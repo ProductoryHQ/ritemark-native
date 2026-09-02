@@ -9,6 +9,7 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 - Gate 2 pipeline block: Windows run `33642850280` passed exact-source checkout and dependencies, then correctly rejected a source-mutating platform cleanup plus an order-sensitive reverse check of overlapping patches. The repository was restored to public and obsolete x64 run `33642854001` was cancelled.
 - Replacement Gate 1 DMG: **not yet produced**. The immutable target-copy/source-gate correction changes canonical source, so the otherwise-valid notarized `0140ab9` artifact is not eligible for multi-platform publication. A fresh exact-`main` arm64 candidate must repeat build, signing, mounted checks, Jarmo approval, hardening, and notarization.
 - Production dependency security: **pass** — extension and webview `npm audit --omit=dev` each report zero findings; SheetJS is pinned to the official `0.20.3` tarball and targeted spreadsheet/Markdown/Mermaid checks pass.
+- Task-list round-trip correction: deterministic tight, loose, nested, mixed task/bullet, and non-leading-checkbox coverage passes. Fresh exact-source RunDev preserved `- [ ]` / `- [x]` through UI creation, explicit save, raw-disk inspection, a loose-GFM close/reopen, a checked-state edit, resave, and a second close/reopen; all four captured screenshots were visually inspected (2026-09-02). A replacement signed Gate 1 DMG is still required.
 
 ## Trusted Windows installation (Sprint 114)
 
@@ -142,6 +143,13 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [ ] Verify front matter, properties, comments, relative images, CSV rows/cells, Undo/recovery, and save semantics remain intact through packaged-candidate reconciliation.
 - [ ] Inject a non-cooperating write during Keep-local resolution and record/accept the explicit last-writer boundary; local filesystem APIs provide no atomic content-hash CAS beyond the implemented immediate validator check and post-write verification.
 
+## Task-list Markdown round-trip (RC bug fix)
+
+- [x] Deterministic conversion covers tight and loose GFM task lists, checked and unchecked state, nested task lists, mixed adjacent task/bullet runs, and rejects non-leading inline checkboxes.
+- [x] TipTap task nodes serialize to compact `- [ ]` / `- [x]` Markdown and reparsing restores the same task semantics.
+- [x] Fresh RunDev UI creates and checks task items, writes the expected raw Markdown, reopens a valid loose-GFM fixture as real checkboxes, preserves checked state through another UI edit/save, and passes a second close/reopen (2026-09-02; screenshots and disk hashes inspected).
+- [ ] Repeat the same lifecycle on the newly installed exact-main arm64 release candidate.
+
 ## Automated gates
 
 ### Product Help menu (RC bug fix)
@@ -163,6 +171,7 @@ The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: d
 - [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
 - [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
 - [x] RC editor corrections: 36/36 focused editor-sync tests, exact save-receipt shell compile plus 15/15 targeted VS Code save tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
+- [x] RC task-list correction: focused task-list round-trip suite, extension compile, webview typecheck/build, and fresh exact-source RunDev close/reopen/edit/save/reopen smoke pass (2026-09-02).
 - [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
 - [ ] RC runtime-component correction passes repository QA, release preflight, native runtime CI, signed-package component checks, and the packaged Codex file-tool canary on its final merged commit.
 - [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.

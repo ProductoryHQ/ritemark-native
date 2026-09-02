@@ -168,6 +168,12 @@ path even if it lands immediately after Save.
 Blank Markdown documents also keep the normal `# ` shortcut on the first line,
 so you can begin with a title without adding body text first.
 
+Task lists now keep their checkbox structure and checked state through the full
+edit, save, close, and reopen cycle. This also covers valid Markdown that uses
+blank lines between task items, nested checklists, and adjacent ordinary bullet
+items; reopening such a document no longer lets the next save erase its
+`[x]` / `[ ]` markers.
+
 ## Help that belongs to Ritemark
 
 The desktop **Help** menu is focused again: **Support**, **View License**, and an
