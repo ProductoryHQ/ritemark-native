@@ -28,8 +28,14 @@ if [ ! -d "$VANILLA_CACHE/.git" ]; then
 fi
 
 mkdir -p "$TMP_ROOT/scripts" "$TMP_ROOT/patches" "$TMP_ROOT/branding" "$TMP_ROOT/extensions/ritemark/webview/src/assets/fonts"
+git -C "$TMP_ROOT" init -q
+git -C "$TMP_ROOT" config user.email "ci-asset-parity@ritemark.invalid"
+git -C "$TMP_ROOT" config user.name "Ritemark CI Asset Parity"
+git -C "$TMP_ROOT" commit --allow-empty -qm "Initialize CI asset parity fixture"
+
 cp "$PROJECT_ROOT/scripts/apply-patches.sh" "$TMP_ROOT/scripts/"
 cp "$PROJECT_ROOT/scripts/copy-welcome-assets.sh" "$TMP_ROOT/scripts/"
+cp "$PROJECT_ROOT/scripts/vscode-derived-state.mjs" "$TMP_ROOT/scripts/"
 cp -R "$PROJECT_ROOT/patches/vscode" "$TMP_ROOT/patches/"
 cp "$PROJECT_ROOT/branding/product.json" "$TMP_ROOT/branding/"
 
@@ -46,12 +52,20 @@ cp -R "$VANILLA_CACHE" "$TMP_ROOT/vscode"
 git -C "$TMP_ROOT/vscode" checkout -f . >/dev/null 2>&1
 git -C "$TMP_ROOT/vscode" clean -fd >/dev/null 2>&1
 
-# Match CI more closely: VS Code deps/install ensures codicon.ttf is present.
-if [ -f "$PROJECT_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.ttf" ]; then
-  mkdir -p "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon"
-  cp "$PROJECT_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.ttf" \
-     "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/"
+# Match CI: VS Code dependencies provide codicon.ttf, while a previous compile
+# may already have copied it beside codicon.css. Fresh release worktrees must
+# support the former path and reused developer trees may use the latter.
+CODICON_SOURCE="$PROJECT_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.ttf"
+if [ ! -f "$CODICON_SOURCE" ]; then
+  CODICON_SOURCE="$PROJECT_ROOT/vscode/node_modules/@vscode/codicons/dist/codicon.ttf"
 fi
+if [ ! -f "$CODICON_SOURCE" ]; then
+  echo "ERROR: Missing codicon.ttf from VS Code's materialized dependencies"
+  echo "Run npm ci in $PROJECT_ROOT/vscode before the asset parity check."
+  exit 1
+fi
+mkdir -p "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon"
+cp "$CODICON_SOURCE" "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.ttf"
 
 # Simulate CI: extension deps live inside vscode/extensions/ritemark, not repo root.
 mkdir -p "$TMP_ROOT/vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular"

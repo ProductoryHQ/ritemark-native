@@ -14,8 +14,8 @@ Usage: ./scripts/create-release-worktree.sh [--path PATH]
 
 Creates a new detached worktree from origin/main, initializes a physical VS Code
 submodule at the recorded gitlink, marks the worktree as disposable release
-infrastructure, materializes extension/webview dependencies from lockfiles,
-and runs the pristine release-source gate.
+infrastructure, materializes VS Code/extension/webview dependencies from
+lockfiles, and runs the pristine release-source gate.
 EOF
 }
 
@@ -101,6 +101,8 @@ if [[ "$INSTALL_DEPENDENCIES" -eq 1 ]]; then
     nvm use "$REQUIRED_NODE_VERSION" >/dev/null
   fi
 
+  echo "Installing VS Code dependencies from the committed lockfile..."
+  (cd "$TARGET_PATH/vscode" && npm ci)
   echo "Installing extension dependencies from the committed lockfile..."
   (cd "$TARGET_PATH/extensions/ritemark" && npm ci --legacy-peer-deps)
   echo "Installing webview dependencies from the committed lockfile..."
