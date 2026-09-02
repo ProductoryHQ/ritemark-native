@@ -24,6 +24,7 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `012-ritemark-shell-watchdog.patch` | Shell startup watchdog |
 | `013-ritemark-configuration-defaults.patch` | Product configuration defaults |
 | `014-ritemark-save-receipts.patch` | Exact successful-save identity for editor–disk synchronization |
+| `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars |
 
 ## Commands
 

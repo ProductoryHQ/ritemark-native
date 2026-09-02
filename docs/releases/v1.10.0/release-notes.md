@@ -168,6 +168,14 @@ path even if it lands immediately after Save.
 Blank Markdown documents also keep the normal `# ` shortcut on the first line,
 so you can begin with a title without adding body text first.
 
+## Help that belongs to Ritemark
+
+The desktop **Help** menu is focused again: **Support**, **View License**, and an
+**Advanced** submenu for **Toggle Developer Tools**. **About Ritemark** remains
+where the operating system normally provides it. VS Code-specific playgrounds,
+walkthroughs, `Ask @vscode`, and process tooling no longer appear in Ritemark's
+product menu; power-user commands remain available from the Command Menu.
+
 > Native continuation is intentionally version- and configuration-specific. “Previous messages were included” means transcript fallback, not complete private model memory.
 
 Conversation history remains local to this Ritemark installation and profile.
