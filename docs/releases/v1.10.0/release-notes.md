@@ -126,6 +126,12 @@ the login, that same card reports success and offers **OK**; acknowledging it
 removes the recovered error from the conversation. A cancelled or timed-out
 login remains in place with **Try again**.
 
+This also covers a Claude SDK edge case where a structured authentication
+failure is followed by a nominally successful terminal envelope. Ritemark uses
+the structured failure as the authority, never shows **Done** for that turn,
+and repairs the exact OAuth-expiry response already stored by affected release
+candidates when the conversation is reopened.
+
 If the conversation uses an Anthropic API key instead, the card directs you to
 **Update API key** in AI Settings. Ritemark keeps OAuth and API-key recovery
 separate, even when the provider returns the same generic authentication text.

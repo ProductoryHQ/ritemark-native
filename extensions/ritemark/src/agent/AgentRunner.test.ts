@@ -3,8 +3,10 @@ import {
   AgentSession,
   buildClaudeSystemAppend,
   buildClaudeTurnPrompt,
+  claudeSdkAssistantError,
   DEFAULT_SETTING_SOURCES,
   modelMatchesExpectedIdentity,
+  normalizeClaudeSdkSuccessResult,
 } from './AgentRunner';
 
 function testCanonicalModelIdentityMatching(): void {
@@ -360,6 +362,87 @@ async function testWarmSessionUnsupportedEffortFallsBackToAuto(): Promise<void> 
   session.close();
 }
 
+async function testSyntheticAuthSuccessEnvelopeFailsTheTurn(): Promise<void> {
+  const rawOAuthError = 'Failed to authenticate: OAuth session expired and could not be refreshed';
+  const syntheticAssistant = {
+    type: 'assistant',
+    error: 'authentication_failed',
+    isApiErrorMessage: true,
+    message: {
+      model: '<synthetic>',
+      content: [{ type: 'text', text: rawOAuthError }],
+    },
+  };
+  assert.equal(claudeSdkAssistantError(syntheticAssistant), rawOAuthError);
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: rawOAuthError,
+    resultIsError: true,
+    structuredAssistantError: rawOAuthError,
+    sawRegularAssistant: false,
+  }), { text: '', error: rawOAuthError });
+
+  // Exercise the actual persistent-session consumer with the exact envelope
+  // observed in Claude Code 2.1.239 / Agent SDK 0.3.239.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const progress: string[] = [];
+  const resultPromise = new Promise<{ text: string; error?: string }>((resolve) => {
+    session._turnResolve = resolve;
+  });
+  session._turnId = 1;
+  session._consumerTurnId = 1;
+  session._emitProgress = (type: string) => progress.push(type);
+  session._queryStream = {
+    async *[Symbol.asyncIterator]() {
+      yield syntheticAssistant;
+      yield {
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        result: rawOAuthError,
+        duration_ms: 1000,
+        total_cost_usd: 0,
+      };
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+
+  await session._consumeLoop();
+  const result = await resultPromise;
+  assert.deepEqual(result, {
+    text: '',
+    filesModified: [],
+    metrics: { durationMs: 1000, costUsd: 0, model: null, waitedMs: 0 },
+    error: rawOAuthError,
+  });
+  assert.deepEqual(progress, ['error'], 'synthetic auth failure must never emit thinking or done');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: rawOAuthError,
+    resultIsError: false,
+    sawRegularAssistant: true,
+  }), { text: rawOAuthError }, 'ordinary assistant output is never inferred to be an error');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: 'Recovered after a transient provider retry.',
+    resultIsError: false,
+    structuredAssistantError: 'Temporary upstream authentication failure',
+    sawRegularAssistant: true,
+  }), {
+    text: 'Recovered after a transient provider retry.',
+  }, 'an explicit successful terminal result overrides an earlier transient API-error frame');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: 'Provider failed without an assistant frame',
+    resultIsError: true,
+    sawRegularAssistant: true,
+  }), {
+    text: '',
+    error: 'Provider failed without an assistant frame',
+  }, 'the SDK terminal is_error bit remains authoritative even with prior assistant activity');
+}
+
 async function main() {
   testCanonicalModelIdentityMatching();
   testDefaultSettingSources();
@@ -375,6 +458,7 @@ async function main() {
   await testSprint103KeepPlanningFeedbackDeny();
   await testWarmSessionThinkingEffortUpdatesBeforeInput();
   await testWarmSessionUnsupportedEffortFallsBackToAuto();
+  await testSyntheticAuthSuccessEnvelopeFailsTheTurn();
   console.log('AgentRunner lifecycle tests passed.');
 }
 

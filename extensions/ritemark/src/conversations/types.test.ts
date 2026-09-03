@@ -63,6 +63,58 @@ function run(): void {
   assert.throws(() => decodeConversationRecordV1({ ...record(), conversationId: '../escape' }), /conversationId must be a UUID/);
   assert.throws(() => decodeConversationRecordV1({ ...record(), scopeId: 'project-a' }), /scopeId must be a ps1 scope id/);
   assert.throws(() => decodeConversationRecordV1({ ...record(), identityColorSlot: 24 }), /identityColorSlot must be an integer from 0 to 23/);
+
+  const affectedRcRecord = record();
+  const affectedUser = affectedRcRecord.events[0];
+  if (affectedUser.kind !== 'user-message') throw new Error('missing user fixture');
+  affectedUser.runtimeId = 'claude-code';
+  affectedRcRecord.title = 'Failed to authenticate: OAuth session expired';
+  affectedRcRecord.runtimeSummary = ['claude-code'];
+  affectedRcRecord.events.push({
+    kind: 'assistant-message',
+    eventId: 'assistant-auth',
+    turnId: affectedUser.turnId,
+    sequence: 1,
+    occurredAt: '2026-09-03T05:10:24.405Z',
+    runtimeId: 'claude-code',
+    content: 'Failed to authenticate: OAuth session expired and could not be refreshed',
+    terminalStatus: 'completed',
+    appliedThinkingEffort: null,
+  });
+  affectedRcRecord.continuations = {
+    'claude-code': {
+      ...descriptor(),
+      runtimeId: 'claude-code',
+      coveredThroughEventId: 'assistant-auth',
+    },
+  };
+  const repairedRcRecord = decodeConversationRecordV1(JSON.parse(JSON.stringify(affectedRcRecord)));
+  const repairedAuth = repairedRcRecord.events[1];
+  assert.deepEqual(repairedAuth, {
+    ...affectedRcRecord.events[1],
+    content: '',
+    terminalStatus: 'failed',
+    error: 'Failed to authenticate: OAuth session expired and could not be refreshed',
+    failureKind: 'authentication',
+  }, 'affected RC records recover into a durable OAuth failure instead of model text');
+  assert.equal(repairedRcRecord.title, 'Plan it', 'a provider error can no longer remain the conversation title');
+  assert.deepEqual(repairedRcRecord.lifecycle, {
+    state: 'interrupted',
+    turnId: affectedUser.turnId,
+    reason: 'failed',
+  });
+  assert.equal(repairedRcRecord.continuations, undefined, 'the invalid auth session cannot be resumed');
+
+  const explanatoryAnswer = structuredClone(affectedRcRecord);
+  const explanatoryEvent = explanatoryAnswer.events[1];
+  if (explanatoryEvent.kind !== 'assistant-message') throw new Error('missing assistant fixture');
+  explanatoryEvent.content = 'I can explain why you saw “Failed to authenticate: OAuth session expired”.';
+  const decodedExplanation = decodeConversationRecordV1(explanatoryAnswer).events[1];
+  assert.equal(
+    decodedExplanation.kind === 'assistant-message' ? decodedExplanation.terminalStatus : null,
+    'completed',
+    'normal Claude prose that discusses auth remains a completed answer',
+  );
   assert.throws(() => decodeConversationRecordV1({ ...record(), runtimeSummary: [] }), /include every event runtime/);
   const duplicate = record();
   duplicate.events.push({ ...duplicate.events[0], sequence: 1 });

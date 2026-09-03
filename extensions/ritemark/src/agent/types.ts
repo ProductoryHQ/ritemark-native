@@ -389,7 +389,11 @@ export interface SDKMessage {
   status?: string;
   output_file?: string;
   summary?: string;
+  /** Structured provider failure metadata can arrive on an assistant event. */
+  error?: string;
+  isApiErrorMessage?: boolean;
   message?: {
+    model?: string;
     content?: Array<{
       type: string;
       name?: string;
@@ -400,6 +404,8 @@ export interface SDKMessage {
   };
   duration_ms?: number;
   total_cost_usd?: number;
+  /** A `success` result can still carry provider failure text. */
+  is_error?: boolean;
   result?: string;
   errors?: string[];
 }

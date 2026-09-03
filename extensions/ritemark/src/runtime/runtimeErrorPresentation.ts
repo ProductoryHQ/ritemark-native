@@ -16,9 +16,42 @@ const CLAUDE_AUTH_ERROR_PATTERNS = [
   /please run \/login/i,
 ];
 
+const CLAUDE_STANDALONE_AUTH_ERROR_PATTERNS = [
+  /^failed to authenticate:\s*.+$/i,
+  /^oauth session expired(?:\s+and could not be refreshed)?[.!]?$/i,
+  /^oauth token has expired[.!]?$/i,
+  /^invalid authentication credentials[.!]?$/i,
+  /^not logged in.*(?:\/login|sign in)[.!]?$/i,
+  /^please run \/login[.!]?$/i,
+];
+
 export function isClaudeAuthenticationError(error: string | undefined): boolean {
   if (!error) return false;
   return CLAUDE_AUTH_ERROR_PATTERNS.some((pattern) => pattern.test(error));
+}
+
+/**
+ * Recognize a provider diagnostic only when the complete payload is the error.
+ *
+ * Claude's SDK can occasionally wrap an authentication failure in a nominally
+ * successful result envelope. Keeping this matcher anchored and single-line
+ * prevents a normal model answer that merely discusses an auth error from
+ * being reclassified as a failed turn.
+ */
+export function standaloneClaudeAuthenticationError(text: string | undefined): string | undefined {
+  const diagnostic = text?.trim();
+  if (!diagnostic || diagnostic.length > 500 || /[\r\n]/.test(diagnostic)) return undefined;
+  return CLAUDE_STANDALONE_AUTH_ERROR_PATTERNS.some((pattern) => pattern.test(diagnostic))
+    ? diagnostic
+    : undefined;
+}
+
+/** Exact legacy RC shape whose auth method is unambiguously OAuth. */
+export function standaloneClaudeOAuthExpirationError(text: string | undefined): string | undefined {
+  const diagnostic = standaloneClaudeAuthenticationError(text);
+  return diagnostic && /oauth (?:session|token) (?:has )?expired/i.test(diagnostic)
+    ? diagnostic
+    : undefined;
 }
 
 export function classifyClaudeAuthenticationError(
