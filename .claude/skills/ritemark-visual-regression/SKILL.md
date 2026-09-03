@@ -66,6 +66,29 @@ For task lists, assert all of these:
 
 Any silent content or structural loss is a release blocker.
 
+## Failure-envelope regression protocol
+
+When a change touches AI terminal states, authentication recovery, or stored conversation migration, extend test 9 with a fixture copied from the real failing provider event. Redact user content and seed it only into an isolated RUNDEV profile; never edit the user's live conversation store.
+
+Validate the complete envelope path rather than mocking the final card:
+
+```text
+provider event -> runtime normalization -> stored record decode
+-> conversation projection -> rendered recovery UI -> reload -> rendered recovery UI
+```
+
+For an authentication failure, assert all of these before reporting a pass:
+
+- the provider's structured failure signal (for example `is_error` or an explicit error field) produces a failed terminal event;
+- the raw provider error is absent from the visible conversation;
+- no successful `Done` state appears for the failed turn;
+- the conversation title comes from the user's prompt instead of the error text;
+- the recovery card has user-facing copy and a working sign-in action;
+- the action bar follows the global convention: secondary actions left of the rightmost primary action;
+- the same state survives a real workbench reload.
+
+Use DOM or accessibility assertions for text absence, terminal state, and control geometry. Then capture the whole RUNDEV window and visually inspect wrapping, clipping, color, radius, spacing, and action alignment. Neither assertion layer replaces the other.
+
 ## Evidence protocol
 
 For each test, keep a concise result: `PASS`, `FAIL`, or `BLOCKED`, the user action, and the observed outcome. Capture screenshots at meaningful state boundaries rather than every click. At minimum capture:
@@ -75,6 +98,7 @@ For each test, keep a concise result: `PASS`, `FAIL`, or `BLOCKED`, the user act
 - task list after reopen;
 - filled table;
 - AI menus and completed response when tested;
+- any failure-recovery card exercised under the failure-envelope protocol, both before and after reload;
 - final results document.
 
 Visually open every screenshot used as evidence. Do not infer a visual pass from accessibility text alone. Use accessibility state and raw files as additional deterministic evidence.

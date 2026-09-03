@@ -39,7 +39,10 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
   echo "Agent lifecycle changes detected; running targeted lifecycle tests..."
   (
     cd "$PROJECT_ROOT/extensions/ritemark"
+    npx tsx src/runtime/runtimeErrorPresentation.test.ts
     npx tsx src/agent/AgentRunner.test.ts
+    npx tsx src/agent/ClaudeCodeRuntime.test.ts
+    npx tsx src/conversations/types.test.ts
     npx tsx src/codex/codexApproval.test.ts
     npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts
     npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts
@@ -48,6 +51,7 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
     npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts
     npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts
     npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts
+    npx tsx webview/src/components/ai-sidebar/conversationProjection.test.ts
   )
 fi
 

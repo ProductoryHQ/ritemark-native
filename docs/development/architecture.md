@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-02 (clean-build and worktree-hygiene architecture)
+**Last updated:** 2026-09-03 (Claude SDK terminal-envelope normalization)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -252,6 +252,20 @@ activity trace. That active-turn recovery card takes
 precedence over the full-sidebar setup/onboarding gate, so the ensuing
 `needs-auth` status refresh cannot hide the action the user was just shown;
 empty or newly started conversations continue to use the normal setup wizard.
+
+Claude terminal state is derived from the complete SDK event sequence, not
+from `result.subtype` alone. Claude Code 2.1.239 / Agent SDK 0.3.239 explicitly
+defines that a `subtype: success` result can still be a failure when its
+`is_error` bit is true; the stream also carries a synthetic assistant event
+with the provider `error` category. `AgentRunner`
+captures that structured failure before rendering assistant content and
+normalizes the terminal envelope before any `done` event or assistant text can
+escape. A narrow fallback recognizes a short standalone authentication
+diagnostic only when no regular assistant event existed; explanatory model
+prose is therefore never inferred to be an error. Canonical record decoding
+also repairs the exact OAuth-expiry shape written by affected 1.10.0 release
+candidates, so projection and model-context construction cannot revive it as a
+successful answer after restart.
 
 Claude OAuth and its macOS Keychain credential are app-global even though
 conversation sessions are independent. A proven Claude authentication failure

@@ -3,11 +3,30 @@ import {
   classifyClaudeAuthenticationError,
   isClaudeAuthenticationError,
   presentRuntimeError,
+  standaloneClaudeAuthenticationError,
+  standaloneClaudeOAuthExpirationError,
 } from './runtimeErrorPresentation';
 
 const rawOAuthError = 'Failed to authenticate: OAuth session expired and could not be refreshed';
 
 assert.equal(isClaudeAuthenticationError(rawOAuthError), true);
+assert.equal(standaloneClaudeAuthenticationError(`  ${rawOAuthError}  `), rawOAuthError);
+assert.equal(standaloneClaudeOAuthExpirationError(rawOAuthError), rawOAuthError);
+assert.equal(
+  standaloneClaudeAuthenticationError(`I can explain this message: ${rawOAuthError}`),
+  undefined,
+  'normal prose that mentions a provider error must remain model output',
+);
+assert.equal(
+  standaloneClaudeAuthenticationError(`${rawOAuthError}\n\nSign in and try again.`),
+  undefined,
+  'multi-line model guidance must not be treated as a standalone provider diagnostic',
+);
+assert.equal(
+  standaloneClaudeOAuthExpirationError('Failed to authenticate: invalid authentication credentials'),
+  undefined,
+  'legacy records cannot infer OAuth from an auth-method-neutral diagnostic',
+);
 assert.deepEqual(presentRuntimeError('claude-code', rawOAuthError), {
   message: 'Your Claude session has expired. Sign in again, then resend your message.',
   failureKind: 'authentication',

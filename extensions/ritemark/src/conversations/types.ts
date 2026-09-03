@@ -13,7 +13,11 @@ import {
   type ExplicitThinkingEffort,
   type ThinkingEffort,
 } from '../runtime/thinkingEffort';
-import type { RuntimeFailureKind } from '../runtime/runtimeErrorPresentation';
+import {
+  standaloneClaudeOAuthExpirationError,
+  type RuntimeFailureKind,
+} from '../runtime/runtimeErrorPresentation';
+import { fallbackTitleFromPrompt } from './ConversationTitlePolicy';
 
 export const CONVERSATION_SCHEMA_VERSION = 1 as const;
 export const CONVERSATION_INDEX_VERSION = 1 as const;
@@ -393,18 +397,39 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
     };
   }
   if (kind === 'assistant-message') {
+    const content = stringAt(input.content, `${path}.content`);
+    const terminalStatus = input.terminalStatus === null
+      ? null
+      : enumAt(input.terminalStatus, `${path}.terminalStatus`, ['completed', 'failed', 'cancelled'] as const);
     const appliedThinkingEffort = input.appliedThinkingEffort === undefined || input.appliedThinkingEffort === null
       ? null
       : isExplicitThinkingEffort(input.appliedThinkingEffort)
         ? input.appliedThinkingEffort
         : fail(`${path}.appliedThinkingEffort`, 'a canonical explicit thinking effort or null');
+    // Compatibility repair for records written by the affected 1.10.0 RC.
+    // Claude SDK 0.3.239 could wrap an expired OAuth session in a "success"
+    // result, so the raw provider diagnostic was checkpointed as completed
+    // assistant text. Normalize the exact unambiguous OAuth shape while
+    // decoding so projection, model context, and later writes all agree.
+    const legacyOAuthError = base.runtimeId === 'claude-code' && terminalStatus === 'completed'
+      ? standaloneClaudeOAuthExpirationError(content)
+      : undefined;
+    if (legacyOAuthError) {
+      return {
+        ...base,
+        kind,
+        content: '',
+        terminalStatus: 'failed',
+        error: legacyOAuthError,
+        failureKind: 'authentication',
+        appliedThinkingEffort,
+      };
+    }
     return {
       ...base,
       kind,
-      content: stringAt(input.content, `${path}.content`),
-      terminalStatus: input.terminalStatus === null
-        ? null
-        : enumAt(input.terminalStatus, `${path}.terminalStatus`, ['completed', 'failed', 'cancelled'] as const),
+      content,
+      terminalStatus,
       ...(input.error === undefined ? {} : { error: stringAt(input.error, `${path}.error`) }),
       ...(input.failureKind === undefined ? {} : {
         failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
@@ -613,6 +638,46 @@ export function decodeConversationRecordV1(value: unknown): ConversationRecordV1
     record.continuations = decodeLegacyContinuation(input.continuation, record.scopeId);
   }
   if (input.migration !== undefined) record.migration = decodeMigration(input.migration, 'migration');
+
+  const repairedOAuthEvents = record.events.filter(
+    (event): event is AssistantMessageEventV1 => event.kind === 'assistant-message'
+      && event.runtimeId === 'claude-code'
+      && event.terminalStatus === 'failed'
+      && event.failureKind === 'authentication'
+      && Boolean(standaloneClaudeOAuthExpirationError(event.error)),
+  );
+  if (repairedOAuthEvents.length > 0) {
+    const repairedEventIds = new Set(repairedOAuthEvents.map((event) => event.eventId));
+    const claudeContinuation = record.continuations?.['claude-code'];
+    if (claudeContinuation?.coveredThroughEventId
+      && repairedEventIds.has(claudeContinuation.coveredThroughEventId)) {
+      delete record.continuations?.['claude-code'];
+      if (record.continuations && Object.keys(record.continuations).length === 0) {
+        delete record.continuations;
+      }
+    }
+
+    if (standaloneClaudeOAuthExpirationError(record.title)) {
+      const firstUserPrompt = record.events.find(
+        (event): event is UserMessageEventV1 => event.kind === 'user-message',
+      )?.text;
+      if (firstUserPrompt) record.title = fallbackTitleFromPrompt(firstUserPrompt);
+    }
+
+    const latestTerminal = [...record.events].reverse().find(
+      (event) => (event.kind === 'assistant-message' && event.terminalStatus !== null)
+        || event.kind === 'boundary',
+    );
+    if (record.lifecycle.state === 'idle'
+      && latestTerminal
+      && repairedEventIds.has(latestTerminal.eventId)) {
+      record.lifecycle = {
+        state: 'interrupted',
+        turnId: latestTerminal.turnId,
+        reason: 'failed',
+      };
+    }
+  }
   validateRecordRelationships(record);
   return record;
 }

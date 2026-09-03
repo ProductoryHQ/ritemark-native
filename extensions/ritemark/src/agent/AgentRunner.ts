@@ -29,6 +29,7 @@ import type {
   SubagentProgress,
 } from './types';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import { standaloneClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
 
@@ -120,6 +121,55 @@ const CONTEXT_OVERFLOW_PATTERNS = [
 function isContextOverflowError(str: string): boolean {
   const lower = str.toLowerCase();
   return CONTEXT_OVERFLOW_PATTERNS.some(p => lower.includes(p));
+}
+
+/**
+ * Claude CLI can emit an API failure as an assistant message and then close
+ * the turn with result.subtype="success". Capture the SDK's structured error
+ * marker before the generic assistant renderer can mistake its text for model
+ * output. This covers every structured API error, not only authentication.
+ */
+export function claudeSdkAssistantError(message: SDKMessage): string | undefined {
+  if (message.type !== 'assistant') return undefined;
+  const errorCode = typeof message.error === 'string' ? message.error.trim() : '';
+  if (message.isApiErrorMessage !== true && !errorCode) return undefined;
+  const text = message.message?.content
+    ?.filter((block) => block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text!.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  return text || errorCode || 'Claude could not complete the request.';
+}
+
+export function normalizeClaudeSdkSuccessResult(input: {
+  result?: string;
+  resultIsError?: boolean;
+  structuredAssistantError?: string;
+  sawRegularAssistant: boolean;
+}): { text: string; error?: string } {
+  const structuredError = input.structuredAssistantError?.trim();
+  if (input.resultIsError === true) {
+    return {
+      text: '',
+      error: input.result?.trim() || structuredError || 'Claude could not complete the request.',
+    };
+  }
+  // The terminal bit is authoritative when the SDK provides it. A structured
+  // API-error assistant frame may describe a transient retry that was followed
+  // by a successful final answer.
+  if (input.resultIsError === false) return { text: input.result || '' };
+  if (structuredError) return { text: '', error: structuredError };
+
+  // Defensive compatibility for SDK versions that drop the assistant event's
+  // structured flags. A normal assistant event suppresses this fallback, and
+  // the diagnostic matcher only accepts a short, standalone provider message.
+  const authError = input.sawRegularAssistant
+    ? undefined
+    : standaloneClaudeAuthenticationError(input.result);
+  return authError
+    ? { text: '', error: authError }
+    : { text: input.result || '' };
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -370,6 +420,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     });
 
     let resultText = '';
+    let structuredAssistantError: string | undefined;
+    let sawRegularAssistant = false;
 
     for await (const rawMessage of stream) {
       const message = rawMessage as SDKMessage;
@@ -392,7 +444,13 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
         emitProgress('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
       } else if (message.type === 'assistant') {
-        processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
+        const sdkError = claudeSdkAssistantError(message);
+        if (sdkError) {
+          structuredAssistantError = sdkError;
+        } else {
+          sawRegularAssistant = true;
+          processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
+        }
       } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
         processSystemMessage(message, emitProgress);
       } else if (message.type === 'result') {
@@ -400,7 +458,18 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         metrics.costUsd = message.total_cost_usd ?? null;
 
         if (message.subtype === 'success') {
-          resultText = message.result || '';
+          const normalized = normalizeClaudeSdkSuccessResult({
+            result: message.result,
+            resultIsError: message.is_error,
+            structuredAssistantError,
+            sawRegularAssistant,
+          });
+          if (normalized.error) {
+            emitProgress('error', normalized.error);
+            if (timeoutId) clearTimeout(timeoutId);
+            return { text: '', filesModified: [], metrics, error: normalized.error };
+          }
+          resultText = normalized.text;
           const durationStr = (metrics.durationMs / 1000).toFixed(1);
           emitProgress('done', `Completed in ${durationStr}s`);
         } else {
@@ -465,6 +534,8 @@ export class AgentSession {
   private _consumerTurnId = 0;   // Set by generator when it yields to SDK
   private _turnResolve: ((result: AgentResult) => void) | null = null;
   private _turnFilesModified: string[] = [];
+  private _turnStructuredAssistantError: string | undefined;
+  private _turnSawRegularAssistant = false;
   private _emitProgress: ExtendedProgressEmitter | null = null;
   private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
   private _emitPlanApproval: ((request: AgentPlanApprovalRequest) => void) | null = null;
@@ -662,6 +733,8 @@ export class AgentSession {
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
+    this._turnStructuredAssistantError = undefined;
+    this._turnSawRegularAssistant = false;
     this._turnWaitedMs = 0;
     // In a plan-first turn the whole phase is plan context (native plan mode);
     // otherwise plan state only activates on a model-initiated EnterPlanMode.
@@ -848,6 +921,8 @@ export class AgentSession {
       this._emitPlanApproval = null;
       this._emitToolApproval = null;
       this._turnFilesModified = [];
+      this._turnStructuredAssistantError = undefined;
+      this._turnSawRegularAssistant = false;
       this._planModeActive = false;
       if (this._turnTimeout) {
         clearTimeout(this._turnTimeout);
@@ -1067,16 +1142,30 @@ export class AgentSession {
           traceClaude('sdk', 'system:compact_boundary');
           this._emitProgress?.('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
         } else if (message.type === 'assistant') {
-          traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
-          processAssistantMessage(
-            message,
-            this._turnFilesModified,
-            this._emitProgress || (() => {}),
-            message.parent_tool_use_id,
-            this._planModeActive,
-            this._planFirst
-          );
-          this._planModeActive = updatePlanModeState(message, this._planModeActive);
+          const sdkError = claudeSdkAssistantError(message);
+          if (sdkError) {
+            traceClaude('sdk', 'assistant api error', {
+              errorCode: message.error ?? null,
+              synthetic: message.message?.model === '<synthetic>',
+            });
+            if (this._consumerTurnId === this._turnId) {
+              this._turnStructuredAssistantError = sdkError;
+            }
+          } else {
+            traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
+            if (this._consumerTurnId === this._turnId) {
+              this._turnSawRegularAssistant = true;
+            }
+            processAssistantMessage(
+              message,
+              this._turnFilesModified,
+              this._emitProgress || (() => {}),
+              message.parent_tool_use_id,
+              this._planModeActive,
+              this._planFirst
+            );
+            this._planModeActive = updatePlanModeState(message, this._planModeActive);
+          }
         } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
           traceClaude('sdk', 'tool/system progress', {
             type: message.type,
@@ -1088,6 +1177,7 @@ export class AgentSession {
         } else if (message.type === 'result') {
           traceClaude('sdk', 'result', {
             subtype: message.subtype,
+            isError: message.is_error ?? null,
             durationMs: message.duration_ms ?? null,
             errors: message.errors ?? [],
           });
@@ -1102,6 +1192,22 @@ export class AgentSession {
             };
 
             if (message.subtype === 'success') {
+              const normalized = normalizeClaudeSdkSuccessResult({
+                result: message.result,
+                resultIsError: message.is_error,
+                structuredAssistantError: this._turnStructuredAssistantError,
+                sawRegularAssistant: this._turnSawRegularAssistant,
+              });
+              if (normalized.error) {
+                this._emitProgress?.('error', normalized.error);
+                this._forceResolveTurn(this._turnId, {
+                  text: '',
+                  filesModified: [],
+                  metrics,
+                  error: normalized.error,
+                });
+                continue;
+              }
               // Sprint 103 R7: the headline number is agent working time —
               // waiting on the user (plan review, questions, approvals) is
               // reported separately via metrics.waitedMs.
@@ -1109,7 +1215,7 @@ export class AgentSession {
               const durationStr = (activeMs / 1000).toFixed(1);
               this._emitProgress?.('done', `Completed in ${durationStr}s`);
               this._forceResolveTurn(this._turnId, {
-                text: message.result || '',
+                text: normalized.text,
                 filesModified: this._workspaceFilesModified(),
                 metrics,
               });
