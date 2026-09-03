@@ -75,6 +75,11 @@ function main(): void {
       'claude-opus-5[1m]',
       'a persisted alias is reconciled without waiting for runtime hydration',
     );
+    assert.equal(
+      state.conversations[state.activeConversationId!].pendingRuntime.modelId,
+      'gpt-5.6-sol',
+      'Codex bootstrap must bind the Codex model, not the Claude catalog selection',
+    );
 
     deliver({
       type: 'codex:status',
@@ -135,6 +140,35 @@ function main(): void {
     state = useAISidebarStore.getState();
     assert.equal(state.bootstrapGeneration, 4);
     assert.equal(state.models[0].id, 'claude-opus-5[1m]', 'a late bootstrap from an old view is discarded');
+
+    const activeId = state.activeConversationId!;
+    useAISidebarStore.setState({
+      conversations: {
+        ...state.conversations,
+        [activeId]: {
+          ...state.conversations[activeId],
+          codexConversation: [{
+            id: 'existing-turn',
+            userPrompt: 'Keep this conversation on Codex',
+            streamingText: 'Done',
+            activities: [],
+            isRunning: false,
+            timestamp: 1,
+            runtime: 'codex',
+          }],
+        },
+      },
+    });
+
+    const refresh = bootstrap(5);
+    refresh.selectedAgent = 'claude-code';
+    deliver(refresh);
+    state = useAISidebarStore.getState();
+    assert.equal(
+      state.conversations[activeId].selectedAgent,
+      'codex',
+      'a later app-global status/bootstrap refresh must not rebind a non-empty conversation',
+    );
 
     console.log('Agent sidebar bootstrap store tests passed.');
   } finally {

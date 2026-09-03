@@ -28,6 +28,8 @@ import { markdownStyles } from './RenderedMarkdown';
 import type { ExtensionMessage } from './types';
 import { sendConversationRequest } from '../../bridge';
 import { Icon } from '../ui/Icon';
+import { RuntimeAvailabilityNotice } from './RuntimeAvailabilityNotice';
+import { deriveRuntimeAvailabilities, listReadyAlternatives } from './runtimeAvailability';
 
 export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
@@ -130,17 +132,28 @@ export function AISidebar() {
   }, [loadConversationList]);
 
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
   const isOpenCode = selectedAgent === 'opencode';
   const selectedRuntimeHydration = runtimeHydration[selectedAgent];
+  const runtimeAvailabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const selectedRuntimeAvailability = runtimeAvailabilities[selectedAgent];
+  const readyAlternatives = listReadyAlternatives(runtimeAvailabilities, selectedAgent);
   const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
   const [runtimeTimedOut, setRuntimeTimedOut] = useState(false);
   const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'Codex' : 'OpenCode';
   const bootstrapDisplayError = bootstrapError
     ?? (bootstrapTimedOut ? 'Agent Chat is taking longer than expected to load its local configuration.' : null);
-  const runtimeDisplayError = selectedRuntimeHydration?.error
-    ?? (runtimeTimedOut ? `Checking ${runtimeLabel} is taking longer than expected.` : null);
+  const runtimeDisplayError = `Checking ${runtimeLabel} is taking longer than expected.`;
 
   useEffect(() => {
     if (ready || bootstrapError || bootstrapTimedOut) return;
@@ -163,12 +176,16 @@ export function AISidebar() {
     // A terminal result dismisses the timeout for the completed revision.
     if (selectedRuntimeHydration?.phase !== 'checking') setRuntimeTimedOut(false);
   }, [selectedRuntimeHydration?.phase]);
-  const needsSetup = isClaudeCode && setupStatus !== null
-    && setupStatus.state !== 'ready';
+  const needsSetup = isClaudeCode
+    && selectedRuntimeAvailability.state !== 'checking'
+    && selectedRuntimeAvailability.state !== 'error'
+    && !selectedRuntimeAvailability.usable;
   const latestClaudeTurn = agentConversation[agentConversation.length - 1];
   const inlineRecoveryAvailable = isClaudeCode
     && hasUndismissedInlineRecovery(latestClaudeTurn, dismissedAuthRecoveryTurnIds);
-  const hasAnyRuntimeConversation = agentConversation.length > 0 || codexConversation.length > 0;
+  const hasAnyRuntimeConversation = agentConversation.length > 0
+    || codexConversation.length > 0
+    || legacyConversation !== null;
   const showWelcome = isClaudeCode && setupStatus !== null
     && setupStatus.state === 'ready' && !hasSeenWelcome && !hasAnyRuntimeConversation;
 
@@ -181,18 +198,26 @@ export function AISidebar() {
   }, [ready, showWelcome, dismissWelcome]);
 
   const showCodexSetup = isCodex
-    && selectedRuntimeHydration?.phase === 'ready'
-    && codexStatus.state !== 'ready';
+    && selectedRuntimeAvailability.state !== 'checking'
+    && selectedRuntimeAvailability.state !== 'error'
+    && !selectedRuntimeAvailability.usable;
   // OpenCode zero-key: no conversation yet and all four provider booleans are false
   const showOpenCodeSetup = isOpenCode
-    && selectedRuntimeHydration?.phase === 'ready'
+    && selectedRuntimeAvailability.state !== 'checking'
+    && selectedRuntimeAvailability.state !== 'error'
+    && !selectedRuntimeAvailability.usable
     && !hasAnyRuntimeConversation
-    && acpProviders
-    && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
+    && selectedRuntimeAvailability.state === 'needs-configuration';
   const sidebarView = sidebarGate({
     ready,
     inlineRecoveryAvailable,
-    onboardingNeeded: Boolean(onboardingStatus && !onboardingStatus.anyAgentReady && !onboardingDismissed),
+    onboardingNeeded: Boolean(
+      onboardingStatus
+      && !Object.values(runtimeAvailabilities).some((availability) => availability.usable)
+      && !onboardingDismissed
+    ),
+    hasConversation: hasAnyRuntimeConversation,
+    hasReadyAlternative: readyAlternatives.length > 0,
     needsSetup,
     showCodexSetup: Boolean(showCodexSetup),
     showOpenCodeSetup: Boolean(showOpenCodeSetup),
@@ -218,7 +243,7 @@ export function AISidebar() {
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
-      {ready && (selectedRuntimeHydration?.phase === 'error' || runtimeTimedOut) && (
+      {ready && runtimeTimedOut && (
         <div className="mx-3 mt-3 rounded-[10px] border border-[var(--r-warning)] bg-[var(--r-warning-soft)] p-3" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--r-surface)] text-[var(--r-warning)]">
@@ -324,6 +349,13 @@ export function AISidebar() {
                   isRunning={visibleCurrentPlan.isRunning}
                   allCompleted={Boolean(visibleCurrentPlan.allCompleted)}
                   onDismiss={() => dismissCurrentPlan(visibleCurrentPlan.key)}
+                />
+              )}
+              {!inlineRecoveryAvailable && (
+                <RuntimeAvailabilityNotice
+                  runtimeId={selectedAgent}
+                  availability={selectedRuntimeAvailability}
+                  alternativeRuntime={readyAlternatives[0] ?? null}
                 />
               )}
               <ChatInput />

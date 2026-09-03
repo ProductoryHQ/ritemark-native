@@ -579,6 +579,7 @@ export class ConversationController {
   async interruptRuntimeAttachments(
     conversationIds: Iterable<string>,
     reason: 'restart' | 'runtime-released',
+    runtimeId?: AgentId,
   ): Promise<void> {
     if (this.disposed) return;
     for (const conversationId of new Set(conversationIds)) {
@@ -594,6 +595,7 @@ export class ConversationController {
       const lastEvent = current.events[current.events.length - 1];
       const lastRuntime = current.runtimeSummary[current.runtimeSummary.length - 1];
       const interruptedRuntime = lastEvent?.runtimeId ?? lastRuntime;
+      if (runtimeId && interruptedRuntime !== runtimeId) continue;
       const continuationRuntime = interruptedRuntime === 'claude-code'
         || interruptedRuntime === 'codex'
         || interruptedRuntime === 'opencode'

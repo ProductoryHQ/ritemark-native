@@ -6,6 +6,7 @@ export type ClaudeStatusInvalidationReason =
   | 'login-started'
   | 'login-finished'
   | 'authentication-failed'
+  | 'logout'
   | 'status-refresh'
   | 'settings-updated';
 

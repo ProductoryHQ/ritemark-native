@@ -31,7 +31,7 @@ The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (
 
 | Agent | Vendor | Version | Source | License |
 |---|---|---|---|---|
-| Codex | OpenAI | 0.149.0 (`rust-v0.149.0`) | GitHub Releases — `codex-app-server-*` and `codex-code-mode-host-*` archives | Apache-2.0 |
+| Codex | OpenAI | 0.153.0 (`rust-v0.153.0`) | GitHub Releases — `codex-app-server-*` and `codex-code-mode-host-*` archives | Apache-2.0 |
 | Claude | Anthropic | 2.1.239 (SDK pinned `0.3.239`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
 | OpenCode | anomalyco | 1.18.21 (ACP SDK pinned `1.4.0`) | npm optional packages — `opencode-<platform>-<arch>` | MIT |
 
@@ -54,7 +54,7 @@ If Anthropic's published terms change, this README and the manifest must be re-v
 
 ## Codex invocation contract
 
-Codex 0.149.0 publishes a standalone `codex-app-server` binary that is **not** the same as the `codex` CLI. The `manifest.json` records this as `invocationMode: "direct-app-server"`, which means Ritemark spawns the extracted binary directly:
+Codex 0.153.0 publishes a standalone `codex-app-server` binary that is **not** the same as the `codex` CLI. The `manifest.json` records this as `invocationMode: "direct-app-server"`, which means Ritemark spawns the extracted binary directly:
 
 ```text
 <binaries>/agents/<platform>-<arch>/codex-app-server[.exe]
@@ -62,7 +62,7 @@ Codex 0.149.0 publishes a standalone `codex-app-server` binary that is **not** t
 
 Ritemark must **not** invoke `codex app-server` as a subcommand; the `codex` CLI is not bundled.
 
-Codex 0.149.0 also enables Code Mode file tools through a sibling
+Codex 0.153.0 also enables Code Mode file tools through a sibling
 `codex-code-mode-host[.exe]` process. The app-server resolves that executable
 next to itself, so both version-matched components are mandatory packaging
 inputs. Shipping only `codex-app-server` lets chat start but makes file tools
@@ -114,8 +114,8 @@ Each entry in `runtimes`:
 ```bash
 mkdir -p extensions/ritemark/binaries/agents/darwin-arm64
 curl -L -o /tmp/codex.tar.gz \
-  https://github.com/openai/codex/releases/download/rust-v0.149.0/codex-app-server-aarch64-apple-darwin.tar.gz
-echo "35892a576ec29edbbb766cfba002c57c7beea479c6c21715a134cab4a7352032  /tmp/codex.tar.gz" | shasum -a 256 -c
+  https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-app-server-aarch64-apple-darwin.tar.gz
+echo "4293c483605cae9e3fa413add08ec394bb5f8e52c1762567444551f7c763e143  /tmp/codex.tar.gz" | shasum -a 256 -c
 tar -xzf /tmp/codex.tar.gz -C /tmp
 mv /tmp/codex-app-server-aarch64-apple-darwin \
   extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server

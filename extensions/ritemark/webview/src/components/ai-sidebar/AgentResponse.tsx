@@ -6,13 +6,19 @@
 
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { Button } from '../ui/button';
-import { useAISidebarStore } from './store';
+import { useActiveConversation, useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
+import { RuntimeNotice } from './RuntimeNotice';
+import {
+  deriveRuntimeAvailabilities,
+  listReadyAlternatives,
+  resolveAvailableRuntimeModel,
+  RUNTIME_LABELS,
+} from './runtimeAvailability';
 
 import type { AgentConversationTurn } from './types';
 
@@ -47,11 +53,6 @@ interface RecoveryNoticeProps {
   onAction?: () => void;
 }
 
-/**
- * Recoverable runtime failures are conversation cards, not form validation.
- * Keep the surface neutral and use amber only for the attention icon so the
- * notice fits the Ritemark card system without visually shouting at the user.
- */
 function RecoveryNotice({
   title,
   message,
@@ -62,52 +63,19 @@ function RecoveryNotice({
   actionDisabled = false,
   onAction,
 }: RecoveryNoticeProps) {
-  const visual = {
-    warning: { icon: 'warning' as const, background: 'var(--r-warning-soft)', color: 'var(--r-warning)' },
-    progress: { icon: 'circle-notch' as const, background: 'var(--r-accent-soft)', color: 'var(--r-accent)' },
-    success: { icon: 'check-circle' as const, background: 'var(--r-success-soft)', color: 'var(--r-success)' },
-    error: { icon: 'warning-circle' as const, background: 'var(--r-error-soft)', color: 'var(--r-error)' },
-  }[tone];
-
   return (
-    <div
-      role={tone === 'warning' ? 'group' : 'status'}
-      aria-label={title}
-      className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] shadow-[0_1px_2px_rgba(30,27,75,0.04)]"
-    >
-      <div className="flex items-start gap-2.5 px-3 py-2.5">
-        <span
-          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-          style={{ background: visual.background, color: visual.color }}
-        >
-          <Icon
-            name={visual.icon}
-            size={14}
-            tone="inherit"
-            className={tone === 'progress' ? 'animate-spin' : undefined}
-          />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold leading-5 text-[var(--r-ink-strong)]">{title}</div>
-          <div className="mt-0.5 text-[11px] leading-[1.45] text-[var(--r-ink-muted)]">{message}</div>
-        </div>
-      </div>
-      {(statusLabel || (actionLabel && actionIcon && onAction)) && (
-        <div className={`flex flex-wrap items-center border-t border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2 ${statusLabel ? 'pl-[46px]' : 'justify-end gap-2'}`}>
-          {statusLabel ? (
-            <div className="inline-flex h-8 items-center gap-1.5 text-xs font-medium text-[var(--r-accent)]">
-              <Icon name="circle-notch" size={12} tone="inherit" className="animate-spin" />
-              {statusLabel}
-            </div>
-          ) : (
-            <Button type="button" size="sm" onClick={onAction} disabled={actionDisabled}>
-              <Icon name={actionIcon!} size={12} tone="inherit" />
-              {actionLabel}
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
+    <RuntimeNotice
+      title={title}
+      message={message}
+      tone={tone}
+      statusLabel={statusLabel}
+      primaryAction={actionLabel && actionIcon && onAction ? {
+        label: actionLabel,
+        icon: actionIcon,
+        onAction,
+        disabled: actionDisabled,
+      } : undefined}
+    />
   );
 }
 
@@ -123,8 +91,43 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const setupError = useAISidebarStore((s) => s.setupError);
   const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
   const dismissAuthRecovery = useAISidebarStore((s) => s.dismissAuthRecovery);
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const models = useAISidebarStore((s) => s.models);
+  const codexModels = useAISidebarStore((s) => s.codexModels);
+  const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
+  const activeConversation = useActiveConversation();
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
+
+  const availabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const alternativeCandidate = listReadyAlternatives(availabilities, 'claude-code')[0] ?? null;
+  const alternativeModelId = alternativeCandidate
+    ? resolveAvailableRuntimeModel(alternativeCandidate, {
+        claude: activeConversation.selectedModel,
+        codex: activeConversation.codexSelectedModel,
+        opencode: activeConversation.opencodeSelectedModel,
+      }, {
+        claude: models,
+        codex: codexModels,
+        opencode: byokProviderModels,
+        acpProviders,
+      }) ?? ''
+    : '';
+  const readyAlternative = alternativeCandidate && alternativeModelId
+    ? alternativeCandidate
+    : null;
 
   if (!result) return null;
 
@@ -181,14 +184,25 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
     return (
       <div style={chatFontStyle}>
-        <RecoveryNotice
+        <RuntimeNotice
           title={usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
           message={usesApiKey
             ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
-            : 'Your session expired before Claude could answer. Sign in, then resend your message.'}
-          actionLabel={usesApiKey ? 'Update API key' : 'Sign in to Claude'}
-          actionIcon={usesApiKey ? 'key' : 'sign-in'}
-          onAction={usesApiKey ? openApiKeySettings : () => startLogin(turn.id)}
+            : 'Your session expired before Claude could answer. Sign in again or continue with another available agent.'}
+          secondaryAction={readyAlternative ? {
+              label: usesApiKey ? 'Update key' : 'Sign in',
+              icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+              onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
+            } : undefined}
+          primaryAction={readyAlternative ? {
+              label: `Use ${RUNTIME_LABELS[readyAlternative]}`,
+              icon: 'chat-circle' as const,
+              onAction: () => selectRuntimeModel(readyAlternative, alternativeModelId),
+            } : {
+                label: usesApiKey ? 'Update API key' : 'Sign in to Claude',
+                icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+                onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
+              }}
         />
         <ActivityDetails activities={activities} metrics={result.metrics} />
       </div>

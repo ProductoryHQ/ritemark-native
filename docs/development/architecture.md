@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-03 (Claude SDK terminal-envelope normalization)
+**Last updated:** 2026-09-03 (runtime availability and account isolation)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -186,13 +186,13 @@ Dispatch certainty is append-only host state: the store atomically saves user te
 
 ## Agent Runtime Architecture
 
-### Bundled runtime baseline (Sprint 111)
+### Bundled runtime baseline (Sprint 111, RC-corrected 2026-09-03)
 
-The v1.10.0 host↔binary baseline is exact and reproducible: Codex `0.149.0`, Claude Code `2.1.239` paired with Agent SDK `0.3.239`, and OpenCode `1.18.21` paired with ACP SDK `1.4.0`. `extensions/ritemark/binaries/agents/manifest.json` remains the single binary supply-chain contract with one row per required component × supported platform (`darwin-arm64`, `darwin-x64`, `win32-x64`). Codex has two mandatory, version-matched components: `app-server` and the sibling `code-mode-host` that serves Code Mode file tools. Claude and OpenCode each have one `runtime` component. Codex retains direct GitHub release assets; Claude and OpenCode retain official npm optional-package artifacts. This changes no `AgentRuntime` interface and adds no runtime kind.
+The v1.10.0 host↔binary baseline is exact and reproducible: Codex `0.153.0`, Claude Code `2.1.239` paired with Agent SDK `0.3.239`, and OpenCode `1.18.21` paired with ACP SDK `1.4.0`. `extensions/ritemark/binaries/agents/manifest.json` remains the single binary supply-chain contract with one row per required component × supported platform (`darwin-arm64`, `darwin-x64`, `win32-x64`). Codex has two mandatory, version-matched components: `app-server` and the sibling `code-mode-host` that serves Code Mode file tools. Claude and OpenCode each have one `runtime` component. Codex retains direct GitHub release assets; Claude and OpenCode retain official npm optional-package artifacts. This changes no `AgentRuntime` interface and adds no runtime kind.
 
 `scripts/validate-agent-runtime-manifest.mjs` is the hard pre-fetch/build gate. Schema 2 requires twelve component rows and rejects an incomplete component/platform matrix, duplicate or noncanonical per-target install names, a snapshot outside the approved pins, malformed checksums/source URLs, stale vendor identity, package-lock drift, or a missing/mismatched Claude optional package. It runs from fetch, runtime verification, and the repository QA gate. The canonical install name is part of the runtime contract: Codex discovers `codex-code-mode-host[.exe]` by its exact sibling filename. The manifest fetcher verifies archive SHA-256 before extraction, validates the recorded path/architecture, and runs each component's supported native smoke (`--version` for primary runtimes, `--help` for the code-mode host). Build-output validation and the Windows installer preflight both enumerate the manifest, while macOS signing re-signs every executable component under the agent directory. `.github/workflows/agent-runtime-matrix.yml` reruns the exact SDK compile, native fetch, and component smoke on Intel macOS and Windows x64 when supply-chain inputs change. Full installer/signing and a real packaged Codex file-tool canary remain release gates; a macOS cross-fetch alone proves bytes/layout, not native behavior.
 
-The measured protocol delta is deliberately narrow: Codex 0.149.0 adds `isBlocking` to `request_user_input`; Ritemark tolerates it as optional so older explicitly selected system runtimes still work. ACP 1.4.0 retains the client API used by `src/acp/`; OpenCode effort discovery stays semantic (`configOptions.category === "thought_level"`) and model-dependent. Composer effort UI belongs to Sprint 112, not this supply-chain baseline.
+The measured protocol delta is deliberately narrow: generated app-server types from Codex `0.149.0` through `0.153.0` keep every request, notification, and response field consumed by Ritemark compatible; later fields are optional/additive. Ritemark tolerates optional `request_user_input.isBlocking` so older explicitly selected system runtimes still work, while `0.153.0` accepts the current GPT-5.6 model catalog and effort vocabulary. ACP 1.4.0 retains the client API used by `src/acp/`; OpenCode effort discovery stays semantic (`configOptions.category === "thought_level"`) and model-dependent. Composer effort UI belongs to Sprint 112, not this supply-chain baseline.
 
 ### Per-turn thinking effort (Sprint 112)
 
@@ -278,6 +278,32 @@ coordinator; a second surface joins the already-open flow instead of spawning a
 competing login process. The coordinator fans completion, failure, timeout, and
 cancellation back to every joined surface so none can retain a stale busy state.
 No credential or token crosses into the webview.
+
+Runtime availability is normalized separately from probe lifecycle. The
+webview's `runtimeHydration` records only whether each independent status probe
+is checking, complete, or failed; `runtimeAvailability.ts` combines that probe
+with Claude setup, Codex account, and OpenCode provider/model state into one
+canonical `checking | ready | needs-auth | auth-in-progress |
+needs-configuration | not-installed | broken | disabled | error` union. Only
+`ready` can accept a turn. The sidebar gate, recovery surface, Composer Send
+guard, and fallback actions consume this same result rather than implementing
+provider-specific readiness tests. Selection is a consumer of an already
+hydrated availability snapshot, never a status-probe trigger: bootstrap,
+explicit recheck, and account/runtime invalidation own probes. This prevents a
+stalled background `account/read` from replacing a known-ready fallback with a
+blocking `Checking ...` Composer immediately after the user selects it.
+
+Account failures are provider-scoped, not application-scoped. If the selected
+runtime is unavailable while another is ready, the transcript, Composer, and
+model selector remain visible; recovery offers both the affected account
+action and an explicit switch to a ready runtime. A non-empty conversation is
+never silently rebound to a different provider, and later app-global bootstrap
+or status refreshes cannot overwrite its pending runtime. Runtime plus model
+selection is one atomic conversation action; the first subsequent Send keeps
+using the durable cross-runtime boundary contract. If no runtime is ready,
+onboarding/setup may take over only an empty conversation. Provider logout or
+auth replacement checkpoints active turns for that provider and releases only
+that provider's sessions, leaving other runtimes and their work untouched.
 
 Sprint 99 fixed three concurrency defects that the single-conversation shape had hidden:
 `CodexRuntime` held `_threadApprovalKey`/`_browserToolsEnabledForThread` as scalars whose mismatch
@@ -814,6 +840,8 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-03 | v1.10.0 RC bugfix | **Codex service-compatibility correction.** The bundled `0.149.0` app-server was invalidated after a real GPT-5.6 turn returned a newer-runtime requirement and failed to decode the service's current `max` effort value. The exact cross-platform app-server + code-mode-host manifest now pins official Codex `0.153.0`; the generated protocol subset remains backward compatible, manifest mutation gates pass, and a fresh-profile RUNDEV canary proves `Bundled with app · Ready · v0.153.0` plus a real GPT-5.6 response. Native Intel/Windows and packaged-app canaries remain release gates. |
+| 2026-09-03 | v1.10.0 RC bugfix | **Provider-scoped runtime availability.** Probe completion is no longer confused with authenticated usability: one normalized availability union now drives the gate, recovery cards, Composer Send guard, and explicit ready-runtime fallback. Signing out of Claude cannot hide or disable connected Codex/OpenCode; transcripts remain visible, runtime+model changes are atomic, status refreshes cannot rebind non-empty conversations, and logout interrupts/releases only the affected provider's sessions. |
 | 2026-09-01 | v1.10.0 RC bugfix | **Storage-isolated Agent Chat bootstrap.** A packaged upgraded profile exposed that the pre-Sprint-109 global→workspace localStorage copier still ran synchronously inside `agent:bootstrap`; quota exhaustion aborted the handler before catalogs committed. Workspace selection is now side-effect-free, host rollout selects storage authority after bootstrap, host modes inventory legacy data read-only, and legacy rollback reads existing global data in place without duplicating it. Quota-full regressions are mandatory bootstrap/conversation QA. |
 | 2026-09-01 | v1.10.0 RC bugfix | **Atomic Agent Chat bootstrap.** The model/agent selector now hydrates from synchronous local authorities before any SecretStorage, runtime, process, network, or filesystem-discovery probe. Per-domain generation/revision guards reject stale window and out-of-order results; operational failures remain recoverable without erasing or hiding the bundled model floor. |
 | 2026-08-24 | Sprint 113 | **Typed Transcribe Insights output boundary.** The sandboxed workbench sends a validated Auto/known/custom language selection through one protocol; autocomplete search remains local UI state and any explicitly committed normalized language or dialect can be used. The host records selected/resolved provenance, passes the language as quoted prompt data, preserves legacy English provenance, validates primary-path aliases and cross-platform filenames, and exclusively creates separate Insights-only Markdown snapshots. Full Unicode speaker labels remain intact through storage, prompts, and exports while webview layout alone truncates their display. |
