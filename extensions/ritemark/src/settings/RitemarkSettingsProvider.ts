@@ -174,7 +174,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     this.disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       if (event.reason === 'login-started') {
         this.startClaudeLoginPolling();
-      } else if (event.reason === 'login-finished' || event.reason === 'authentication-failed' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
+      } else if (event.reason === 'login-finished' || event.reason === 'authentication-failed' || event.reason === 'logout' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
         this.stopClaudeLoginPolling();
       }
       const panel = RitemarkSettingsProvider.panel;
@@ -947,7 +947,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     try {
       await logoutClaude(status.binaryPath);
       setClaudeLoginInProgress(false);
-      emitClaudeStatusInvalidated('settings-updated');
+      emitClaudeStatusInvalidated('logout');
       vscode.window.showInformationMessage('Signed out from Claude.ai.');
     } catch (error) {
       vscode.window.showErrorMessage(

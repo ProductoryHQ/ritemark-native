@@ -30,11 +30,11 @@ test('rejects Claude binary and SDK drift', () => {
 test('rejects an unapproved runtime snapshot even when all platform rows agree', () => {
   const { manifest, packageJson, packageLock } = fixture();
   for (const runtime of manifest.runtimes.filter((entry) => entry.agent === 'codex')) {
-    runtime.version = '0.150.0';
-    runtime.sourceUrl = runtime.sourceUrl.replace('0.149.0', '0.150.0');
+    runtime.version = '0.154.0';
+    runtime.sourceUrl = runtime.sourceUrl.replace('0.153.0', '0.154.0');
   }
   const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('version must be approved snapshot 0.149.0')));
+  assert.ok(errors.some((error) => error.includes('version must be approved snapshot 0.153.0')));
 });
 
 test('rejects a missing Claude platform package from the lockfile', () => {
@@ -86,7 +86,7 @@ test('rejects a unique but undiscoverable Codex sidecar install name', () => {
     && runtime.platform === 'darwin'
     && runtime.arch === 'arm64'
   ));
-  codeModeHost.installName = 'codex-code-mode-host-0.149.0';
+  codeModeHost.installName = 'codex-code-mode-host-0.153.0';
   const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
   assert.ok(errors.some((error) => error.includes('installName must be codex-code-mode-host')));
 });

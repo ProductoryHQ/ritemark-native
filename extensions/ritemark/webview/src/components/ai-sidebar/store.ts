@@ -38,6 +38,7 @@ import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult }
 import {
   createConversationState,
   isConversationEmpty,
+  isRuntimeHandoff,
   policyOf,
   type ConversationState,
   type PendingRuntimeSelection,
@@ -379,6 +380,8 @@ interface AISidebarState {
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
+  /** Atomically apply the runtime + its model to the active conversation. */
+  selectRuntimeModel: (runtimeId: AgentId, modelId: string) => void;
   setPendingRuntime: (partial: Partial<PendingRuntimeSelection>) => void;
   setThinkingEffort: (effort: ThinkingEffort) => void;
   clearThinkingEffortNotice: () => void;
@@ -1064,6 +1067,39 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     selectModel: (modelId) => {
       patchConversation(get().activeConversationId, () => ({ selectedModel: modelId }));
       vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: get().activeConversationId });
+    },
+
+    selectRuntimeModel: (runtimeId, modelId) => {
+      const conversation = activeConversation();
+      if (!conversation || !modelId) return;
+
+      if (isRuntimeHandoff(conversation, runtimeId)) get().cancelRequest();
+
+      const openCodeComposite = runtimeId === 'opencode'
+        ? (modelId.startsWith('opencode:') ? modelId : `opencode:${modelId}`)
+        : conversation.opencodeSelectedModel;
+      const pendingModelId = runtimeId === 'opencode'
+        ? openCodeComposite.slice('opencode:'.length)
+        : modelId;
+
+      patchConversation(conversation.id, (current) => ({
+        selectedAgent: runtimeId,
+        selectedModel: runtimeId === 'claude-code' ? modelId : current.selectedModel,
+        codexSelectedModel: runtimeId === 'codex' ? modelId : current.codexSelectedModel,
+        opencodeSelectedModel: openCodeComposite,
+        pendingRuntime: {
+          ...current.pendingRuntime,
+          runtimeId,
+          modelId: pendingModelId,
+        },
+      }));
+
+      if (conversation.selectedAgent !== runtimeId) {
+        vscode.postMessage({ type: 'ai-select-agent', agentId: runtimeId, conversationId: conversation.id });
+      }
+      if (runtimeId === 'claude-code' && conversation.selectedModel !== modelId) {
+        vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: conversation.id });
+      }
     },
 
     setPendingRuntime: (partial) => {
@@ -1796,11 +1832,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ onboardingDismissed: true });
       // Auto-select best available agent
       const status = get().onboardingStatus;
+      const conversation = activeConversation();
       if (status) {
-        if (status.claudeCliAuthenticated) {
-          get().selectAgent('claude-code');
-        } else if (status.codexCliAuthenticated) {
-          get().selectAgent('codex');
+        if (status.claudeCliAuthenticated && conversation) {
+          const modelId = reconciledModelId(get().models, conversation.selectedModel)
+            ?? get().models[0]?.id;
+          if (modelId) get().selectRuntimeModel('claude-code', modelId);
+        } else if (status.codexCliAuthenticated && conversation) {
+          const modelId = get().codexModels.some((model) => model.id === conversation.codexSelectedModel)
+            ? conversation.codexSelectedModel
+            : get().codexModels[0]?.id;
+          if (modelId) get().selectRuntimeModel('codex', modelId);
         }
       }
     },
@@ -2368,6 +2410,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // to the ACTIVE thread — the host's "selected agent" is a single value and
           // must not re-bind background threads to a different runtime.
           const activeId = get().activeConversationId;
+          const applyHostDefault = !get().ready;
           const conversations: Record<string, ConversationState> = {};
           for (const conversation of Object.values(get().conversations)) {
             const codexSelectedModel = newCodexModels.some((m: { id: string }) => m.id === conversation.codexSelectedModel)
@@ -2378,7 +2421,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               : conversation.selectedModel;
             const selectedModel = reconciledModelId(newClaudeModels, candidateClaude)
               ?? (newClaudeModels[0]?.id || candidateClaude);
-            const isActive = conversation.id === activeId;
+            const isActiveBlankConversation = applyHostDefault
+              && conversation.id === activeId
+              && isConversationEmpty(conversation);
+            const incomingPendingModel = incomingRuntimeId === 'codex'
+              ? codexSelectedModel
+              : incomingRuntimeId === 'opencode'
+                ? (conversation.opencodeSelectedModel || firstAvailableOpenCodeModel(
+                    opencodeEnabled,
+                    acpProviders,
+                    byokProviderModels,
+                  )).replace(/^opencode:/, '')
+                : selectedModel;
             conversations[conversation.id] = {
               ...conversation,
               selectedModel,
@@ -2390,10 +2444,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 acpProviders,
                 byokProviderModels,
               ),
-              ...(isActive
+              ...(isActiveBlankConversation
                 ? {
                     selectedAgent: incomingAgent,
-                    pendingRuntime: { ...conversation.pendingRuntime, runtimeId: incomingRuntimeId, modelId: selectedModel },
+                    pendingRuntime: { ...conversation.pendingRuntime, runtimeId: incomingRuntimeId, modelId: incomingPendingModel },
                   }
                 : {}),
             };

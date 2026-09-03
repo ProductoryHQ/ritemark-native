@@ -368,9 +368,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             vscode.ConfigurationTarget.Global
           );
           // The selected label is local bootstrap state. Runtime readiness is
-          // hydrated independently and cannot delay model selection.
+          // hydrated independently and cannot delay model selection. In
+          // particular, do not start a new provider probe here: the picker can
+          // only offer an already-ready fallback, and replacing that
+          // last-known-good snapshot with "checking" can disable the composer
+          // for an unrelated (or stalled) account/read request.
           await this._sendCurrentAgentBootstrap();
-          void this._sendRuntimeStatus(message.agentId as AgentId);
           break;
 
         case 'conversation:selected':
@@ -1617,6 +1620,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       rt.startLoginPolling((s) => this._postCodexSidebarStatus(s));
     } else if (reason === 'logout' || reason === 'login-finished') {
       rt.stopLoginPolling();
+      await this._releaseRuntimeSessionsForAgent('codex');
       rt.dispose();
     }
     const codexStatus = await this._sendCodexSidebarStatus();
@@ -1624,7 +1628,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _handleExternalClaudeStatusInvalidation(
-    reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'authentication-failed' | 'status-refresh' | 'settings-updated'
+    reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'authentication-failed' | 'logout' | 'status-refresh' | 'settings-updated'
   ): Promise<void> {
     if (reason === 'login-started') {
       setClaudeLoginInProgress(true);
@@ -1632,13 +1636,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     } else if (reason === 'login-finished') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
-    } else if (reason === 'authentication-failed' || reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
+    } else if (reason === 'authentication-failed' || reason === 'logout' || reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
       setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
     }
 
-    if (reason === 'login-started' || reason === 'login-finished' || reason === 'authentication-failed') {
-      this._disposeRuntimeSessionsForAgent('claude-code');
+    if (reason === 'login-started' || reason === 'login-finished' || reason === 'authentication-failed' || reason === 'logout') {
+      await this._releaseRuntimeSessionsForAgent('claude-code');
     }
 
     // Auth/runtime context may have changed (account, binary, settings) and model
@@ -2301,6 +2305,29 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       if (!this._runtimeSessions.has(conversationId)) {
         this._runtimeSessionLastUsed.delete(conversationId);
       }
+    }
+  }
+
+  /** Checkpoint only this provider's active turns, then release only its sessions. */
+  private async _releaseRuntimeSessionsForAgent(agentId: AgentId): Promise<void> {
+    const conversationIds = Array.from(this._runtimeSessions.entries())
+      .filter(([, sessions]) => sessions.has(agentId))
+      .map(([conversationId]) => conversationId);
+    try {
+      await this._conversationController.interruptRuntimeAttachments(
+        conversationIds,
+        'runtime-released',
+        agentId,
+      );
+    } catch (error) {
+      // Availability is app-global and must still advance even if one durable
+      // conversation checkpoint is temporarily unavailable. The controller's
+      // write remains authoritative and recoverable on its next reconciliation.
+      console.error(`[Agent Chat] Could not checkpoint ${agentId} sessions before release:`, error);
+    } finally {
+      // An invalid credential/runtime must never keep a stale live session,
+      // even when durable interruption checkpointing itself reports an error.
+      this._disposeRuntimeSessionsForAgent(agentId);
     }
   }
 

@@ -2,10 +2,11 @@
 
 This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
-## Current candidate record — 2026-09-02
+## Current candidate record — 2026-09-03
 
 - Invalidated candidate: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from merged `main` commit `3f01ef5` passed static packaging/signature checks but omitted Codex 0.149.0's required `codex-code-mode-host` sibling. A real Codex file-tool turn failed with `No such file or directory`, so this DMG is not a Gate 1 candidate and must not be notarized or published.
 - Retired Gate 1 evidence: the arm64 DMG from exact merged `main` commit `0140ab9948703ad8067d89d7c41dc3742d531ef2` passed QA/preflight, mounted content/signature/architecture/runtime checks, visual inspection, and Jarmo's installed-app test. After more than four hours with no new bug, Apple accepted submission `8434142f-25a0-48ce-8848-a8606c3fc319`; stapling and all six final notarization checks passed. Final notarized SHA-256: `0bb1e49df477b95762521894844d4003afe03cb55877b597184638e81a5684b3`.
+- Invalidated candidate: exact merged `main` commit `117e29608501665b8a0cc2042b3b6da6e6eb5ad4` is not eligible for Gate 1. Its Agent Chat blocked connected ChatGPT/Codex when Claude was signed out, and bundled Codex `0.149.0` was rejected by the current GPT-5.6 service/model catalog. The replacement branch proves provider-isolated fallback and a real GPT-5.6-Sol turn on official bundled Codex `0.153.0`; a fresh exact-main DMG is still required.
 - Gate 2 pipeline block: Windows run `33642850280` passed exact-source checkout and dependencies, then correctly rejected a source-mutating platform cleanup plus an order-sensitive reverse check of overlapping patches. The repository was restored to public and obsolete x64 run `33642854001` was cancelled.
 - Replacement Gate 1 DMG: **not yet produced**. The immutable target-copy/source-gate correction changes canonical source, so the otherwise-valid notarized `0140ab9` artifact is not eligible for multi-platform publication. A fresh exact-`main` arm64 candidate must repeat build, signing, mounted checks, Jarmo approval, hardening, and notarization.
 - Production dependency security: **mitigated and verified** — the extension audit reports zero findings; `fast-uri` is fixed at `3.1.6`, `@xmldom/xmldom` at `0.8.15`, and SheetJS at the official `0.20.3` tarball. The webview audit still version-reports one TipTap 2 advisory through 35 dependency paths because npm cannot recognize a patched package. The vendor-recommended `__proto__` rejection is backported to TipTap 2.27.2 with `patch-package`; the exploit-shaped test fails on the unpatched package, passes after the patch, and passes after a clean isolated `npm ci`. TipTap 3 migration is tracked in [#243](https://github.com/ProductoryHQ/ritemark-native/issues/243).
@@ -54,14 +55,16 @@ This checklist accumulates release evidence across Sprints 109–115 and focused
 
 These two live rows are intentionally retained for the post-Sprint 111/final release matrix because Sprint 111 changes the exact runtime binaries. Sprint 110 covers their deterministic adapter/controller policy paths and does not claim unrun production-UI evidence.
 
-## Runtime refresh (Sprint 111)
+## Runtime refresh (Sprint 111 + RC correction)
 
-- [x] Exact Codex 0.149.0, Claude Code 2.1.239, Claude Agent SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0 pins are recorded with official sources and licenses.
-- [x] All twelve darwin-arm64, darwin-x64, and win32-x64 runtime-component archives pass URL, SHA-256, archive-layout, and architecture validation, including Codex app-server plus code-mode host on every target.
+- [x] Exact Codex 0.153.0, Claude Code 2.1.239, Claude Agent SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0 pins are recorded with official sources and licenses. The superseded Sprint 111 Codex 0.149.0 evidence remains historical.
+- [x] The twelve-row darwin-arm64, darwin-x64, and win32-x64 manifest passes URL, published SHA-256, component completeness, install-name, and architecture-contract validation, including Codex app-server plus code-mode host on every target. The 0.153.0 darwin-arm64 pair additionally passes real fetch/checksum/extraction/native-architecture smoke.
 - [x] Claude binary/SDK drift, an incomplete component/platform matrix, duplicate or noncanonical install names, and an unsupported component smoke argument fail the hard manifest validator.
 - [x] Native darwin-arm64 fetch, version discovery, OpenCode permission gates, cancellation, and shared-process survival pass on the shipping pins.
 - [x] Codex, Claude, and OpenCode continuation/restart plus two-conversation isolation probes pass on the shipping pins.
 - [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
+- [x] Codex 0.149.0 is explicitly invalidated after a real GPT-5.6-Sol turn returned the newer-runtime requirement and the runtime failed to decode the current `max` effort value.
+- [x] Codex 0.153.0 generated protocol surfaces used by Ritemark remain backward compatible/additive; fresh-profile RUNDEV Settings reports `Bundled with app · Ready · v0.153.0`, and a real GPT-5.6-Sol no-write canary returns the requested answer without either 0.149 failure.
 - [ ] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and required-component smoke pass on the final RC correction commit. The earlier three-runtime baseline passed on `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)) but did not assert Codex's code-mode host.
 - [ ] The exact signed arm64 replacement candidate completes a real Codex file create/edit/read canary without a missing-host log error.
 
@@ -98,8 +101,18 @@ These two live rows are intentionally retained for the post-Sprint 111/final rel
 - [x] A chat CTA joining a login already started from Settings receives the same completion/cancel terminal callback; coordinator fan-out regression passes and no joined surface retains `setupInProgress`.
 - [x] Store regressions cover the chat recovery lifecycle: click starts `pending`, either `agent-setup:complete` or a polled ready `agent:config` produces `success`, error/cancel produces a retry state, and **OK** persistently dismisses only the recovered turn.
 - [x] Settings/Onboarding login starts without a chat turn ID and both ready callback paths return its lifecycle to `idle` without fabricating a hidden login error; a later auth loss can show Setup again because dismissed historical turns are excluded from the inline-recovery gate. Verified end-to-end in RunDev on 2026-09-01: dismiss recovery → inject `needs-auth` → visually inspect restored Setup Wizard → complete its shared login → return to clean chat without an error card.
+
+## Provider availability isolation (RC bug fix)
+
+- [x] One normalized discriminated availability union covers checking, ready, auth, configuration, install, repair, disabled, and probe-error states; only `ready` is usable.
+- [x] Existing transcripts, Composer, and model selection remain visible when the selected provider is unavailable but another provider is ready. Empty setup/onboarding takeover is allowed only when no usable provider and no conversation require preservation.
+- [x] Switching from a recovery card changes the pending runtime and model atomically and never dispatches before the next explicit Send; late bootstrap/status refresh cannot rebind a non-empty conversation.
+- [x] Auth loss interrupts, checkpoints, and releases only the affected provider's live sessions.
+- [x] Fresh-profile RUNDEV on 2026-09-03: deterministic Claude `needs-auth` plus real connected Codex preserved the completed transcript, rendered one compact recovery card, kept `Sign in` left of the rightmost primary `Use Codex` even at the 240 px minimum sidebar width, and switched the same conversation explicitly. Settings showed `Codex · Ready · Bundled with app · v0.153.0`; a real GPT-5.6-Sol canary completed before the injected auth state.
+- [ ] Repeat provider-isolation and authenticated-turn canaries in the exact signed arm64 replacement candidate.
 - [x] In RunDev, the real shared login callback changed the same canonical OAuth recovery card to **You’re signed in to Claude**; the **OK** primary action was visually verified at the right edge of the action bar and removed the full card without leaving an error/status line (2026-09-01, narrow sidebar screenshot inspected).
-- [ ] In RunDev, visually verify the **Waiting for sign-in…** and **Try again** states using a deliberately delayed/cancelled browser flow; their pending/error transitions are covered by the focused store regression.
+- [x] In RUNDEV, visually verify **Waiting for sign-in…** with a deterministic `auth-in-progress` state at minimum sidebar width. The status occupies its own readable row and the right-aligned **Use Codex** primary remains available beneath it (2026-09-03).
+- [ ] In RUNDEV, visually verify the **Try again** state using a deliberately failed status probe; its recovery action is covered by the focused state regression.
 - [x] The same generic provider authentication sentence under `anthropic-api-key` is classified as `api-key-authentication` and offers **Update API key**, never the Claude.ai OAuth action. Verified in RunDev 2026-09-01; the card was visually inspected and its CTA opened the existing Ritemark Settings editor without mutating a key.
 - [x] Friendly failure copy and its auth-method-aware recovery category are stored on the canonical terminal event; projection/controller regressions verify **Sign in to Claude** or **Update API key** survives window reload and conversation navigation. A stopped-profile canonical OAuth-failure fixture was restored in a fresh RunDev process and the resulting card was captured and visually inspected (2026-09-01).
 - [x] The recovery alert uses the Ritemark card system rather than VS Code validation-warning colours: 10 px radius, neutral surface and hairline, amber confined to the attention icon, and the standard indigo CTA. A fresh RunDev canonical OAuth-failure fixture was captured and visually inspected at the narrow sidebar width; computed styles confirmed the 10 px radius and theme surface, and the duplicate red raw-error status was absent (2026-09-01).

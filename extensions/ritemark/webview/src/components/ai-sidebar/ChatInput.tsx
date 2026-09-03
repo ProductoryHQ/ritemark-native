@@ -16,7 +16,7 @@ import {
   SelectTrigger,
 } from '../ui/select';
 import { useAISidebarStore, useActiveConversation } from './store';
-import { isRuntimeHandoff, policyOf } from './conversationState';
+import { policyOf } from './conversationState';
 import { SelectedContextTab } from './SelectedContextTab';
 import {
   AIFirstUseDisclosure,
@@ -30,11 +30,12 @@ import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
 import { ThinkingEffortControl } from './ThinkingEffortControl';
+import { deriveRuntimeAvailabilities, RUNTIME_LABELS } from './runtimeAvailability';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
-import type { AgentId, FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
+import type { FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -170,7 +171,6 @@ export function ChatInput() {
     isStreaming,
     agentConversation,
     codexConversation,
-    selectedAgent,
     selectedModel,
     codexSelectedModel,
     opencodeSelectedModel,
@@ -186,9 +186,7 @@ export function ChatInput() {
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
   const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
-  const selectAgent = useAISidebarStore((s) => s.selectAgent);
-  const selectModel = useAISidebarStore((s) => s.selectModel);
-  const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
+  const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
   const setThinkingEffort = useAISidebarStore((s) => s.setThinkingEffort);
   const clearThinkingEffortNotice = useAISidebarStore((s) => s.clearThinkingEffortNotice);
@@ -215,10 +213,10 @@ export function ChatInput() {
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
   const sendOpenCodeMessage = useAISidebarStore((s) => s.sendOpenCodeMessage);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
   const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
 
@@ -227,10 +225,18 @@ export function ChatInput() {
   const isCodex = pendingRuntime.runtimeId === 'codex';
   const isOpenCode = (pendingRuntime.runtimeId as string) === 'opencode';
   const isAgentMode = isClaudeCode || isCodex || isOpenCode;
-  const operationalStatus = runtimeHydration[pendingRuntime.runtimeId];
-  const isRuntimeChecking = operationalStatus?.phase === 'checking';
-  const isRuntimeError = operationalStatus?.phase === 'error';
-  const isRuntimeOperational = operationalStatus?.phase === 'ready';
+  const runtimeAvailabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const operationalStatus = runtimeAvailabilities[pendingRuntime.runtimeId];
+  const isRuntimeChecking = operationalStatus.state === 'checking';
+  const isRuntimeError = operationalStatus.state === 'error';
+  const isRuntimeOperational = operationalStatus.usable;
   // Sprint 103 R8: two-axis composer policy (legacy 'plan' mode normalized).
   const composerPolicy = policyOf(pendingRuntime);
   const composerThinkingEffort = composerThinkingEffortEnabled
@@ -253,10 +259,13 @@ export function ChatInput() {
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
   // Enter queues the next prompt instead of sending it.
+  const runtimeLabel = RUNTIME_LABELS[pendingRuntime.runtimeId];
   const placeholder = isRuntimeChecking
-    ? `Checking ${isClaudeCode ? 'Claude' : isCodex ? 'Codex' : 'OpenCode'}…`
+    ? `Checking ${runtimeLabel}…`
     : isRuntimeError
-      ? `${isClaudeCode ? 'Claude' : isCodex ? 'Codex' : 'OpenCode'} is unavailable — try again above`
+      ? `${runtimeLabel} is unavailable — try again above`
+    : !isRuntimeOperational
+      ? `${runtimeLabel} needs attention — choose another model or use the action above`
     : isLoading && isAgentMode
     ? 'Add a follow-up… (Enter queues it for when the agent finishes)'
     // Sprint 103 R8: the placeholder is the cheapest honest signal that the
@@ -347,7 +356,7 @@ export function ChatInput() {
       return;
     }
 
-    if (!isOnline || isLoading || !isRuntimeOperational || (isCodex && codexStatus.state !== 'ready')) return;
+    if (!isOnline || isLoading || !isRuntimeOperational) return;
 
     // Build hidden context (agent instructions — sent to AI but not shown in chat).
     // Dismissal + new pin can both be active when switching agents A → B.
@@ -405,7 +414,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -961,41 +970,21 @@ export function ChatInput() {
   const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
       const modelId = value.slice('claude-code:'.length);
-      if (selectedAgent !== 'claude-code') {
-        selectAgent('claude-code' as AgentId);
-      }
-      selectModel(modelId);
-      setPendingRuntime({ runtimeId: 'claude-code', modelId });
+      selectRuntimeModel('claude-code', modelId);
     } else if (value.startsWith('codex:')) {
       const modelId = value.slice('codex:'.length);
-      if (selectedAgent !== 'codex') {
-        selectAgent('codex' as AgentId);
-      }
-      selectCodexModel(modelId);
-      setPendingRuntime({ runtimeId: 'codex', modelId });
+      selectRuntimeModel('codex', modelId);
     } else if (value.startsWith('opencode:')) {
       // composite: opencode:<provider>/<model> — host expects bare provider/model
       const providerModel = value.slice('opencode:'.length);
-      if (selectedAgent !== 'opencode') {
-        selectAgent('opencode' as AgentId);
-      }
-      selectOpenCodeModel(value);
-      setPendingRuntime({ runtimeId: 'opencode', modelId: providerModel });
+      selectRuntimeModel('opencode', providerModel);
     }
-  }, [selectedAgent, selectAgent, selectModel, selectCodexModel, selectOpenCodeModel, setPendingRuntime]);
+  }, [selectRuntimeModel]);
 
   function handleRuntimeChange(value: string) {
-    const target = value.startsWith('claude-code:')
-      ? { runtimeId: 'claude-code' as const }
-      : value.startsWith('codex:')
-        ? { runtimeId: 'codex' as const }
-        : value.startsWith('opencode:')
-          ? { runtimeId: 'opencode' as const }
-          : null;
     // Sprint 110 R9: choosing another agent is already explicit intent. Stop
     // active prior work, preserve the composer draft, and wait for Send. The
     // host adds one quiet durable transcript boundary when fallback is used.
-    if (target && isRuntimeHandoff(activeConversation, target.runtimeId)) cancelRequest();
     applyRuntimeChange(value);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
@@ -1501,7 +1490,13 @@ export function ChatInput() {
                 onClick={() => handleSend()}
                 disabled={!value.trim() || !isOnline || !isRuntimeOperational}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
-                title={isRuntimeChecking ? 'Checking runtime status…' : isRuntimeError ? 'Runtime check failed — try again above' : sendTitle}
+                title={isRuntimeChecking
+                  ? 'Checking runtime status…'
+                  : isRuntimeError
+                    ? 'Runtime check failed — try again above'
+                    : !isRuntimeOperational
+                      ? `${runtimeLabel} is not ready — choose another model or use the action above`
+                      : sendTitle}
               >
                 <Icon name="paper-plane-right" size={14} />
               </button>

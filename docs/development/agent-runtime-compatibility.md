@@ -1,5 +1,29 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.10.0 service-compatibility correction — 2026-09-03
+
+The bundled Codex `0.149.0` candidate is invalidated. A real GPT-5.6-Sol RUNDEV
+turn returned the service's explicit newer-runtime requirement, while the same
+runtime also failed to decode the current model catalog's `max` effort value.
+This was not an account failure and cannot be repaired by provider fallback.
+
+The release manifest now pins both official Codex components to `0.153.0` on
+darwin-arm64, darwin-x64, and win32-x64 with the SHA-256 values published by
+OpenAI. The manifest validator and its mutation suite pass. On darwin-arm64,
+the fetched `codex-app-server` reports `0.153.0`, the adjacent
+`codex-code-mode-host` passes its supported `--help` probe, and both binaries
+are native arm64 Mach-O executables.
+
+Generated app-server types were compared from `0.149.0` through `0.153.0` for
+the Thread start/resume, Turn start, approvals, user input, account, and model
+surfaces Ritemark consumes. Existing fields remain compatible and later fields
+are optional/additive. In a fresh isolated RUNDEV profile, Settings reported
+`Codex · Ready · Bundled with app · v0.153.0`; selecting GPT-5.6-Sol and sending
+a no-write canary returned the requested exact answer. The previous newer-client
+and effort-decoding errors were absent. Native darwin-x64/win32-x64 execution,
+signed-package validation, and the packaged file create/edit/read canary remain
+release gates.
+
 ## v1.10.0 release-candidate correction — 2026-08-31
 
 The first signed arm64 candidate exposed a packaging gap that the original

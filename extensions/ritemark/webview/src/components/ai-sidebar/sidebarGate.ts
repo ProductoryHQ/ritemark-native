@@ -13,6 +13,10 @@ export interface SidebarGateInput {
   inlineRecoveryAvailable: boolean;
   /** First run, no agent ready yet, wizard not dismissed. */
   onboardingNeeded: boolean;
+  /** Existing content must never disappear behind an account/setup takeover. */
+  hasConversation: boolean;
+  /** A provider problem cannot block a different ready provider. */
+  hasReadyAlternative: boolean;
   /** Claude selected and its binary/auth is not ready (broken, missing, needs sign-in). */
   needsSetup: boolean;
   showCodexSetup: boolean;
@@ -38,9 +42,9 @@ export function sidebarGate(i: SidebarGateInput): SidebarView {
   // full-sidebar wizard. Starting a new conversation removes this condition,
   // so first-run and empty-thread setup still use the dedicated wizard.
   if (i.ready && i.inlineRecoveryAvailable) return 'chat';
-  if (i.ready && i.onboardingNeeded) return 'onboarding';
-  if (i.ready && i.needsSetup) return 'claude-setup';
-  if (i.ready && i.showCodexSetup) return 'codex-setup';
-  if (i.ready && i.showOpenCodeSetup) return 'opencode-setup';
+  if (i.ready && i.onboardingNeeded && !i.hasConversation) return 'onboarding';
+  if (i.ready && i.needsSetup && !i.hasConversation && !i.hasReadyAlternative) return 'claude-setup';
+  if (i.ready && i.showCodexSetup && !i.hasConversation && !i.hasReadyAlternative) return 'codex-setup';
+  if (i.ready && i.showOpenCodeSetup && !i.hasConversation && !i.hasReadyAlternative) return 'opencode-setup';
   return 'chat';
 }

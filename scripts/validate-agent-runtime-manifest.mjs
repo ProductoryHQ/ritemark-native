@@ -32,7 +32,7 @@ const EXPECTED_RUNTIME_ROWS = Object.values(EXPECTED_COMPONENTS)
   .reduce((total, components) => total + components.length * EXPECTED_TARGETS.length, 0);
 
 const APPROVED_RUNTIMES = {
-  codex: { vendor: 'openai', version: '0.149.0' },
+  codex: { vendor: 'openai', version: '0.153.0' },
   claude: { vendor: 'anthropic', version: '2.1.239' },
   opencode: { vendor: 'anomalyco', version: '1.18.21' },
 };

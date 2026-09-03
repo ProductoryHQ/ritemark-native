@@ -566,6 +566,35 @@ async function run(): Promise<void> {
     assert.equal(recoveryUndo.data.conversation.scopeId, unknownScope.scopeId);
     assert.equal(recoveryUndo.data.recovery, true);
 
+    const providerScoped = await controller.handle({
+      type: 'conversation/accept-turn',
+      requestId: 'provider-scoped-interrupt',
+      agentId: 'codex',
+      text: 'Keep Codex running when Claude signs out',
+    });
+    assert.equal(providerScoped.ok, true);
+    if (!providerScoped.ok || !('conversation' in providerScoped.data) || !providerScoped.data.conversation) throw new Error('missing provider-scoped record');
+    await controller.interruptRuntimeAttachments(
+      [providerScoped.data.conversation.conversationId],
+      'runtime-released',
+      'claude-code',
+    );
+    assert.equal(
+      (await store.get(providerScoped.data.conversation.conversationId))?.lifecycle.state,
+      'working',
+      'Claude logout must not interrupt a Codex turn in the same app',
+    );
+    await controller.interruptRuntimeAttachments(
+      [providerScoped.data.conversation.conversationId],
+      'runtime-released',
+      'codex',
+    );
+    assert.equal(
+      (await store.get(providerScoped.data.conversation.conversationId))?.lifecycle.state,
+      'interrupted',
+      'provider release interrupts its own active turn',
+    );
+
     const shutdownActive = await controller.handle({
       type: 'conversation/accept-turn',
       requestId: 'shutdown-active',
@@ -586,7 +615,7 @@ async function run(): Promise<void> {
     controller.dispose();
     const afterDispose = await controller.handle({ type: 'conversation/list', requestId: 'disposed' });
     assert.equal(afterDispose.ok, false);
-    assert.equal((await store.list(scope.scopeId)).length, 5, 'controller disposal does not delete durable conversations');
+    assert.equal((await store.list(scope.scopeId)).length, 6, 'controller disposal does not delete durable conversations');
 
     console.log('ConversationController.test.ts: all tests passed');
   } finally {

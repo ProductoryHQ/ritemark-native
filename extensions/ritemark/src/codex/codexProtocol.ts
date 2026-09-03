@@ -3,7 +3,7 @@
  *
  * JSON-RPC 2.0 over stdio protocol for communicating with `codex app-server`.
  *
- * Audited against: codex app-server generate-ts (v0.149.0)
+ * Audited against: codex app-server generate-ts (v0.153.0)
  * Simplified to the subset used by Ritemark Native.
  */
 

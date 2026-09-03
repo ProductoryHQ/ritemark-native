@@ -81,7 +81,7 @@ them.
 
 ## Refreshed built-in agents
 
-Ritemark 1.10.0 refreshes all three bundled agent engines: Codex 0.149.0,
+Ritemark 1.10.0 refreshes all three bundled agent engines: Codex 0.153.0,
 Claude Code 2.1.239, and OpenCode 1.18.21. Their matching SDK edges are pinned
 to Claude Agent SDK 0.3.239 and ACP SDK 1.4.0, so an app update cannot quietly
 combine an old client with a new engine.
@@ -139,6 +139,16 @@ The recovery card remains available after reloading the window or leaving and
 returning to the failed conversation. Its neutral Ritemark card treatment keeps
 warning colour on the attention icon, uses the standard primary action, and
 does not repeat the same failure as a second red status line.
+
+Claude, Codex, and OpenCode account state is now isolated. Signing out of one
+provider no longer replaces Agent Chat or hides the model selector when another
+provider is connected. The transcript and Composer stay available, and the
+recovery card places the affected account action to the left of a rightmost
+**Use Codex**, **Use Claude**, or **Use OpenCode** action. Ritemark never makes
+that switch silently in an existing conversation: the explicit choice changes
+the pending runtime and model together, and the next message records the normal
+conversation handoff boundary. A logout releases only the affected provider's
+live sessions.
 
 ## Transcribe Insights you can deliver
 

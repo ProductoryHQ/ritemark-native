@@ -412,7 +412,7 @@ function testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval() {
   }
 }
 
-function testSelectingCodexHasOneHostOwnedRefreshPath() {
+function testSelectingCodexEmitsOnlyTheSelectionIntent() {
   const posted: unknown[] = [];
   const originalPostMessage = vscode.postMessage;
   vscode.postMessage = (message: unknown) => { posted.push(message); };
@@ -424,7 +424,85 @@ function testSelectingCodexHasOneHostOwnedRefreshPath() {
       type: 'ai-select-agent',
       agentId: 'codex',
       conversationId: 'conv-active',
-    }], 'the host selection handler owns the one runtime-status refresh');
+    }], 'runtime selection must not add a webview-owned readiness refresh');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testRuntimeAndModelSelectionIsAtomic() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({
+      selectedAgent: 'claude-code',
+      selectedModel: 'claude-opus-5[1m]',
+      codexSelectedModel: 'gpt-old',
+      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-opus-5[1m]', mode: 'ask' },
+    });
+
+    useAISidebarStore.getState().selectRuntimeModel('codex', 'gpt-5.6-sol');
+
+    const active = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(active.selectedAgent, 'codex');
+    assert.equal(active.codexSelectedModel, 'gpt-5.6-sol');
+    assert.deepEqual(active.pendingRuntime, {
+      runtimeId: 'codex',
+      modelId: 'gpt-5.6-sol',
+      mode: 'ask',
+    });
+    assert.deepEqual(posted, [{
+      type: 'ai-select-agent',
+      agentId: 'codex',
+      conversationId: 'conv-active',
+    }]);
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testOnboardingSelectionUsesAtomicRuntimeAndModel() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({
+      selectedAgent: 'claude-code',
+      codexSelectedModel: 'stale-codex-model',
+      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-opus-5[1m]', mode: 'ask' },
+    });
+    useAISidebarStore.setState({
+      codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', description: 'Test model' }],
+      onboardingStatus: {
+        platform: 'darwin',
+        wingetAvailable: false,
+        gitInstalled: true,
+        nodeInstalled: true,
+        claudeCliInstalled: true,
+        claudeCliAuthenticated: false,
+        codexCliInstalled: true,
+        codexCliAuthenticated: true,
+        hasOpenAiKey: false,
+        hasAnthropicKey: false,
+        anyAgentReady: true,
+      },
+    });
+
+    useAISidebarStore.getState().dismissOnboarding();
+
+    const active = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(active.selectedAgent, 'codex');
+    assert.equal(active.codexSelectedModel, 'gpt-5.6-sol');
+    assert.equal(active.pendingRuntime.runtimeId, 'codex');
+    assert.equal(active.pendingRuntime.modelId, 'gpt-5.6-sol');
+    assert.ok(posted.some((message) => (
+      typeof message === 'object'
+      && message !== null
+      && (message as { type?: string }).type === 'ai-select-agent'
+    )));
   } finally {
     vscode.postMessage = originalPostMessage;
     resetStore();
@@ -444,7 +522,9 @@ function main() {
   testFailedRuntimeCanBeStoppedAndHandedToAnotherAgent();
   testOpenCodeLeavesCanonicalHandoffContextToHost();
   testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval();
-  testSelectingCodexHasOneHostOwnedRefreshPath();
+  testSelectingCodexEmitsOnlyTheSelectionIntent();
+  testRuntimeAndModelSelectionIsAtomic();
+  testOnboardingSelectionUsesAtomicRuntimeAndModel();
   console.log('Runtime switching tests passed.');
 }
 
