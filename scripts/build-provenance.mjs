@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sha256Tree } from './tree-sha256.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,9 +14,15 @@ let mode = 'write';
 let repo = process.cwd();
 let target = 'darwin-arm64';
 let appPath = '';
+let extensionInput = '';
+let expectedExtensionSha = '';
+let expectedExtensionAuthenticodeSha = '';
+let verifyRecordedExtensionAuthenticode = false;
 
 function usage() {
   console.log(`Usage: node scripts/build-provenance.mjs --write|--verify --target TARGET --app PATH [--repo PATH]
+       [--extension-input PATH --expected-extension-sha SHA256 --expected-extension-authenticode-sha SHA256]
+       [--verify-recorded-extension-authenticode]
 
 Writes or verifies the immutable input manifest embedded in a release build.`);
 }
@@ -27,6 +34,10 @@ for (let index = 0; index < args.length; index += 1) {
   else if (arg === '--repo') repo = args[++index];
   else if (arg === '--target') target = args[++index];
   else if (arg === '--app') appPath = args[++index];
+  else if (arg === '--extension-input') extensionInput = args[++index];
+  else if (arg === '--expected-extension-sha') expectedExtensionSha = args[++index];
+  else if (arg === '--expected-extension-authenticode-sha') expectedExtensionAuthenticodeSha = args[++index];
+  else if (arg === '--verify-recorded-extension-authenticode') verifyRecordedExtensionAuthenticode = true;
   else if (arg === '--help' || arg === '-h') {
     usage();
     process.exit(0);
@@ -43,6 +54,25 @@ if (!appPath || !repo || !target) {
 
 repo = fs.realpathSync(repo);
 appPath = path.resolve(repo, appPath);
+if (extensionInput) extensionInput = path.resolve(repo, extensionInput);
+
+for (const [option, digest] of [
+  ['--expected-extension-sha', expectedExtensionSha],
+  ['--expected-extension-authenticode-sha', expectedExtensionAuthenticodeSha]
+]) {
+  if (digest && !/^[a-f0-9]{64}$/.test(digest)) {
+    console.error(`ERROR: ${option} must be a lowercase SHA-256 digest`);
+    process.exit(2);
+  }
+}
+if ((expectedExtensionSha || expectedExtensionAuthenticodeSha) && !extensionInput && !verifyRecordedExtensionAuthenticode) {
+  console.error('ERROR: expected extension digests require --extension-input or --verify-recorded-extension-authenticode');
+  process.exit(2);
+}
+if (verifyRecordedExtensionAuthenticode && (mode !== 'verify' || target !== 'win32-x64')) {
+  console.error('ERROR: --verify-recorded-extension-authenticode is only valid for Windows verification');
+  process.exit(2);
+}
 
 function git(gitArgs, cwd = repo) {
   return execFileSync('git', ['-C', cwd, ...gitArgs], { encoding: 'utf8' }).trim();
@@ -79,6 +109,44 @@ function derivedVscodeState() {
     repo
   ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return JSON.parse(output);
+}
+
+function builtExtensionPath() {
+  if (target.startsWith('darwin-')) {
+    return path.join(appPath, 'Contents', 'Resources', 'app', 'extensions', 'ritemark');
+  }
+  if (target === 'win32-x64') {
+    return path.join(appPath, 'resources', 'app', 'extensions', 'ritemark');
+  }
+  throw new Error(`unsupported target: ${target}`);
+}
+
+function verifiedExtensionPayload() {
+  if (!extensionInput) return null;
+
+  const stagedSha256 = sha256Tree(extensionInput);
+  const stagedAuthenticodeSha256 = sha256Tree(extensionInput, { normalizeAuthenticode: true });
+  if (expectedExtensionSha && stagedSha256 !== expectedExtensionSha) {
+    throw new Error(`staged extension changed after its release digest was recorded: expected ${expectedExtensionSha}, got ${stagedSha256}`);
+  }
+  if (expectedExtensionAuthenticodeSha && stagedAuthenticodeSha256 !== expectedExtensionAuthenticodeSha) {
+    throw new Error(`staged Authenticode-normalized extension payload changed after its release digest was recorded: expected ${expectedExtensionAuthenticodeSha}, got ${stagedAuthenticodeSha256}`);
+  }
+
+  const builtSha256 = sha256Tree(builtExtensionPath());
+  const builtAuthenticodeSha256 = sha256Tree(builtExtensionPath(), { normalizeAuthenticode: true });
+  if (stagedSha256 !== builtSha256) {
+    throw new Error(`built extension does not match staged release payload: staged ${stagedSha256}, built ${builtSha256}`);
+  }
+  if (stagedAuthenticodeSha256 !== builtAuthenticodeSha256) {
+    throw new Error(`built Authenticode-normalized extension payload does not match staging: staged ${stagedAuthenticodeSha256}, built ${builtAuthenticodeSha256}`);
+  }
+
+  return {
+    sha256: stagedSha256,
+    authenticodeSha256: stagedAuthenticodeSha256,
+    verifiedTransition: 'staged-tree-to-final-copy-before-signing'
+  };
 }
 
 function inputs() {
@@ -129,8 +197,10 @@ try {
   }
 
   if (mode === 'write') {
+    const extensionPayload = verifiedExtensionPayload();
     const manifest = {
       ...current,
+      ...(extensionPayload ? { extensionPayload } : {}),
       buildEnvironment: { nodeVersion: process.version, nodeArch: process.arch },
       builtAt: new Date().toISOString()
     };
@@ -139,9 +209,48 @@ try {
     console.log(`BUILD PROVENANCE WRITTEN: ${output}`);
   } else {
     const manifest = JSON.parse(fs.readFileSync(output, 'utf8'));
-    const { builtAt: _builtAt, buildEnvironment: _buildEnvironment, ...recorded } = manifest;
+    const {
+      builtAt: _builtAt,
+      buildEnvironment: _buildEnvironment,
+      extensionPayload,
+      ...recorded
+    } = manifest;
     if (JSON.stringify(recorded) !== JSON.stringify(current)) {
       throw new Error('embedded build provenance does not match the current canonical inputs');
+    }
+    if (target.startsWith('darwin-') && (
+      !/^[a-f0-9]{64}$/.test(extensionPayload?.sha256 || '') ||
+      !/^[a-f0-9]{64}$/.test(extensionPayload?.authenticodeSha256 || '') ||
+      extensionPayload?.verifiedTransition !== 'staged-tree-to-final-copy-before-signing'
+    )) {
+      throw new Error('embedded macOS build provenance is missing a valid pre-sign extension payload attestation');
+    }
+    if (extensionInput) {
+      if (!extensionPayload) {
+        throw new Error('embedded build provenance is missing the staged extension payload digest');
+      }
+      const currentExtensionPayload = verifiedExtensionPayload();
+      if (JSON.stringify(extensionPayload) !== JSON.stringify(currentExtensionPayload)) {
+        throw new Error('embedded staged extension payload digest does not match');
+      }
+    }
+    if (verifyRecordedExtensionAuthenticode) {
+      if (!extensionPayload?.authenticodeSha256) {
+        throw new Error('embedded build provenance is missing the required Authenticode-normalized extension payload digest');
+      }
+      if (extensionPayload.verifiedTransition !== 'staged-tree-to-final-copy-before-signing') {
+        throw new Error('embedded extension payload has an invalid verification transition');
+      }
+      if (expectedExtensionSha && extensionPayload.sha256 !== expectedExtensionSha) {
+        throw new Error(`embedded staged extension digest does not match the original pre-build digest: expected ${expectedExtensionSha}, got ${extensionPayload.sha256 || '<missing>'}`);
+      }
+      if (expectedExtensionAuthenticodeSha && extensionPayload.authenticodeSha256 !== expectedExtensionAuthenticodeSha) {
+        throw new Error(`embedded Authenticode-normalized extension digest does not match the original pre-build digest: expected ${expectedExtensionAuthenticodeSha}, got ${extensionPayload.authenticodeSha256 || '<missing>'}`);
+      }
+      const currentAuthenticodeSha256 = sha256Tree(builtExtensionPath(), { normalizeAuthenticode: true });
+      if (currentAuthenticodeSha256 !== extensionPayload.authenticodeSha256) {
+        throw new Error(`signed build Authenticode-normalized extension payload changed after attestation: expected ${extensionPayload.authenticodeSha256}, got ${currentAuthenticodeSha256}`);
+      }
     }
     console.log(`BUILD PROVENANCE VERIFIED: ${output}`);
   }

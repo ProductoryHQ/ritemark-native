@@ -420,17 +420,29 @@ echo ""
 echo -e "${BLUE}Step 6/9: Provenance & Post-Build Validation${NC}"
 echo "----------------------------------------"
 
+EXTENSION_SHA_PATH="$PROJECT_DIR/VSCode-$TARGET/ritemark-extension-pre-sign.sha256"
+node ./scripts/tree-sha256.mjs "$EXT_DEST" > "$EXTENSION_SHA_PATH"
+if ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"; then
+  echo -e "${RED}Failed to record the pre-sign extension digest${NC}"
+  exit 1
+fi
+EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
+
 node ./scripts/build-provenance.mjs \
   --write \
   --repo "$PROJECT_DIR" \
   --target "$TARGET" \
-  --app "$APP_PATH"
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
 
 node ./scripts/build-provenance.mjs \
   --verify \
   --repo "$PROJECT_DIR" \
   --target "$TARGET" \
-  --app "$APP_PATH"
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
 
 if ! ./scripts/validate-build-output.sh "$TARGET"; then
   echo ""
@@ -470,7 +482,9 @@ node ./scripts/build-provenance.mjs \
   --verify \
   --repo "$PROJECT_DIR" \
   --target "$TARGET" \
-  --app "$APP_PATH"
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
 echo ""
 
 # =============================================================================

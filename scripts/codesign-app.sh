@@ -44,15 +44,9 @@ esac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_PATH="$PROJECT_ROOT/VSCode-$TARGET/Ritemark.app"
+EXTENSION_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+EXTENSION_SHA_PATH="$PROJECT_ROOT/VSCode-$TARGET/ritemark-extension-pre-sign.sha256"
 ENTITLEMENTS_PATH="$PROJECT_ROOT/branding/entitlements.plist"
-
-# Never sign an app whose source/dependency identity cannot be traced back to
-# the exact main commit and committed build recipe that produced it.
-if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
-    --verify --repo "$PROJECT_ROOT" --target "$TARGET" --app "$APP_PATH"; then
-    echo -e "${RED}ERROR: Build provenance verification failed; refusing to sign.${NC}"
-    exit 1
-fi
 
 # Counters (using temp files to persist across subshells)
 SIGNED_FILE=$(mktemp)
@@ -198,9 +192,9 @@ echo "[3/7] Cleaning up unnecessary files..."
 # Remove webview node_modules if present (shouldn't be in production bundle)
 WEBVIEW_NODE_MODULES="$APP_PATH/Contents/Resources/app/extensions/ritemark/webview/node_modules"
 if [ -d "$WEBVIEW_NODE_MODULES" ]; then
-    echo "  Removing webview node_modules..."
-    rm -rf "$WEBVIEW_NODE_MODULES"
-    echo -e "  ${GREEN}✓ Removed webview node_modules${NC}"
+    echo -e "  ${RED}ERROR: Unexpected webview node_modules in the attested extension payload.${NC}"
+    echo "  Rebuild the app; signing must not rewrite extension contents."
+    exit 1
 else
     echo "  ✓ No webview node_modules to remove"
 fi
@@ -222,6 +216,24 @@ do
     fi
 done
 echo "  ✓ Normalized framework bundle symlinks"
+
+# The build records the exact extension tree outside the app bundle. Verify it
+# after all deterministic preparation and immediately before the first signing
+# mutation. Codesign changes Mach-O bytes, so the deep app signature becomes the
+# integrity boundary after this point.
+if [ ! -f "$EXTENSION_SHA_PATH" ] || ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"; then
+    echo -e "${RED}ERROR: Missing or invalid pre-sign extension digest: $EXTENSION_SHA_PATH${NC}"
+    exit 1
+fi
+EXPECTED_EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
+if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
+    --verify --repo "$PROJECT_ROOT" --target "$TARGET" --app "$APP_PATH" \
+    --extension-input "$EXTENSION_PATH" \
+    --expected-extension-sha "$EXPECTED_EXTENSION_SHA"; then
+    echo -e "${RED}ERROR: Build or extension provenance verification failed; refusing to sign.${NC}"
+    exit 1
+fi
+echo "  ✓ Exact pre-sign extension payload verified"
 
 # =============================================================================
 # Step 4: Discover ALL native binaries

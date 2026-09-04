@@ -70,7 +70,7 @@ Use this for VS Code core changes, `patches/vscode`, branding, app bundle change
 ```
 
 9. Switch the repository private and manually dispatch `build-macos-x64.yml` and `build-windows.yml` against the exact approved source commit. These workflows are `workflow_dispatch`-only; a tag push does not trigger them. Restore the repository to public after the Windows workflow completes.
-10. Download the x64 artifact, sign it, create the x64 DMG without notarizing it, and verify the signed Windows installer.
+10. Download the x64 artifact tarball into `dist/x64-ci`, run `./scripts/extract-macos-x64-artifact.sh` to verify and restore its symlinks/modes, sign it, create the x64 DMG without notarizing it, and verify the signed Windows installer.
 11. Gate 2: Jarmo tests the signed, unnotarized x64 DMG and Windows installer. Complete any release-bound Store/external matrix against the exact Windows hash. Do not notarize x64 until Jarmo approves and at least 60 minutes have elapsed since the x64 DMG build with no new bug.
 12. After Gate 2 plus the full hardening window, notarize/staple and verify the x64 DMG.
 13. Tag the already-pushed source commit, create the GitHub release, and publish the canonical update feed together only after every release gate is closed.

@@ -53,7 +53,9 @@ function vscodeState(vscodePath) {
   hash.update(git(vscodePath, ['diff', '--binary', 'HEAD', '--'], { encoding: 'buffer' }));
 
   const untracked = git(vscodePath, ['ls-files', '--others', '--exclude-standard', '-z'])
-    .split('\0').filter(Boolean).sort();
+    .split('\0')
+    .filter(Boolean)
+    .sort();
   for (const relative of untracked) {
     const absolute = path.join(vscodePath, relative);
     hash.update(relative);

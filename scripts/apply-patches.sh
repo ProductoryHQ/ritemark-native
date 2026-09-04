@@ -2,11 +2,14 @@
 #
 # apply-patches.sh - Apply all RiteMark patches to VS Code submodule
 #
-# Usage: ./scripts/apply-patches.sh [--dry-run] [--reverse]
+# Usage: ./scripts/apply-patches.sh [--dry-run] [--reverse] [--extension-layout auto|absent]
 #
 # Options:
 #   --dry-run   Check if patches apply cleanly without actually applying
 #   --reverse   Remove patches (unapply)
+#   --extension-layout absent
+#               Keep vscode/extensions/ritemark absent and bind that exact
+#               shell-build state into release provenance (Windows CI only)
 #
 set -e
 
@@ -24,16 +27,39 @@ NC='\033[0m' # No Color
 # Parse arguments
 DRY_RUN=false
 REVERSE=false
-for arg in "$@"; do
-    case $arg in
+EXTENSION_LAYOUT=auto
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         --dry-run)
             DRY_RUN=true
+            shift
             ;;
         --reverse)
             REVERSE=true
+            shift
+            ;;
+        --extension-layout)
+            if [ "$#" -lt 2 ]; then
+                echo -e "${RED}Error: --extension-layout requires auto or absent${NC}" >&2
+                exit 2
+            fi
+            EXTENSION_LAYOUT="$2"
+            shift 2
+            ;;
+        *)
+            echo -e "${RED}Error: unknown argument: $1${NC}" >&2
+            exit 2
             ;;
     esac
 done
+
+case "$EXTENSION_LAYOUT" in
+    auto|absent) ;;
+    *)
+        echo -e "${RED}Error: --extension-layout must be auto or absent${NC}" >&2
+        exit 2
+        ;;
+esac
 
 # Check directories exist
 if [ ! -d "$PATCHES_DIR" ]; then
@@ -43,6 +69,12 @@ fi
 
 if [ ! -d "$VSCODE_DIR" ]; then
     echo -e "${RED}Error: VS Code directory not found at $VSCODE_DIR${NC}"
+    exit 1
+fi
+
+if [ "$EXTENSION_LAYOUT" = "absent" ] && \
+   { [ -e "$VSCODE_DIR/extensions/ritemark" ] || [ -L "$VSCODE_DIR/extensions/ritemark" ]; }; then
+    echo -e "${RED}Error: extension must already be staged outside VS Code for absent layout${NC}" >&2
     exit 1
 fi
 
@@ -264,6 +296,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"
     PHOSPHOR_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
+    PHOSPHOR_FONT_DEST="$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
     if [ ! -f "$PHOSPHOR_FONT_SRC" ]; then
         PHOSPHOR_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
     fi
@@ -280,11 +313,14 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     if [ -f "$PHOSPHOR_FONT_SRC" ]; then
         echo -n "Copying Phosphor 400 (Regular) icon font... "
-        mkdir -p "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon"
-        cp "$PHOSPHOR_FONT_SRC" "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+        mkdir -p "$(dirname "$PHOSPHOR_FONT_DEST")"
+        cp "$PHOSPHOR_FONT_SRC" "$PHOSPHOR_FONT_DEST"
         echo -e "${GREEN}Done${NC}"
+    elif [ -s "$PHOSPHOR_FONT_DEST" ]; then
+        echo "Phosphor 400 icon font was preserved before dependency pruning"
     else
-        echo -e "${YELLOW}Phosphor 400 font file missing; skipping icon font copy${NC}"
+        echo -e "${RED}Error: required Phosphor 400 font is missing${NC}" >&2
+        exit 1
     fi
 
     # Copy product.json if it exists (for branding)
@@ -298,7 +334,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     echo ""
     echo "========================================"
-    echo "Ensuring Extension Link"
+    echo "Ensuring Extension Layout"
     echo "========================================"
 
     EXTENSION_LINK="$VSCODE_DIR/extensions/ritemark"
@@ -306,7 +342,13 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     mkdir -p "$VSCODE_DIR/extensions"
 
-    if [ ! -e "$EXTENSION_LINK" ]; then
+    if [ "$EXTENSION_LAYOUT" = "absent" ]; then
+        if [ -e "$EXTENSION_LINK" ] || [ -L "$EXTENSION_LINK" ]; then
+            echo -e "${RED}Error: extension must already be staged outside VS Code for absent layout${NC}" >&2
+            exit 1
+        fi
+        echo "Extension remains absent for the staged Windows shell build"
+    elif [ ! -e "$EXTENSION_LINK" ]; then
         echo -n "Creating extension symlink... "
         ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
         echo -e "${GREEN}Done${NC}"

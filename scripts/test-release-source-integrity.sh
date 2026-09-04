@@ -100,6 +100,22 @@ echo "PASS: dry-run validates dependent patches sequentially without changing th
 "$SCRIPT_DIR/verify-release-source.sh" --repo "$SUPER" --expected-ref origin/main >/dev/null
 echo "PASS: accepted clean exact main source"
 
+mkdir -p "$SUPER/vscode/extensions"
+ln -s ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
+expect_failure "extension must already be staged outside VS Code" \
+  "$SUPER/scripts/apply-patches.sh" --extension-layout absent
+rm "$SUPER/vscode/extensions/ritemark"
+mkdir -p "$SUPER/vscode/src/vs/base/browser/ui/codicons/codicon"
+printf 'test phosphor font\n' >"$SUPER/vscode/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+"$SUPER/scripts/apply-patches.sh" --extension-layout absent >/dev/null
+"$SCRIPT_DIR/verify-release-source.sh" \
+  --repo "$SUPER" --expected-ref origin/main --phase patched \
+  --extension-layout absent >/dev/null
+git -C "$SUPER/vscode" restore package-lock.json
+rm -rf "$SUPER/vscode/product.json" "$SUPER/vscode/src"
+node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
+echo "PASS: patch applicator records only an already-staged absent-extension layout"
+
 printf 'derived patch state\n' >>"$SUPER/vscode/package-lock.json"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --verify --repo "$SUPER" >/dev/null
@@ -125,9 +141,24 @@ expect_failure "canonical patch set or patched vscode differs from the state rec
   "$SCRIPT_DIR/verify-release-source.sh" \
     --repo "$SUPER" --expected-ref origin/main --phase patched
 rm "$SUPER/vscode/manual-edit.txt" "$SUPER/vscode/extensions/ritemark"
+expect_failure "canonical patch set or patched vscode differs from the state recorded" \
+  "$SCRIPT_DIR/verify-release-source.sh" \
+    --repo "$SUPER" --expected-ref origin/main --phase patched \
+    --extension-layout absent
+node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
+"$SCRIPT_DIR/verify-release-source.sh" \
+  --repo "$SUPER" --expected-ref origin/main --phase patched \
+  --extension-layout absent >/dev/null
+mkdir -p "$SUPER/vscode/extensions/ritemark"
+printf 'unexpected extension return\n' >"$SUPER/vscode/extensions/ritemark/package.json"
+expect_failure "patched vscode still contains the extension during the staged shell build" \
+  "$SCRIPT_DIR/verify-release-source.sh" \
+    --repo "$SUPER" --expected-ref origin/main --phase patched \
+    --extension-layout absent
+rm -rf "$SUPER/vscode/extensions/ritemark"
 git -C "$SUPER/vscode" restore package-lock.json
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
-echo "PASS: patched release gate rejects unrelated manual VS Code edits"
+echo "PASS: patched release gate binds the exact extension layout and rejects unrelated edits"
 
 CREATED_RELEASE="$TEST_ROOT/created-release"
 GIT_ALLOW_PROTOCOL=file "$SUPER/scripts/create-release-worktree.sh" \
@@ -179,13 +210,95 @@ rm "$SUPER/vscode"
 git -C "$SUPER" -c protocol.file.allow=always submodule update --init --checkout vscode >/dev/null
 
 APP="$SUPER/VSCode-darwin-arm64/Ritemark.app"
-mkdir -p "$APP"
+APP_EXTENSION="$APP/Contents/Resources/app/extensions/ritemark"
+mkdir -p "$APP_EXTENSION/out"
+printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
+STAGED_EXTENSION="$TEST_ROOT/staged-extension"
+cp -R "$APP_EXTENSION" "$STAGED_EXTENSION"
+STAGED_EXTENSION_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" "$STAGED_EXTENSION")"
+STAGED_EXTENSION_AUTHENTICODE_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" --normalize-authenticode "$STAGED_EXTENSION")"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
   --write --repo "$SUPER" --target darwin-arm64 --app "$APP" >/dev/null
+expect_failure "embedded macOS build provenance is missing a valid pre-sign extension payload attestation" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP"
+echo "PASS: macOS provenance requires a pre-sign extension payload attestation"
+
 node "$SCRIPT_DIR/build-provenance.mjs" \
-  --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" >/dev/null
+  --write --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA" >/dev/null
+node "$SCRIPT_DIR/build-provenance.mjs" \
+  --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA" >/dev/null
 echo "PASS: build provenance round-trip"
+
+printf 'staged mutation\n' >>"$STAGED_EXTENSION/out/extension.js"
+expect_failure "staged extension changed after its release digest was recorded" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+    --extension-input "$STAGED_EXTENSION" \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+printf 'built extension\n' >"$STAGED_EXTENSION/out/extension.js"
+echo "PASS: build provenance rejects staged extension drift after digest recording"
+
+printf 'mutated built extension\n' >>"$APP_EXTENSION/out/extension.js"
+expect_failure "built extension does not match staged release payload" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+    --extension-input "$STAGED_EXTENSION" \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
+echo "PASS: build provenance binds the final extension payload"
+
+WINDOWS_APP="$SUPER/VSCode-win32-x64"
+WINDOWS_EXTENSION="$WINDOWS_APP/resources/app/extensions/ritemark"
+mkdir -p "$(dirname "$WINDOWS_EXTENSION")"
+cp -R "$STAGED_EXTENSION" "$WINDOWS_EXTENSION"
+node "$SCRIPT_DIR/build-provenance.mjs" \
+  --write --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA" >/dev/null
+printf 'post-sign non-PE mutation\n' >>"$WINDOWS_EXTENSION/out/extension.js"
+expect_failure "signed build Authenticode-normalized extension payload changed after attestation" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-authenticode \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+printf 'built extension\n' >"$WINDOWS_EXTENSION/out/extension.js"
+echo "PASS: post-sign provenance rejects Authenticode-covered extension drift"
+
+WINDOWS_PROVENANCE="$WINDOWS_APP/resources/app/ritemark-build-provenance.json"
+node -e 'const fs=require("fs"); const p=process.argv[1]; const m=JSON.parse(fs.readFileSync(p)); m.extensionPayload.sha256="0".repeat(64); fs.writeFileSync(p, JSON.stringify(m));' "$WINDOWS_PROVENANCE"
+expect_failure "embedded staged extension digest does not match the original pre-build digest" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-authenticode \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+echo "PASS: post-sign provenance rejects attestation-field drift"
+
+node "$SCRIPT_DIR/build-provenance.mjs" \
+  --write --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA" >/dev/null
+node -e 'const fs=require("fs"); const p=process.argv[1]; const m=JSON.parse(fs.readFileSync(p)); m.extensionPayload.authenticodeSha256="1".repeat(64); fs.writeFileSync(p, JSON.stringify(m));' "$WINDOWS_PROVENANCE"
+expect_failure "embedded Authenticode-normalized extension digest does not match the original pre-build digest" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-authenticode \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+echo "PASS: post-sign provenance rejects Authenticode attestation-field drift"
 
 printf 'manual change after build\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "embedded build provenance does not match" \
@@ -198,5 +311,11 @@ printf '{"ritemarkVersion":"changed"}\n' >"$SUPER/branding/product.json"
 expect_failure "embedded build provenance does not match" \
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target darwin-arm64 --app "$APP"
+
+if ! grep -Fq 'codesign --verify --deep --strict "$APP_PATH"' "$SCRIPT_DIR/create-dmg.sh"; then
+  echo "FAIL: DMG creator does not enforce the post-sign app integrity boundary" >&2
+  exit 1
+fi
+echo "PASS: DMG packaging requires a valid deep app signature"
 
 echo "Release source integrity tests passed"
