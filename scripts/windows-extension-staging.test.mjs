@@ -38,7 +38,7 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   assert.ok(applyPatchesStep < shellBuildStep, 'the staged shell state must be verified before build');
   assert.ok(shellBuildStep < finalCopyStep, 'final extension copy must happen after the shell build');
   assert.ok(finalCopyStep < provenanceStep, 'the copied extension must be attested before later packaging steps');
-  assert.ok(signedPayloadStep < validateBuildStep, 'non-PE payload verification must run after PE signing');
+  assert.ok(signedPayloadStep < validateBuildStep, 'Authenticode-normalized payload verification must run after PE signing');
 
   assert.match(
     workflow,
@@ -63,8 +63,8 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   );
   assert.match(
     workflow.slice(validateBuildStep),
-    /build-provenance\.mjs[\s\\]+--verify --target win32-x64 --app "\$BUILD_DIR"[\s\\]+--verify-recorded-extension-non-pe[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"[\s\\]+--expected-extension-non-pe-sha "\$STAGED_EXTENSION_NON_PE_SHA"/,
-    'post-sign validation must require both original staged digests',
+    /build-provenance\.mjs[\s\\]+--verify --target win32-x64 --app "\$BUILD_DIR"[\s\\]+--verify-recorded-extension-authenticode[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"[\s\\]+--expected-extension-authenticode-sha "\$STAGED_EXTENSION_AUTHENTICODE_SHA"/,
+    'post-sign validation must bind the original tree and Authenticode-normalized digests',
   );
   const finalCopyCommand = workflow.indexOf('cp -R "$STAGED_EXTENSION" "$EXT_DEST"', finalCopyStep);
   assert.notEqual(finalCopyCommand, -1, 'the staged extension must be copied into the final app');

@@ -400,11 +400,11 @@ jobs:
             "$RUNNER_TEMP/ritemark-extension" \
             > "$RUNNER_TEMP/ritemark-extension.sha256"
           node ./scripts/tree-sha256.mjs \
-            --omit-portable-executable-bytes \
+            --normalize-authenticode \
             "$RUNNER_TEMP/ritemark-extension" \
-            > "$RUNNER_TEMP/ritemark-extension-non-pe.sha256"
+            > "$RUNNER_TEMP/ritemark-extension-authenticode.sha256"
           grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension.sha256"
-          grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension-non-pe.sha256"
+          grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension-authenticode.sha256"
 
       - name: Apply patches to staged shell state
         shell: bash
@@ -497,17 +497,17 @@ jobs:
         run: |
           STAGED_EXTENSION="$RUNNER_TEMP/ritemark-extension"
           STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
-          STAGED_EXTENSION_NON_PE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-non-pe.sha256")"
+          STAGED_EXTENSION_AUTHENTICODE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-authenticode.sha256")"
           node ./scripts/build-provenance.mjs \
             --write --target win32-x64 --app VSCode-win32-x64 \
             --extension-input "$STAGED_EXTENSION" \
             --expected-extension-sha "$STAGED_EXTENSION_SHA" \
-            --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
+            --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
           node ./scripts/build-provenance.mjs \
             --verify --target win32-x64 --app VSCode-win32-x64 \
             --extension-input "$STAGED_EXTENSION" \
             --expected-extension-sha "$STAGED_EXTENSION_SHA" \
-            --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
+            --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
 
       - name: Patch Ritemark.exe icon (branding)
         shell: bash
@@ -593,14 +593,14 @@ jobs:
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
           STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
-          STAGED_EXTENSION_NON_PE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-non-pe.sha256")"
+          STAGED_EXTENSION_AUTHENTICODE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-authenticode.sha256")"
           ERRORS=0
 
           if ! node ./scripts/build-provenance.mjs \
               --verify --target win32-x64 --app "$BUILD_DIR" \
-              --verify-recorded-extension-non-pe \
+              --verify-recorded-extension-authenticode \
               --expected-extension-sha "$STAGED_EXTENSION_SHA" \
-              --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"; then
+              --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"; then
             ERRORS=$((ERRORS + 1))
           fi
 

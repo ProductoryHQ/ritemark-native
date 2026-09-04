@@ -13,7 +13,91 @@ export function isPortableExecutable(content) {
     content[peOffset + 2] === 0x00 && content[peOffset + 3] === 0x00;
 }
 
-export function sha256Tree(root, { omitPortableExecutableBytes = false } = {}) {
+export function normalizePortableExecutableForAuthenticode(content) {
+  if (!isPortableExecutable(content)) {
+    throw new Error('content is not a Portable Executable');
+  }
+
+  const peOffset = content.readInt32LE(0x3c);
+  const coffHeaderEnd = peOffset + 24;
+  if (coffHeaderEnd > content.length) {
+    throw new Error('truncated PE COFF header');
+  }
+
+  const numberOfSections = content.readUInt16LE(peOffset + 6);
+  const optionalHeaderSize = content.readUInt16LE(peOffset + 20);
+  const optionalHeaderOffset = coffHeaderEnd;
+  const optionalHeaderEnd = optionalHeaderOffset + optionalHeaderSize;
+  if (optionalHeaderEnd > content.length) {
+    throw new Error('truncated PE optional header');
+  }
+
+  const optionalMagic = content.readUInt16LE(optionalHeaderOffset);
+  const dataDirectoryOffset = optionalMagic === 0x10b ? 96 : optionalMagic === 0x20b ? 112 : 0;
+  const numberOfDirectoriesOffset = optionalMagic === 0x10b ? 92 : optionalMagic === 0x20b ? 108 : 0;
+  if (!dataDirectoryOffset) {
+    throw new Error(`unsupported PE optional-header magic 0x${optionalMagic.toString(16)}`);
+  }
+
+  const checksumOffset = optionalHeaderOffset + 64;
+  const sizeOfHeadersOffset = optionalHeaderOffset + 60;
+  const numberOfDirectoriesAbsolute = optionalHeaderOffset + numberOfDirectoriesOffset;
+  const certificateDirectoryOffset = optionalHeaderOffset + dataDirectoryOffset + (4 * 8);
+  if (checksumOffset + 4 > optionalHeaderEnd ||
+      sizeOfHeadersOffset + 4 > optionalHeaderEnd ||
+      numberOfDirectoriesAbsolute + 4 > optionalHeaderEnd ||
+      certificateDirectoryOffset + 8 > optionalHeaderEnd) {
+    throw new Error('PE optional header is too small for Authenticode fields');
+  }
+  if (content.readUInt32LE(numberOfDirectoriesAbsolute) < 5) {
+    throw new Error('PE optional header has no Certificate Table directory entry');
+  }
+
+  const sectionTableOffset = optionalHeaderEnd;
+  const sectionTableEnd = sectionTableOffset + (numberOfSections * 40);
+  if (sectionTableEnd > content.length) {
+    throw new Error('truncated PE section table');
+  }
+
+  let signedContentEnd = content.readUInt32LE(sizeOfHeadersOffset);
+  if (signedContentEnd < sectionTableEnd || signedContentEnd > content.length) {
+    throw new Error('invalid PE SizeOfHeaders');
+  }
+  for (let index = 0; index < numberOfSections; index += 1) {
+    const sectionOffset = sectionTableOffset + (index * 40);
+    const rawSize = content.readUInt32LE(sectionOffset + 16);
+    const rawOffset = content.readUInt32LE(sectionOffset + 20);
+    if (rawSize > content.length || rawOffset > content.length - rawSize) {
+      throw new Error(`PE section ${index + 1} exceeds the file`);
+    }
+    signedContentEnd = Math.max(signedContentEnd, rawOffset + rawSize);
+  }
+
+  const certificateOffset = content.readUInt32LE(certificateDirectoryOffset);
+  const certificateSize = content.readUInt32LE(certificateDirectoryOffset + 4);
+  if ((certificateOffset === 0) !== (certificateSize === 0)) {
+    throw new Error('incomplete PE Certificate Table directory entry');
+  }
+  if (certificateSize) {
+    if (certificateOffset % 8 !== 0) {
+      throw new Error('PE Certificate Table is not 8-byte aligned');
+    }
+    if (certificateOffset < signedContentEnd ||
+        certificateOffset > content.length - certificateSize) {
+      throw new Error('PE Certificate Table overlaps signed content or exceeds the file');
+    }
+  }
+
+  // Authenticode may update the checksum and Certificate Table directory, and
+  // append the certificate after the final image section. Keep every header and
+  // section byte stable while normalizing only those signing-owned regions.
+  const normalized = Buffer.from(content.subarray(0, signedContentEnd));
+  normalized.fill(0, checksumOffset, checksumOffset + 4);
+  normalized.fill(0, certificateDirectoryOffset, certificateDirectoryOffset + 8);
+  return normalized;
+}
+
+export function sha256Tree(root, { normalizeAuthenticode = false } = {}) {
   const absoluteRoot = path.resolve(root);
   if (!fs.statSync(absoluteRoot).isDirectory()) {
     throw new Error(`tree root is not a directory: ${root}`);
@@ -34,8 +118,9 @@ export function sha256Tree(root, { omitPortableExecutableBytes = false } = {}) {
       } else if (stat.isFile()) {
         hash.update(`file\0${relative}\0`);
         const content = fs.readFileSync(absolute);
-        if (omitPortableExecutableBytes && isPortableExecutable(content)) {
-          hash.update('portable-executable-bytes-covered-by-authenticode');
+        if (normalizeAuthenticode && isPortableExecutable(content)) {
+          hash.update('authenticode-normalized\0');
+          hash.update(normalizePortableExecutableForAuthenticode(content));
         } else {
           hash.update(content);
         }
@@ -55,15 +140,15 @@ export function sha256Tree(root, { omitPortableExecutableBytes = false } = {}) {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
   const cliArgs = process.argv.slice(2);
-  const omitPortableExecutableBytes = cliArgs[0] === '--omit-portable-executable-bytes';
-  const directory = omitPortableExecutableBytes ? cliArgs[1] : cliArgs[0];
-  if (!directory || cliArgs.length !== (omitPortableExecutableBytes ? 2 : 1)) {
-    console.error('Usage: node scripts/tree-sha256.mjs [--omit-portable-executable-bytes] DIRECTORY');
+  const normalizeAuthenticode = cliArgs[0] === '--normalize-authenticode';
+  const directory = normalizeAuthenticode ? cliArgs[1] : cliArgs[0];
+  if (!directory || cliArgs.length !== (normalizeAuthenticode ? 2 : 1)) {
+    console.error('Usage: node scripts/tree-sha256.mjs [--normalize-authenticode] DIRECTORY');
     process.exit(2);
   }
 
   try {
-    process.stdout.write(`${sha256Tree(directory, { omitPortableExecutableBytes })}\n`);
+    process.stdout.write(`${sha256Tree(directory, { normalizeAuthenticode })}\n`);
   } catch (error) {
     console.error(`TREE SHA-256 BLOCKED: ${error.message}`);
     process.exit(1);
