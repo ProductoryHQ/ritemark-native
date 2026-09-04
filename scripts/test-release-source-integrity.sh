@@ -210,13 +210,40 @@ rm "$SUPER/vscode"
 git -C "$SUPER" -c protocol.file.allow=always submodule update --init --checkout vscode >/dev/null
 
 APP="$SUPER/VSCode-darwin-arm64/Ritemark.app"
-mkdir -p "$APP"
+APP_EXTENSION="$APP/Contents/Resources/app/extensions/ritemark"
+mkdir -p "$APP_EXTENSION/out"
+printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
+STAGED_EXTENSION="$TEST_ROOT/staged-extension"
+cp -R "$APP_EXTENSION" "$STAGED_EXTENSION"
+STAGED_EXTENSION_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" "$STAGED_EXTENSION")"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
-  --write --repo "$SUPER" --target darwin-arm64 --app "$APP" >/dev/null
+  --write --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
-  --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" >/dev/null
+  --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
 echo "PASS: build provenance round-trip"
+
+printf 'staged mutation\n' >>"$STAGED_EXTENSION/out/extension.js"
+expect_failure "staged extension changed after its release digest was recorded" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+    --extension-input "$STAGED_EXTENSION" \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+printf 'built extension\n' >"$STAGED_EXTENSION/out/extension.js"
+echo "PASS: build provenance rejects staged extension drift after digest recording"
+
+printf 'mutated built extension\n' >>"$APP_EXTENSION/out/extension.js"
+expect_failure "built extension does not match staged release payload" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
+    --extension-input "$STAGED_EXTENSION" \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
+echo "PASS: build provenance binds the final extension payload"
 
 printf 'manual change after build\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "embedded build provenance does not match" \
@@ -229,5 +256,11 @@ printf '{"ritemarkVersion":"changed"}\n' >"$SUPER/branding/product.json"
 expect_failure "embedded build provenance does not match" \
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target darwin-arm64 --app "$APP"
+
+if ! grep -Fq 'codesign --verify --deep --strict "$APP_PATH"' "$SCRIPT_DIR/create-dmg.sh"; then
+  echo "FAIL: DMG creator does not enforce the post-sign app integrity boundary" >&2
+  exit 1
+fi
+echo "PASS: DMG packaging requires a valid deep app signature"
 
 echo "Release source integrity tests passed"

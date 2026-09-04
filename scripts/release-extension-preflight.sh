@@ -73,6 +73,7 @@ SHELL_TIER_PATHS=(
   "scripts/build-prod.sh"
   "scripts/build-prod-windows.sh"
   "scripts/build-provenance.mjs"
+  "scripts/tree-sha256.mjs"
   "scripts/codesign-app.sh"
   "scripts/create-dmg.sh"
   "scripts/create-release-worktree.sh"

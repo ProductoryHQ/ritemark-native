@@ -381,6 +381,10 @@ jobs:
           bash ./scripts/stage-extension-for-shell-build.sh \
             vscode/extensions/ritemark \
             "$RUNNER_TEMP/ritemark-extension"
+          node ./scripts/tree-sha256.mjs \
+            "$RUNNER_TEMP/ritemark-extension" \
+            > "$RUNNER_TEMP/ritemark-extension.sha256"
+          grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension.sha256"
 
       - name: Apply patches to staged shell state
         shell: bash
@@ -493,10 +497,16 @@ jobs:
         shell: bash
         working-directory: r
         run: |
+          STAGED_EXTENSION="$RUNNER_TEMP/ritemark-extension"
+          STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
           node ./scripts/build-provenance.mjs \
-            --write --target win32-x64 --app VSCode-win32-x64
+            --write --target win32-x64 --app VSCode-win32-x64 \
+            --extension-input "$STAGED_EXTENSION" \
+            --expected-extension-sha "$STAGED_EXTENSION_SHA"
           node ./scripts/build-provenance.mjs \
-            --verify --target win32-x64 --app VSCode-win32-x64
+            --verify --target win32-x64 --app VSCode-win32-x64 \
+            --extension-input "$STAGED_EXTENSION" \
+            --expected-extension-sha "$STAGED_EXTENSION_SHA"
 
       - name: Patch Ritemark.exe icon (branding)
         shell: bash

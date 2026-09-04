@@ -57,6 +57,8 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Add a deterministic staging test covering complete content, paths with spaces, collision refusal, and incomplete-extension refusal.
 - [x] Keep provenance fail-closed: stage the extension before recording the Windows patch state, bind its intentional absence into the complete VS Code shell fingerprint, and leave macOS extension inputs fully fingerprinted.
 - [x] Preserve and validate the locked Phosphor workbench font before extension dev dependencies are pruned; fail closed if neither the dependency source nor the preserved destination exists.
+- [x] Record the complete staged extension tree digest before the shell build, require the final copied extension to match it, and embed that digest in build provenance.
+- [x] Keep integrity continuous across signing: use the staged payload digest before signing, then require a valid deep macOS app signature before DMG packaging.
 - [x] Pass repository QA and review.
 - [ ] Pass a fresh Windows build from the merged canonical `main` commit.
 

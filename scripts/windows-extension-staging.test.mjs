@@ -33,8 +33,18 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
     workflow,
     /stage-extension-for-shell-build\.sh\s+\\\s*\n\s*vscode\/extensions\/ritemark\s+\\\s*\n\s*"\$RUNNER_TEMP\/ritemark-extension"/,
   );
+  assert.match(
+    workflow.slice(stageStep, shellBuildStep),
+    /tree-sha256\.mjs[\s\\]+"\$RUNNER_TEMP\/ritemark-extension"/,
+    'the staged extension digest must be recorded before the shell build',
+  );
   assert.match(workflow, /STAGED_EXTENSION="\$RUNNER_TEMP\/ritemark-extension"/);
   assert.match(workflow, /cp -R "\$STAGED_EXTENSION" "\$EXT_DEST"/);
+  assert.match(
+    workflow.slice(finalCopyStep),
+    /--extension-input "\$STAGED_EXTENSION"[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"/,
+    'provenance must compare the final copied extension with the pre-build staged digest',
+  );
   assert.match(
     workflow.slice(preserveFontStep, pruneStep),
     /node_modules\/@phosphor-icons\/web\/src\/regular\/Phosphor\.woff2/,

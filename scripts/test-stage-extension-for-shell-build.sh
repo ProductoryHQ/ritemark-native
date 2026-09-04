@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STAGER="$SCRIPT_DIR/stage-extension-for-shell-build.sh"
+TREE_HASHER="$SCRIPT_DIR/tree-sha256.mjs"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/ritemark-stage-extension.XXXXXX")"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
@@ -27,6 +28,14 @@ test -s "$DESTINATION/package.json"
 test -s "$DESTINATION/out/extension.js"
 test -s "$DESTINATION/media/webview.js"
 test "$(cat "$DESTINATION/runtime data/sentinel.txt")" = "preserve me"
+
+DESTINATION_SHA="$(node "$TREE_HASHER" "$DESTINATION")"
+ROUNDTRIP="$TEST_ROOT/roundtrip/ritemark"
+mkdir -p "$(dirname "$ROUNDTRIP")"
+cp -R "$DESTINATION" "$ROUNDTRIP"
+test "$(node "$TREE_HASHER" "$ROUNDTRIP")" = "$DESTINATION_SHA"
+printf 'mutated\n' >>"$ROUNDTRIP/out/extension.js"
+test "$(node "$TREE_HASHER" "$ROUNDTRIP")" != "$DESTINATION_SHA"
 
 COLLISION_SOURCE="$TEST_ROOT/collision/source"
 COLLISION_DESTINATION="$TEST_ROOT/collision/destination"
