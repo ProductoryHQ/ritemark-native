@@ -97,3 +97,33 @@ test('PE normalization rejects a Certificate Table that overlaps executable cont
     /overlaps signed content/,
   );
 });
+
+test('PE normalization preserves overlay payloads and removes only the Certificate Table', () => {
+  const imageLength = unsignedPe().length;
+  const unsignedWithOverlay = Buffer.concat([unsignedPe(), Buffer.from('packed-overlay')]);
+  const signed = authenticodeSigned(unsignedWithOverlay);
+  const expectedIdentity = normalizePortableExecutableForAuthenticode(unsignedWithOverlay);
+
+  assert.deepEqual(
+    normalizePortableExecutableForAuthenticode(signed),
+    expectedIdentity,
+    '8-byte signing alignment and certificate bytes must not change PE identity',
+  );
+
+  const changedOverlay = Buffer.from(signed);
+  changedOverlay[imageLength] ^= 0xff;
+  assert.notDeepEqual(
+    normalizePortableExecutableForAuthenticode(changedOverlay),
+    expectedIdentity,
+    'pre-certificate overlay bytes must remain bound to the staged identity',
+  );
+
+  const changedCertificate = Buffer.from(signed);
+  const certificateOffset = changedCertificate.readUInt32LE(CERTIFICATE_DIRECTORY_OFFSET);
+  changedCertificate[certificateOffset + 8] ^= 0xff;
+  assert.deepEqual(
+    normalizePortableExecutableForAuthenticode(changedCertificate),
+    expectedIdentity,
+    'only the actual Certificate Table bytes may vary after signing',
+  );
+});

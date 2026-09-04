@@ -89,12 +89,25 @@ export function normalizePortableExecutableForAuthenticode(content) {
   }
 
   // Authenticode may update the checksum and Certificate Table directory, and
-  // append the certificate after the final image section. Keep every header and
-  // section byte stable while normalizing only those signing-owned regions.
-  const normalized = Buffer.from(content.subarray(0, signedContentEnd));
+  // add/remove only the Certificate Table itself. Retain all other bytes,
+  // including PE overlay payloads used by packed or self-extracting runtimes.
+  const normalized = Buffer.from(content);
   normalized.fill(0, checksumOffset, checksumOffset + 4);
   normalized.fill(0, certificateDirectoryOffset, certificateDirectoryOffset + 8);
-  return normalized;
+  if (certificateSize) {
+    return Buffer.concat([
+      normalized.subarray(0, certificateOffset),
+      normalized.subarray(certificateOffset + certificateSize),
+    ]);
+  }
+
+  // SignTool aligns a newly appended WIN_CERTIFICATE to an 8-byte boundary.
+  // Model that deterministic padding before signing so the identity remains
+  // stable after the actual Certificate Table range is removed.
+  const alignedLength = Math.ceil(normalized.length / 8) * 8;
+  return alignedLength === normalized.length
+    ? normalized
+    : Buffer.concat([normalized, Buffer.alloc(alignedLength - normalized.length)]);
 }
 
 export function sha256Tree(root, { normalizeAuthenticode = false } = {}) {
