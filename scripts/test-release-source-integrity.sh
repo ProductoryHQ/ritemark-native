@@ -257,8 +257,19 @@ printf 'post-sign non-PE mutation\n' >>"$WINDOWS_EXTENSION/out/extension.js"
 expect_failure "signed build non-PE extension payload changed after attestation" \
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
-    --verify-recorded-extension-non-pe
+    --verify-recorded-extension-non-pe \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+printf 'built extension\n' >"$WINDOWS_EXTENSION/out/extension.js"
 echo "PASS: post-sign provenance rejects non-PE extension drift"
+
+WINDOWS_PROVENANCE="$WINDOWS_APP/resources/app/ritemark-build-provenance.json"
+node -e 'const fs=require("fs"); const p=process.argv[1]; const m=JSON.parse(fs.readFileSync(p)); m.extensionPayload.sha256="0".repeat(64); fs.writeFileSync(p, JSON.stringify(m));' "$WINDOWS_PROVENANCE"
+expect_failure "embedded staged extension digest does not match the original pre-build digest" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-non-pe \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+echo "PASS: post-sign provenance rejects attestation-field drift"
 
 printf 'manual change after build\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "embedded build provenance does not match" \

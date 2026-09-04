@@ -584,11 +584,13 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
+          STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
           ERRORS=0
 
           if ! node ./scripts/build-provenance.mjs \
               --verify --target win32-x64 --app "$BUILD_DIR" \
-              --verify-recorded-extension-non-pe; then
+              --verify-recorded-extension-non-pe \
+              --expected-extension-sha "$STAGED_EXTENSION_SHA"; then
             ERRORS=$((ERRORS + 1))
           fi
 

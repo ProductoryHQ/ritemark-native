@@ -58,8 +58,8 @@ if (expectedExtensionSha && !/^[a-f0-9]{64}$/.test(expectedExtensionSha)) {
   console.error('ERROR: --expected-extension-sha must be a lowercase SHA-256 digest');
   process.exit(2);
 }
-if (expectedExtensionSha && !extensionInput) {
-  console.error('ERROR: --expected-extension-sha requires --extension-input');
+if (expectedExtensionSha && !extensionInput && !verifyRecordedExtensionNonPe) {
+  console.error('ERROR: --expected-extension-sha requires --extension-input or --verify-recorded-extension-non-pe');
   process.exit(2);
 }
 if (verifyRecordedExtensionNonPe && (mode !== 'verify' || target !== 'win32-x64')) {
@@ -220,6 +220,12 @@ try {
     if (verifyRecordedExtensionNonPe) {
       if (!extensionPayload?.nonPeSha256) {
         throw new Error('embedded build provenance is missing the required non-PE extension payload digest');
+      }
+      if (extensionPayload.verifiedTransition !== 'staged-tree-to-final-copy-before-signing') {
+        throw new Error('embedded extension payload has an invalid verification transition');
+      }
+      if (expectedExtensionSha && extensionPayload.sha256 !== expectedExtensionSha) {
+        throw new Error(`embedded staged extension digest does not match the original pre-build digest: expected ${expectedExtensionSha}, got ${extensionPayload.sha256 || '<missing>'}`);
       }
       const currentNonPeSha256 = sha256Tree(builtExtensionPath(), { omitPortableExecutableBytes: true });
       if (currentNonPeSha256 !== extensionPayload.nonPeSha256) {
