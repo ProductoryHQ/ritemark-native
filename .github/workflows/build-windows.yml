@@ -328,14 +328,6 @@ jobs:
             echo "Copilot SDK vendor dir not present, skipping."
           fi
 
-      - name: Apply patches
-        shell: bash
-        working-directory: r
-        run: |
-          ./scripts/apply-patches.sh
-          ./scripts/verify-release-source.sh \
-            --target win32-x64 --phase patched --extension-layout copy
-
       - name: Compile extension
         shell: bash
         working-directory: r/vscode/extensions/ritemark
@@ -372,9 +364,15 @@ jobs:
           bash ./scripts/stage-extension-for-shell-build.sh \
             vscode/extensions/ritemark \
             "$RUNNER_TEMP/ritemark-extension"
-          # The canonical derived-state fingerprint deliberately excludes only
-          # this ephemeral target-extension path. Verify both that the path is
-          # now absent and that no other VS Code state changed before building.
+
+      - name: Apply patches to staged shell state
+        shell: bash
+        working-directory: r
+        run: |
+          # Record provenance only after the extension has left the shell tree.
+          # This keeps the complete VS Code fingerprint fail-closed on macOS
+          # while binding Windows to its intentional absent-extension layout.
+          ./scripts/apply-patches.sh --extension-layout absent
           ./scripts/verify-release-source.sh \
             --target win32-x64 --phase patched --extension-layout absent
 

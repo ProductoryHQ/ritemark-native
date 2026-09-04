@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --extension-layout)
-      EXTENSION_LAYOUT="${2:?--extension-layout requires link or copy}"
+      EXTENSION_LAYOUT="${2:?--extension-layout requires link, copy, or absent}"
       shift 2
       ;;
     -h|--help)

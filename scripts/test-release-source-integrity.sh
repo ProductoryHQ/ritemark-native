@@ -100,6 +100,20 @@ echo "PASS: dry-run validates dependent patches sequentially without changing th
 "$SCRIPT_DIR/verify-release-source.sh" --repo "$SUPER" --expected-ref origin/main >/dev/null
 echo "PASS: accepted clean exact main source"
 
+mkdir -p "$SUPER/vscode/extensions"
+ln -s ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
+expect_failure "extension must already be staged outside VS Code" \
+  "$SUPER/scripts/apply-patches.sh" --extension-layout absent
+rm "$SUPER/vscode/extensions/ritemark"
+"$SUPER/scripts/apply-patches.sh" --extension-layout absent >/dev/null
+"$SCRIPT_DIR/verify-release-source.sh" \
+  --repo "$SUPER" --expected-ref origin/main --phase patched \
+  --extension-layout absent >/dev/null
+git -C "$SUPER/vscode" restore package-lock.json
+rm -f "$SUPER/vscode/product.json"
+node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
+echo "PASS: patch applicator records only an already-staged absent-extension layout"
+
 printf 'derived patch state\n' >>"$SUPER/vscode/package-lock.json"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --verify --repo "$SUPER" >/dev/null
@@ -125,6 +139,11 @@ expect_failure "canonical patch set or patched vscode differs from the state rec
   "$SCRIPT_DIR/verify-release-source.sh" \
     --repo "$SUPER" --expected-ref origin/main --phase patched
 rm "$SUPER/vscode/manual-edit.txt" "$SUPER/vscode/extensions/ritemark"
+expect_failure "canonical patch set or patched vscode differs from the state recorded" \
+  "$SCRIPT_DIR/verify-release-source.sh" \
+    --repo "$SUPER" --expected-ref origin/main --phase patched \
+    --extension-layout absent
+node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 "$SCRIPT_DIR/verify-release-source.sh" \
   --repo "$SUPER" --expected-ref origin/main --phase patched \
   --extension-layout absent >/dev/null
@@ -137,7 +156,7 @@ expect_failure "patched vscode still contains the extension during the staged sh
 rm -rf "$SUPER/vscode/extensions/ritemark"
 git -C "$SUPER/vscode" restore package-lock.json
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
-echo "PASS: patched release gate rejects unrelated edits and validates explicit extension staging"
+echo "PASS: patched release gate binds the exact extension layout and rejects unrelated edits"
 
 CREATED_RELEASE="$TEST_ROOT/created-release"
 GIT_ALLOW_PROTOCOL=file "$SUPER/scripts/create-release-worktree.sh" \
