@@ -16,10 +16,12 @@ let target = 'darwin-arm64';
 let appPath = '';
 let extensionInput = '';
 let expectedExtensionSha = '';
+let verifyRecordedExtensionNonPe = false;
 
 function usage() {
   console.log(`Usage: node scripts/build-provenance.mjs --write|--verify --target TARGET --app PATH [--repo PATH]
        [--extension-input PATH --expected-extension-sha SHA256]
+       [--verify-recorded-extension-non-pe]
 
 Writes or verifies the immutable input manifest embedded in a release build.`);
 }
@@ -33,6 +35,7 @@ for (let index = 0; index < args.length; index += 1) {
   else if (arg === '--app') appPath = args[++index];
   else if (arg === '--extension-input') extensionInput = args[++index];
   else if (arg === '--expected-extension-sha') expectedExtensionSha = args[++index];
+  else if (arg === '--verify-recorded-extension-non-pe') verifyRecordedExtensionNonPe = true;
   else if (arg === '--help' || arg === '-h') {
     usage();
     process.exit(0);
@@ -57,6 +60,10 @@ if (expectedExtensionSha && !/^[a-f0-9]{64}$/.test(expectedExtensionSha)) {
 }
 if (expectedExtensionSha && !extensionInput) {
   console.error('ERROR: --expected-extension-sha requires --extension-input');
+  process.exit(2);
+}
+if (verifyRecordedExtensionNonPe && (mode !== 'verify' || target !== 'win32-x64')) {
+  console.error('ERROR: --verify-recorded-extension-non-pe is only valid for Windows verification');
   process.exit(2);
 }
 
@@ -111,17 +118,23 @@ function verifiedExtensionPayload() {
   if (!extensionInput) return null;
 
   const stagedSha256 = sha256Tree(extensionInput);
+  const stagedNonPeSha256 = sha256Tree(extensionInput, { omitPortableExecutableBytes: true });
   if (expectedExtensionSha && stagedSha256 !== expectedExtensionSha) {
     throw new Error(`staged extension changed after its release digest was recorded: expected ${expectedExtensionSha}, got ${stagedSha256}`);
   }
 
   const builtSha256 = sha256Tree(builtExtensionPath());
+  const builtNonPeSha256 = sha256Tree(builtExtensionPath(), { omitPortableExecutableBytes: true });
   if (stagedSha256 !== builtSha256) {
     throw new Error(`built extension does not match staged release payload: staged ${stagedSha256}, built ${builtSha256}`);
+  }
+  if (stagedNonPeSha256 !== builtNonPeSha256) {
+    throw new Error(`built non-PE extension payload does not match staging: staged ${stagedNonPeSha256}, built ${builtNonPeSha256}`);
   }
 
   return {
     sha256: stagedSha256,
+    nonPeSha256: stagedNonPeSha256,
     verifiedTransition: 'staged-tree-to-final-copy-before-signing'
   };
 }
@@ -202,6 +215,15 @@ try {
       const currentExtensionPayload = verifiedExtensionPayload();
       if (JSON.stringify(extensionPayload) !== JSON.stringify(currentExtensionPayload)) {
         throw new Error('embedded staged extension payload digest does not match');
+      }
+    }
+    if (verifyRecordedExtensionNonPe) {
+      if (!extensionPayload?.nonPeSha256) {
+        throw new Error('embedded build provenance is missing the required non-PE extension payload digest');
+      }
+      const currentNonPeSha256 = sha256Tree(builtExtensionPath(), { omitPortableExecutableBytes: true });
+      if (currentNonPeSha256 !== extensionPayload.nonPeSha256) {
+        throw new Error(`signed build non-PE extension payload changed after attestation: expected ${extensionPayload.nonPeSha256}, got ${currentNonPeSha256}`);
       }
     }
     console.log(`BUILD PROVENANCE VERIFIED: ${output}`);

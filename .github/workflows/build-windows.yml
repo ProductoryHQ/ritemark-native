@@ -587,7 +587,8 @@ jobs:
           ERRORS=0
 
           if ! node ./scripts/build-provenance.mjs \
-              --verify --target win32-x64 --app "$BUILD_DIR"; then
+              --verify --target win32-x64 --app "$BUILD_DIR" \
+              --verify-recorded-extension-non-pe; then
             ERRORS=$((ERRORS + 1))
           fi
 

@@ -5,7 +5,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export function sha256Tree(root) {
+export function isPortableExecutable(content) {
+  if (content.length < 68 || content[0] !== 0x4d || content[1] !== 0x5a) return false;
+  const peOffset = content.readInt32LE(0x3c);
+  return peOffset >= 0 && peOffset + 4 <= content.length &&
+    content[peOffset] === 0x50 && content[peOffset + 1] === 0x45 &&
+    content[peOffset + 2] === 0x00 && content[peOffset + 3] === 0x00;
+}
+
+export function sha256Tree(root, { omitPortableExecutableBytes = false } = {}) {
   const absoluteRoot = path.resolve(root);
   if (!fs.statSync(absoluteRoot).isDirectory()) {
     throw new Error(`tree root is not a directory: ${root}`);
@@ -25,7 +33,12 @@ export function sha256Tree(root) {
         walk(absolute);
       } else if (stat.isFile()) {
         hash.update(`file\0${relative}\0`);
-        hash.update(fs.readFileSync(absolute));
+        const content = fs.readFileSync(absolute);
+        if (omitPortableExecutableBytes && isPortableExecutable(content)) {
+          hash.update('portable-executable-bytes-covered-by-authenticode');
+        } else {
+          hash.update(content);
+        }
         hash.update('\0');
       } else if (stat.isSymbolicLink()) {
         hash.update(`symlink\0${relative}\0${fs.readlinkSync(absolute)}\0`);

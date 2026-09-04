@@ -245,6 +245,21 @@ expect_failure "built extension does not match staged release payload" \
 printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
 echo "PASS: build provenance binds the final extension payload"
 
+WINDOWS_APP="$SUPER/VSCode-win32-x64"
+WINDOWS_EXTENSION="$WINDOWS_APP/resources/app/extensions/ritemark"
+mkdir -p "$(dirname "$WINDOWS_EXTENSION")"
+cp -R "$STAGED_EXTENSION" "$WINDOWS_EXTENSION"
+node "$SCRIPT_DIR/build-provenance.mjs" \
+  --write --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
+printf 'post-sign non-PE mutation\n' >>"$WINDOWS_EXTENSION/out/extension.js"
+expect_failure "signed build non-PE extension payload changed after attestation" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-non-pe
+echo "PASS: post-sign provenance rejects non-PE extension drift"
+
 printf 'manual change after build\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "embedded build provenance does not match" \
   node "$SCRIPT_DIR/build-provenance.mjs" \

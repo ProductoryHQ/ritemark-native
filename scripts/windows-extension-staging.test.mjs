@@ -17,6 +17,8 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   const shellBuildStep = workflow.indexOf('- name: Build VS Code (win32-x64-min)');
   const finalCopyStep = workflow.indexOf('- name: Copy extension to build output');
   const provenanceStep = workflow.indexOf('- name: Embed and verify build provenance');
+  const signedPayloadStep = workflow.indexOf('- name: Verify signed payload');
+  const validateBuildStep = workflow.indexOf('- name: Validate build');
 
   assert.notEqual(preserveFontStep, -1, 'font preservation step must exist');
   assert.notEqual(pruneStep, -1, 'extension pruning step must exist');
@@ -26,6 +28,8 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   assert.notEqual(shellBuildStep, -1, 'Windows shell build step must exist');
   assert.notEqual(finalCopyStep, -1, 'final extension copy step must exist');
   assert.notEqual(provenanceStep, -1, 'build provenance step must exist');
+  assert.notEqual(signedPayloadStep, -1, 'signed payload verification step must exist');
+  assert.notEqual(validateBuildStep, -1, 'post-sign build validation step must exist');
   assert.ok(preserveFontStep < pruneStep, 'the dependency-backed font must be copied before npm prune');
   assert.ok(pruneStep < floorVersionStep, 'the compiled extension must be pruned before its final version transform');
   assert.ok(floorVersionStep < stageStep, 'all extension transforms must finish before staging');
@@ -34,6 +38,7 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   assert.ok(applyPatchesStep < shellBuildStep, 'the staged shell state must be verified before build');
   assert.ok(shellBuildStep < finalCopyStep, 'final extension copy must happen after the shell build');
   assert.ok(finalCopyStep < provenanceStep, 'the copied extension must be attested before later packaging steps');
+  assert.ok(signedPayloadStep < validateBuildStep, 'non-PE payload verification must run after PE signing');
 
   assert.match(
     workflow,
@@ -55,6 +60,11 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
     workflow.slice(finalCopyStep),
     /--extension-input "\$STAGED_EXTENSION"[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"/,
     'provenance must compare the final copied extension with the pre-build staged digest',
+  );
+  assert.match(
+    workflow.slice(validateBuildStep),
+    /build-provenance\.mjs[\s\\]+--verify --target win32-x64 --app "\$BUILD_DIR"[\s\\]+--verify-recorded-extension-non-pe/,
+    'post-sign validation must require the recorded non-PE extension digest',
   );
   const finalCopyCommand = workflow.indexOf('cp -R "$STAGED_EXTENSION" "$EXT_DEST"', finalCopyStep);
   assert.notEqual(finalCopyCommand, -1, 'the staged extension must be copied into the final app');

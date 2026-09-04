@@ -60,6 +60,7 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Record the complete staged extension tree digest before the shell build, require the final copied extension to match it, and embed that digest in build provenance.
 - [x] Complete every extension transform, including the bundled-version floor, before staging; forbid post-copy extension mutation before attestation.
 - [x] Keep integrity continuous across signing: use the staged payload digest before signing, then require a valid deep macOS app signature before DMG packaging.
+- [x] On Windows, verify every post-sign non-PE extension byte against the staged attestation while the existing Authenticode gate verifies every PE file.
 - [x] Pass repository QA and review.
 - [ ] Pass a fresh Windows build from the merged canonical `main` commit.
 
