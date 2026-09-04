@@ -16,11 +16,12 @@ let target = 'darwin-arm64';
 let appPath = '';
 let extensionInput = '';
 let expectedExtensionSha = '';
+let expectedExtensionNonPeSha = '';
 let verifyRecordedExtensionNonPe = false;
 
 function usage() {
   console.log(`Usage: node scripts/build-provenance.mjs --write|--verify --target TARGET --app PATH [--repo PATH]
-       [--extension-input PATH --expected-extension-sha SHA256]
+       [--extension-input PATH --expected-extension-sha SHA256 --expected-extension-non-pe-sha SHA256]
        [--verify-recorded-extension-non-pe]
 
 Writes or verifies the immutable input manifest embedded in a release build.`);
@@ -35,6 +36,7 @@ for (let index = 0; index < args.length; index += 1) {
   else if (arg === '--app') appPath = args[++index];
   else if (arg === '--extension-input') extensionInput = args[++index];
   else if (arg === '--expected-extension-sha') expectedExtensionSha = args[++index];
+  else if (arg === '--expected-extension-non-pe-sha') expectedExtensionNonPeSha = args[++index];
   else if (arg === '--verify-recorded-extension-non-pe') verifyRecordedExtensionNonPe = true;
   else if (arg === '--help' || arg === '-h') {
     usage();
@@ -54,12 +56,17 @@ repo = fs.realpathSync(repo);
 appPath = path.resolve(repo, appPath);
 if (extensionInput) extensionInput = path.resolve(repo, extensionInput);
 
-if (expectedExtensionSha && !/^[a-f0-9]{64}$/.test(expectedExtensionSha)) {
-  console.error('ERROR: --expected-extension-sha must be a lowercase SHA-256 digest');
-  process.exit(2);
+for (const [option, digest] of [
+  ['--expected-extension-sha', expectedExtensionSha],
+  ['--expected-extension-non-pe-sha', expectedExtensionNonPeSha]
+]) {
+  if (digest && !/^[a-f0-9]{64}$/.test(digest)) {
+    console.error(`ERROR: ${option} must be a lowercase SHA-256 digest`);
+    process.exit(2);
+  }
 }
-if (expectedExtensionSha && !extensionInput && !verifyRecordedExtensionNonPe) {
-  console.error('ERROR: --expected-extension-sha requires --extension-input or --verify-recorded-extension-non-pe');
+if ((expectedExtensionSha || expectedExtensionNonPeSha) && !extensionInput && !verifyRecordedExtensionNonPe) {
+  console.error('ERROR: expected extension digests require --extension-input or --verify-recorded-extension-non-pe');
   process.exit(2);
 }
 if (verifyRecordedExtensionNonPe && (mode !== 'verify' || target !== 'win32-x64')) {
@@ -121,6 +128,9 @@ function verifiedExtensionPayload() {
   const stagedNonPeSha256 = sha256Tree(extensionInput, { omitPortableExecutableBytes: true });
   if (expectedExtensionSha && stagedSha256 !== expectedExtensionSha) {
     throw new Error(`staged extension changed after its release digest was recorded: expected ${expectedExtensionSha}, got ${stagedSha256}`);
+  }
+  if (expectedExtensionNonPeSha && stagedNonPeSha256 !== expectedExtensionNonPeSha) {
+    throw new Error(`staged non-PE extension payload changed after its release digest was recorded: expected ${expectedExtensionNonPeSha}, got ${stagedNonPeSha256}`);
   }
 
   const builtSha256 = sha256Tree(builtExtensionPath());
@@ -226,6 +236,9 @@ try {
       }
       if (expectedExtensionSha && extensionPayload.sha256 !== expectedExtensionSha) {
         throw new Error(`embedded staged extension digest does not match the original pre-build digest: expected ${expectedExtensionSha}, got ${extensionPayload.sha256 || '<missing>'}`);
+      }
+      if (expectedExtensionNonPeSha && extensionPayload.nonPeSha256 !== expectedExtensionNonPeSha) {
+        throw new Error(`embedded non-PE extension digest does not match the original pre-build digest: expected ${expectedExtensionNonPeSha}, got ${extensionPayload.nonPeSha256 || '<missing>'}`);
       }
       const currentNonPeSha256 = sha256Tree(builtExtensionPath(), { omitPortableExecutableBytes: true });
       if (currentNonPeSha256 !== extensionPayload.nonPeSha256) {

@@ -216,15 +216,18 @@ printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
 STAGED_EXTENSION="$TEST_ROOT/staged-extension"
 cp -R "$APP_EXTENSION" "$STAGED_EXTENSION"
 STAGED_EXTENSION_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" "$STAGED_EXTENSION")"
+STAGED_EXTENSION_NON_PE_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" --omit-portable-executable-bytes "$STAGED_EXTENSION")"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
   --write --repo "$SUPER" --target darwin-arm64 --app "$APP" \
   --extension-input "$STAGED_EXTENSION" \
-  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
   --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
   --extension-input "$STAGED_EXTENSION" \
-  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA" >/dev/null
 echo "PASS: build provenance round-trip"
 
 printf 'staged mutation\n' >>"$STAGED_EXTENSION/out/extension.js"
@@ -232,7 +235,8 @@ expect_failure "staged extension changed after its release digest was recorded" 
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
     --extension-input "$STAGED_EXTENSION" \
-    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
 printf 'built extension\n' >"$STAGED_EXTENSION/out/extension.js"
 echo "PASS: build provenance rejects staged extension drift after digest recording"
 
@@ -241,7 +245,8 @@ expect_failure "built extension does not match staged release payload" \
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target darwin-arm64 --app "$APP" \
     --extension-input "$STAGED_EXTENSION" \
-    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
 printf 'built extension\n' >"$APP_EXTENSION/out/extension.js"
 echo "PASS: build provenance binds the final extension payload"
 
@@ -252,13 +257,15 @@ cp -R "$STAGED_EXTENSION" "$WINDOWS_EXTENSION"
 node "$SCRIPT_DIR/build-provenance.mjs" \
   --write --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
   --extension-input "$STAGED_EXTENSION" \
-  --expected-extension-sha "$STAGED_EXTENSION_SHA" >/dev/null
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA" >/dev/null
 printf 'post-sign non-PE mutation\n' >>"$WINDOWS_EXTENSION/out/extension.js"
 expect_failure "signed build non-PE extension payload changed after attestation" \
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
     --verify-recorded-extension-non-pe \
-    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
 printf 'built extension\n' >"$WINDOWS_EXTENSION/out/extension.js"
 echo "PASS: post-sign provenance rejects non-PE extension drift"
 
@@ -268,8 +275,23 @@ expect_failure "embedded staged extension digest does not match the original pre
   node "$SCRIPT_DIR/build-provenance.mjs" \
     --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
     --verify-recorded-extension-non-pe \
-    --expected-extension-sha "$STAGED_EXTENSION_SHA"
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
 echo "PASS: post-sign provenance rejects attestation-field drift"
+
+node "$SCRIPT_DIR/build-provenance.mjs" \
+  --write --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+  --extension-input "$STAGED_EXTENSION" \
+  --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+  --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA" >/dev/null
+node -e 'const fs=require("fs"); const p=process.argv[1]; const m=JSON.parse(fs.readFileSync(p)); m.extensionPayload.nonPeSha256="1".repeat(64); fs.writeFileSync(p, JSON.stringify(m));' "$WINDOWS_PROVENANCE"
+expect_failure "embedded non-PE extension digest does not match the original pre-build digest" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target win32-x64 --app "$WINDOWS_APP" \
+    --verify-recorded-extension-non-pe \
+    --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+    --expected-extension-non-pe-sha "$STAGED_EXTENSION_NON_PE_SHA"
+echo "PASS: post-sign provenance rejects non-PE attestation-field drift"
 
 printf 'manual change after build\n' >>"$SUPER/vscode/package-lock.json"
 expect_failure "embedded build provenance does not match" \

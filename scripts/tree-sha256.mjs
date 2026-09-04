@@ -54,13 +54,16 @@ export function sha256Tree(root, { omitPortableExecutableBytes = false } = {}) {
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
-  if (process.argv.length !== 3) {
-    console.error('Usage: node scripts/tree-sha256.mjs DIRECTORY');
+  const cliArgs = process.argv.slice(2);
+  const omitPortableExecutableBytes = cliArgs[0] === '--omit-portable-executable-bytes';
+  const directory = omitPortableExecutableBytes ? cliArgs[1] : cliArgs[0];
+  if (!directory || cliArgs.length !== (omitPortableExecutableBytes ? 2 : 1)) {
+    console.error('Usage: node scripts/tree-sha256.mjs [--omit-portable-executable-bytes] DIRECTORY');
     process.exit(2);
   }
 
   try {
-    process.stdout.write(`${sha256Tree(process.argv[2])}\n`);
+    process.stdout.write(`${sha256Tree(directory, { omitPortableExecutableBytes })}\n`);
   } catch (error) {
     console.error(`TREE SHA-256 BLOCKED: ${error.message}`);
     process.exit(1);

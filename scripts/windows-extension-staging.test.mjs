@@ -63,8 +63,8 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   );
   assert.match(
     workflow.slice(validateBuildStep),
-    /build-provenance\.mjs[\s\\]+--verify --target win32-x64 --app "\$BUILD_DIR"[\s\\]+--verify-recorded-extension-non-pe[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"/,
-    'post-sign validation must require both the recorded non-PE digest and original staged SHA',
+    /build-provenance\.mjs[\s\\]+--verify --target win32-x64 --app "\$BUILD_DIR"[\s\\]+--verify-recorded-extension-non-pe[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"[\s\\]+--expected-extension-non-pe-sha "\$STAGED_EXTENSION_NON_PE_SHA"/,
+    'post-sign validation must require both original staged digests',
   );
   const finalCopyCommand = workflow.indexOf('cp -R "$STAGED_EXTENSION" "$EXT_DEST"', finalCopyStep);
   assert.notEqual(finalCopyCommand, -1, 'the staged extension must be copied into the final app');
