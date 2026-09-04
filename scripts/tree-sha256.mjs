@@ -124,12 +124,13 @@ export function sha256Tree(root, { normalizeAuthenticode = false } = {}) {
       const absolute = path.join(current, entry.name);
       const relative = path.relative(absoluteRoot, absolute).split(path.sep).join('/');
       const stat = fs.lstatSync(absolute);
+      const permissions = (stat.mode & 0o777).toString(8).padStart(3, '0');
 
       if (stat.isDirectory()) {
-        hash.update(`directory\0${relative}\0`);
+        hash.update(`directory\0${relative}\0${permissions}\0`);
         walk(absolute);
       } else if (stat.isFile()) {
-        hash.update(`file\0${relative}\0`);
+        hash.update(`file\0${relative}\0${permissions}\0`);
         const content = fs.readFileSync(absolute);
         if (normalizeAuthenticode && isPortableExecutable(content)) {
           hash.update('authenticode-normalized\0');

@@ -127,3 +127,19 @@ test('PE normalization preserves overlay payloads and removes only the Certifica
     'only the actual Certificate Table bytes may vary after signing',
   );
 });
+
+test('tree digest binds executable permission bits', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-tree-mode-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const runtime = path.join(root, 'agent-runtime');
+  fs.writeFileSync(runtime, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  fs.chmodSync(runtime, 0o755);
+  const executableDigest = sha256Tree(root);
+
+  fs.chmodSync(runtime, 0o644);
+  assert.notEqual(
+    sha256Tree(root),
+    executableDigest,
+    'removing the executable bit must invalidate the attested extension tree',
+  );
+});

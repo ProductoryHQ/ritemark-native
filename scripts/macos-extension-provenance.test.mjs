@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { sha256Tree } from './tree-sha256.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(repo, relative), 'utf8');
@@ -44,4 +47,50 @@ test('DMG packaging relies on the post-sign deep app signature', () => {
   const provenance = source.indexOf('build-provenance.mjs');
   const signature = source.indexOf('codesign --verify --deep --strict');
   assert.ok(provenance >= 0 && signature > provenance);
+});
+
+test('x64 workflow uploads a symlink- and mode-preserving archive', () => {
+  const source = read('.github/workflows/build-macos-x64.yml');
+  const archive = source.indexOf('tar -czf ritemark-darwin-x64.tar.gz VSCode-darwin-x64');
+  const upload = source.indexOf('path: r/ritemark-darwin-x64.tar.gz');
+  assert.ok(archive >= 0 && upload > archive);
+  assert.ok(!source.includes('path: r/VSCode-darwin-x64/'));
+});
+
+test('tar transport preserves extension symlinks, modes, and tree identity', {
+  skip: process.platform === 'win32',
+}, t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-x64-artifact-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'VSCode-darwin-x64');
+  const extension = path.join(source, 'Ritemark.app', 'Contents', 'Resources', 'app', 'extensions', 'ritemark');
+  const bin = path.join(extension, 'node_modules', '.bin');
+  const packageRoot = path.join(extension, 'node_modules', 'fixture');
+  fs.mkdirSync(bin, { recursive: true });
+  fs.mkdirSync(packageRoot, { recursive: true });
+  const runtime = path.join(packageRoot, 'runtime');
+  fs.writeFileSync(runtime, '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(runtime, 0o755);
+  fs.symlinkSync('../fixture/runtime', path.join(bin, 'runtime'));
+  const originalDigest = sha256Tree(extension);
+
+  const archive = path.join(root, 'ritemark-darwin-x64.tar.gz');
+  execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
+  const extractedRoot = path.join(root, 'extracted');
+  fs.mkdirSync(extractedRoot);
+  execFileSync('tar', ['-xzf', archive, '-C', extractedRoot]);
+
+  const extractedExtension = path.join(
+    extractedRoot,
+    'VSCode-darwin-x64',
+    'Ritemark.app',
+    'Contents',
+    'Resources',
+    'app',
+    'extensions',
+    'ritemark',
+  );
+  assert.equal(sha256Tree(extractedExtension), originalDigest);
+  assert.equal(fs.lstatSync(path.join(extractedExtension, 'node_modules', '.bin', 'runtime')).isSymbolicLink(), true);
+  fs.accessSync(path.join(extractedExtension, 'node_modules', 'fixture', 'runtime'), fs.constants.X_OK);
 });

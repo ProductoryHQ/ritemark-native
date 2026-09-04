@@ -359,6 +359,12 @@ jobs:
           fi
           echo "Validation PASSED"
 
+      - name: Archive artifact with symlinks and modes
+        working-directory: r
+        run: |
+          tar -czf ritemark-darwin-x64.tar.gz VSCode-darwin-x64
+          tar -tzf ritemark-darwin-x64.tar.gz > /dev/null
+
       # =========================================================================
       # Step 11: Upload artifact
       # =========================================================================
@@ -366,7 +372,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ritemark-darwin-x64
-          path: r/VSCode-darwin-x64/
+          path: r/ritemark-darwin-x64.tar.gz
           retention-days: 30
 
       # =========================================================================
@@ -385,5 +391,5 @@ jobs:
           echo "Extension:"
           ls -lh VSCode-darwin-x64/Ritemark.app/Contents/Resources/app/extensions/ritemark/ | head -10
           echo ""
-          echo "Artifact: ritemark-darwin-x64"
+          echo "Artifact: ritemark-darwin-x64/ritemark-darwin-x64.tar.gz"
           echo "NOTE: Code sign and notarize locally after downloading"
