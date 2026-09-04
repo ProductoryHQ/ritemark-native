@@ -1,6 +1,6 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Repository scope merged through PR #218 as `faba032`; the Store submission worksheet is prepared. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
+**Status:** Reopened for Gate 2 build recovery after Windows run `33876792999` exposed an `EMFILE` deadlock in VS Code's eager local-extension packager. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
 **Issue:** [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212)<br>
 **Release:** [v1.10.0](../release-plan.md)
@@ -49,6 +49,15 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [ ] Microsoft Store becomes the primary Windows link; the direct installer remains the same signed file.
 - [ ] Jarmo gives Windows Gate 2 approval for that exact SHA-256.
 
+## Gate 2 build recovery
+
+- [x] Preserve the failed run and identify its exact failing step and error instead of blindly rerunning it.
+- [x] Confirm the failure mode: the retry queue waited its full minute but could not make progress because the VS Code packager had eagerly opened Ritemark's production dependency streams.
+- [x] Remove redundant packaging: compile and validate the target-specific extension, stage it outside `vscode/extensions`, build the VS Code shell, then copy the same staged extension into the final app.
+- [x] Add a deterministic staging test covering complete content, paths with spaces, collision refusal, and incomplete-extension refusal.
+- [x] Pass repository QA and review.
+- [ ] Pass a fresh Windows build from the merged canonical `main` commit.
+
 ## Decisions
 
 - Existing repository-level Azure signing secrets remain in use.
@@ -57,3 +66,5 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - No Windows build is run for sprint closeout. Candidate signing, hosting, Store certification, SAC-On validation, and exact-hash approval happen once against the final v1.10.0 release-ready build.
 - The 2026-08-25 Store worksheet records the exact package fields, draft listing copy, media inventory, and current blockers; it does not authorize a pre-Gate-1 Windows dispatch or submission.
 - No `docs/development/architecture.md` update is required because this sprint changes packaging and documentation only.
+- Ritemark is no longer packaged twice during the Windows build. VS Code builds the shell without Ritemark in its eager local-extension stream; the already compiled, pruned, target-specific extension is copied into the final shell exactly once and is then covered by the existing completeness, provenance, signing, install, and uninstall gates.
+- No changelog or public release-note entry is added for this recovery because it changes only the release build pipeline and does not change user-facing product behavior.

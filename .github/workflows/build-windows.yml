@@ -361,15 +361,25 @@ jobs:
           echo "Retained top-level extension paths:"
           find . -maxdepth 1 -mindepth 1 | sort
 
+      - name: Stage extension outside VS Code shell build
+        shell: bash
+        working-directory: r
+        run: |
+          # The shell build does not need to package Ritemark here: the final,
+          # target-specific extension is copied into the app in the next step.
+          # Keeping it under vscode/extensions makes VS Code eagerly open every
+          # production dependency and can deadlock at Windows' descriptor cap.
+          bash ./scripts/stage-extension-for-shell-build.sh \
+            vscode/extensions/ritemark \
+            "$RUNNER_TEMP/ritemark-extension"
+
       - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
         run: |
-          # Preload graceful-fs so fs.createReadStream gets EMFILE retry/queue
-          # behaviour. vsce/yazl opens the whole production node_modules tree
-          # concurrently when packaging the ritemark extension (claude-agent-sdk's
-          # peer @modelcontextprotocol/sdk drags express/hono/ajv/... into prod),
-          # which exceeds the Windows fd limit -> EMFILE.
+          # Keep graceful-fs as baseline protection for VS Code's own built-in
+          # extensions. Ritemark itself is staged outside this eager packager
+          # and copied into the completed shell afterwards.
           #
           # The --require path MUST be absolute: NODE_OPTIONS is inherited by child
           # processes, and VS Code's build spawns `npm ls` from a DIFFERENT cwd
@@ -399,7 +409,13 @@ jobs:
           fi
 
           rm -rf "$EXT_DEST" || true
-          cp -R vscode/extensions/ritemark "$EXT_DEST"
+          STAGED_EXTENSION="$RUNNER_TEMP/ritemark-extension"
+          if [ ! -s "$STAGED_EXTENSION/out/extension.js" ] || [ ! -s "$STAGED_EXTENSION/media/webview.js" ]; then
+            echo "ERROR: Staged Ritemark extension is missing or incomplete: $STAGED_EXTENSION"
+            exit 1
+          fi
+
+          cp -R "$STAGED_EXTENSION" "$EXT_DEST"
           rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
           rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
           # Strip foreign-platform agent runtimes (Sprint 64). Keeps only
