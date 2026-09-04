@@ -296,6 +296,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"
     PHOSPHOR_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
+    PHOSPHOR_FONT_DEST="$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
     if [ ! -f "$PHOSPHOR_FONT_SRC" ]; then
         PHOSPHOR_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
     fi
@@ -312,11 +313,14 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     if [ -f "$PHOSPHOR_FONT_SRC" ]; then
         echo -n "Copying Phosphor 400 (Regular) icon font... "
-        mkdir -p "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon"
-        cp "$PHOSPHOR_FONT_SRC" "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+        mkdir -p "$(dirname "$PHOSPHOR_FONT_DEST")"
+        cp "$PHOSPHOR_FONT_SRC" "$PHOSPHOR_FONT_DEST"
         echo -e "${GREEN}Done${NC}"
+    elif [ -s "$PHOSPHOR_FONT_DEST" ]; then
+        echo "Phosphor 400 icon font was preserved before dependency pruning"
     else
-        echo -e "${YELLOW}Phosphor 400 font file missing; skipping icon font copy${NC}"
+        echo -e "${RED}Error: required Phosphor 400 font is missing${NC}" >&2
+        exit 1
     fi
 
     # Copy product.json if it exists (for branding)

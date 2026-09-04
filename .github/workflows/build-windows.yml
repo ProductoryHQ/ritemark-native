@@ -333,6 +333,23 @@ jobs:
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
 
+      - name: Preserve dependency-backed workbench font
+        shell: bash
+        working-directory: r
+        run: |
+          # @phosphor-icons/web is a dev dependency and the extension is pruned
+          # before the delayed shell patch step. Preserve the exact locked font
+          # in its final VS Code location while the dependency still exists.
+          PHOSPHOR_SOURCE="vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
+          PHOSPHOR_DESTINATION="vscode/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+          if [ ! -s "$PHOSPHOR_SOURCE" ]; then
+            echo "ERROR: Required Phosphor workbench font is missing: $PHOSPHOR_SOURCE" >&2
+            exit 1
+          fi
+          mkdir -p "$(dirname "$PHOSPHOR_DESTINATION")"
+          cp "$PHOSPHOR_SOURCE" "$PHOSPHOR_DESTINATION"
+          test -s "$PHOSPHOR_DESTINATION"
+
       - name: Prune extension dev files before build
         shell: bash
         working-directory: r/vscode/extensions/ritemark

@@ -105,12 +105,14 @@ ln -s ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
 expect_failure "extension must already be staged outside VS Code" \
   "$SUPER/scripts/apply-patches.sh" --extension-layout absent
 rm "$SUPER/vscode/extensions/ritemark"
+mkdir -p "$SUPER/vscode/src/vs/base/browser/ui/codicons/codicon"
+printf 'test phosphor font\n' >"$SUPER/vscode/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
 "$SUPER/scripts/apply-patches.sh" --extension-layout absent >/dev/null
 "$SCRIPT_DIR/verify-release-source.sh" \
   --repo "$SUPER" --expected-ref origin/main --phase patched \
   --extension-layout absent >/dev/null
 git -C "$SUPER/vscode" restore package-lock.json
-rm -f "$SUPER/vscode/product.json"
+rm -rf "$SUPER/vscode/product.json" "$SUPER/vscode/src"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
 echo "PASS: patch applicator records only an already-staged absent-extension layout"
 
