@@ -254,10 +254,20 @@ jobs:
       - name: Embed and verify build provenance
         working-directory: r
         run: |
+          APP_PATH="VSCode-darwin-x64/Ritemark.app"
+          EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+          EXTENSION_SHA_PATH="VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"
+          node ./scripts/tree-sha256.mjs "$EXT_PATH" > "$EXTENSION_SHA_PATH"
+          grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"
+          EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
           node ./scripts/build-provenance.mjs \
-            --write --target darwin-x64 --app VSCode-darwin-x64/Ritemark.app
+            --write --target darwin-x64 --app "$APP_PATH" \
+            --extension-input "$EXT_PATH" \
+            --expected-extension-sha "$EXTENSION_SHA"
           node ./scripts/build-provenance.mjs \
-            --verify --target darwin-x64 --app VSCode-darwin-x64/Ritemark.app
+            --verify --target darwin-x64 --app "$APP_PATH" \
+            --extension-input "$EXT_PATH" \
+            --expected-extension-sha "$EXTENSION_SHA"
 
       # =========================================================================
       # Step 10: Validate build
@@ -267,11 +277,15 @@ jobs:
         run: |
           APP_PATH="VSCode-darwin-x64/Ritemark.app"
           EXT_PATH="$APP_PATH/Contents/Resources/app/extensions/ritemark"
+          EXTENSION_SHA_PATH="VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"
           PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json"
+          EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
           ERRORS=0
 
           if ! node ./scripts/build-provenance.mjs \
-              --verify --target darwin-x64 --app "$APP_PATH"; then
+              --verify --target darwin-x64 --app "$APP_PATH" \
+              --extension-input "$EXT_PATH" \
+              --expected-extension-sha "$EXTENSION_SHA"; then
             ERRORS=$((ERRORS + 1))
           fi
 

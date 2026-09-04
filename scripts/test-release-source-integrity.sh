@@ -219,6 +219,13 @@ STAGED_EXTENSION_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" "$STAGED_EXTENSION")"
 STAGED_EXTENSION_AUTHENTICODE_SHA="$(node "$SCRIPT_DIR/tree-sha256.mjs" --normalize-authenticode "$STAGED_EXTENSION")"
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
 node "$SCRIPT_DIR/build-provenance.mjs" \
+  --write --repo "$SUPER" --target darwin-arm64 --app "$APP" >/dev/null
+expect_failure "embedded macOS build provenance is missing a valid pre-sign extension payload attestation" \
+  node "$SCRIPT_DIR/build-provenance.mjs" \
+    --verify --repo "$SUPER" --target darwin-arm64 --app "$APP"
+echo "PASS: macOS provenance requires a pre-sign extension payload attestation"
+
+node "$SCRIPT_DIR/build-provenance.mjs" \
   --write --repo "$SUPER" --target darwin-arm64 --app "$APP" \
   --extension-input "$STAGED_EXTENSION" \
   --expected-extension-sha "$STAGED_EXTENSION_SHA" \

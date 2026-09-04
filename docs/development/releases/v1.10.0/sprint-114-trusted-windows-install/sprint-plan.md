@@ -59,7 +59,7 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Preserve and validate the locked Phosphor workbench font before extension dev dependencies are pruned; fail closed if neither the dependency source nor the preserved destination exists.
 - [x] Record the complete staged extension tree digest before the shell build, require the final copied extension to match it, and embed that digest in build provenance.
 - [x] Complete every extension transform, including the bundled-version floor, before staging; forbid post-copy extension mutation before attestation.
-- [x] Keep integrity continuous across signing: use the staged payload digest before signing, then require a valid deep macOS app signature before DMG packaging.
+- [x] Keep integrity continuous across signing: both macOS build paths record an external exact extension-tree digest, signing verifies it immediately before the first Mach-O mutation, and DMG packaging then requires the valid deep app signature.
 - [x] On Windows, bind every extension PE header/section/overlay byte and every non-PE byte to the staged attestation; normalize only Authenticode-owned checksum, Certificate Table metadata, and the exact Certificate Table range, then independently verify every PE signature.
 - [x] Pass repository QA and review.
 - [ ] Pass a fresh Windows build from the merged canonical `main` commit.

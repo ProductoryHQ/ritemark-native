@@ -218,6 +218,13 @@ try {
     if (JSON.stringify(recorded) !== JSON.stringify(current)) {
       throw new Error('embedded build provenance does not match the current canonical inputs');
     }
+    if (target.startsWith('darwin-') && (
+      !/^[a-f0-9]{64}$/.test(extensionPayload?.sha256 || '') ||
+      !/^[a-f0-9]{64}$/.test(extensionPayload?.authenticodeSha256 || '') ||
+      extensionPayload?.verifiedTransition !== 'staged-tree-to-final-copy-before-signing'
+    )) {
+      throw new Error('embedded macOS build provenance is missing a valid pre-sign extension payload attestation');
+    }
     if (extensionInput) {
       if (!extensionPayload) {
         throw new Error('embedded build provenance is missing the staged extension payload digest');
