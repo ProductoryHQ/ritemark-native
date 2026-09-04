@@ -61,6 +61,7 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Complete every extension transform, including the bundled-version floor, before staging; forbid post-copy extension mutation before attestation.
 - [x] Keep integrity continuous across signing: both macOS build paths record an external exact extension-tree digest, signing verifies it immediately before the first Mach-O mutation, and DMG packaging then requires the valid deep app signature.
 - [x] Preserve the x64 app's symlinks and executable modes across GitHub artifact transport with a verified tar archive, and bind POSIX permission bits into the extension-tree digest.
+- [x] Restore the downloaded x64 archive through one fail-closed extractor before signing; keep the canonical Claude and Codex release playbooks aligned with that command.
 - [x] On Windows, bind every extension PE header/section/overlay byte and every non-PE byte to the staged attestation; normalize only Authenticode-owned checksum, Certificate Table metadata, and the exact Certificate Table range, then independently verify every PE signature.
 - [x] Pass repository QA and review.
 - [ ] Pass a fresh Windows build from the merged canonical `main` commit.

@@ -117,6 +117,14 @@ export function sha256Tree(root, { normalizeAuthenticode = false } = {}) {
   }
 
   const hash = createHash('sha256');
+  hash.update('ritemark-tree-sha256-v2\0');
+  const updateField = value => {
+    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
+    const length = Buffer.alloc(8);
+    length.writeBigUInt64BE(BigInt(bytes.length));
+    hash.update(length);
+    hash.update(bytes);
+  };
   const walk = current => {
     for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => (
       a.name < b.name ? -1 : a.name > b.name ? 1 : 0
@@ -127,20 +135,26 @@ export function sha256Tree(root, { normalizeAuthenticode = false } = {}) {
       const permissions = (stat.mode & 0o777).toString(8).padStart(3, '0');
 
       if (stat.isDirectory()) {
-        hash.update(`directory\0${relative}\0${permissions}\0`);
+        updateField('directory');
+        updateField(relative);
+        updateField(permissions);
         walk(absolute);
       } else if (stat.isFile()) {
-        hash.update(`file\0${relative}\0${permissions}\0`);
+        updateField('file');
+        updateField(relative);
+        updateField(permissions);
         const content = fs.readFileSync(absolute);
         if (normalizeAuthenticode && isPortableExecutable(content)) {
-          hash.update('authenticode-normalized\0');
-          hash.update(normalizePortableExecutableForAuthenticode(content));
+          updateField('authenticode-normalized');
+          updateField(normalizePortableExecutableForAuthenticode(content));
         } else {
-          hash.update(content);
+          updateField('raw');
+          updateField(content);
         }
-        hash.update('\0');
       } else if (stat.isSymbolicLink()) {
-        hash.update(`symlink\0${relative}\0${fs.readlinkSync(absolute)}\0`);
+        updateField('symlink');
+        updateField(relative);
+        updateField(fs.readlinkSync(absolute));
       } else {
         throw new Error(`unsupported filesystem entry in tree: ${relative}`);
       }

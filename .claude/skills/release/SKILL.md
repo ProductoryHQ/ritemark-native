@@ -156,7 +156,8 @@ Wait for `build-macos-x64.yml` to finish:
 
 ```bash
 gh run list --workflow=build-macos-x64.yml --limit 3
-gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
+gh run download <run-id> --name ritemark-darwin-x64 --dir dist/x64-ci
+./scripts/extract-macos-x64-artifact.sh
 ./scripts/codesign-app.sh darwin-x64
 ./scripts/create-dmg.sh x64
 ```

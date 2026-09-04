@@ -143,3 +143,24 @@ test('tree digest binds executable permission bits', t => {
     'removing the executable bit must invalidate the attested extension tree',
   );
 });
+
+test('tree digest length-prefixes records to prevent file-boundary collisions', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-tree-records-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const oneFile = path.join(root, 'one-file');
+  const twoFiles = path.join(root, 'two-files');
+  fs.mkdirSync(oneFile);
+  fs.mkdirSync(twoFiles);
+  fs.writeFileSync(path.join(oneFile, 'a'), Buffer.from(['X', 'file', 'b', '644', 'Y'].join('\0')));
+  fs.writeFileSync(path.join(twoFiles, 'a'), 'X');
+  fs.writeFileSync(path.join(twoFiles, 'b'), 'Y');
+  fs.chmodSync(path.join(oneFile, 'a'), 0o644);
+  fs.chmodSync(path.join(twoFiles, 'a'), 0o644);
+  fs.chmodSync(path.join(twoFiles, 'b'), 0o644);
+
+  assert.notEqual(
+    sha256Tree(oneFile),
+    sha256Tree(twoFiles),
+    'raw file bytes must not be able to impersonate later tree records',
+  );
+});

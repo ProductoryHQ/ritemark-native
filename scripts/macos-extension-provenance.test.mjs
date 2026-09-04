@@ -57,6 +57,17 @@ test('x64 workflow uploads a symlink- and mode-preserving archive', () => {
   assert.ok(!source.includes('path: r/VSCode-darwin-x64/'));
 });
 
+test('canonical release playbook extracts the verified x64 archive before signing', () => {
+  const source = read('.claude/skills/release/SKILL.md');
+  const download = source.indexOf('gh run download <run-id> --name ritemark-darwin-x64 --dir dist/x64-ci');
+  const extract = source.indexOf('./scripts/extract-macos-x64-artifact.sh', download);
+  const sign = source.indexOf('./scripts/codesign-app.sh darwin-x64', extract);
+  assert.ok(download >= 0 && extract > download && sign > extract);
+
+  const codexPlaybook = read('.agents/skills/release-process/SKILL.md');
+  assert.ok(codexPlaybook.includes('./scripts/extract-macos-x64-artifact.sh'));
+});
+
 test('tar transport preserves extension symlinks, modes, and tree identity', {
   skip: process.platform === 'win32',
 }, t => {
@@ -73,16 +84,15 @@ test('tar transport preserves extension symlinks, modes, and tree identity', {
   fs.chmodSync(runtime, 0o755);
   fs.symlinkSync('../fixture/runtime', path.join(bin, 'runtime'));
   const originalDigest = sha256Tree(extension);
+  fs.writeFileSync(path.join(source, 'ritemark-extension-pre-sign.sha256'), `${originalDigest}\n`);
 
   const archive = path.join(root, 'ritemark-darwin-x64.tar.gz');
   execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
-  const extractedRoot = path.join(root, 'extracted');
-  fs.mkdirSync(extractedRoot);
-  execFileSync('tar', ['-xzf', archive, '-C', extractedRoot]);
+  const destination = path.join(root, 'verified-output');
+  execFileSync(path.join(repo, 'scripts/extract-macos-x64-artifact.sh'), [archive, destination]);
 
   const extractedExtension = path.join(
-    extractedRoot,
-    'VSCode-darwin-x64',
+    destination,
     'Ritemark.app',
     'Contents',
     'Resources',
