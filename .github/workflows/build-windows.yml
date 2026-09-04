@@ -372,6 +372,11 @@ jobs:
           bash ./scripts/stage-extension-for-shell-build.sh \
             vscode/extensions/ritemark \
             "$RUNNER_TEMP/ritemark-extension"
+          # The canonical derived-state fingerprint deliberately excludes only
+          # this ephemeral target-extension path. Verify both that the path is
+          # now absent and that no other VS Code state changed before building.
+          ./scripts/verify-release-source.sh \
+            --target win32-x64 --phase patched --extension-layout absent
 
       - name: Build VS Code (win32-x64-min)
         shell: bash

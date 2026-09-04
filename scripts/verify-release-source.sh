@@ -25,7 +25,7 @@ Options:
   --expected-ref REF    Exact release source ref (default: origin/main)
   --target TARGET       Build target (default: darwin-arm64)
   --phase PHASE         pristine or patched (default: pristine)
-  --extension-layout L  link or copy in patched phase (default: link)
+  --extension-layout L  link, copy, or absent in patched phase (default: link)
   -h, --help            Show this help
 
 Production callers must use the defaults. --repo and --expected-ref exist so the
@@ -76,9 +76,9 @@ case "$PHASE" in
 esac
 
 case "$EXTENSION_LAYOUT" in
-  link|copy) ;;
+  link|copy|absent) ;;
   *)
-    echo "ERROR: --extension-layout must be link or copy" >&2
+    echo "ERROR: --extension-layout must be link, copy, or absent" >&2
     exit 2
     ;;
 esac
@@ -210,6 +210,12 @@ if [[ "$PHASE" == "patched" ]]; then
       fail "patched vscode is missing the physical extension copy required by CI"
     else
       pass "vscode contains the CI-owned physical extension copy"
+    fi
+  elif [[ "$EXTENSION_LAYOUT" == "absent" ]]; then
+    if [[ -e "$EXTENSION_LINK" || -L "$EXTENSION_LINK" ]]; then
+      fail "patched vscode still contains the extension during the staged shell build"
+    else
+      pass "target extension is explicitly staged outside the VS Code shell tree"
     fi
   elif [[ ! -L "$EXTENSION_LINK" ]]; then
     fail "patched vscode is missing the extension symlink"

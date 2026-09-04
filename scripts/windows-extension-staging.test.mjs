@@ -25,6 +25,11 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   );
   assert.match(workflow, /STAGED_EXTENSION="\$RUNNER_TEMP\/ritemark-extension"/);
   assert.match(workflow, /cp -R "\$STAGED_EXTENSION" "\$EXT_DEST"/);
+  assert.match(
+    workflow.slice(stageStep, shellBuildStep),
+    /verify-release-source\.sh\s+\\\s*\n\s*--target win32-x64 --phase patched --extension-layout absent/,
+    'the staged shell state must pass the canonical source gate before the build starts',
+  );
   assert.doesNotMatch(
     workflow,
     /cp -R vscode\/extensions\/ritemark "\$EXT_DEST"/,

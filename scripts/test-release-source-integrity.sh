@@ -125,9 +125,19 @@ expect_failure "canonical patch set or patched vscode differs from the state rec
   "$SCRIPT_DIR/verify-release-source.sh" \
     --repo "$SUPER" --expected-ref origin/main --phase patched
 rm "$SUPER/vscode/manual-edit.txt" "$SUPER/vscode/extensions/ritemark"
+"$SCRIPT_DIR/verify-release-source.sh" \
+  --repo "$SUPER" --expected-ref origin/main --phase patched \
+  --extension-layout absent >/dev/null
+mkdir -p "$SUPER/vscode/extensions/ritemark"
+printf 'unexpected extension return\n' >"$SUPER/vscode/extensions/ritemark/package.json"
+expect_failure "patched vscode still contains the extension during the staged shell build" \
+  "$SCRIPT_DIR/verify-release-source.sh" \
+    --repo "$SUPER" --expected-ref origin/main --phase patched \
+    --extension-layout absent
+rm -rf "$SUPER/vscode/extensions/ritemark"
 git -C "$SUPER/vscode" restore package-lock.json
 node "$SCRIPT_DIR/vscode-derived-state.mjs" --clear --repo "$SUPER" >/dev/null
-echo "PASS: patched release gate rejects unrelated manual VS Code edits"
+echo "PASS: patched release gate rejects unrelated edits and validates explicit extension staging"
 
 CREATED_RELEASE="$TEST_ROOT/created-release"
 GIT_ALLOW_PROTOCOL=file "$SUPER/scripts/create-release-worktree.sh" \

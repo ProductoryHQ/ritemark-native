@@ -8,6 +8,7 @@ import path from 'node:path';
 const args = process.argv.slice(2);
 let mode = 'verify';
 let repo = process.cwd();
+const ephemeralExtensionPath = 'extensions/ritemark';
 
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
@@ -50,10 +51,19 @@ function sha256Directory(directory) {
 
 function vscodeState(vscodePath) {
   const hash = createHash('sha256');
-  hash.update(git(vscodePath, ['diff', '--binary', 'HEAD', '--'], { encoding: 'buffer' }));
+  // Ritemark's target-specific extension copy is a build input, not part of
+  // the patched VS Code shell. CI compiles/prunes/stages that tree separately,
+  // so the derived-state fingerprint must remain stable across those explicit
+  // lifecycle transitions while still rejecting every other VS Code change.
+  hash.update(git(vscodePath, [
+    'diff', '--binary', 'HEAD', '--', '.', `:(exclude)${ephemeralExtensionPath}`
+  ], { encoding: 'buffer' }));
 
   const untracked = git(vscodePath, ['ls-files', '--others', '--exclude-standard', '-z'])
-    .split('\0').filter(Boolean).sort();
+    .split('\0')
+    .filter(Boolean)
+    .filter(relative => relative !== ephemeralExtensionPath && !relative.startsWith(`${ephemeralExtensionPath}/`))
+    .sort();
   for (const relative of untracked) {
     const absolute = path.join(vscodePath, relative);
     hash.update(relative);
@@ -83,10 +93,11 @@ try {
   }
 
   const current = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     sourceCommit: git(repo, ['rev-parse', 'HEAD']).trim(),
     vscodeCommit: git(vscodePath, ['rev-parse', 'HEAD']).trim(),
     patchSetSha256: sha256Directory(path.join(repo, 'patches', 'vscode')),
+    excludedPaths: [ephemeralExtensionPath],
     vscodeStateSha256: vscodeState(vscodePath)
   };
 
