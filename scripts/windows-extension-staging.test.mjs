@@ -11,23 +11,29 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   const workflow = await readFile(workflowPath, 'utf8');
   const preserveFontStep = workflow.indexOf('- name: Preserve dependency-backed workbench font');
   const pruneStep = workflow.indexOf('- name: Prune extension dev files before build');
+  const floorVersionStep = workflow.indexOf('- name: Floor staged extension version');
   const stageStep = workflow.indexOf('- name: Stage extension outside VS Code shell build');
   const applyPatchesStep = workflow.indexOf('- name: Apply patches to staged shell state');
   const shellBuildStep = workflow.indexOf('- name: Build VS Code (win32-x64-min)');
   const finalCopyStep = workflow.indexOf('- name: Copy extension to build output');
+  const provenanceStep = workflow.indexOf('- name: Embed and verify build provenance');
 
   assert.notEqual(preserveFontStep, -1, 'font preservation step must exist');
   assert.notEqual(pruneStep, -1, 'extension pruning step must exist');
+  assert.notEqual(floorVersionStep, -1, 'staged extension version step must exist');
   assert.notEqual(stageStep, -1, 'staging step must exist');
   assert.notEqual(applyPatchesStep, -1, 'post-staging patch step must exist');
   assert.notEqual(shellBuildStep, -1, 'Windows shell build step must exist');
   assert.notEqual(finalCopyStep, -1, 'final extension copy step must exist');
+  assert.notEqual(provenanceStep, -1, 'build provenance step must exist');
   assert.ok(preserveFontStep < pruneStep, 'the dependency-backed font must be copied before npm prune');
-  assert.ok(pruneStep < stageStep, 'the compiled extension must be pruned before staging');
+  assert.ok(pruneStep < floorVersionStep, 'the compiled extension must be pruned before its final version transform');
+  assert.ok(floorVersionStep < stageStep, 'all extension transforms must finish before staging');
   assert.ok(stageStep < shellBuildStep, 'extension must leave vscode/extensions before the shell build');
   assert.ok(stageStep < applyPatchesStep, 'extension must be staged before derived state is recorded');
   assert.ok(applyPatchesStep < shellBuildStep, 'the staged shell state must be verified before build');
   assert.ok(shellBuildStep < finalCopyStep, 'final extension copy must happen after the shell build');
+  assert.ok(finalCopyStep < provenanceStep, 'the copied extension must be attested before later packaging steps');
 
   assert.match(
     workflow,
@@ -41,9 +47,21 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   assert.match(workflow, /STAGED_EXTENSION="\$RUNNER_TEMP\/ritemark-extension"/);
   assert.match(workflow, /cp -R "\$STAGED_EXTENSION" "\$EXT_DEST"/);
   assert.match(
+    workflow.slice(floorVersionStep, stageStep),
+    /floor-bundled-extension\.sh[\s\\]+"vscode\/extensions\/ritemark"/,
+    'the version floor must be included in the staged payload digest',
+  );
+  assert.match(
     workflow.slice(finalCopyStep),
     /--extension-input "\$STAGED_EXTENSION"[\s\\]+--expected-extension-sha "\$STAGED_EXTENSION_SHA"/,
     'provenance must compare the final copied extension with the pre-build staged digest',
+  );
+  const finalCopyCommand = workflow.indexOf('cp -R "$STAGED_EXTENSION" "$EXT_DEST"', finalCopyStep);
+  assert.notEqual(finalCopyCommand, -1, 'the staged extension must be copied into the final app');
+  assert.doesNotMatch(
+    workflow.slice(finalCopyCommand, provenanceStep),
+    /floor-bundled-extension|strip-foreign-agent-runtimes|rm -rf "\$EXT_DEST\//,
+    'the final copied extension must remain byte-identical until provenance verification',
   );
   assert.match(
     workflow.slice(preserveFontStep, pruneStep),

@@ -370,6 +370,21 @@ jobs:
           echo "Retained top-level extension paths:"
           find . -maxdepth 1 -mindepth 1 | sort
 
+      - name: Floor staged extension version
+        # GH #142: perform the final package.json transform before recording
+        # the staged payload digest, so the final app receives identical bytes.
+        shell: bash
+        working-directory: r
+        run: |
+          RITEMARK_VERSION=$(python -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
+          if [ -z "$RITEMARK_VERSION" ]; then
+            echo "ERROR: ritemarkVersion not found in branding/product.json" >&2
+            exit 1
+          fi
+          ./scripts/floor-bundled-extension.sh \
+            "vscode/extensions/ritemark" \
+            "$RITEMARK_VERSION"
+
       - name: Stage extension outside VS Code shell build
         shell: bash
         working-directory: r
@@ -440,30 +455,8 @@ jobs:
           fi
 
           cp -R "$STAGED_EXTENSION" "$EXT_DEST"
-          rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
-          rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
-          # Strip foreign-platform agent runtimes (Sprint 64). Keeps only
-          # win32-x64/ inside binaries/agents/, removes darwin-arm64/ and
-          # darwin-x64/ if present. Allowlist-based and idempotent.
-          ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" win32 x64
           ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
-
-      - name: Floor bundled extension version
-        # GH #142: the built-in must sort below any X.Y.Z-ext.N OTA patch so
-        # VS Code's extension scanner prefers a user-installed update. Shared
-        # logic with build-prod-windows.sh via floor-bundled-extension.sh.
-        shell: bash
-        working-directory: r
-        run: |
-          RITEMARK_VERSION=$(python -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
-          if [ -z "$RITEMARK_VERSION" ]; then
-            echo "ERROR: ritemarkVersion not found in branding/product.json"
-            exit 1
-          fi
-          ./scripts/floor-bundled-extension.sh \
-            "VSCode-win32-x64/resources/app/extensions/ritemark" \
-            "$RITEMARK_VERSION"
 
       - name: Strip bundled copilot extension from output
         # VS Code 1.117 bundles GitHub Copilot Chat as a built-in extension.
