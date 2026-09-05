@@ -104,3 +104,33 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
     'release patches must not record provenance before the extension is staged',
   );
 });
+
+test('Windows standard-user test stages exact installer bytes and avoids profile-hive races', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const verificationStep = workflow.indexOf('- name: Verify install and uninstall as a standard user');
+  const uploadStep = workflow.indexOf('- name: Upload signed Windows artifacts');
+  assert.notEqual(verificationStep, -1, 'standard-user verification step must exist');
+  assert.notEqual(uploadStep, -1, 'Windows artifact upload step must exist');
+
+  const verification = workflow.slice(verificationStep, uploadStep);
+  const profileInitialization = verification.indexOf("Start-Process -FilePath 'cmd.exe'");
+  const stageInstaller = verification.indexOf('Copy-Item -LiteralPath $installer -Destination $stagedInstaller');
+  const compareInstallerHash = verification.indexOf("Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256");
+  const launchInstaller = verification.indexOf('Start-Process -FilePath $stagedInstaller');
+  const firstHiveLoad = verification.indexOf("Mount-TestUserHive 'after install'");
+
+  assert.ok(profileInitialization >= 0, 'the standard-user profile must be initialized');
+  assert.ok(stageInstaller > profileInitialization, 'installer staging must happen after profile initialization');
+  assert.ok(compareInstallerHash > stageInstaller, 'staged installer bytes must be hashed after copying');
+  assert.ok(launchInstaller > compareInstallerHash, 'only the verified staged copy may be launched');
+  assert.ok(firstHiveLoad > launchInstaller, 'the test must not load NTUSER.DAT before -LoadUserProfile runs');
+  assert.match(verification, /\$beforeKeys = @\(\)/, 'a newly-created account must use an empty registration baseline');
+  assert.match(verification, /\/LOG=`"\$installLog`"/, 'installation failures must retain an Inno Setup log');
+  assert.match(verification, /\/LOG=`"\$uninstallLog`"/, 'uninstallation failures must retain an Inno Setup log');
+  assert.match(verification, /for \(\$attempt = 1; \$attempt -le 10; \$attempt\+\+\)/, 'registry hive transitions must retry');
+  assert.doesNotMatch(
+    verification.slice(0, launchInstaller),
+    /Mount-TestUserHive '/,
+    'the profile hive must not be mounted manually before launching the installer as that user',
+  );
+});

@@ -710,19 +710,62 @@ jobs:
             if ($initializeProfile.ExitCode -ne 0) { throw 'Could not initialize the standard-user profile.' }
             $profileRoot = "C:\Users\$userName"
             $installRoot = Join-Path $profileRoot 'AppData\Local\Programs\Ritemark'
+            $stagedInstaller = Join-Path $profileRoot 'Ritemark-Setup.exe'
+            $installLog = Join-Path $profileRoot 'Ritemark-install.log'
+            $uninstallLog = Join-Path $profileRoot 'Ritemark-uninstall.log'
+
+            # The hosted runner workspace is owned by the runner account and is
+            # not guaranteed to be readable by a newly-created standard user.
+            # Stage the exact signed bytes inside that user's profile, whose ACL
+            # is inherited by the copied file, before crossing the user boundary.
+            Copy-Item -LiteralPath $installer -Destination $stagedInstaller
+            $originalInstallerSha = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+            $stagedInstallerSha = (Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256).Hash
+            if ($stagedInstallerSha -ne $originalInstallerSha) {
+              throw 'Standard-user installer staging changed the signed installer bytes.'
+            }
 
             $hiveName = 'RitemarkCiUser'
-            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive before install.' }
+            # This account was created immediately above, so its uninstall-key
+            # baseline is deterministically empty. Loading NTUSER.DAT before
+            # launching with -LoadUserProfile can leave the hive locked and make
+            # a correct per-user installer fail with Access Denied.
             $uninstallKey = "Registry::HKEY_USERS\$hiveName\Software\Microsoft\Windows\CurrentVersion\Uninstall"
-            $beforeKeys = @(Get-ChildItem $uninstallKey -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSChildName)
-            & reg.exe unload "HKU\$hiveName" | Out-Null
+            $beforeKeys = @()
 
-            $install = Start-Process -FilePath $installer -Credential $credential -LoadUserProfile -ArgumentList @(
+            function Mount-TestUserHive([string]$phase) {
+              for ($attempt = 1; $attempt -le 10; $attempt++) {
+                & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { return }
+                [gc]::Collect()
+                [gc]::WaitForPendingFinalizers()
+                Start-Sleep -Seconds 2
+              }
+              throw "Could not load standard-user registry hive $phase."
+            }
+
+            function Dismount-TestUserHive([string]$phase) {
+              for ($attempt = 1; $attempt -le 10; $attempt++) {
+                [gc]::Collect()
+                [gc]::WaitForPendingFinalizers()
+                & reg.exe unload "HKU\$hiveName" 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { return }
+                Start-Sleep -Seconds 2
+              }
+              throw "Could not unload standard-user registry hive $phase."
+            }
+
+            $install = Start-Process -FilePath $stagedInstaller -Credential $credential -LoadUserProfile -ArgumentList @(
               '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
-              "/DIR=`"$installRoot`""
+              "/DIR=`"$installRoot`"", "/LOG=`"$installLog`""
             ) -Wait -PassThru
-            if ($install.ExitCode -ne 0) { throw "Standard-user silent install failed ($($install.ExitCode))." }
+            if ($install.ExitCode -ne 0) {
+              if (Test-Path -LiteralPath $installLog) {
+                Write-Host '--- Inno Setup install log ---'
+                Get-Content -LiteralPath $installLog
+              }
+              throw "Standard-user silent install failed ($($install.ExitCode))."
+            }
 
             ./scripts/verify-windows-signatures.ps1 `
               -Mode Verify `
@@ -735,8 +778,7 @@ jobs:
             $appLinks = @(Get-ChildItem -LiteralPath $startMenu -Filter 'Ritemark.lnk' -File -ErrorAction Stop)
             if ($appLinks.Count -ne 1) { throw "Expected one Ritemark Start menu entry, found $($appLinks.Count)." }
 
-            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive.' }
+            Mount-TestUserHive 'after install'
             try {
               $afterEntries = @(Get-ChildItem $uninstallKey -ErrorAction SilentlyContinue)
               $newEntries = @($afterEntries | Where-Object { $beforeKeys -notcontains $_.PSChildName })
@@ -751,21 +793,28 @@ jobs:
                 throw 'Installed ProductName, Publisher, or Version is incorrect.'
               }
             } finally {
-              [gc]::Collect()
-              & reg.exe unload "HKU\$hiveName" | Out-Null
+              $registration = $null
+              $newEntries = $null
+              $afterEntries = $null
+              Dismount-TestUserHive 'after install checks'
             }
 
             $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
             if ($null -eq $uninstaller) { throw 'Signed uninstaller was not installed.' }
             $uninstall = Start-Process -FilePath $uninstaller.FullName -Credential $credential -LoadUserProfile -ArgumentList @(
-              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$uninstallLog`""
             ) -Wait -PassThru
-            if ($uninstall.ExitCode -ne 0) { throw "Standard-user silent uninstall failed ($($uninstall.ExitCode))." }
+            if ($uninstall.ExitCode -ne 0) {
+              if (Test-Path -LiteralPath $uninstallLog) {
+                Write-Host '--- Inno Setup uninstall log ---'
+                Get-Content -LiteralPath $uninstallLog
+              }
+              throw "Standard-user silent uninstall failed ($($uninstall.ExitCode))."
+            }
             if (Test-Path -LiteralPath $installRoot) { throw 'Uninstall left the Ritemark install directory behind.' }
             if (Test-Path -LiteralPath $startMenu) { throw 'Uninstall left the Ritemark Start menu group behind.' }
 
-            & reg.exe load "HKU\$hiveName" (Join-Path $profileRoot 'NTUSER.DAT') | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'Could not load standard-user registry hive after uninstall.' }
+            Mount-TestUserHive 'after uninstall'
             try {
               if (Test-Path -LiteralPath "$uninstallKey\$registrationKeyName") {
                 throw 'Uninstall left the Ritemark app registration behind.'
@@ -774,8 +823,8 @@ jobs:
                 Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -eq 'Ritemark' })
               if ($remainingRitemark.Count -ne 0) { throw 'Uninstall left a Ritemark app registration behind.' }
             } finally {
-              [gc]::Collect()
-              & reg.exe unload "HKU\$hiveName" | Out-Null
+              $remainingRitemark = $null
+              Dismount-TestUserHive 'after uninstall checks'
             }
           } finally {
             Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
