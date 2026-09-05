@@ -1,7 +1,8 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Reopened for Gate 2 build recovery after Windows run `33876792999` exposed an `EMFILE` deadlock in VS Code's eager local-extension packager. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
+**Status:** Reopened for Gate 2 build recovery. Run `33954203308` confirmed that the `EMFILE` recovery, Windows shell build, Azure signing, signed payload verification, validation, and signed installer build all pass; its standard-user install test then exposed a runner-workspace/profile-hive access race before artifact upload. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
+**Follow-up branch:** `codex/sprint-114-windows-standard-user-ci`<br>
 **Issue:** [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212)<br>
 **Release:** [v1.10.0](../release-plan.md)
 
@@ -63,7 +64,12 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Preserve the x64 app's symlinks and executable modes across GitHub artifact transport with a verified tar archive, and bind POSIX permission bits into the extension-tree digest.
 - [x] Restore the downloaded x64 archive through one fail-closed extractor before signing; keep the canonical Claude and Codex release playbooks aligned with that command.
 - [x] On Windows, bind every extension PE header/section/overlay byte and every non-PE byte to the staged attestation; normalize only Authenticode-owned checksum, Certificate Table metadata, and the exact Certificate Table range, then independently verify every PE signature.
+- [x] Preserve run `33954203308` as evidence that build, signing, payload validation, and signed-installer creation pass before the standard-user test fails with `Access is denied`.
+- [x] Stage the exact signed installer bytes inside the new standard user's own profile, verify the staged SHA-256 before launch, and never launch the runner-workspace path across the user boundary.
+- [x] Remove the unnecessary pre-install `NTUSER.DAT` mount for the newly created account; retry and explicitly verify the post-process hive mount/unmount transitions.
+- [x] Capture Inno Setup install and uninstall logs on failure, with a deterministic workflow-shape regression test.
 - [x] Pass repository QA and review.
+- [x] Pass follow-up QA and local PowerShell syntax validation for the standard-user CI recovery.
 - [ ] Pass a fresh Windows build from the merged canonical `main` commit.
 
 ## Decisions
@@ -76,3 +82,4 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - No `docs/development/architecture.md` update is required because this sprint changes packaging and documentation only.
 - Ritemark is no longer packaged twice during the Windows build. VS Code builds the shell without Ritemark in its eager local-extension stream; the already compiled, pruned, target-specific extension is copied into the final shell exactly once and is then covered by the existing completeness, provenance, signing, install, and uninstall gates. Windows records and verifies its complete patched shell only after staging, with the extension's absence as part of that fingerprint. macOS keeps its physical extension copy in the complete fingerprint, so the Windows recovery cannot weaken another platform's provenance gate.
 - No changelog or public release-note entry is added for this recovery because it changes only the release build pipeline and does not change user-facing product behavior.
+- Run `33954203308` did not upload an artifact: fail-closed upload remained after the standard-user install/uninstall gate. The observed `Access is denied` happened only after the installer signature, Windows shell, signed payload, and installer-build checks had passed; the recovery therefore changes test-user isolation and diagnostics, not product payload or signing policy.
