@@ -158,9 +158,19 @@ Wait for `build-macos-x64.yml` to finish:
 gh run list --workflow=build-macos-x64.yml --limit 3
 gh run download <run-id> --name ritemark-darwin-x64 --dir dist/x64-ci
 ./scripts/extract-macos-x64-artifact.sh
+export RITEMARK_RELEASE_COMMIT=<approved 40-char source commit>
 ./scripts/codesign-app.sh darwin-x64
 ./scripts/create-dmg.sh x64
 ```
+
+`RITEMARK_RELEASE_COMMIT` is mandatory for a CI-built artifact. The x64 app was
+built on another machine, so its embedded provenance is verified against the
+approved release commit's git objects (`build-provenance.mjs --release-commit`)
+instead of this checkout's working tree — a working-tree comparison can never
+match across machines (CI copies the extension into `vscode/extensions`; a
+worktree links it). Run these steps from any clean **harness worktree** whose
+`vscode` submodule is initialized; the product source is the release commit,
+not the worktree's HEAD. Record the harness commit next to the artifact hash.
 
 Output: `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed, **NOT notarized**). Same rule as arm64 — record the DMG build timestamp; **do NOT notarize until Gate 2 passes AND ≥60 min hardening have elapsed.**
 

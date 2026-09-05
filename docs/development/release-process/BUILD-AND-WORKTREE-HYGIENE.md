@@ -58,6 +58,25 @@ Any new source commit invalidates the candidate. Delete the old release
 worktree and create a new one; never pull, rebase, or hot-copy files into an RC
 worktree.
 
+### Product source versus release harness
+
+A "source commit" above means the commit whose *product* bytes ship. The
+scripts and workflows that build, verify, sign, and package are a **harness**.
+Fixing the harness after an artifact exists does not change the artifact and
+does not require rebuilding it; every artifact record carries both identities
+(the Windows record already writes `source_commit` and `workflow_commit`).
+
+Artifacts that CI builds on another machine (macOS x64, Windows) are therefore
+signed and packaged from a **harness worktree** — any clean checkout with an
+initialized `vscode` submodule — with `RITEMARK_RELEASE_COMMIT` set to the
+approved 40-character source commit. `build-provenance.mjs --release-commit`
+then verifies the embedded source commit, VS Code gitlink, patch-set digest,
+and lock-file digests against that commit's git objects, and requires (without
+recomputing) the build machine's VS Code working-tree digest. The commit must
+be on `origin/main`. Without the anchor, verification compares against this
+checkout's working tree, which is correct only for the machine that ran the
+build.
+
 ## Hard failures
 
 The release source gate blocks when any of these is true:

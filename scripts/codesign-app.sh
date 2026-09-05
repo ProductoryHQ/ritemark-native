@@ -226,10 +226,19 @@ if [ ! -f "$EXTENSION_SHA_PATH" ] || ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA
     exit 1
 fi
 EXPECTED_EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
+# A CI-built artifact (darwin-x64) is signed from a harness worktree, so its
+# provenance is anchored to the approved release commit rather than to this
+# checkout's working tree. Same-machine builds keep the working-tree check.
+PROVENANCE_ANCHOR=()
+if [ -n "${RITEMARK_RELEASE_COMMIT:-}" ]; then
+    PROVENANCE_ANCHOR=(--release-commit "$RITEMARK_RELEASE_COMMIT")
+    echo "  Provenance anchor: release commit $RITEMARK_RELEASE_COMMIT"
+fi
 if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
     --verify --repo "$PROJECT_ROOT" --target "$TARGET" --app "$APP_PATH" \
     --extension-input "$EXTENSION_PATH" \
-    --expected-extension-sha "$EXPECTED_EXTENSION_SHA"; then
+    --expected-extension-sha "$EXPECTED_EXTENSION_SHA" \
+    ${PROVENANCE_ANCHOR[@]+"${PROVENANCE_ANCHOR[@]}"}; then
     echo -e "${RED}ERROR: Build or extension provenance verification failed; refusing to sign.${NC}"
     exit 1
 fi

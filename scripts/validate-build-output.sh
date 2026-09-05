@@ -98,7 +98,8 @@ if [[ ! -s "$PROVENANCE_PATH" ]]; then
   echo "  Missing release provenance: $PROVENANCE_PATH"
   ERRORS=$((ERRORS + 1))
 elif node ./scripts/build-provenance.mjs \
-    --verify --target "$TARGET" --app "$APP_PATH" >/dev/null 2>&1; then
+    --verify --target "$TARGET" --app "$APP_PATH" \
+    ${RITEMARK_RELEASE_COMMIT:+--release-commit "$RITEMARK_RELEASE_COMMIT"} >/dev/null 2>&1; then
   echo -e "${GREEN}OK${NC}"
 else
   echo -e "${RED}FAIL${NC}"
