@@ -171,6 +171,8 @@ test('Windows standard-user test uses one observable, replayable roundtrip harne
   assert.match(roundtrip, /\/LOG=\$installLog/, 'installation failures must retain an Inno Setup log');
   assert.match(roundtrip, /\/LOG=\$uninstallLog/, 'uninstallation failures must retain an Inno Setup log');
   assert.match(roundtrip, /-RedirectStandardOutput \$stdoutPath -RedirectStandardError \$stderrPath/, 'child-process failures must expose their diagnostics');
+  assert.match(roundtrip, /Get-Content -LiteralPath \$entry\.Path -Encoding oem/, 'redirected Windows console diagnostics must be decoded with the runner OEM code page');
+  assert.match(roundtrip, /registry-\$mode\.result\.json/, 'the exact UTF-8 registry result must be preserved independently from console output');
   assert.match(roundtrip, /Copy-Item -Path \(Join-Path \$userEvidence '\*'\) -Destination \$evidenceRoot/, 'roundtrip diagnostics must survive test-user deletion');
   assert.doesNotMatch(roundtrip, /HKEY_USERS|NTUSER\.DAT|reg\.exe (?:load|unload)|Mount-TestUserHive|Dismount-TestUserHive/, 'admin-side profile hive mounting must not return');
   assert.match(workflow.slice(uploadStep), /- name: Upload signed Windows artifacts\n\s+if: always\(\)/, 'a built signed installer must remain downloadable when the roundtrip test fails');

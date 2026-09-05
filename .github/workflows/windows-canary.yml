@@ -199,7 +199,7 @@ jobs:
               foreach ($entry in @(@{ Name = 'stdout'; Path = $stdoutPath }, @{ Name = 'stderr'; Path = $stderrPath })) {
                 if (Test-Path -LiteralPath $entry.Path) {
                   Write-Host "--- registry canary $mode $($entry.Name) ---"
-                  Get-Content -LiteralPath $entry.Path | ForEach-Object { Write-Host $_ }
+                  Get-Content -LiteralPath $entry.Path -Encoding oem | ForEach-Object { Write-Host $_ }
                 }
               }
               if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {

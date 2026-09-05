@@ -123,7 +123,7 @@ try {
     )) {
       if (Test-Path -LiteralPath $entry.Path) {
         Write-Host "--- $label $($entry.Name) ---"
-        Get-Content -LiteralPath $entry.Path | ForEach-Object { Write-Host $_ }
+        Get-Content -LiteralPath $entry.Path -Encoding oem | ForEach-Object { Write-Host $_ }
       }
     }
   }
@@ -175,6 +175,8 @@ $ErrorActionPreference = 'Stop'
   if ($environmentProbe.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $environmentProbeResult)) {
     throw "Standard-user environment probe failed ($($environmentProbe.ExitCode))."
   }
+  Copy-Item -LiteralPath $environmentProbeResult `
+    -Destination (Join-Path $userEvidence 'environment-probe.result.json') -Force
 
   $probe = Get-Content -LiteralPath $environmentProbeResult -Raw | ConvertFrom-Json
   $expectedProbe = [ordered]@{
@@ -208,6 +210,8 @@ $ErrorActionPreference = 'Stop'
     if ($registryProbe.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {
       throw "Standard-user registry probe '$mode' failed ($($registryProbe.ExitCode))."
     }
+    Copy-Item -LiteralPath $resultPath `
+      -Destination (Join-Path $userEvidence "registry-$mode.result.json") -Force
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     if ([string]$result.Identity -ine "$env:COMPUTERNAME\$userName") {
       throw "Registry probe '$mode' ran as '$($result.Identity)' instead of the standard user."
