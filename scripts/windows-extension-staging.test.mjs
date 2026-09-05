@@ -7,6 +7,19 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const workflowPath = path.join(projectRoot, '.github', 'workflows', 'build-windows.yml');
 
+test('Windows release workflow separates immutable product source from workflow revision', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+
+  assert.match(workflow, /source_commit:\s*\n\s+description:[^\n]+\n\s+required: true\n\s+type: string/);
+  assert.match(workflow, /uses: actions\/checkout@v4[\s\S]*?ref: \$\{\{ inputs\.source_commit \}\}/);
+  assert.match(workflow, /SOURCE_COMMIT='\$\{\{ inputs\.source_commit \}\}'/);
+  assert.match(workflow, /\^\[0-9a-fA-F\]\{40\}\$/);
+  assert.match(workflow, /CHECKED_OUT_COMMIT="\$\(git rev-parse HEAD\)"/);
+  assert.match(workflow, /verify-release-source\.sh --target win32-x64 --phase pristine/);
+  assert.match(workflow, /source_commit=\$\(\(git rev-parse HEAD\)\.Trim\(\)\)/);
+  assert.match(workflow, /workflow_commit=\$env:GITHUB_SHA/);
+});
+
 test('Windows shell build stages Ritemark outside the eager VS Code packager', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const preserveFontStep = workflow.indexOf('- name: Preserve dependency-backed workbench font');
@@ -105,7 +118,7 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   );
 });
 
-test('Windows standard-user test stages exact installer bytes and avoids profile-hive races', async () => {
+test('Windows standard-user test proves an isolated user environment before installing', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const verificationStep = workflow.indexOf('- name: Verify install and uninstall as a standard user');
   const uploadStep = workflow.indexOf('- name: Upload signed Windows artifacts');
@@ -116,17 +129,40 @@ test('Windows standard-user test stages exact installer bytes and avoids profile
   const profileInitialization = verification.indexOf("Start-Process -FilePath 'cmd.exe'");
   const stageInstaller = verification.indexOf('Copy-Item -LiteralPath $installer -Destination $stagedInstaller');
   const compareInstallerHash = verification.indexOf("Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256");
+  const defineUserEnvironment = verification.indexOf('$userProcessEnvironment = @{');
+  const environmentProbe = verification.indexOf('$environmentProbe = Start-Process');
+  const compareProbe = verification.indexOf('$expectedProbe = [ordered]@{');
   const launchInstaller = verification.indexOf('Start-Process -FilePath $stagedInstaller');
   const firstHiveLoad = verification.indexOf("Mount-TestUserHive 'after install'");
 
   assert.ok(profileInitialization >= 0, 'the standard-user profile must be initialized');
   assert.ok(stageInstaller > profileInitialization, 'installer staging must happen after profile initialization');
   assert.ok(compareInstallerHash > stageInstaller, 'staged installer bytes must be hashed after copying');
-  assert.ok(launchInstaller > compareInstallerHash, 'only the verified staged copy may be launched');
+  assert.ok(defineUserEnvironment > compareInstallerHash, 'the user environment must be defined after exact installer staging');
+  assert.ok(environmentProbe > defineUserEnvironment, 'the alternate-user environment must be probed before install');
+  assert.ok(compareProbe > environmentProbe, 'the probe result must be checked before install');
+  assert.ok(launchInstaller > compareProbe, 'only the user-readable, exact staged copy may be launched');
   assert.ok(firstHiveLoad > launchInstaller, 'the test must not load NTUSER.DAT before -LoadUserProfile runs');
   assert.match(verification, /\$beforeKeys = @\(\)/, 'a newly-created account must use an empty registration baseline');
-  assert.match(verification, /\/LOG=`"\$installLog`"/, 'installation failures must retain an Inno Setup log');
-  assert.match(verification, /\/LOG=`"\$uninstallLog`"/, 'uninstallation failures must retain an Inno Setup log');
+  for (const variable of ['USERNAME', 'USERDOMAIN', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'LOCALAPPDATA', 'APPDATA', 'TEMP', 'TMP']) {
+    assert.match(verification, new RegExp(`\\b${variable}\\s*=`), `${variable} must be explicit at the user boundary`);
+  }
+  const environmentProbeBlock = verification.slice(environmentProbe, compareProbe);
+  assert.match(environmentProbeBlock, /-WorkingDirectory \$profileRoot/, 'the environment canary must run from the user profile');
+  assert.match(environmentProbeBlock, /-Environment \$userProcessEnvironment/, 'the environment canary must receive the explicit user environment');
+  assert.equal(
+    (verification.match(/-Environment \$userProcessEnvironment/g) ?? []).length,
+    3,
+    'the canary, installer, and uninstaller must share the same proven user environment',
+  );
+  assert.equal(
+    (verification.match(/-WorkingDirectory \$profileRoot/g) ?? []).length,
+    3,
+    'the canary, installer, and uninstaller must share the user-owned working directory',
+  );
+  assert.match(verification, /InstallerSha256 = \$originalInstallerSha/, 'the user-side installer hash must match the signed source');
+  assert.match(verification, /\/LOG=\$installLog/, 'installation failures must retain an Inno Setup log');
+  assert.match(verification, /\/LOG=\$uninstallLog/, 'uninstallation failures must retain an Inno Setup log');
   assert.match(verification, /for \(\$attempt = 1; \$attempt -le 10; \$attempt\+\+\)/, 'registry hive transitions must retry');
   assert.doesNotMatch(
     verification.slice(0, launchInstaller),
