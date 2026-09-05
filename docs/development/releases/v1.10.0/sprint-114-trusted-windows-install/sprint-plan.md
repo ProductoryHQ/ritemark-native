@@ -1,6 +1,6 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Reopened for Gate 2 build recovery. Runs `33954203308` and `33965759422` confirmed that the Windows shell build, Azure signing, signed payload verification, validation, and signed installer build all pass. The first exposed runner-workspace/profile-hive isolation; the second removed those causes and isolated the remaining failure to the alternate-credential process inheriting the runner administrator's environment. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
+**Status:** Reopened for Gate 2 build recovery. Runs `33954203308`, `33965759422`, and `33968428932` progressively isolated CI-only standard-user harness faults after the Windows app, Azure signing, payload verification, validation, and signed installer build had passed. The third run proved the corrected process environment, successful install, and all 44 installed PE signatures; it then exposed an admin-side registry-hive unload race after install verification. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
 **Follow-up branch:** `codex/sprint-114-windows-standard-user-ci`<br>
 **Second follow-up branch:** `codex/sprint-114-windows-user-environment`<br>
@@ -75,11 +75,16 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Replace that implicit environment boundary with an explicit standard-user working directory and identity/profile/temp/shell-folder environment shared by the canary, installer, and uninstaller.
 - [x] Require an alternate-user canary to prove identity, environment, working directory, write access, and the user-visible installer SHA-256 before installation.
 - [x] Decouple the immutable approved product-source SHA from the workflow revision: the paid workflow requires an explicit 40-character source commit, checks out that exact commit, still requires it to equal canonical `origin/main`, and records both source and workflow commits beside the installer hash.
+- [x] Preserve run `33968428932` as evidence that the isolated standard-user process installs the signed application and that all 44 installed PE files verify; classify the later `reg unload` failure as an admin-side test-harness race.
+- [x] Replace admin-side `HKEY_USERS` hive mounting with a shared verifier that inspects `HKCU` inside the same standard-user credential boundary before and after uninstall.
+- [ ] Pass the shared standard-user/HKCU verifier first in the free `windows-latest` canary.
 - [ ] Pass a fresh Windows build from the exact approved canonical `main` product commit using the reviewed workflow revision.
 
 ## Decisions
 
 - **2026-09-05 — Do not invalidate an approved Mac RC for a Windows-only CI harness correction.** The Windows workflow definition may advance independently, but the product checkout remains pinned to the exact Gate 1 source commit and must still pass the existing `origin/main` integrity and embedded provenance gates. Both identities are recorded in the workflow summary and Windows hash manifest.
+- **2026-09-05 — Inspect user-owned state as that user.** Do not mount a generated user's `NTUSER.DAT` into `HKEY_USERS` from the runner administrator. Run the registry verifier under the exact standard-user credentials and `HKCU`, and exercise that same verifier in the free Windows canary before paying for another release build.
+- **2026-09-05 — Preserve a completed signed installer even when the last test fails.** Record its SHA/source/workflow identity before the roundtrip and upload it with `if: always()`; this prevents a late harness failure from destroying the only debuggable artifact.
 
 - Existing repository-level Azure signing secrets remain in use.
 - GitHub Release continues as the secondary direct-download location; no channel redesign is needed.

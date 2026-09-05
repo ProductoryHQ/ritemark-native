@@ -6,15 +6,19 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const workflowPath = path.join(projectRoot, '.github', 'workflows', 'build-windows.yml');
+const canaryWorkflowPath = path.join(projectRoot, '.github', 'workflows', 'windows-canary.yml');
+const registryProbePath = path.join(projectRoot, 'scripts', 'windows-standard-user-registry-probe.ps1');
 
 test('Windows release workflow separates immutable product source from workflow revision', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
 
   assert.match(workflow, /source_commit:\s*\n\s+description:[^\n]+\n\s+required: true\n\s+type: string/);
   assert.match(workflow, /uses: actions\/checkout@v4[\s\S]*?ref: \$\{\{ inputs\.source_commit \}\}/);
+  assert.match(workflow, /- name: Checkout reviewed release harness[\s\S]*?ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /SOURCE_COMMIT='\$\{\{ inputs\.source_commit \}\}'/);
   assert.match(workflow, /\^\[0-9a-fA-F\]\{40\}\$/);
   assert.match(workflow, /CHECKED_OUT_COMMIT="\$\(git rev-parse HEAD\)"/);
+  assert.match(workflow, /HARNESS_COMMIT="\$\(git -C \.\.\/ci-harness rev-parse HEAD\)"/);
   assert.match(workflow, /verify-release-source\.sh --target win32-x64 --phase pristine/);
   assert.match(workflow, /source_commit=\$\(\(git rev-parse HEAD\)\.Trim\(\)\)/);
   assert.match(workflow, /workflow_commit=\$env:GITHUB_SHA/);
@@ -132,8 +136,11 @@ test('Windows standard-user test proves an isolated user environment before inst
   const defineUserEnvironment = verification.indexOf('$userProcessEnvironment = @{');
   const environmentProbe = verification.indexOf('$environmentProbe = Start-Process');
   const compareProbe = verification.indexOf('$expectedProbe = [ordered]@{');
+  const registryProbeFunction = verification.indexOf('function Invoke-RegistryProbe');
   const launchInstaller = verification.indexOf('Start-Process -FilePath $stagedInstaller');
-  const firstHiveLoad = verification.indexOf("Mount-TestUserHive 'after install'");
+  const verifyInstalled = verification.indexOf("Invoke-RegistryProbe 'verify-installed'");
+  const launchUninstaller = verification.indexOf('Start-Process -FilePath $uninstaller.FullName');
+  const verifyUninstalled = verification.indexOf("Invoke-RegistryProbe 'verify-uninstalled'");
 
   assert.ok(profileInitialization >= 0, 'the standard-user profile must be initialized');
   assert.ok(stageInstaller > profileInitialization, 'installer staging must happen after profile initialization');
@@ -141,9 +148,11 @@ test('Windows standard-user test proves an isolated user environment before inst
   assert.ok(defineUserEnvironment > compareInstallerHash, 'the user environment must be defined after exact installer staging');
   assert.ok(environmentProbe > defineUserEnvironment, 'the alternate-user environment must be probed before install');
   assert.ok(compareProbe > environmentProbe, 'the probe result must be checked before install');
+  assert.ok(registryProbeFunction > compareProbe, 'current-user registry inspection must share the proven user boundary');
   assert.ok(launchInstaller > compareProbe, 'only the user-readable, exact staged copy may be launched');
-  assert.ok(firstHiveLoad > launchInstaller, 'the test must not load NTUSER.DAT before -LoadUserProfile runs');
-  assert.match(verification, /\$beforeKeys = @\(\)/, 'a newly-created account must use an empty registration baseline');
+  assert.ok(verifyInstalled > launchInstaller, 'HKCU must be checked as the standard user after install');
+  assert.ok(launchUninstaller > verifyInstalled, 'uninstall must run after the installed HKCU state is proven');
+  assert.ok(verifyUninstalled > launchUninstaller, 'HKCU must be checked as the standard user after uninstall');
   for (const variable of ['USERNAME', 'USERDOMAIN', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'LOCALAPPDATA', 'APPDATA', 'TEMP', 'TMP']) {
     assert.match(verification, new RegExp(`\\b${variable}\\s*=`), `${variable} must be explicit at the user boundary`);
   }
@@ -152,21 +161,33 @@ test('Windows standard-user test proves an isolated user environment before inst
   assert.match(environmentProbeBlock, /-Environment \$userProcessEnvironment/, 'the environment canary must receive the explicit user environment');
   assert.equal(
     (verification.match(/-Environment \$userProcessEnvironment/g) ?? []).length,
-    3,
-    'the canary, installer, and uninstaller must share the same proven user environment',
+    4,
+    'the environment canary, registry probe, installer, and uninstaller must share the same proven user environment',
   );
   assert.equal(
     (verification.match(/-WorkingDirectory \$profileRoot/g) ?? []).length,
-    3,
-    'the canary, installer, and uninstaller must share the user-owned working directory',
+    4,
+    'the environment canary, registry probe, installer, and uninstaller must share the user-owned working directory',
   );
   assert.match(verification, /InstallerSha256 = \$originalInstallerSha/, 'the user-side installer hash must match the signed source');
   assert.match(verification, /\/LOG=\$installLog/, 'installation failures must retain an Inno Setup log');
   assert.match(verification, /\/LOG=\$uninstallLog/, 'uninstallation failures must retain an Inno Setup log');
-  assert.match(verification, /for \(\$attempt = 1; \$attempt -le 10; \$attempt\+\+\)/, 'registry hive transitions must retry');
-  assert.doesNotMatch(
-    verification.slice(0, launchInstaller),
-    /Mount-TestUserHive '/,
-    'the profile hive must not be mounted manually before launching the installer as that user',
-  );
+  assert.match(verification, /ci-harness\\scripts\\windows-standard-user-registry-probe\.ps1/, 'the reviewed registry probe must be copied into the user profile');
+  assert.doesNotMatch(verification, /HKEY_USERS|NTUSER\.DAT|reg\.exe (?:load|unload)|Mount-TestUserHive|Dismount-TestUserHive/, 'admin-side profile hive mounting must not return');
+  assert.match(workflow.slice(uploadStep), /- name: Upload signed Windows artifacts\n\s+if: always\(\)/, 'a built signed installer must remain downloadable when the roundtrip test fails');
+});
+
+test('free Windows canary exercises the shared current-user registry verifier', async () => {
+  const [canaryWorkflow, registryProbe] = await Promise.all([
+    readFile(canaryWorkflowPath, 'utf8'),
+    readFile(registryProbePath, 'utf8'),
+  ]);
+
+  assert.match(canaryWorkflow, /Verify standard-user process and HKCU boundary/);
+  for (const mode of ['seed-canary', 'verify-installed', 'remove-canary', 'verify-uninstalled']) {
+    assert.match(canaryWorkflow, new RegExp(`Invoke-CanaryRegistryProbe '${mode}'`));
+    assert.match(registryProbe, new RegExp(`'${mode}'`));
+  }
+  assert.match(registryProbe, /HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall/);
+  assert.doesNotMatch(registryProbe, /HKEY_USERS|NTUSER\.DAT|reg\.exe/);
 });

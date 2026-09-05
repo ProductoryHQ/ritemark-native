@@ -35,6 +35,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Checkout release harness
+        uses: actions/checkout@v4
+
       - name: Configure Git for Windows
         shell: bash
         run: |
@@ -120,3 +123,69 @@ jobs:
           # it from source exercises node-gyp -> MSVC end to end.
           npm install @vscode/spdlog --build-from-source --no-audit --no-fund --foreground-scripts --loglevel=error
           node -e "require('@vscode/spdlog'); console.log('Native compile + load OK (@vscode/spdlog)')"
+
+      - name: Verify standard-user process and HKCU boundary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runId = [string]$env:GITHUB_RUN_ID
+          $runIdSuffix = if ($runId.Length -gt 15) { $runId.Substring($runId.Length - 15) } else { $runId }
+          $userName = "rmci-$runIdSuffix"
+          $plainPassword = "Ritemark!$([guid]::NewGuid().ToString('N'))"
+          $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
+          $credential = [pscredential]::new("$env:COMPUTERNAME\$userName", $securePassword)
+          New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires | Out-Null
+          try {
+            $initializeProfile = Start-Process -FilePath 'cmd.exe' -Credential $credential -LoadUserProfile `
+              -WorkingDirectory $env:SystemRoot -ArgumentList '/c','exit 0' -Wait -PassThru
+            if ($initializeProfile.ExitCode -ne 0) { throw 'Could not initialize the standard-user profile.' }
+
+            $profileRoot = "C:\Users\$userName"
+            $localAppData = Join-Path $profileRoot 'AppData\Local'
+            $userTemp = Join-Path $localAppData 'Temp'
+            $probeScript = Join-Path $profileRoot 'Ritemark-Ci-Registry-Probe.ps1'
+            New-Item -ItemType Directory -Path $userTemp -Force | Out-Null
+            Copy-Item -LiteralPath (Resolve-Path 'scripts\windows-standard-user-registry-probe.ps1').Path `
+              -Destination $probeScript
+
+            $userProcessEnvironment = @{
+              USERNAME = $userName
+              USERDOMAIN = $env:COMPUTERNAME
+              USERPROFILE = $profileRoot
+              HOMEDRIVE = 'C:'
+              HOMEPATH = "\Users\$userName"
+              LOCALAPPDATA = $localAppData
+              APPDATA = (Join-Path $profileRoot 'AppData\Roaming')
+              TEMP = $userTemp
+              TMP = $userTemp
+              RITEMARK_CI_PUBLISHER = 'Productory Services OÜ'
+              RITEMARK_CI_VERSION = 'canary'
+            }
+
+            function Invoke-CanaryRegistryProbe([string]$mode, [int]$expectedCount) {
+              $resultPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.json"
+              Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
+              $userProcessEnvironment.RITEMARK_CI_REGISTRY_MODE = $mode
+              $userProcessEnvironment.RITEMARK_CI_REGISTRY_RESULT = $resultPath
+              $process = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') `
+                -Credential $credential -LoadUserProfile -WorkingDirectory $profileRoot `
+                -Environment $userProcessEnvironment `
+                -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-File',$probeScript `
+                -Wait -PassThru
+              if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {
+                throw "Standard-user registry canary '$mode' failed ($($process.ExitCode))."
+              }
+              $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+              if ([string]$result.Identity -ine "$env:COMPUTERNAME\$userName" -or
+                  [int]$result.Count -ne $expectedCount) {
+                throw "Registry canary '$mode' returned the wrong identity or count."
+              }
+            }
+
+            Invoke-CanaryRegistryProbe 'seed-canary' 1
+            Invoke-CanaryRegistryProbe 'verify-installed' 1
+            Invoke-CanaryRegistryProbe 'remove-canary' 0
+            Invoke-CanaryRegistryProbe 'verify-uninstalled' 0
+          } finally {
+            Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
+          }
