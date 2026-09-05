@@ -75,9 +75,17 @@ fi
 echo "  ✓ App bundle found"
 
 # Packaging an older or locally assembled app as an RC is forbidden. The
-# embedded manifest must still match this checkout's canonical build inputs.
+# embedded manifest must match the canonical build inputs: this checkout's
+# working tree for a same-machine build, or the approved release commit when
+# RITEMARK_RELEASE_COMMIT anchors a CI-built artifact.
+PROVENANCE_ANCHOR=()
+if [ -n "${RITEMARK_RELEASE_COMMIT:-}" ]; then
+    PROVENANCE_ANCHOR=(--release-commit "$RITEMARK_RELEASE_COMMIT")
+    echo "  Provenance anchor: release commit $RITEMARK_RELEASE_COMMIT"
+fi
 if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
-    --verify --repo "$PROJECT_ROOT" --target "darwin-$ARCH" --app "$APP_PATH"; then
+    --verify --repo "$PROJECT_ROOT" --target "darwin-$ARCH" --app "$APP_PATH" \
+    ${PROVENANCE_ANCHOR[@]+"${PROVENANCE_ANCHOR[@]}"}; then
     echo -e "${RED}ERROR: Build provenance verification failed; refusing to package.${NC}"
     exit 1
 fi

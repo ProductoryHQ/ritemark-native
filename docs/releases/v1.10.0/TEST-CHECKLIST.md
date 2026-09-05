@@ -2,6 +2,14 @@
 
 This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
 
+## Current candidate record — 2026-09-05
+
+- Product source frozen at `8698ce9900ec437067a40eda3f5209f79029786f` (D1). The release worktree is `.worktrees/release-8698ce9900ec`.
+- arm64: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from that exact commit passed Jarmo's Gate 1, was notarized and stapled (`stapler validate` passes); final post-staple SHA-256 `5258848c5cab5ddb32beac8844b4a3ab7cb15ee09d93b50f586af49a1b26a1d2`. The `.sha256` sidecar had been written before notarization and was regenerated to the post-staple hash.
+- x64: CI run `33965759392` (`main@8698ce99`) succeeded. The artifact was extracted with `extract-macos-x64-artifact.sh` (extension attestation `125eb109…` matches), all binaries are x86_64 including `codex-code-mode-host`, `Info.plist` reports `1.10.0`, and the embedded provenance records `target=darwin-x64` and `sourceCommit=8698ce99`. Local signing was blocked by the cross-machine provenance defect; the signed DMG is produced with `RITEMARK_RELEASE_COMMIT` after the correction merges.
+- Windows: run `33970702424` (workflow `caf2e1a0` from PR #251, product source `8698ce99`) produced `Ritemark-Setup.exe` with SHA-256 `7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3`. Its own standard-user check failed on a test-model bug (registry `DisplayName` is `Ritemark 1.10.0`, the test expected `Ritemark`); the preserved installer then passed the complete standard-user install, 44-binary signature, registry, and uninstall replays in canary runs `33973536662` and `33973980742`. The file is preserved as `dist/Ritemark-1.10.0-win32-x64-setup.exe` with its `.sha256.txt` in the release worktree.
+- Open: Jarmo's Gate 2 test of the signed/unnotarized x64 DMG, Kristiina's clean Windows 11 Smart App Control-On test of the exact installer hash, the x64 60-minute window, x64 notarization, tag on `8698ce99`, GitHub Release, and update feed. Store certification (#212) no longer blocks publication (D2).
+
 ## Current candidate record — 2026-09-03
 
 - Invalidated candidate: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from merged `main` commit `3f01ef5` passed static packaging/signature checks but omitted Codex 0.149.0's required `codex-code-mode-host` sibling. A real Codex file-tool turn failed with `No such file or directory`, so this DMG is not a Gate 1 candidate and must not be notarized or published.
