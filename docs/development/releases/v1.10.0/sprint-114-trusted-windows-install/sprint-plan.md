@@ -1,6 +1,6 @@
 # Sprint 114 — Trusted Windows Install
 
-**Status:** Reopened for Gate 2 build recovery. Runs `33954203308`, `33965759422`, and `33968428932` progressively isolated CI-only standard-user harness faults after the Windows app, Azure signing, payload verification, validation, and signed installer build had passed. The third run proved the corrected process environment, successful install, and all 44 installed PE signatures; it then exposed an admin-side registry-hive unload race after install verification. The signed candidate, immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
+**Status:** Reopened for Gate 2 build recovery. Runs `33954203308`, `33965759422`, `33968428932`, and `33970702424` progressively isolated CI-only standard-user harness faults after the Windows app, Azure signing, payload verification, validation, and signed installer build had passed. The latest run produced preserved installer SHA-256 `7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3` from approved product commit `8698ce9900ec437067a40eda3f5209f79029786f`, installed it successfully as a standard user, and verified all 44 installed PE signatures. Its last failure was the harness expecting `DisplayName=Ritemark` although Inno Setup correctly writes the configured `AppVerName`, `Ritemark 1.10.0`. The corrected verifier and preserved-installer replay remain to pass before Gate 2. The immutable download URL, legal URLs, Partner Center certification, Kristiina SAC-On test, and Jarmo exact-hash approval remain v1.10.0 release gates.<br>
 **Branch:** `codex/sprint-114-trusted-windows-install`<br>
 **Follow-up branch:** `codex/sprint-114-windows-standard-user-ci`<br>
 **Second follow-up branch:** `codex/sprint-114-windows-user-environment`<br>
@@ -77,14 +77,21 @@ These checks require the final release-ready v1.10.0 bytes. They do not keep the
 - [x] Decouple the immutable approved product-source SHA from the workflow revision: the paid workflow requires an explicit 40-character source commit, checks out that exact commit, still requires it to equal canonical `origin/main`, and records both source and workflow commits beside the installer hash.
 - [x] Preserve run `33968428932` as evidence that the isolated standard-user process installs the signed application and that all 44 installed PE files verify; classify the later `reg unload` failure as an admin-side test-harness race.
 - [x] Replace admin-side `HKEY_USERS` hive mounting with a shared verifier that inspects `HKCU` inside the same standard-user credential boundary before and after uninstall.
-- [ ] Pass the shared standard-user/HKCU verifier first in the free `windows-latest` canary.
-- [ ] Pass a fresh Windows build from the exact approved canonical `main` product commit using the reviewed workflow revision.
+- [x] Pass the first shared standard-user/HKCU verifier in free `windows-latest` canary run `33970548341` before using it in the release workflow.
+- [x] Preserve run `33970702424` and its exact signed installer after it proved standard-user install plus all 44 installed PE signatures, then failed only because the shared verifier modeled Inno's uninstall `DisplayName` incorrectly.
+- [x] Match Inno Setup's documented registration contract: absent an explicit `UninstallDisplayName`, the registry `DisplayName` is `AppVerName` (`Ritemark 1.10.0`), while still detecting leftover or duplicate Ritemark registrations.
+- [x] Extract the complete standard-user install/signature/registration/uninstall sequence into one shared roundtrip script used by both the release build and the preserved-installer replay path.
+- [x] Capture every alternate-user child process's stdout/stderr and retain roundtrip evidence after the temporary user is deleted.
+- [ ] Pass the corrected standard-user/HKCU contract in the free `windows-latest` canary.
+- [ ] Replay and pass the preserved installer from run `33970702424` without rebuilding or re-signing product bytes.
 
 ## Decisions
 
 - **2026-09-05 — Do not invalidate an approved Mac RC for a Windows-only CI harness correction.** The Windows workflow definition may advance independently, but the product checkout remains pinned to the exact Gate 1 source commit and must still pass the existing `origin/main` integrity and embedded provenance gates. Both identities are recorded in the workflow summary and Windows hash manifest.
 - **2026-09-05 — Inspect user-owned state as that user.** Do not mount a generated user's `NTUSER.DAT` into `HKEY_USERS` from the runner administrator. Run the registry verifier under the exact standard-user credentials and `HKCU`, and exercise that same verifier in the free Windows canary before paying for another release build.
 - **2026-09-05 — Preserve a completed signed installer even when the last test fails.** Record its SHA/source/workflow identity before the roundtrip and upload it with `if: always()`; this prevents a late harness failure from destroying the only debuggable artifact.
+- **2026-09-05 — Re-verify immutable bytes instead of rebuilding after a harness-only failure.** A manual path in the free Windows canary accepts the source run ID, expected product commit, expected installer SHA-256, and version; it downloads the preserved artifact, fails closed on identity mismatch, and runs the same shared roundtrip script without compiling or signing a new product.
+- **2026-09-05 — Model the installer's declared contract, not a synthetic canary value.** Inno Setup uses `AppVerName` as the Add/Remove Programs display name when `UninstallDisplayName` is absent. Both the canary and release verifier therefore require `Ritemark <version>` and retain the observed key names, display names, publishers, and versions as evidence.
 
 - Existing repository-level Azure signing secrets remain in use.
 - GitHub Release continues as the secondary direct-download location; no channel redesign is needed.

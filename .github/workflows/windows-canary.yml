@@ -11,8 +11,10 @@ name: Windows CI Canary
 # compile — every week on the FREE `windows-latest` standard runner, so a
 # toolchain regression surfaces on a Monday, not mid-release.
 #
-# SCOPE: this is an EARLY WARNING, not a gate. It does NOT clone/build VS Code
-# or produce an installer. `windows-latest` (standard) and `windows-8core`
+# SCOPE: the scheduled path is an EARLY WARNING, not a gate. It does NOT
+# clone/build VS Code or produce an installer. The manual replay path can also
+# download and verify an already preserved signed installer without rebuilding
+# or re-signing it. `windows-latest` (standard) and `windows-8core`
 # (larger) can run slightly different image versions, so a green canary does
 # not GUARANTEE the 8-core build is green — but a RED canary reliably means the
 # shared Windows toolchain (Node + node-gyp + MSVC/VS detection) has shifted and
@@ -23,6 +25,23 @@ on:
   schedule:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC
   workflow_dispatch:
+    inputs:
+      installer_run_id:
+        description: 'Optional completed Build Windows run ID whose preserved installer should be re-verified'
+        required: false
+        type: string
+      expected_source_commit:
+        description: 'Required with installer_run_id: exact 40-character product source commit'
+        required: false
+        type: string
+      expected_sha256:
+        description: 'Required with installer_run_id: exact installer SHA-256'
+        required: false
+        type: string
+      expected_version:
+        description: 'Required with installer_run_id: Ritemark release version'
+        required: false
+        type: string
 
 env:
   # Keep in lockstep with build-windows.yml so the canary exercises the same
@@ -31,6 +50,7 @@ env:
 
 jobs:
   canary:
+    if: ${{ github.event_name == 'schedule' || inputs.installer_run_id == '' }}
     runs-on: windows-latest
     timeout-minutes: 20
 
@@ -164,14 +184,24 @@ jobs:
 
             function Invoke-CanaryRegistryProbe([string]$mode, [int]$expectedCount) {
               $resultPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.json"
+              $stdoutPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.stdout.log"
+              $stderrPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.stderr.log"
               Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
+              Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue
               $userProcessEnvironment.RITEMARK_CI_REGISTRY_MODE = $mode
               $userProcessEnvironment.RITEMARK_CI_REGISTRY_RESULT = $resultPath
               $process = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') `
                 -Credential $credential -LoadUserProfile -WorkingDirectory $profileRoot `
                 -Environment $userProcessEnvironment `
                 -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-File',$probeScript `
+                -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
                 -Wait -PassThru
+              foreach ($entry in @(@{ Name = 'stdout'; Path = $stdoutPath }, @{ Name = 'stderr'; Path = $stderrPath })) {
+                if (Test-Path -LiteralPath $entry.Path) {
+                  Write-Host "--- registry canary $mode $($entry.Name) ---"
+                  Get-Content -LiteralPath $entry.Path | ForEach-Object { Write-Host $_ }
+                }
+              }
               if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {
                 throw "Standard-user registry canary '$mode' failed ($($process.ExitCode))."
               }
@@ -189,3 +219,96 @@ jobs:
           } finally {
             Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
           }
+
+  verify-preserved-installer:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.installer_run_id != '' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout reviewed verification harness
+        uses: actions/checkout@v4
+
+      - name: Download preserved signed installer
+        uses: actions/download-artifact@v4
+        with:
+          name: ritemark-windows-installer
+          path: installer-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.installer_run_id }}
+
+      - name: Verify immutable installer identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expectedSource = '${{ inputs.expected_source_commit }}'.ToLowerInvariant()
+          $expectedSha = '${{ inputs.expected_sha256 }}'.ToLowerInvariant()
+          $expectedVersion = '${{ inputs.expected_version }}'
+          if ($expectedSource -notmatch '^[0-9a-f]{40}$') {
+            throw 'expected_source_commit must be exactly 40 hexadecimal characters.'
+          }
+          if ($expectedSha -notmatch '^[0-9a-f]{64}$') {
+            throw 'expected_sha256 must be exactly 64 hexadecimal characters.'
+          }
+          if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
+            throw 'expected_version is required when replaying a preserved installer.'
+          }
+
+          $installer = (Resolve-Path 'installer-artifact\Ritemark-Setup.exe').Path
+          $manifestPath = (Resolve-Path 'installer-artifact\Ritemark-Setup.sha256.txt').Path
+          $manifest = @{}
+          foreach ($line in Get-Content -LiteralPath $manifestPath) {
+            if ($line -match '^(?<key>[^=]+)=(?<value>.*)$') {
+              $manifest[$Matches.key] = $Matches.value
+            }
+          }
+          $actualSha = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha -ne $expectedSha -or [string]$manifest.sha256 -ne $expectedSha) {
+            throw "Preserved installer SHA-256 mismatch (actual '$actualSha', manifest '$($manifest.sha256)', expected '$expectedSha')."
+          }
+          if ([string]$manifest.source_commit -ne $expectedSource) {
+            throw "Preserved installer source mismatch (manifest '$($manifest.source_commit)', expected '$expectedSource')."
+          }
+          Write-Host "Verified preserved installer from run ${{ inputs.installer_run_id }}: $actualSha"
+
+      - name: Resolve Windows signature verifier
+        id: signing-tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(Get-ChildItem `
+            -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" `
+            -File -ErrorAction SilentlyContinue | Sort-Object {
+              [version]$_.Directory.Parent.Name
+            } -Descending)
+          if ($candidates.Count -eq 0) {
+            throw 'signtool.exe was not found on the Windows runner.'
+          }
+          "signtool=$($candidates[0].FullName)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Verify install and uninstall as a standard user
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/verify-windows-installer-roundtrip.ps1 `
+            -InstallerPath 'installer-artifact\Ritemark-Setup.exe' `
+            -SignatureVerifierPath 'scripts\verify-windows-signatures.ps1' `
+            -RegistryProbePath 'scripts\windows-standard-user-registry-probe.ps1' `
+            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
+            -ExpectedPublisher 'Productory Services OÜ' `
+            -ExpectedVersion '${{ inputs.expected_version }}' `
+            -EvidenceDirectory 'roundtrip-evidence'
+
+      - name: Upload roundtrip evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-windows-roundtrip-${{ inputs.installer_run_id }}
+          path: |
+            installer-artifact/Ritemark-Setup.sha256.txt
+            roundtrip-evidence
+          if-no-files-found: warn
+          retention-days: 30

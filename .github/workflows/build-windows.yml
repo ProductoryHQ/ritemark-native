@@ -43,7 +43,9 @@ jobs:
           path: ci-harness
           ref: ${{ github.sha }}
           fetch-depth: 1
-          sparse-checkout: scripts/windows-standard-user-registry-probe.ps1
+          sparse-checkout: |
+            scripts/windows-standard-user-registry-probe.ps1
+            scripts/verify-windows-installer-roundtrip.ps1
           sparse-checkout-cone-mode: false
 
       - name: Verify canonical release source
@@ -741,192 +743,14 @@ jobs:
           INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $installer = (Resolve-Path -LiteralPath $env:INSTALLER_PATH).Path
-
-          ./scripts/verify-windows-signatures.ps1 `
-            -Mode Verify `
-            -Root installer-output `
+          & (Resolve-Path '..\ci-harness\scripts\verify-windows-installer-roundtrip.ps1').Path `
+            -InstallerPath $env:INSTALLER_PATH `
+            -SignatureVerifierPath 'scripts\verify-windows-signatures.ps1' `
+            -RegistryProbePath '..\ci-harness\scripts\windows-standard-user-registry-probe.ps1' `
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -OwnedPathPattern '*'
-
-          $runId = [string]$env:GITHUB_RUN_ID
-          $runIdSuffix = if ($runId.Length -gt 15) { $runId.Substring($runId.Length - 15) } else { $runId }
-          $userName = "rmci-$runIdSuffix"
-          if ($userName.Length -gt 20) { throw "Generated Windows test username exceeds 20 characters: $userName" }
-          $plainPassword = "Ritemark!$([guid]::NewGuid().ToString('N'))"
-          $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
-          $credential = [pscredential]::new("$env:COMPUTERNAME\$userName", $securePassword)
-          New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires | Out-Null
-          try {
-            $initializeProfile = Start-Process -FilePath 'cmd.exe' -Credential $credential -LoadUserProfile `
-              -WorkingDirectory $env:SystemRoot -ArgumentList '/c','exit 0' -Wait -PassThru
-            if ($initializeProfile.ExitCode -ne 0) { throw 'Could not initialize the standard-user profile.' }
-            $profileRoot = "C:\Users\$userName"
-            if (-not (Test-Path -LiteralPath $profileRoot -PathType Container)) {
-              throw "Standard-user profile was not created at $profileRoot."
-            }
-            $installRoot = Join-Path $profileRoot 'AppData\Local\Programs\Ritemark'
-            $localAppData = Join-Path $profileRoot 'AppData\Local'
-            $roamingAppData = Join-Path $profileRoot 'AppData\Roaming'
-            $userTemp = Join-Path $localAppData 'Temp'
-            $stagedInstaller = Join-Path $profileRoot 'Ritemark-Setup.exe'
-            $installLog = Join-Path $profileRoot 'Ritemark-install.log'
-            $uninstallLog = Join-Path $profileRoot 'Ritemark-uninstall.log'
-            $environmentProbeScript = Join-Path $profileRoot 'Ritemark-Ci-Environment-Probe.ps1'
-            $environmentProbeResult = Join-Path $profileRoot 'Ritemark-Ci-Environment-Probe.json'
-            $registryProbeScript = Join-Path $profileRoot 'Ritemark-Ci-Registry-Probe.ps1'
-            New-Item -ItemType Directory -Path $userTemp -Force | Out-Null
-
-            # The hosted runner workspace is owned by the runner account and is
-            # not guaranteed to be readable by a newly-created standard user.
-            # Stage the exact signed bytes inside that user's profile, whose ACL
-            # is inherited by the copied file, before crossing the user boundary.
-            Copy-Item -LiteralPath $installer -Destination $stagedInstaller
-            Copy-Item -LiteralPath (Resolve-Path '..\ci-harness\scripts\windows-standard-user-registry-probe.ps1').Path `
-              -Destination $registryProbeScript
-            $originalInstallerSha = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
-            $stagedInstallerSha = (Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256).Hash
-            if ($stagedInstallerSha -ne $originalInstallerSha) {
-              throw 'Standard-user installer staging changed the signed installer bytes.'
-            }
-
-            # Start-Process inherits the runner administrator's environment even
-            # when -Credential and -LoadUserProfile are supplied. Inno extracts
-            # its loader through TEMP and resolves per-user shell folders from
-            # these variables, so crossing the user boundary with the runner's
-            # USERPROFILE/TEMP/APPDATA can fail before Inno can create its log.
-            # Give every child the complete standard-user environment explicitly.
-            $userProcessEnvironment = @{
-              USERNAME = $userName
-              USERDOMAIN = $env:COMPUTERNAME
-              USERPROFILE = $profileRoot
-              HOMEDRIVE = 'C:'
-              HOMEPATH = "\Users\$userName"
-              LOCALAPPDATA = $localAppData
-              APPDATA = $roamingAppData
-              TEMP = $userTemp
-              TMP = $userTemp
-              RITEMARK_CI_INSTALLER = $stagedInstaller
-              RITEMARK_CI_PROBE = $environmentProbeResult
-              RITEMARK_CI_PUBLISHER = $env:WINDOWS_PUBLISHER
-              RITEMARK_CI_VERSION = '${{ steps.release.outputs.version }}'
-            }
-
-            # Prove the exact identity, working directory, environment, write
-            # access, and installer bytes from inside the alternate-user process
-            # before using an expensive signed installer as the canary.
-            $environmentProbeContents = @'
-            $ErrorActionPreference = 'Stop'
-            [ordered]@{
-              Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-              WorkingDirectory = (Get-Location).Path
-              UserName = $env:USERNAME
-              UserProfile = $env:USERPROFILE
-              LocalAppData = $env:LOCALAPPDATA
-              AppData = $env:APPDATA
-              Temp = $env:TEMP
-              Tmp = $env:TMP
-              InstallerSha256 = (Get-FileHash -LiteralPath $env:RITEMARK_CI_INSTALLER -Algorithm SHA256).Hash
-            } | ConvertTo-Json | Set-Content -LiteralPath $env:RITEMARK_CI_PROBE -Encoding utf8NoBOM
-          '@
-            Set-Content -LiteralPath $environmentProbeScript -Value $environmentProbeContents -Encoding utf8NoBOM
-
-            $environmentProbe = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') `
-              -Credential $credential -LoadUserProfile -WorkingDirectory $profileRoot `
-              -Environment $userProcessEnvironment `
-              -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-File',$environmentProbeScript `
-              -Wait -PassThru
-            if ($environmentProbe.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $environmentProbeResult)) {
-              throw "Standard-user environment probe failed ($($environmentProbe.ExitCode))."
-            }
-            $probe = Get-Content -LiteralPath $environmentProbeResult -Raw | ConvertFrom-Json
-            $expectedProbe = [ordered]@{
-              Identity = "$env:COMPUTERNAME\$userName"
-              WorkingDirectory = $profileRoot
-              UserName = $userName
-              UserProfile = $profileRoot
-              LocalAppData = $localAppData
-              AppData = $roamingAppData
-              Temp = $userTemp
-              Tmp = $userTemp
-              InstallerSha256 = $originalInstallerSha
-            }
-            foreach ($name in $expectedProbe.Keys) {
-              if ([string]$probe.$name -ine [string]$expectedProbe[$name]) {
-                throw "Standard-user environment probe mismatch for $name (got '$($probe.$name)', expected '$($expectedProbe[$name])')."
-              }
-            }
-
-            # HKCU belongs to the standard user, so inspect it inside that same
-            # credential boundary. Admin-side reg load/unload introduces an
-            # artificial hive-lock race that says nothing about the installer.
-            function Invoke-RegistryProbe([string]$mode) {
-              $resultPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.json"
-              Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
-              $userProcessEnvironment.RITEMARK_CI_REGISTRY_MODE = $mode
-              $userProcessEnvironment.RITEMARK_CI_REGISTRY_RESULT = $resultPath
-              $registryProbe = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') `
-                -Credential $credential -LoadUserProfile -WorkingDirectory $profileRoot `
-                -Environment $userProcessEnvironment `
-                -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-File',$registryProbeScript `
-                -Wait -PassThru
-              if ($registryProbe.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {
-                throw "Standard-user registry probe '$mode' failed ($($registryProbe.ExitCode))."
-              }
-              $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-              if ([string]$result.Identity -ine "$env:COMPUTERNAME\$userName") {
-                throw "Registry probe '$mode' ran as '$($result.Identity)' instead of the standard user."
-              }
-              return $result
-            }
-
-            $install = Start-Process -FilePath $stagedInstaller -Credential $credential -LoadUserProfile `
-              -WorkingDirectory $profileRoot -Environment $userProcessEnvironment -ArgumentList @(
-              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
-              "/DIR=$installRoot", "/LOG=$installLog"
-            ) -Wait -PassThru
-            if ($install.ExitCode -ne 0) {
-              if (Test-Path -LiteralPath $installLog) {
-                Write-Host '--- Inno Setup install log ---'
-                Get-Content -LiteralPath $installLog
-              }
-              throw "Standard-user silent install failed ($($install.ExitCode))."
-            }
-
-            ./scripts/verify-windows-signatures.ps1 `
-              -Mode Verify `
-              -Root $installRoot `
-              -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
-              -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-              -OwnedPathPattern 'Ritemark.exe','unins*.exe'
-
-            $startMenu = Join-Path $profileRoot 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Ritemark'
-            $appLinks = @(Get-ChildItem -LiteralPath $startMenu -Filter 'Ritemark.lnk' -File -ErrorAction Stop)
-            if ($appLinks.Count -ne 1) { throw "Expected one Ritemark Start menu entry, found $($appLinks.Count)." }
-            $installedRegistration = Invoke-RegistryProbe 'verify-installed'
-            Write-Host "Verified $($installedRegistration.Count) current-user Ritemark registration after install."
-
-            $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
-            if ($null -eq $uninstaller) { throw 'Signed uninstaller was not installed.' }
-            $uninstall = Start-Process -FilePath $uninstaller.FullName -Credential $credential -LoadUserProfile `
-              -WorkingDirectory $profileRoot -Environment $userProcessEnvironment -ArgumentList @(
-              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$uninstallLog"
-            ) -Wait -PassThru
-            if ($uninstall.ExitCode -ne 0) {
-              if (Test-Path -LiteralPath $uninstallLog) {
-                Write-Host '--- Inno Setup uninstall log ---'
-                Get-Content -LiteralPath $uninstallLog
-              }
-              throw "Standard-user silent uninstall failed ($($uninstall.ExitCode))."
-            }
-            if (Test-Path -LiteralPath $installRoot) { throw 'Uninstall left the Ritemark install directory behind.' }
-            if (Test-Path -LiteralPath $startMenu) { throw 'Uninstall left the Ritemark Start menu group behind.' }
-            $removedRegistration = Invoke-RegistryProbe 'verify-uninstalled'
-            Write-Host "Verified $($removedRegistration.Count) current-user Ritemark registrations after uninstall."
-          } finally {
-            Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
-          }
+            -ExpectedVersion '${{ steps.release.outputs.version }}' `
+            -EvidenceDirectory 'installer-output\roundtrip-evidence'
 
       - name: Upload signed Windows artifacts
         if: always()
@@ -936,6 +760,7 @@ jobs:
           path: |
             r/${{ steps.installer.outputs.installer_path }}
             r/installer-output/Ritemark-Setup.sha256.txt
+            r/installer-output/roundtrip-evidence
           if-no-files-found: warn
           retention-days: 30
 
