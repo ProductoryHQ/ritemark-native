@@ -6,6 +6,24 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const workflowPath = path.join(projectRoot, '.github', 'workflows', 'build-windows.yml');
+const canaryWorkflowPath = path.join(projectRoot, '.github', 'workflows', 'windows-canary.yml');
+const registryProbePath = path.join(projectRoot, 'scripts', 'windows-standard-user-registry-probe.ps1');
+const roundtripPath = path.join(projectRoot, 'scripts', 'verify-windows-installer-roundtrip.ps1');
+
+test('Windows release workflow separates immutable product source from workflow revision', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+
+  assert.match(workflow, /source_commit:\s*\n\s+description:[^\n]+\n\s+required: true\n\s+type: string/);
+  assert.match(workflow, /uses: actions\/checkout@v4[\s\S]*?ref: \$\{\{ inputs\.source_commit \}\}/);
+  assert.match(workflow, /- name: Checkout reviewed release harness[\s\S]*?ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /SOURCE_COMMIT='\$\{\{ inputs\.source_commit \}\}'/);
+  assert.match(workflow, /\^\[0-9a-fA-F\]\{40\}\$/);
+  assert.match(workflow, /CHECKED_OUT_COMMIT="\$\(git rev-parse HEAD\)"/);
+  assert.match(workflow, /HARNESS_COMMIT="\$\(git -C \.\.\/ci-harness rev-parse HEAD\)"/);
+  assert.match(workflow, /verify-release-source\.sh --target win32-x64 --phase pristine/);
+  assert.match(workflow, /source_commit=\$\(\(git rev-parse HEAD\)\.Trim\(\)\)/);
+  assert.match(workflow, /workflow_commit=\$env:GITHUB_SHA/);
+});
 
 test('Windows shell build stages Ritemark outside the eager VS Code packager', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
@@ -105,32 +123,96 @@ test('Windows shell build stages Ritemark outside the eager VS Code packager', a
   );
 });
 
-test('Windows standard-user test stages exact installer bytes and avoids profile-hive races', async () => {
-  const workflow = await readFile(workflowPath, 'utf8');
+test('Windows standard-user test uses one observable, replayable roundtrip harness', async () => {
+  const [workflow, roundtrip] = await Promise.all([
+    readFile(workflowPath, 'utf8'),
+    readFile(roundtripPath, 'utf8'),
+  ]);
   const verificationStep = workflow.indexOf('- name: Verify install and uninstall as a standard user');
   const uploadStep = workflow.indexOf('- name: Upload signed Windows artifacts');
   assert.notEqual(verificationStep, -1, 'standard-user verification step must exist');
   assert.notEqual(uploadStep, -1, 'Windows artifact upload step must exist');
 
   const verification = workflow.slice(verificationStep, uploadStep);
-  const profileInitialization = verification.indexOf("Start-Process -FilePath 'cmd.exe'");
-  const stageInstaller = verification.indexOf('Copy-Item -LiteralPath $installer -Destination $stagedInstaller');
-  const compareInstallerHash = verification.indexOf("Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256");
-  const launchInstaller = verification.indexOf('Start-Process -FilePath $stagedInstaller');
-  const firstHiveLoad = verification.indexOf("Mount-TestUserHive 'after install'");
+  assert.match(verification, /ci-harness\\scripts\\verify-windows-installer-roundtrip\.ps1/);
+  assert.match(verification, /ci-harness\\scripts\\windows-standard-user-registry-probe\.ps1/);
+  assert.match(verification, /-EvidenceDirectory 'installer-output\\roundtrip-evidence'/);
+  assert.doesNotMatch(verification, /New-LocalUser|Start-Process|HKEY_USERS|NTUSER\.DAT/);
+
+  const profileInitialization = roundtrip.indexOf("Start-Process -FilePath 'cmd.exe'");
+  const stageInstaller = roundtrip.indexOf('Copy-Item -LiteralPath $installer -Destination $stagedInstaller');
+  const compareInstallerHash = roundtrip.indexOf("Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256");
+  const defineUserEnvironment = roundtrip.indexOf('$userProcessEnvironment = @{');
+  const environmentProbe = roundtrip.indexOf("-Label 'environment-probe'");
+  const compareProbe = roundtrip.indexOf('$expectedProbe = [ordered]@{');
+  const registryProbeFunction = roundtrip.indexOf('function Invoke-RegistryProbe');
+  const launchInstaller = roundtrip.indexOf("-Label 'installer'");
+  const verifyInstalled = roundtrip.indexOf("Invoke-RegistryProbe 'verify-installed'");
+  const launchUninstaller = roundtrip.indexOf("-Label 'uninstaller'");
+  const verifyUninstalled = roundtrip.indexOf("Invoke-RegistryProbe 'verify-uninstalled'");
 
   assert.ok(profileInitialization >= 0, 'the standard-user profile must be initialized');
   assert.ok(stageInstaller > profileInitialization, 'installer staging must happen after profile initialization');
   assert.ok(compareInstallerHash > stageInstaller, 'staged installer bytes must be hashed after copying');
-  assert.ok(launchInstaller > compareInstallerHash, 'only the verified staged copy may be launched');
-  assert.ok(firstHiveLoad > launchInstaller, 'the test must not load NTUSER.DAT before -LoadUserProfile runs');
-  assert.match(verification, /\$beforeKeys = @\(\)/, 'a newly-created account must use an empty registration baseline');
-  assert.match(verification, /\/LOG=`"\$installLog`"/, 'installation failures must retain an Inno Setup log');
-  assert.match(verification, /\/LOG=`"\$uninstallLog`"/, 'uninstallation failures must retain an Inno Setup log');
-  assert.match(verification, /for \(\$attempt = 1; \$attempt -le 10; \$attempt\+\+\)/, 'registry hive transitions must retry');
+  assert.ok(defineUserEnvironment > compareInstallerHash, 'the user environment must be defined after exact installer staging');
+  assert.ok(environmentProbe > defineUserEnvironment, 'the alternate-user environment must be probed before install');
+  assert.ok(compareProbe > environmentProbe, 'the probe result must be checked before install');
+  assert.ok(registryProbeFunction > compareProbe, 'current-user registry inspection must share the proven user boundary');
+  assert.ok(launchInstaller > compareProbe, 'only the user-readable, exact staged copy may be launched');
+  assert.ok(verifyInstalled > launchInstaller, 'HKCU must be checked as the standard user after install');
+  assert.ok(launchUninstaller > verifyInstalled, 'uninstall must run after the installed HKCU state is proven');
+  assert.ok(verifyUninstalled > launchUninstaller, 'HKCU must be checked as the standard user after uninstall');
+  for (const variable of ['USERNAME', 'USERDOMAIN', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'LOCALAPPDATA', 'APPDATA', 'TEMP', 'TMP']) {
+    assert.match(roundtrip, new RegExp(`\\b${variable}\\s*=`), `${variable} must be explicit at the user boundary`);
+  }
+  assert.match(roundtrip, /-WorkingDirectory \$profileRoot/, 'every alternate-user child must use the user profile');
+  assert.match(roundtrip, /-Environment \$Environment/, 'every alternate-user child must receive the explicit user environment');
+  assert.match(roundtrip, /InstallerSha256 = \$originalInstallerSha/, 'the user-side installer hash must match the signed source');
+  assert.match(roundtrip, /\/LOG=\$installLog/, 'installation failures must retain an Inno Setup log');
+  assert.match(roundtrip, /\/LOG=\$uninstallLog/, 'uninstallation failures must retain an Inno Setup log');
+  assert.match(roundtrip, /-RedirectStandardOutput \$stdoutPath -RedirectStandardError \$stderrPath/, 'child-process failures must expose their diagnostics');
+  assert.match(roundtrip, /Get-Content -LiteralPath \$entry\.Path -Encoding oem/, 'redirected Windows console diagnostics must be decoded with the runner OEM code page');
+  assert.match(roundtrip, /registry-\$mode\.result\.json/, 'the exact UTF-8 registry result must be preserved independently from console output');
+  assert.match(roundtrip, /Copy-Item -Path \(Join-Path \$userEvidence '\*'\) -Destination \$evidenceRoot/, 'roundtrip diagnostics must survive test-user deletion');
+  assert.doesNotMatch(roundtrip, /HKEY_USERS|NTUSER\.DAT|reg\.exe (?:load|unload)|Mount-TestUserHive|Dismount-TestUserHive/, 'admin-side profile hive mounting must not return');
+  assert.match(workflow.slice(uploadStep), /- name: Upload signed Windows artifacts\n\s+if: always\(\)/, 'a built signed installer must remain downloadable when the roundtrip test fails');
+  assert.match(workflow.slice(uploadStep), /r\/installer-output\/roundtrip-evidence/, 'release artifacts must retain roundtrip diagnostics');
+});
+
+test('free Windows canary exercises the shared current-user registry verifier', async () => {
+  const [canaryWorkflow, registryProbe] = await Promise.all([
+    readFile(canaryWorkflowPath, 'utf8'),
+    readFile(registryProbePath, 'utf8'),
+  ]);
+
+  assert.match(canaryWorkflow, /Verify standard-user process and HKCU boundary/);
+  for (const mode of ['seed-canary', 'verify-installed', 'remove-canary', 'verify-uninstalled']) {
+    assert.match(canaryWorkflow, new RegExp(`Invoke-CanaryRegistryProbe '${mode}'`));
+    assert.match(registryProbe, new RegExp(`'${mode}'`));
+  }
+  assert.match(registryProbe, /HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall/);
+  assert.match(registryProbe, /\$expectedDisplayName = "Ritemark \$expectedVersion"/);
+  assert.match(registryProbe, /DisplayName -Value \$expectedDisplayName/);
+  assert.match(registryProbe, /DisplayName -ne \$expectedDisplayName/);
+  assert.match(canaryWorkflow, /-RedirectStandardOutput \$stdoutPath -RedirectStandardError \$stderrPath/);
+  assert.doesNotMatch(registryProbe, /HKEY_USERS|NTUSER\.DAT|reg\.exe/);
+});
+
+test('free Windows workflow can replay an immutable preserved installer without rebuilding', async () => {
+  const canaryWorkflow = await readFile(canaryWorkflowPath, 'utf8');
+
+  for (const input of ['installer_run_id', 'expected_source_commit', 'expected_sha256', 'expected_version']) {
+    assert.match(canaryWorkflow, new RegExp(`\\n\\s{6}${input}:`), `${input} must be an explicit replay input`);
+  }
+  assert.match(canaryWorkflow, /verify-preserved-installer:/);
+  assert.match(canaryWorkflow, /uses: actions\/download-artifact@v4[\s\S]*?run-id: \$\{\{ inputs\.installer_run_id \}\}/);
+  assert.match(canaryWorkflow, /Get-FileHash -LiteralPath \$installer -Algorithm SHA256/);
+  assert.match(canaryWorkflow, /\$manifest\.source_commit -ne \$expectedSource/);
+  assert.match(canaryWorkflow, /verify-windows-installer-roundtrip\.ps1/);
+  assert.match(canaryWorkflow, /-EvidenceDirectory 'roundtrip-evidence'/);
   assert.doesNotMatch(
-    verification.slice(0, launchInstaller),
-    /Mount-TestUserHive '/,
-    'the profile hive must not be mounted manually before launching the installer as that user',
+    canaryWorkflow.slice(canaryWorkflow.indexOf('verify-preserved-installer:')),
+    /gulp|ISCC|artifact-signing-action|Build VS Code/,
+    'the replay path must verify preserved bytes without compiling or signing a new product',
   );
 });
