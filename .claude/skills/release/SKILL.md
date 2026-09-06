@@ -201,13 +201,56 @@ cp dist/Ritemark-X.Y.Z-darwin-x64.dmg   dist/Ritemark-x64.dmg
 
 gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
   --title "Ritemark vX.Y.Z" \
-  --notes-file docs/releases/vX.Y.Z.md \
+  --notes-file <prepared body> \
   dist/Ritemark-arm64.dmg \
   dist/Ritemark-x64.dmg \
   installer/windows/Ritemark-X.Y.Z-win32-x64-setup.exe
 ```
 
-**Update feed (MANDATORY):** regenerate canonical update metadata, verify it matches the published assets, publish to canonical location. Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
+**Preparing the body — two traps, both hit in v1.10.0:**
+
+1. **Take the notes from `origin/main`, not from the release worktree.** The
+   release worktree is pinned to the frozen product source commit, so any notes
+   correction merged after it was created is missing there. Publishing from it
+   silently reverts those corrections:
+   `git show origin/main:docs/releases/vX.Y.Z/release-notes.md > /tmp/body.md`.
+2. **Rewrite relative image paths to absolute URLs.** A release body is rendered
+   standalone, so `![](screenshots/foo.png)` renders as a broken link even
+   though it is correct inside the repo. Copy the referenced images into
+   `images/` in `jarmo-productory/ritemark-public`, push, and rewrite the body
+   (leave the repo document's relative paths alone):
+
+```bash
+sed -E 's#\]\(screenshots/#](https://raw.githubusercontent.com/jarmo-productory/ritemark-public/main/images/#g' \
+  /tmp/body.md > /tmp/release-body.md
+```
+
+Afterwards, verify against the live release: every image reports
+`complete && naturalWidth > 0`, every URL returns 200, and the body differs
+from `origin/main`'s notes only by the image rewrite.
+
+**Update feed (MANDATORY):** regenerate canonical update metadata, verify it matches the published assets, publish to canonical location.
+
+⛔ **Always pass `--existing-feed-url` naming the PREVIOUS release.** The
+generator seeds from `releases/latest/download/update-feed.json`, but the
+release you just published *is* `latest` and has no feed attached yet, so that
+URL 404s, the seed comes back empty, and the generated feed silently contains
+only the new version — wiping every older per-platform entry:
+
+```bash
+node ./scripts/generate-update-feed.mjs --mode full --version X.Y.Z \
+  --output dist/update-feed.json \
+  --existing-feed-url https://github.com/jarmo-productory/ritemark-public/releases/download/v<PREV>/update-feed.json \
+  --notes-file docs/releases/vX.Y.Z/release-notes.md \
+  --asset "dist/Ritemark-arm64.dmg|darwin|arm64|Ritemark-arm64.dmg" \
+  --asset "dist/Ritemark-x64.dmg|darwin|x64|Ritemark-x64.dmg" \
+  --asset "dist/Ritemark-Setup.exe|win32|x64|Ritemark-Setup.exe"
+```
+
+Before uploading, confirm `fullReleases` grew by exactly one and that each
+platform SHA-256 matches the published asset. After uploading, the
+`latest/download/` URL needs ~20-40 s of CDN propagation before it returns 200 —
+retry rather than assuming the upload failed. Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
 
 If feed/metadata is stale or missing, the release is BLOCKED — even if binaries are uploaded.
 
@@ -263,6 +306,15 @@ cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Content
 
 This is development-only. A hot-copied app has invalid provenance and must
 never be signed, packaged, or described as an RC.
+
+### Release worktree holds the only copy of the artifacts
+
+`node ./scripts/worktree-hygiene.mjs --check` classifies an active release
+worktree as `REMOVE — verified disposable release worktree` even when its
+`dist/` holds the only copies of the notarized DMGs and the signed Windows
+installer. The scheduled `worktree-janitor` runs `--clean` every Friday 18:00.
+**Never run `--clean` while a release is mid-flight**; get the artifacts onto
+the GitHub Release first.
 
 ### Clean build and worktree contract
 
