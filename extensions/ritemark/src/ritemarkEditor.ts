@@ -23,6 +23,7 @@ import {
 } from './workspaceFileLinks';
 import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
+import { ensureTrailingNewline } from './editorSync/state';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 
 // Properties type for front-matter
@@ -940,7 +941,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   ): string {
     // If no properties or empty properties, return content only
     if (!properties || Object.keys(properties).length === 0) {
-      return content;
+      return ensureTrailingNewline(content);
     }
 
     // Use gray-matter to stringify with YAML front-matter
