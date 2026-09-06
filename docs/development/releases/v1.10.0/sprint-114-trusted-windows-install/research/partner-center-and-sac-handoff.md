@@ -1,5 +1,7 @@
 # Partner Center and Smart App Control handoff
 
+> Historical Sprint 114 handoff. Use the release-independent [`Microsoft Store submission hub`](../../../../../microsoft-store-submission/README.md) for current account state, listing copy, URLs, assets, Partner Center steps, and certification gates. This file remains as v1.10.0 research context only.
+
 **Publisher:** `Productory Services OÜ`<br>
 **Owners:** Jarmo — Partner Center and final approval; engineering — signed installer; Kristiina — clean Windows 11 test
 

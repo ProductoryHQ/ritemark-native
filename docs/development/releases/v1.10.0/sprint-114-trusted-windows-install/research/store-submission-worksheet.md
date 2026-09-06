@@ -1,5 +1,7 @@
 # Microsoft Store submission worksheet — Ritemark v1.10.0
 
+> Historical Sprint 114 research. The release-independent source of truth is now [`docs/microsoft-store-submission/`](../../../../../microsoft-store-submission/README.md); the active v1.10.0 package record is [`v1.10.0-candidate-1.md`](../../../../../microsoft-store-submission/release-candidates/v1.10.0-candidate-1.md). Do not update mutable Store account, listing, legal, hosting, or asset state in this historical worksheet.
+
 **Prepared:** 2026-08-25  
 **Submission owner:** Jarmo  
 **Engineering owner:** v1.10.0 release manager  
@@ -121,4 +123,3 @@ Existing screenshots:
 - [Upload EXE/MSI packages](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/upload-app-packages)
 - [Manual package validation](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/manual-package-validation)
 - [App certification process](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/app-certification-process)
-
