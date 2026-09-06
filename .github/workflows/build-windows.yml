@@ -2,13 +2,20 @@ name: Build Windows (x64)
 
 on:
   workflow_dispatch:
-    # Release CI is dispatched explicitly (gh workflow run build-windows.yml --ref <ref>).
-    # The version comes from branding/product.json, not the git ref, so any ref works.
-    # Tag pushes no longer auto-trigger this expensive windows-8core build (v1.8.2, #130/CI de-risk).
+    inputs:
+      source_commit:
+        description: 'Exact approved 40-character commit to build (must equal canonical origin/main)'
+        required: true
+        type: string
+    # This paid larger-runner workflow stays manual and always produces a
+    # fully signed installer. Missing credentials or any unsigned PE fails it.
+
+permissions:
+  contents: read
 
 env:
-  VSCODE_VERSION: '1.117.0'
   NODE_VERSION: '22.22.1'
+  WINDOWS_PUBLISHER: 'Productory Services OÜ'
 
 jobs:
   build:
@@ -26,6 +33,66 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: r
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+          submodules: true
+
+      - name: Checkout reviewed release harness
+        uses: actions/checkout@v4
+        with:
+          path: ci-harness
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts/windows-standard-user-registry-probe.ps1
+            scripts/verify-windows-installer-roundtrip.ps1
+          sparse-checkout-cone-mode: false
+
+      - name: Verify canonical release source
+        shell: bash
+        working-directory: r
+        run: |
+          SOURCE_COMMIT='${{ inputs.source_commit }}'
+          if [[ ! "$SOURCE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "ERROR: source_commit must be an exact 40-character commit SHA." >&2
+            exit 1
+          fi
+          CHECKED_OUT_COMMIT="$(git rev-parse HEAD)"
+          if [ "$CHECKED_OUT_COMMIT" != "${SOURCE_COMMIT,,}" ]; then
+            echo "ERROR: checkout resolved to $CHECKED_OUT_COMMIT, expected ${SOURCE_COMMIT,,}." >&2
+            exit 1
+          fi
+          HARNESS_COMMIT="$(git -C ../ci-harness rev-parse HEAD)"
+          if [ "$HARNESS_COMMIT" != "$GITHUB_SHA" ]; then
+            echo "ERROR: release harness resolved to $HARNESS_COMMIT, expected $GITHUB_SHA." >&2
+            exit 1
+          fi
+          git fetch origin main:refs/remotes/origin/main --force
+          ./scripts/verify-release-source.sh --target win32-x64 --phase pristine
+          {
+            echo '### Release build identity'
+            echo "- Product source: $CHECKED_OUT_COMMIT"
+            echo "- Workflow definition: $GITHUB_WORKFLOW_REF"
+            echo "- Workflow/harness commit: $HARNESS_COMMIT"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require signing credentials
+        id: release
+        shell: pwsh
+        working-directory: r
+        env:
+          AZURE_SIGNING_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          AZURE_SIGNING_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          AZURE_SIGNING_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content branding/product.json -Raw | ConvertFrom-Json).ritemarkVersion
+          foreach ($name in 'AZURE_SIGNING_TENANT_ID','AZURE_SIGNING_CLIENT_ID','AZURE_SIGNING_CLIENT_SECRET') {
+            if ([string]::IsNullOrWhiteSpace((Get-Item "env:$name").Value)) {
+              throw "Required repository secret $name is missing."
+            }
+          }
+          "version=$version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,12 +104,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Clone VS Code OSS
-        shell: bash
-        run: |
-          git clone --depth 1 --branch ${{ env.VSCODE_VERSION }} https://github.com/microsoft/vscode.git r/vscode
-          echo "VS Code ${{ env.VSCODE_VERSION }} cloned"
 
       - name: Fetch bundled agent runtimes (win32-x64)
         # Sprint 64 Phase D: materialise app-owned Codex + Claude binaries into
@@ -59,20 +120,13 @@ jobs:
         shell: bash
         working-directory: r
         run: |
-          rm -rf vscode/extensions/ritemark 2>/dev/null || true
-          # Strip macOS dictation dylib tree before cp -R. binaries/darwin-arm64/
-          # contains whisper.cpp/libggml dylibs with macOS symlinks (e.g.
-          # libggml-base.0.dylib -> libggml-base.1.dylib). Git Bash on the
-          # Windows runner cannot replicate macOS symlinks, so cp -R fails
-          # mid-copy with "cannot create symbolic link". This tree is darwin-only
-          # (macOS dictation), it has no role in the Windows build, so dropping
-          # it before the copy is the right move. Do NOT remove this line
-          # without first solving the Git-Bash-symlink problem on Windows
-          # runners. See Commit A (956665b) for the regression that re-broke
-          # this and Commit C for the restore.
-          rm -rf extensions/ritemark/binaries/darwin-arm64 2>/dev/null || true
-          cp -R extensions/ritemark vscode/extensions/ritemark
-          echo "Extension copied to vscode/extensions/ritemark"
+          # Build a target-only physical copy without mutating tracked source.
+          # The copier filters macOS dylib symlinks before traversal, so it is
+          # safe under Git Bash without Windows symlink privileges.
+          node ./scripts/copy-extension-for-target.mjs \
+            --source extensions/ritemark \
+            --destination vscode/extensions/ritemark \
+            --target win32-x64
 
       - name: Patch bundled node-gyp for VS2026 detection
         # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs a copy of
@@ -312,15 +366,27 @@ jobs:
             echo "Copilot SDK vendor dir not present, skipping."
           fi
 
-      - name: Apply patches
-        shell: bash
-        working-directory: r
-        run: ./scripts/apply-patches.sh
-
       - name: Compile extension
         shell: bash
         working-directory: r/vscode/extensions/ritemark
         run: npm run compile
+
+      - name: Preserve dependency-backed workbench font
+        shell: bash
+        working-directory: r
+        run: |
+          # @phosphor-icons/web is a dev dependency and the extension is pruned
+          # before the delayed shell patch step. Preserve the exact locked font
+          # in its final VS Code location while the dependency still exists.
+          PHOSPHOR_SOURCE="vscode/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
+          PHOSPHOR_DESTINATION="vscode/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+          if [ ! -s "$PHOSPHOR_SOURCE" ]; then
+            echo "ERROR: Required Phosphor workbench font is missing: $PHOSPHOR_SOURCE" >&2
+            exit 1
+          fi
+          mkdir -p "$(dirname "$PHOSPHOR_DESTINATION")"
+          cp "$PHOSPHOR_SOURCE" "$PHOSPHOR_DESTINATION"
+          test -s "$PHOSPHOR_DESTINATION"
 
       - name: Prune extension dev files before build
         shell: bash
@@ -342,15 +408,60 @@ jobs:
           echo "Retained top-level extension paths:"
           find . -maxdepth 1 -mindepth 1 | sort
 
+      - name: Floor staged extension version
+        # GH #142: perform the final package.json transform before recording
+        # the staged payload digest, so the final app receives identical bytes.
+        shell: bash
+        working-directory: r
+        run: |
+          RITEMARK_VERSION=$(python -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
+          if [ -z "$RITEMARK_VERSION" ]; then
+            echo "ERROR: ritemarkVersion not found in branding/product.json" >&2
+            exit 1
+          fi
+          ./scripts/floor-bundled-extension.sh \
+            "vscode/extensions/ritemark" \
+            "$RITEMARK_VERSION"
+
+      - name: Stage extension outside VS Code shell build
+        shell: bash
+        working-directory: r
+        run: |
+          # The shell build does not need to package Ritemark here: the final,
+          # target-specific extension is copied into the app in the next step.
+          # Keeping it under vscode/extensions makes VS Code eagerly open every
+          # production dependency and can deadlock at Windows' descriptor cap.
+          bash ./scripts/stage-extension-for-shell-build.sh \
+            vscode/extensions/ritemark \
+            "$RUNNER_TEMP/ritemark-extension"
+          node ./scripts/tree-sha256.mjs \
+            "$RUNNER_TEMP/ritemark-extension" \
+            > "$RUNNER_TEMP/ritemark-extension.sha256"
+          node ./scripts/tree-sha256.mjs \
+            --normalize-authenticode \
+            "$RUNNER_TEMP/ritemark-extension" \
+            > "$RUNNER_TEMP/ritemark-extension-authenticode.sha256"
+          grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension.sha256"
+          grep -Eq '^[a-f0-9]{64}$' "$RUNNER_TEMP/ritemark-extension-authenticode.sha256"
+
+      - name: Apply patches to staged shell state
+        shell: bash
+        working-directory: r
+        run: |
+          # Record provenance only after the extension has left the shell tree.
+          # This keeps the complete VS Code fingerprint fail-closed on macOS
+          # while binding Windows to its intentional absent-extension layout.
+          ./scripts/apply-patches.sh --extension-layout absent
+          ./scripts/verify-release-source.sh \
+            --target win32-x64 --phase patched --extension-layout absent
+
       - name: Build VS Code (win32-x64-min)
         shell: bash
         working-directory: r/vscode
         run: |
-          # Preload graceful-fs so fs.createReadStream gets EMFILE retry/queue
-          # behaviour. vsce/yazl opens the whole production node_modules tree
-          # concurrently when packaging the ritemark extension (claude-agent-sdk's
-          # peer @modelcontextprotocol/sdk drags express/hono/ajv/... into prod),
-          # which exceeds the Windows fd limit -> EMFILE.
+          # Keep graceful-fs as baseline protection for VS Code's own built-in
+          # extensions. Ritemark itself is staged outside this eager packager
+          # and copied into the completed shell afterwards.
           #
           # The --require path MUST be absolute: NODE_OPTIONS is inherited by child
           # processes, and VS Code's build spawns `npm ls` from a DIFFERENT cwd
@@ -380,31 +491,15 @@ jobs:
           fi
 
           rm -rf "$EXT_DEST" || true
-          cp -R vscode/extensions/ritemark "$EXT_DEST"
-          rm -rf "$EXT_DEST/webview/node_modules" 2>/dev/null || true
-          rm -rf "$EXT_DEST/webview/src" 2>/dev/null || true
-          # Strip foreign-platform agent runtimes (Sprint 64). Keeps only
-          # win32-x64/ inside binaries/agents/, removes darwin-arm64/ and
-          # darwin-x64/ if present. Allowlist-based and idempotent.
-          ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" win32 x64
-          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
-          echo "Extension copied successfully"
-
-      - name: Floor bundled extension version
-        # GH #142: the built-in must sort below any X.Y.Z-ext.N OTA patch so
-        # VS Code's extension scanner prefers a user-installed update. Shared
-        # logic with build-prod-windows.sh via floor-bundled-extension.sh.
-        shell: bash
-        working-directory: r
-        run: |
-          RITEMARK_VERSION=$(python -c "import json; print(json.load(open('branding/product.json')).get('ritemarkVersion', ''))")
-          if [ -z "$RITEMARK_VERSION" ]; then
-            echo "ERROR: ritemarkVersion not found in branding/product.json"
+          STAGED_EXTENSION="$RUNNER_TEMP/ritemark-extension"
+          if [ ! -s "$STAGED_EXTENSION/out/extension.js" ] || [ ! -s "$STAGED_EXTENSION/media/webview.js" ]; then
+            echo "ERROR: Staged Ritemark extension is missing or incomplete: $STAGED_EXTENSION"
             exit 1
           fi
-          ./scripts/floor-bundled-extension.sh \
-            "VSCode-win32-x64/resources/app/extensions/ritemark" \
-            "$RITEMARK_VERSION"
+
+          cp -R "$STAGED_EXTENSION" "$EXT_DEST"
+          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
+          echo "Extension copied successfully"
 
       - name: Strip bundled copilot extension from output
         # VS Code 1.117 bundles GitHub Copilot Chat as a built-in extension.
@@ -434,41 +529,100 @@ jobs:
             echo "Chat activity bar CSS hide rule appended"
           fi
 
+      - name: Embed and verify build provenance
+        shell: bash
+        working-directory: r
+        run: |
+          STAGED_EXTENSION="$RUNNER_TEMP/ritemark-extension"
+          STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
+          STAGED_EXTENSION_AUTHENTICODE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-authenticode.sha256")"
+          node ./scripts/build-provenance.mjs \
+            --write --target win32-x64 --app VSCode-win32-x64 \
+            --extension-input "$STAGED_EXTENSION" \
+            --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+            --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+          node ./scripts/build-provenance.mjs \
+            --verify --target win32-x64 --app VSCode-win32-x64 \
+            --extension-input "$STAGED_EXTENSION" \
+            --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+            --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"
+
       - name: Patch Ritemark.exe icon (branding)
-        # rcedit modifies the PE binary, which invalidates any existing signature.
-        # This MUST run BEFORE the signing step.
         shell: bash
         working-directory: r
         run: |
           RCEDIT="vscode/node_modules/rcedit/bin/rcedit.exe"
-          if [ -f "$RCEDIT" ] && [ -f "branding/icons/icon.ico" ]; then
-            "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
-            echo "Ritemark.exe icon patched with branding/icons/icon.ico"
-          else
-            echo "WARNING: rcedit or icon not found, skipping icon patch"
+          if [ ! -f "$RCEDIT" ] || [ ! -f "branding/icons/icon.ico" ]; then
+            echo "ERROR: rcedit or branding icon is missing; refusing to sign an unbranded binary." >&2
+            exit 1
           fi
+          "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
 
-      - name: Sign Windows binaries (Azure Trusted Signing)
-        # Signs all .exe files in the build output with Authenticode via the
-        # official azure/trusted-signing-action. This includes Ritemark.exe,
-        # bundled agent binaries, and Electron helpers — signing everything is
-        # correct for Smart App Control compliance.
-        # Skipped when AZURE_SIGNING_ENABLED repo variable is not 'true'.
-        if: ${{ vars.AZURE_SIGNING_ENABLED == 'true' }}
-        uses: azure/trusted-signing-action@v0.5.0
+      - name: Resolve Windows signing tools
+        id: signing-tools
+        shell: pwsh
+        working-directory: r
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command nuget.exe -ErrorAction SilentlyContinue)) {
+            choco install nuget.commandline -y --no-progress | Out-Null
+          }
+
+          $clientRoot = Join-Path $env:RUNNER_TEMP 'artifact-signing-client'
+          New-Item -ItemType Directory -Path $clientRoot -Force | Out-Null
+          nuget.exe install Microsoft.ArtifactSigning.Client -OutputDirectory $clientRoot -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "Microsoft.ArtifactSigning.Client install failed ($LASTEXITCODE)." }
+
+          $tools = ./scripts/find-windows-signing-tools.ps1 `
+            -SdkBinRoot "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -ArtifactSigningClientRoot $clientRoot | ConvertFrom-Json
+
+          $metadataPath = Join-Path $env:RUNNER_TEMP 'ritemark-artifact-signing-metadata.json'
+          [ordered]@{
+            Endpoint = 'https://neu.codesigning.azure.net'
+            CodeSigningAccountName = 'ritemark-signing'
+            CertificateProfileName = 'ritemark-public-trust'
+          } | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding utf8NoBOM
+
+          "signtool=$($tools.signToolPath)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "dlib=$($tools.dlibPath)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "metadata=$metadataPath" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Find unsigned Windows binaries
+        shell: pwsh
+        working-directory: r
+        run: |
+          ./scripts/verify-windows-signatures.ps1 `
+            -Mode PrepareSigning `
+            -Root VSCode-win32-x64 `
+            -CatalogPath windows-pe-signing-catalog.txt `
+            -ExpectedPublisher $env:WINDOWS_PUBLISHER `
+            -OwnedPathPattern 'Ritemark.exe'
+
+      - name: Sign Windows binaries (Azure Artifact Signing)
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
           endpoint: https://neu.codesigning.azure.net
-          trusted-signing-account-name: ritemark-signing
+          signing-account-name: ritemark-signing
           certificate-profile-name: ritemark-public-trust
-          files-folder: r/VSCode-win32-x64
-          files-folder-filter: exe
-          files-folder-recurse: true
+          files-catalog: r/windows-pe-signing-catalog.txt
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+
+      - name: Verify signed payload
+        shell: pwsh
+        working-directory: r
+        run: |
+          ./scripts/verify-windows-signatures.ps1 `
+            -Mode Verify `
+            -Root VSCode-win32-x64 `
+            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
+            -ExpectedPublisher $env:WINDOWS_PUBLISHER `
+            -OwnedPathPattern 'Ritemark.exe'
 
       - name: Validate build
         shell: bash
@@ -476,7 +630,17 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_PATH="$BUILD_DIR/resources/app/extensions/ritemark"
+          STAGED_EXTENSION_SHA="$(cat "$RUNNER_TEMP/ritemark-extension.sha256")"
+          STAGED_EXTENSION_AUTHENTICODE_SHA="$(cat "$RUNNER_TEMP/ritemark-extension-authenticode.sha256")"
           ERRORS=0
+
+          if ! node ./scripts/build-provenance.mjs \
+              --verify --target win32-x64 --app "$BUILD_DIR" \
+              --verify-recorded-extension-authenticode \
+              --expected-extension-sha "$STAGED_EXTENSION_SHA" \
+              --expected-extension-authenticode-sha "$STAGED_EXTENSION_AUTHENTICODE_SHA"; then
+            ERRORS=$((ERRORS + 1))
+          fi
 
           if [ -f "$EXT_PATH/media/webview.js" ]; then
             WEBVIEW_SIZE=$(wc -c < "$EXT_PATH/media/webview.js" | tr -d ' ')
@@ -512,14 +676,6 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # Sprint 64 Phase D: delegate bundled-agent arch check to
-          # validate-build-output.sh which has Layer 2 fallback for file(1)
-          # output drift on Windows runners (PE32+ + x86-64 tokens + MZ magic
-          # bytes verification). The previous duplicate inline grep -qF
-          # approach was fragile to runner-specific file(1) format reordering
-          # like "PE32+ executable for MS Windows 6.00 (console), x86-64".
-          # See Commit D (7dc66e5) for the fallback logic; this delegation
-          # ensures Windows CI uses it (the inline check did not).
           if ! ./scripts/validate-build-output.sh win32-x64; then
             ERRORS=$((ERRORS + 1))
           fi
@@ -530,66 +686,87 @@ jobs:
           fi
           echo "Validation PASSED"
 
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ritemark-windows-x64
-          path: r/VSCode-win32-x64/
-          retention-days: 30
-      - name: Build Windows installer (Inno Setup)
-        # v1.8.6: the installer is built ON the runner so its wrapper exe can
-        # be signed with the same Trusted Signing profile as the binaries
-        # (locally-built installers could not be signtool-signed from macOS).
-        # Runs AFTER binary signing so the payload carries signed binaries.
+      - name: Build signed Windows installer (Inno Setup)
+        id: installer
         shell: pwsh
         working-directory: r
+        env:
+          SIGNTOOL_PATH: ${{ steps.signing-tools.outputs.signtool }}
+          ARTIFACT_SIGNING_DLIB: ${{ steps.signing-tools.outputs.dlib }}
+          ARTIFACT_SIGNING_METADATA: ${{ steps.signing-tools.outputs.metadata }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
         run: |
+          $ErrorActionPreference = 'Stop'
           choco install innosetup -y --no-progress | Out-Null
-          $version = (Get-Content branding/product.json | ConvertFrom-Json).ritemarkVersion
+          $version = '${{ steps.release.outputs.version }}'
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          $src = (Resolve-Path "VSCode-win32-x64").Path
-          & $iscc "/DAppVersion=$version" "/DSourcePath=$src" "installer\windows\ritemark.iss"
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          $exe = "installer-output\Ritemark-$version-win32-x64-setup.exe"
-          if (-not (Test-Path $exe)) { Write-Error "installer missing: $exe"; exit 1 }
-          Write-Host "Installer built: $exe ($([math]::Round((Get-Item $exe).Length/1MB)) MB)"
+          $src = (Resolve-Path 'VSCode-win32-x64').Path
+          $wrapper = (Resolve-Path 'scripts/sign-windows-file.ps1').Path
+          $signCommand = "pwsh.exe -NoLogo -NoProfile -File `$q$wrapper`$q -FilePath `$f -SignToolPath `$q$($env:SIGNTOOL_PATH)`$q -DlibPath `$q$($env:ARTIFACT_SIGNING_DLIB)`$q -MetadataPath `$q$($env:ARTIFACT_SIGNING_METADATA)`$q -ExpectedPublisher `$q$($env:WINDOWS_PUBLISHER)`$q"
 
-      - name: Sign Windows installer (Azure Trusted Signing)
-        if: ${{ vars.AZURE_SIGNING_ENABLED == 'true' }}
-        uses: azure/trusted-signing-action@v0.5.0
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
-          endpoint: https://neu.codesigning.azure.net
-          trusted-signing-account-name: ritemark-signing
-          certificate-profile-name: ritemark-public-trust
-          files-folder: r/installer-output
-          files-folder-filter: exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
+          if (Test-Path -LiteralPath installer-output) {
+            Remove-Item -LiteralPath installer-output -Recurse -Force
+          }
+          & $iscc "/DAppVersion=$version" "/DSourcePath=$src" '/DSign' "/Sazuresign=$signCommand" 'installer\windows\ritemark.iss'
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
 
-      - name: Upload installer artifact
+          $versionedInstaller = "installer-output\Ritemark-$version-win32-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $versionedInstaller)) { throw "Installer missing: $versionedInstaller" }
+          $canonicalInstaller = 'installer-output\Ritemark-Setup.exe'
+          Move-Item -LiteralPath $versionedInstaller -Destination $canonicalInstaller
+          "installer_path=$($canonicalInstaller.Replace('\', '/'))" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Record signed Windows installer identity
+        shell: pwsh
+        working-directory: r
+        env:
+          INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
+        run: |
+          $installer = (Resolve-Path -LiteralPath $env:INSTALLER_PATH).Path
+          $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "installer=$([System.IO.Path]::GetFileName($installer))"
+            "sha256=$sha256"
+            "source_commit=$((git rev-parse HEAD).Trim())"
+            "workflow_ref=$env:GITHUB_WORKFLOW_REF"
+            "workflow_commit=$env:GITHUB_SHA"
+            "store_url=https://downloads.ritemark.app/windows/v${{ steps.release.outputs.version }}/Ritemark-Setup.exe"
+            'Partner Center must receive this same file and SHA-256.'
+          ) | Set-Content -LiteralPath installer-output/Ritemark-Setup.sha256.txt -Encoding utf8NoBOM
+
+      - name: Verify install and uninstall as a standard user
+        shell: pwsh
+        working-directory: r
+        env:
+          INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & (Resolve-Path '..\ci-harness\scripts\verify-windows-installer-roundtrip.ps1').Path `
+            -InstallerPath $env:INSTALLER_PATH `
+            -SignatureVerifierPath 'scripts\verify-windows-signatures.ps1' `
+            -RegistryProbePath '..\ci-harness\scripts\windows-standard-user-registry-probe.ps1' `
+            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
+            -ExpectedPublisher $env:WINDOWS_PUBLISHER `
+            -ExpectedVersion '${{ steps.release.outputs.version }}' `
+            -EvidenceDirectory 'installer-output\roundtrip-evidence'
+
+      - name: Upload signed Windows artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ritemark-windows-installer
-          path: r/installer-output/*.exe
+          path: |
+            r/${{ steps.installer.outputs.installer_path }}
+            r/installer-output/Ritemark-Setup.sha256.txt
+            r/installer-output/roundtrip-evidence
+          if-no-files-found: warn
           retention-days: 30
-
 
       - name: Build summary
         shell: bash
         working-directory: r
         run: |
-          echo "========================================"
-          echo "Windows Build Complete"
-          echo "========================================"
-          echo ""
-          echo "Build contents:"
-          ls -lh VSCode-win32-x64/ | head -10
-          echo ""
-          echo "Extension:"
-          ls -lh VSCode-win32-x64/resources/app/extensions/ritemark/ | head -10
-          echo ""
-          echo "Artifact: ritemark-windows-x64"
+          echo "Windows build, Productory signing, standard-user install/uninstall, and SHA-256 checks passed."
+          ls -lh "${{ steps.installer.outputs.installer_path }}" installer-output/Ritemark-Setup.sha256.txt

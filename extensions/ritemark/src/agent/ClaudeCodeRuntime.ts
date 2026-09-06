@@ -27,6 +27,13 @@ import type {
   RuntimeStatus,
   UnifiedApprovalRequest,
 } from '../runtime/AgentRuntime';
+import {
+  continuationCheckpoint,
+  frameRuntimePrompt,
+  resolveRuntimeContinuation,
+  transcriptRestoredState,
+} from '../runtime/continuation';
+import { classifyClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 
 /** One conversation's Claude Code session. */
 export class ClaudeCodeSession implements RuntimeSession {
@@ -34,8 +41,10 @@ export class ClaudeCodeSession implements RuntimeSession {
 
   private _session: AgentSession;
   private _config: RuntimeSessionConfig;
+  private readonly _binaryPath: string | undefined;
   /** Model of the live session — used to decide reuse vs recreate. */
   private _activeModel: string | undefined;
+  private _activeResolvedModel: string | undefined;
 
   /**
    * Pending question requests, so respondToApproval() can look them up.
@@ -54,22 +63,52 @@ export class ClaudeCodeSession implements RuntimeSession {
     binaryPath: string | undefined,
   ) {
     this._config = config;
+    this._binaryPath = binaryPath;
     this._activeModel = config.model;
+    this._activeResolvedModel = config.expectedResolvedModel;
     this._session = ClaudeCodeSession._build(config, binaryPath);
   }
 
   private static _build(config: RuntimeSessionConfig, binaryPath: string | undefined): AgentSession {
+    const continuation = resolveRuntimeContinuation('claude-code', config.continuation);
+    if (continuation.kind === 'native') config.onContinuationState?.({ mode: 'pending' });
+    if (continuation.kind === 'fallback') {
+      config.onContinuationState?.(config.continuation?.fallbackContext
+        ? transcriptRestoredState(config.continuation.fallbackContext)
+        : { mode: 'context-unavailable', failureCategory: continuation.failureCategory });
+    }
+    const compatibility = config.continuation?.compatibility;
     return new AgentSession({
       workspacePath: config.workspacePath,
       model: config.model,
+      expectedResolvedModel: config.expectedResolvedModel,
       pathToClaudeCodeExecutable: binaryPath,
       excludedFolders: config.excludedFolders,
       extraSystemPromptAppend: config.extraSystemPrompt,
       mcpServers: config.mcpServers,
+      tools: config.availableTools,
+      settingSources: config.settingSources,
       allowedTools: config.allowedTools,
       approvalMode: config.approvalMode ?? 'auto',
       planFirst: config.planFirst === true,
       ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
+      ...(continuation.kind === 'native' ? { resumeSessionId: continuation.descriptor.nativeReference } : {}),
+      onSessionCheckpoint: (sessionId) => {
+        if (compatibility) {
+          config.onContinuationCheckpoint?.(continuationCheckpoint(
+            sessionId,
+            compatibility,
+            continuation.kind === 'native'
+              ? continuation.descriptor.coveredThroughEventId
+              : config.continuation?.fallbackContext?.coveredThroughEventId ?? null,
+          ));
+        }
+        config.onContinuationState?.(continuation.kind === 'native'
+          ? { mode: 'native-restored' }
+          : config.continuation?.fallbackContext
+            ? transcriptRestoredState(config.continuation.fallbackContext)
+            : { mode: 'not-attempted' });
+      },
     });
   }
 
@@ -85,7 +124,9 @@ export class ClaudeCodeSession implements RuntimeSession {
   applyConfig(config: RuntimeSessionConfig, binaryPath: string | undefined): void {
     this._config = config;
 
-    if (this._session.isActive && this._activeModel === config.model) {
+    if (this._session.isActive
+      && this._activeModel === config.model
+      && this._activeResolvedModel === config.expectedResolvedModel) {
       this._session.setApprovalMode(config.approvalMode ?? 'auto', config.planFirst === true);
       return;
     }
@@ -94,6 +135,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._session.close();
     this._pendingQuestions.clear();
     this._activeModel = config.model;
+    this._activeResolvedModel = config.expectedResolvedModel;
     this._session = ClaudeCodeSession._build(config, binaryPath);
     if (hadLiveSession) {
       config.onProgress({
@@ -112,10 +154,17 @@ export class ClaudeCodeSession implements RuntimeSession {
 
     // Sprint 103 R2: no prompt-level plan reminder — plan behavior comes from
     // the SDK's native plan mode (permissionMode 'plan' + planModeInstructions).
-    const promptText = turn.prompt;
+    const continuation = resolveRuntimeContinuation('claude-code', config.continuation);
+    let promptText = frameRuntimePrompt(
+      turn.prompt,
+      continuation.kind === 'native'
+        ? config.continuation?.nativeDelta
+        : config.continuation?.fallbackContext,
+    );
 
     try {
-      const result = await this._session.sendMessage({
+      let providerAccepted = false;
+      const send = () => this._session.sendMessage({
         prompt: promptText,
         attachments,
         activeFile: turn.activeFile,
@@ -147,15 +196,54 @@ export class ClaudeCodeSession implements RuntimeSession {
           // approval gate — questions need multi-choice answers, not approve/reject.
           config.onQuestion?.(question);
         },
+        onDispatchAccepted: () => {
+          providerAccepted = true;
+          config.onDispatchAccepted?.();
+        },
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
+        onThinkingEffortApplied: (applied, adjusted = false) => {
+          config.onThinkingEffortApplied?.({
+            requested: turn.thinkingEffort ?? 'auto',
+            ...(applied ? { applied } : {}),
+            adjusted,
+          });
+        },
       });
+      let result = await send();
+      // An invalid/expired resume can fail before the SDK emits any provider
+      // event. In that proven-unsent case retry this same accepted user prompt
+      // once in a fresh session with the full transcript pack. Once any
+      // provider evidence exists, never retry silently.
+      if (result.error
+        && continuation.kind === 'native'
+        && config.continuation?.fallbackContext
+        && !providerAccepted) {
+        this._session.close();
+        const fallbackConfig: RuntimeSessionConfig = {
+          ...config,
+          continuation: {
+            ...config.continuation,
+            descriptor: undefined,
+            nativeDelta: undefined,
+          },
+        };
+        this._config = fallbackConfig;
+        this._session = ClaudeCodeSession._build(fallbackConfig, this._binaryPath);
+        promptText = frameRuntimePrompt(turn.prompt, config.continuation.fallbackContext);
+        result = await send();
+      }
       config.onComplete?.({
         text: result.text,
         filesModified: result.filesModified,
         metrics: result.metrics,
+        error: result.error,
+        failureKind: classifyClaudeAuthenticationError(result.error, Boolean(config.anthropicApiKey)),
       });
     } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
       config.onComplete?.({
-        error: err instanceof Error ? err.message : String(err),
+        error,
+        failureKind: classifyClaudeAuthenticationError(error, Boolean(config.anthropicApiKey)),
       });
     }
   }
@@ -211,8 +299,14 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     // session, and therefore the context, belonging to another.
     const existing = this._sessions.get(conversationId);
     if (existing) {
-      existing.applyConfig(config, status.binaryPath);
-      return existing;
+      const continuation = resolveRuntimeContinuation('claude-code', config.continuation);
+      if (continuation.kind === 'native' || !config.continuation?.fallbackContext) {
+        existing.applyConfig(config, status.binaryPath);
+        return existing;
+      }
+      // A descriptor/config mismatch must not keep using an in-memory session
+      // that the host has declared incompatible or ambiguous.
+      this.disposeSession(conversationId);
     }
 
     const session = new ClaudeCodeSession(conversationId, config, status.binaryPath);

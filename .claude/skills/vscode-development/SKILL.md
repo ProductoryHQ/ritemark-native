@@ -205,26 +205,26 @@ After gulp build completes, ALWAYS:
 The user-facing app is built with `./scripts/build-prod.sh`. Hard rules — diverging from these has cost full 25-minute builds:
 
 ```bash
-# 1. Switch to arm64 Node v20 (mandatory)
-arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && node -p "process.arch"'
-# Must show: arm64 + v20.x
+# 1. From a normal checkout, audit and create the disposable RC worktree.
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
 
-# 2. Verify patches
-./scripts/apply-patches.sh --dry-run
-# Must show: all "Already applied"
+# 2. cd to the printed path. Preflight must see pristine exact-main source.
+./scripts/release-preflight.sh
 
-# 3. Compile extension — Sprint 92: `npm run compile` = `tsc --noEmit` (typecheck)
-#    + esbuild (emit the 2 bundles). `tsc --noEmit` ALONE no longer produces out/.
-cd extensions/ritemark && npm run compile && cd ../..
-
-# 4. Run production build (~25 min) — NEVER pipe through tail!
-arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && ./scripts/build-prod.sh 2>&1'
+# 3. Build with the submodule-pinned arm64 Node. build-prod performs frozen
+#    dependency installs, bundle rebuilds, patching, and provenance itself.
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use "$(cat vscode/.nvmrc)" && ./scripts/build-prod.sh 2>&1'
 ```
 
 **Hard rules:**
+- **NEVER** promote a development/old RC tree into a release. `vscode/` must be a physical pristine submodule in a new exact-main worktree.
+- **NEVER** pre-apply patches, link another checkout's VS Code or `node_modules`, or reuse `VSCode-<target>` output. The production script owns materialization.
+- **NEVER** sign/package an app without matching `ritemark-build-provenance.json`; signing and DMG scripts enforce this.
+- `apply-patches.sh` records the exact derived VS Code diff. A later manual submodule edit invalidates that proof and blocks automatic worktree cleanup.
 - **NEVER** use `| tail` or `| head` with build commands — output buffering hangs background mode.
 - **NEVER** run `gulp vscode-darwin-arm64` directly — skips extension copy → broken app.
-- **ALWAYS** use the `arch -arm64 /bin/zsh` wrapper — default shell has x64 Node v23.
+- **ALWAYS** use the `arch -arm64 /bin/zsh` wrapper and the version in `vscode/.nvmrc`.
 - **ALWAYS** run as background task with `run_in_background: true` and `timeout: 600000` (10 min cap).
 - **Extension-only changes** (no VS Code core edits) skip full rebuild:
 
@@ -257,8 +257,8 @@ Because the host is one flat bundle, new code must not reintroduce the layout as
 
 | Context | Required | Why |
 |---|---|---|
-| Production builds | Node v20.x arm64 (`nvm use 20`) | Build pipeline native arm64 dependencies (Rollup, esbuild, electron) require this exact arch + version |
-| Dev mode (`./vscode/scripts/code.sh`) | Node v22.21.1 arm64 (`nvm use 22.21.1`) | Matches `vscode/.nvmrc`. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
+| Production builds | arm64 Node pinned by `vscode/.nvmrc` | Clean build and CI must use the submodule-owned toolchain version, not a machine default |
+| Dev mode (`./vscode/scripts/code.sh`) | Node v22.21.1 arm64 (`nvm use` at repo root) | Matches the repo-root development pin. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
 | Webview Vite build | Node v20 (uses compiled rollup) | OK |
 
 Repo root `.nvmrc` pins 22.21.1. `nvm use` from repo root picks it up automatically. x64/Rosetta Node fails all builds (missing arm64 native binaries).

@@ -20,6 +20,7 @@ import type {
   ChatMessage,
   CodexConversationTurn,
   ConversationEntry,
+  ThinkingEffort,
 } from './types';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 
@@ -38,6 +39,23 @@ export interface PendingRuntimeSelection {
    * APPROVED, then auto-resets. Cancel/discard leaves it on.
    */
   planFirst?: boolean;
+}
+
+export interface ConversationContinuationNotice {
+  mode: 'context-unavailable' | 'runtime-unavailable';
+  runtimeId: AgentId;
+  turnId?: string;
+  truncated: boolean;
+  unansweredPriorRequest: boolean;
+}
+
+/** Durable, read-only history marker projected from a canonical boundary event. */
+export interface ConversationTranscriptBoundary {
+  id: string;
+  turnId: string;
+  runtimeId: AgentId;
+  timestamp: number;
+  message: string;
 }
 
 /**
@@ -83,12 +101,18 @@ export interface ConversationState {
   /** Full composite value: "opencode:<provider>/<model>". */
   opencodeSelectedModel: string;
   pendingRuntime: PendingRuntimeSelection;
+  /** Draft preference is isolated by runtime inside this conversation. */
+  thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>>;
 
   // ── Per-thread UI state ──
   dismissedCurrentPlanKey: string | null;
   estimatedTokens: number;
   contextUsagePercent: number;
   showContextWarning: boolean;
+  /** Live continuation disclosure; dismissing it does not remove durable history. */
+  continuationNotice: ConversationContinuationNotice | null;
+  /** Canonical transcript-restoration boundaries survive close/reopen and restart. */
+  transcriptBoundaries: ConversationTranscriptBoundary[];
 }
 
 export function createConversationState(
@@ -110,10 +134,13 @@ export function createConversationState(
     codexSelectedModel: '',
     opencodeSelectedModel: '',
     pendingRuntime: { runtimeId: 'claude-code', modelId: '', mode: 'auto' },
+    thinkingEffortByRuntime: {},
     dismissedCurrentPlanKey: null,
     estimatedTokens: 0,
     contextUsagePercent: 0,
     showContextWarning: false,
+    continuationNotice: null,
+    transcriptBoundaries: [],
   };
   // `id` is the storage key — never let an override desync it from the map key.
   return { ...base, ...overrides, id };
@@ -126,6 +153,15 @@ export function isConversationEmpty(conversation: ConversationState): boolean {
     && conversation.codexConversation.length === 0
     && conversation.chatMessages.length === 0
   );
+}
+
+/** R9: a non-empty cross-runtime change is an immediate, draft-safe handoff. */
+export function isRuntimeHandoff(
+  conversation: ConversationState,
+  targetRuntimeId: AgentId,
+): boolean {
+  return targetRuntimeId !== conversation.pendingRuntime.runtimeId
+    && !isConversationEmpty(conversation);
 }
 
 /** True when any turn in this thread is mid-flight. */

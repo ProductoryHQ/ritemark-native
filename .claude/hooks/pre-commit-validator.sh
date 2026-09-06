@@ -51,14 +51,24 @@ if grep -q "@tailwind base" "extensions/ritemark/media/webview.js" 2>/dev/null; 
   ERRORS=$((ERRORS + 1))
 fi
 
-# Check 5: Webview bundle freshness (source vs bundle)
-# If webview source files are staged, bundle must also be staged
-STAGED_WEBVIEW_SRC=$(git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null || true)
-if [[ -n "$STAGED_WEBVIEW_SRC" ]]; then
+# Check 5: Webview bundle freshness (production inputs vs bundle)
+# Colocated tests are not Vite inputs. If production source, dependency locks,
+# or dependency patches are staged, the generated bundle must also be staged.
+STAGED_WEBVIEW_INPUTS=$(
+  {
+    git diff --cached --name-only -- "extensions/ritemark/webview/src" 2>/dev/null \
+      | grep -Ev '(\.test|\.spec)\.[cm]?[jt]sx?$' || true
+    git diff --cached --name-only -- \
+      "extensions/ritemark/webview/package.json" \
+      "extensions/ritemark/webview/package-lock.json" \
+      "extensions/ritemark/webview/patches" 2>/dev/null || true
+  } | sort -u
+)
+if [[ -n "$STAGED_WEBVIEW_INPUTS" ]]; then
   STAGED_BUNDLE=$(git diff --cached --name-only -- "extensions/ritemark/media/webview.js" 2>/dev/null || true)
   if [[ -z "$STAGED_BUNDLE" ]]; then
-    echo "ERROR: Webview source files changed but webview.js not updated!"
-    echo "  Changed: $(echo "$STAGED_WEBVIEW_SRC" | wc -l | tr -d ' ') source file(s)"
+    echo "ERROR: Webview production inputs changed but webview.js not updated!"
+    echo "  Changed: $(echo "$STAGED_WEBVIEW_INPUTS" | wc -l | tr -d ' ') production input(s)"
     echo "  Fix: cd extensions/ritemark/webview && npm run build"
     ERRORS=$((ERRORS + 1))
   fi
@@ -156,6 +166,20 @@ if git diff --cached --name-only | grep -qx "$MANIFEST"; then
       echo "  anything it SKIPS — a skip is 'not proven', not a pass)."
       ERRORS=$((ERRORS + 1))
     fi
+  fi
+fi
+
+# Check 12: build/worktree governance changes must prove both acceptance and
+# rejection paths in real disposable Git repositories before commit.
+STAGED_BUILD_GUARDS=$(git diff --cached --name-only | grep -E '^((scripts/(verify-release-source|create-release-worktree|test-release-source-integrity|test-worktree-hygiene)\.sh|scripts/(build-provenance|worktree-hygiene|vscode-derived-state)\.mjs|scripts/(build-prod|build-prod-windows|release-preflight|validate-build-output)\.sh)|\.github/workflows/build-)' || true)
+if [[ -n "$STAGED_BUILD_GUARDS" ]]; then
+  if ! ./scripts/test-release-source-integrity.sh; then
+    echo "ERROR: Release source/provenance guard tests failed"
+    ERRORS=$((ERRORS + 1))
+  fi
+  if ! ./scripts/test-worktree-hygiene.sh; then
+    echo "ERROR: Worktree hygiene tests failed"
+    ERRORS=$((ERRORS + 1))
   fi
 fi
 

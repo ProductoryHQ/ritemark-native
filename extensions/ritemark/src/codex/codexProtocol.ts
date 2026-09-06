@@ -3,7 +3,7 @@
  *
  * JSON-RPC 2.0 over stdio protocol for communicating with `codex app-server`.
  *
- * Generated from: codex app-server generate-ts (v0.106.0)
+ * Audited against: codex app-server generate-ts (v0.153.0)
  * Simplified to the subset used by Ritemark Native.
  */
 
@@ -194,6 +194,21 @@ export interface ThreadStartResponse {
   reasoningEffort: string | null;
 }
 
+export interface ThreadResumeParams {
+  threadId: string;
+  cwd?: string | null;
+  approvalPolicy?: 'untrusted' | 'on-failure' | 'on-request' | 'never' | null;
+  sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access' | null;
+}
+
+export interface ThreadResumeResponse {
+  thread: ThreadInfo;
+}
+
+export interface ThreadReadResponse {
+  thread: ThreadInfo;
+}
+
 export interface ThreadInfo {
   id: string;
   preview: string;
@@ -218,6 +233,8 @@ export interface TurnStartParams {
   threadId: string;
   input: UserInput[];
   model?: string | null;
+  /** Per-turn reasoning effort. Omitted to let Codex use its current default. */
+  effort?: string | null;
   collaborationMode?: CollaborationMode | null;
 }
 
@@ -306,6 +323,8 @@ export interface ToolRequestUserInputParams {
   turnId: string;
   itemId: string;
   questions: ToolRequestUserInputQuestion[];
+  /** Added in Codex 0.149.0. Optional locally for older system runtimes. */
+  isBlocking?: boolean;
 }
 
 export interface ToolRequestUserInputAnswer {

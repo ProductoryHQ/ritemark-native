@@ -3,8 +3,29 @@ import {
   AgentSession,
   buildClaudeSystemAppend,
   buildClaudeTurnPrompt,
+  claudeSdkAssistantError,
   DEFAULT_SETTING_SOURCES,
+  modelMatchesExpectedIdentity,
+  normalizeClaudeSdkSuccessResult,
 } from './AgentRunner';
+
+function testCanonicalModelIdentityMatching(): void {
+  assert.equal(
+    modelMatchesExpectedIdentity('default', 'claude-opus-5[1m]', 'claude-opus-5[1m]'),
+    true,
+    'a request alias must match the canonical identity reported by the runtime',
+  );
+  assert.equal(
+    modelMatchesExpectedIdentity('opus[1m]', 'claude-opus-5[1m]', 'claude-sonnet-5'),
+    false,
+    'a genuinely different canonical identity must still warn',
+  );
+  assert.equal(
+    modelMatchesExpectedIdentity('claude-opus-5', undefined, 'claude-opus-5[1m]'),
+    true,
+    'legacy direct ids retain the existing 1M suffix compatibility',
+  );
+}
 
 async function testSynchronousPlanApprovalAnswer() {
   const session = new AgentSession({
@@ -98,6 +119,15 @@ function testDefaultSettingSources() {
     ['project'],
     'custom setting sources should be preserved'
   );
+
+  const isolatedSession = new AgentSession({
+    workspacePath: process.cwd(),
+    settingSources: [],
+    tools: [],
+  }) as AgentSession & Record<string, unknown>;
+
+  assert.deepEqual(isolatedSession._settingSources, [], 'an explicit empty setting scope loads no settings');
+  assert.deepEqual(isolatedSession._tools, [], 'an explicit empty tool set removes built-in tools');
 }
 
 function testDefaultToolsIncludePlanAndQuestionLifecycle() {
@@ -252,7 +282,169 @@ async function testSprint103KeepPlanningFeedbackDeny() {
   assert.equal(s._planFirst, true, 'plan-first STAYS on after Keep planning (D2)');
 }
 
+async function testWarmSessionThinkingEffortUpdatesBeforeInput(): Promise<void> {
+  // The warm Claude process must receive per-turn effort before the next user
+  // message is enqueued. Auto is an explicit reset (`null`), not a stale reuse
+  // of the prior manual value.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const calls: Array<{ kind: string; value?: unknown }> = [];
+  session._queryStream = {
+    applyFlagSettings: async (settings: { effortLevel: string | null }) => {
+      calls.push({ kind: 'effort', value: settings.effortLevel });
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+  session._enqueueInput = () => calls.push({ kind: 'input' });
+
+  const completeTurn = () => session._forceResolveTurn(session._turnId, {
+    text: 'ok',
+    filesModified: [],
+    metrics: { durationMs: 1, costUsd: null, model: null },
+  });
+
+  const manual = session.sendMessage({ prompt: 'manual', thinkingEffort: 'high' });
+  await new Promise((resolve) => setImmediate(resolve));
+  completeTurn();
+  await manual;
+  assert.deepEqual(calls.splice(0), [
+    { kind: 'effort', value: 'high' },
+    { kind: 'input' },
+  ], 'manual effort is applied before the warm-session input');
+
+  const auto = session.sendMessage({ prompt: 'auto', thinkingEffort: 'auto' });
+  await new Promise((resolve) => setImmediate(resolve));
+  completeTurn();
+  await auto;
+  assert.deepEqual(calls, [
+    { kind: 'effort', value: null },
+    { kind: 'input' },
+  ], 'Auto resets a prior manual effort before the next input');
+
+  session.close();
+}
+
+async function testWarmSessionUnsupportedEffortFallsBackToAuto(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const calls: Array<{ kind: string; value?: unknown }> = [];
+  session._queryStream = {
+    applyFlagSettings: async (settings: { effortLevel: string | null }) => {
+      calls.push({ kind: 'effort', value: settings.effortLevel });
+      if (settings.effortLevel === 'max') throw new Error('unsupported for this account');
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+  session._enqueueInput = () => calls.push({ kind: 'input' });
+  const applied: Array<{ effort?: string; adjusted?: boolean }> = [];
+
+  const turn = session.sendMessage({
+    prompt: 'keep this accepted turn',
+    thinkingEffort: 'max',
+    onThinkingEffortApplied: (effort?: string, adjusted?: boolean) => applied.push({ effort, adjusted }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  session._forceResolveTurn(session._turnId, {
+    text: 'ok',
+    filesModified: [],
+    metrics: { durationMs: 1, costUsd: null, model: null },
+  });
+  await turn;
+
+  assert.deepEqual(calls, [
+    { kind: 'effort', value: 'max' },
+    { kind: 'effort', value: null },
+    { kind: 'input' },
+  ], 'unsupported manual effort resets to Auto before the accepted input is enqueued');
+  assert.deepEqual(applied, [{ effort: undefined, adjusted: true }]);
+  session.close();
+}
+
+async function testSyntheticAuthSuccessEnvelopeFailsTheTurn(): Promise<void> {
+  const rawOAuthError = 'Failed to authenticate: OAuth session expired and could not be refreshed';
+  const syntheticAssistant = {
+    type: 'assistant',
+    error: 'authentication_failed',
+    isApiErrorMessage: true,
+    message: {
+      model: '<synthetic>',
+      content: [{ type: 'text', text: rawOAuthError }],
+    },
+  };
+  assert.equal(claudeSdkAssistantError(syntheticAssistant), rawOAuthError);
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: rawOAuthError,
+    resultIsError: true,
+    structuredAssistantError: rawOAuthError,
+    sawRegularAssistant: false,
+  }), { text: '', error: rawOAuthError });
+
+  // Exercise the actual persistent-session consumer with the exact envelope
+  // observed in Claude Code 2.1.239 / Agent SDK 0.3.239.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const progress: string[] = [];
+  const resultPromise = new Promise<{ text: string; error?: string }>((resolve) => {
+    session._turnResolve = resolve;
+  });
+  session._turnId = 1;
+  session._consumerTurnId = 1;
+  session._emitProgress = (type: string) => progress.push(type);
+  session._queryStream = {
+    async *[Symbol.asyncIterator]() {
+      yield syntheticAssistant;
+      yield {
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        result: rawOAuthError,
+        duration_ms: 1000,
+        total_cost_usd: 0,
+      };
+    },
+    interrupt: async () => {},
+    close: () => {},
+  };
+
+  await session._consumeLoop();
+  const result = await resultPromise;
+  assert.deepEqual(result, {
+    text: '',
+    filesModified: [],
+    metrics: { durationMs: 1000, costUsd: 0, model: null, waitedMs: 0 },
+    error: rawOAuthError,
+  });
+  assert.deepEqual(progress, ['error'], 'synthetic auth failure must never emit thinking or done');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: rawOAuthError,
+    resultIsError: false,
+    sawRegularAssistant: true,
+  }), { text: rawOAuthError }, 'ordinary assistant output is never inferred to be an error');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: 'Recovered after a transient provider retry.',
+    resultIsError: false,
+    structuredAssistantError: 'Temporary upstream authentication failure',
+    sawRegularAssistant: true,
+  }), {
+    text: 'Recovered after a transient provider retry.',
+  }, 'an explicit successful terminal result overrides an earlier transient API-error frame');
+
+  assert.deepEqual(normalizeClaudeSdkSuccessResult({
+    result: 'Provider failed without an assistant frame',
+    resultIsError: true,
+    sawRegularAssistant: true,
+  }), {
+    text: '',
+    error: 'Provider failed without an assistant frame',
+  }, 'the SDK terminal is_error bit remains authoritative even with prior assistant activity');
+}
+
 async function main() {
+  testCanonicalModelIdentityMatching();
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
   testClaudeLifecycleInstructionsAreIncluded();
@@ -264,6 +456,9 @@ async function main() {
   await testSprint103AutoModeAllowsFallthrough();
   await testSprint103ExitPlanModeApprovalCarriesModeSwitch();
   await testSprint103KeepPlanningFeedbackDeny();
+  await testWarmSessionThinkingEffortUpdatesBeforeInput();
+  await testWarmSessionUnsupportedEffortFallsBackToAuto();
+  await testSyntheticAuthSuccessEnvelopeFailsTheTurn();
   console.log('AgentRunner lifecycle tests passed.');
 }
 

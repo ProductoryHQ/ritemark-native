@@ -4,22 +4,50 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { AgentSidebarProtocolMessage } from '../../../../src/views/agentSidebarProtocol';
+
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
 export type AgentId = 'claude-code' | 'codex' | 'opencode';
+export type RuntimeFailureKind = 'authentication' | 'api-key-authentication';
+export type ThinkingEffort = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+export type ExplicitThinkingEffort = Exclude<ThinkingEffort, 'auto'>;
+
+export interface ModelThinkingEffort {
+  levels: ExplicitThinkingEffort[];
+  defaultLevel?: ExplicitThinkingEffort;
+}
+
+export interface ThinkingEffortCapability {
+  selectable: ExplicitThinkingEffort[];
+  defaultLevel?: ExplicitThinkingEffort;
+  source: 'model-catalog' | 'runtime-live';
+  supportsAppliedValue: boolean;
+}
+
+export interface RuntimeCapabilityFlags {
+  planFirst: boolean;
+  liveModeSwitch: boolean;
+  structuredPlanSteps: boolean;
+  thinkingEffortSource: 'model-catalog' | 'runtime-live';
+}
 
 export interface AgentInfo {
   id: AgentId;
   label: string;
   description: string;
   experimental: boolean;
-  requiresApiKey: 'anthropic' | 'openai' | null;
+  requiresApiKey: 'anthropic' | 'openai' | 'byok' | null;
 }
 
 export interface ModelOption {
   id: string;
   label: string;
   description: string;
+  resolvedModel?: string;
+  aliases?: string[];
+  isDefault?: boolean;
+  thinkingEffort?: ModelThinkingEffort;
 }
 
 export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
@@ -204,6 +232,7 @@ export interface AgentConversationTurn {
    */
   conversationId?: string;
   userPrompt: string;
+  thinkingEffort?: ThinkingEffort;
   /** Active file path that was included as context (when not skipped) */
   activeFilePath?: string;
   attachments?: FileAttachment[];
@@ -215,6 +244,7 @@ export interface AgentConversationTurn {
     filesModified: string[];
     metrics: AgentMetrics;
     error?: string;
+    failureKind?: RuntimeFailureKind;
   };
   isRunning: boolean;
   /** Turn ended with a plan that needs user approval */
@@ -316,6 +346,7 @@ export interface CodexConversationTurn {
    */
   runtime?: 'codex' | 'opencode';
   userPrompt: string;
+  thinkingEffort?: ThinkingEffort;
   requestedPlanMode?: boolean;
   /** Active file path that was included as context */
   activeFilePath?: string;
@@ -373,12 +404,15 @@ export interface ConversationScopedMessage {
 }
 
 export type ExtensionMessage =
+  | AgentSidebarProtocolMessage
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
   | { type: 'comment:submit'; agentId: string; prompt: string; commentIds?: string[]; documentPath?: string }
-  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103 R6: per-runtime capability map. */ runtimeCapabilities?: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }> }
-  | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags }
+  | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
+  | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
+  | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)
+  | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags; generation?: number; revision?: number; error?: string }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
@@ -391,16 +425,31 @@ export type ExtensionMessage =
   | ({ type: 'agent-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
-  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
-  | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus }
-  | { type: 'agent-setup:error'; error: string }
+  | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus; generation?: number; revision?: number }
+  | { type: 'agent-setup:error'; error: string; generation?: number; revision?: number }
   | { type: 'settings:chatFontSize'; fontSize: number }
   | { type: 'toggle-history-panel' }
+  | { type: 'conversation/canonical-id'; clientConversationId: string; conversationId: string; bindingGeneration: number }
+  | {
+      type: 'conversation/continuation-state';
+      conversationId: string;
+      turnId?: string;
+      runtimeId: AgentId;
+      state: {
+        mode: 'not-attempted' | 'pending' | 'native-restored' | 'transcript-restored' | 'context-unavailable' | 'runtime-unavailable';
+        failureCategory?: 'invalid-descriptor' | 'incompatible-descriptor' | 'authentication' | 'runtime-unavailable' | 'provider-rejected' | 'ambiguous-dispatch' | 'no-usable-context';
+        truncated?: boolean;
+        unansweredPriorRequest?: boolean;
+      };
+    }
+  | import('../../../../src/conversations/protocol').ConversationResultMessage
+  | import('../../../../src/conversations/protocol').ConversationHostEvent
   | { type: 'files-dropped'; paths: string[] }
   // Codex messages
-  | { type: 'codex:status'; status: CodexSidebarStatus }
+  | { type: 'codex:status'; status: CodexSidebarStatus; generation?: number; revision?: number }
   | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'codex-rpc-progress'; method: string; message: string } & ConversationScopedMessage)
   | ({ type: 'codex-streaming'; delta: string } & ConversationScopedMessage)

@@ -15,8 +15,8 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
  *  - Image rule preferring `title="./..."` over DOM-resolved `src` (used for
  *    both paste-flow and Save-as-Markdown image references)
  *
- * TipTap-specific rules (`tiptapTaskItem`, `tiptapTaskList`) live in
- * `components/Editor.tsx` and are layered on top when the editor loads.
+ * TipTap-specific task-list rules live in `taskListRoundTrip.ts` and are
+ * layered on top by `components/Editor.tsx` when the editor loads.
  */
 export function createTurndownService(): TurndownService {
   const service = new TurndownService({

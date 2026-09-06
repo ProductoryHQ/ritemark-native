@@ -2,7 +2,7 @@
   "name": "ritemark",
   "displayName": "Ritemark Editor",
   "description": "WYSIWYG Markdown Editor",
-  "version": "1.8.6",
+  "version": "1.10.0",
   "publisher": "ritemark",
   "license": "MIT",
   "engines": {
@@ -272,6 +272,18 @@
             "default": true,
             "description": "Home launcher (#74): persistent Activity Bar view with New document, quick actions, and recent work. Kill-switch — disable to hide the launcher UI.",
             "scope": "application"
+          },
+          "ritemark.features.durableAgentConversations": {
+            "type": "boolean",
+            "default": true,
+            "description": "Durable Agent Conversations: host-owned project history and the Conversations UI. After host cutover, disabling uses compatibility presentation without returning to legacy storage.",
+            "scope": "application"
+          },
+          "ritemark.features.composer-thinking-effort": {
+            "type": "boolean",
+            "default": true,
+            "description": "Composer Thinking Effort: choose a model-supported effort for the next Agent Chat message. Kill-switch — disable to use provider defaults.",
+            "scope": "application"
           }
         }
       },
@@ -413,6 +425,16 @@
             "scope": "application"
           }
         }
+      },
+      {
+        "title": "Ritemark Transcription",
+        "properties": {
+          "ritemark.transcription.exportFolder": {
+            "type": "string",
+            "default": "Transcripts",
+            "markdownDescription": "Folder for exported transcripts, relative to the workspace root (or an absolute path). With no workspace open, transcripts are written beside the recording."
+          }
+        }
       }
     ],
     "viewsContainers": {
@@ -421,6 +443,11 @@
           "id": "ritemark-home",
           "title": "Home",
           "icon": "media/home-icon.svg"
+        },
+        {
+          "id": "ritemark-transcribe",
+          "title": "Transcribe",
+          "icon": "media/transcribe-icon.svg"
         },
         {
           "id": "ritemark-agent-library",
@@ -477,6 +504,15 @@
           "contextualTitle": "Browser",
           "visibility": "visible"
         }
+      ],
+      "ritemark-transcribe": [
+        {
+          "type": "webview",
+          "id": "ritemark.transcribeView",
+          "name": "Transcribe",
+          "contextualTitle": "Transcribe",
+          "visibility": "visible"
+        }
       ]
     },
     "menus": {
@@ -516,6 +552,11 @@
           "command": "ritemark.browser.history.clearAll",
           "when": "view == ritemark.browserView",
           "group": "navigation@2"
+        },
+        {
+          "command": "ritemark.aiSettings",
+          "when": "view == ritemark.transcribeView",
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [
@@ -611,6 +652,31 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "ritemark.transcriptWorkbench",
+        "displayName": "Transcript Workbench",
+        "selector": [
+          {
+            "filenamePattern": "*.m4a"
+          },
+          {
+            "filenamePattern": "*.mp3"
+          },
+          {
+            "filenamePattern": "*.wav"
+          },
+          {
+            "filenamePattern": "*.flac"
+          },
+          {
+            "filenamePattern": "*.ogg"
+          },
+          {
+            "filenamePattern": "*.aac"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "configurationDefaults": {
@@ -699,15 +765,23 @@
   "scripts": {
     "compile": "tsc --noEmit -p ./ && node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueueStore.test.ts && npx tsx webview/src/components/ai-sidebar/aiDisclosure.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts && npx tsx src/update/versionComparison.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/workspaceConsent.test.ts && npx tsx src/utils/stickyTabHealer.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts && npx tsx src/ai/capabilityContext.test.ts && npx tsx webview/src/extensions/comment/commentRoundTrip.test.ts && npx tsx webview/src/extensions/comment/commentIndex.test.ts && npx tsx src/agent/ClaudeCodeRuntime.test.ts && npx tsx src/codex/CodexRuntime.test.ts && npx tsx src/acp/AcpRuntime.test.ts && npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts && npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts && npx tsx webview/src/components/ai-sidebar/threadStatus.test.ts && npx tsx webview/src/components/ai-sidebar/threadRail.test.ts && npx tsx webview/src/components/ai-sidebar/activityState.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/chatLinks.test.ts && npx tsx src/browser/browserActionSerialization.test.ts && npx tsx src/views/HomeViewProvider.test.ts",
+    "pretest": "npm run test:conversations && npm run test:thinking-effort && npm run test:sprint113-language && npm run test:editor-sync && npm run test:claude-auth && npm run test:security-backports",
+    "test:thinking-effort": "npx tsx src/runtime/thinkingEffort.test.ts && npx tsx webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts",
+    "test:sprint113-language": "npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx webview/src/components/transcribe/workbench/InsightsLanguageCombobox.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts",
+    "test:editor-sync": "npx tsx src/editorSync/state.test.ts && npx tsx src/editorSync/protocol.test.ts && npx tsx src/editorSync/delivery.test.ts && npx tsx src/editorSync/saveReceipt.test.ts && npx tsx webview/src/documentSyncReducer.test.ts && npx tsx webview/src/editorValueReconciliation.test.ts && npm run test:task-list-roundtrip",
+    "test:task-list-roundtrip": "npx tsx webview/src/utils/taskListRoundTrip.test.ts",
+    "test:security-backports": "npx tsx webview/src/utils/securityBackports.test.ts",
+    "test:claude-auth": "npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts",
+    "test:conversations": "npx tsx src/runtime/continuation.test.ts && npx tsx src/conversations/contextPack.test.ts && npx tsx src/conversations/identityColor.test.ts && npx tsx src/conversations/runtimeAttachmentPolicy.test.ts && npx tsx src/conversations/types.test.ts && npx tsx src/conversations/projectScope.test.ts && npx tsx src/conversations/ConversationStore.test.ts && npx tsx src/conversations/ConversationController.test.ts && npx tsx src/conversations/conversationDeleteNotification.test.ts && npx tsx src/conversations/ConversationCutoverState.test.ts && npx tsx src/conversations/LegacyConversationMigrator.test.ts && npx tsx src/conversations/ConversationTitlePolicy.test.ts && npx tsx src/conversations/ConversationTitleGenerator.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageReadOnly.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts && npx tsx webview/src/components/ai-sidebar/conversationSelectors.test.ts && npx tsx webview/src/components/ai-sidebar/conversationProjection.test.ts && npx tsx webview/src/components/ai-sidebar/continuationPresentation.test.ts",
+    "test": "npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueueStore.test.ts && npx tsx webview/src/components/ai-sidebar/aiDisclosure.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts && npx tsx src/update/versionComparison.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/speech/transcriptionFlag.test.ts && npx tsx src/speech/durationProbe.test.ts && npx tsx src/speech/segmentFolding.test.ts && npx tsx src/speech/engineParsing.test.ts && npx tsx src/speech/audioPrep.test.ts && npx tsx src/speech/transcriptMarkdown.test.ts && npx tsx src/speech/SessionStore.test.ts && npx tsx src/speech/engineRegistry.test.ts && npx tsx src/speech/JobManager.test.ts && npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/speakerNames.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx src/speech/exportTranscript.test.ts && npx tsx webview/src/components/transcribe/workbench/playback.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/workspaceConsent.test.ts && npx tsx src/utils/stickyTabHealer.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts && npx tsx src/ai/capabilityContext.test.ts && npx tsx src/ai/connectivityPolicy.test.ts && npx tsx webview/src/extensions/comment/commentRoundTrip.test.ts && npx tsx webview/src/extensions/comment/commentIndex.test.ts && npx tsx src/runtime/runtimeErrorPresentation.test.ts && npx tsx src/agent/ClaudeCodeRuntime.test.ts && npx tsx src/codex/CodexRuntime.test.ts && npx tsx src/acp/AcpRuntime.test.ts && npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts && npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts && npx tsx webview/src/components/ai-sidebar/threadStatus.test.ts && npx tsx webview/src/components/ai-sidebar/threadRail.test.ts && npx tsx webview/src/components/ai-sidebar/activityState.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/chatLinks.test.ts && npx tsx src/browser/browserActionSerialization.test.ts && npx tsx src/views/HomeViewProvider.test.ts",
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",
     "test:update": "npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "0.22.1",
-    "@anthropic-ai/claude-agent-sdk": "0.3.217",
+    "@agentclientprotocol/sdk": "1.4.0",
+    "@anthropic-ai/claude-agent-sdk": "0.3.239",
     "@anthropic-ai/sdk": "file:./npm-stubs/anthropic-ai-sdk",
     "@modelcontextprotocol/sdk": "file:./npm-stubs/modelcontextprotocol-sdk",
     "@types/marked": "^5.0.2",
@@ -725,8 +799,13 @@
     "posthog-node": "^5.28.8",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.0.0"
+  },
+  "overrides": {
+    "fast-uri": "3.1.6",
+    "js-yaml": "3.15.1",
+    "nanoid": "5.1.16"
   },
   "devDependencies": {
     "@phosphor-icons/core": "^2.1.1",
@@ -735,6 +814,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/turndown": "^5.0.5",
     "@types/vscode": "^1.94.0",
+    "@xmldom/xmldom": "^0.8.15",
     "esbuild": "^0.28.1",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"

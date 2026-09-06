@@ -5,6 +5,8 @@
  * Used by AgentRunner, UnifiedViewProvider, and webview.
  */
 
+import type { ExplicitThinkingEffort, ThinkingEffort } from '../runtime/thinkingEffort';
+
 /**
  * Available agent identifiers
  */
@@ -61,6 +63,10 @@ export interface ModelOption {
   id: string;
   label: string;
   description: string;
+  resolvedModel?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: ExplicitThinkingEffort[];
+  supportsAdaptiveThinking?: boolean;
 }
 
 
@@ -286,9 +292,13 @@ export interface AgentExecutionOptions {
 export interface AgentSessionConfig {
   workspacePath: string;
   excludedFolders?: string[];
+  /** Built-in Claude tools exposed to the model. Omitted keeps the SDK default; [] removes them. */
+  tools?: string[];
   allowedTools?: string[];
   settingSources?: AgentSettingSource[];
   model?: string;
+  /** Canonical model identity expected from the SDK init event. */
+  expectedResolvedModel?: string;
   anthropicApiKey?: string;
   pathToClaudeCodeExecutable?: string;
   /**
@@ -312,6 +322,10 @@ export interface AgentSessionConfig {
    * the SDK's native `permissionMode: 'plan'` until a plan is approved.
    */
   planFirst?: boolean;
+  /** Exact-compatible Claude SDK session to resume on first query. */
+  resumeSessionId?: string;
+  /** Authoritative session id reported by the SDK init event. */
+  onSessionCheckpoint?: (sessionId: string) => void;
 }
 
 /**
@@ -335,6 +349,12 @@ export interface AgentTurnOptions {
   onPlanApproval?: (request: AgentPlanApprovalRequest) => void;
   /** Emitted in 'ask' mode before a Write/Edit/Bash tool executes. */
   onToolApproval?: (request: AgentToolApprovalRequest) => void;
+  /** First positive SDK signal after this turn enters the provider stream. */
+  onDispatchAccepted?: () => void;
+  /** Immutable Composer effort captured when this turn was accepted. */
+  thinkingEffort?: ThinkingEffort;
+  /** Called after the SDK query/config accepted the requested effort. */
+  onThinkingEffortApplied?: (applied?: ExplicitThinkingEffort, adjusted?: boolean) => void;
 }
 
 /**
@@ -346,6 +366,8 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   close(): void;
   /** Change the permission mode of a live session (used by unified approval). */
   setPermissionMode?(mode: string): Promise<void>;
+  /** Change the effort of a warm Claude query without rebuilding its context. */
+  applyFlagSettings?(settings: { effortLevel: ExplicitThinkingEffort | null }): Promise<void>;
 }
 
 /**
@@ -367,7 +389,11 @@ export interface SDKMessage {
   status?: string;
   output_file?: string;
   summary?: string;
+  /** Structured provider failure metadata can arrive on an assistant event. */
+  error?: string;
+  isApiErrorMessage?: boolean;
   message?: {
+    model?: string;
     content?: Array<{
       type: string;
       name?: string;
@@ -378,6 +404,8 @@ export interface SDKMessage {
   };
   duration_ms?: number;
   total_cost_usd?: number;
+  /** A `success` result can still carry provider failure text. */
+  is_error?: boolean;
   result?: string;
   errors?: string[];
 }

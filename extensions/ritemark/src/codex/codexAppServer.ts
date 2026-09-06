@@ -162,6 +162,18 @@ export class CodexAppServer extends EventEmitter {
     });
   }
 
+  /** Resume an existing persisted thread without replaying its history to UI. */
+  async threadResume(params: import('./codexProtocol').ThreadResumeParams): Promise<import('./codexProtocol').ThreadResumeResponse> {
+    await this.ensureInitialized();
+    return this.rpc('thread/resume', params, 120_000);
+  }
+
+  /** Existence/diagnostics only; canonical transcript stays host-owned. */
+  async threadRead(threadId: string): Promise<import('./codexProtocol').ThreadReadResponse> {
+    await this.ensureInitialized();
+    return this.rpc('thread/read', { threadId, includeTurns: false });
+  }
+
   /**
    * Build a diagnostics snapshot for thread/start timeouts. Includes the
    * resolved binary path, runtime source (bundled/system), arch, and the
@@ -194,7 +206,8 @@ export class CodexAppServer extends EventEmitter {
     message: string,
     model?: string,
     imageDataUrls?: string[],
-    collaborationMode?: CollaborationMode | null
+    collaborationMode?: CollaborationMode | null,
+    effort?: string,
   ): Promise<TurnStartResponse> {
     await this.ensureInitialized();
     const input: UserInput[] = [{
@@ -211,6 +224,7 @@ export class CodexAppServer extends EventEmitter {
       threadId,
       input,
       model: model || null,
+      ...(effort ? { effort } : {}),
       collaborationMode: collaborationMode ?? null,
     });
   }

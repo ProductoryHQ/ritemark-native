@@ -2,11 +2,14 @@
 #
 # apply-patches.sh - Apply all RiteMark patches to VS Code submodule
 #
-# Usage: ./scripts/apply-patches.sh [--dry-run] [--reverse]
+# Usage: ./scripts/apply-patches.sh [--dry-run] [--reverse] [--extension-layout auto|absent]
 #
 # Options:
 #   --dry-run   Check if patches apply cleanly without actually applying
 #   --reverse   Remove patches (unapply)
+#   --extension-layout absent
+#               Keep vscode/extensions/ritemark absent and bind that exact
+#               shell-build state into release provenance (Windows CI only)
 #
 set -e
 
@@ -24,16 +27,39 @@ NC='\033[0m' # No Color
 # Parse arguments
 DRY_RUN=false
 REVERSE=false
-for arg in "$@"; do
-    case $arg in
+EXTENSION_LAYOUT=auto
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         --dry-run)
             DRY_RUN=true
+            shift
             ;;
         --reverse)
             REVERSE=true
+            shift
+            ;;
+        --extension-layout)
+            if [ "$#" -lt 2 ]; then
+                echo -e "${RED}Error: --extension-layout requires auto or absent${NC}" >&2
+                exit 2
+            fi
+            EXTENSION_LAYOUT="$2"
+            shift 2
+            ;;
+        *)
+            echo -e "${RED}Error: unknown argument: $1${NC}" >&2
+            exit 2
             ;;
     esac
 done
+
+case "$EXTENSION_LAYOUT" in
+    auto|absent) ;;
+    *)
+        echo -e "${RED}Error: --extension-layout must be auto or absent${NC}" >&2
+        exit 2
+        ;;
+esac
 
 # Check directories exist
 if [ ! -d "$PATCHES_DIR" ]; then
@@ -43,6 +69,12 @@ fi
 
 if [ ! -d "$VSCODE_DIR" ]; then
     echo -e "${RED}Error: VS Code directory not found at $VSCODE_DIR${NC}"
+    exit 1
+fi
+
+if [ "$EXTENSION_LAYOUT" = "absent" ] && \
+   { [ -e "$VSCODE_DIR/extensions/ritemark" ] || [ -L "$VSCODE_DIR/extensions/ritemark" ]; }; then
+    echo -e "${RED}Error: extension must already be staged outside VS Code for absent layout${NC}" >&2
     exit 1
 fi
 
@@ -70,6 +102,18 @@ cd "$VSCODE_DIR"
 APPLIED=0
 FAILED=0
 SKIPPED=0
+DRY_RUN_INDEX=""
+
+if [ "$DRY_RUN" = true ]; then
+    # Validate the canonical stack sequentially against HEAD without touching
+    # the worktree. Checking every patch independently is incorrect when a
+    # later patch intentionally builds on an earlier patch's hunk. A temporary
+    # index also avoids Windows CRLF conversion affecting patch validation.
+    DRY_RUN_INDEX="$(mktemp -t ritemark-patch-index.XXXXXX)"
+    rm -f "$DRY_RUN_INDEX"
+    GIT_INDEX_FILE="$DRY_RUN_INDEX" git read-tree HEAD
+    trap 'rm -f "$DRY_RUN_INDEX"' EXIT
+fi
 
 patch_paths() {
     awk '
@@ -125,15 +169,9 @@ for patch_index in "${!PATCHES[@]}"; do
 
     if [ "$DRY_RUN" = true ]; then
         echo -n "Checking $PATCH_NAME... "
-        if git apply --check "$patch" 2>/dev/null; then
+        if GIT_INDEX_FILE="$DRY_RUN_INDEX" git apply --cached "$patch" 2>/dev/null; then
             echo -e "${GREEN}OK (can apply)${NC}"
             APPLIED=$((APPLIED + 1))
-        elif git apply --check --reverse "$patch" 2>/dev/null; then
-            echo -e "${YELLOW}Already applied${NC}"
-            SKIPPED=$((SKIPPED + 1))
-        elif reverse_later_patches_then_check_current "$patch_index" "$patch"; then
-            echo -e "${YELLOW}Already applied (overlapped by later patch)${NC}"
-            SKIPPED=$((SKIPPED + 1))
         else
             echo -e "${RED}CONFLICT${NC}"
             FAILED=$((FAILED + 1))
@@ -154,6 +192,12 @@ for patch_index in "${!PATCHES[@]}"; do
         echo -n "Applying $PATCH_NAME... "
         if git apply --check --reverse "$patch" 2>/dev/null; then
             echo -e "${YELLOW}Already applied (skipping)${NC}"
+            SKIPPED=$((SKIPPED + 1))
+        elif reverse_later_patches_then_check_current "$patch_index" "$patch"; then
+            # Patches that create new files are not always reversible directly
+            # in a dirty submodule because those files are intentionally not in
+            # the Git index. Verify their exact content in an isolated tree.
+            echo -e "${YELLOW}Already applied (content verified)${NC}"
             SKIPPED=$((SKIPPED + 1))
         elif git apply "$patch" 2>/dev/null; then
             echo -e "${GREEN}Done${NC}"
@@ -188,6 +232,11 @@ echo "========================================"
 
 if [ $FAILED -gt 0 ]; then
     exit 1
+fi
+
+if [ -n "$DRY_RUN_INDEX" ]; then
+    rm -f "$DRY_RUN_INDEX"
+    trap - EXIT
 fi
 
 # Copy branding assets (only when applying, not reversing or dry-run)
@@ -247,6 +296,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"
     PHOSPHOR_FONT_SRC="$VSCODE_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
+    PHOSPHOR_FONT_DEST="$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
     if [ ! -f "$PHOSPHOR_FONT_SRC" ]; then
         PHOSPHOR_FONT_SRC="$ROOT_DIR/extensions/ritemark/node_modules/@phosphor-icons/web/src/regular/Phosphor.woff2"
     fi
@@ -263,11 +313,14 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     if [ -f "$PHOSPHOR_FONT_SRC" ]; then
         echo -n "Copying Phosphor 400 (Regular) icon font... "
-        mkdir -p "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon"
-        cp "$PHOSPHOR_FONT_SRC" "$VSCODE_DIR/src/vs/base/browser/ui/codicons/codicon/phosphor.woff2"
+        mkdir -p "$(dirname "$PHOSPHOR_FONT_DEST")"
+        cp "$PHOSPHOR_FONT_SRC" "$PHOSPHOR_FONT_DEST"
         echo -e "${GREEN}Done${NC}"
+    elif [ -s "$PHOSPHOR_FONT_DEST" ]; then
+        echo "Phosphor 400 icon font was preserved before dependency pruning"
     else
-        echo -e "${YELLOW}Phosphor 400 font file missing; skipping icon font copy${NC}"
+        echo -e "${RED}Error: required Phosphor 400 font is missing${NC}" >&2
+        exit 1
     fi
 
     # Copy product.json if it exists (for branding)
@@ -281,7 +334,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     echo ""
     echo "========================================"
-    echo "Ensuring Extension Link"
+    echo "Ensuring Extension Layout"
     echo "========================================"
 
     EXTENSION_LINK="$VSCODE_DIR/extensions/ritemark"
@@ -289,7 +342,13 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     mkdir -p "$VSCODE_DIR/extensions"
 
-    if [ ! -e "$EXTENSION_LINK" ]; then
+    if [ "$EXTENSION_LAYOUT" = "absent" ]; then
+        if [ -e "$EXTENSION_LINK" ] || [ -L "$EXTENSION_LINK" ]; then
+            echo -e "${RED}Error: extension must already be staged outside VS Code for absent layout${NC}" >&2
+            exit 1
+        fi
+        echo "Extension remains absent for the staged Windows shell build"
+    elif [ ! -e "$EXTENSION_LINK" ]; then
         echo -n "Creating extension symlink... "
         ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
         echo -e "${GREEN}Done${NC}"
@@ -308,4 +367,11 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
     fi
 
     echo "========================================"
+
+    # Record the exact derived VS Code diff in the per-worktree Git metadata.
+    # Hygiene may later remove a merged worktree only while this fingerprint
+    # still matches; any manual VS Code edit invalidates the marker.
+    node "$ROOT_DIR/scripts/vscode-derived-state.mjs" --write --repo "$ROOT_DIR"
+elif [ "$DRY_RUN" = false ] && [ "$REVERSE" = true ]; then
+    node "$ROOT_DIR/scripts/vscode-derived-state.mjs" --clear --repo "$ROOT_DIR"
 fi

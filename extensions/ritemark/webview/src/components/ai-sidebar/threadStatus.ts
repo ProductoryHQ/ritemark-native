@@ -168,10 +168,6 @@ export function deriveThreadTitle(conversation: ConversationState): string {
  * idle (Resolved Gap 4): closing it would silently discard something the user
  * has already written, so the affordance is withheld until the queue drains.
  */
-export function canCloseThread(status: ThreadStatus, hasQueuedPrompt: boolean): boolean {
-  return status === 'idle' && !hasQueuedPrompt;
-}
-
 /** Hover tooltip copy: "<title> — <status>" (design.md §4). */
 export function threadTooltip(title: string, status: ThreadStatus, hasQueuedPrompt: boolean): string {
   const label =
@@ -180,41 +176,4 @@ export function threadTooltip(title: string, status: ThreadStatus, hasQueuedProm
     : hasQueuedPrompt ? 'prompt queued'
     : 'idle';
   return `${title} — ${label}`;
-}
-
-// ── Soft cap (R11 + Resolved Gaps 2 and 3) ───────────────────────────────
-
-/** Advisory limit on open threads. Not a hard block — see {@link evaluateSoftCap}. */
-export const SOFT_THREAD_CAP = 5;
-
-export interface CapCandidate {
-  id: string;
-  title: string;
-  status: ThreadStatus;
-  hasQueuedPrompt: boolean;
-}
-
-export interface CapEvaluation {
-  /** The open set is at or over the cap, so opening one more needs a prompt. */
-  atCap: boolean;
-  /** Idle threads the user could close to make room, in rail order. */
-  closable: CapCandidate[];
-  /**
-   * At the cap with nothing idle to close. The cap stays advisory (Resolved
-   * Gap 2): we explain the cost and let the user open the thread anyway rather
-   * than telling them they cannot start work because their work is running.
-   */
-  allowAnyway: boolean;
-}
-
-/**
- * Decide what pressing "+" (or reopening from History — Resolved Gap 3 applies
- * the same rule) should do given the current open set.
- */
-export function evaluateSoftCap(candidates: CapCandidate[]): CapEvaluation {
-  if (candidates.length < SOFT_THREAD_CAP) {
-    return { atCap: false, closable: [], allowAnyway: false };
-  }
-  const closable = candidates.filter((c) => canCloseThread(c.status, c.hasQueuedPrompt));
-  return { atCap: true, closable, allowAnyway: closable.length === 0 };
 }

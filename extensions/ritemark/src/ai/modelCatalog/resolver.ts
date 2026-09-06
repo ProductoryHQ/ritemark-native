@@ -54,7 +54,11 @@ function resolveProvider(
   const remotePC = remote?.providers[provider] ?? null;
   const cachePC = cache?.providers[provider] ?? null;
   const bundledPC = bundled.providers[provider] ?? null;
-  const bestCatalog = remotePC ?? cachePC ?? bundledPC; // curated metadata + defaults
+  // A structurally valid but empty provider is not a usable catalog source. It
+  // must not erase the compiled offline floor and leave a picker with no rows.
+  const usableRemotePC = remotePC && remotePC.models.length > 0 ? remotePC : null;
+  const usableCachePC = cachePC && cachePC.models.length > 0 ? cachePC : null;
+  const bestCatalog = usableRemotePC ?? usableCachePC ?? bundledPC; // curated metadata + defaults
 
   const live = discovery[provider];
 
@@ -64,16 +68,16 @@ function resolveProvider(
 
   if (live && live.length > 0) {
     source = 'live';
-    models = enrichLive(live, bestCatalog);
+    models = enrichLive(live, bestCatalog, bundledPC);
     defaults = bestCatalog?.defaults ?? {};
-  } else if (remotePC) {
+  } else if (usableRemotePC) {
     source = 'remote';
-    models = remotePC.models;
-    defaults = remotePC.defaults;
-  } else if (cachePC) {
+    models = enrichCatalogCapabilities(usableRemotePC.models, bundledPC);
+    defaults = usableRemotePC.defaults;
+  } else if (usableCachePC) {
     source = 'cache';
-    models = cachePC.models;
-    defaults = cachePC.defaults;
+    models = enrichCatalogCapabilities(usableCachePC.models, bundledPC);
+    defaults = usableCachePC.defaults;
   } else if (bundledPC) {
     source = 'bundled';
     models = bundledPC.models;
@@ -84,9 +88,96 @@ function resolveProvider(
     defaults = {};
   }
 
-  const filtered = models.filter((m) => allowedByAppVersion(m, appVersion));
-  const sorted = [...filtered].sort((a, b) => a.order - b.order);
+  // Public resolver invariant: a newer source may add/remove models and replace
+  // presentation metadata, but it cannot accidentally erase an exact-pin
+  // capability that this build knows how to implement.
+  const filtered = enrichCatalogCapabilities(models, bundledPC)
+    .filter((m) => allowedByAppVersion(m, appVersion));
+  const canonical = source === 'live' ? canonicalizeModelAliases(filtered) : filtered;
+  let sorted = [...canonical].sort((a, b) => a.order - b.order);
+  // A higher-priority source can contain only future-gated rows. Preserve the
+  // selectable-provider invariant with models this exact build ships and knows.
+  if (sorted.length === 0 && bundledPC) {
+    sorted = bundledPC.models
+      .filter((model) => allowedByAppVersion(model, appVersion))
+      .sort((a, b) => a.order - b.order);
+    if (sorted.length > 0) {
+      source = 'bundled';
+      defaults = bundledPC.defaults;
+    }
+  }
   return { models: sorted, defaults, source };
+}
+
+/**
+ * Collapse live request aliases only when the provider reports the exact same
+ * resolved identity. Labels are never used as identity: two similarly named
+ * models must remain distinct unless the runtime explicitly equates them.
+ */
+export function canonicalizeModelAliases(models: ModelEntry[]): ModelEntry[] {
+  const groups = new Map<string, ModelEntry[]>();
+  const order: string[] = [];
+
+  for (const model of models) {
+    const key = model.resolvedModel ? `resolved:${model.resolvedModel}` : `id:${model.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(model);
+    } else {
+      groups.set(key, [model]);
+      order.push(key);
+    }
+  }
+
+  return order.map((key) => {
+    const group = groups.get(key)!;
+    if (group.length === 1 && group[0].id !== 'default') return group[0];
+
+    const representative = group.find((model) => model.id !== 'default') ?? group[0];
+    const aliases = group
+      .map((model) => model.id)
+      .filter((id) => id !== representative.id);
+    const fallbackEffort = group.find((model) => model.thinkingEffort)?.thinkingEffort;
+
+    return {
+      ...representative,
+      order: Math.min(...group.map((model) => model.order)),
+      ...(representative.resolvedModel ? { resolvedModel: representative.resolvedModel } : {}),
+      ...(aliases.length > 0 ? { aliases } : {}),
+      ...(group.some((model) => model.id === 'default') ? { isDefault: true } : {}),
+      ...(representative.thinkingEffort || !fallbackEffort
+        ? {}
+        : { thinkingEffort: fallbackEffort }),
+    };
+  });
+}
+
+/** Find a resolved picker row by its representative id or a retained alias. */
+export function findModelEntry(models: ModelEntry[], id: string | undefined): ModelEntry | undefined {
+  if (!id) return undefined;
+  return models.find((model) => (
+    model.id === id
+    || model.resolvedModel === id
+    || model.aliases?.includes(id)
+  ));
+}
+
+/**
+ * Remote/cache catalogs can predate a capability field added by the shipping
+ * app. Preserve their provider-cadence model set and labels, but use the exact-
+ * pin bundled metadata as a floor for a known model. A remote capability, when
+ * present, remains authoritative.
+ */
+function enrichCatalogCapabilities(
+  models: ModelEntry[],
+  bundled: ProviderCatalog | null,
+): ModelEntry[] {
+  if (!bundled) return models;
+  const bundledById = new Map(bundled.models.map((model) => [model.id, model]));
+  return models.map((model) => ({
+    ...model,
+    thinkingEffort: model.thinkingEffort ?? bundledById.get(model.id)?.thinkingEffort,
+  }));
 }
 
 /**
@@ -98,12 +189,28 @@ function resolveProvider(
  *    appended, so a user who still has one selected sees it (flagged) rather than
  *    getting a silent reset (spec R2).
  */
-function enrichLive(live: ModelEntry[], catalog: ProviderCatalog | null): ModelEntry[] {
-  if (!catalog) return live;
-  const curatedById = new Map(catalog.models.map((m) => [m.id, m]));
+function enrichLive(
+  live: ModelEntry[],
+  catalog: ProviderCatalog | null,
+  bundled: ProviderCatalog | null,
+): ModelEntry[] {
+  if (!catalog && !bundled) return live;
+  const curatedById = new Map((catalog?.models ?? []).map((m) => [m.id, m]));
+  const bundledById = new Map((bundled?.models ?? []).map((m) => [m.id, m]));
   const liveIds = new Set(live.map((m) => m.id));
-  const enriched = live.map((m) => curatedById.get(m.id) ?? m);
-  const deprecatedExtras = catalog.models.filter((m) => m.deprecated && !liveIds.has(m.id));
+  const enriched = live.map((m) => {
+    const curated = curatedById.get(m.id);
+    const bundledEntry = bundledById.get(m.id);
+    if (!curated && !bundledEntry) return m;
+    return {
+      ...m,
+      ...curated,
+      // Live protocol metadata wins. A remote catalog may predate this field,
+      // so the exact-pin bundled capability remains the final offline floor.
+      thinkingEffort: m.thinkingEffort ?? curated?.thinkingEffort ?? bundledEntry?.thinkingEffort,
+    };
+  });
+  const deprecatedExtras = (catalog?.models ?? []).filter((m) => m.deprecated && !liveIds.has(m.id));
   return [...enriched, ...deprecatedExtras];
 }
 

@@ -8,6 +8,7 @@
 import type { AgentId, AgentConversationTurn, CodexConversationTurn, ChatMessage, ConversationEntry } from './types';
 import type { RuntimeId, ConversationRun } from './conversationModel';
 import { truncateThreadTitle } from './threadStatus';
+import type { LegacyConversationCandidateV1 } from '../../../../src/conversations/LegacyConversationMigrator';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -63,10 +64,20 @@ const MAX_CONVERSATIONS = 50;
 // ── v2 rollout guard ──────────────────────────────────────────────────
 
 let _v2StorageEnabled = false;
+let _legacyStorageReadOnly = false;
 
 /** Enable v2 conversation record writes. Off by default — flip after testing. */
 export function enableV2Storage(): void {
   _v2StorageEnabled = true;
+}
+
+/**
+ * Monotonic Sprint 109 cutover guard. Once the host owns conversations, this
+ * adapter remains available for migration/rollback reads but cannot create a
+ * second writable source of truth.
+ */
+export function setLegacyStorageReadOnly(readOnly: boolean): void {
+  _legacyStorageReadOnly = _legacyStorageReadOnly || readOnly;
 }
 
 // ── Metadata normalization ────────────────────────────────────────────
@@ -104,6 +115,7 @@ export function normalizeMetadata(raw: SavedConversation | SavedConversationV2):
 // ── Workspace scoping ────────────────────────────────────────────────
 
 let _workspacePath: string | undefined;
+let _legacyStorageScope: 'workspace' | 'global' = 'workspace';
 
 /**
  * Simple hash of workspace path for localStorage key scoping.
@@ -120,7 +132,7 @@ function hashWorkspacePath(path: string): string {
 }
 
 function getStoragePrefix(): string {
-  if (_workspacePath) {
+  if (_workspacePath && _legacyStorageScope === 'workspace') {
     return `${GLOBAL_PREFIX}${hashWorkspacePath(_workspacePath)}-`;
   }
   return GLOBAL_PREFIX;
@@ -131,73 +143,45 @@ function getMetadataKey(): string {
 }
 
 /**
- * Set the workspace path for per-project history scoping.
- * Called once when the webview receives workspace info from the extension.
- * Automatically migrates legacy global conversations on first use.
+ * Set the workspace path for per-project history scoping. This critical
+ * bootstrap operation is intentionally side-effect-free; the host rollout
+ * result decides later whether legacy storage is authoritative at all.
  */
 export function setWorkspaceContext(workspacePath: string | undefined): void {
+  if (_workspacePath === workspacePath) return;
   _workspacePath = workspacePath;
-  if (workspacePath) {
-    migrateGlobalConversations();
-  }
+  _legacyStorageScope = workspacePath ? 'workspace' : 'global';
 }
 
-const MIGRATION_DONE_KEY = 'ritemark-chat-migrated';
-
 /**
- * One-time migration: copy conversations from the old global prefix
- * into the current workspace-scoped prefix.
+ * Select the existing legacy authority after the host has explicitly kept the
+ * webview in pre-cutover legacy mode. This is deliberately read-only: copying
+ * full records during bootstrap can temporarily double storage and exhaust the
+ * webview quota. Existing scoped data wins; otherwise an existing global store
+ * remains readable/writable for rollback compatibility. A brand-new store uses
+ * workspace scope.
  */
-function migrateGlobalConversations(): void {
-  const scopedMetaKey = getMetadataKey();
-
-  // Skip if this workspace already has data or was already migrated
-  const alreadyMigrated = localStorage.getItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`) === '1';
-  if (alreadyMigrated) return;
-
-  const existingScoped = localStorage.getItem(scopedMetaKey);
-  if (existingScoped) {
-    // Already has workspace-scoped data — mark done and skip
-    localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-    return;
+export function selectLegacyStorageScope(): 'workspace' | 'global' {
+  if (_legacyStorageReadOnly || !_workspacePath) {
+    _legacyStorageScope = _workspacePath ? 'workspace' : 'global';
+    return _legacyStorageScope;
   }
-
-  // Read old global metadata
-  const globalMetaKey = `${GLOBAL_PREFIX}metadata`;
-  const globalRaw = localStorage.getItem(globalMetaKey);
-  if (!globalRaw) {
-    localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-    return;
-  }
-
   try {
-    const globalMeta = JSON.parse(globalRaw) as (SavedConversation | SavedConversationV2)[];
-    if (globalMeta.length === 0) {
-      localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
-      return;
+    const scopedMetadataKey = `${GLOBAL_PREFIX}${hashWorkspacePath(_workspacePath)}-metadata`;
+    if (localStorage.getItem(scopedMetadataKey)) {
+      _legacyStorageScope = 'workspace';
+    } else if (localStorage.getItem(`${GLOBAL_PREFIX}metadata`)) {
+      _legacyStorageScope = 'global';
+    } else {
+      _legacyStorageScope = 'workspace';
     }
-
-    // Copy each conversation to workspace-scoped keys
-    const migratedMeta: SavedConversationV2[] = [];
-    for (const meta of globalMeta) {
-      const oldKey = `${GLOBAL_PREFIX}${meta.id}`;
-      const data = localStorage.getItem(oldKey);
-      if (data) {
-        localStorage.setItem(getConversationKey(meta.id), data);
-        migratedMeta.push(normalizeMetadata(meta));
-      }
-    }
-
-    // Save workspace-scoped metadata
-    if (migratedMeta.length > 0) {
-      localStorage.setItem(scopedMetaKey, JSON.stringify(migratedMeta));
-      console.log(`[chatHistoryStorage] Migrated ${migratedMeta.length} conversations to workspace scope`);
-    }
-  } catch (err) {
-    console.warn('[chatHistoryStorage] Migration failed:', err);
+  } catch (error) {
+    // Storage availability is optional UI state. Keep a deterministic scope and
+    // let the existing guarded read helpers surface an empty legacy list.
+    _legacyStorageScope = 'workspace';
+    console.warn('[chatHistoryStorage] Could not select legacy storage scope:', error);
   }
-
-  localStorage.setItem(`${MIGRATION_DONE_KEY}-${hashWorkspacePath(_workspacePath!)}`, '1');
+  return _legacyStorageScope;
 }
 
 // ── Storage Functions ─────────────────────────────────────────────────
@@ -206,7 +190,12 @@ function migrateGlobalConversations(): void {
  * Generate a unique conversation ID
  */
 export function generateId(): string {
-  return `conv-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  // RFC 4122 v4 fallback for older embedded webviews.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (token) => {
+    const value = Math.floor(Math.random() * 16);
+    return (token === 'x' ? value : (value & 0x3) | 0x8).toString(16);
+  });
 }
 
 /**
@@ -214,6 +203,67 @@ export function generateId(): string {
  */
 function getConversationKey(id: string): string {
   return `${getStoragePrefix()}${id}`;
+}
+
+/** Read-only inventory handed to the host migrator after canonical cutover. */
+export function discoverLegacyConversationCandidates(): LegacyConversationCandidateV1[] {
+  const candidates: LegacyConversationCandidateV1[] = [];
+  const seen = new Set<string>();
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const metadataKey = localStorage.key(index);
+      if (!metadataKey?.startsWith(GLOBAL_PREFIX) || !metadataKey.endsWith('metadata')) continue;
+      try {
+        const raw = localStorage.getItem(metadataKey);
+        const metadata = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(metadata)) continue;
+        const prefix = metadataKey.slice(0, -'metadata'.length);
+        for (const value of metadata) {
+          if (!value || typeof value !== 'object') continue;
+          const meta = value as Record<string, unknown>;
+          if (typeof meta.id !== 'string') continue;
+          const sourceKey = `${prefix}${meta.id}`;
+          if (seen.has(sourceKey)) continue;
+          try {
+            const sourceRaw = localStorage.getItem(sourceKey);
+            if (!sourceRaw) continue;
+            const data = JSON.parse(sourceRaw);
+            seen.add(sourceKey);
+            candidates.push({
+              sourceKey,
+              sourceId: meta.id,
+              ...(typeof meta.title === 'string' ? { title: meta.title } : {}),
+              ...(typeof meta.agentId === 'string' ? { agentId: meta.agentId } : {}),
+              ...(typeof meta.createdAt === 'number' ? { createdAt: meta.createdAt } : {}),
+              ...(typeof meta.updatedAt === 'number' ? { updatedAt: meta.updatedAt } : {}),
+              data,
+            });
+          } catch (error) {
+            console.warn('[chatHistoryStorage] Skipped malformed legacy record:', sourceKey, error);
+          }
+        }
+      } catch (error) {
+        console.warn('[chatHistoryStorage] Skipped malformed legacy inventory:', metadataKey, error);
+      }
+    }
+  } catch (error) {
+    console.warn('[chatHistoryStorage] Legacy inventory unavailable:', error);
+  }
+  return candidates;
+}
+
+/** Keep each bridge message within the host protocol's bounded import limit. */
+export function buildLegacyMigrationBatches(
+  candidates: readonly LegacyConversationCandidateV1[],
+  batchSize = 100,
+): LegacyConversationCandidateV1[][] {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1) throw new Error('batchSize must be a positive integer');
+  if (candidates.length === 0) return [[]];
+  const batches: LegacyConversationCandidateV1[][] = [];
+  for (let index = 0; index < candidates.length; index += batchSize) {
+    batches.push(candidates.slice(index, index + batchSize));
+  }
+  return batches;
 }
 
 /**
@@ -235,6 +285,7 @@ export function loadMetadata(): SavedConversationV2[] {
  * Save metadata list to localStorage
  */
 function saveMetadata(list: SavedConversationV2[]): void {
+  if (_legacyStorageReadOnly) return;
   try {
     localStorage.setItem(getMetadataKey(), JSON.stringify(list));
   } catch (err) {
@@ -267,6 +318,7 @@ export function loadConversation(id: string): SavedConversationData | null {
  * Save a conversation (creates or updates)
  */
 export function saveConversation(data: SavedConversationData): void {
+  if (_legacyStorageReadOnly) return;
   try {
     const key = getConversationKey(data.id);
     localStorage.setItem(key, JSON.stringify(data));
@@ -318,6 +370,7 @@ export function saveConversation(data: SavedConversationData): void {
  * Delete a conversation
  */
 export function deleteConversation(id: string): void {
+  if (_legacyStorageReadOnly) return;
   deleteConversationData(id);
 
   const metadata = loadMetadata();
@@ -329,6 +382,7 @@ export function deleteConversation(id: string): void {
  * Delete only the conversation data (not metadata)
  */
 function deleteConversationData(id: string): void {
+  if (_legacyStorageReadOnly) return;
   try {
     localStorage.removeItem(getConversationKey(id));
   } catch (err) {
@@ -340,6 +394,7 @@ function deleteConversationData(id: string): void {
  * Clean up old conversations to free space
  */
 function cleanupOldConversations(): void {
+  if (_legacyStorageReadOnly) return;
   const metadata = loadMetadata();
   if (metadata.length > MAX_CONVERSATIONS / 2) {
     // Remove oldest half
@@ -389,47 +444,12 @@ export function hasHistory(): boolean {
   return loadMetadata().length > 0;
 }
 
-// ── Open-thread set (Sprint 99 R13 / E7) ──────────────────────────────
-
-/**
- * Which conversations were on the rail, per workspace.
- *
- * Transcripts already persist per conversation id under this same prefix; the
- * only thing missing for R13 was *which* of them were open. This is deliberately
- * a list of ids and nothing else — titles, runtime bindings and turns all come
- * back from the conversation records themselves, so the two can never disagree.
- */
-function getOpenThreadsKey(): string {
-  return `${getStoragePrefix()}open-threads`;
-}
-
-export function saveOpenThreadIds(ids: readonly string[]): void {
-  try {
-    localStorage.setItem(getOpenThreadsKey(), JSON.stringify(ids));
-  } catch (err) {
-    console.warn('[chatHistoryStorage] Failed to save open threads:', err);
-  }
-}
-
-export function loadOpenThreadIds(): string[] {
-  try {
-    const raw = localStorage.getItem(getOpenThreadsKey());
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((id): id is string => typeof id === 'string');
-  } catch (err) {
-    console.warn('[chatHistoryStorage] Failed to load open threads:', err);
-    return [];
-  }
-}
-
 /**
  * Save a v2 conversation record. No-op unless enableV2Storage() has been called.
  * Preserves old fields in the record so a downgrade can still read it.
  */
 export function saveConversationV2(data: SavedConversationDataV2): void {
-  if (!_v2StorageEnabled) return;
+  if (!_v2StorageEnabled || _legacyStorageReadOnly) return;
   try {
     const key = getConversationKey(data.id);
     localStorage.setItem(key, JSON.stringify(data));

@@ -1,0 +1,31 @@
+{
+  "capturedAt": "2026-08-24T08:01:41.181Z",
+  "pins": {
+    "codexAppServer": "0.149.0",
+    "claudeCode": "2.1.239",
+    "claudeAgentSdk": "0.3.239",
+    "opencode": "1.18.21",
+    "acpSdk": "1.4.0"
+  },
+  "codex": [
+    { "id": "gpt-5.6-sol", "displayName": "GPT-5.6-Sol", "isDefault": true, "defaultReasoningEffort": "low", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh", "max", "ultra"] },
+    { "id": "gpt-5.6-terra", "displayName": "GPT-5.6-Terra", "isDefault": false, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh", "max", "ultra"] },
+    { "id": "gpt-5.6-luna", "displayName": "GPT-5.6-Luna", "isDefault": false, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh", "max"] },
+    { "id": "gpt-5.5", "displayName": "GPT-5.5", "isDefault": false, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh"] },
+    { "id": "gpt-5.4", "displayName": "GPT-5.4", "isDefault": false, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh"] },
+    { "id": "gpt-5.4-mini", "displayName": "GPT-5.4-Mini", "isDefault": false, "defaultReasoningEffort": "medium", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh"] },
+    { "id": "gpt-5.3-codex-spark", "displayName": "GPT-5.3-Codex-Spark", "isDefault": false, "defaultReasoningEffort": "high", "supportedReasoningEfforts": ["low", "medium", "high", "xhigh"] }
+  ],
+  "claude": [
+    { "id": "default", "resolvedModel": "claude-opus-4-8[1m]", "displayName": "Default (recommended)", "supportsEffort": true, "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"], "supportsAdaptiveThinking": true },
+    { "id": "opus[1m]", "resolvedModel": "claude-opus-4-8[1m]", "displayName": "Opus", "supportsEffort": true, "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"], "supportsAdaptiveThinking": true },
+    { "id": "claude-fable-5[1m]", "resolvedModel": "claude-fable-5", "displayName": "Fable", "supportsEffort": true, "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"], "supportsAdaptiveThinking": true },
+    { "id": "sonnet", "resolvedModel": "claude-sonnet-5", "displayName": "Sonnet", "supportsEffort": true, "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"], "supportsAdaptiveThinking": true },
+    { "id": "haiku", "resolvedModel": "claude-haiku-4-5-20251001", "displayName": "Haiku", "supportsEffort": false, "supportedEffortLevels": [], "supportsAdaptiveThinking": false }
+  ],
+  "opencodeEvidence": {
+    "source": "../../sprint-111-agent-runtime-refresh/research/runtime-version-audit.md",
+    "defaultModel": { "id": "opencode/big-pickle", "thoughtLevelOption": null },
+    "effortCapableCanary": { "category": "thought_level", "observedOptionId": "effort", "values": ["low", "medium", "high"], "setAcknowledgedBeforePrompt": true }
+  }
+}

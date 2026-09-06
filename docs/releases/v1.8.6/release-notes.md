@@ -49,10 +49,16 @@ breathing room; Sofia Sans in every corner.
 
 ## Fixes
 
+- The "Offline — AI features require internet connection" banner no longer flickers on a healthy connection: connectivity now races several independent endpoints (any response counts) and only two consecutive failed rounds mean offline — recovery is instant
 - Finder no longer shows "Ritemark.app (1.117.0)" — the bundle carries the real Ritemark version
 - Chat links to workspace files (including `README.md:12` style) open in Ritemark
 - The AI info banner shows until dismissed, then never again — verified across restarts
 - Comment task prompts keep cross-agent references intact
+
+## Known issues
+
+- **Recent documents in very large folders.** Home's recent-documents list picks from the first 200 markdown files the workspace scan returns, then sorts those by modification time — so in a folder with more than 200 markdown files the newest files can be missing entirely. Fix tracked in [issue #194](https://github.com/ProductoryHQ/ritemark-native/issues/194).
+- **Browser "Recent" only records pages opened by command.** Pages you navigate to inside the browser panel (address bar, link clicks) are not added to the list — only pages opened via "Open in integrated browser", an agent action, or a terminal link. Fix tracked in [issue #195](https://github.com/ProductoryHQ/ritemark-native/issues/195).
 
 ## For the record
 

@@ -16,10 +16,26 @@
  * provider this build doesn't know must not break the whole fetch).
  */
 
+import {
+  isExplicitThinkingEffort,
+  type ExplicitThinkingEffort,
+} from '../../runtime/thinkingEffort';
+
+export interface ModelThinkingEffort {
+  levels: ExplicitThinkingEffort[];
+  defaultLevel?: ExplicitThinkingEffort;
+}
+
 /** A single selectable model, as shown in a picker row. */
 export interface ModelEntry {
   /** Provider model id (bare, e.g. `claude-sonnet-5`; composite for opencode, e.g. `google/gemini-3.1-pro-preview`). */
   id: string;
+  /** Runtime-reported canonical identity for a live request alias. */
+  resolvedModel?: string;
+  /** Other request ids that the live runtime resolves to this same model. */
+  aliases?: string[];
+  /** The live runtime exposed `default` as an alias of this model. */
+  isDefault?: boolean;
   /** Short display label for the row. */
   label: string;
   /** One-line description (curated — the live `/v1/models` probe does not return this). */
@@ -32,6 +48,8 @@ export interface ModelEntry {
   order: number;
   /** Optional semver gate: entry is filtered out when the running app version is below this. */
   minAppVersion?: string;
+  /** Authoritative model-scoped manual effort levels; absent means Auto-only. */
+  thinkingEffort?: ModelThinkingEffort;
 }
 
 export type ModelTier = 'low' | 'medium' | 'high';
@@ -75,7 +93,7 @@ function fail(msg: string): never {
 
 function validateEntry(raw: unknown, where: string): ModelEntry {
   if (!isObject(raw)) fail(`${where} is not an object`);
-  const { id, label, description, tier, deprecated, order, minAppVersion } = raw;
+  const { id, label, description, tier, deprecated, order, minAppVersion, thinkingEffort } = raw;
   if (typeof id !== 'string' || id.length === 0) fail(`${where}.id must be a non-empty string`);
   if (typeof label !== 'string') fail(`${where}.label must be a string`);
   if (typeof description !== 'string') fail(`${where}.description must be a string`);
@@ -85,7 +103,30 @@ function validateEntry(raw: unknown, where: string): ModelEntry {
   if (minAppVersion !== undefined && typeof minAppVersion !== 'string') fail(`${where}.minAppVersion must be a string`);
   const entry: ModelEntry = { id, label, description, tier: tier as ModelTier, deprecated, order };
   if (minAppVersion !== undefined) entry.minAppVersion = minAppVersion;
+  if (thinkingEffort !== undefined) {
+    const effort = objectAtThinkingEffort(thinkingEffort, `${where}.thinkingEffort`);
+    entry.thinkingEffort = effort;
+  }
   return entry;
+}
+
+function objectAtThinkingEffort(value: unknown, where: string): ModelThinkingEffort {
+  if (!isObject(value)) fail(`${where} must be an object`);
+  if (!Array.isArray(value.levels) || !value.levels.every(isExplicitThinkingEffort)) {
+    fail(`${where}.levels must contain canonical explicit effort values`);
+  }
+  const levels = [...new Set(value.levels)] as ExplicitThinkingEffort[];
+  if (levels.length !== value.levels.length) fail(`${where}.levels must be deduplicated`);
+  if (value.defaultLevel !== undefined && !isExplicitThinkingEffort(value.defaultLevel)) {
+    fail(`${where}.defaultLevel must be a canonical explicit effort value`);
+  }
+  if (value.defaultLevel !== undefined && !levels.includes(value.defaultLevel)) {
+    fail(`${where}.defaultLevel must be included in levels`);
+  }
+  return {
+    levels,
+    ...(value.defaultLevel === undefined ? {} : { defaultLevel: value.defaultLevel }),
+  };
 }
 
 function validateProviderCatalog(raw: unknown, where: string): ProviderCatalog {

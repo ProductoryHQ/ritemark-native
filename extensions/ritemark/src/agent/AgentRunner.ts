@@ -23,10 +23,13 @@ import type {
   AgentResult,
   AgentMetrics,
   FileAttachment,
+  ModelOption,
   QueryHandle,
   SDKMessage,
   SubagentProgress,
 } from './types';
+import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import { standaloneClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
 
@@ -120,6 +123,55 @@ function isContextOverflowError(str: string): boolean {
   return CONTEXT_OVERFLOW_PATTERNS.some(p => lower.includes(p));
 }
 
+/**
+ * Claude CLI can emit an API failure as an assistant message and then close
+ * the turn with result.subtype="success". Capture the SDK's structured error
+ * marker before the generic assistant renderer can mistake its text for model
+ * output. This covers every structured API error, not only authentication.
+ */
+export function claudeSdkAssistantError(message: SDKMessage): string | undefined {
+  if (message.type !== 'assistant') return undefined;
+  const errorCode = typeof message.error === 'string' ? message.error.trim() : '';
+  if (message.isApiErrorMessage !== true && !errorCode) return undefined;
+  const text = message.message?.content
+    ?.filter((block) => block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text!.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  return text || errorCode || 'Claude could not complete the request.';
+}
+
+export function normalizeClaudeSdkSuccessResult(input: {
+  result?: string;
+  resultIsError?: boolean;
+  structuredAssistantError?: string;
+  sawRegularAssistant: boolean;
+}): { text: string; error?: string } {
+  const structuredError = input.structuredAssistantError?.trim();
+  if (input.resultIsError === true) {
+    return {
+      text: '',
+      error: input.result?.trim() || structuredError || 'Claude could not complete the request.',
+    };
+  }
+  // The terminal bit is authoritative when the SDK provides it. A structured
+  // API-error assistant frame may describe a transient retry that was followed
+  // by a successful final answer.
+  if (input.resultIsError === false) return { text: input.result || '' };
+  if (structuredError) return { text: '', error: structuredError };
+
+  // Defensive compatibility for SDK versions that drop the assistant event's
+  // structured flags. A normal assistant event suppresses this fallback, and
+  // the diagnostic matcher only accepts a short, standalone provider message.
+  const authError = input.sawRegularAssistant
+    ? undefined
+    : standaloneClaudeAuthenticationError(input.result);
+  return authError
+    ? { text: '', error: authError }
+    : { text: input.result || '' };
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 export const DEFAULT_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode'];
@@ -135,6 +187,21 @@ const MUTATING_TOOLS = new Set(['Bash', 'Write', 'Edit', 'NotebookEdit']);
  */
 const NEVER_AUTO_ALLOWED = new Set([...MUTATING_TOOLS, 'ExitPlanMode']);
 const DEFAULT_TIMEOUT_MINUTES = 15;
+
+/**
+ * Compare values from the same identity layer. Claude request aliases such as
+ * `default` are not expected to equal the canonical model reported at init.
+ */
+export function modelMatchesExpectedIdentity(
+  requestedModel: string | undefined,
+  expectedResolvedModel: string | undefined,
+  actualModel: string,
+): boolean {
+  if (!requestedModel || !actualModel) return true;
+  if (expectedResolvedModel) return actualModel === expectedResolvedModel;
+  return actualModel === requestedModel || actualModel.replace(/\[1m\]$/, '') === requestedModel;
+}
+
 // Sprint 103 R2/R4 (audit F4): no ExitPlanMode/plan-mode nudges outside plan
 // mode — the always-on reminder made Claude plan autonomously in Auto mode.
 // Plan-mode behavior now comes from the SDK's native plan mode +
@@ -243,9 +310,7 @@ function normalizeAgentQuestion(input: Record<string, unknown>, toolUseId: strin
 }
 
 function resolveSettingSources(settingSources?: AgentSettingSource[]): AgentSettingSource[] {
-  return settingSources && settingSources.length > 0
-    ? settingSources
-    : DEFAULT_SETTING_SOURCES;
+  return settingSources ?? DEFAULT_SETTING_SOURCES;
 }
 
 // ── One-shot execution (for Flows) ──────────────────────────────────
@@ -355,6 +420,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     });
 
     let resultText = '';
+    let structuredAssistantError: string | undefined;
+    let sawRegularAssistant = false;
 
     for await (const rawMessage of stream) {
       const message = rawMessage as SDKMessage;
@@ -377,7 +444,13 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       } else if (message.type === 'system' && message.subtype === 'compact_boundary') {
         emitProgress('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
       } else if (message.type === 'assistant') {
-        processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
+        const sdkError = claudeSdkAssistantError(message);
+        if (sdkError) {
+          structuredAssistantError = sdkError;
+        } else {
+          sawRegularAssistant = true;
+          processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
+        }
       } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
         processSystemMessage(message, emitProgress);
       } else if (message.type === 'result') {
@@ -385,7 +458,18 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         metrics.costUsd = message.total_cost_usd ?? null;
 
         if (message.subtype === 'success') {
-          resultText = message.result || '';
+          const normalized = normalizeClaudeSdkSuccessResult({
+            result: message.result,
+            resultIsError: message.is_error,
+            structuredAssistantError,
+            sawRegularAssistant,
+          });
+          if (normalized.error) {
+            emitProgress('error', normalized.error);
+            if (timeoutId) clearTimeout(timeoutId);
+            return { text: '', filesModified: [], metrics, error: normalized.error };
+          }
+          resultText = normalized.text;
           const durationStr = (metrics.durationMs / 1000).toFixed(1);
           emitProgress('done', `Completed in ${durationStr}s`);
         } else {
@@ -450,10 +534,13 @@ export class AgentSession {
   private _consumerTurnId = 0;   // Set by generator when it yields to SDK
   private _turnResolve: ((result: AgentResult) => void) | null = null;
   private _turnFilesModified: string[] = [];
+  private _turnStructuredAssistantError: string | undefined;
+  private _turnSawRegularAssistant = false;
   private _emitProgress: ExtendedProgressEmitter | null = null;
   private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
   private _emitPlanApproval: ((request: AgentPlanApprovalRequest) => void) | null = null;
   private _emitToolApproval: ((request: AgentToolApprovalRequest) => void) | null = null;
+  private _emitDispatchAccepted: (() => void) | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
   private _planModeActive = false;
@@ -484,11 +571,15 @@ export class AgentSession {
   // Config
   private readonly _workspacePath: string;
   private readonly _excludedFolders: string[];
+  private readonly _tools: string[] | undefined;
   private _allowedTools: string[];
   private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
+  private readonly _expectedResolvedModel: string | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
+  private readonly _resumeSessionId: string | undefined;
+  private readonly _onSessionCheckpoint: ((sessionId: string) => void) | undefined;
   private _mcpServers: Record<string, unknown> | undefined;
   private _extraSystemPromptAppend: string | undefined;
   /** Autonomy policy (Sprint 103 R1; mutable per turn via setApprovalMode). */
@@ -501,16 +592,20 @@ export class AgentSession {
   private _turnWaitedMs = 0;
 
   /** Called when SDK reports its available models (after session init) */
-  onModelsDiscovered: ((models: Array<{ id: string; label: string; description: string }>) => void) | null = null;
+  onModelsDiscovered: ((models: ModelOption[]) => void) | null = null;
 
   constructor(config: AgentSessionConfig) {
     this._workspacePath = config.workspacePath;
     this._excludedFolders = config.excludedFolders || DEFAULT_EXCLUDED_FOLDERS;
+    this._tools = config.tools;
     this._allowedTools = config.allowedTools || DEFAULT_TOOLS;
     this._settingSources = resolveSettingSources(config.settingSources);
     this._modelId = config.model;
+    this._expectedResolvedModel = config.expectedResolvedModel;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
+    this._resumeSessionId = config.resumeSessionId;
+    this._onSessionCheckpoint = config.onSessionCheckpoint;
     this._mcpServers = config.mcpServers;
     this._extraSystemPromptAppend = config.extraSystemPromptAppend;
     // Legacy 'plan' normalizes to auto + planFirst (Sprint 103 R1).
@@ -585,7 +680,19 @@ export class AgentSession {
    * subsequent calls feed into the existing warm process (~2-3s).
    */
   async sendMessage(options: AgentTurnOptions): Promise<AgentResult> {
-    const { prompt, attachments, activeFile, timeoutMinutes = DEFAULT_TIMEOUT_MINUTES, onProgress, onQuestion, onPlanApproval, onToolApproval } = options;
+    const {
+      prompt,
+      attachments,
+      activeFile,
+      timeoutMinutes = DEFAULT_TIMEOUT_MINUTES,
+      onProgress,
+      onQuestion,
+      onPlanApproval,
+      onToolApproval,
+      onDispatchAccepted,
+      thinkingEffort = 'auto',
+      onThinkingEffortApplied,
+    } = options;
 
     if (!prompt || prompt.trim() === '') {
       throw new Error('Agent prompt is empty');
@@ -626,6 +733,8 @@ export class AgentSession {
 
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
+    this._turnStructuredAssistantError = undefined;
+    this._turnSawRegularAssistant = false;
     this._turnWaitedMs = 0;
     // In a plan-first turn the whole phase is plan context (native plan mode);
     // otherwise plan state only activates on a model-initiated EnterPlanMode.
@@ -648,6 +757,7 @@ export class AgentSession {
     this._emitQuestion = onQuestion || null;
     this._emitPlanApproval = onPlanApproval || null;
     this._emitToolApproval = onToolApproval || null;
+    this._emitDispatchAccepted = onDispatchAccepted || null;
 
     const resultPromise = new Promise<AgentResult>((resolve) => {
       this._turnResolve = resolve;
@@ -659,9 +769,31 @@ export class AgentSession {
 
     if (!this._queryStream) {
       // First turn — start session with warm process
-      await this._startSession(userMsg);
+      await this._startSession(userMsg, thinkingEffort);
+      // The SDK accepted the flag, but only hook payloads expose a truthful
+      // post-downgrade level. Do not echo the requested value as provider fact.
+      onThinkingEffortApplied?.();
     } else {
       // Follow-up turn — feed into existing warm process
+      const applyFlagSettings = this._queryStream.applyFlagSettings;
+      let adjustedToAuto = false;
+      if (!applyFlagSettings) {
+        throw new Error('Claude runtime does not support changing thinking effort on a warm session');
+      } else {
+        try {
+          await applyFlagSettings.call(this._queryStream, {
+            effortLevel: thinkingEffort === 'auto' ? null : thinkingEffort,
+          });
+        } catch (error) {
+          if (thinkingEffort === 'auto') throw error;
+          // Account/model capability may change while a Claude session is warm.
+          // Reset to provider default before enqueueing instead of dropping the
+          // already accepted user turn.
+          await applyFlagSettings.call(this._queryStream, { effortLevel: null });
+          adjustedToAuto = true;
+        }
+      }
+      onThinkingEffortApplied?.(undefined, adjustedToAuto);
       this._emitProgress('init', `Continuing (${this._model || 'claude'})`);
       this._enqueueInput(userMsg);
     }
@@ -722,12 +854,24 @@ export class AgentSession {
     try {
       const qs = this._queryStream as any;
       if (qs && typeof qs.supportedModels === 'function') {
-        const models: Array<{ value: string; displayName: string; description: string }> = await qs.supportedModels();
+        const models: Array<{
+          value: string;
+          resolvedModel?: string;
+          displayName: string;
+          description: string;
+          supportsEffort?: boolean;
+          supportedEffortLevels?: ExplicitThinkingEffort[];
+          supportsAdaptiveThinking?: boolean;
+        }> = await qs.supportedModels();
         if (models?.length && this.onModelsDiscovered) {
           this.onModelsDiscovered(models.map(m => ({
             id: m.value,
             label: m.displayName,
             description: m.description,
+            resolvedModel: m.resolvedModel,
+            supportsEffort: m.supportsEffort,
+            supportedEffortLevels: m.supportedEffortLevels,
+            supportsAdaptiveThinking: m.supportsAdaptiveThinking,
           })));
         }
       }
@@ -777,6 +921,8 @@ export class AgentSession {
       this._emitPlanApproval = null;
       this._emitToolApproval = null;
       this._turnFilesModified = [];
+      this._turnStructuredAssistantError = undefined;
+      this._turnSawRegularAssistant = false;
       this._planModeActive = false;
       if (this._turnTimeout) {
         clearTimeout(this._turnTimeout);
@@ -873,7 +1019,10 @@ export class AgentSession {
 
   // ── Session lifecycle ───────────────────────────────────────────────
 
-  private async _startSession(firstMsg: Record<string, unknown>) {
+  private async _startSession(
+    firstMsg: Record<string, unknown>,
+    thinkingEffort: AgentTurnOptions['thinkingEffort'],
+  ) {
     const query = await getQuery();
     const safetyAppend = buildClaudeSystemAppend(this._workspacePath, this._excludedFolders);
     const fullAppend = this._extraSystemPromptAppend
@@ -905,9 +1054,12 @@ export class AgentSession {
       // native plan-mode enforcement (audit §4).
       permissionMode,
       planModeInstructions: PLAN_MODE_INSTRUCTIONS,
+      ...(this._tools !== undefined ? { tools: this._tools } : {}),
       allowedTools: sdkAllowedTools,
       canUseTool: this._handleCanUseTool.bind(this),
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
+      ...(this._resumeSessionId ? { resume: this._resumeSessionId } : {}),
+      ...(thinkingEffort && thinkingEffort !== 'auto' ? { effort: thinkingEffort } : {}),
     };
 
     if (this._modelId) {
@@ -929,6 +1081,7 @@ export class AgentSession {
     traceClaude('execution', 'session started', {
       model: this._modelId ?? null,
       settingSources: this._settingSources,
+      tools: this._tools ?? null,
       allowedTools: this._allowedTools,
       workspacePath: this._workspacePath,
     });
@@ -948,6 +1101,11 @@ export class AgentSession {
         if (this._closed) break;
         const message = rawMessage as SDKMessage;
 
+        // The SDK has now produced provider-originated evidence for this turn.
+        // This is deliberately later than enqueueing the prompt.
+        this._emitDispatchAccepted?.();
+        this._emitDispatchAccepted = null;
+
         // Reset inactivity timeout on any activity from the agent
         if (message.type !== 'result') {
           this._resetTurnTimeout();
@@ -959,13 +1117,17 @@ export class AgentSession {
             sessionId: message.session_id ?? null,
           });
           this._model = message.model || null;
+          if (message.session_id) this._onSessionCheckpoint?.(message.session_id);
           // Model truth (2026-08-05): the CLI reports the model it ACTUALLY
           // resolved (may carry a "[1m]" 1M-context suffix). If we pinned one
           // and got another, say so in the transcript — silent drift between
           // the UI label and the running model is never acceptable.
           const actualModel = (message.model || '') as string;
-          const normalizedActual = actualModel.replace(/\[1m\]$/, '');
-          if (this._modelId && actualModel && normalizedActual !== this._modelId) {
+          if (!modelMatchesExpectedIdentity(
+            this._modelId,
+            this._expectedResolvedModel,
+            actualModel,
+          )) {
             this._emitProgress?.('init',
               `Model mismatch — running on ${actualModel}, but ${this._modelId} was requested. The runtime could not apply the requested model.`);
           } else {
@@ -980,16 +1142,30 @@ export class AgentSession {
           traceClaude('sdk', 'system:compact_boundary');
           this._emitProgress?.('compacted', 'Varasem vestlus on kokku võetud. Kui midagi olulist puudu, maini seda uuesti.');
         } else if (message.type === 'assistant') {
-          traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
-          processAssistantMessage(
-            message,
-            this._turnFilesModified,
-            this._emitProgress || (() => {}),
-            message.parent_tool_use_id,
-            this._planModeActive,
-            this._planFirst
-          );
-          this._planModeActive = updatePlanModeState(message, this._planModeActive);
+          const sdkError = claudeSdkAssistantError(message);
+          if (sdkError) {
+            traceClaude('sdk', 'assistant api error', {
+              errorCode: message.error ?? null,
+              synthetic: message.message?.model === '<synthetic>',
+            });
+            if (this._consumerTurnId === this._turnId) {
+              this._turnStructuredAssistantError = sdkError;
+            }
+          } else {
+            traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
+            if (this._consumerTurnId === this._turnId) {
+              this._turnSawRegularAssistant = true;
+            }
+            processAssistantMessage(
+              message,
+              this._turnFilesModified,
+              this._emitProgress || (() => {}),
+              message.parent_tool_use_id,
+              this._planModeActive,
+              this._planFirst
+            );
+            this._planModeActive = updatePlanModeState(message, this._planModeActive);
+          }
         } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
           traceClaude('sdk', 'tool/system progress', {
             type: message.type,
@@ -1001,6 +1177,7 @@ export class AgentSession {
         } else if (message.type === 'result') {
           traceClaude('sdk', 'result', {
             subtype: message.subtype,
+            isError: message.is_error ?? null,
             durationMs: message.duration_ms ?? null,
             errors: message.errors ?? [],
           });
@@ -1015,6 +1192,22 @@ export class AgentSession {
             };
 
             if (message.subtype === 'success') {
+              const normalized = normalizeClaudeSdkSuccessResult({
+                result: message.result,
+                resultIsError: message.is_error,
+                structuredAssistantError: this._turnStructuredAssistantError,
+                sawRegularAssistant: this._turnSawRegularAssistant,
+              });
+              if (normalized.error) {
+                this._emitProgress?.('error', normalized.error);
+                this._forceResolveTurn(this._turnId, {
+                  text: '',
+                  filesModified: [],
+                  metrics,
+                  error: normalized.error,
+                });
+                continue;
+              }
               // Sprint 103 R7: the headline number is agent working time —
               // waiting on the user (plan review, questions, approvals) is
               // reported separately via metrics.waitedMs.
@@ -1022,7 +1215,7 @@ export class AgentSession {
               const durationStr = (activeMs / 1000).toFixed(1);
               this._emitProgress?.('done', `Completed in ${durationStr}s`);
               this._forceResolveTurn(this._turnId, {
-                text: message.result || '',
+                text: normalized.text,
                 filesModified: this._workspaceFilesModified(),
                 metrics,
               });

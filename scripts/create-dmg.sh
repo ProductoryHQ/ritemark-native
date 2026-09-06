@@ -74,6 +74,33 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 echo "  ✓ App bundle found"
 
+# Packaging an older or locally assembled app as an RC is forbidden. The
+# embedded manifest must match the canonical build inputs: this checkout's
+# working tree for a same-machine build, or the approved release commit when
+# RITEMARK_RELEASE_COMMIT anchors a CI-built artifact.
+PROVENANCE_ANCHOR=()
+if [ -n "${RITEMARK_RELEASE_COMMIT:-}" ]; then
+    PROVENANCE_ANCHOR=(--release-commit "$RITEMARK_RELEASE_COMMIT")
+    echo "  Provenance anchor: release commit $RITEMARK_RELEASE_COMMIT"
+fi
+if ! node "$PROJECT_ROOT/scripts/build-provenance.mjs" \
+    --verify --repo "$PROJECT_ROOT" --target "darwin-$ARCH" --app "$APP_PATH" \
+    ${PROVENANCE_ANCHOR[@]+"${PROVENANCE_ANCHOR[@]}"}; then
+    echo -e "${RED}ERROR: Build provenance verification failed; refusing to package.${NC}"
+    exit 1
+fi
+echo "  ✓ Build provenance verified"
+
+# The extension payload digest is verified before signing because code signing
+# intentionally changes Mach-O bytes. From this point onward the deep app
+# signature is the integrity boundary: any post-sign extension mutation must
+# block packaging.
+if ! codesign --verify --deep --strict "$APP_PATH" 2>/dev/null; then
+    echo -e "${RED}ERROR: App signature is invalid; refusing to package.${NC}"
+    exit 1
+fi
+echo "  ✓ App signature verified"
+
 # Check icon exists
 if [ ! -f "$ICON_PATH" ]; then
     echo -e "${RED}ERROR: Icon not found at $ICON_PATH${NC}"

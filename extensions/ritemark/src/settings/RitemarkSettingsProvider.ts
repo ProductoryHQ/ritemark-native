@@ -11,18 +11,19 @@ import { isEnabled } from '../features/featureGate';
 import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated, onCodexStatusInvalidated } from '../codex';
 import { UpdateService } from '../update';
 import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
+import { SessionStore } from '../speech/SessionStore';
+import { sessionStoreDir } from '../speech/paths';
 import {
   getAgentEnvironmentStatus,
   getSetupStatus,
   installClaude,
-  openClaudeLoginTerminal,
   logoutClaude,
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   setAnthropicKeyAvailable,
   setClaudeLoginInProgress,
-  startClaudeLoginSubprocess,
-  type ClaudeLoginSubprocessHandle,
+  beginClaudeLogin,
+  cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
@@ -147,7 +148,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private disposeClaudeStatusListener: (() => void) | null = null;
   private disposeCodexStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
-  private claudeLoginSubprocess: ClaudeLoginSubprocessHandle | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -174,7 +174,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     this.disposeClaudeStatusListener = onClaudeStatusInvalidated((event) => {
       if (event.reason === 'login-started') {
         this.startClaudeLoginPolling();
-      } else if (event.reason === 'login-finished' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
+      } else if (event.reason === 'login-finished' || event.reason === 'authentication-failed' || event.reason === 'logout' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
         this.stopClaudeLoginPolling();
       }
       const panel = RitemarkSettingsProvider.panel;
@@ -352,7 +352,15 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         } else if (message.key === 'openrouter-api-key' && isEnabled('opencode-integration')) {
           // Sprint 76 R3a (Q-UX4): validate against the OpenRouter key endpoint.
           await this.testOpenRouterKey(webview);
+        } else if (message.key === 'elevenlabs-api-key' && isEnabled('transcription-workbench')) {
+          // Sprint 108 R4: a cheap authenticated GET, so a bad key is caught in
+          // Settings rather than halfway through a 44 MB upload.
+          await this.testElevenLabsKey(webview);
         }
+        break;
+
+      case 'transcription:clearStorage':
+        await this.clearTranscriptionStorage(webview);
         break;
 
       case 'claude:install':
@@ -510,6 +518,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     const openrouterKey = openrouterEnabled
       ? await this.context.secrets.get('openrouter-api-key')
       : undefined;
+    // Sprint 108 R4: 'elevenlabs-api-key' joins the same SecretStorage list.
+    // Gated on the transcription flag so the card disappears with the feature.
+    const transcriptionEnabled = isEnabled('transcription-workbench');
+    const elevenlabsKey = transcriptionEnabled
+      ? await this.context.secrets.get('elevenlabs-api-key')
+      : undefined;
+    const transcriptionStorageBytes = transcriptionEnabled ? await this.transcriptionStorageBytes() : 0;
 
     const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
     const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
@@ -615,6 +630,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         openrouterEnabled,
         openrouterKey: openrouterKey || '',
         openrouterKeyConfigured: !!openrouterKey,
+        // Sprint 108 R4/R12: the ElevenLabs card and the transcription-data row
+        // both disappear when the feature flag is off.
+        transcriptionEnabled,
+        elevenlabsKey: elevenlabsKey || '',
+        elevenlabsKeyConfigured: !!elevenlabsKey,
+        transcriptionStorageBytes,
 
         // Update-adjacent components
         componentStatus,
@@ -800,11 +821,21 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
-    setClaudeLoginInProgress(true);
-    emitClaudeStatusInvalidated('login-started');
-    this.startClaudeLoginPolling();
-    openClaudeLoginTerminal(status.binaryPath);
-    vscode.window.showInformationMessage('Finish Claude.ai sign-in in the terminal and browser. Ritemark will refresh automatically.');
+    const startResult = beginClaudeLogin(status.binaryPath, {
+      onUrl: (url) => {
+        vscode.window.showInformationMessage(
+          'Sign-in opened in your browser. Authorize to finish.',
+          'Copy backup link',
+        ).then((action) => {
+          if (action === 'Copy backup link') void vscode.env.clipboard.writeText(url);
+        });
+      },
+      onError: (message) => vscode.window.showErrorMessage(`Claude sign-in failed: ${message}`),
+      onTimeout: () => vscode.window.showWarningMessage('Claude sign-in timed out after 5 minutes. Please try again.'),
+    });
+    if (startResult === 'already-running') {
+      vscode.window.showInformationMessage('Claude sign-in is already open. Finish it in your browser.');
+    }
   }
 
   public async startCodexLoginFromCommand(): Promise<void> {
@@ -849,16 +880,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
-    if (this.claudeLoginSubprocess) {
-      this.claudeLoginSubprocess.kill();
-      this.claudeLoginSubprocess = null;
-    }
-
-    setClaudeLoginInProgress(true);
-    emitClaudeStatusInvalidated('login-started');
-    this.startClaudeLoginPolling();
-
-    this.claudeLoginSubprocess = startClaudeLoginSubprocess(status.binaryPath, {
+    const startResult = beginClaudeLogin(status.binaryPath, {
       onUrl: (url) => {
         vscode.window.showInformationMessage(
           'Sign-in opened in your browser. Authorize to finish.',
@@ -869,36 +891,24 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           }
         });
       },
-      onComplete: () => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('login-finished');
-      },
       onError: (msg) => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         vscode.window.showErrorMessage(`Claude sign-in failed: ${msg}`);
       },
       onTimeout: () => {
-        this.claudeLoginSubprocess = null;
-        setClaudeLoginInProgress(false);
-        emitClaudeStatusInvalidated('settings-updated');
         vscode.window.showWarningMessage('Claude sign-in timed out after 5 minutes. Please try again.');
       },
     });
+
+    if (startResult === 'already-running') {
+      vscode.window.showInformationMessage('Claude sign-in is already open. Finish it in your browser.');
+    }
 
     await this.sendCurrentSettings(webview);
   }
 
   private cancelClaudeLogin(): void {
-    if (this.claudeLoginSubprocess) {
-      this.claudeLoginSubprocess.kill();
-      this.claudeLoginSubprocess = null;
-    }
-    setClaudeLoginInProgress(false);
-    emitClaudeStatusInvalidated('settings-updated');
-    vscode.window.showInformationMessage('Sign-in cancelled.');
+    const cancelled = cancelActiveClaudeLogin();
+    vscode.window.showInformationMessage(cancelled ? 'Sign-in cancelled.' : 'No Claude sign-in is currently open.');
   }
 
   private async enterAnthropicApiKey(webview: vscode.Webview): Promise<void> {
@@ -937,7 +947,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     try {
       await logoutClaude(status.binaryPath);
       setClaudeLoginInProgress(false);
-      emitClaudeStatusInvalidated('settings-updated');
+      emitClaudeStatusInvalidated('logout');
       vscode.window.showInformationMessage('Signed out from Claude.ai.');
     } catch (error) {
       vscode.window.showErrorMessage(
@@ -1092,6 +1102,84 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * /api/v1/key endpoint (no token spend) — same card pattern as the other
    * provider keys.
    */
+  /**
+   * Sprint 108 R4 — validate the ElevenLabs key against a cheap authenticated
+   * endpoint. `/v1/user` returns the account, costs nothing, and needs no audio.
+   */
+  private async testElevenLabsKey(webview: vscode.Webview): Promise<void> {
+    const key = await this.context.secrets.get('elevenlabs-api-key');
+    if (!key) {
+      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: false, error: 'No API key configured' });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.elevenlabs.io/v1/user', {
+        method: 'GET',
+        headers: { 'xi-api-key': key },
+      });
+
+      if (!response.ok) {
+        // 401 is the case that matters, and "rejected the key" is more useful
+        // to the reader than the status line.
+        throw new Error(
+          response.status === 401
+            ? 'ElevenLabs rejected this key'
+            : `ElevenLabs returned an error (${response.status})`
+        );
+      }
+
+      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: true, message: 'API key is valid' });
+    } catch (err) {
+      webview.postMessage({
+        type: 'testResult',
+        key: 'elevenlabs',
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }
+
+  /** Sprint 108 R12 — bytes held by stored transcripts, for the Settings row. */
+  private async transcriptionStorageBytes(): Promise<number> {
+    try {
+      const store = new SessionStore(sessionStoreDir(this.context.globalStorageUri.fsPath));
+      return await store.sizeBytes();
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Sprint 108 R12 — delete stored transcripts.
+   *
+   * Confirmed first, because sessions hold the user's speaker renames and
+   * corrections (D5). Recordings and exported markdown are never touched.
+   */
+  private async clearTranscriptionStorage(webview: vscode.Webview): Promise<void> {
+    const confirm = await vscode.window.showWarningMessage(
+      'Delete all stored transcripts?',
+      {
+        modal: true,
+        detail:
+          'Speaker names, corrections and insights stored with your transcripts will be removed. Your recordings and any documents you saved are not affected.',
+      },
+      'Delete transcripts'
+    );
+    if (confirm !== 'Delete transcripts') return;
+
+    try {
+      const store = new SessionStore(sessionStoreDir(this.context.globalStorageUri.fsPath));
+      await store.clear();
+      vscode.window.showInformationMessage('Stored transcripts deleted.');
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        `Could not delete stored transcripts: ${err instanceof Error ? err.message : 'unknown error'}`
+      );
+    }
+    await this.sendCurrentSettings(webview);
+  }
+
   private async testOpenRouterKey(webview: vscode.Webview): Promise<void> {
     const key = await this.context.secrets.get('openrouter-api-key');
     if (!key) {

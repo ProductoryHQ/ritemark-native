@@ -1,11 +1,20 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
+/**
+ * RULE: an icon inside a button is ALWAYS the same colour as the button's text.
+ *
+ * `Icon` defaults to `tone="muted"` and renders that as a `fill` attribute on
+ * the svg, so a white-on-indigo button would otherwise get a grey glyph. The
+ * `[&_svg]:fill-current` below overrides that attribute in CSS (presentation
+ * attributes lose to CSS), which makes the rule hold for every button in the
+ * app without any call site having to remember it.
+ */
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] active:scale-[0.98] aria-invalid:ring-[var(--r-error-soft)] aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 [&_svg]:fill-current [&_svg]:text-current outline-none focus-visible:border-ring focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] active:scale-[0.98] aria-invalid:ring-[var(--r-error-soft)] aria-invalid:border-destructive",
   {
     variants: {
       variant: {

@@ -15,6 +15,7 @@
  */
 
 import type { ModelCatalog } from './schema';
+import { CODEX_MODEL_IDS } from '../modelConfig';
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
@@ -23,10 +24,10 @@ export const BUNDLED_CATALOG: ModelCatalog = {
     anthropic: {
       defaults: { 'claude-code': 'claude-sonnet-5' },
       models: [
-        { id: 'claude-sonnet-5', label: 'Sonnet 5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0 },
-        { id: 'claude-opus-5', label: 'Opus 5', description: 'Most powerful Opus-tier', tier: 'high', deprecated: false, order: 1 },
-        { id: 'claude-opus-4-8', label: 'Opus 4.8', description: 'Previous Opus generation', tier: 'high', deprecated: false, order: 2 },
-        { id: 'claude-fable-5', label: 'Fable 5', description: 'Most capable, long-horizon work', tier: 'high', deprecated: false, order: 3 },
+        { id: 'claude-sonnet-5', label: 'Sonnet 5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: 'claude-opus-5', label: 'Opus 5', description: 'Most powerful Opus-tier', tier: 'high', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: 'claude-opus-4-8', label: 'Opus 4.8', description: 'Previous Opus generation', tier: 'high', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: 'claude-fable-5', label: 'Fable 5', description: 'Most capable, long-horizon work', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 4 },
       ],
     },
@@ -52,11 +53,15 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     codex: {
-      defaults: { codex: 'gpt-5.6-sol' },
+      defaults: { codex: CODEX_MODEL_IDS.SOL },
       models: [
-        { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Latest flagship agentic coding model', tier: 'high', deprecated: false, order: 0 },
-        { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 1 },
-        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 2 },
+        { id: CODEX_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Latest flagship agentic coding model', tier: 'high', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
+        { id: CODEX_MODEL_IDS.TERRA, label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.LUNA, label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_5, label: 'GPT-5.5', description: 'Previous flagship agentic model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_4, label: 'GPT-5.4', description: 'Strong everyday agentic model', tier: 'medium', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_4_MINI, label: 'GPT-5.4 Mini', description: 'Efficient smaller agentic model', tier: 'low', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.GPT_5_3_CODEX_SPARK, label: 'GPT-5.3 Codex Spark', description: 'Fast coding-focused model', tier: 'low', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'high' } },
       ],
     },
     // opencode is BYOK/multi-vendor: ids are composite `<vendor>/<model>`; consumers

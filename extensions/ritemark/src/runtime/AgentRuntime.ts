@@ -1,12 +1,40 @@
-import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, ActiveFileContext } from '../agent/types';
+import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext } from '../agent/types';
+import type {
+  RuntimeContinuationDescriptorV1,
+  RuntimeContinuationRequest,
+  RuntimeContinuationState,
+} from './continuation';
+import type {
+  ExplicitThinkingEffort,
+  ThinkingEffort,
+  ThinkingEffortApplied,
+  ThinkingEffortCapability,
+} from './thinkingEffort';
+import type { RuntimeFailureKind } from './runtimeErrorPresentation';
 
 export type { AgentId };
+export type {
+  ContinuationFailureCategory,
+  ContinuationMode,
+  NormalizedRuntimeContext,
+  RuntimeContinuationDescriptorV1,
+  RuntimeContinuationRequest,
+  RuntimeContinuationState,
+} from './continuation';
+export type {
+  ExplicitThinkingEffort,
+  ThinkingEffort,
+  ThinkingEffortApplied,
+  ThinkingEffortCapability,
+} from './thinkingEffort';
 
 export interface RuntimeTurnResult {
   text?: string;
   filesModified?: string[];
   metrics?: { durationMs: number; costUsd: number | null; model: string | null };
   error?: string;
+  /** Stable, auth-method-aware recovery category; provider text stays diagnostic-only. */
+  failureKind?: RuntimeFailureKind;
 }
 
 /**
@@ -25,6 +53,9 @@ export interface AgentRuntime {
    * session A must never mutate session B's state.
    */
   createSession(conversationId: string, config: RuntimeSessionConfig): Promise<RuntimeSession>;
+
+  /** Release exactly one conversation's provider session. */
+  disposeSession(conversationId: string): void;
 
   /**
    * Adapter-level, deliberately NOT per-conversation: this reports on the
@@ -61,15 +92,34 @@ export interface RuntimeSession {
 
 export interface RuntimeSessionConfig {
   workspacePath: string;
+  /** Provider request id sent to the runtime. */
   model?: string;
+  /** Canonical identity the provider reports after resolving that request id. */
+  expectedResolvedModel?: string;
   excludedFolders?: string[];
   extraSystemPrompt?: string;
   mcpServers?: Record<string, unknown>;
+  /** Built-in tools exposed to the model. Omitted keeps the runtime default; [] removes them. */
+  availableTools?: string[];
+  /** Provider setting scopes to load. Omitted keeps defaults; [] loads none. */
+  settingSources?: AgentSettingSource[];
   allowedTools?: string[];
   /** API key for Claude Code (api-key auth method) */
   anthropicApiKey?: string;
   /** BYOK provider env vars for AcpRuntime */
   byokEnv?: Record<string, string>;
+  /** Host-owned native descriptor and/or deterministic transcript fallback. */
+  continuation?: RuntimeContinuationRequest;
+  /** Runtime reports a new opaque checkpoint; the host persists it. */
+  onContinuationCheckpoint?: (descriptor: RuntimeContinuationDescriptorV1) => void;
+  /** Runtime reports the truthful continuation result; no provider IDs. */
+  onContinuationState?: (state: RuntimeContinuationState) => void;
+  /** First audit-approved positive signal that the current turn was accepted. */
+  onDispatchAccepted?: () => void;
+  /** Session-local capability update (ACP discovers thought_level lazily). */
+  onThinkingEffortCapability?: (capability: ThinkingEffortCapability) => void;
+  /** Truthful requested/applied value, when the provider exposes it. */
+  onThinkingEffortApplied?: (result: ThinkingEffortApplied) => void;
   /**
    * Autonomy policy applied across all runtimes (Sprint 103 R1):
    * - 'auto'  — agents act without asking (no approval prompts)
@@ -121,6 +171,10 @@ export interface RuntimeTurnConfig {
   mode?: 'plan' | 'execute';
   /** Per-turn model override (Codex uses this; Claude Code ignores it) */
   model?: string;
+  /** Immutable accepted-turn snapshot. Auto restores the provider default. */
+  thinkingEffort?: ThinkingEffort;
+  /** Catalog/live default captured before any manual override. */
+  thinkingEffortDefault?: ExplicitThinkingEffort;
 }
 
 export interface UnifiedAttachment {

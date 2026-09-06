@@ -14,6 +14,7 @@ import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime
 // ── Mock AgentSession ────────────────────────────────────────────────────────
 
 const calls: string[] = [];
+const capturedEfforts: string[] = [];
 
 const mockSession = {
   isActive: false,
@@ -25,8 +26,12 @@ const mockSession = {
     onProgress?: (p: { type: string; message: string; timestamp: number }) => void;
     onPlanApproval?: (r: unknown) => void;
     onQuestion?: (q: unknown) => void;
+    thinkingEffort?: string;
+    onThinkingEffortApplied?: (effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max', adjusted?: boolean) => void;
   }) => {
     calls.push('sendMessage');
+    capturedEfforts.push(opts.thinkingEffort ?? 'auto');
+    opts.onThinkingEffortApplied?.();
     opts.onProgress?.({ type: 'done', message: 'ok', timestamp: Date.now() });
     return { text: 'ok', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null } };
   },
@@ -141,7 +146,97 @@ async function run() {
     console.log('✓ Test 5: conversations hold independent sessions');
   }
 
-  console.log('\nAll 5 ClaudeCodeRuntime tests passed!');
+  // Test 6: an SDK result error remains a failed turn at the runtime boundary.
+  {
+    let completedError: string | undefined;
+    const session = makeSession('conv-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'resume rejected',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onComplete: (result: { error?: string }) => { completedError = result.error; },
+    };
+    await session.prompt({ prompt: 'Continue safely' });
+    assert.strictEqual(completedError, 'resume rejected');
+    console.log('✓ Test 6: SDK result errors remain failed turns');
+  }
+
+  // Sprint 112: the immutable turn effort reaches AgentSession and applied
+  // evidence is surfaced through the shared runtime callback.
+  {
+    capturedEfforts.length = 0;
+    const applied: Array<{ requested: string; applied?: string }> = [];
+    const session = makeSession('conv-effort');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onThinkingEffortApplied: (result: { requested: string; applied?: string }) => applied.push(result),
+    };
+    const advertised = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+    for (const effort of advertised) {
+      await session.prompt({ prompt: `Use ${effort}`, thinkingEffort: effort });
+    }
+    assert.deepStrictEqual(capturedEfforts, advertised);
+    assert.deepStrictEqual(applied, advertised.map((requested) => ({ requested, adjusted: false })));
+    console.log('✓ Test 7: every advertised Claude effort reaches the SDK without inventing an applied value');
+  }
+
+  // A provider OAuth failure becomes a stable recovery category while the raw
+  // text remains available to the host for diagnostics/presentation.
+  {
+    let completed: { error?: string; failureKind?: string } | undefined;
+    const session = makeSession('conv-auth-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'Failed to authenticate: OAuth session expired and could not be refreshed',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      onComplete: (result: { error?: string; failureKind?: string }) => { completed = result; },
+    };
+    await session.prompt({ prompt: 'Try Claude' });
+    assert.equal(completed?.failureKind, 'authentication');
+    assert.match(completed?.error ?? '', /OAuth session expired/);
+    console.log('✓ Test 8: OAuth failures carry the authentication recovery category');
+  }
+
+  // The same provider sentence under API-key auth must recover through AI
+  // Settings, never through the Claude.ai OAuth flow.
+  {
+    let completed: { failureKind?: string } | undefined;
+    const session = makeSession('conv-api-key-error', {
+      ...mockSession,
+      sendMessage: async () => ({
+        text: '',
+        filesModified: [],
+        metrics: { durationMs: 0, costUsd: null, model: null },
+        error: 'Failed to authenticate: invalid authentication credentials',
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (session as any)._config = {
+      ...dummyConfig,
+      anthropicApiKey: 'sk-ant-test',
+      onComplete: (result: { failureKind?: string }) => { completed = result; },
+    };
+    await session.prompt({ prompt: 'Try Claude with a key' });
+    assert.equal(completed?.failureKind, 'api-key-authentication');
+    console.log('✓ Test 9: API-key failures use the AI Settings recovery category');
+  }
+
+  console.log('\nAll 9 ClaudeCodeRuntime tests passed!');
 }
 
 run().then(

@@ -50,27 +50,43 @@ Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening (no n
 ### Step 0 — Pre-flight
 
 ```bash
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# cd to the new path printed by the command
 ./scripts/release-preflight.sh
 ```
 
-Must pass (clean git, on main, synced with origin, Node v20.x arm64, signing cert present, no 0-byte source files, node_modules present, webview.js + extension.js built). If FAIL → fix, do not proceed.
+Review the hygiene report before `--clean`. The release worktree must be new,
+detached at the exact `origin/main` commit, and contain a physical pristine VS
+Code submodule. Preflight hard-blocks local patches, shared dependencies, old
+output, and any source drift. If the release source gate fails, discard the RC
+worktree and recreate it; do not repair it in place.
 
 ### Step 1 — Version bump (no tag yet)
 
-1. Edit `branding/product.json` — bump `version`.
-2. Edit `extensions/ritemark/package.json` — bump `version`.
-3. Commit: `git commit -m "chore: bump version to X.Y.Z"`
-4. Push: `git push origin main`
+1. Make the version changes on a dedicated release-prep branch.
+2. Edit `branding/product.json` — bump `version`.
+3. Edit `extensions/ritemark/package.json` — bump `version`.
+4. Commit, push, and merge through the normal protected-main workflow.
+5. Fetch `origin/main`; the previous preflight worktree is now invalid.
 
 **Do NOT create the tag yet** — tag push triggers CI; we wait until Gate 1 passes.
 
 ### Step 2 — Build macOS arm64 (local)
 
 ```bash
-arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use 20 && cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && ./scripts/build-prod.sh 2>&1'
+node ./scripts/worktree-hygiene.mjs --check
+./scripts/create-release-worktree.sh
+# cd to the new path, then:
+./scripts/release-preflight.sh
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use "$(cat vscode/.nvmrc)" && ./scripts/build-prod.sh 2>&1'
 ```
 
-Run as background task with `timeout: 600000` (10 min cap). Never pipe through `tail`/`head` — buffering hangs background mode.
+This second fresh worktree is mandatory because the version commit changed
+`origin/main`. `build-prod.sh` uses `npm ci`, applies canonical patches itself,
+requires empty output, and embeds `ritemark-build-provenance.json`. Run as a
+background task with `timeout: 600000` (10 min cap). Never pipe through
+`tail`/`head` — buffering hangs background mode.
 
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
@@ -124,6 +140,10 @@ gh workflow run build-macos-x64.yml --ref <ref>
 gh workflow run build-windows.yml  --ref <ref>
 ```
 
+`<ref>` must resolve to the exact already-approved `origin/main` source commit.
+Both workflows independently initialize the recorded VS Code gitlink, use
+frozen installs, run the clean-source gate, and embed provenance.
+
 After the Windows build completes (Step 6), toggle back:
 
 ```bash
@@ -136,10 +156,21 @@ Wait for `build-macos-x64.yml` to finish:
 
 ```bash
 gh run list --workflow=build-macos-x64.yml --limit 3
-gh run download <run-id> --name ritemark-darwin-x64 --dir VSCode-darwin-x64
+gh run download <run-id> --name ritemark-darwin-x64 --dir dist/x64-ci
+./scripts/extract-macos-x64-artifact.sh
+export RITEMARK_RELEASE_COMMIT=<approved 40-char source commit>
 ./scripts/codesign-app.sh darwin-x64
 ./scripts/create-dmg.sh x64
 ```
+
+`RITEMARK_RELEASE_COMMIT` is mandatory for a CI-built artifact. The x64 app was
+built on another machine, so its embedded provenance is verified against the
+approved release commit's git objects (`build-provenance.mjs --release-commit`)
+instead of this checkout's working tree — a working-tree comparison can never
+match across machines (CI copies the extension into `vscode/extensions`; a
+worktree links it). Run these steps from any clean **harness worktree** whose
+`vscode` submodule is initialized; the product source is the release commit,
+not the worktree's HEAD. Record the harness commit next to the artifact hash.
 
 Output: `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed, **NOT notarized**). Same rule as arm64 — record the DMG build timestamp; **do NOT notarize until Gate 2 passes AND ≥60 min hardening have elapsed.**
 
@@ -170,13 +201,56 @@ cp dist/Ritemark-X.Y.Z-darwin-x64.dmg   dist/Ritemark-x64.dmg
 
 gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
   --title "Ritemark vX.Y.Z" \
-  --notes-file docs/releases/vX.Y.Z.md \
+  --notes-file <prepared body> \
   dist/Ritemark-arm64.dmg \
   dist/Ritemark-x64.dmg \
   installer/windows/Ritemark-X.Y.Z-win32-x64-setup.exe
 ```
 
-**Update feed (MANDATORY):** regenerate canonical update metadata, verify it matches the published assets, publish to canonical location. Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
+**Preparing the body — two traps, both hit in v1.10.0:**
+
+1. **Take the notes from `origin/main`, not from the release worktree.** The
+   release worktree is pinned to the frozen product source commit, so any notes
+   correction merged after it was created is missing there. Publishing from it
+   silently reverts those corrections:
+   `git show origin/main:docs/releases/vX.Y.Z/release-notes.md > /tmp/body.md`.
+2. **Rewrite relative image paths to absolute URLs.** A release body is rendered
+   standalone, so `![](screenshots/foo.png)` renders as a broken link even
+   though it is correct inside the repo. Copy the referenced images into
+   `images/` in `jarmo-productory/ritemark-public`, push, and rewrite the body
+   (leave the repo document's relative paths alone):
+
+```bash
+sed -E 's#\]\(screenshots/#](https://raw.githubusercontent.com/jarmo-productory/ritemark-public/main/images/#g' \
+  /tmp/body.md > /tmp/release-body.md
+```
+
+Afterwards, verify against the live release: every image reports
+`complete && naturalWidth > 0`, every URL returns 200, and the body differs
+from `origin/main`'s notes only by the image rewrite.
+
+**Update feed (MANDATORY):** regenerate canonical update metadata, verify it matches the published assets, publish to canonical location.
+
+⛔ **Always pass `--existing-feed-url` naming the PREVIOUS release.** The
+generator seeds from `releases/latest/download/update-feed.json`, but the
+release you just published *is* `latest` and has no feed attached yet, so that
+URL 404s, the seed comes back empty, and the generated feed silently contains
+only the new version — wiping every older per-platform entry:
+
+```bash
+node ./scripts/generate-update-feed.mjs --mode full --version X.Y.Z \
+  --output dist/update-feed.json \
+  --existing-feed-url https://github.com/jarmo-productory/ritemark-public/releases/download/v<PREV>/update-feed.json \
+  --notes-file docs/releases/vX.Y.Z/release-notes.md \
+  --asset "dist/Ritemark-arm64.dmg|darwin|arm64|Ritemark-arm64.dmg" \
+  --asset "dist/Ritemark-x64.dmg|darwin|x64|Ritemark-x64.dmg" \
+  --asset "dist/Ritemark-Setup.exe|win32|x64|Ritemark-Setup.exe"
+```
+
+Before uploading, confirm `fullReleases` grew by exactly one and that each
+platform SHA-256 matches the published asset. After uploading, the
+`latest/download/` URL needs ~20-40 s of CDN propagation before it returns 200 —
+retry rather than assuming the upload failed. Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
 
 If feed/metadata is stale or missing, the release is BLOCKED — even if binaries are uploaded.
 
@@ -208,7 +282,7 @@ GitHub does NOT allow larger runners (windows-8core) on public repos. Before dis
 
 ### Node version + architecture
 
-Production builds require **Node v20.x arm64** (`nvm use 20`). Default shell has x64 Node v23 — this fails with missing `@rollup/rollup-darwin-arm64` and similar arm64 native binaries. Always wrap with the `arch -arm64 /bin/zsh` invocation.
+Production builds require **arm64 Node at the version pinned by `vscode/.nvmrc`**. A machine default or Rosetta/x64 Node is not a release input. Always use the `arch -arm64 /bin/zsh` invocation and `nvm use "$(cat vscode/.nvmrc)"`.
 
 ### x64 from CI, never cross-compiled
 
@@ -229,6 +303,30 @@ For changes confined to extension code:
 ```bash
 cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Contents/Resources/app/extensions/ritemark/out/"
 ```
+
+This is development-only. A hot-copied app has invalid provenance and must
+never be signed, packaged, or described as an RC.
+
+### Release worktree holds the only copy of the artifacts
+
+`node ./scripts/worktree-hygiene.mjs --check` classifies an active release
+worktree as `REMOVE — verified disposable release worktree` even when its
+`dist/` holds the only copies of the notarized DMGs and the signed Windows
+installer. The scheduled `worktree-janitor` runs `--clean` every Friday 18:00.
+**Never run `--clean` while a release is mid-flight**; get the artifacts onto
+the GitHub Release first.
+
+### Clean build and worktree contract
+
+The authoritative contract is
+`docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
+
+- Audit after merge/close, at sprint close, before RC creation, and weekly:
+  `node ./scripts/worktree-hygiene.mjs --check`.
+- Use `--clean` only after reviewing classifications. Never override `BLOCKED`.
+- Every RC begins with `./scripts/create-release-worktree.sh`.
+- `codesign-app.sh` and `create-dmg.sh` refuse missing or mismatched provenance.
+- Any source change or rebuild creates a new candidate and resets the relevant gate.
 
 ## Past incidents (institutional memory)
 

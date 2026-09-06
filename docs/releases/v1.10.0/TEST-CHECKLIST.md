@@ -1,0 +1,232 @@
+# Ritemark 1.10.0 Test Checklist
+
+This checklist accumulates release evidence across Sprints 109–115 and focused release-candidate bug fixes.
+
+## Current candidate record — 2026-09-05
+
+- Product source frozen at `8698ce9900ec437067a40eda3f5209f79029786f` (D1). The release worktree is `.worktrees/release-8698ce9900ec`.
+- arm64: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from that exact commit passed Jarmo's Gate 1, was notarized and stapled (`stapler validate` passes); final post-staple SHA-256 `5258848c5cab5ddb32beac8844b4a3ab7cb15ee09d93b50f586af49a1b26a1d2`. The `.sha256` sidecar had been written before notarization and was regenerated to the post-staple hash.
+- x64: CI run `33965759392` (`main@8698ce99`) succeeded. The artifact was extracted with `extract-macos-x64-artifact.sh` (extension attestation `125eb109…` matches), all binaries are x86_64 including `codex-code-mode-host`, `Info.plist` reports `1.10.0`, and the embedded provenance records `target=darwin-x64` and `sourceCommit=8698ce99`. Local signing was blocked by the cross-machine provenance defect; the signed DMG is produced with `RITEMARK_RELEASE_COMMIT` after the correction merges.
+- Windows: run `33970702424` (workflow `caf2e1a0` from PR #251, product source `8698ce99`) produced `Ritemark-Setup.exe` with SHA-256 `7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3`. Its own standard-user check failed on a test-model bug (registry `DisplayName` is `Ritemark 1.10.0`, the test expected `Ritemark`); the preserved installer then passed the complete standard-user install, 44-binary signature, registry, and uninstall replays in canary runs `33973536662` and `33973980742`. The file is preserved as `dist/Ritemark-1.10.0-win32-x64-setup.exe` with its `.sha256.txt` in the release worktree.
+- Open: Jarmo's Gate 2 test of the signed/unnotarized x64 DMG, Kristiina's clean Windows 11 Smart App Control-On test of the exact installer hash, the x64 60-minute window, x64 notarization, tag on `8698ce99`, GitHub Release, and update feed. Store certification (#212) no longer blocks publication (D2).
+
+## Current candidate record — 2026-09-03
+
+- Invalidated candidate: `dist/Ritemark-1.10.0-darwin-arm64.dmg` from merged `main` commit `3f01ef5` passed static packaging/signature checks but omitted Codex 0.149.0's required `codex-code-mode-host` sibling. A real Codex file-tool turn failed with `No such file or directory`, so this DMG is not a Gate 1 candidate and must not be notarized or published.
+- Retired Gate 1 evidence: the arm64 DMG from exact merged `main` commit `0140ab9948703ad8067d89d7c41dc3742d531ef2` passed QA/preflight, mounted content/signature/architecture/runtime checks, visual inspection, and Jarmo's installed-app test. After more than four hours with no new bug, Apple accepted submission `8434142f-25a0-48ce-8848-a8606c3fc319`; stapling and all six final notarization checks passed. Final notarized SHA-256: `0bb1e49df477b95762521894844d4003afe03cb55877b597184638e81a5684b3`.
+- Invalidated candidate: exact merged `main` commit `117e29608501665b8a0cc2042b3b6da6e6eb5ad4` is not eligible for Gate 1. Its Agent Chat blocked connected ChatGPT/Codex when Claude was signed out, and bundled Codex `0.149.0` was rejected by the current GPT-5.6 service/model catalog. The replacement branch proves provider-isolated fallback and a real GPT-5.6-Sol turn on official bundled Codex `0.153.0`; a fresh exact-main DMG is still required.
+- Gate 2 pipeline block: Windows run `33642850280` passed exact-source checkout and dependencies, then correctly rejected a source-mutating platform cleanup plus an order-sensitive reverse check of overlapping patches. The repository was restored to public and obsolete x64 run `33642854001` was cancelled.
+- Replacement Gate 1 DMG: **not yet produced**. The immutable target-copy/source-gate correction changes canonical source, so the otherwise-valid notarized `0140ab9` artifact is not eligible for multi-platform publication. A fresh exact-`main` arm64 candidate must repeat build, signing, mounted checks, Jarmo approval, hardening, and notarization.
+- Production dependency security: **mitigated and verified** — the extension audit reports zero findings; `fast-uri` is fixed at `3.1.6`, `@xmldom/xmldom` at `0.8.15`, and SheetJS at the official `0.20.3` tarball. The webview audit still version-reports one TipTap 2 advisory through 35 dependency paths because npm cannot recognize a patched package. The vendor-recommended `__proto__` rejection is backported to TipTap 2.27.2 with `patch-package`; the exploit-shaped test fails on the unpatched package, passes after the patch, and passes after a clean isolated `npm ci`. TipTap 3 migration is tracked in [#243](https://github.com/ProductoryHQ/ritemark-native/issues/243).
+- Task-list round-trip correction: deterministic tight, loose, nested, mixed task/bullet, and non-leading-checkbox coverage passes. Fresh exact-source RunDev preserved `- [ ]` / `- [x]` through UI creation, explicit save, raw-disk inspection, a loose-GFM close/reopen, a checked-state edit, resave, and a second close/reopen. A final rebuilt-bundle pass additionally proved both compact and loose task lists open with a clean tab, a real UI checkbox click alone creates dirty state, save returns the tab to clean, disk bytes contain the expected three `[x]` rows, and close/reopen preserves all three checks; screenshots `03`, `04`, `07`, `08`, and `09` were visually inspected (2026-09-02). A replacement signed Gate 1 DMG is still required.
+
+## Packaged-candidate canary — 2026-09-05 (notarized arm64)
+
+Driven by Claude against the installed, notarized, stapled arm64 candidate
+(`5258848c…a1d2`) from an isolated user-data directory and a seeded workspace,
+over CDP. Sequence and observed results:
+
+- [x] Gatekeeper accepts the installed app: `spctl -a` reports `accepted`, `source=Notarized Developer ID`, `origin=Developer ID Application: Jarmo Tuisk (JKBSC3ZDT5)`. `CFBundleShortVersionString` is `1.10.0`.
+- [x] Opening a folder shows no workspace-trust dialog and no error notification (patch 013 desktop `configurationDefaults`).
+- [x] `*.md` opens in the Ritemark editor, not the text editor.
+- [x] Task list renders every form: 4 checkboxes (tight `alpha`/`beta`, blank-line-separated `gamma`, nested `nested`) plus an adjacent ordinary bullet; initial checked count matches the source (`beta`).
+- [x] Opening the task list alone leaves the tab **clean** — no phantom dirty state from an internal editor transaction.
+- [x] A real checkbox click on `alpha` persists `- [x] alpha` to disk while `- [x] beta` is retained.
+- [x] Close and reopen: the tab is clean and the rendered state still shows exactly `alpha` and `beta` checked.
+- [x] Second edit cycle: clicking `gamma` writes three `[x]` rows to disk with all four task markers and the nested `- [ ]` intact. No marker erasure across two full edit/save/close/reopen cycles.
+- [x] AI sidebar loads in the packaged build and shows a real resolved model (`Claude Code · Anthropic · Sonnet 5`) — no permanent `Model` placeholder, no **Model mismatch** warning, no unavailability text.
+- [x] All four bundled runtimes execute from the signed bundle at exactly the pinned versions: Claude Code `2.1.239`, `codex-app-server 0.153.0`, `opencode 1.18.21`, and `codex-code-mode-host` starts and parses arguments (the sibling whose absence invalidated the `3f01ef5` candidate).
+
+Not covered by this canary and therefore still open below: authenticated agent
+turns (the isolated profile carries no credentials by design), failure
+injection, the accessibility/theme/zoom/screen-reader matrices, and the native
+macOS Help-menu visual capture.
+
+**Minor finding, not a release blocker:** after an edit whose last block is a
+list, the saved Markdown loses its trailing newline (`tasks.md` ended at
+`plain bullet` with no `0a`). Content and every task marker are correct; only
+the final byte differs, which surfaces as `\ No newline at end of file` in Git
+diffs. Filed for a follow-up release.
+
+## Trusted Windows installation (Sprint 114)
+
+- [x] Manual Windows workflow passes content-based payload inventory, Productory signing, Inno setup/uninstaller signing, standard-user install, installed-tree/app-registration verification, and uninstall. Build run `33970702424` produced the signed installer and failed only its own registry assertion (`DisplayName` is `Ritemark 1.10.0`; Inno uses `AppVerName`). The preserved installer then passed the complete standard-user install, 44-binary signature, single-registration, and uninstall-cleanup replay in canary runs `33973536662` and `33973980742` without rebuilding or re-signing.
+- [x] Installer and GitHub Release direct asset have one recorded SHA-256 (`7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3`) and publisher `Productory Services OÜ`. The versioned Store URL carries the same bytes when hosting is configured.
+- [ ] Partner Center preprocessing and certification pass against `downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`. Deferred by D2; tracked in [#212](https://github.com/ProductoryHQ/ritemark-native/issues/212) and does not block publication.
+- [x] Clean Windows 11 machine with Smart App Control **On** installs, launches, and uninstalls the exact hash without disabling SmartScreen, Smart App Control, or Defender (Jarmo, 2026-09-05).
+- [ ] Store-origin clean install passes. Deferred by D2 with the Store listing; the direct download documents signature and hash and gives no security-bypass instructions.
+- [x] Jarmo cleared Windows Gate 2 for shipping hash `7ada28ad…32f3` (2026-09-05); any rebuild resets this section.
+
+## Durable conversations (Sprint 109)
+
+- [x] New, Pinned, automatic active/recent/current, and All conversations rail order is stable.
+- [x] Selecting a conversation does not reorder Recents.
+- [x] Pin/Unpin, Rename, Delete, confirmation, and Undo preserve canonical identity.
+- [x] The Delete confirmation stays inside the narrow Conversations pane with wrapped copy and actions that stack at extra-narrow widths; deletion shows native VS Code notifications with no custom in-panel snackbar, the toast auto-hides, and each displayed Undo remains valid after the panel closes (RunDev + screenshots, 2026-08-29).
+- [x] Host-backed history remains current-project-only and survives reload.
+
+## Conversation continuation (Sprint 110)
+
+- [x] Opening/selecting a saved conversation performs no runtime resume or send.
+- [x] Claude compatible descriptor selects SDK native resume; rejected native resume retries once with transcript fallback only before provider evidence.
+- [x] Codex compatible descriptor selects `thread/resume`; successful `turn/start` is the acceptance receipt.
+- [x] OpenCode checks ACP `sessionCapabilities.resume`, uses `session/resume`, and never calls `session/load`.
+- [x] Runtime/project/version/model/policy/auth mismatch rejects native binding and keeps the transcript readable.
+- [x] Fallback stays within 32,000 UTF-8 bytes, truncates deterministically, and discloses omitted messages.
+- [x] Fallback excludes the newly accepted prompt, tools, approvals, partial/failed assistant text, hidden prompts, and attachment binary/content.
+- [x] A previous unanswered prompt crosses Codex → Claude (and equivalent handoffs) as labelled context; only the new instruction is dispatched.
+- [x] `not-sent → ambiguous → accepted` receipts are ordered, idempotent, and absent from webview projections.
+- [x] Coverage advances only with a saved completed assistant final; failed/no-final paths invalidate only that runtime descriptor.
+- [x] Choosing another runtime applies without a dialog, preserves draft text, stops an active prior run, starts nothing before Send, and keeps one canonical conversation ID.
+- [x] Late callbacks from the superseded runtime cannot append output, change lifecycle, or advance a watermark.
+- [x] Transcript-restored, truncated, context-unavailable, and runtime-unavailable copy is truthful and accessible; native restore is quiet.
+- [x] Fresh-profile canary: empty legacy inventory establishes host authority before the first durable prompt is accepted.
+- [x] Legacy cutover drains every bounded import batch; 205 records preserve `100 / 100 / 5` order, while an all-invalid non-empty inventory retains legacy authority.
+- [x] Live dev R9: immediate runtime selection preserved the draft, opened no dialog, started nothing before Send, and rendered exactly one compact durable boundary without the old banner in the Ritemark demo workspace (Claude Sonnet 5 → Codex GPT-5.5, 2026-08-23).
+- [x] Live cross-runtime semantic recall: Codex GPT-5.5 recovered Claude's synthetic probe phrase and exact prior question from bounded transcript context.
+- [x] Live restart: the same canonical Claude + Codex transcript and context-restored boundary reappeared after a full desktop restart.
+- [ ] Live authenticated restart: verify native semantic recall through the production UI for each available runtime.
+- [ ] Failure injection: auth loss/runtime unavailable and ambiguous crash after transport but before final checkpoint.
+- [ ] Verify reduced-motion conversation continuation and boundary UI on the exact packaged arm64 Gate 1 candidate.
+
+These two live rows are intentionally retained for the post-Sprint 111/final release matrix because Sprint 111 changes the exact runtime binaries. Sprint 110 covers their deterministic adapter/controller policy paths and does not claim unrun production-UI evidence.
+
+## Runtime refresh (Sprint 111 + RC correction)
+
+- [x] Exact Codex 0.153.0, Claude Code 2.1.239, Claude Agent SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0 pins are recorded with official sources and licenses. The superseded Sprint 111 Codex 0.149.0 evidence remains historical.
+- [x] The twelve-row darwin-arm64, darwin-x64, and win32-x64 manifest passes URL, published SHA-256, component completeness, install-name, and architecture-contract validation, including Codex app-server plus code-mode host on every target. The 0.153.0 darwin-arm64 pair additionally passes real fetch/checksum/extraction/native-architecture smoke.
+- [x] Claude binary/SDK drift, an incomplete component/platform matrix, duplicate or noncanonical install names, and an unsupported component smoke argument fail the hard manifest validator.
+- [x] Native darwin-arm64 fetch, version discovery, OpenCode permission gates, cancellation, and shared-process survival pass on the shipping pins.
+- [x] Codex, Claude, and OpenCode continuation/restart plus two-conversation isolation probes pass on the shipping pins.
+- [x] Codex optional `isBlocking` input metadata routes through the existing input contract; ACP 1.4.0 preserves the contained adapter boundary.
+- [x] Codex 0.149.0 is explicitly invalidated after a real GPT-5.6-Sol turn returned the newer-runtime requirement and the runtime failed to decode the current `max` effort value.
+- [x] Codex 0.153.0 generated protocol surfaces used by Ritemark remain backward compatible/additive; fresh-profile RUNDEV Settings reports `Bundled with app · Ready · v0.153.0`, and a real GPT-5.6-Sol no-write canary returns the requested answer without either 0.149 failure.
+- [ ] Native darwin-x64 and win32-x64 exact SDK compile, runtime fetch/checksum/architecture, and required-component smoke pass on the final RC correction commit. The earlier three-runtime baseline passed on `3ef9e0c` ([matrix run](https://github.com/ProductoryHQ/ritemark-native/actions/runs/32701706388)) but did not assert Codex's code-mode host.
+- [ ] The exact signed arm64 replacement candidate completes a real Codex file create/edit/read canary without a missing-host log error.
+
+## Composer thinking effort (Sprint 112)
+
+- [x] Auto is the default, sends no initial override, and restores the captured runtime default after a warm manual choice.
+- [x] Claude, Codex execute/plan, and ACP `thought_level` adapters map only advertised explicit levels and record requested/applied evidence.
+- [x] Unsupported/unknown values are rejected; model changes invalidate an unavailable preference to Auto with user-visible copy.
+- [x] Preferences remain conversation/runtime-scoped; accepted and queued turns keep immutable effort snapshots across switching and reload.
+- [x] OpenCode remains lazy and exposes effort only after the live ACP session advertises compatible thought levels.
+- [x] Feature-flag OFF omits the control without deleting saved preferences.
+- [x] Native RunDev smoke: range drag, click/arrow operation, Auto checkbox, Escape/focus return, 300px sidebar collision, normal width, and 200% zoom geometry pass in `ritemark-demo` (2026-08-24).
+- [x] Native range/checkbox names, value text, keyboard semantics, live status copy, and reduced-motion CSS contract are present; no bespoke slider keyboard behavior is used.
+
+## Claude model identity (RC bug fix)
+
+- [x] Live Claude 2.1.239 discovery resolves `default` and `opus[1m]` to one `claude-opus-5[1m]` catalog row while Fable, Sonnet, and Haiku remain distinct.
+- [x] Persisted request aliases and canonical resolved IDs reconcile to the representative explicit request ID.
+- [x] Alias-equivalent init identity stays quiet; a genuinely different actual model still produces **Model mismatch**.
+- [x] The default row contains one visual `*` plus explicit screen-reader and tooltip copy.
+- [x] At a 299 px AI-sidebar viewport, the closed permission control shows only its mode icon and the selected model receives the freed width; reopening the control still shows every full mode label.
+- [x] At a 299 px AI-sidebar viewport, thinking effort shows only its level-aware icon; tooltip and accessible name retain the exact effort value and the opened control retains its full labels.
+- [x] New conversation, conversation, and history buttons in the thread rail have a measured vertical gap of 4 px, including when the rail has no visible conversations; a pinned divider has 4 px clearance before and after its 1 px line.
+- [ ] Verify the one-row picker and absence of a false mismatch in the final packaged release candidate.
+
+## Claude sign-in recovery (RC bug fix)
+
+- [x] The exact provider error `Failed to authenticate: OAuth session expired and could not be refreshed` is classified as an authentication failure and replaced with plain-language transcript copy.
+- [x] The recovery card uses the existing `agent-setup:login` route and the same app-global Claude browser-login coordinator as Settings and command actions; a second surface cannot spawn a competing login subprocess.
+- [x] A proven auth failure and sign-in transition release every warm Ritemark Claude session; missing-auth and login-started transitions do not spawn a model-discovery Claude process.
+- [x] Extension compile, webview typecheck, focused error-presentation test, and Claude runtime adapter regression pass.
+- [x] In RunDev, inject the exact OAuth failure, verify the raw provider sentence is absent from the visible response, click **Sign in to Claude**, and capture/visually inspect the recovery card at narrow and normal sidebar widths. Verified 2026-09-01 at 300 px and 480 px; the CTA reached the shared browser-login route and the test account remained signed out.
+- [x] A subsequent `needs-auth` setup refresh keeps the failed turn and inline sign-in CTA visible instead of replacing chat with the full-sidebar Setup Wizard. Verified 2026-09-01 by sequential RunDev event injection and visual inspection.
+- [x] A chat CTA joining a login already started from Settings receives the same completion/cancel terminal callback; coordinator fan-out regression passes and no joined surface retains `setupInProgress`.
+- [x] Store regressions cover the chat recovery lifecycle: click starts `pending`, either `agent-setup:complete` or a polled ready `agent:config` produces `success`, error/cancel produces a retry state, and **OK** persistently dismisses only the recovered turn.
+- [x] Settings/Onboarding login starts without a chat turn ID and both ready callback paths return its lifecycle to `idle` without fabricating a hidden login error; a later auth loss can show Setup again because dismissed historical turns are excluded from the inline-recovery gate. Verified end-to-end in RunDev on 2026-09-01: dismiss recovery → inject `needs-auth` → visually inspect restored Setup Wizard → complete its shared login → return to clean chat without an error card.
+
+## Provider availability isolation (RC bug fix)
+
+- [x] One normalized discriminated availability union covers checking, ready, auth, configuration, install, repair, disabled, and probe-error states; only `ready` is usable.
+- [x] Existing transcripts, Composer, and model selection remain visible when the selected provider is unavailable but another provider is ready. Empty setup/onboarding takeover is allowed only when no usable provider and no conversation require preservation.
+- [x] Switching from a recovery card changes the pending runtime and model atomically and never dispatches before the next explicit Send; late bootstrap/status refresh cannot rebind a non-empty conversation.
+- [x] Auth loss interrupts, checkpoints, and releases only the affected provider's live sessions.
+- [x] Fresh-profile RUNDEV on 2026-09-03: deterministic Claude `needs-auth` plus real connected Codex preserved the completed transcript, rendered one compact recovery card, kept `Sign in` left of the rightmost primary `Use Codex` even at the 240 px minimum sidebar width, and switched the same conversation explicitly. Settings showed `Codex · Ready · Bundled with app · v0.153.0`; a real GPT-5.6-Sol canary completed before the injected auth state.
+- [ ] Repeat provider-isolation and authenticated-turn canaries in the exact signed arm64 replacement candidate.
+- [x] In RunDev, the real shared login callback changed the same canonical OAuth recovery card to **You’re signed in to Claude**; the **OK** primary action was visually verified at the right edge of the action bar and removed the full card without leaving an error/status line (2026-09-01, narrow sidebar screenshot inspected).
+- [x] In RUNDEV, visually verify **Waiting for sign-in…** with a deterministic `auth-in-progress` state at minimum sidebar width. The status occupies its own readable row and the right-aligned **Use Codex** primary remains available beneath it (2026-09-03).
+- [ ] In RUNDEV, visually verify the **Try again** state using a deliberately failed status probe; its recovery action is covered by the focused state regression.
+- [x] The same generic provider authentication sentence under `anthropic-api-key` is classified as `api-key-authentication` and offers **Update API key**, never the Claude.ai OAuth action. Verified in RunDev 2026-09-01; the card was visually inspected and its CTA opened the existing Ritemark Settings editor without mutating a key.
+- [x] Friendly failure copy and its auth-method-aware recovery category are stored on the canonical terminal event; projection/controller regressions verify **Sign in to Claude** or **Update API key** survives window reload and conversation navigation. A stopped-profile canonical OAuth-failure fixture was restored in a fresh RunDev process and the resulting card was captured and visually inspected (2026-09-01).
+- [x] The recovery alert uses the Ritemark card system rather than VS Code validation-warning colours: 10 px radius, neutral surface and hairline, amber confined to the attention icon, and the standard indigo CTA. A fresh RunDev canonical OAuth-failure fixture was captured and visually inspected at the narrow sidebar width; computed styles confirmed the 10 px radius and theme surface, and the duplicate red raw-error status was absent (2026-09-01).
+- [x] Restored warning cards are named semantic groups rather than assertive live alerts, so reopening a transcript does not make a screen reader re-announce every historical failure; only the transient pending/success/error login states use polite status semantics.
+- [ ] Repeat the recovery path on the final packaged release candidate; cancel before completing a test-account login unless the release owner explicitly wants credential mutation.
+
+## Transcribe Insights and speaker names (Sprint 113)
+
+- [x] Auto/known/custom language contract, catalog search, custom normalization, fallback, invalid-wire, data-only prompt language, quote-fidelity instruction, and legacy-English provenance tests pass.
+- [x] Insights-only Markdown, `.md` normalization, Windows-invalid names, primary/existing/case-alias rejection, exclusive-create race, write-failure cleanup, and transcript bytes/mtime isolation tests pass.
+- [x] Full-name normalization, Unicode, empty rejection, transcript export, Insights prompt attribution, and interactive-target playback guards pass.
+- [x] Runtime-policy tests confirm low extraction effort, no built-in SDK tools, no coding-agent setting sources, and unchanged default session behavior elsewhere.
+- [x] Post-fix authenticated timing runs against the same 48-minute transcript complete in 27.2s and 15.2s versus the 3m43.5s baseline; the final run persists German output correctly. Timestamp-seek regression remains covered separately below.
+- [ ] Manual custom-language generation preserves verbatim source quotes and working timestamp seeks; authenticated known-language German generation already passed, and Jarmo deferred this remaining custom call to release QA.
+- [x] Manual save-dialog success creates a separate Estonian Insights Markdown snapshot and leaves the workbench primary action as **Save to document**.
+- [ ] Manual save-dialog cancel, collision, primary-path refusal, optional Open action, and broader transcript-link isolation matrix pass.
+- [ ] Manual keyboard, screen-reader labels, narrow rail, 200% zoom, light/dark/high-contrast, speaker-chip/gutter ellipsis, and full-name tooltip pass.
+
+First draft PR #217 smoke on 2026-08-24 failed two checks: **Regenerate** preceded the language selector in DOM/tab order, and approximately 207% zoom produced `innerWidth=354` with `scrollWidth=1080`, clipping the editor. Local DOM-order and responsive-containment fixes plus automated regressions were completed; manual PR retest was still pending at that checkpoint, so the rows remained unchecked.
+
+The first responsive-fix rerun passed keyboard order, horizontal containment, wider zoom, and long-name checks, but the exact `354×300` case still collapsed Insights to `clientHeight=0`, clipped focused rail controls, and showed a native orange **Regenerate** outline. A second local fix then bounded the upper chrome and rail scrollers, reserved two equal narrow pane rows, and applied the approved 4 px translucent indigo ring. Another manual rerun was still required at that checkpoint; the rows remained unchecked.
+
+The final Electron rerun passes at exact `354×300` / DPR `4.147200107574463`: document/body/root stay exactly viewport-sized with zero document overflow; chrome is 150 px; pane rows are `74.9904px`; transcript and Insights use bounded independent scrollers; language, **Regenerate**, and **Create insights document** focus rectangles are wholly visible; and **Regenerate** has the 4 px translucent indigo ring with no orange native outline. `654×300` high zoom, `1400×766` desktop, and long-name ellipsis/full accessible-name checks also pass. The later live R6 smoke successfully created `KUMi AI arutelu - Risto Raaperiga-insights.md` as a separate Estonian snapshot while the workbench still showed **Save to document**. Authenticated known-language generation later passed in German; custom-language generation and the broader negative save/spoken/theme matrix remain explicit release-QA rows by owner decision.
+
+## Reliable editor–disk synchronization (Sprint 115)
+
+- [x] A generic external write appears in a focused open Markdown editor without close/reopen; a normal loaded view acknowledges in 5–75 ms in the observed run.
+- [x] A visible CSV table applies a clean external write and acknowledges only after parsing/render scheduling, without a false header action.
+- [x] Local-only typing with autosave off stays visible and quiet beyond the former ten-second timer while disk bytes remain unchanged.
+- [x] Twenty rapid type → save → continue-typing cycles keep the view quiet, retain every visible suffix, and end byte-equivalent to disk; deterministic ordered receipts cover successful ordinary and format-on-save disk content, reject matches superseded by a later already-confirmed save, retire stale receipts after unmatched observations, preserve saves completed during an older read, and keep canceled/unconfirmed or unknown snapshots on the true-conflict path (2026-08-31 RC correction).
+- [x] An empty Markdown document accepts `# ` as the first input rule, renders the following text as H1, saves as `# …`, and shows no conflict surface (2026-08-31 live dev smoke plus focused regression).
+- [x] True divergence preserves immutable local and disk snapshots beyond ten seconds and exposes only **Review changes**.
+- [x] **Compare changes** opens read-only in-memory text inputs without recursively activating the custom editor.
+- [x] **Use disk version** is one model edit; Cmd-Z restores the exact prior local snapshot as dirty while disk remains unchanged.
+- [x] **Keep my version** rechecks the exact disk validator, persists the final conflict-time local snapshot, refreshes clean/etag state, and retains Undo.
+- [x] Two visible views of one URI receive distinct epochs and both acknowledge; disposing one does not dispose the shared watcher/poll; a hidden view catches up when shown.
+- [x] Exact ACK, wrong receipt, bounded 750 ms / 2.5 s / 5 s retry, stale revision, cross-session validation, dirty-initial-open, EOL/BOM, conflict-time typing, and visible-view resolution invariants pass deterministically.
+- [ ] Force a real visible-webview receipt loss through the final release build and verify the five-second **Retry document update** path end to end.
+- [ ] Repeat light/dark/high-contrast, keyboard-only, spoken screen-reader, and 200% zoom checks on the final release build.
+- [ ] Repeat rename/delete/save-as, generic-process and formatter writes, focused/blurred editors, continuous typing, delayed autosave, burst writes, multi-root/standalone, rapid/large-file, previous-epoch, and exact Claude/Codex/ACP-origin rows on the final release build.
+- [ ] Verify front matter, properties, comments, relative images, CSV rows/cells, Undo/recovery, and save semantics remain intact through packaged-candidate reconciliation.
+- [ ] Inject a non-cooperating write during Keep-local resolution and record/accept the explicit last-writer boundary; local filesystem APIs provide no atomic content-hash CAS beyond the implemented immediate validator check and post-write verification.
+
+## Task-list Markdown round-trip (RC bug fix)
+
+- [x] Deterministic conversion covers tight and loose GFM task lists, checked and unchecked state, nested task lists, mixed adjacent task/bullet runs, and rejects non-leading inline checkboxes.
+- [x] TipTap task nodes serialize to compact `- [ ]` / `- [x]` Markdown and reparsing restores the same task semantics.
+- [x] Fresh RunDev UI creates and checks task items, writes the expected raw Markdown, reopens a valid loose-GFM fixture as real checkboxes, preserves checked state through another UI edit/save, and passes a second close/reopen. The final rebuilt bundle also opens compact and loose fixtures without a false dirty tab, marks dirty only after a real checkbox click, returns clean after save, writes the expected three `[x]` rows, and reopens clean with all checks visible (2026-09-02; screenshots and disk hashes inspected).
+- [ ] Repeat the same lifecycle on the newly installed exact-main arm64 release candidate.
+
+## Automated gates
+
+### Product Help menu (RC bug fix)
+
+- [x] Historical audit traces the regression to Help-specific hunks dropped during the VS Code 1.117 patch rebase and records the stable Ritemark product policy.
+- [x] The native and custom menubar paths share one Ritemark-only fail-closed allowlist; unknown future upstream Help contributions are rejected and separators are normalized.
+- [x] Focused Electron unit suite passes 4/4, VS Code `compile-client` reports zero errors, native TypeScript validation passes, and the full canonical patch stack applies in the fresh CI asset-parity simulation (2026-09-02).
+- [x] Fresh RunDev accessibility inspection exposes exactly **Support**, **View License**, and **Advanced → Toggle Developer Tools**; no VS Code-only Help item is present.
+- [ ] Capture and visually inspect the open native macOS Help menu. Computer Use exposes the exact menu through accessibility, but this machine's automated `screencapture` path drops accessibility-opened native menu overlays; do not treat the underlying RunDev-window screenshot as evidence.
+- [ ] Repeat the exact Help-menu check on the final packaged release candidate.
+
+- [x] Extension TypeScript compile and bundle.
+- [x] Webview TypeScript typecheck and production bundle.
+- [x] Focused continuation, context-pack, controller/store, three-adapter, projection, presentation, and runtime-switch tests.
+- [x] Complete conversation regression suite.
+- [x] `./scripts/validate-qa.sh` on the final Sprint 110 branch (2026-08-23).
+- [x] Sprint 110 fresh-profile migration+resume canary.
+- [x] Sprint 111 exact-manifest validator, validator mutation tests, extension compile, focused runtime suites, and deterministic extension suite.
+- [x] Sprint 112 official QA, focused effort/runtime suites, conversation regressions, extension compile, and webview typecheck/build (2026-08-24).
+- [x] Sprint 115 focused state/protocol/delivery/reducer suite (26/26), extension compile, webview typecheck, production bundle, final-bundle Compare→Keep-local→Undo smoke, and official repository QA (final post-review automation rerun 2026-08-25).
+- [x] RC editor corrections: 36/36 focused editor-sync tests, exact save-receipt shell compile plus 15/15 targeted VS Code save tests, extension compile, webview typecheck/build, and live empty-H1 plus 20-cycle rapid-save smoke pass (2026-08-31).
+- [x] RC task-list correction: focused task-list round-trip suite, extension compile, webview typecheck/build, and fresh exact-source RunDev close/reopen/edit/save/reopen smoke pass (2026-09-02).
+- [x] Release preflight passes on clean synchronized `main` after all v1.10.0 sprints and focused RC fixes merge (2026-08-29).
+- [ ] RC runtime-component correction passes repository QA, release preflight, native runtime CI, signed-package component checks, and the packaged Codex file-tool canary on its final merged commit.
+- [ ] Final packaged migration+resume canary passes on the exact arm64 Gate 1 candidate.
+
+## Remaining release scope
+
+- [ ] Sprint 113 residual custom-language plus manual negative save-dialog, spoken screen-reader, and theme/high-contrast matrix; authenticated known-language generation and sprint closure already passed.
+- [ ] Sprint 115 forced live receipt-loss plus residual accessibility/theme/lifecycle/runtime-origin release matrix.
+- [x] Final macOS arm64/x64 and Windows candidate gates. Jarmo approved the signed arm64 candidate (Gate 1), the signed/un-notarized x64 DMG, and the Windows installer on a clean Windows 11 machine with Smart App Control **On** (Gate 2, 2026-09-05). Both DMGs were notarized and stapled afterwards; the Windows installer ships the exact tested bytes.

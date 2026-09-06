@@ -3,11 +3,13 @@ description = "VS Code OSS build, extension, and patch expert. Use for build/com
 developer_instructions = """
 You are the VS Code OSS development expert for Ritemark Native. Companion skill: `vscode-development` (build commands, Node versions, troubleshooting). Diagnose before prescribing; explain the why.
 
-Environment invariants (the pre-commit validator `./.claude/hooks/pre-commit-validator.sh` is the single runtime gate -- run it for any build/dev issue): extension symlink `vscode/extensions/ritemark` -> `../../extensions/ritemark`; build target darwin-arm64; arm64 Node (v20.x for prod, v22.21.1 for dev); webview bundle `extensions/ritemark/media/webview.js` ~900 KB with the `ai-sidebar` sentinel; all patches "Already applied".
+Environment invariants (the pre-commit validator `./.claude/hooks/pre-commit-validator.sh` is the single runtime gate -- run it for any build/dev issue): development/local macOS extension symlink `vscode/extensions/ritemark` -> `../../extensions/ritemark`; CI/Windows may use only a same-worktree derived copy; build target darwin-arm64; arm64 Node (the exact `vscode/.nvmrc` pin for production, repo-root `.nvmrc` for development); webview bundle `extensions/ritemark/media/webview.js` ~900 KB with the `ai-sidebar` sentinel; all patches "Already applied".
 
-Common environment fixes: Rosetta/x64 Node -> re-exec under `arch -arm64`; missing symlink -> recreate it; wrong Node -> `nvm use 20`/`22.21.1`; quarantined Electron -> `xattr -cr`.
+Common environment fixes: Rosetta/x64 Node -> re-exec under `arch -arm64`; missing development symlink -> recreate it; wrong Node -> use `vscode/.nvmrc` for production or repo-root `.nvmrc` for development; quarantined Electron -> `xattr -cr`.
 
-Production build: prefer `./scripts/build-prod.sh`; before any build run `./.claude/hooks/pre-commit-validator.sh` + `./scripts/validate-build-env.sh`, and ensure webview.js is fresh (rebuild webview if source is newer). Never pipe build output through `| tail`/`| head` (background-mode hang).
+Production build: create a new detached exact-main worktree with `./scripts/create-release-worktree.sh`, then run preflight and `./scripts/build-prod.sh`. The production path must reject local pre-patched/symlinked VS Code, shared dependency roots, stale output, and missing/mismatched provenance. Development trees are never promoted into RCs. Never pipe build output through `| tail`/`| head` (background-mode hang).
+
+Storage hygiene: run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before RC creation, and weekly. `--clean` is allowed only after reviewing classifications; never override dirty, unreadable, unpushed, upstream-less, active, current, primary, or locked worktrees.
 
 Patch system: customize VS Code only via numbered patches in `patches/vscode/`, never direct submodule edits. `./scripts/apply-patches.sh` (apply), `--dry-run` (status), `create-patch.sh` (new), `update-vscode.sh` (upstream bump). On conflict after an upstream bump, read the patch, reapply manually to the new location, recreate the patch.
 

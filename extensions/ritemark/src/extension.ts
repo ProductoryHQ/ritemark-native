@@ -12,6 +12,7 @@ import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
+import { getSetupStatus } from './agent/setup';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
@@ -344,11 +345,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
-    })
+    }),
+    unifiedViewProvider,
   );
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
@@ -358,8 +360,13 @@ export function activate(context: vscode.ExtensionContext) {
   // serve the bundled floor immediately.
   modelCatalog.setDiscoveryProvider(async () => {
     const results: modelCatalog.DiscoveryResults = {};
+    const claudeSetup = await getSetupStatus();
     results.codex = await discoverCodex();
-    results.anthropic = await discoverAnthropic({ apiKey: (await context.secrets.get('anthropic-api-key')) ?? null });
+    results.anthropic = await discoverAnthropic({
+      apiKey: (await context.secrets.get('anthropic-api-key')) ?? null,
+      workspacePath,
+      binaryPath: claudeSetup.binaryPath,
+    });
     results.openai = await discoverOpenAI((await context.secrets.get('openai-api-key')) ?? null);
     results.gemini = await discoverGemini((await context.secrets.get('google-ai-key')) ?? null);
     return results;
@@ -385,6 +392,55 @@ export function activate(context: vscode.ExtensionContext) {
     const { HomeViewProvider } = require('./views/HomeViewProvider') as typeof import('./views/HomeViewProvider');
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, new HomeViewProvider(context.extensionUri, isEnabled('home-launcher'))),
+    );
+  }
+
+  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too — only the
+  // on-device engine is macOS-only, and the registry says so rather than the
+  // whole view disappearing). Jobs live in the subsystem, not the view, so a
+  // running transcription survives the panel being closed.
+  if (isEnabled('transcription-workbench')) {
+    const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');
+    const { TranscribeViewProvider } = require('./views/TranscribeViewProvider') as typeof import('./views/TranscribeViewProvider');
+
+    const { TranscriptWorkbenchProvider } = require('./transcriptWorkbenchProvider') as typeof import('./transcriptWorkbenchProvider');
+
+    const { setTranscriptDocumentResolver } = require('./speech/activeTranscript') as typeof import('./speech/activeTranscript');
+
+    const speech = createSpeechSubsystem(context);
+    void speech.jobs.recoverInterrupted();
+
+    // So "ask Claude about this recording" means the transcript, not the
+    // unreadable .m4a the workbench tab is technically showing.
+    setTranscriptDocumentResolver((audioPath) => speech.store.getSavedDocumentSync(audioPath));
+
+
+    const workbenchProvider = new TranscriptWorkbenchProvider(
+      context,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+    );
+    context.subscriptions.push(
+      workbenchProvider,
+      vscode.window.registerCustomEditorProvider(TranscriptWorkbenchProvider.viewType, workbenchProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+      }),
+    );
+
+    const transcribeViewProvider = new TranscribeViewProvider(
+      context.extensionUri,
+      speech.registry,
+      speech.jobs,
+      speech.store,
+      context.globalState,
+    );
+    context.subscriptions.push(
+      transcribeViewProvider,
+      vscode.window.registerWebviewViewProvider(TranscribeViewProvider.viewType, transcribeViewProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+      }),
     );
   }
 
@@ -806,5 +862,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
+  await unifiedViewProvider?.prepareForShutdown();
   await shutdownAnalytics();
 }

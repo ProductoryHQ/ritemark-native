@@ -58,11 +58,22 @@ const mockManager = {
   currentSessionId: 'ses-1',
   hasSession: () => true,
   start: async () => { calls.push('start'); return `ses-${++sessionSeq}`; },
+  resume: async (sessionId: string) => { calls.push(`resume:${sessionId}`); },
   prompt: async (_sessionId: string, _text: string) => {
     calls.push('prompt');
     return { stopReason: 'end_turn', usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 } };
   },
   setModel: async (_sessionId: string, _model: string) => { calls.push('setModel'); },
+  getThinkingEffortCapability: () => ({
+    selectable: ['low', 'medium', 'high'],
+    defaultLevel: 'medium',
+    source: 'runtime-live',
+    supportsAppliedValue: true,
+  }),
+  setThinkingEffort: async (_sessionId: string, effort: string) => {
+    calls.push(`setThinkingEffort:${effort}`);
+    return effort === 'auto' ? 'medium' : effort;
+  },
   cancel: async (_sessionId: string) => { calls.push('cancel'); },
   closeSession: (_sessionId: string) => { calls.push('closeSession'); },
   dispose: () => { calls.push('dispose'); },
@@ -248,6 +259,58 @@ async function run() {
     console.log('✓ Test 6: prompt() calls setModel and manager.prompt()');
   }
 
+  // Thinking effort is applied before the prompt, and Auto restores the live default.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const session = addSession(runtime, 'conv-effort');
+    await session.prompt({ prompt: 'thorough', thinkingEffort: 'high' });
+    await session.prompt({ prompt: 'default again', thinkingEffort: 'auto' });
+    assert.ok(calls.indexOf('setThinkingEffort:high') < calls.indexOf('prompt'));
+    assert.ok(calls.includes('setThinkingEffort:auto'), 'Auto restores the captured ACP default after a manual override');
+    console.log('✓ Test 6b: ACP effort applies before prompt and Auto restores the live default');
+  }
+
+  // A rejected live option falls back to Auto without dropping the user prompt.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const applied: Array<{ requested: string; adjusted: boolean }> = [];
+    const session = addSession(runtime, 'conv-effort-fallback', {
+      ...dummyConfig,
+      onThinkingEffortApplied: (result) => applied.push(result),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = {
+      ...mockManager,
+      setThinkingEffort: async (_sessionId: string, effort: string) => {
+        if (effort === 'high') throw new Error('option rejected');
+        return 'medium';
+      },
+    };
+    await session.prompt({ prompt: 'still send', thinkingEffort: 'high' });
+    assert.ok(calls.includes('prompt'), 'effort rejection must not drop the accepted prompt');
+    assert.equal(applied[0]?.adjusted, true);
+    console.log('✓ Test 6c: rejected ACP effort falls back to Auto and still prompts');
+  }
+
+  // ACP remains provider-driven, but every level actually advertised by the
+  // live option must be forwarded verbatim before its associated prompt.
+  {
+    const runtime = new AcpRuntime();
+    calls.length = 0;
+    const session = addSession(runtime, 'conv-effort-matrix');
+    const advertised = ['low', 'medium', 'high'] as const;
+    for (const effort of advertised) {
+      await session.prompt({ prompt: `Use ${effort}`, thinkingEffort: effort });
+    }
+    assert.deepStrictEqual(
+      calls.filter((call) => call.startsWith('setThinkingEffort:')),
+      advertised.map((effort) => `setThinkingEffort:${effort}`),
+    );
+    console.log('✓ Test 6d: every live-advertised ACP effort is forwarded unchanged');
+  }
+
   // ── Test 7: C1 REGRESSION — two sessions must not share write-approval state.
   // Before Sprint 99 `_recentlyPermissionedWrites` was a process-wide
   // Set<filePath> on the runtime: chat A approving a write to foo.md silently
@@ -330,6 +393,46 @@ async function run() {
 
   await testHungTurnTimesOut();
 
+  // ACP continuation uses session/resume (never session/load) and retains the
+  // provider session id as a host-only checkpoint.
+  {
+    const runtime = new AcpRuntime();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = mockManager;
+    calls.length = 0;
+    const states: string[] = [];
+    const checkpoints: string[] = [];
+    const compatibility = {
+      runtimeId: 'opencode' as const,
+      scopeId: `ps1-${'b'.repeat(40)}`,
+      runtimeVersion: '1.18.21',
+      adapterContractVersion: 1,
+      modelId: 'opencode:anthropic/claude-opus-4-1',
+      compatibilityFingerprint: 'fingerprint',
+    };
+    const session = await runtime.createSession('conv-resume', {
+      ...dummyConfig,
+      continuation: {
+        compatibility,
+        descriptor: {
+          descriptorVersion: 1,
+          ...compatibility,
+          nativeReference: 'ses-resume-me',
+          coveredThroughEventId: 'assistant-final-2',
+          capturedAt: '2026-08-23T10:00:00.000Z',
+        },
+      },
+      onContinuationState: (state) => states.push(state.mode),
+      onContinuationCheckpoint: (descriptor) => checkpoints.push(descriptor.nativeReference),
+    });
+    assert.strictEqual((session as AcpSession).acpSessionId, 'ses-resume-me');
+    assert.ok(calls.includes('resume:ses-resume-me'));
+    assert.ok(!calls.includes('start'), 'compatible resume does not mint a new ACP session');
+    assert.deepStrictEqual(states, ['pending', 'native-restored']);
+    assert.deepStrictEqual(checkpoints, ['ses-resume-me']);
+    console.log('✓ Test 12: ACP session/resume is used without session/load');
+  }
+
   // ── Test 9: Sprint 101 — capability context prefixed, order preserved ──
   {
     const turn = { prompt: 'rewrite this', activeFile: { path: 'notes.md' } };
@@ -370,7 +473,20 @@ async function run() {
     console.log('✓ Test 10: capability context is once-per-session');
   }
 
-  console.log('\nAll 13 AcpRuntime tests passed!');
+  // First provider progress/tool/final evidence advances dispatch exactly once.
+  {
+    let accepted = 0;
+    const session = new AcpSession('conv-dispatch', 'ses-dispatch', {
+      ...dummyConfig,
+      onDispatchAccepted: () => { accepted += 1; },
+    }, {} as AcpRuntime);
+    session.markDispatchAccepted();
+    session.markDispatchAccepted();
+    assert.strictEqual(accepted, 1);
+    console.log('✓ Test 13: ACP provider evidence accepts dispatch once');
+  }
+
+  console.log('\nAll 15 AcpRuntime tests passed!');
 }
 
 run().then(

@@ -14,6 +14,17 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `002-ritemark-ui-layout.patch` | Sidebar, titlebar, tabs, explorer, panels |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
+| `005-ritemark-windows-and-oss-fixes.patch` | Windows packaging and OSS compatibility fixes |
+| `006-ritemark-dev-launch-fallback.patch` | Development launch fallback behavior |
+| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 compatibility adjustments |
+| `008-ritemark-windows-binary-strip.patch` | Windows binary packaging exclusions |
+| `009-ritemark-browser-context-bridge.patch` | Browser context bridge |
+| `010-ritemark-browser-action-bridge.patch` | Browser action bridge |
+| `011-ritemark-cloud-file-error.patch` | Cloud-file error handling |
+| `012-ritemark-shell-watchdog.patch` | Shell startup watchdog |
+| `013-ritemark-configuration-defaults.patch` | Product configuration defaults |
+| `014-ritemark-save-receipts.patch` | Exact successful-save identity for editor–disk synchronization |
+| `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars |
 
 ## Commands
 
@@ -21,7 +32,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 # Apply all patches
 ./scripts/apply-patches.sh
 
-# Check status without applying
+# Validate the complete ordered stack against pristine VS Code HEAD without
+# changing the worktree
 ./scripts/apply-patches.sh --dry-run
 
 # Create a new patch

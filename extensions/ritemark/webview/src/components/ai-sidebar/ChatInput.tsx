@@ -25,14 +25,17 @@ import {
   useAIInformationDisclosure,
 } from './AIInformation';
 import { resolveAIIdentity } from './aiDisclosure';
+import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
+import { ThinkingEffortControl } from './ThinkingEffortControl';
+import { deriveRuntimeAvailabilities, RUNTIME_LABELS } from './runtimeAvailability';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
-import type { AgentId, FileAttachment, AttachmentKind } from './types';
+import type { FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -46,32 +49,6 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
-
-/**
- * Split a Claude SDK model description into two parts so the dropdown can
- * mirror Claude Desktop's layout: large version line on top, short purpose
- * tagline underneath.
- *
- * Input examples from the SDK's `supportedModels()`:
- *   "Opus 4.8 with 1M context · Most capable"
- *   "Sonnet 4.6 · Best for everyday tasks"
- *   "Haiku 4.5 · Fastest for quick answers"
- *
- * For Codex (no " · " separator) the whole string is the tagline and the
- * version line stays empty — Codex labels already carry the version.
- */
-function parseModelDescription(description: string | undefined): {
-  versionLine: string | null;
-  tagline: string;
-} {
-  if (!description) return { versionLine: null, tagline: '' };
-  const sep = description.indexOf(' · ');
-  if (sep < 0) return { versionLine: null, tagline: description.trim() };
-  return {
-    versionLine: description.slice(0, sep).trim(),
-    tagline: description.slice(sep + 3).trim(),
-  };
-}
 
 /** Dropped file path chip */
 interface PathChip {
@@ -188,26 +165,31 @@ export function ChatInput() {
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
 
+  const activeConversation = useActiveConversation();
   const {
     pendingRuntime,
     isStreaming,
     agentConversation,
     codexConversation,
-    selectedAgent,
     selectedModel,
     codexSelectedModel,
     opencodeSelectedModel,
-  } = useActiveConversation();
+  } = activeConversation;
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const runtimeCapabilities = useAISidebarStore((s) => s.runtimeCapabilities);
+  const thinkingEffortCapabilities = useAISidebarStore((s) => s.thinkingEffortCapabilities);
+  const thinkingEffortNotice = useAISidebarStore((s) => activeConversationId
+    ? s.thinkingEffortNotices[activeConversationId] ?? null
+    : null);
+  const composerThinkingEffortEnabled = useAISidebarStore((s) => s.composerThinkingEffortEnabled);
   const agents = useAISidebarStore((s) => s.agents);
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
   const agenticEnabled = useAISidebarStore((s) => s.agenticEnabled);
-  const selectAgent = useAISidebarStore((s) => s.selectAgent);
-  const selectModel = useAISidebarStore((s) => s.selectModel);
-  const selectCodexModel = useAISidebarStore((s) => s.selectCodexModel);
+  const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const setPendingRuntime = useAISidebarStore((s) => s.setPendingRuntime);
+  const setThinkingEffort = useAISidebarStore((s) => s.setThinkingEffort);
+  const clearThinkingEffortNotice = useAISidebarStore((s) => s.clearThinkingEffortNotice);
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const cancelRequest = useAISidebarStore((s) => s.cancelRequest);
   const discoveredAgents = useAISidebarStore((s) => s.discoveredAgents);
@@ -231,19 +213,35 @@ export function ChatInput() {
   const sendCodexMessage = useAISidebarStore((s) => s.sendCodexMessage);
   const sendOpenCodeMessage = useAISidebarStore((s) => s.sendOpenCodeMessage);
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const selectOpenCodeModel = useAISidebarStore((s) => s.selectOpenCodeModel);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
 
   // Route by pendingRuntime so switching provider mid-session takes effect immediately
   const isClaudeCode = pendingRuntime.runtimeId === 'claude-code';
   const isCodex = pendingRuntime.runtimeId === 'codex';
   const isOpenCode = (pendingRuntime.runtimeId as string) === 'opencode';
   const isAgentMode = isClaudeCode || isCodex || isOpenCode;
+  const runtimeAvailabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const operationalStatus = runtimeAvailabilities[pendingRuntime.runtimeId];
+  const isRuntimeChecking = operationalStatus.state === 'checking';
+  const isRuntimeError = operationalStatus.state === 'error';
+  const isRuntimeOperational = operationalStatus.usable;
   // Sprint 103 R8: two-axis composer policy (legacy 'plan' mode normalized).
   const composerPolicy = policyOf(pendingRuntime);
+  const composerThinkingEffort = composerThinkingEffortEnabled
+    ? activeConversation.thinkingEffortByRuntime[pendingRuntime.runtimeId] ?? 'auto'
+    : 'auto';
   // R6: the Plan chip renders only for runtimes with an enforceable plan contract.
   const planCapable = runtimeCapabilities[pendingRuntime.runtimeId]?.planFirst === true;
   // OpenCode zero-key check: all four provider booleans are false
@@ -261,7 +259,14 @@ export function ChatInput() {
   const isLoading = isAgentMode ? agentRunning : isStreaming;
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
   // Enter queues the next prompt instead of sending it.
-  const placeholder = isLoading && isAgentMode
+  const runtimeLabel = RUNTIME_LABELS[pendingRuntime.runtimeId];
+  const placeholder = isRuntimeChecking
+    ? `Checking ${runtimeLabel}…`
+    : isRuntimeError
+      ? `${runtimeLabel} is unavailable — try again above`
+    : !isRuntimeOperational
+      ? `${runtimeLabel} needs attention — choose another model or use the action above`
+    : isLoading && isAgentMode
     ? 'Add a follow-up… (Enter queues it for when the agent finishes)'
     // Sprint 103 R8: the placeholder is the cheapest honest signal that the
     // next message runs plan-first.
@@ -294,6 +299,7 @@ export function ChatInput() {
         : pendingRuntime.runtimeId === 'opencode'
           ? opencodeSelectedModel
           : (pendingRuntime.modelId ?? selectedModel),
+      thinkingEffort: composerThinkingEffort,
       prompt,
       displayText,
       source: 'composer',
@@ -307,7 +313,7 @@ export function ChatInput() {
       setTimeout(() => setQueueFullNotice(false), 4000);
     }
     return outcome;
-  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
 
 
   // Build final message with path chips and pinned agent prepended
@@ -350,7 +356,7 @@ export function ChatInput() {
       return;
     }
 
-    if (!isOnline || isLoading || (isCodex && codexStatus.state !== 'ready')) return;
+    if (!isOnline || isLoading || !isRuntimeOperational) return;
 
     // Build hidden context (agent instructions — sent to AI but not shown in chat).
     // Dismissal + new pin can both be active when switching agents A → B.
@@ -408,7 +414,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, codexStatus.state, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -894,16 +900,55 @@ export function ChatInput() {
     }
   }
   const currentOpenCodeEntry = openCodeModels.find((m) => m.compositeValue === opencodeSelectedModel);
+  const currentCatalogEffort = pendingRuntime.runtimeId === 'codex'
+    ? currentCodexModel?.thinkingEffort
+    : pendingRuntime.runtimeId === 'claude-code'
+      ? currentClaudeModel?.thinkingEffort
+      : undefined;
+  const effortCapability = useMemo<ThinkingEffortCapability | null>(() => {
+    if (runtimeCapabilities[pendingRuntime.runtimeId]?.thinkingEffortSource === 'runtime-live') {
+      return activeConversationId
+        ? thinkingEffortCapabilities[activeConversationId]?.[pendingRuntime.runtimeId] ?? null
+        : null;
+    }
+    return {
+      selectable: currentCatalogEffort?.levels ?? [],
+      ...(currentCatalogEffort?.defaultLevel ? { defaultLevel: currentCatalogEffort.defaultLevel } : {}),
+      source: 'model-catalog',
+      supportsAppliedValue: false,
+    };
+  }, [activeConversationId, currentCatalogEffort, pendingRuntime.runtimeId, runtimeCapabilities, thinkingEffortCapabilities]);
+  const [localEffortNotice, setLocalEffortNotice] = useState<string | null>(null);
+
+  useEffect(() => setLocalEffortNotice(null), [activeConversationId]);
+
+  useEffect(() => {
+    if (!effortCapability || composerThinkingEffort === 'auto') return;
+    if (effortCapability.selectable.includes(composerThinkingEffort)) return;
+    const labels: Record<string, string> = { xhigh: 'Extra', low: 'Low', medium: 'Medium', high: 'High', max: 'Max', ultra: 'Ultra' };
+    setThinkingEffort('auto');
+    setLocalEffortNotice(`${labels[composerThinkingEffort] ?? composerThinkingEffort} isn’t available for this model. Using Auto.`);
+  }, [composerThinkingEffort, effortCapability, setThinkingEffort]);
+
+  useEffect(() => {
+    if (!thinkingEffortNotice && !localEffortNotice) return;
+    const timer = window.setTimeout(() => {
+      setLocalEffortNotice(null);
+      clearThinkingEffortNotice();
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [clearThinkingEffortNotice, localEffortNotice, thinkingEffortNotice]);
   const runtimeSelectValue = isOpenCode
     ? (opencodeSelectedModel || 'opencode:')
     : pendingRuntime.runtimeId === 'codex'
       ? `codex:${currentCodexModel?.id || codexSelectedModel}`
       : `claude-code:${currentClaudeModel?.id || selectedModel}`;
-  const runtimeFooterLabel = isOpenCode
-    ? `OpenCode · ${(currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'}`
+  const runtimeModelLabel = isOpenCode
+    ? (currentOpenCodeEntry || openCodeModels[0])?.label || 'Select a model…'
     : pendingRuntime.runtimeId === 'codex'
-      ? `Codex · ${currentCodexModel?.label || codexSelectedModel || 'Model'}`
-      : `Claude · ${currentClaudeModel?.label || selectedModel || 'Model'}`;
+      ? modelDisplayName(currentCodexModel) || codexSelectedModel || 'Model'
+      : modelDisplayName(currentClaudeModel, true) || selectedModel || 'Model';
+  const runtimeFooterLabel = `${isOpenCode ? 'OpenCode' : pendingRuntime.runtimeId === 'codex' ? 'Codex' : 'Claude'} · ${runtimeModelLabel}`;
   // 2026-08-05 Jarmo: no "N context" here — the context chips above the
   // composer already show exactly what's included; counting them again is noise.
   const contextSummary = [
@@ -922,33 +967,30 @@ export function ChatInput() {
   });
   const aiInformation = useAIInformationDisclosure();
 
-  function handleRuntimeChange(value: string) {
+  const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
       const modelId = value.slice('claude-code:'.length);
-      if (selectedAgent !== 'claude-code') {
-        selectAgent('claude-code' as AgentId);
-      }
-      selectModel(modelId);
-      setPendingRuntime({ runtimeId: 'claude-code', modelId });
+      selectRuntimeModel('claude-code', modelId);
     } else if (value.startsWith('codex:')) {
       const modelId = value.slice('codex:'.length);
-      if (selectedAgent !== 'codex') {
-        selectAgent('codex' as AgentId);
-      }
-      selectCodexModel(modelId);
-      setPendingRuntime({ runtimeId: 'codex', modelId });
+      selectRuntimeModel('codex', modelId);
     } else if (value.startsWith('opencode:')) {
       // composite: opencode:<provider>/<model> — host expects bare provider/model
       const providerModel = value.slice('opencode:'.length);
-      if (selectedAgent !== 'opencode') {
-        selectAgent('opencode' as AgentId);
-      }
-      selectOpenCodeModel(value);
-      setPendingRuntime({ runtimeId: 'opencode', modelId: providerModel });
+      selectRuntimeModel('opencode', providerModel);
     }
+  }, [selectRuntimeModel]);
+
+  function handleRuntimeChange(value: string) {
+    // Sprint 110 R9: choosing another agent is already explicit intent. Stop
+    // active prior work, preserve the composer draft, and wait for Send. The
+    // host adds one quiet durable transcript boundary when fallback is used.
+    applyRuntimeChange(value);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
   return (
+    <>
     <div
       ref={containerRef}
       className={`relative px-3 py-2.5 ${
@@ -1127,6 +1169,7 @@ export function ChatInput() {
             prompt is already queued (one queued prompt at a time). */}
         <textarea
           ref={textareaRef}
+          aria-label="Message"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -1176,14 +1219,15 @@ export function ChatInput() {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent">
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[360px]:gap-1 max-[360px]:px-1">
           <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
             <SelectTrigger
-              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0"
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[360px]:w-auto max-[360px]:max-w-none max-[360px]:flex-1 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
               title={runtimeFooterLabel}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
-                {runtimeFooterLabel}
+                <span className="max-[360px]:hidden">{runtimeFooterLabel}</span>
+                <span className="hidden max-[360px]:inline">{runtimeModelLabel}</span>
               </div>
             </SelectTrigger>
             <SelectContent
@@ -1212,11 +1256,18 @@ export function ChatInput() {
                       <SelectItem
                         key={model.id}
                         value={`claude-code:${model.id}`}
+                        title={model.isDefault ? `${primary} — Claude default` : undefined}
                         className="items-start py-1.5"
                       >
                         <div className="block w-full">
                           <div className="text-[13px] font-medium text-[var(--r-ink-strong)] leading-tight">
                             {primary}
+                            {model.isDefault && (
+                              <>
+                                <span aria-hidden="true" className="text-[var(--r-ink-muted)]"> *</span>
+                                <span className="sr-only"> (Claude default)</span>
+                              </>
+                            )}
                           </div>
                           {tagline && (
                             <div className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">
@@ -1317,7 +1368,8 @@ export function ChatInput() {
             }}
           >
             <SelectTrigger
-              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0"
+              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[360px]:w-6 max-[360px]:justify-center max-[360px]:gap-0 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
+              aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
               title={composerPolicy.planFirst && planCapable
                 ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'
                 : composerPolicy.autonomy === 'ask'
@@ -1331,7 +1383,9 @@ export function ChatInput() {
                   name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
                   size={12}
                 />
-                {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                <span className="max-[360px]:sr-only">
+                  {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                </span>
               </div>
             </SelectTrigger>
             <SelectContent>
@@ -1367,10 +1421,31 @@ export function ChatInput() {
             </SelectContent>
           </Select>
 
+          {composerThinkingEffortEnabled ? (
+            <ThinkingEffortControl
+              runtimeLabel={pendingRuntime.runtimeId === 'codex' ? 'Codex' : pendingRuntime.runtimeId === 'opencode' ? 'OpenCode' : 'Claude'}
+              modelLabel={pendingRuntime.runtimeId === 'codex'
+                ? currentCodexModel?.label ?? 'Model'
+                : pendingRuntime.runtimeId === 'opencode'
+                  ? currentOpenCodeEntry?.label ?? 'Model'
+                  : currentClaudeModel?.label ?? 'Model'}
+              capability={effortCapability}
+              value={composerThinkingEffort}
+              onChange={setThinkingEffort}
+              running={isLoading}
+            />
+          ) : null}
+
           {!planCapable && composerPolicy.planFirst ? (
             /* R6: runtime without a plan contract — deactivate visibly, never pretend. */
             <span className="text-[10px] text-[var(--r-ink-faint)] whitespace-nowrap">
               Plan off — not supported by this runtime
+            </span>
+          ) : null}
+
+          {(thinkingEffortNotice || localEffortNotice) ? (
+            <span role="status" aria-live="polite" className="min-w-0 truncate text-[10px] text-[var(--r-ink-muted)]">
+              {thinkingEffortNotice || localEffortNotice}
             </span>
           ) : null}
 
@@ -1380,7 +1455,7 @@ export function ChatInput() {
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1.5 max-[360px]:gap-1 max-[360px]:[&>button]:h-6 max-[360px]:[&>button]:w-6">
             <AIInformationButton onOpen={() => aiInformation.setOpen(true)} />
             {isAgentMode && (
               <>
@@ -1413,9 +1488,15 @@ export function ChatInput() {
             ) : (
               <button
                 onClick={() => handleSend()}
-                disabled={!value.trim() || !isOnline}
+                disabled={!value.trim() || !isOnline || !isRuntimeOperational}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
-                title={sendTitle}
+                title={isRuntimeChecking
+                  ? 'Checking runtime status…'
+                  : isRuntimeError
+                    ? 'Runtime check failed — try again above'
+                    : !isRuntimeOperational
+                      ? `${runtimeLabel} is not ready — choose another model or use the action above`
+                      : sendTitle}
               >
                 <Icon name="paper-plane-right" size={14} />
               </button>
@@ -1439,5 +1520,6 @@ export function ChatInput() {
         onAcknowledge={aiInformation.acknowledge}
       />
     </div>
+    </>
   );
 }

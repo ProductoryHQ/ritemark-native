@@ -8,6 +8,16 @@
 // without involving the extension. Example: dictation state changes need to update
 // both the mic button AND insert placeholder text in editor.
 
+import type {
+  ConversationHostEvent,
+  ConversationRequest,
+  ConversationResultMessage,
+} from '../../src/conversations/protocol'
+import type {
+  DocumentSyncBootstrap,
+  DocumentViewMessage,
+} from '../../src/editorSync/protocol'
+
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void
   getState(): unknown
@@ -18,6 +28,7 @@ declare function acquireVsCodeApi(): {
 declare global {
   interface Window {
     __vscodeApi?: ReturnType<typeof acquireVsCodeApi>;
+    __ritemarkDocumentSync?: DocumentSyncBootstrap;
   }
 }
 
@@ -52,6 +63,36 @@ export function sendToExtension(type: string, data: Record<string, unknown> = {}
   } else {
     console.log('[Bridge] Would send to extension:', { type, ...data })
   }
+}
+
+/** Typed, revision-aware document channel used by Markdown and CSV editors. */
+export function sendDocumentMessage(message: DocumentViewMessage) {
+  if (vscode) {
+    vscode.postMessage(message)
+  } else {
+    console.log('[Bridge] Would send document message:', message.type)
+  }
+}
+
+export function getDocumentSyncBootstrap(): DocumentSyncBootstrap | undefined {
+  return typeof window === 'undefined' ? undefined : window.__ritemarkDocumentSync
+}
+
+/** Typed Sprint 109 conversation channel; generic bridge messages remain legacy-compatible. */
+export function sendConversationRequest(message: ConversationRequest) {
+  if (vscode) {
+    vscode.postMessage(message)
+  } else {
+    console.log('[Bridge] Would send conversation request:', message)
+  }
+}
+
+export type ConversationInboundMessage = ConversationResultMessage | ConversationHostEvent
+
+export function isConversationInboundMessage(message: Message): message is Message & ConversationInboundMessage {
+  return message.type === 'conversation/result'
+    || message.type === 'conversation/changed'
+    || message.type === 'conversation/store-status'
 }
 
 /**

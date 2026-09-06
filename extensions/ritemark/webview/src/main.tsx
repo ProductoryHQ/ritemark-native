@@ -66,6 +66,19 @@ const AISidebar = lazy(() =>
   import('./components/ai-sidebar/AISidebar').then((m) => ({ default: m.AISidebar }))
 )
 
+// Lazy load the Transcribe panel (Sprint 108) — the sidebar app for turning
+// recordings into markdown. Lazy like every other surface, so it stays off the
+// critical path for plain markdown editing (#107).
+const TranscribePanel = lazy(() =>
+  import('./components/transcribe/TranscribePanel').then((m) => ({ default: m.TranscribePanel }))
+)
+
+// Lazy load the Transcript Workbench (Sprint 108) — the editor surface for a
+// recording: waveform, speaker-separated transcript, click-a-line-to-hear-it.
+const TranscriptWorkbench = lazy(() =>
+  import('./components/transcribe/workbench/Workbench').then((m) => ({ default: m.Workbench }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -80,7 +93,12 @@ new MutationObserver(syncRitemarkThemeClass).observe(document.body, {
 })
 
 // Sidebar panels use sideBar background (grey) instead of editor background (white)
-if (editorType === 'flows-panel' || editorType === 'ai-sidebar' || editorType === 'settings') {
+if (
+  editorType === 'flows-panel' ||
+  editorType === 'ai-sidebar' ||
+  editorType === 'settings' ||
+  editorType === 'transcribe-panel'
+) {
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
 
@@ -117,6 +135,14 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'ai-sidebar' ? (
       <Suspense fallback={<LoadingFallback />}>
         <AISidebar />
+      </Suspense>
+    ) : editorType === 'transcribe-panel' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <TranscribePanel />
+      </Suspense>
+    ) : editorType === 'transcript-workbench' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <TranscriptWorkbench />
       </Suspense>
     ) : (
       <App />

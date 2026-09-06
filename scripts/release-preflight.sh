@@ -39,7 +39,7 @@ WEBVIEW_DIR="$EXTENSION_DIR/webview"
 PATCHES_DIR="$PROJECT_ROOT/patches/vscode"
 VSCODE_TAG="1.117.0"
 NVMRC_PATH="$PROJECT_ROOT/vscode/.nvmrc"
-REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$NVMRC_PATH" 2>/dev/null || true)"
+REQUIRED_NODE_VERSION=""
 
 # Parse arguments
 MODE="full"
@@ -115,9 +115,30 @@ echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
 # =============================================================================
-# SECTION 0: Platform Detection
+# SECTION 0: Reproducible Release Source
 # =============================================================================
-echo -e "${BOLD}[0] Platform Detection${NC}"
+if [ "$MODE" != "ci" ]; then
+    echo -e "${BOLD}[0] Reproducible Release Source${NC}"
+    echo "----------------------------------------"
+    if "$SCRIPT_DIR/verify-release-source.sh" --repo "$PROJECT_ROOT" --phase pristine; then
+        check_pass "Release source is isolated from local machine state"
+    else
+        check_fail "Release source integrity gate failed"
+        echo ""
+        echo -e "${RED}${BOLD}PRE-FLIGHT FAILED${NC} — refusing to inspect or build from an unsafe source tree"
+        exit 1
+    fi
+    echo ""
+fi
+
+if [ -f "$NVMRC_PATH" ]; then
+    REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$NVMRC_PATH")"
+fi
+
+# =============================================================================
+# SECTION 1: Platform Detection
+# =============================================================================
+echo -e "${BOLD}[1] Platform Detection${NC}"
 echo "----------------------------------------"
 
 PLATFORM=$(uname -s)
@@ -137,19 +158,24 @@ fi
 echo ""
 
 # =============================================================================
-# SECTION 1: Patches vs Vanilla VS Code (CI SIMULATION)
+# SECTION 2: Patches vs Vanilla VS Code (CI SIMULATION)
 # =============================================================================
-echo -e "${BOLD}[1] Patches vs Vanilla VS Code $VSCODE_TAG${NC}"
+echo -e "${BOLD}[2] Patches vs Vanilla VS Code $VSCODE_TAG${NC}"
 echo "----------------------------------------"
 check_info "This is what CI does — patches must apply against fresh vanilla VS Code"
 
 VANILLA_CACHE="/tmp/vscode-vanilla-$VSCODE_TAG"
 
-if [ -d "$VANILLA_CACHE/.git" ]; then
+# A directory named .git is not proof of a usable clone. macOS reaps /tmp, and
+# what it leaves behind is the directory skeleton with every file gone — which
+# passes -d, then makes the git calls below exit 128 and, under `set -e`, kills
+# the whole pre-flight with no message. Ask git whether it can read the repo.
+if git rev-parse --resolve-git-dir "$VANILLA_CACHE/.git" >/dev/null 2>&1; then
     check_info "Using cached vanilla clone at $VANILLA_CACHE"
     git -C "$VANILLA_CACHE" checkout . 2>/dev/null
     git -C "$VANILLA_CACHE" clean -fd 2>/dev/null
 else
+    rm -rf "$VANILLA_CACHE"
     check_info "Cloning vanilla VS Code $VSCODE_TAG (cached for future runs)..."
     if git clone --depth 1 --branch "$VSCODE_TAG" https://github.com/microsoft/vscode.git "$VANILLA_CACHE" 2>&1 | tail -1; then
         check_pass "Cloned vanilla VS Code $VSCODE_TAG"
@@ -227,9 +253,9 @@ fi
 echo ""
 
 # =============================================================================
-# SECTION 2: CI Workflow Configuration
+# SECTION 3: CI Workflow Configuration
 # =============================================================================
-echo -e "${BOLD}[2] CI Workflow Configuration${NC}"
+echo -e "${BOLD}[3] CI Workflow Configuration${NC}"
 echo "----------------------------------------"
 
 for wf in "$PROJECT_ROOT"/.github/workflows/build-*.yml; do
@@ -241,6 +267,24 @@ for wf in "$PROJECT_ROOT"/.github/workflows/build-*.yml; do
         check_pass "$name: GITHUB_TOKEN present"
     else
         check_fail "$name: missing GITHUB_TOKEN (ripgrep download will 403 on CI)"
+    fi
+
+    if grep -q "submodules: true" "$wf"; then
+        check_pass "$name: initializes the recorded VS Code gitlink"
+    else
+        check_fail "$name: must checkout the committed VS Code submodule"
+    fi
+
+    if grep -q "verify-release-source.sh" "$wf"; then
+        check_pass "$name: clean release-source gate present"
+    else
+        check_fail "$name: missing clean release-source gate"
+    fi
+
+    if grep -q "build-provenance.mjs" "$wf"; then
+        check_pass "$name: embeds and verifies build provenance"
+    else
+        check_fail "$name: missing build provenance"
     fi
 
     # Check VS Code version matches our target
@@ -282,22 +326,26 @@ if [ "$MODE" = "ci" ]; then
 fi
 
 # =============================================================================
-# SECTION 3: Git State
+# SECTION 4: Git State
 # =============================================================================
-echo -e "${BOLD}[3] Git State${NC}"
+echo -e "${BOLD}[4] Git State${NC}"
 echo "----------------------------------------"
 
-if git -C "$PROJECT_ROOT" diff --quiet && git -C "$PROJECT_ROOT" diff --cached --quiet; then
+if [ -z "$(git -C "$PROJECT_ROOT" status --porcelain=v1 --untracked-files=all --ignore-submodules=all)" ]; then
     check_pass "No uncommitted changes"
 else
-    check_warn "Uncommitted changes detected"
+    check_fail "Uncommitted or untracked release-source changes detected"
 fi
 
 CURRENT_BRANCH=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" = "main" ]; then
     check_pass "On main branch"
 else
-    check_warn "Not on main branch (current: $CURRENT_BRANCH)"
+    if [ "$CURRENT_BRANCH" = "HEAD" ]; then
+        check_pass "Detached at the exact release commit"
+    else
+        check_fail "Not on main or detached release commit (current: $CURRENT_BRANCH)"
+    fi
 fi
 
 if git -C "$PROJECT_ROOT" remote get-url origin &>/dev/null; then
@@ -327,15 +375,15 @@ if [ "$SUBMODULE_TAG" = "$VSCODE_TAG" ]; then
     check_pass "Submodule at vanilla VS Code $VSCODE_TAG"
 else
     SUBMODULE_COMMIT=$(git -C "$PROJECT_ROOT/vscode" rev-parse --short HEAD 2>/dev/null)
-    check_warn "Submodule at $SUBMODULE_COMMIT ($SUBMODULE_TAG) — expected vanilla $VSCODE_TAG"
+    check_fail "Submodule at $SUBMODULE_COMMIT ($SUBMODULE_TAG) — expected vanilla $VSCODE_TAG"
 fi
 
 echo ""
 
 # =============================================================================
-# SECTION 4: Build Environment
+# SECTION 5: Build Environment
 # =============================================================================
-echo -e "${BOLD}[4] Build Environment${NC}"
+echo -e "${BOLD}[5] Build Environment${NC}"
 echo "----------------------------------------"
 
 NODE_VERSION=$(node -v 2>/dev/null || echo "not found")
@@ -373,9 +421,9 @@ fi
 echo ""
 
 # =============================================================================
-# SECTION 5: Extension Source & Bundle
+# SECTION 6: Extension Source & Bundle
 # =============================================================================
-echo -e "${BOLD}[5] Extension Source & Bundle${NC}"
+echo -e "${BOLD}[6] Extension Source & Bundle${NC}"
 echo "----------------------------------------"
 
 # 0-byte file corruption check
@@ -448,9 +496,9 @@ if [ "$MODE" = "quick" ]; then
 fi
 
 # =============================================================================
-# SECTION 6: Dependencies
+# SECTION 7: Dependencies
 # =============================================================================
-echo -e "${BOLD}[6] Dependencies${NC}"
+echo -e "${BOLD}[7] Dependencies${NC}"
 echo "----------------------------------------"
 
 if [ -d "$EXTENSION_DIR/node_modules" ]; then
@@ -488,9 +536,9 @@ else
     echo ""
 
     # =============================================================================
-    # SECTION 7: Peer Dependencies & Known Versions
+    # SECTION 8: Peer Dependencies & Known Versions
     # =============================================================================
-    echo -e "${BOLD}[7] Peer Dependencies${NC}"
+    echo -e "${BOLD}[8] Peer Dependencies${NC}"
     echo "----------------------------------------"
 
     cd "$EXTENSION_DIR"
@@ -531,9 +579,9 @@ else
     echo ""
 
     # =============================================================================
-    # SECTION 8: TypeScript Compilation
+    # SECTION 9: TypeScript Compilation
     # =============================================================================
-    echo -e "${BOLD}[8] TypeScript Compilation${NC}"
+    echo -e "${BOLD}[9] TypeScript Compilation${NC}"
     echo "----------------------------------------"
 
     cd "$EXTENSION_DIR"
@@ -562,9 +610,9 @@ else
     echo ""
 
     # =============================================================================
-    # SECTION 9: Windows Compatibility
+    # SECTION 10: Windows Compatibility
     # =============================================================================
-    echo -e "${BOLD}[9] Windows Compatibility${NC}"
+    echo -e "${BOLD}[10] Windows Compatibility${NC}"
     echo "----------------------------------------"
 
     cd "$EXTENSION_DIR"

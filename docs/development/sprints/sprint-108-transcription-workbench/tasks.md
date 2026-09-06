@@ -1,0 +1,215 @@
+# Sprint 108 Tasks
+
+Status here is the source of truth for "what is done" — but only when it agrees with the code. Do not pre-tick: before `[x]`, the change must exist on `sprint-108-transcription-workbench`.
+
+## Phase 0: Audits — COMPLETE (2026-08-12)
+
+- [x] Produce fixtures: `short-2spk.m4a` (1:53), `long-meeting.m4a` (60:34), `mono-lecture.mp3`, `broken.m4a`, `screen-recording.mp4` — generated with macOS `say` + ffmpeg via `make-fixtures.sh` (session scratchpad; not committed — synthetic speech, valid for throughput/IO only)
+- [x] `research/audio-transfer-audit.md` (A1) — **transfer problem eliminated**: native mp3/wav/flac/ogg support + `afconvert` for m4a (1.2 s / 60 min)
+- [x] `research/whisper-longrun-audit.md` (A2) — 23.5× realtime, 2.47 GB peak, `-ojf` + `-pp` flag set fixed, clean SIGTERM, **exit-0-on-undecodable trap** documented
+- [x] `research/webview-audio-audit.md` (A3) — playback + seek verified live via CDP; 223 ms seek to 45:00 in a 42 MB file, range requests served; user-gesture rule recorded
+- [x] `research/elevenlabs-prior-art.md` — Scribe integration reviewed in `productory-videomark`; `xi-api-key`, no-windowing decision, majority-vote speaker folding
+- [x] **Gate: passed** — no re-scope needed; spec R4/R5/R7/R9 revised and technical plan updated to match
+
+## Phase 0b: Fixture follow-up — COMPLETE (2026-08-12)
+
+- [x] `.ogg` decodes natively through the bundled binary — stays in the accepted list
+- [x] `afconvert` fails loudly on a corrupt m4a (exit 1, no output file) — it does *not* share whisper-cli's exit-0 trap
+
+## Phase 1: Engine abstraction and job pipeline (R2, R3, R4) — COMPLETE (2026-08-12)
+
+- [x] `src/speech/types.ts` — session, segment, word, speaker, job-state types; seconds everywhere; `TranscriptionError` with user-facing codes
+- [x] `src/speech/TranscriptionEngine.ts` — interface + capability shape, mirroring `runtime/AgentRuntime.ts`
+- [x] `src/speech/engineRegistry.ts` — registration, platform filtering, readiness, local-first preference
+- [x] `src/speech/engines/whisperLocalEngine.ts` — A2 flag set (`-ojf -pp -l auto`, no timeout), stderr progress parsing, SIGTERM cancel, **success judged on parsed output not exit code**
+- [x] `src/speech/engines/elevenLabsEngine.ts` — streamed multipart with real upload progress, `xi-api-key`, `diarize`, one request (no windowing), `logprob` → 0..1 confidence, typed error mapping
+- [x] `src/speech/segmentFolding.ts` — majority-vote speaker, speaker-change break, breath break, runaway guard *(not in the original plan; extracted so the folding rules are testable without a network call)*
+- [x] `src/speech/audioPrep.ts` — format gate, `afconvert` for m4a/aac, pass-through otherwise, streaming peak extraction with proper RIFF chunk walking
+- [x] `src/speech/JobManager.ts` — single-flight queue, state machine, progress events, cancel + temp cleanup, in-flight persistence for interrupted-job recovery
+- [x] `src/speech/SessionStore.ts` — file-backed globalStorage CRUD, fingerprint keying, relink, delete, size accounting
+- [x] `src/speech/transcriptMarkdown.ts` — session → markdown writer
+- [x] Unit tests — 7 files, all passing: folding, engine parsing, audio prep, markdown, session store, registry, job manager
+- [x] Registered the new tests in `package.json` **ahead of the first pre-existing failure**, so they actually run under `npm test`
+- [x] `tsc --noEmit` clean
+- [x] Commit Workstream 1
+
+### Found during Phase 1
+
+- **Bug caught in review, fixed + regression-tested:** `JobManager.pump()` reused the enqueue call's request for every queued job, so a second recording would have transcribed in the first one's language. Each job now carries its own request.
+- **Pre-existing, out of scope:** `npm test` short-circuits at test 31 of 68 (`SaveFileNodeExecutor.integration.test.ts` needs the `vscode` module). Running each independently: **65 pass, 3 fail** — that one, `ClaudeCodeNodeExecutor.integration.test.ts` (same cause) and `daemon/workspaceConsent.test.ts` (top-level await under CJS). Not introduced by this sprint; flagged separately.
+- **Waveform peaks are macOS-only** (they come from `afconvert`). Phase 4 needs a plain seek-bar fallback on Windows.
+
+## Phase 2: Settings, keys, flag (R4, R13) — COMPLETE (2026-08-12)
+
+- [x] `features/flags.ts` — `transcription-workbench` (`stable`, `['darwin','win32']` — broader than `voice-dictation` on purpose)
+- [x] `RitemarkSettingsProvider.ts` — `elevenlabs-api-key` read + payload fields; **storage needed no change**, the `setApiKey` handler was already generic on `message.key`
+- [x] `testElevenLabsKey` — authenticated `GET /v1/user`, so a bad key is caught in Settings rather than halfway through a 44 MB upload
+- [x] `RitemarkSettings.tsx` — ElevenLabs card appended to the existing API Keys section, copied structurally from the OpenRouter card. Purely additive; no restructure
+- [x] Transcription data row (size + **Clear**) under Component readiness, with a modal confirm that names what is and is not deleted
+- [x] `src/speech/paths.ts` — one definition of the session directory, shared by Settings and the pipeline
+- [x] Unit test: flag platform gating, incl. a guard that it never silently matches `voice-dictation`'s macOS-only list
+- [x] Verified live in dev mode via CDP: both surfaces render, `Clear` correctly disabled when empty, rest of the page intact
+- [x] `tsc` clean (host + webview), webview bundle rebuilt, `pre-commit-validator.sh` green
+- [x] Commit Workstream 2
+
+### Found during Phase 2
+
+- **Verification caught a false pass.** After the first build the card did not appear: `tsc --noEmit` and the webview build had both run, but the extension host bundle had not — `npm run compile` is what emits `out/extension.js`. The old host never sent `transcriptionEnabled`, so the flag-gated card silently stayed hidden. Same shape as the known `build-prod.sh` trap: type-checking is not compiling.
+- Copy fix after reading it on screen: the empty state read "Nothing stored yet — stored transcripts, speaker names and corrections." Now the whole sentence is chosen per state.
+
+## Phase 3: Transcribe activity-bar app (R1, R13) — COMPLETE (2026-08-12)
+
+- [x] `media/transcribe-icon.svg` — audio-lines mark, phosphor-weight, matching the existing set
+- [x] `package.json` — `ritemark-transcribe` container + `ritemark.transcribeView`
+- [x] `src/views/TranscribeViewProvider.ts` — import/staging, engine state, job subscription, activity-bar badge
+- [x] `src/speech/durationProbe.ts` + test — `afinfo` then WAV header; returns **null** rather than inventing a length for a cost estimate
+- [x] `src/speech/index.ts` — one factory for registry + jobs + store, called from `extension.ts`
+- [x] `extension.ts` — registered behind the flag; `recoverInterrupted()` runs on activation
+- [x] `webview/src/main.tsx` — lazy route for `transcribe-panel`
+- [x] `components/transcribe/TranscribePanel.tsx` + `types.ts` — drop zone, pending-import engine chooser, job rows, library rows, first-run cards. shadcn `Button` throughout
+- [x] First-run state, engine cards with real state, Windows path links #133
+- [x] Drag-and-drop and file-picker import; video/unsupported refusal copy
+- [x] Commit Workstream 3
+
+### Verified live in dev mode (CDP)
+
+- Drop `long-meeting.m4a` → duration probed as **1 h 1 min**, engine choices with cost, on-device marked Free/private, ElevenLabs correctly disabled with "No API key — needed for speaker separation"
+- Full transcription of `short-2spk.m4a` → job row → Library. Session on disk: **38 segments, 2002 peaks, 372 words with confidence** (min 0.115 — R9 has real on-device data, confirming A2 in production), `speakerSeparation: 'none'`, `speakers: []` — no invented speakers
+- Video drop → "Video files are not supported yet. Export the audio track…"
+
+### Found during Phase 3
+
+- **Upstream VS Code bug — activity-bar badge cannot be cleared with `undefined`.** `WebviewViewPane.updateBadge` stores the new badge then registers an activity only `if (badge)`; it never clears the previous activity, so a finished job left "1 transcribing" on the icon permanently. Worked around by assigning `{ value: 0 }`, which the renderer hides via its `if (total > 0)` check. **Deliberately not patched:** `patches/` is shell-tier, so a three-line upstream fix would turn this sprint into a full app rebuild + notarization for a cosmetic badge. Worth revisiting if a shell release happens for other reasons.
+- **Finder drag-and-drop cannot be supported.** Electron no longer exposes a filesystem path for files dragged from Finder, so that case shows "Use Add recording to pick it instead" rather than failing silently. Dragging from the VS Code Explorer works (uri-list).
+- `Icon` only accepts sizes 12/14/16/20 — caught by the type-checker, not at runtime.
+
+## Phase 4: Workbench, playback, speakers, confidence (R6–R9) — COMPLETE (2026-08-12)
+
+- [x] **Click-and-listen confirmed.** A real CDP `Input` click on Play (a genuine user gesture, unlike `element.click()`) produced `paused: false`, `currentTime` advancing, `readyState: 4`, `volume: 1`, `muted: false`, no media error. The last A3 unknown is closed.
+- [x] **Priority contest won.** Opening `mono-lecture.mp3` gave the **Transcript** editor with our `<audio>` element, not the built-in `vscode.audioPreview`. `priority: "default"` outranks `builtin` as expected — no patch, no stripping of `media-preview` needed.
+- [x] `src/transcriptWorkbenchProvider.ts` — `CustomReadonlyEditorProvider` over the audio file; never reads the file into memory (the webview streams it by URI); `localResourceRoots` includes the recording's folder
+- [x] `package.json` — custom editor for `.m4a .mp3 .wav .flac .ogg .aac` at `priority: "default"`
+- [x] `webview/src/main.tsx` — lazy `transcript-workbench` route
+- [x] `Workbench.tsx` — player, speaker bar, transcript; no-session state offers to transcribe with the same honest engine choice; running-job state shows progress
+- [x] Player — play/pause, clock, 1×/1.25×/1.5×/2×, seek. **Never auto-plays** (A3's user-gesture rule)
+- [x] `Waveform.tsx` — canvas from stored peaks, click-to-seek, no library added. Falls back to a plain seek bar where there are no peaks (Windows)
+- [x] Transcript — click-to-seek-and-play, active highlight, auto-scroll that yields on manual scroll, space/←/→ keys
+- [x] Speaker chips, stable palette, rename popover stating the affected segment count, persisted host-side
+- [x] On-device "cannot separate speakers" row + **Re-run with ElevenLabs**
+- [x] Confidence marking on both engines, per-engine thresholds documented in code, absent when an engine reports nothing
+- [x] Unit tests — `playback.test.ts`: active-segment selection (incl. gaps), speaker palette, thresholds, clock, peak resampling
+- [x] Commit Workstream 4
+
+### Found during Phase 4
+
+- **Bug caught by looking at the screenshot, not by any test:** whisper's timestamp tokens (`[_TT_212]`) were leaking into the word list and, carrying low probabilities, being painted amber — so the transcript read `software.[_TT_212]` with an "uncertain" mark. The special-token filter required a trailing `_` (`[_BEG_]`, `[_EOT_]`) and timestamp tokens end in a digit. Fixed, regression-tested, and re-verified end to end: 0 tokens leaking, and low-confidence marks dropped from 5 bogus to **1 genuine** word. The segment `text` field was always clean, which is why nothing upstream noticed.
+- The icon pack has no pause glyph; a `minus` reads as "remove", so pause is two bars.
+
+### Not verified live
+
+- **Diarized UI** — speaker chips, colours, and global rename — has no ElevenLabs key on this machine, so it is covered by unit tests and the host-side rename path only. Needs a real diarized recording at QA (Jarmo's key).
+
+## Phase 5: Insights rail (R10) — COMPLETE (2026-08-13)
+
+- [x] `src/speech/insightsParsing.ts` — prompt building, timestamp parsing, citation resolution. Pure (no `vscode`), so it is unit tested
+- [x] `src/speech/insights.ts` — runs a one-shot prompt on the **existing** Claude Code runtime; model id from `modelCatalog.getDefault('anthropic', 'claude-code')`, never hardcoded; cancellable
+- [x] `InsightsRail.tsx` — Summary / Decisions / Action items / Open questions / Key quotes; every item's timestamp is a seek button; generating, failed, and no-runtime states
+- [x] Insights persisted on the session (survive reopening) and carried into the Markdown export
+- [x] Unit tests — `insights.test.ts`: timestamp formats, snapping, and the case that matters: **uncitable items are dropped**
+- [x] Commit Workstream 5
+
+### Verified live against the real runtime
+
+Generated on a 2-minute on-device transcript: **11 items, 0 citing a non-segment moment** — the resolution/drop logic holds in production, not just in tests. Quotes came back verbatim. Model reported as `claude-sonnet-5`, resolved from the catalog.
+
+Notably, **every item came back with no owner** — correct, because this was a non-diarized transcript and the prompt forbids attributing to a named person. D3 held all the way through to the model.
+
+### Found during Phase 5
+
+- **Confidence marking was too noisy.** The flat 0.6 threshold painted `and`, `The`, `One`, `now,` amber — whisper's low-probability tail is dominated by short function words at segment *boundaries*, where it is unsure about the split, not the word. Measured the real distribution (372 words: nothing below 0.5; 8 below 0.6) and changed the rule to **0.55 plus a minimum word length of 4**. Result on the same recording: 8 marks → **2** (`Wednesday,` and `Merike`), both worth checking. Length rather than a stopword list because Ritemark is used in Estonian as much as English.
+- The two per-engine thresholds had converged on the same number, which pretended to knowledge I do not have. Now one constant, with the ElevenLabs side documented as an assumption needing a real diarized recording to tune.
+- **Transcribing from the workbench stored `durationSec: 0`**, so the library row read "Length unknown". The webview was trusted for a value the host can probe; it now probes host-side, matching the panel path.
+
+### Known characteristic
+
+Insight generation takes **1–3 minutes** even for a short recording: the agentic runtime has real startup cost, and this is a one-shot extraction wearing an agent's clothes. Acceptable for a background action with a visible cancel, but if it becomes annoying, the fix is a direct model call rather than the full runtime.
+
+## Phase 6: Export and sessions (R11, R12) — COMPLETE (2026-08-13)
+
+*(taken before Phase 5: it closes the loop back to Markdown and carries the D5 mitigation.)*
+
+- [x] `src/speech/exportTranscript.ts` — pure path resolution + writer. Workspace → `<workspace>/<folder>/`; no workspace → beside the recording; absolute setting honoured
+- [x] `ritemark.transcription.exportFolder` setting, default `Transcripts`
+- [x] `src/speech/autoExport.ts` + registration — **every completed transcription writes a Markdown file automatically**, so a transcript is never only in hidden app storage (D5)
+- [x] Auto-export never overwrites (numbered sibling); the manual **Update Markdown** button asks *Replace* / *Save a copy* first, because the existing file may have been hand-edited
+- [x] **Export to Markdown** / **Update Markdown** button in the workbench header
+- [x] Panel row actions: open the Markdown transcript; **Find it** to relink a moved recording (R12)
+- [x] Unit tests — `exportTranscript.test.ts`: path rules, never-clobber, overwrite-the-known-file, renames reaching the file
+- [x] Commit Workstream 6
+
+### Verified live
+
+- Transcribed a recording → `a3-workspace/Transcripts/short-2spk.md` appeared **without being asked**, with front matter (title, date, duration, engine, language, `speakers: none — this engine cannot separate speakers`, source path) and the timestamped transcript
+- Opening it from the library row lands in **Ritemark's visual editor** (TipTap confirmed in the DOM), and the AI sidebar picks it up as the active document — the loop from audio back to Ritemark is closed
+
+### Found during Phase 6
+
+- **The export opened as raw Markdown source.** `vscode.workspace.openTextDocument` + `showTextDocument` forces the plain text editor and bypasses the registered custom editor, so the transcript appeared as syntax with line numbers — the exact thing Ritemark exists to avoid. Both call sites now use `vscode.commands.executeCommand('vscode.open', …)`, which resolves the default editor. Caught by looking at the screenshot; every test still passed.
+- [ ] Commit Workstream 6
+
+## Phase 6b: Scope changes from Jarmo's live test (2026-08-13)
+
+Found by using the thing on a real 41-minute Estonian recording. All agreed in-session.
+
+- [x] **The diarized path is verified.** ElevenLabs on a real recording: 4 speakers, Estonian detected, 567 segments, `Speaker 1 → Kristiina` rename applied everywhere. This was the one thing Phases 1–5 could not close.
+- [x] **"Markdown" removed from user-facing copy.** Ritemark exists so people do not have to think in markdown; the word has no place in the UI. Now "document" throughout — panel, workbench, Settings, dialogs.
+- [x] **Save asks where.** "Save to document" opens a folder picker (remembering the last choice) instead of writing to a folder we chose. The saved document then stays **linked in the workbench header** — click to open, and the button becomes "Save again".
+- [x] **Insights got "Add to document"**, so the action is where the user is looking when they decide to keep them.
+- [x] **Automatic export removed.** It silently wrote into a folder the user had not chosen, which contradicts an explicit Save. **This drops the D5 mitigation** — nothing is written unless the user saves. Jarmo's call, made with the trade stated.
+- [x] **Settings moved to the view title bar** (`package.json` `view/title`, reusing `ritemark.aiSettings`). A gear inside the panel body landed on its own row under the title and read as a stray control. Matters most on Windows, where the cloud engine is the only one and a user without a key has no other route to the key field.
+- [x] **Windows first run verified by simulation** (`EngineRegistry('win32')` + no key, temporarily): on-device shows "Not available on Windows yet" + **Why?** → #133; ElevenLabs shows "No API key" + **Add key**; "Add recording" is disabled. Experiment reverted.
+- [x] **AI sidebar now gets the transcript.** With a workbench tab active it was handing the agent the `.m4a` path — worse than no context, because it looks like context. It now resolves to the saved document, via a registered resolver so `UnifiedViewProvider` stays ignorant of speech storage. Before a save there is nothing readable, so it offers nothing rather than something wrong.
+- [x] **Global rule: an icon on a button matches the button's text colour.** Fixed at source — `Icon` defaults to a muted `fill` **attribute** that does not inherit, so `ui/button.tsx` now carries `[&_svg]:fill-current`. CSS beats presentation attributes, so every button in the app obeys it without call sites remembering. The round play control was also a hand-rolled `<button>`; it is now the shadcn `Button`.
+
+## Phase 7: QA and closeout
+
+- [x] `docs/development/architecture.md` — `src/speech/` subsystem, the workbench editor contract, the two facts that shape every surface, the measured engine facts, and the open debt (dictation still has its own whisper integration)
+- [x] `docs/CHANGELOG.md` — Unreleased / Sprint 108 entry
+- [x] Webview bundle: **7.85 MB vs 7.81 MB on main — +0.04 MB** for two new surfaces, because they are lazy-loaded like `flows` and `ai-sidebar` (#107 budget respected)
+- [x] `npm run compile` + webview build green; 12 unit-test files green; `tsc` clean on both projects
+- [x] `pre-commit-validator.sh` green
+- [ ] Open PR, `pr-reviewer` review, merge
+
+### Scenario matrix — what was actually exercised
+
+Verified live (dev mode over CDP, or by Jarmo on a real 41-minute Estonian recording):
+
+| Area | Result |
+|---|---|
+| First run, nothing configured | Both engine cards with real state and one action each; **Windows** variant verified by simulating `win32` + no key |
+| Import by drag and drop | Duration probed, engine choices with cost |
+| Open audio from the Explorer | Our workbench wins over built-in `vscode.audioPreview` |
+| On-device transcription | 60-min file at 23.5× realtime; 38 segments / 2002 peaks / 372 words with confidence on the short file |
+| On-device states it cannot separate speakers | Explanatory row + Re-run with ElevenLabs; `speakers: []`, no invented speaker |
+| ElevenLabs consent + cost | Shown before upload; upload reports **real byte progress** |
+| Diarized result | 4 speakers on a real 41-min Estonian recording, 567 segments |
+| Speaker rename | `Speaker 1 → Kristiina` applied everywhere |
+| Click a line to hear it | Seeks and plays under a real user gesture; highlight follows |
+| Cancel | Aborted a 42 MB upload in under a second, mid-flight |
+| Panel close does not kill the job | View closed for 25 s; job still running, progress advanced |
+| Quit during a job | Restart shows **Interrupted** + Try again; no orphan `whisper-cli` |
+| Video file refused | Designed copy with what to do instead |
+| Corrupt file | Fails with a designed message (raw converter stderr no longer leaks — fixed here) |
+| Insights generate and cite | 11 items, **0** citing a non-segment moment; no owner invented on a non-diarized transcript |
+| Save to document | Folder picker; opens in Ritemark's editor; link persists in the header |
+| AI sidebar context | Resolves to the saved document, not the `.m4a` |
+| Live dictation regression | `src/voiceDictation/` has **zero changes** on this branch |
+| Feature flag off | Everything sits behind one `isEnabled('transcription-workbench')` guard in `extension.ts` |
+
+**Not exercised, and why:**
+
+- **Offline with a cloud engine, rate-limit / quota / invalid-key responses** — need network conditions or an ElevenLabs account state I cannot create on demand. The mapping is unit-tested (`engineParsing.test.ts` covers 401/403/429/402/5xx and the two `detail` shapes), but no live request was made against them.
+- **Insufficient disk space for the model download** — needs a full disk.
+- **Windows end-to-end** — the platform gating and first-run screen were verified by simulation on macOS; nobody has run the app on Windows. Worth a pass before any release that claims Windows support.
+- **`.ogg`** — claimed by whisper-cli's help text, still untested with a real file.
+- **Confidence threshold for ElevenLabs** — the 0.55 value was measured against on-device output only; the Scribe scale is `exp(logprob)` and may want a different number. Documented as an assumption in `playback.ts`.

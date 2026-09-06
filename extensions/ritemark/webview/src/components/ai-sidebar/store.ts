@@ -17,34 +17,34 @@ import {
   listConversations,
   loadConversation,
   saveConversation,
-  deleteConversation as deleteConversationFromStorage,
   generateId,
   generateTitle,
   setWorkspaceContext,
-  saveOpenThreadIds,
-  loadOpenThreadIds,
+  selectLegacyStorageScope,
+  setLegacyStorageReadOnly,
+  discoverLegacyConversationCandidates,
+  buildLegacyMigrationBatches,
   type SavedConversationV2,
 } from './chatHistoryStorage';
+import type {
+  ConversationInitializeResult,
+  ConversationProjectionV1,
+  ConversationRequest,
+} from '../../../../src/conversations/protocol';
+import { sendConversationRequest } from '../../bridge';
+import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult } from './lifecycle';
 import {
   createConversationState,
   isConversationEmpty,
-  markConversationInterrupted,
+  isRuntimeHandoff,
   policyOf,
   type ConversationState,
   type PendingRuntimeSelection,
 } from './conversationState';
-import {
-  deriveThreadStatus,
-  deriveThreadTitle,
-  evaluateSoftCap,
-  runtimeOfConversation,
-  type CapCandidate,
-  type ThreadRuntime,
-  type ThreadStatus,
-} from './threadStatus';
-import { clearSlot, pruneSlots, setSlot, type ComposerSlots } from './composerQueue';
+import { runtimeOfConversation } from './threadStatus';
+import { clearSlot, setSlot, type ComposerSlots } from './composerQueue';
 import {
   enqueueItem,
   removeItem as removeQueueItem,
@@ -52,8 +52,6 @@ import {
   moveItem as moveQueueItem,
   markStatus as markQueueStatus,
   requeueFailed,
-  pruneQueues,
-  queueFor,
   nextDispatchable,
   isReadyToDrain,
   type PromptQueues,
@@ -61,6 +59,7 @@ import {
 } from './promptQueue';
 import { deriveActivityState } from './activityState';
 import { resolveInboundConversationId } from './conversationRouting';
+import { projectionToConversation } from './conversationProjection';
 import type {
   AgentId,
   AgentInfo,
@@ -87,13 +86,57 @@ import type {
   OnboardingInstallState,
   AcpProviderFlags,
   ByokModelOption,
+  RuntimeCapabilityFlags,
+  ThinkingEffort,
+  ThinkingEffortCapability,
 } from './types';
 
 export type { ConversationState, PendingRuntimeSelection } from './conversationState';
 
+export type ClaudeLoginState = 'idle' | 'pending' | 'success' | 'error';
+
 let msgCounter = 0;
 function nextId(): string {
   return `msg-${++msgCounter}-${Date.now()}`;
+}
+
+const RUNTIME_LABELS: Record<'claude-code' | 'codex' | 'opencode', string> = {
+  'claude-code': 'Claude',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+};
+
+/**
+ * Add the immediate visual copy of the host-owned runtime boundary. The host
+ * persists the same boundary atomically with the accepted turn; a later
+ * canonical projection replaces this optimistic item instead of duplicating
+ * it. Keeping this local makes the disclosure appear with the user bubble,
+ * not only after reopening the conversation.
+ */
+function withRuntimeSwitchBoundary(
+  conversation: ConversationState,
+  runtimeId: 'claude-code' | 'codex' | 'opencode',
+  turnId: string,
+  timestamp: number,
+): ConversationState['transcriptBoundaries'] {
+  const latestClaude = conversation.agentConversation[conversation.agentConversation.length - 1];
+  const latestCodex = conversation.codexConversation[conversation.codexConversation.length - 1];
+  const latest = !latestClaude
+    ? latestCodex && { runtimeId: latestCodex.runtime ?? 'codex' as const, timestamp: latestCodex.timestamp }
+    : !latestCodex || latestClaude.timestamp >= latestCodex.timestamp
+      ? { runtimeId: 'claude-code' as const, timestamp: latestClaude.timestamp }
+      : { runtimeId: latestCodex.runtime ?? 'codex' as const, timestamp: latestCodex.timestamp };
+  if (!latest || latest.runtimeId === runtimeId) return conversation.transcriptBoundaries;
+  return [
+    ...conversation.transcriptBoundaries.filter((boundary) => boundary.turnId !== turnId),
+    {
+      id: `runtime-switch-${turnId}`,
+      turnId,
+      runtimeId,
+      timestamp,
+      message: `Continuing with ${RUNTIME_LABELS[runtimeId]}. Previous messages were included as context.`,
+    },
+  ];
 }
 
 /**
@@ -108,37 +151,15 @@ function resetProviderSession(conversationId: string): void {
   vscode.postMessage({ type: 'conversation:reset', conversationId });
 }
 
-/**
- * Build a compact cross-runtime handoff block from the other runtime's turns
- * that occurred after `sinceTimestamp`. Only includes completed turns (with a
- * response). Injected as a preamble so the receiving runtime knows what the
- * other runtime already said in this conversation.
- *
- * Note (spec non-requirement #97): handoff is strictly WITHIN one conversation.
- * It never reads another thread's turns.
- */
-function buildHandoffContext(
-  turns: Array<{ userPrompt: string; responseText: string | undefined; timestamp: number }>,
-  runtimeLabel: string,
-  sinceTimestamp: number,
-  maxTurns = 6,
-  maxResponseChars = 1200,
-): string | null {
-  const relevant = turns
-    .filter((t) => t.timestamp > sinceTimestamp && t.responseText)
-    .slice(-maxTurns);
-  if (relevant.length === 0) return null;
-
-  const lines: string[] = [
-    `[The following turns were handled by ${runtimeLabel} earlier in this conversation. You are a different AI assistant continuing the same conversation — do not claim to be ${runtimeLabel}.]`,
-  ];
-  for (const t of relevant) {
-    lines.push(`User: ${t.userPrompt}`);
-    const text = t.responseText!;
-    lines.push(`${runtimeLabel}: ${text.length > maxResponseChars ? text.slice(0, maxResponseChars) + '…' : text}`);
-  }
-  lines.push('[End of prior context. Respond to the user request below as yourself.]');
-  return lines.join('\n');
+function focusComposerSoon(): void {
+  if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') return;
+  requestAnimationFrame(() => {
+    // Wait through the panel-unmount frame. Otherwise the browser may move
+    // focus back to <body> when the selected row disappears after we focus.
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+    });
+  });
 }
 
 const DEFAULT_CODEX_STATUS: CodexSidebarStatus = {
@@ -186,6 +207,14 @@ function firstAvailableOpenCodeModel(
   return '';
 }
 
+function reconciledModelId(models: ModelOption[], id: string): string | undefined {
+  return models.find((model) => (
+    model.id === id
+    || model.resolvedModel === id
+    || model.aliases?.includes(id)
+  ))?.id;
+}
+
 function getCodexCompatibilityNoticeKey(status: CodexSidebarStatus): string | null {
   const compatibility = status.compatibility;
   if (status.state !== 'ready' || !compatibility || compatibility.state === 'compatible') {
@@ -207,30 +236,16 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
   return turns.map((t) => (t.conversationId === conversationId ? t : { ...t, conversationId }));
 }
 
-/**
- * A thread open on the rail, as the rail and History need to see it. Derived —
- * never stored — so it cannot drift from `conversations`.
- */
-export interface OpenThreadSummary {
-  id: string;
-  title: string;
-  runtime: ThreadRuntime;
-  status: ThreadStatus;
-  hasQueuedPrompt: boolean;
-  isActive: boolean;
-}
-
-/** A thread-open action parked behind the soft-cap prompt (R11). */
-export type PendingThreadOpen =
-  | { kind: 'new' }
-  | { kind: 'reopen'; conversationId: string };
-
 interface AISidebarState {
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
   isOnline: boolean;
   isCheckingConnectivity: boolean;
   ready: boolean;
+  bootstrapGeneration: number;
+  bootstrapError: string | null;
+  sidebarStatusRevisions: Record<'claude-code' | 'codex' | 'opencode' | 'discovery', number>;
+  runtimeHydration: Record<AgentId, { phase: 'checking' | 'ready' | 'error'; error: string | null }>;
 
   // ── Agent config: catalogs + availability (APP-GLOBAL) ──
   agenticEnabled: boolean;
@@ -240,7 +255,6 @@ interface AISidebarState {
    * rather than adds. Defaults to TRUE so a config message that never arrives
    * cannot silently disable a shipped feature — the host turns it off explicitly.
    */
-  parallelChatsEnabled: boolean;
   agents: AgentInfo[];
   models: ModelOption[];
 
@@ -267,11 +281,24 @@ interface AISidebarState {
   byokProviderModels: Record<string, ByokModelOption[]> | undefined;
 
   // ── Sprint 103 R6: per-runtime capability map (APP-GLOBAL, host-provided) ──
-  runtimeCapabilities: Record<string, { planFirst: boolean; liveModeSwitch: boolean; structuredPlanSteps: boolean }>;
+  runtimeCapabilities: Record<string, RuntimeCapabilityFlags>;
+  /** Default-on host kill-switch; false removes UI and sends Auto. */
+  composerThinkingEffortEnabled: boolean;
+  /** Live session capabilities keyed by durable conversation and runtime. */
+  thinkingEffortCapabilities: Record<string, Partial<Record<AgentId, ThinkingEffortCapability>>>;
+  /** Concise non-blocking invalidation/downgrade notices, isolated by conversation. */
+  thinkingEffortNotices: Record<string, string>;
 
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
+  conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
+  /** Current host flag; absent on an older host means enabled. */
+  durableAgentConversationsEnabled: boolean;
+  hostConversations: ConversationSummaryV1[];
+  earlierConversations: ConversationSummaryV1[];
+  pinnedConversationIds: string[];
+  conversationStoreNotice: string | null;
 
   // ── Composer state, keyed per thread (Sprint 99 R14 / E5) ──
   /**
@@ -303,15 +330,17 @@ interface AISidebarState {
   maybeDrainQueue: (conversationId: string) => void;
   setComposerDraft: (conversationId: string, text: string) => void;
 
-  // ── Soft cap gate (Sprint 99 R11 + Resolved Gaps 2/3) ──
-  /** Set when "+" or a History reopen hit the soft cap and needs a decision. */
-  pendingThreadOpen: PendingThreadOpen | null;
-
   // ── Setup state (Claude Code) (APP-GLOBAL) ──
   setupStatus: SetupStatus | null;
   environmentStatus: AgentEnvironmentStatus | null;
   setupInProgress: boolean;
   setupError: string | null;
+  /** Chat-visible lifecycle for the shared browser sign-in flow. */
+  claudeLoginState: ClaudeLoginState;
+  /** Failed turn whose recovery card started the current browser sign-in. */
+  claudeLoginTurnId: string | null;
+  /** Acknowledged recovered turns stay out of the transcript after navigation/reload. */
+  dismissedAuthRecoveryTurnIds: string[];
   hasSeenWelcome: boolean;
   claudeSdkVersion: string | null;
 
@@ -343,31 +372,19 @@ interface AISidebarState {
   switchConversation: (id: string) => void;
   /** Ids of every open thread, in creation order. */
   listOpenConversations: () => string[];
-  /** Close a thread: frees its runtime session, keeps the transcript in History. */
-  closeConversation: (id: string) => void;
-  /**
-   * User pressed "+". Refocuses an existing empty thread, opens a new one, or —
-   * at the soft cap — raises `pendingThreadOpen` for the user to decide (R11).
-   */
+  /** User pressed "+". Refocus an existing blank or create a conversation. */
   requestNewThread: () => void;
-  /**
-   * User picked a conversation in History. Switches to it if it is already open,
-   * otherwise reopens it onto the rail under the same cap rule as "+" (Gap 3).
-   */
-  requestOpenConversation: (id: string) => void;
-  /** "Open anyway" / "opened after closing something" — perform the pending open. */
-  confirmThreadOpen: () => void;
-  /** Dismiss the cap prompt without opening anything. */
-  cancelThreadOpen: () => void;
-  /** Rail/History view model for every open thread, in creation order. */
-  listOpenThreads: () => OpenThreadSummary[];
   /** Restore persisted transcript fields into the active thread (webview state restore). */
   restoreActiveConversation: (partial: Partial<ConversationState>) => void;
 
   // ── Actions ──
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
+  /** Atomically apply the runtime + its model to the active conversation. */
+  selectRuntimeModel: (runtimeId: AgentId, modelId: string) => void;
   setPendingRuntime: (partial: Partial<PendingRuntimeSelection>) => void;
+  setThinkingEffort: (effort: ThinkingEffort) => void;
+  clearThinkingEffortNotice: () => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
   /**
@@ -388,7 +405,8 @@ interface AISidebarState {
   configureApiKey: () => void;
   clearChat: () => void;
   startInstall: () => void;
-  startLogin: () => void;
+  startLogin: (recoveryTurnId?: string) => void;
+  dismissAuthRecovery: (turnId: string) => void;
   openApiKeySettings: () => void;
   openGitDownload: () => void;
   openNodeDownload: () => void;
@@ -415,6 +433,7 @@ interface AISidebarState {
   refreshCodexStatus: () => void;
   repairCodex: () => void;
   dismissCodexNotice: (key: string) => void;
+  dismissContinuationNotice: (conversationId: string) => void;
   dismissCurrentPlan: (key: string) => void;
   reloadWindow: () => void;
   openAgentSettings: () => void;
@@ -429,28 +448,46 @@ interface AISidebarState {
   loadConversationList: () => void;
   saveCurrentConversation: () => void;
   loadSavedConversation: (id: string) => void;
-  deleteSavedConversation: (id: string) => void;
   startNewConversation: () => void;
   toggleHistoryPanel: () => void;
+  setPinnedConversationIds: (ids: string[]) => void;
+  pinConversation: (id: string) => void;
+  unpinConversation: (id: string) => void;
+  renameHostConversation: (id: string, title: string) => void;
+  moveEarlierConversation: (id: string) => void;
+  deleteHostConversation: (id: string, stopRunning?: boolean, recovery?: boolean) => void;
 
   // ── Internal: message handler ──
   handleExtensionMessage: (message: ExtensionMessage) => void;
 }
 
+type ConversationRequestWithoutId = ConversationRequest extends infer Request
+  ? Request extends { requestId: string }
+    ? Omit<Request, 'requestId'>
+    : never
+  : never;
+
+function postConversationRequest(message: ConversationRequestWithoutId): void {
+  sendConversationRequest({ ...message, requestId: nextId() } as ConversationRequest);
+}
+
 const initialConversation = createConversationState(generateId());
 
-/**
- * Sprint 99 (R13): the open-thread set is restored ONCE per webview, on the
- * first `agent:config` that carries a workspace path — that is the first moment
- * the workspace-scoped storage prefix is known. A later `agent:config` must not
- * re-open threads the user has since closed, so the guard lives here at module
- * scope rather than in component state.
- */
-let openThreadsRestored = false;
+let legacyInventorySent = false;
+type LegacyMigrationBatch = ReturnType<typeof discoverLegacyConversationCandidates>;
+let pendingLegacyMigrationBatches: LegacyMigrationBatch[] = [];
 
-/** Test-only: forget the restore guard so a relaunch can be simulated. */
-export function resetOpenThreadRestoreForTest(): void {
-  openThreadsRestored = false;
+function startLegacyInventoryMigration(candidates: LegacyMigrationBatch): void {
+  legacyInventorySent = true;
+  pendingLegacyMigrationBatches = buildLegacyMigrationBatches(candidates);
+  const first = pendingLegacyMigrationBatches.shift();
+  if (first) postConversationRequest({ type: 'legacy/import-batch', records: first });
+}
+
+/** Test-only: allow a fresh migration handshake in the same process. */
+export function resetConversationMigrationGuardForTest(): void {
+  legacyInventorySent = false;
+  pendingLegacyMigrationBatches = [];
 }
 
 export const useAISidebarStore = create<AISidebarState>((set, get) => {
@@ -534,6 +571,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
   /** Persist ONE conversation. Background threads autosave without touching the active one. */
   function persistConversation(id: string): void {
     const state = get();
+    if (state.conversationRolloutMode !== 'legacy') return;
     const conversation = state.conversations[id];
     if (!conversation) return;
 
@@ -583,89 +621,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     const next = { ...state.conversations };
     delete next[leavingId];
     return next;
-  }
-
-  /**
-   * Sprint 99 (R13 / E7): mirror the open set to localStorage and drop composer
-   * slots belonging to threads that are no longer open. Called after every
-   * change to `conversations` so the persisted rail can never lag the store.
-   */
-  function syncOpenThreads(): void {
-    const state = get();
-    const ids = Object.values(state.conversations)
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => c.id);
-    saveOpenThreadIds(ids);
-
-    const promptQueues = pruneQueues(state.promptQueues, ids);
-    const composerDrafts = pruneSlots(state.composerDrafts, ids);
-    if (promptQueues !== state.promptQueues || composerDrafts !== state.composerDrafts) {
-      set({ promptQueues, composerDrafts });
-    }
-  }
-
-  /** Read one open thread's rail/History view model. */
-  function summarizeThread(conversation: ConversationState, activeId: string | null): OpenThreadSummary {
-    return {
-      id: conversation.id,
-      title: deriveThreadTitle(conversation),
-      runtime: runtimeOfConversation(conversation),
-      status: deriveThreadStatus(conversation),
-      hasQueuedPrompt: queueFor(get().promptQueues, conversation.id).length > 0,
-      isActive: conversation.id === activeId,
-    };
-  }
-
-  /** Cap inputs for the open set, in rail order. */
-  function capCandidates(): CapCandidate[] {
-    const state = get();
-    return Object.values(state.conversations)
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => {
-        const summary = summarizeThread(c, state.activeConversationId);
-        return { id: c.id, title: summary.title, status: summary.status, hasQueuedPrompt: summary.hasQueuedPrompt };
-      });
-  }
-
-  /**
-   * Rebuild a stored conversation as an OPEN thread.
-   *
-   * R13: transcripts restore immediately, sessions do NOT — nothing here starts
-   * a runtime. The session re-attaches on the user's next prompt in the thread.
-   */
-  function rehydrateStoredConversation(id: string, template: ConversationState | null): ConversationState | null {
-    const data = loadConversation(id);
-    if (!data) return null;
-
-    let agentConv = data.agentConversation || [];
-    let codexConv = data.codexConversation || [];
-    if (data.agentId === 'codex' && codexConv.length === 0 && agentConv.length > 0) {
-      codexConv = agentConv as unknown as typeof codexConv;
-      agentConv = [];
-    }
-    const restoredAgentId: AgentId =
-      data.agentId === 'claude-code' || data.agentId === 'codex' ? data.agentId : 'claude-code';
-
-    return markConversationInterrupted(createConversationState(id, {
-      createdAt: data.createdAt,
-      agentConversation: stampConversationId(agentConv, id),
-      codexConversation: stampConversationId(codexConv, id),
-      chatMessages: data.chatMessages || [],
-      conversationHistory: data.conversationHistory || [],
-      selectedAgent: restoredAgentId,
-      selectedModel: template?.selectedModel ?? '',
-      codexSelectedModel: template?.codexSelectedModel ?? '',
-      opencodeSelectedModel: template?.opencodeSelectedModel ?? '',
-      pendingRuntime: {
-        runtimeId: restoredAgentId,
-        modelId: template?.pendingRuntime.modelId ?? '',
-        // Sprint 103 R8: the thread's own persisted policy wins; only pre-103
-        // records without one fall back to the boot template.
-        mode: data.turnPolicy?.mode ?? template?.pendingRuntime.mode ?? 'auto',
-        planFirst: data.turnPolicy?.planFirst === true,
-      },
-      ...computeContextState(agentConv),
-    }));
   }
 
   /**
@@ -736,6 +691,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           id: nextId(),
           conversationId: item.conversationId,
           userPrompt: item.displayText,
+          thinkingEffort: item.thinkingEffort,
           activeFilePath: item.documentPath,
           attachments: item.attachments,
           activities: [],
@@ -748,18 +704,24 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           pendingPlanApproval: undefined,
           timestamp: Date.now(),
         };
-        patchConversation(item.conversationId, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+        patchConversation(item.conversationId, (c) => ({
+          agentConversation: [...c.agentConversation, turn],
+          transcriptBoundaries: withRuntimeSwitchBoundary(c, 'claude-code', turn.id, turn.timestamp),
+        }));
         vscode.postMessage({
           type: 'agent-execute',
           conversationId: item.conversationId,
+          conversationTurnId: turn.id,
           agentId: 'claude-code',
           prompt: item.prompt,
+          displayPrompt: item.displayText,
           // Model drift fix: pin the frozen model — never let the CLI's own
           // user config decide (falls back to the conversation selection).
           model: item.modelId || get().conversations[item.conversationId]?.selectedModel || undefined,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
+          thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           mentionedAgentPaths: item.mentionedAgentPaths,
@@ -769,6 +731,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           id: nextId(),
           conversationId: item.conversationId,
           userPrompt: item.displayText,
+          thinkingEffort: item.thinkingEffort,
           runtime: item.runtimeId === 'opencode' ? 'opencode' : 'codex',
           requestedPlanMode: item.planFirst,
           activeFilePath: item.documentPath,
@@ -786,15 +749,21 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           isRunning: true,
           timestamp: Date.now(),
         };
-        patchConversation(item.conversationId, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+        patchConversation(item.conversationId, (c) => ({
+          codexConversation: [...c.codexConversation, turn],
+          transcriptBoundaries: withRuntimeSwitchBoundary(c, item.runtimeId, turn.id, turn.timestamp),
+        }));
         vscode.postMessage({
           type: 'agent-execute',
           conversationId: item.conversationId,
+          conversationTurnId: turn.id,
           agentId: item.runtimeId,
           prompt: item.prompt,
+          displayPrompt: item.displayText,
           model: item.modelId,
           approvalMode: item.autonomy,
           planFirst: item.planFirst,
+          thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
@@ -837,40 +806,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       pendingRuntime: { runtimeId, modelId: '', mode: 'auto', planFirst: false },
     });
     set({ conversations: { ...state.conversations, [conversation.id]: conversation } });
-    syncOpenThreads();
     return conversation.id;
-  }
-
-  function restoreOpenThreads(): void {
-    const state = get();
-    const storedIds = loadOpenThreadIds();
-    if (storedIds.length === 0) return;
-
-    const template = state.activeConversationId ? state.conversations[state.activeConversationId] : null;
-    const restored: ConversationState[] = [];
-    for (const id of storedIds) {
-      if (state.conversations[id]) continue;
-      const conversation = rehydrateStoredConversation(id, template);
-      if (conversation) restored.push(conversation);
-    }
-    if (restored.length === 0) return;
-
-    const conversations = { ...state.conversations };
-    for (const conversation of restored) conversations[conversation.id] = conversation;
-
-    // Drop the throwaway blank the webview booted with — but only if the user
-    // has not typed in it, and only when something real replaces it (R10).
-    let activeId = state.activeConversationId;
-    const active = activeId ? conversations[activeId] : null;
-    if (active && isConversationEmpty(active)) {
-      delete conversations[active.id];
-      activeId = restored[restored.length - 1].id;
-    }
-
-    const nextActive = activeId ? conversations[activeId] : null;
-    if (!nextActive) return;
-    set({ conversations, activeConversationId: nextActive.id });
-    syncOpenThreads();
   }
 
   return {
@@ -879,9 +815,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     isOnline: true,
     isCheckingConnectivity: false,
     ready: false,
+    bootstrapGeneration: 0,
+    bootstrapError: null,
+    sidebarStatusRevisions: { 'claude-code': 0, codex: 0, opencode: 0, discovery: 0 },
+    runtimeHydration: {
+      'claude-code': { phase: 'checking', error: null },
+      codex: { phase: 'checking', error: null },
+      opencode: { phase: 'checking', error: null },
+    },
 
     agenticEnabled: false,
-    parallelChatsEnabled: true,
     agents: [],
     models: [],
 
@@ -903,23 +846,33 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // Mirrors src/runtime/capabilities.ts until the first agent:config arrives.
     runtimeCapabilities: {
-      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false },
-      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true },
-      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false },
+      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog' },
+      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog' },
+      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live' },
     },
+    composerThinkingEffortEnabled: true,
+    thinkingEffortCapabilities: {},
+    thinkingEffortNotices: {},
 
     savedConversations: [],
     showHistoryPanel: false,
+    conversationRolloutMode: 'unknown',
+    durableAgentConversationsEnabled: true,
+    hostConversations: [],
+    earlierConversations: [],
+    pinnedConversationIds: [],
+    conversationStoreNotice: null,
 
     promptQueues: {},
     commentTasks: {},
     composerDrafts: {},
-    pendingThreadOpen: null,
-
     setupStatus: null,
     environmentStatus: null,
     setupInProgress: false,
     setupError: null,
+    claudeLoginState: 'idle',
+    claudeLoginTurnId: null,
+    dismissedAuthRecoveryTurnIds: [],
     hasSeenWelcome: false,
     claudeSdkVersion: null,
 
@@ -977,14 +930,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversations: { ...state.conversations, [conversation.id]: conversation },
         activeConversationId: conversation.id,
       });
-      syncOpenThreads();
       return conversation.id;
     },
 
     switchConversation: (id) => {
       const state = get();
       const target = state.conversations[id];
-      if (!target || id === state.activeConversationId) return;
+      if (!target) return;
+      if (id === state.activeConversationId) {
+        set({ showHistoryPanel: false });
+        focusComposerSoon();
+        return;
+      }
 
       // Sprint 99 (E4): NO resetProviderSessions() here. Switching is a view
       // change — every other thread keeps streaming.
@@ -994,7 +951,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: id,
         showHistoryPanel: false,
       });
-      if (pruned) syncOpenThreads();
+      focusComposerSoon();
     },
 
     listOpenConversations: () => {
@@ -1004,68 +961,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         .map((c) => c.id);
     },
 
-    closeConversation: (id) => {
-      const state = get();
-      const target = state.conversations[id];
-      if (!target) return;
-
-      // Close ≠ delete: persist first so the transcript is complete in History.
-      persistConversation(id);
-      // Closing DOES free the runtime session — this is one of the two remaining
-      // legitimate reset sites (the other is an explicit clear/delete).
-      resetProviderSession(id);
-
-      const remaining = { ...get().conversations };
-      delete remaining[id];
-
-      if (id !== state.activeConversationId) {
-        set({ conversations: remaining });
-        syncOpenThreads();
-        return;
-      }
-
-      const nextId = Object.values(remaining).sort((a, b) => a.createdAt - b.createdAt)[0];
-      if (nextId) {
-        set({ conversations: remaining, activeConversationId: nextId.id });
-        syncOpenThreads();
-        return;
-      }
-      const fresh = createConversationState(generateId(), {
-        selectedAgent: target.selectedAgent,
-        selectedModel: target.selectedModel,
-        codexSelectedModel: target.codexSelectedModel,
-        opencodeSelectedModel: target.opencodeSelectedModel,
-        pendingRuntime: target.pendingRuntime,
-      });
-      set({
-        conversations: { [fresh.id]: fresh },
-        activeConversationId: fresh.id,
-      });
-      syncOpenThreads();
-    },
-
-    listOpenThreads: () => {
-      const state = get();
-      return Object.values(state.conversations)
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((c) => summarizeThread(c, state.activeConversationId));
-    },
-
     requestNewThread: () => {
       const state = get();
-
-      // Kill-switch (R15): with parallel chats off, "new chat" means what it used
-      // to — replace the current conversation rather than open an additional one.
-      // clearChat saves the outgoing thread to History, so nothing is lost.
-      if (!state.parallelChatsEnabled) {
-        get().clearChat();
-        set({ showHistoryPanel: false });
-        return;
-      }
-
-      // R10: one empty thread at a time — "+" refocuses the blank that exists
-      // rather than stacking another. Checked across the whole open set, not
-      // just the active thread, so a blank parked in the background is reused.
       const existingEmpty = Object.values(state.conversations)
         .sort((a, b) => a.createdAt - b.createdAt)
         .find(isConversationEmpty);
@@ -1074,49 +971,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         set({ showHistoryPanel: false });
         return;
       }
-
-      const evaluation = evaluateSoftCap(capCandidates());
-      if (evaluation.atCap) {
-        set({ pendingThreadOpen: { kind: 'new' }, showHistoryPanel: false });
-        return;
-      }
       get().startNewConversation();
     },
-
-    requestOpenConversation: (id) => {
-      const state = get();
-      // Already on the rail → this is just a switch, and the cap is irrelevant.
-      if (state.conversations[id]) {
-        get().switchConversation(id);
-        return;
-      }
-
-      // Kill-switch: without parallel chats there is no rail to reopen ONTO, so
-      // History goes back to load-in-place.
-      if (!state.parallelChatsEnabled) {
-        get().loadSavedConversation(id);
-        return;
-      }
-      // Resolved Gap 3: a reopened thread is an open thread, so it obeys the
-      // same cap rule as "+". Exempting it would be an easy way to accumulate
-      // ten open threads without ever seeing the prompt.
-      const evaluation = evaluateSoftCap(capCandidates());
-      if (evaluation.atCap) {
-        set({ pendingThreadOpen: { kind: 'reopen', conversationId: id }, showHistoryPanel: false });
-        return;
-      }
-      get().loadSavedConversation(id);
-    },
-
-    confirmThreadOpen: () => {
-      const pending = get().pendingThreadOpen;
-      if (!pending) return;
-      set({ pendingThreadOpen: null });
-      if (pending.kind === 'new') get().startNewConversation();
-      else get().loadSavedConversation(pending.conversationId);
-    },
-
-    cancelThreadOpen: () => set({ pendingThreadOpen: null }),
 
     // ── Sprint 104 (#162): bounded per-conversation prompt queue ──────────
 
@@ -1206,14 +1062,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     selectAgent: (agentId) => {
       patchConversation(get().activeConversationId, () => ({ selectedAgent: agentId }));
       vscode.postMessage({ type: 'ai-select-agent', agentId, conversationId: get().activeConversationId });
-      // When switching to Codex, force a fresh auth status check.
-      // The AI sidebar and Settings each maintain their own CodexAppServer instance,
-      // so logging out from Settings can leave the AI sidebar with a stale "ready"
-      // state. A fresh status round-trip ensures CodexSetupView appears whenever
-      // the user actually needs to sign in.
-      if (agentId === 'codex') {
-        vscode.postMessage({ type: 'codex:refreshStatus' });
-      }
     },
 
     selectModel: (modelId) => {
@@ -1221,10 +1069,70 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: get().activeConversationId });
     },
 
+    selectRuntimeModel: (runtimeId, modelId) => {
+      const conversation = activeConversation();
+      if (!conversation || !modelId) return;
+
+      if (isRuntimeHandoff(conversation, runtimeId)) get().cancelRequest();
+
+      const openCodeComposite = runtimeId === 'opencode'
+        ? (modelId.startsWith('opencode:') ? modelId : `opencode:${modelId}`)
+        : conversation.opencodeSelectedModel;
+      const pendingModelId = runtimeId === 'opencode'
+        ? openCodeComposite.slice('opencode:'.length)
+        : modelId;
+
+      patchConversation(conversation.id, (current) => ({
+        selectedAgent: runtimeId,
+        selectedModel: runtimeId === 'claude-code' ? modelId : current.selectedModel,
+        codexSelectedModel: runtimeId === 'codex' ? modelId : current.codexSelectedModel,
+        opencodeSelectedModel: openCodeComposite,
+        pendingRuntime: {
+          ...current.pendingRuntime,
+          runtimeId,
+          modelId: pendingModelId,
+        },
+      }));
+
+      if (conversation.selectedAgent !== runtimeId) {
+        vscode.postMessage({ type: 'ai-select-agent', agentId: runtimeId, conversationId: conversation.id });
+      }
+      if (runtimeId === 'claude-code' && conversation.selectedModel !== modelId) {
+        vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: conversation.id });
+      }
+    },
+
     setPendingRuntime: (partial) => {
       patchConversation(get().activeConversationId, (c) => ({
         pendingRuntime: { ...c.pendingRuntime, ...partial },
       }));
+    },
+
+    setThinkingEffort: (effort) => {
+      const state = get();
+      const conversation = activeConversation();
+      if (!conversation) return;
+      const runtimeId = conversation.pendingRuntime.runtimeId;
+      patchConversation(conversation.id, (current) => ({
+        thinkingEffortByRuntime: { ...current.thinkingEffortByRuntime, [runtimeId]: effort },
+      }));
+      const summary = state.hostConversations.find((item) => item.conversationId === conversation.id);
+      if (summary && state.conversationRolloutMode !== 'legacy') {
+        postConversationRequest({
+          type: 'conversation/set-composer-preference',
+          conversationId: conversation.id,
+          bindingGeneration: summary.bindingGeneration,
+          agentId: runtimeId,
+          thinkingEffort: effort,
+        });
+      }
+    },
+
+    clearThinkingEffortNotice: () => {
+      const conversationId = get().activeConversationId;
+      if (!conversationId) return;
+      const { [conversationId]: _removed, ...thinkingEffortNotices } = get().thinkingEffortNotices;
+      set({ thinkingEffortNotices });
     },
 
     sendAgentMessage: (prompt, attachments?, options?) => {
@@ -1239,35 +1147,26 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       const activeFile = (!options?.skipActiveFile && state.activeFilePath) ? state.activeFilePath : undefined;
 
-      // Prepend Codex turns that happened after Claude's last turn (same thread only)
-      const lastAgentTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.codexConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.streamingText || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Codex',
-        lastAgentTimestamp,
-      );
-      const basePrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       // Selection context comes BEFORE the pinned-agent hidden context so the
       // agent's role instructions (if any) can frame their response around the
       // selected text. The order is:
-      //   [Selection context] → [Pinned agent instructions] → handoff → prompt
+      //   [Selection context] → [Pinned agent instructions] → prompt
       const selectionBlock = get().buildSelectionContextBlock();
       const hiddenPieces = [
         selectionBlock,
         options?.hiddenContext,
       ].filter((p): p is string => Boolean(p));
       const fullPrompt = hiddenPieces.length > 0
-        ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${basePrompt}`
-        : basePrompt;
+        ? `${hiddenPieces.join('\n\n---\n\n')}\n\n---\n\n${prompt}`
+        : prompt;
 
       const turn: AgentConversationTurn = {
         id: nextId(),
         conversationId: conversation.id,
         userPrompt: prompt,
+        thinkingEffort: state.composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime['claude-code'] ?? 'auto'
+          : 'auto',
         activeFilePath: activeFile,
         attachments,
         activities: [],
@@ -1281,7 +1180,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        agentConversation: [...c.agentConversation, turn],
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'claude-code', turn.id, turn.timestamp),
+      }));
 
       // Send attachments as serializable payload (strip thumbnails for extension)
       const attachmentPayload = attachments?.map((att) => ({
@@ -1296,13 +1198,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'claude-code',
         prompt: fullPrompt,
+        displayPrompt: prompt,
         // Model drift fix: always pin the UI-selected model.
         model: conversation.selectedModel || undefined,
         attachments: attachmentPayload,
         approvalMode: claudePolicy.autonomy,
         planFirst: claudePolicy.planFirst,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipActiveFile: options?.skipActiveFile,
         skipBrowserContext: options?.skipBrowserContext,
         mentionedAgentPaths: options?.mentionedAgentPaths,
@@ -1467,13 +1372,28 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     },
 
     startInstall: () => {
-      set({ setupInProgress: true, setupError: null });
+      set({ setupInProgress: true, setupError: null, claudeLoginState: 'idle', claudeLoginTurnId: null });
       vscode.postMessage({ type: 'agent-setup:install' });
     },
 
-    startLogin: () => {
-      set({ setupInProgress: true, setupError: null });
+    startLogin: (recoveryTurnId) => {
+      set({
+        setupInProgress: true,
+        setupError: null,
+        claudeLoginState: 'pending',
+        claudeLoginTurnId: recoveryTurnId ?? null,
+      });
       vscode.postMessage({ type: 'agent-setup:login' });
+    },
+
+    dismissAuthRecovery: (turnId) => {
+      set((state) => ({
+        claudeLoginState: 'idle',
+        claudeLoginTurnId: state.claudeLoginTurnId === turnId ? null : state.claudeLoginTurnId,
+        dismissedAuthRecoveryTurnIds: state.dismissedAuthRecoveryTurnIds.includes(turnId)
+          ? state.dismissedAuthRecoveryTurnIds
+          : [...state.dismissedAuthRecoveryTurnIds, turnId].slice(-100),
+      }));
     },
 
     openApiKeySettings: () => {
@@ -1584,26 +1504,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const lastTurn = conversation.codexConversation[conversation.codexConversation.length - 1];
       if (lastTurn?.isRunning) return;
 
-      // Prepend Claude turns that happened after Codex's last turn (same thread only)
-      const lastCodexTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.agentConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.result?.text || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Claude',
-        lastCodexTimestamp,
-      );
       // Prepend selection context so the agent actually receives the docked
       // selection. The Codex turn shows only the user-typed prompt in the chat
       // bubble; the selection wrapper is invisible to the user but visible to
       // the model — same pattern Claude already uses for hiddenContext.
       const selectionBlock = get().buildSelectionContextBlock();
-      const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       const fullPrompt = selectionBlock
-        ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
-        : handoffPrompt;
+        ? `${selectionBlock}\n\n---\n\n${prompt}`
+        : prompt;
 
       // Sprint 103 R1 (D4): plan-first comes ONLY from explicit UI state —
       // prompt-text sniffing removed.
@@ -1615,6 +1523,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         id: nextId(),
         conversationId: conversation.id,
         userPrompt: prompt,
+        thinkingEffort: get().composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime.codex ?? 'auto'
+          : 'auto',
         requestedPlanMode: codexPlanFirst,
         activeFilePath: skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
@@ -1632,20 +1543,32 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        codexConversation: [...c.codexConversation, turn],
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'codex', turn.id, turn.timestamp),
+      }));
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'codex',
         prompt: fullPrompt,
+        displayPrompt: prompt,
         model: conversation.codexSelectedModel,
         // Sprint 103 R1: autonomy + planFirst on the wire — the host maps them
         // to the Codex approval policy, sandbox, and plan collaboration mode.
         approvalMode: codexAutonomy,
         planFirst: codexPlanFirst,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipBrowserContext,
         skipActiveFile,
-        attachments: attachments?.map(a => ({ kind: a.kind, data: a.data, mediaType: a.mediaType })),
+        attachments: attachments?.map((attachment) => ({
+          id: attachment.id,
+          kind: attachment.kind,
+          name: attachment.name,
+          data: attachment.data,
+          mediaType: attachment.mediaType,
+        })),
       });
     },
 
@@ -1665,26 +1588,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const lastTurn = conversation.codexConversation[conversation.codexConversation.length - 1];
       if (lastTurn?.isRunning) return;
 
-      // Cross-runtime handoff. OpenCode's send path was the only one of the three
-      // that never built this, so switching to OpenCode mid-conversation dropped
-      // everything Claude had said — it would answer "I have no prior context"
-      // with that context sitting one bubble above. Mirror sendCodexMessage:
-      // prepend Claude turns since OpenCode's last turn, plus the selection block.
-      const lastOpenCodeTimestamp = lastTurn?.timestamp ?? 0;
-      const handoff = buildHandoffContext(
-        conversation.agentConversation.map((t) => ({
-          userPrompt: t.userPrompt,
-          responseText: t.result?.text || undefined,
-          timestamp: t.timestamp,
-        })),
-        'Claude',
-        lastOpenCodeTimestamp,
-      );
       const selectionBlock = get().buildSelectionContextBlock();
-      const handoffPrompt = handoff ? `${handoff}\n\nUser request:\n${prompt}` : prompt;
       const fullPrompt = selectionBlock
-        ? `${selectionBlock}\n\n---\n\n${handoffPrompt}`
-        : handoffPrompt;
+        ? `${selectionBlock}\n\n---\n\n${prompt}`
+        : prompt;
 
       // Strip the "opencode:" prefix — host expects bare "provider/model"
       const compositeValue = conversation.opencodeSelectedModel;
@@ -1697,6 +1604,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         conversationId: conversation.id,
         runtime: 'opencode',
         userPrompt: prompt,
+        thinkingEffort: get().composerThinkingEffortEnabled
+          ? conversation.thinkingEffortByRuntime.opencode ?? 'auto'
+          : 'auto',
         requestedPlanMode: false,
         activeFilePath: options?.skipActiveFile ? undefined : get().activeFilePath || undefined,
         attachments,
@@ -1714,16 +1624,22 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         timestamp: Date.now(),
       };
 
-      patchConversation(conversation.id, (c) => ({ codexConversation: [...c.codexConversation, turn] }));
+      patchConversation(conversation.id, (c) => ({
+        codexConversation: [...c.codexConversation, turn],
+        transcriptBoundaries: withRuntimeSwitchBoundary(c, 'opencode', turn.id, turn.timestamp),
+      }));
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turn.id,
         agentId: 'opencode',
         // The chat bubble shows the raw `prompt` (turn.userPrompt); the model
         // receives the handoff/selection-wrapped `fullPrompt`, same as Codex.
         prompt: fullPrompt,
+        displayPrompt: prompt,
         model,
         approvalMode: conversation.pendingRuntime.mode,
+        thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipActiveFile: options?.skipActiveFile,
         attachments: attachments?.map((attachment) => ({
           id: attachment.id,
@@ -1788,6 +1704,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     approveCodexPlan: (turnId) => {
       const conversation = activeConversation();
       if (!conversation) return;
+      const approvedTurnEffort = conversation.codexConversation.find((turn) => turn.id === turnId)?.thinkingEffort ?? 'auto';
       const { conversation: nextTurns, prompt } = applyCodexPlanApproval(conversation.codexConversation, turnId, nextId);
       if (!prompt) {
         return;
@@ -1806,11 +1723,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
+        conversationTurnId: turnId,
         agentId: 'codex',
         prompt,
+        conversationContinuation: true,
         model: conversation.codexSelectedModel,
         approvalMode: policyOf(conversation.pendingRuntime).autonomy,
         planFirst: false,
+        thinkingEffort: approvedTurnEffort,
       });
       get().maybeDrainQueue(conversation.id);
     },
@@ -1864,6 +1784,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ dismissedCodexNoticeKey: key });
     },
 
+    dismissContinuationNotice: (conversationId) => {
+      patchConversation(conversationId, () => ({ continuationNotice: null }));
+    },
+
     dismissCurrentPlan: (key) => {
       patchConversation(get().activeConversationId, () => ({ dismissedCurrentPlanKey: key }));
     },
@@ -1908,11 +1832,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ onboardingDismissed: true });
       // Auto-select best available agent
       const status = get().onboardingStatus;
+      const conversation = activeConversation();
       if (status) {
-        if (status.claudeCliAuthenticated) {
-          get().selectAgent('claude-code');
-        } else if (status.codexCliAuthenticated) {
-          get().selectAgent('codex');
+        if (status.claudeCliAuthenticated && conversation) {
+          const modelId = reconciledModelId(get().models, conversation.selectedModel)
+            ?? get().models[0]?.id;
+          if (modelId) get().selectRuntimeModel('claude-code', modelId);
+        } else if (status.codexCliAuthenticated && conversation) {
+          const modelId = get().codexModels.some((model) => model.id === conversation.codexSelectedModel)
+            ? conversation.codexSelectedModel
+            : get().codexModels[0]?.id;
+          if (modelId) get().selectRuntimeModel('codex', modelId);
         }
       }
     },
@@ -1920,8 +1850,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // ── Chat history actions ──
 
     loadConversationList: () => {
-      const list = listConversations();
-      set({ savedConversations: list });
+      if (get().conversationRolloutMode === 'legacy') {
+        set({ savedConversations: listConversations() });
+      } else {
+        postConversationRequest({ type: 'conversation/list' });
+      }
     },
 
     saveCurrentConversation: () => {
@@ -1941,6 +1874,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       if (state.conversations[id]) {
         get().switchConversation(id);
+        return;
+      }
+
+      if (state.conversationRolloutMode !== 'legacy' && state.hostConversations.some((item) => item.conversationId === id)) {
+        postConversationRequest({ type: 'conversation/get', conversationId: id });
         return;
       }
 
@@ -2010,22 +1948,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         activeConversationId: id,
         showHistoryPanel: false,
       });
-      syncOpenThreads();
+      focusComposerSoon();
 
       // Update agent selection in extension
       vscode.postMessage({ type: 'ai-select-agent', agentId: loadedAgentId, conversationId: id });
-    },
-
-    deleteSavedConversation: (id) => {
-      deleteConversationFromStorage(id);
-
-      // Deleting an OPEN conversation also closes it — that is a genuine
-      // "throw this away", so its runtime session is released.
-      if (get().conversations[id]) {
-        get().closeConversation(id);
-      }
-
-      set({ savedConversations: listConversations() });
     },
 
     /**
@@ -2040,6 +1966,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (id) persistConversation(id);
       get().createConversation();
       set({ showHistoryPanel: false });
+      focusComposerSoon();
     },
 
     toggleHistoryPanel: () => {
@@ -2051,12 +1978,61 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ showHistoryPanel: !state.showHistoryPanel });
     },
 
+    setPinnedConversationIds: (ids) => {
+      const unique = [...new Set(ids)].slice(0, 5);
+      set({ pinnedConversationIds: unique });
+    },
+
+    pinConversation: (id) => {
+      const state = get();
+      if (state.pinnedConversationIds.includes(id) || state.pinnedConversationIds.length >= 5) return;
+      set({ pinnedConversationIds: [...state.pinnedConversationIds, id] });
+    },
+
+    unpinConversation: (id) => {
+      set({ pinnedConversationIds: get().pinnedConversationIds.filter((item) => item !== id) });
+    },
+
+    renameHostConversation: (id, title) => {
+      const summary = get().hostConversations.find((item) => item.conversationId === id);
+      const normalized = title.replace(/\s+/g, ' ').trim();
+      if (!summary || !normalized || normalized === summary.title) return;
+      postConversationRequest({
+        type: 'conversation/rename',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+        title: normalized,
+      });
+    },
+
+    moveEarlierConversation: (id) => {
+      const summary = get().earlierConversations.find((item) => item.conversationId === id);
+      if (!summary) return;
+      postConversationRequest({
+        type: 'conversation/move-unassigned',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+      });
+    },
+
+    deleteHostConversation: (id, stopRunning = false, recovery = false) => {
+      const summaries = recovery ? get().earlierConversations : get().hostConversations;
+      const summary = summaries.find((item) => item.conversationId === id);
+      if (!summary) return;
+      postConversationRequest({
+        type: 'conversation/delete',
+        conversationId: id,
+        bindingGeneration: summary.bindingGeneration,
+        stopRunning,
+        ...(recovery ? { recovery: true } : {}),
+      });
+    },
+
     /**
      * `/clear` — explicitly throw the current thread away.
      *
-     * This is one of the two remaining legitimate reset sites (the other is
-     * `closeConversation`). It resets exactly ONE conversation's runtime session,
-     * never "all providers". The thread keeps its rail slot but gets a fresh id
+     * It resets exactly ONE conversation's runtime session, never "all
+     * providers". The replacement gets a fresh id
      * so the next turn does not overwrite the cleared conversation in History
      * (#135).
      */
@@ -2080,7 +2056,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       conversations[fresh.id] = fresh;
 
       set({ conversations, activeConversationId: fresh.id });
-      syncOpenThreads();
     },
 
     // ── Message handler ──
@@ -2089,8 +2064,241 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const state = get();
 
       switch (message.type) {
+        case 'conversation/canonical-id': {
+          const current = get();
+          const local = current.conversations[message.clientConversationId];
+          if (!local) break;
+          const conversations = { ...current.conversations };
+          delete conversations[message.clientConversationId];
+          conversations[message.conversationId] = {
+            ...local,
+            id: message.conversationId,
+            agentConversation: stampConversationId(local.agentConversation, message.conversationId),
+            codexConversation: stampConversationId(local.codexConversation, message.conversationId),
+          };
+          const thinkingEffortCapabilities = { ...current.thinkingEffortCapabilities };
+          if (thinkingEffortCapabilities[message.clientConversationId]) {
+            thinkingEffortCapabilities[message.conversationId] = thinkingEffortCapabilities[message.clientConversationId];
+            delete thinkingEffortCapabilities[message.clientConversationId];
+          }
+          const thinkingEffortNotices = { ...current.thinkingEffortNotices };
+          if (thinkingEffortNotices[message.clientConversationId]) {
+            thinkingEffortNotices[message.conversationId] = thinkingEffortNotices[message.clientConversationId];
+            delete thinkingEffortNotices[message.clientConversationId];
+          }
+          set({
+            conversations,
+            activeConversationId: current.activeConversationId === message.clientConversationId
+              ? message.conversationId
+              : current.activeConversationId,
+            pinnedConversationIds: current.pinnedConversationIds.map((id) => id === message.clientConversationId ? message.conversationId : id),
+            thinkingEffortCapabilities,
+            thinkingEffortNotices,
+          });
+          break;
+        }
+
+        case 'thinking-effort/capability': {
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          set({
+            thinkingEffortCapabilities: {
+              ...get().thinkingEffortCapabilities,
+              [targetId]: {
+                ...get().thinkingEffortCapabilities[targetId],
+                [message.runtimeId]: message.capability,
+              },
+            },
+          });
+          break;
+        }
+
+        case 'thinking-effort/status': {
+          const targetId = routeInbound(message);
+          if (targetId && message.message) {
+            set({
+              thinkingEffortNotices: {
+                ...get().thinkingEffortNotices,
+                [targetId]: message.message,
+              },
+            });
+          }
+          break;
+        }
+
+        case 'conversation/continuation-state': {
+          const current = get();
+          const conversation = current.conversations[message.conversationId];
+          if (!conversation) break;
+          if (message.state.mode === 'transcript-restored' && message.turnId) {
+            const details = [
+              `Continuing with ${RUNTIME_LABELS[message.runtimeId]}. Previous messages were included as context.`,
+              ...(message.state.unansweredPriorRequest === true
+                ? ['The previous agent did not return a saved answer.']
+                : []),
+              ...(message.state.truncated === true ? ['Some older messages were left out.'] : []),
+            ];
+            set({
+              conversations: {
+                ...current.conversations,
+                [message.conversationId]: {
+                  ...conversation,
+                  continuationNotice: null,
+                  transcriptBoundaries: [
+                    ...conversation.transcriptBoundaries.filter((boundary) => boundary.turnId !== message.turnId),
+                    {
+                      id: `transcript-restored-${message.turnId}`,
+                      turnId: message.turnId,
+                      runtimeId: message.runtimeId,
+                      timestamp: Date.now(),
+                      message: details.join(' '),
+                    },
+                  ],
+                },
+              },
+            });
+            break;
+          }
+          const visibleMode = message.state.mode === 'context-unavailable'
+            || message.state.mode === 'runtime-unavailable';
+          set({
+            conversations: {
+              ...current.conversations,
+              [message.conversationId]: {
+                ...conversation,
+                continuationNotice: visibleMode
+                  ? {
+                      mode: message.state.mode as 'context-unavailable' | 'runtime-unavailable',
+                      runtimeId: message.runtimeId,
+                      ...(message.turnId ? { turnId: message.turnId } : {}),
+                      truncated: message.state.truncated === true,
+                      unansweredPriorRequest: message.state.unansweredPriorRequest === true,
+                    }
+                  : null,
+              },
+            },
+          });
+          break;
+        }
+
+        case 'conversation/result': {
+          if (!message.ok) {
+            if (message.operation === 'legacy/import-batch') {
+              // A later initialize may retry safely: host migration is
+              // fingerprint-deduplicated and authority was not advanced by a
+              // completely failed non-empty batch.
+              legacyInventorySent = false;
+              pendingLegacyMigrationBatches = [];
+            }
+            set({ conversationStoreNotice: message.error.message });
+            break;
+          }
+          const data = message.data as Record<string, unknown>;
+          if (message.operation === 'conversation/initialize') {
+            const initialized = message.data as ConversationInitializeResult;
+            setLegacyStorageReadOnly(initialized.rolloutMode !== 'legacy');
+            if (initialized.rolloutMode === 'legacy') {
+              selectLegacyStorageScope();
+            }
+            set({
+              conversationRolloutMode: initialized.rolloutMode,
+              hostConversations: initialized.conversations,
+              earlierConversations: initialized.earlierConversations,
+              savedConversations: initialized.rolloutMode === 'legacy' ? listConversations() : [],
+              conversationStoreNotice: null,
+            });
+            if (initialized.rolloutMode === 'legacy'
+              && get().durableAgentConversationsEnabled
+              && !legacyInventorySent) {
+              // Copy-first cutover: inventory the legacy store while it is
+              // still authoritative. The host marks cutover only after this
+              // request succeeds, including the valid empty-inventory case.
+              startLegacyInventoryMigration(discoverLegacyConversationCandidates());
+            } else if (initialized.rolloutMode !== 'legacy' && !legacyInventorySent) {
+              const records = discoverLegacyConversationCandidates();
+              if (records.length > 0) startLegacyInventoryMigration(records);
+              else legacyInventorySent = true;
+            }
+            if (initialized.selectedConversationId) {
+              postConversationRequest({ type: 'conversation/get', conversationId: initialized.selectedConversationId });
+            }
+            break;
+          }
+          if (message.operation === 'conversation/list' && Array.isArray(data.conversations)) {
+            set({
+              hostConversations: data.conversations as ConversationSummaryV1[],
+              earlierConversations: Array.isArray(data.earlierConversations) ? data.earlierConversations as ConversationSummaryV1[] : [],
+              conversationStoreNotice: null,
+            });
+            break;
+          }
+          if (message.operation === 'legacy/import-batch') {
+            const nextBatch = pendingLegacyMigrationBatches.shift();
+            if (nextBatch) {
+              postConversationRequest({ type: 'legacy/import-batch', records: nextBatch });
+              break;
+            }
+            // Re-resolve the monotonic cutover marker. A fresh profile has an
+            // empty import but must still enter host-canonical mode.
+            postConversationRequest({ type: 'conversation/initialize' });
+            break;
+          }
+          if ((message.operation === 'conversation/rename' || message.operation === 'conversation/move-unassigned') && data.conversation) {
+            postConversationRequest({ type: 'conversation/list' });
+            set({ conversationStoreNotice: null });
+            break;
+          }
+          if ((message.operation === 'conversation/get' || message.operation === 'conversation/undo-delete') && data.conversation) {
+            if (data.recovery === true) {
+              postConversationRequest({ type: 'conversation/list' });
+              set({ conversationStoreNotice: null });
+              break;
+            }
+            const projection = data.conversation as ConversationProjectionV1;
+            const current = get();
+            const restored = projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined);
+            const conversations = { ...current.conversations, [restored.id]: restored };
+            const activeConversationId = restored.id;
+            set({
+              conversations,
+              activeConversationId,
+              showHistoryPanel: false,
+              conversationStoreNotice: null,
+            });
+            focusComposerSoon();
+            postConversationRequest({ type: 'conversation/list' });
+            vscode.postMessage({ type: 'ai-select-agent', agentId: restored.selectedAgent, conversationId: restored.id });
+            break;
+          }
+          if (message.operation === 'conversation/delete' && typeof data.conversationId === 'string' && typeof data.undoToken === 'string') {
+            const current = get();
+            const recovery = data.recovery === true;
+            const conversations = { ...current.conversations };
+            delete conversations[data.conversationId];
+            const nextSummary = recovery ? undefined : current.hostConversations.find((item) => item.conversationId !== data.conversationId);
+            const nextOpenId = Object.keys(conversations)[0] ?? null;
+            set({
+              conversations,
+              activeConversationId: current.activeConversationId === data.conversationId ? nextOpenId : current.activeConversationId,
+              pinnedConversationIds: current.pinnedConversationIds.filter((id) => id !== data.conversationId),
+            });
+            postConversationRequest({ type: 'conversation/list' });
+            if (!nextOpenId && nextSummary) postConversationRequest({ type: 'conversation/get', conversationId: nextSummary.conversationId });
+            break;
+          }
+          break;
+        }
+
+        case 'conversation/changed':
+          postConversationRequest({ type: 'conversation/list' });
+          break;
+
+        case 'conversation/store-status':
+          set({ conversationStoreNotice: message.state === 'degraded' ? (message.message ?? 'Conversation storage needs attention.') : null });
+          break;
+
         case 'ai-key-status':
-          set({ hasApiKey: message.hasKey, ready: true });
+          set({ hasApiKey: message.hasKey });
           break;
 
         case 'connectivity-status':
@@ -2119,6 +2327,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             autonomy: policy.autonomy,
             planFirst: false,
             modelId: rt === 'codex' ? target?.codexSelectedModel : rt === 'opencode' ? target?.opencodeSelectedModel : undefined,
+            thinkingEffort: target?.thinkingEffortByRuntime[rt] ?? 'auto',
             prompt: message.prompt,
             displayText: message.prompt,
             source: 'comment',
@@ -2128,21 +2337,61 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         }
 
+        case 'agent:bootstrap-error':
+          if (message.generation < get().bootstrapGeneration) break;
+          set({
+            bootstrapGeneration: message.generation,
+            bootstrapError: message.error,
+            ready: false,
+          });
+          break;
+
+        case 'agent:status-checking':
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions[message.runtimeId]) break;
+          set({
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              [message.runtimeId]: { phase: 'checking', error: null },
+            },
+            sidebarStatusRevisions: {
+              ...get().sidebarStatusRevisions,
+              [message.runtimeId]: message.revision,
+            },
+          });
+          break;
+
+        case 'agent:runtime-status-error':
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions[message.runtimeId]) break;
+          set({
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              [message.runtimeId]: { phase: 'error', error: message.error },
+            },
+            sidebarStatusRevisions: {
+              ...get().sidebarStatusRevisions,
+              [message.runtimeId]: message.revision,
+            },
+          });
+          break;
+
+        case 'agent:discovery': {
+          if (message.generation !== get().bootstrapGeneration) break;
+          if (message.revision < get().sidebarStatusRevisions.discovery) break;
+          set({
+            discoveredAgents: message.agents,
+            discoveredCommands: message.commands,
+            sidebarStatusRevisions: { ...get().sidebarStatusRevisions, discovery: message.revision },
+          });
+          break;
+        }
+
+        case 'agent:bootstrap':
         case 'agent:config': {
-          // Set workspace context for per-project history scoping, then immediately
-          // reload the conversation list so the history panel shows all saved entries.
-          if (message.workspacePath) {
-            setWorkspaceContext(message.workspacePath);
-            get().loadConversationList();
-            // R13 / E7: the workspace prefix is only known now, so this is the
-            // first moment the persisted open-thread set can be read. Runs once
-            // per webview — a later agent:config must not re-open threads the
-            // user has since closed.
-            if (!openThreadsRestored) {
-              openThreadsRestored = true;
-              restoreOpenThreads();
-            }
-          }
+          const bootstrap = message.type === 'agent:bootstrap' ? message : null;
+          const legacyConfig = message.type === 'agent:config' ? message : null;
+          if (bootstrap && bootstrap.generation < get().bootstrapGeneration) break;
           const newCodexModels = message.codexModels || [];
           const newClaudeModels = message.models || [];
           const incomingAgent = (message.selectedAgent as AgentId) || 'claude-code';
@@ -2150,9 +2399,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             incomingAgent === 'codex' ? 'codex'
             : incomingAgent === 'opencode' ? 'opencode'
             : 'claude-code';
-          const incomingCodexStatus = message.codexStatus ?? get().codexStatus;
+          const incomingCodexStatus = legacyConfig?.codexStatus ?? get().codexStatus;
           const opencodeEnabled = message.opencodeEnabled ?? get().opencodeEnabled;
-          const acpProviders = message.acpProviders ?? get().acpProviders;
+          const acpProviders = legacyConfig?.acpProviders ?? get().acpProviders;
           const byokProviderModels = message.byokProviderModels ?? get().byokProviderModels;
 
           // Model-catalog reconciliation applies to EVERY open thread: if a thread's
@@ -2161,6 +2410,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // to the ACTIVE thread — the host's "selected agent" is a single value and
           // must not re-bind background threads to a different runtime.
           const activeId = get().activeConversationId;
+          const applyHostDefault = !get().ready;
           const conversations: Record<string, ConversationState> = {};
           for (const conversation of Object.values(get().conversations)) {
             const codexSelectedModel = newCodexModels.some((m: { id: string }) => m.id === conversation.codexSelectedModel)
@@ -2169,10 +2419,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             const candidateClaude = conversation.id === activeId
               ? (message.selectedModel || conversation.selectedModel)
               : conversation.selectedModel;
-            const selectedModel = newClaudeModels.some((m: { id: string }) => m.id === candidateClaude)
-              ? candidateClaude
-              : (newClaudeModels[0]?.id || candidateClaude);
-            const isActive = conversation.id === activeId;
+            const selectedModel = reconciledModelId(newClaudeModels, candidateClaude)
+              ?? (newClaudeModels[0]?.id || candidateClaude);
+            const isActiveBlankConversation = applyHostDefault
+              && conversation.id === activeId
+              && isConversationEmpty(conversation);
+            const incomingPendingModel = incomingRuntimeId === 'codex'
+              ? codexSelectedModel
+              : incomingRuntimeId === 'opencode'
+                ? (conversation.opencodeSelectedModel || firstAvailableOpenCodeModel(
+                    opencodeEnabled,
+                    acpProviders,
+                    byokProviderModels,
+                  )).replace(/^opencode:/, '')
+                : selectedModel;
             conversations[conversation.id] = {
               ...conversation,
               selectedModel,
@@ -2184,18 +2444,32 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 acpProviders,
                 byokProviderModels,
               ),
-              ...(isActive
+              ...(isActiveBlankConversation
                 ? {
                     selectedAgent: incomingAgent,
-                    pendingRuntime: { ...conversation.pendingRuntime, runtimeId: incomingRuntimeId, modelId: selectedModel },
+                    pendingRuntime: { ...conversation.pendingRuntime, runtimeId: incomingRuntimeId, modelId: incomingPendingModel },
                   }
                 : {}),
             };
           }
 
+          // The host can report a completed browser login either through the
+          // setup callback or through its status polling refresh. Treat both
+          // paths as the same transition for the inline recovery card.
+          const incomingSetupStatus = legacyConfig?.setupStatus ?? get().setupStatus;
+          const loginCompleted = (get().claudeLoginState === 'pending' || get().claudeLoginState === 'error')
+            && incomingSetupStatus?.state === 'ready';
+          const inlineLoginCompleted = loginCompleted && get().claudeLoginTurnId !== null;
+
           set({
+            ready: true,
+            ...(bootstrap ? {
+              bootstrapGeneration: bootstrap.generation,
+              bootstrapError: null,
+            } : {}),
             agenticEnabled: message.agenticEnabled,
-            parallelChatsEnabled: message.parallelChatsEnabled !== false,
+            durableAgentConversationsEnabled: message.durableAgentConversations !== false,
+            composerThinkingEffortEnabled: message.composerThinkingEffortEnabled !== false,
             codexEnabled: message.codexEnabled ?? false,
             agents: message.agents,
             models: newClaudeModels,
@@ -2204,11 +2478,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             dismissedCodexNoticeKey: getCodexCompatibilityNoticeKey(incomingCodexStatus)
               ? get().dismissedCodexNoticeKey
               : null,
-            setupStatus: message.setupStatus ?? get().setupStatus,
-            environmentStatus: message.environmentStatus ?? get().environmentStatus,
+            setupStatus: incomingSetupStatus,
+            environmentStatus: legacyConfig?.environmentStatus ?? get().environmentStatus,
+            ...(loginCompleted ? {
+              setupInProgress: false,
+              setupError: null,
+              claudeLoginState: inlineLoginCompleted ? 'success' as const : 'idle' as const,
+              ...(!inlineLoginCompleted ? { claudeLoginTurnId: null } : {}),
+            } : {}),
             hasSeenWelcome: message.hasSeenWelcome ?? get().hasSeenWelcome,
-            discoveredAgents: message.discoveredAgents || [],
-            discoveredCommands: message.discoveredCommands || [],
+            discoveredAgents: legacyConfig?.discoveredAgents ?? get().discoveredAgents,
+            discoveredCommands: legacyConfig?.discoveredCommands ?? get().discoveredCommands,
             claudeSdkVersion: message.claudeSdkVersion ?? get().claudeSdkVersion,
             // Sprint 76: OpenCode / ACP fields
             opencodeEnabled,
@@ -2218,10 +2498,29 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
             conversations,
           });
+
+          // Conversation persistence is an independent hydration domain. The
+          // atomic catalog/model commit above must remain complete even when
+          // legacy webview storage is full, corrupt, or unavailable.
+          try {
+            if (message.workspacePath) {
+              setWorkspaceContext(message.workspacePath);
+            }
+            if (get().conversationRolloutMode === 'unknown') {
+              postConversationRequest({ type: 'conversation/initialize' });
+            } else {
+              get().loadConversationList();
+            }
+          } catch (error) {
+            console.error('[Agent Chat conversations] Initialization failed after bootstrap:', error);
+            set({ conversationStoreNotice: 'Conversation history could not be loaded. Agent Chat is still available.' });
+          }
           break;
         }
 
         case 'acp-providers': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions.opencode) break;
           const conversations: Record<string, ConversationState> = {};
           for (const conversation of Object.values(get().conversations)) {
             conversations[conversation.id] = {
@@ -2237,6 +2536,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             opencodeEnabled: message.enabled,
             acpProviders: message.providers,
             conversations,
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              opencode: { phase: message.error ? 'error' : 'ready', error: message.error ?? null },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, opencode: message.revision },
+            } : {}),
           });
           break;
         }
@@ -2262,8 +2568,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'codex:status': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions.codex) break;
           const updates: Partial<AISidebarState> = {
             codexStatus: message.status,
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              codex: {
+                phase: message.status.state === 'checking' ? 'checking' : 'ready',
+                error: null,
+              },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, codex: message.revision },
+            } : {}),
           };
 
           if (!getCodexCompatibilityNoticeKey(message.status)) {
@@ -2509,6 +2827,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   filesModified: message.filesModified || [],
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
                   error: message.error,
+                  failureKind: message.failureKind,
                 },
               };
             },
@@ -2529,20 +2848,64 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'agent-setup:progress':
-          // Progress is informational — setupInProgress stays true
+          if (message.progress.stage === 'login') {
+            set({ setupInProgress: true, setupError: null, claudeLoginState: 'pending' });
+          }
           break;
 
-        case 'agent-setup:complete':
+        case 'agent-setup:complete': {
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions['claude-code']) break;
+          const loginState = get().claudeLoginState;
+          const loginSucceeded = (loginState === 'pending' || loginState === 'error')
+            && message.status.state === 'ready';
+          const inlineLoginSucceeded = loginSucceeded && get().claudeLoginTurnId !== null;
+          const loginFailed = loginState === 'pending' && !loginSucceeded;
           set({
             setupStatus: message.status,
             environmentStatus: message.environmentStatus ?? get().environmentStatus,
             setupInProgress: false,
-            setupError: null,
+            setupError: loginSucceeded
+              ? null
+              : loginState === 'error'
+                ? get().setupError
+                : loginFailed
+                  ? message.status.error ?? 'Claude sign-in did not finish. Please try again.'
+                  : null,
+            claudeLoginState: loginSucceeded
+              ? inlineLoginSucceeded ? 'success' : 'idle'
+              : loginFailed
+                ? 'error'
+                : loginState,
+            ...(loginSucceeded && !inlineLoginSucceeded ? { claudeLoginTurnId: null } : {}),
+            runtimeHydration: {
+              ...get().runtimeHydration,
+              'claude-code': { phase: 'ready', error: null },
+            },
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, 'claude-code': message.revision },
+            } : {}),
           });
           break;
+        }
 
         case 'agent-setup:error':
-          set({ setupInProgress: false, setupError: message.error });
+          if (message.generation !== undefined && message.generation !== get().bootstrapGeneration) break;
+          if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions['claude-code']) break;
+          set({
+            setupInProgress: false,
+            setupError: message.error,
+            claudeLoginState: get().claudeLoginState === 'pending' ? 'error' : get().claudeLoginState,
+            ...(message.generation !== undefined ? {
+              runtimeHydration: {
+                ...get().runtimeHydration,
+                'claude-code': { phase: 'error', error: message.error },
+              },
+            } : {}),
+            ...(message.revision !== undefined ? {
+              sidebarStatusRevisions: { ...get().sidebarStatusRevisions, 'claude-code': message.revision },
+            } : {}),
+          });
           break;
 
         // ── Codex messages ──
@@ -2761,8 +3124,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
  * the selector mints a new object each call. Everything else the selector can
  * return is an object the store already owns, so it is stable by construction.
  *
- * In practice this is unreachable — the store always keeps at least one open
- * conversation (`closeConversation` and `clearChat` both create a replacement) —
+ * In practice this is unreachable — New and `/clear` always leave an active
+ * conversation —
  * it exists so callers get a `ConversationState` rather than a nullable.
  */
 const NO_ACTIVE_CONVERSATION: ConversationState = createConversationState('__no-active-conversation__');

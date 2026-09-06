@@ -25,6 +25,7 @@ import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
 import { emitCodexStatusInvalidated } from './codexStatusEvents';
 import { buildCodexBrowserDynamicTools } from '../browser/codexBrowserTools';
+import { CODEX_MODEL_IDS } from '../ai/modelConfig';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
 import type {
@@ -35,6 +36,14 @@ import type {
   RuntimeStatus,
   UnifiedApprovalRequest,
 } from '../runtime/AgentRuntime';
+import {
+  continuationCheckpoint,
+  frameRuntimePrompt,
+  resolveRuntimeContinuation,
+  transcriptRestoredState,
+} from '../runtime/continuation';
+import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -156,6 +165,11 @@ export class CodexSession implements RuntimeSession {
    */
   private _threadApprovalKey = '';
 
+  /** Provider default captured before this session applies a manual override. */
+  private _defaultThinkingEffort: ExplicitThinkingEffort | null = null;
+  /** Auto only needs an explicit reset after a manual value changed the thread. */
+  private _manualThinkingEffortApplied = false;
+
   /** Approval/question request ids raised by this conversation and still open. */
   private readonly _openRequestIds = new Set<string>();
 
@@ -192,6 +206,8 @@ export class CodexSession implements RuntimeSession {
       throw new Error('CodexRuntime: createSession() must succeed before prompt()');
     }
     const config = this._config;
+    const continuation = resolveRuntimeContinuation('codex', config.continuation);
+    let useNativeContext = false;
     const resolvedModel = turn.model ?? config.model ?? null;
     // Sprint 103 R1 (D4): only the explicit turn mode selects plan-first.
     const shouldUsePlanMode = turn.mode === 'plan';
@@ -228,28 +244,77 @@ export class CodexSession implements RuntimeSession {
       });
       this._clearThread();
     }
+    if (this._threadId) {
+      useNativeContext = true;
+      config.onContinuationState?.({ mode: 'native-restored' });
+    }
 
-    // Create thread on first turn or after reset
+    // Resume an exact-compatible provider thread on first turn. A rejected
+    // native id falls through to a new thread; transcript fallback framing is
+    // injected by the host coordinator, never by provider history replay.
     if (!this._threadId) {
       const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
       const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
-
-      const result = await appServer.threadStart({
-        cwd: config.workspacePath || null,
-        model: resolvedModel,
-        approvalPolicy,
-        sandbox,
-        baseInstructions: buildCodexBaseInstructions(config.extraSystemPrompt),
-        developerInstructions: shouldUsePlanMode ? planDevInstructions : null,
-        ...(dynamicTools ? { dynamicTools } : {}),
-      }, this.conversationId);
+      let result: { thread: { id: string }; reasoningEffort?: string | null } | null = null;
+      if (continuation.kind === 'native') {
+        config.onContinuationState?.({ mode: 'pending' });
+        try {
+          result = await appServer.threadResume({
+            threadId: continuation.descriptor.nativeReference,
+            cwd: config.workspacePath || null,
+            approvalPolicy,
+            sandbox,
+          });
+          useNativeContext = true;
+          config.onContinuationState?.({ mode: 'native-restored' });
+        } catch (error) {
+          traceCodex('execution', 'native thread resume rejected; starting fresh', {
+            conversationId: this.conversationId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          config.onContinuationState?.(config.continuation?.fallbackContext
+            ? transcriptRestoredState(config.continuation.fallbackContext)
+            : { mode: 'context-unavailable', failureCategory: 'provider-rejected' });
+        }
+      } else if (continuation.kind === 'fallback') {
+        config.onContinuationState?.(config.continuation?.fallbackContext
+          ? transcriptRestoredState(config.continuation.fallbackContext)
+          : { mode: 'context-unavailable', failureCategory: continuation.failureCategory });
+      }
+      if (!result) {
+        if (continuation.kind === 'fresh' && config.continuation?.fallbackContext) {
+          config.onContinuationState?.(transcriptRestoredState(config.continuation.fallbackContext));
+        }
+        result = await appServer.threadStart({
+          cwd: config.workspacePath || null,
+          model: resolvedModel,
+          approvalPolicy,
+          sandbox,
+          baseInstructions: buildCodexBaseInstructions(config.extraSystemPrompt),
+          developerInstructions: shouldUsePlanMode ? planDevInstructions : null,
+          ...(dynamicTools ? { dynamicTools } : {}),
+        }, this.conversationId);
+      }
       this._threadId = result.thread.id;
+      const providerDefault = result.reasoningEffort;
+      this._defaultThinkingEffort = isExplicitThinkingEffort(providerDefault)
+        ? providerDefault
+        : turn.thinkingEffortDefault ?? null;
       this._runtime._bindThread(result.thread.id, this);
       this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
       this._threadApprovalKey = approvalKey;
+      const compatibility = config.continuation?.compatibility;
+      if (compatibility) {
+        config.onContinuationCheckpoint?.(continuationCheckpoint(
+          result.thread.id,
+          compatibility,
+          continuation.kind === 'native'
+            ? continuation.descriptor.coveredThroughEventId
+            : config.continuation?.fallbackContext?.coveredThroughEventId ?? null,
+        ));
+      }
       traceCodex('execution', 'thread started', {
         conversationId: this.conversationId,
-        threadId: result.thread.id,
         approvalPolicy,
         sandbox,
         browserTools: this._browserToolsEnabledForThread,
@@ -272,13 +337,22 @@ export class CodexSession implements RuntimeSession {
     if (shouldUsePlanMode) {
       enrichedPrompt = `${CODEX_PLAN_TURN_REMINDER}\n\n${enrichedPrompt}`;
     }
+    enrichedPrompt = frameRuntimePrompt(
+      enrichedPrompt,
+      useNativeContext ? config.continuation?.nativeDelta : config.continuation?.fallbackContext,
+    );
+
+    const requestedThinkingEffort = turn.thinkingEffort ?? 'auto';
+    const effectiveThinkingEffort = requestedThinkingEffort === 'auto'
+      ? (this._manualThinkingEffortApplied ? this._defaultThinkingEffort ?? undefined : undefined)
+      : requestedThinkingEffort;
 
     const collaborationMode = shouldUsePlanMode
       ? {
           mode: 'plan' as const,
           settings: {
-            model: resolvedModel ?? 'gpt-5.6-sol',
-            reasoning_effort: null,
+            model: resolvedModel ?? CODEX_MODEL_IDS.SOL,
+            reasoning_effort: effectiveThinkingEffort ?? null,
             developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
           },
         }
@@ -299,8 +373,15 @@ export class CodexSession implements RuntimeSession {
       resolvedModel ?? undefined,
       imageDataUrls.length > 0 ? imageDataUrls : undefined,
       collaborationMode,
+      effectiveThinkingEffort,
     );
+    this._manualThinkingEffortApplied = requestedThinkingEffort !== 'auto';
+    config.onThinkingEffortApplied?.({
+      requested: requestedThinkingEffort,
+      adjusted: false,
+    });
     this._turnId = turnResult.turn.id;
+    config.onDispatchAccepted?.();
     traceCodex('execution', 'turn start acknowledged', {
       conversationId: this.conversationId,
       threadId: this._threadId,
@@ -365,6 +446,8 @@ export class CodexSession implements RuntimeSession {
     if (this._threadId) this._runtime._unbindThread(this._threadId);
     this._threadId = null;
     this._turnId = null;
+    this._defaultThinkingEffort = null;
+    this._manualThinkingEffortApplied = false;
   }
 }
 
@@ -417,8 +500,12 @@ export class CodexRuntime implements AgentRuntime {
 
     const existing = this._sessions.get(conversationId);
     if (existing) {
-      existing.applyConfig(config);
-      return existing;
+      const continuation = resolveRuntimeContinuation('codex', config.continuation);
+      if (continuation.kind === 'native' || !config.continuation?.fallbackContext) {
+        existing.applyConfig(config);
+        return existing;
+      }
+      this.disposeSession(conversationId);
     }
     const session = new CodexSession(conversationId, config, this);
     this._sessions.set(conversationId, session);

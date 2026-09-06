@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sprint 112 — Composer thinking effort</title>
+  <style>
+    :root {
+      --r-surface:#fff; --r-surface-muted:#f8fafc; --r-surface-soft:#f1f5f9;
+      --r-hairline:#e2e8f0; --r-hairline-strong:#cbd5e1;
+      --r-ink-strong:#1e1b4b; --r-ink-body:#475569; --r-ink-muted:#64748b; --r-ink-faint:#94a3b8;
+      --r-accent:#4338ca; --r-accent-deep:#3730a3; --r-accent-soft:#e0e7ff;
+      --r-ring:rgba(67,56,202,.12); --r-error:#ef4444;
+      --font:'Sofia Sans',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#eef2f7;color:var(--r-ink-strong);font-family:var(--font);font-size:13px}
+    button,select,textarea{font:inherit}
+    button{color:inherit}
+    .lab{min-height:100vh;display:grid;grid-template-columns:minmax(230px,1fr) auto}
+    .notes{padding:28px;max-width:680px}
+    h1{font-size:20px;margin:0 0 8px;font-weight:600}
+    .notes p{max-width:570px;color:var(--r-ink-body);line-height:1.55}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+    .control{border:1px solid var(--r-hairline-strong);background:var(--r-surface);border-radius:6px;padding:6px 9px;cursor:pointer}
+    .control[aria-pressed=true]{border-color:var(--r-accent);background:var(--r-accent-soft);color:var(--r-accent-deep)}
+    .decision{margin-top:24px;padding:14px 16px;border-left:3px solid var(--r-accent);background:var(--r-surface);line-height:1.5}
+    .decision strong{display:block;margin-bottom:4px}
+    .stage{height:100vh;padding:24px;display:flex;align-items:center;justify-content:center;overflow:auto}
+    .sidebar{width:420px;height:min(800px,calc(100vh - 48px));min-height:540px;background:var(--r-surface-muted);border:1px solid var(--r-hairline);box-shadow:0 10px 30px rgba(30,27,75,.1);display:flex;flex-direction:column;position:relative;transition:width .2s ease}
+    .sidebar.narrow{width:280px}
+    .topbar{height:46px;padding:0 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--r-hairline);background:var(--r-surface-muted)}
+    .topbar .active{height:30px;width:30px;border-radius:8px;display:grid;place-items:center;background:var(--r-accent-soft);color:var(--r-accent)}
+    .topbar .spacer{flex:1}
+    .icon{border:0;background:transparent;width:28px;height:28px;border-radius:4px;color:var(--r-ink-muted);cursor:pointer;font-size:16px}
+    .icon:hover{background:var(--r-surface-soft);color:var(--r-ink-strong)}
+    .transcript{flex:1;padding:20px 14px;overflow:hidden;color:var(--r-ink-body)}
+    .runtime-label{font-size:11px;color:var(--r-ink-faint);margin-bottom:10px}
+    .bubble{background:var(--r-surface);padding:12px;border-radius:8px;line-height:1.5;box-shadow:0 1px 2px rgba(30,27,75,.04)}
+    .answer{padding:14px 2px;line-height:1.55}
+    .notice{min-height:27px;margin:0 12px;padding:6px 9px;border-left:2px solid var(--r-accent);background:rgba(224,231,255,.45);color:var(--r-ink-muted);font-size:11px;line-height:1.35;opacity:0;transform:translateY(2px);transition:opacity .12s ease,transform .12s ease}
+    .notice.show{opacity:1;transform:none}
+    .composer-wrap{padding:10px 12px 12px}
+    .composer{position:relative;border:1px solid var(--r-hairline);border-radius:10px;background:var(--r-surface);box-shadow:0 1px 2px rgba(30,27,75,.04)}
+    textarea{width:100%;height:72px;resize:none;border:0;outline:0;background:transparent;padding:12px;color:var(--r-ink-strong)}
+    textarea::placeholder{color:var(--r-ink-faint)}
+    .footer{min-height:38px;padding:5px 7px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;border-top:1px solid transparent}
+    .ghost{height:26px;border:1px solid transparent;background:transparent;border-radius:6px;padding:0 7px;color:var(--r-ink-muted);font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap}
+    .ghost:hover{background:var(--r-surface-soft);color:var(--r-ink-strong)}
+    .ghost:focus-visible,.auto-toggle input:focus-visible{outline:0;box-shadow:0 0 0 4px var(--r-ring);border-color:var(--r-accent)}
+    .runtime{min-width:0;max-width:142px;overflow:hidden;text-overflow:ellipsis}
+    .push{margin-left:auto;display:flex;gap:3px}
+    .send{width:28px;height:28px;border:1px solid var(--r-hairline);border-radius:6px;background:var(--r-surface-soft);color:var(--r-ink-body);cursor:pointer}
+    .send:hover{color:var(--r-ink-strong)}
+    .popover{position:absolute;z-index:5;right:8px;bottom:42px;width:min(320px,calc(100% - 16px));border:1px solid var(--r-hairline);border-radius:10px;background:var(--r-surface);box-shadow:0 10px 22px rgba(30,27,75,.14);padding:14px;display:none}
+    .popover.open{display:block}
+    .pop-head{display:flex;align-items:center;margin-bottom:10px;font-weight:600}
+    .pop-head span:last-child{margin-left:auto;font-weight:500;color:var(--r-ink-muted)}
+    .scale-head{display:flex;justify-content:space-between;color:var(--r-ink-muted);font-size:11px;margin:0 0 6px}
+    .range-wrap{--fill:50%;position:relative;height:40px;transition:opacity .12s ease}
+    .range-wrap.auto-mode{opacity:.58}
+    .range-wrap.auto-mode:hover{opacity:.82}
+    .range-track{position:absolute;left:17px;right:17px;top:8px;height:24px;border:1px solid var(--r-hairline);border-radius:999px;background:var(--r-surface-soft);overflow:hidden;pointer-events:none}
+    .range-fill{position:absolute;inset:0 auto 0 0;width:var(--fill);border-radius:999px;background:var(--r-accent)}
+    .range-dots{position:absolute;inset:0 8px;display:flex;align-items:center;justify-content:space-between}
+    .range-dot{width:5px;height:5px;border-radius:50%;background:var(--r-ink-faint)}
+    .range-dot.is-filled{background:rgba(255,255,255,.45)}
+    .effort-range{appearance:none;position:absolute;inset:0;width:100%;height:40px;margin:0;border:0;background:transparent;cursor:grab}
+    .effort-range:active{cursor:grabbing}
+    .effort-range:focus-visible{outline:0}
+    .effort-range::-webkit-slider-runnable-track{height:24px;background:transparent}
+    .effort-range::-webkit-slider-thumb{appearance:none;width:34px;height:34px;margin-top:-5px;border:1px solid var(--r-hairline);border-radius:50%;background:var(--r-surface);box-shadow:0 2px 7px rgba(30,27,75,.16)}
+    .effort-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px var(--r-ring),0 2px 7px rgba(30,27,75,.16)}
+    .effort-range::-moz-range-track{height:24px;background:transparent;border:0}
+    .effort-range::-moz-range-thumb{width:34px;height:34px;border:1px solid var(--r-hairline);border-radius:50%;background:var(--r-surface);box-shadow:0 2px 7px rgba(30,27,75,.16)}
+    .effort-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--r-ring),0 2px 7px rgba(30,27,75,.16)}
+    .auto-toggle{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--r-hairline);color:var(--r-ink-body);font-size:11px;font-weight:500;cursor:pointer}
+    .auto-toggle input{appearance:none;width:16px;height:16px;margin:0;display:grid;place-items:center;border:1px solid var(--r-hairline-strong);border-radius:3px;background:var(--r-surface);cursor:pointer}
+    .auto-toggle input:checked{border-color:var(--r-accent);background:var(--r-accent)}
+    .auto-toggle input:checked:after{content:'';width:7px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+    .disabled{opacity:.58;cursor:help}
+    .zoomed .sidebar{zoom:2;height:calc((100vh - 48px)/2);min-height:330px}
+    @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+    @media(max-width:760px){.lab{display:block}.notes{padding:18px}.stage{height:auto;min-height:650px;padding:18px}}
+  </style>
+</head>
+<body>
+  <main class="lab">
+    <section class="notes">
+      <h1>Composer thinking effort</h1>
+      <p>This prototype uses the real secondary-sidebar proportions and Composer footer pattern. Try the model and viewport controls, then open <b>Effort</b> with mouse or keyboard.</p>
+      <div class="controls" aria-label="Prototype controls">
+        <button class="control" data-model="claude">Claude · Opus</button>
+        <button class="control" data-model="haiku">Claude · Haiku 4.5</button>
+        <button class="control" data-model="codex">Codex · GPT-5.6 Sol</button>
+        <button class="control" data-model="opencode">OpenCode · live ACP</button>
+        <button class="control" id="width">Minimum width</button>
+        <button class="control" id="zoom">200% zoom</button>
+      </div>
+      <div class="decision">
+        <strong>Audit recommendation</strong>
+        Keep the scale quiet and put <b>Auto</b> below it as a checkbox. Add <b>Ultra</b> only for Codex models that advertise it; Claude shows Low–Max, Haiku stays Auto-only, and OpenCode shows only live ACP-advertised choices.
+      </div>
+    </section>
+    <section class="stage" id="stage">
+      <aside class="sidebar" id="sidebar" aria-label="Ritemark Agent Chat mock">
+        <header class="topbar">
+          <div class="active">✦</div><button class="icon" title="Conversations">◌</button><button class="icon" title="Terminal">›_</button>
+          <span class="spacer"></span><button class="icon" title="Settings">⚙</button><button class="icon" title="Close">×</button>
+        </header>
+        <section class="transcript">
+          <div class="runtime-label">Codex</div>
+          <div class="bubble">Review the release checklist and identify the remaining risk.</div>
+          <div class="answer">I’ll compare the release evidence with the current runtime matrix and call out only actionable gaps.</div>
+        </section>
+        <div class="notice" id="notice" role="status" aria-live="polite"></div>
+        <div class="composer-wrap">
+          <div class="composer">
+            <textarea aria-label="Message" placeholder="Ask Codex… (type / for commands)"></textarea>
+            <div class="footer">
+              <button class="ghost runtime" id="runtime">Codex · GPT-5.6 Sol</button>
+              <button class="ghost" title="Agent behavior: Auto">Auto⌄</button>
+              <button class="ghost" id="effort" aria-haspopup="dialog" aria-expanded="false">Effort</button>
+              <div class="push"><button class="icon" title="Information">ⓘ</button><button class="icon" title="Attach">⌕</button><button class="send" title="Send">➤</button></div>
+            </div>
+            <div class="popover" id="popover" role="dialog" aria-labelledby="pop-title">
+              <div class="pop-head"><span id="pop-title">Thinking effort</span><span id="current">Auto</span></div>
+              <div class="scale-head"><span>Faster</span><span>More thorough</span></div>
+              <div class="range-wrap auto-mode" id="range-wrap">
+                <div class="range-track" aria-hidden="true"><div class="range-fill" id="range-fill"></div><div class="range-dots" id="range-dots"></div></div>
+                <input class="effort-range" id="effort-slider" type="range" min="0" max="5" step="1" value="1" aria-label="Thinking effort" aria-valuetext="Medium">
+              </div>
+              <label class="auto-toggle"><input id="auto" type="checkbox" checked><span>Auto</span></label>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const models={
+      claude:{label:'Claude · Opus',levels:['Low','Medium','High','Extra','Max'],placeholder:'Ask Claude… (type / for commands)'},
+      haiku:{label:'Claude · Haiku 4.5',levels:[],placeholder:'Ask Claude… (type / for commands)'},
+      codex:{label:'Codex · GPT-5.6 Sol',levels:['Low','Medium','High','Extra','Max','Ultra'],placeholder:'Ask Codex… (type / for commands)'},
+      opencode:{label:'OpenCode · effort model',levels:['Low','Medium','High'],placeholder:'Ask OpenCode… (type / for commands)'}
+    };
+    let model='codex',selected='Auto',lastManual='Medium';
+    const $=id=>document.getElementById(id), effort=$('effort'), pop=$('popover'), slider=$('effort-slider'), rangeWrap=$('range-wrap'), rangeDots=$('range-dots'), auto=$('auto'), notice=$('notice');
+    function announce(text){notice.textContent=text;notice.classList.add('show');clearTimeout(announce.t);announce.t=setTimeout(()=>notice.classList.remove('show'),3600)}
+    function choose(value){selected=value;if(value!=='Auto')lastManual=value;$('current').textContent=value;effort.textContent=value==='Auto'?'Effort':'Effort · '+value;auto.checked=value==='Auto';const available=models[model].levels,shown=value==='Auto'?lastManual:value,index=Math.max(0,available.indexOf(shown)),max=Math.max(0,available.length-1);slider.max=max;slider.value=Math.min(index,max);slider.setAttribute('aria-valuetext',value==='Auto'?'Auto; manual position '+shown:shown);rangeWrap.style.setProperty('--fill',max?index/max*100+'%':'0%');rangeWrap.classList.toggle('auto-mode',value==='Auto');rangeDots.innerHTML='';available.forEach((_,i)=>{const dot=document.createElement('span');dot.className='range-dot'+(i<index?' is-filled':'');rangeDots.appendChild(dot)});}
+    function render(){const m=models[model];$('runtime').textContent=m.label;document.querySelector('textarea').placeholder=m.placeholder;const supported=m.levels.includes(selected);if(!supported&&selected!=='Auto'){const old=selected;choose('Auto');announce(old+' isn’t available for this model. Using Auto.')}else choose(selected);const unavailable=m.levels.length===0;slider.disabled=unavailable;effort.classList.toggle('disabled',unavailable);effort.setAttribute('aria-disabled',unavailable);effort.title=unavailable?'This model chooses its own thinking effort.':'Choose thinking effort';document.querySelectorAll('[data-model]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.model===model));}
+    effort.onclick=()=>{if(effort.classList.contains('disabled'))return;pop.classList.toggle('open');effort.setAttribute('aria-expanded',pop.classList.contains('open'));if(pop.classList.contains('open'))(selected==='Auto'?auto:slider).focus()};
+    auto.onchange=()=>{if(auto.checked)choose('Auto');else{const available=models[model].levels;choose(available.includes(lastManual)?lastManual:(available[0]||'Auto'))}};
+    slider.oninput=()=>{const value=models[model].levels[Number(slider.value)];if(value)choose(value)};
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pop.classList.contains('open')){pop.classList.remove('open');effort.setAttribute('aria-expanded','false');effort.focus()}});
+    document.addEventListener('click',e=>{if(!pop.contains(e.target)&&e.target!==effort&&pop.classList.contains('open')){pop.classList.remove('open');effort.setAttribute('aria-expanded','false')}});
+    document.querySelectorAll('[data-model]').forEach(b=>b.onclick=()=>{model=b.dataset.model;render()});
+    $('width').onclick=e=>{const on=$('sidebar').classList.toggle('narrow');e.currentTarget.setAttribute('aria-pressed',on)};
+    $('zoom').onclick=e=>{const on=$('stage').classList.toggle('zoomed');e.currentTarget.setAttribute('aria-pressed',on)};
+    render();
+  </script>
+</body>
+</html>

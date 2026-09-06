@@ -1,0 +1,284 @@
+Ritemark Help Menu Policy: keep the product menu focused and fail closed
+v1.10.0 RC bug fix:
+  - Restores the intentional Support / View License / Advanced menu
+  - Applies one allowlist to both native and custom menubars
+  - Keeps unknown future VS Code Help contributions hidden by default
+  - Keeps commands available through the Command Menu
+  - Covers the policy and separator normalization with unit tests
+---
+diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
+index 861a8cda9357..62ee4b047e78 100644
+--- a/src/vs/platform/actions/common/actions.ts
++++ b/src/vs/platform/actions/common/actions.ts
+@@ -119,6 +119,7 @@ export class MenuId {
+ 	static readonly MenubarFileMenu = new MenuId('MenubarFileMenu');
+ 	static readonly MenubarGoMenu = new MenuId('MenubarGoMenu');
+ 	static readonly MenubarHelpMenu = new MenuId('MenubarHelpMenu');
++	static readonly MenubarHelpMenuAdvanced = new MenuId('MenubarHelpMenuAdvanced');
+ 	static readonly MenubarLayoutMenu = new MenuId('MenubarLayoutMenu');
+ 	static readonly MenubarNewBreakpointMenu = new MenuId('MenubarNewBreakpointMenu');
+ 	static readonly PanelAlignmentMenu = new MenuId('PanelAlignmentMenu');
+diff --git a/src/vs/workbench/browser/actions/helpActions.ts b/src/vs/workbench/browser/actions/helpActions.ts
+index 8251c4a42920..b37ac1996682 100644
+--- a/src/vs/workbench/browser/actions/helpActions.ts
++++ b/src/vs/workbench/browser/actions/helpActions.ts
+@@ -127,11 +127,14 @@ class OpenDocumentationUrlAction extends Action2 {
+ 	static readonly AVAILABLE = !!(isWeb ? product.serverDocumentationUrl : product.documentationUrl);
+ 
+ 	constructor() {
++		const isRitemark = product.applicationName === 'ritemark';
+ 		super({
+ 			id: OpenDocumentationUrlAction.ID,
+ 			title: {
+-				...localize2('openDocumentationUrl', "Documentation"),
+-				mnemonicTitle: localize({ key: 'miDocumentation', comment: ['&& denotes a mnemonic'] }, "&&Documentation"),
++				...(isRitemark ? localize2('openSupportUrl', "Support") : localize2('openDocumentationUrl', "Documentation")),
++				mnemonicTitle: isRitemark
++					? localize({ key: 'miSupport', comment: ['&& denotes a mnemonic'] }, "&&Support")
++					: localize({ key: 'miDocumentation', comment: ['&& denotes a mnemonic'] }, "&&Documentation"),
+ 			},
+ 			category: Categories.Help,
+ 			f1: true,
+diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+index 0891dba11229..2e01c3246799 100644
+--- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
++++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+@@ -42,9 +42,52 @@ import { getFlatContextMenuActions } from '../../../../platform/actions/browser/
+ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+ import { mainWindow } from '../../../../base/browser/window.js';
+ import { ActivityBarPosition } from '../../../services/layout/browser/layoutService.js';
++import product from '../../../../platform/product/common/product.js';
+ 
+ export type IOpenRecentAction = IAction & { uri: URI; remoteAuthority?: string };
+ 
++const RITEMARK_HELP_MENU_ACTION_IDS = new Set([
++	'workbench.action.openDocumentationUrl',
++	'workbench.action.openLicenseUrl',
++	'workbench.action.showAboutDialog',
++]);
++
++/**
++ * Ritemark owns its product Help menu. Keep the policy at the rendering boundary
++ * so new or rebased upstream contributions cannot silently leak into the native
++ * or custom menubar. Commands remain registered and available from the palette.
++ */
++export function filterRitemarkMenubarActions(applicationName: string | undefined, topLevelTitle: string, menuActions: readonly IAction[]): IAction[] {
++	if (applicationName !== 'ritemark' || topLevelTitle !== 'Help') {
++		return Array.from(menuActions);
++	}
++
++	const filtered: IAction[] = [];
++	for (const menuAction of menuActions) {
++		const isAllowed = menuAction instanceof Separator
++			|| (menuAction instanceof SubmenuItemAction && menuAction.item.submenu === MenuId.MenubarHelpMenuAdvanced)
++			|| RITEMARK_HELP_MENU_ACTION_IDS.has(menuAction.id);
++
++		if (!isAllowed) {
++			continue;
++		}
++
++		if (menuAction instanceof Separator) {
++			if (filtered.length === 0 || filtered[filtered.length - 1] instanceof Separator) {
++				continue;
++			}
++		}
++
++		filtered.push(menuAction);
++	}
++
++	if (filtered[filtered.length - 1] instanceof Separator) {
++		filtered.pop();
++	}
++
++	return filtered;
++}
++
+ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	submenu: MenuId.MenubarFileMenu,
+ 	title: {
+@@ -101,6 +144,15 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+ 	order: 9
+ });
+ 
++if (product.applicationName === 'ritemark') {
++	MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
++		title: localize('miHelpAdvanced', "Advanced"),
++		submenu: MenuId.MenubarHelpMenuAdvanced,
++		group: '6_advanced',
++		order: 1
++	});
++}
++
+ export abstract class MenubarControl extends Disposable {
+ 
+ 	protected keys = [
+@@ -198,6 +248,11 @@ export abstract class MenubarControl extends Disposable {
+ 		this.menuUpdater.schedule();
+ 	}
+ 
++	protected getMenuActions(menu: IMenu, topLevelTitle: string): IAction[] {
++		const menuActions = getFlatContextMenuActions(menu.getActions({ shouldForwardArgs: true }));
++		return filterRitemarkMenubarActions(product.applicationName, topLevelTitle, menuActions);
++	}
++
+ 	protected calculateActionLabel(action: { id: string; label: string }): string {
+ 		const label = action.label;
+ 		switch (action.id) {
+@@ -544,10 +599,6 @@ export class CustomMenubarControl extends MenubarControl {
+ 		this._onVisibilityChange.fire(visible);
+ 	}
+ 
+-	private toActionsArray(menu: IMenu): IAction[] {
+-		return getFlatContextMenuActions(menu.getActions({ shouldForwardArgs: true }));
+-	}
+-
+ 	private readonly reinstallDisposables = this._register(new DisposableStore());
+ 	private readonly updateActionsDisposables = this._register(new DisposableStore());
+ 	private setupCustomMenubar(firstTime: boolean): void {
+@@ -657,7 +708,7 @@ export class CustomMenubarControl extends MenubarControl {
+ 					if (!this.focusInsideMenubar) {
+ 						const actions: IAction[] = [];
+ 						menuChangedDisposable.clear();
+-						updateActions(this.toActionsArray(menu), actions, title, menuChangedDisposable);
++						updateActions(this.getMenuActions(menu, title), actions, title, menuChangedDisposable);
+ 						this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
+ 					}
+ 				}));
+@@ -669,7 +720,7 @@ export class CustomMenubarControl extends MenubarControl {
+ 						if (!this.focusInsideMenubar) {
+ 							const actions: IAction[] = [];
+ 							webMenuChangedDisposable.clear();
+-							updateActions(this.toActionsArray(menu), actions, title, webMenuChangedDisposable);
++							updateActions(this.getMenuActions(menu, title), actions, title, webMenuChangedDisposable);
+ 							this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
+ 						}
+ 					}));
+@@ -679,7 +730,7 @@ export class CustomMenubarControl extends MenubarControl {
+ 			const actions: IAction[] = [];
+ 			if (menu) {
+ 				this.updateActionsDisposables.clear();
+-				updateActions(this.toActionsArray(menu), actions, title, this.updateActionsDisposables);
++				updateActions(this.getMenuActions(menu, title), actions, title, this.updateActionsDisposables);
+ 			}
+ 
+ 			if (this.menubar) {
+diff --git a/src/vs/workbench/electron-browser/actions/developerActions.ts b/src/vs/workbench/electron-browser/actions/developerActions.ts
+index f56a9d24177f..5ccdda41c26b 100644
+--- a/src/vs/workbench/electron-browser/actions/developerActions.ts
++++ b/src/vs/workbench/electron-browser/actions/developerActions.ts
+@@ -19,6 +19,7 @@ import { getActiveWindow } from '../../../base/browser/dom.js';
+ import { IProgressService, ProgressLocation } from '../../../platform/progress/common/progress.js';
+ import { IDialogService } from '../../../platform/dialogs/common/dialogs.js';
+ import { IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment } from '../../services/statusbar/browser/statusbar.js';
++import product from '../../../platform/product/common/product.js';
+ 
+ export class ToggleDevToolsAction extends Action2 {
+ 
+@@ -35,7 +36,7 @@ export class ToggleDevToolsAction extends Action2 {
+ 				mac: { primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI }
+ 			},
+ 			menu: {
+-				id: MenuId.MenubarHelpMenu,
++				id: product.applicationName === 'ritemark' ? MenuId.MenubarHelpMenuAdvanced : MenuId.MenubarHelpMenu,
+ 				group: '5_tools',
+ 				order: 1
+ 			}
+diff --git a/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
+index 716f2280413e..ea9ea240939d 100644
+--- a/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
++++ b/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
+@@ -25,7 +25,6 @@ import { IPreferencesService } from '../../../services/preferences/common/prefer
+ import { ICommandService } from '../../../../platform/commands/common/commands.js';
+ import { OpenRecentAction } from '../../../browser/actions/windowActions.js';
+ import { isICommandActionToggleInfo } from '../../../../platform/action/common/action.js';
+-import { getFlatContextMenuActions } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
+ 
+ export class NativeMenubarControl extends MenubarControl {
+ 
+@@ -93,7 +92,7 @@ export class NativeMenubarControl extends MenubarControl {
+ 			const menu = this.menus[topLevelMenuName];
+ 			if (menu) {
+ 				const menubarMenu: IMenubarMenu = { items: [] };
+-				const menuActions = getFlatContextMenuActions(menu.getActions({ shouldForwardArgs: true }));
++				const menuActions = this.getMenuActions(menu, topLevelMenuName);
+ 				this.populateMenuItems(menuActions, menubarMenu, menubarData.keybindings);
+ 				if (menubarMenu.items.length === 0) {
+ 					return false; // Menus are incomplete
+diff --git a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
+new file mode 100644
+index 000000000000..6c5197d070a9
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
+@@ -0,0 +1,72 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { Action, IAction, Separator } from '../../../../../base/common/actions.js';
++import { MenuId, SubmenuItemAction } from '../../../../../platform/actions/common/actions.js';
++import { filterRitemarkMenubarActions } from '../../../../browser/parts/titlebar/menubarControl.js';
++
++suite('Ritemark menubar policy', () => {
++
++	const ids = (actions: readonly IAction[]) => actions.map(action => action.id);
++
++	test('Help is a fail-closed product allowlist with normalized separators', () => {
++		const support = new Action('workbench.action.openDocumentationUrl', 'Support');
++		const license = new Action('workbench.action.openLicenseUrl', 'View License');
++		const about = new Action('workbench.action.showAboutDialog', 'About Ritemark');
++		const advanced = new SubmenuItemAction({
++			title: 'Advanced',
++			submenu: MenuId.MenubarHelpMenuAdvanced,
++		}, undefined, [new Action('workbench.action.toggleDevTools', 'Toggle Developer Tools')]);
++
++		const result = filterRitemarkMenubarActions('ritemark', 'Help', [
++			new Separator(),
++			new Action('workbench.action.openWalkthrough', 'Welcome'),
++			new Separator(),
++			support,
++			new Separator(),
++			new Action('workbench.action.askVScode', 'Ask @vscode'),
++			new Separator(),
++			license,
++			new Separator(),
++			new Separator(),
++			advanced,
++			new Separator(),
++			about,
++			new Separator(),
++		]);
++
++		assert.deepStrictEqual(ids(result), [
++			support.id,
++			Separator.ID,
++			license.id,
++			Separator.ID,
++			advanced.id,
++			Separator.ID,
++			about.id,
++		]);
++	});
++
++	test('unknown and developer-only top-level Help commands are rejected', () => {
++		const result = filterRitemarkMenubarActions('ritemark', 'Help', [
++			new Action('workbench.action.openProcessExplorer', 'Open Process Explorer'),
++			new Action('workbench.action.toggleDevTools', 'Toggle Developer Tools'),
++			new Action('future.upstream.help.command', 'Future upstream command'),
++		]);
++
++		assert.deepStrictEqual(result, []);
++	});
++
++	test('other products and other top-level menus are unchanged', () => {
++		const actions = [
++			new Separator(),
++			new Action('future.upstream.help.command', 'Future upstream command'),
++			new Separator(),
++		];
++
++		assert.deepStrictEqual(ids(filterRitemarkMenubarActions('code-oss', 'Help', actions)), ids(actions));
++		assert.deepStrictEqual(ids(filterRitemarkMenubarActions('ritemark', 'View', actions)), ids(actions));
++	});
++});

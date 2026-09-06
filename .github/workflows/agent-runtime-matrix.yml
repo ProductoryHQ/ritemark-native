@@ -1,0 +1,65 @@
+name: Agent Runtime Matrix
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/agent-runtime-matrix.yml'
+      - 'extensions/ritemark/binaries/agents/**'
+      - 'extensions/ritemark/package.json'
+      - 'extensions/ritemark/package-lock.json'
+      - 'scripts/fetch-agent-runtimes.sh'
+      - 'scripts/verify-agent-runtimes.sh'
+      - 'scripts/validate-agent-runtime-manifest.mjs'
+      - 'scripts/validate-agent-runtime-manifest.test.mjs'
+
+jobs:
+  native-runtime:
+    name: ${{ matrix.target }} native runtime
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-x64
+            os: macos-15-intel
+            platform: darwin
+            arch: x64
+          - target: win32-x64
+            os: windows-latest
+            platform: win32
+            arch: x64
+
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js 22.22.1
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22.22.1'
+
+      - name: Validate exact manifest and SDK snapshot
+        shell: bash
+        run: |
+          node scripts/validate-agent-runtime-manifest.mjs
+          node --test scripts/validate-agent-runtime-manifest.test.mjs
+
+      - name: Install exact extension dependencies
+        shell: bash
+        working-directory: extensions/ritemark
+        run: npm ci --legacy-peer-deps
+
+      - name: Compile extension against target SDKs
+        shell: bash
+        working-directory: extensions/ritemark
+        run: npm run compile
+
+      - name: Fetch and verify native runtime artifacts
+        shell: bash
+        run: ./scripts/fetch-agent-runtimes.sh --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - name: Smoke native runtime versions
+        shell: bash
+        run: ./scripts/verify-agent-runtimes.sh --versions

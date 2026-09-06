@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
-import { createConversationState, type ConversationState } from './conversationState';
+import {
+  createConversationState,
+  isRuntimeHandoff,
+  type ConversationState,
+} from './conversationState';
 import { vscode } from '../../lib/vscode';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
@@ -204,7 +208,120 @@ function testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning() {
 
 // ── cross-runtime handoff (OpenCode was the odd one out) ────────────────────────
 
-function testOpenCodeReceivesClaudeHandoff() {
+function testCrossRuntimeChangeIsAnImmediateHandoffForNonEmptyConversation() {
+  const nonEmpty = createConversationState('non-empty', {
+    pendingRuntime: { runtimeId: 'claude-code', modelId: '', mode: 'auto' },
+    agentConversation: [makeAgentTurn()],
+  });
+  assert.equal(isRuntimeHandoff(nonEmpty, 'opencode'), true);
+  assert.equal(isRuntimeHandoff(nonEmpty, 'claude-code'), false);
+
+  const empty = createConversationState('empty', {
+    pendingRuntime: { runtimeId: 'claude-code', modelId: '', mode: 'auto' },
+  });
+  assert.equal(isRuntimeHandoff(empty, 'codex'), false);
+}
+
+function testTranscriptRestorationUsesDurableBoundaryInsteadOfBanner() {
+  try {
+    seedActiveConversation();
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'conversation/continuation-state',
+      conversationId: 'conv-active',
+      turnId: 'turn-2',
+      runtimeId: 'codex',
+      state: {
+        mode: 'transcript-restored',
+        truncated: true,
+        unansweredPriorRequest: true,
+      },
+    });
+
+    assert.equal(
+      selectActiveConversation(useAISidebarStore.getState()).continuationNotice,
+      null,
+      'transcript restoration is disclosed only by the durable inline boundary',
+    );
+    assert.deepEqual(
+      selectActiveConversation(useAISidebarStore.getState()).transcriptBoundaries.map(({ turnId, runtimeId, message }) => ({ turnId, runtimeId, message })),
+      [{
+        turnId: 'turn-2',
+        runtimeId: 'codex',
+        message: 'Continuing with Codex. Previous messages were included as context. The previous agent did not return a saved answer. Some older messages were left out.',
+      }],
+      'same-runtime fallback renders its compact boundary immediately without waiting for a reload',
+    );
+
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'conversation/continuation-state',
+      conversationId: 'conv-active',
+      runtimeId: 'codex',
+      state: { mode: 'context-unavailable' },
+    });
+    assert.deepEqual(selectActiveConversation(useAISidebarStore.getState()).continuationNotice, {
+      mode: 'context-unavailable',
+      runtimeId: 'codex',
+      truncated: false,
+      unansweredPriorRequest: false,
+    });
+    useAISidebarStore.getState().dismissContinuationNotice('conv-active');
+    assert.equal(selectActiveConversation(useAISidebarStore.getState()).continuationNotice, null);
+  } finally {
+    resetStore();
+  }
+}
+
+function testFailedRuntimeCanBeStoppedAndHandedToAnotherAgent() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({
+      selectedAgent: 'codex',
+      pendingRuntime: { runtimeId: 'codex', modelId: 'gpt-5.6-codex', mode: 'auto' },
+      selectedModel: 'claude-opus-4-1',
+      codexConversation: [makeCodexTurn({
+        id: 'unanswered-codex-turn',
+        userPrompt: 'Complete the Credit24 task',
+        isRunning: true,
+      })],
+    });
+
+    // The confirmation action stops the old runtime before applying the new
+    // selection, so the composer does not queue behind a runtime that is down.
+    useAISidebarStore.getState().cancelRequest();
+    useAISidebarStore.getState().selectAgent('claude-code');
+    useAISidebarStore.getState().setPendingRuntime({ runtimeId: 'claude-code', modelId: 'claude-opus-4-1' });
+    useAISidebarStore.getState().sendAgentMessage('Solve it yourself');
+
+    assert.ok(posted.some((message) => (
+      typeof message === 'object' && message !== null
+      && (message as { type?: string }).type === 'agent-cancel'
+      && (message as { agentId?: string }).agentId === 'codex'
+    )), 'handoff stops the unresponsive runtime');
+    assert.ok(posted.some((message) => (
+      typeof message === 'object' && message !== null
+      && (message as { type?: string }).type === 'agent-execute'
+      && (message as { agentId?: string; prompt?: string }).agentId === 'claude-code'
+      && (message as { prompt?: string }).prompt === 'Solve it yourself'
+    )), 'the new instruction is dispatched once to the selected runtime');
+    const active = selectActiveConversation(useAISidebarStore.getState());
+    const latestAgentTurn = active.agentConversation[active.agentConversation.length - 1];
+    assert.equal(active.codexConversation[0].isRunning, false);
+    assert.equal(latestAgentTurn?.userPrompt, 'Solve it yourself');
+    assert.equal(latestAgentTurn?.isRunning, true);
+    assert.deepEqual(active.transcriptBoundaries.map(({ turnId, runtimeId, message }) => ({ turnId, runtimeId, message })), [{
+      turnId: latestAgentTurn.id,
+      runtimeId: 'claude-code',
+      message: 'Continuing with Claude. Previous messages were included as context.',
+    }], 'the handoff disclosure appears immediately with the newly sent user turn');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testOpenCodeLeavesCanonicalHandoffContextToHost() {
   const posted: unknown[] = [];
   const originalPostMessage = vscode.postMessage;
   vscode.postMessage = (message: unknown) => { posted.push(message); };
@@ -228,17 +345,20 @@ function testOpenCodeReceivesClaudeHandoff() {
       typeof m === 'object' && m !== null && (m as { type?: string }).type === 'agent-execute'
       && (m as { agentId?: string }).agentId === 'opencode');
     assert.ok(exec, 'sendOpenCodeMessage must post an agent-execute for opencode');
-    assert.match(exec!.prompt, /handled by Claude/i,
-      'OpenCode must receive the Claude handoff preamble — the bug was that it did not');
-    assert.match(exec!.prompt, /markdown editor/,
-      'the handoff must carry what Claude actually said');
-    assert.match(exec!.prompt, /and what would you do\?/,
-      'the user request must still be present after the handoff');
+    assert.equal(exec!.prompt, 'and what would you do?',
+      'the webview must send the current request once and leave canonical transcript framing to the host');
+    assert.doesNotMatch(exec!.prompt, /markdown editor|handled by Claude/i,
+      'the removed webview preamble must not duplicate the host continuation pack');
 
     // The chat bubble shows the raw prompt, not the wrapped one.
     const { codexConversation } = selectActiveConversation(useAISidebarStore.getState());
     assert.equal(codexConversation[codexConversation.length - 1].userPrompt, 'and what would you do?',
       'the visible bubble must show the raw prompt, not the handoff wrapper');
+    assert.equal(
+      selectActiveConversation(useAISidebarStore.getState()).transcriptBoundaries[0]?.message,
+      'Continuing with OpenCode. Previous messages were included as context.',
+      'the runtime switch boundary must render immediately rather than waiting for a reload',
+    );
   } finally {
     vscode.postMessage = originalPostMessage;
     resetStore();
@@ -292,6 +412,103 @@ function testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval() {
   }
 }
 
+function testSelectingCodexEmitsOnlyTheSelectionIntent() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({ selectedAgent: 'claude-code' });
+    useAISidebarStore.getState().selectAgent('codex');
+
+    assert.deepEqual(posted, [{
+      type: 'ai-select-agent',
+      agentId: 'codex',
+      conversationId: 'conv-active',
+    }], 'runtime selection must not add a webview-owned readiness refresh');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testRuntimeAndModelSelectionIsAtomic() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({
+      selectedAgent: 'claude-code',
+      selectedModel: 'claude-opus-5[1m]',
+      codexSelectedModel: 'gpt-old',
+      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-opus-5[1m]', mode: 'ask' },
+    });
+
+    useAISidebarStore.getState().selectRuntimeModel('codex', 'gpt-5.6-sol');
+
+    const active = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(active.selectedAgent, 'codex');
+    assert.equal(active.codexSelectedModel, 'gpt-5.6-sol');
+    assert.deepEqual(active.pendingRuntime, {
+      runtimeId: 'codex',
+      modelId: 'gpt-5.6-sol',
+      mode: 'ask',
+    });
+    assert.deepEqual(posted, [{
+      type: 'ai-select-agent',
+      agentId: 'codex',
+      conversationId: 'conv-active',
+    }]);
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testOnboardingSelectionUsesAtomicRuntimeAndModel() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    seedActiveConversation({
+      selectedAgent: 'claude-code',
+      codexSelectedModel: 'stale-codex-model',
+      pendingRuntime: { runtimeId: 'claude-code', modelId: 'claude-opus-5[1m]', mode: 'ask' },
+    });
+    useAISidebarStore.setState({
+      codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', description: 'Test model' }],
+      onboardingStatus: {
+        platform: 'darwin',
+        wingetAvailable: false,
+        gitInstalled: true,
+        nodeInstalled: true,
+        claudeCliInstalled: true,
+        claudeCliAuthenticated: false,
+        codexCliInstalled: true,
+        codexCliAuthenticated: true,
+        hasOpenAiKey: false,
+        hasAnthropicKey: false,
+        anyAgentReady: true,
+      },
+    });
+
+    useAISidebarStore.getState().dismissOnboarding();
+
+    const active = selectActiveConversation(useAISidebarStore.getState());
+    assert.equal(active.selectedAgent, 'codex');
+    assert.equal(active.codexSelectedModel, 'gpt-5.6-sol');
+    assert.equal(active.pendingRuntime.runtimeId, 'codex');
+    assert.equal(active.pendingRuntime.modelId, 'gpt-5.6-sol');
+    assert.ok(posted.some((message) => (
+      typeof message === 'object'
+      && message !== null
+      && (message as { type?: string }).type === 'ai-select-agent'
+    )));
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
 
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
@@ -300,8 +517,14 @@ function main() {
   testCancelRequestRoutesToClaudeWhenClaudeIsRunning();
   testCancelRequestPrefersCodexWhenBothRuntimesHaveRunningTurns();
   testCancelRequestIsNoOpWhenNeitherRuntimeIsRunning();
-  testOpenCodeReceivesClaudeHandoff();
+  testCrossRuntimeChangeIsAnImmediateHandoffForNonEmptyConversation();
+  testTranscriptRestorationUsesDurableBoundaryInsteadOfBanner();
+  testFailedRuntimeCanBeStoppedAndHandedToAnotherAgent();
+  testOpenCodeLeavesCanonicalHandoffContextToHost();
   testOpenCodeTransmitsAttachmentsAndHonoursActiveFileRemoval();
+  testSelectingCodexEmitsOnlyTheSelectionIntent();
+  testRuntimeAndModelSelectionIsAtomic();
+  testOnboardingSelectionUsesAtomicRuntimeAndModel();
   console.log('Runtime switching tests passed.');
 }
 

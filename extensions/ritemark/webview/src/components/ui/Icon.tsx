@@ -6,10 +6,9 @@
  *
  * Rules (enforced by this component):
  *  - Family: Phosphor only. No direct `PhFolderOpen` imports at call sites.
- *  - Weight: 400 (regular). Locked; cannot be overridden per-icon. Matches the
- *    chrome-side Phosphor weight used by patch 001 (codicon.css + iconRegistry.ts)
- *    and the product icon theme (extensions/ritemark/producticons/) — one weight
- *    across chrome and webview, no two-tier hierarchy.
+ *  - Weight: 400 (regular) by default. `duotone` is reserved for the
+ *    conversation identity bubble, where Phosphor renders a 20%-opacity fill
+ *    beneath the regular outline. Chrome remains regular-only.
  *  - Sizes: 12 / 14 / 16 / 20. No other values.
  *  - Tone: muted (default) / active / disabled, backed by --r-* CSS vars.
  */
@@ -28,6 +27,10 @@ import {
   CaretRight,
   CaretUp,
   CaretUpDown,
+  CellSignalFull,
+  CellSignalHigh,
+  CellSignalLow,
+  CellSignalMedium,
   Chat,
   ChatCircle,
   Check,
@@ -81,6 +84,8 @@ import {
   PencilSimple,
   Play,
   Plus,
+  PushPin,
+  PushPinSlash,
   Question,
   Quotes,
   Robot,
@@ -111,11 +116,11 @@ import {
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
+export type IconWeight = 'regular' | 'duotone'
 /**
- * `inherit` (Sprint 99) takes the colour from the wrapping element instead of a
- * role token. It exists for the thread rail, where the glyph is tinted by
- * RUNTIME (Claude clay / Codex green / OpenCode sky) — brand marks, not theme
- * roles, so they have no `--r-*` token to come from. Prefer a role tone
+ * `inherit` takes the colour from the wrapping element instead of a role token.
+ * It exists for conversation identity bubbles and controls whose semantic
+ * colour is defined by their parent. Prefer a role tone
  * everywhere else; `inherit` is not a licence to hardcode colours at call sites.
  */
 export type IconTone = 'muted' | 'active' | 'disabled' | 'inherit'
@@ -141,6 +146,10 @@ const iconMap = {
   'caret-right': CaretRight,
   'caret-up': CaretUp,
   'caret-up-down': CaretUpDown,
+  'cell-signal-full': CellSignalFull,
+  'cell-signal-high': CellSignalHigh,
+  'cell-signal-low': CellSignalLow,
+  'cell-signal-medium': CellSignalMedium,
   'chat': Chat,
   'chat-circle': ChatCircle,
   'check': Check,
@@ -194,6 +203,8 @@ const iconMap = {
   'pencil-simple': PencilSimple,
   'play': Play,
   'plus': Plus,
+  'push-pin': PushPin,
+  'push-pin-slash': PushPinSlash,
   'question': Question,
   'quotes': Quotes,
   'robot': Robot,
@@ -228,6 +239,7 @@ export interface IconProps {
   name: PhosphorIconName
   size?: IconSize
   tone?: IconTone
+  weight?: IconWeight
   className?: string
   'aria-hidden'?: boolean
   'aria-label'?: string
@@ -237,6 +249,7 @@ export function Icon({
   name,
   size = 16,
   tone = 'muted',
+  weight = 'regular',
   className,
   'aria-hidden': ariaHidden,
   'aria-label': ariaLabel,
@@ -246,7 +259,7 @@ export function Icon({
   return (
     <Component
       size={size}
-      weight="regular"
+      weight={weight}
       color={toneToColor[tone]}
       className={className}
       aria-hidden={hiddenFromAria}

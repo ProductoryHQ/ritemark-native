@@ -1,4 +1,73 @@
-# Sprint 100 — Runtime Compatibility Matrix
+# Agent Runtime Compatibility Matrix
+
+## v1.10.0 service-compatibility correction — 2026-09-03
+
+The bundled Codex `0.149.0` candidate is invalidated. A real GPT-5.6-Sol RUNDEV
+turn returned the service's explicit newer-runtime requirement, while the same
+runtime also failed to decode the current model catalog's `max` effort value.
+This was not an account failure and cannot be repaired by provider fallback.
+
+The release manifest now pins both official Codex components to `0.153.0` on
+darwin-arm64, darwin-x64, and win32-x64 with the SHA-256 values published by
+OpenAI. The manifest validator and its mutation suite pass. On darwin-arm64,
+the fetched `codex-app-server` reports `0.153.0`, the adjacent
+`codex-code-mode-host` passes its supported `--help` probe, and both binaries
+are native arm64 Mach-O executables.
+
+Generated app-server types were compared from `0.149.0` through `0.153.0` for
+the Thread start/resume, Turn start, approvals, user input, account, and model
+surfaces Ritemark consumes. Existing fields remain compatible and later fields
+are optional/additive. In a fresh isolated RUNDEV profile, Settings reported
+`Codex · Ready · Bundled with app · v0.153.0`; selecting GPT-5.6-Sol and sending
+a no-write canary returned the requested exact answer. The previous newer-client
+and effort-decoding errors were absent. Native darwin-x64/win32-x64 execution,
+signed-package validation, and the packaged file create/edit/read canary remain
+release gates.
+
+## v1.10.0 release-candidate correction — 2026-08-31
+
+The first signed arm64 candidate exposed a packaging gap that the original
+Sprint 111 matrix could not detect: Codex chat started through
+`codex-app-server`, but its file tools failed because the version-matched
+`codex-code-mode-host` sibling was not bundled. Installed-app renderer logs
+recorded `No such file or directory` at the expected sibling path.
+
+OpenAI's official `rust-v0.149.0` release publishes separate
+`codex-code-mode-host` archives for darwin-arm64, darwin-x64, and win32-x64.
+Manifest schema 2 models required runtime components explicitly. Codex now has
+complete `app-server` and `code-mode-host` matrices; Claude and OpenCode each
+retain one `runtime` matrix. The validator rejects a missing component, a
+duplicate per-target install name, a mismatched version, or an unsupported
+smoke argument before any build begins.
+
+All twelve pinned archives fetched on 2026-08-31, matched their recorded
+SHA-256, extracted at the recorded path, and matched the target architecture.
+On darwin-arm64, `codex-app-server 0.149.0` reports its pinned version and the
+adjacent code-mode host starts successfully with its supported `--help` probe.
+Native darwin-x64 and win32-x64 execution, signed-package validation, and one
+real packaged Codex file edit remain release gates.
+
+## Sprint 111 shipping candidate — 2026-08-24
+
+**Shipping candidate:** Claude Code `2.1.239` (SDK `0.3.239`) · OpenCode `1.18.21` (ACP SDK `1.4.0`) · Codex app-server `0.149.0`.
+
+The exact darwin-arm64 binaries report `2.1.239 (Claude Code)`, `1.18.21`, and `codex-app-server 0.149.0`. All nine then-modeled manifest archives fetched, matched the recorded SHA-256, extracted at the recorded path, and matched the target architecture. This evidence is retained as the historical Sprint 111 baseline; the RC correction above supersedes its runtime-component completeness claim.
+
+| Runtime | Protocol/SDK compatibility | Continuation and isolation | Permission/cancel evidence | Effort capability evidence |
+|---|---|---|---|---|
+| **Codex 0.149.0** | pass — current app-server lifecycle and `untrusted` policy accepted; `request_user_input.isBlocking` is additive/tolerated; focused compile/tests pass | pass — semantic resume across app-server restart, invalid descriptor rejection, and two-thread isolation | pass — existing unified approval/cancel routing tests; no policy default change | pass — live `model/list` advertises `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| **Claude 2.1.239 / SDK 0.3.239** | pass — SDK declares exact binary parity; current extension compiles unchanged; hard checked against package/lock/manifest | pass — semantic resume across new subprocesses, invalid-session rejection, and two-session isolation | pass — existing permission/runtime adapter tests; tools denied during live probes | pass — SDK retains model support metadata and `low` through `max` effort types |
+| **OpenCode 1.18.21 / ACP 1.4.0** | pass — current adapter compiles unchanged; protocol v1 and session load/resume/list/fork/close advertised | pass — semantic resume, transcript replay, invalid-session rejection, and two-session isolation | pass — live write pauses, denial blocks, approval writes, cancel settles `cancelled`, shared process survives | changed-capability-by-model — no option on the default model; an eligible model exposes semantic category `thought_level` with `low`, `medium`, `high` |
+
+### Sprint 111 hard gates
+
+- `scripts/validate-agent-runtime-manifest.mjs` rejects incomplete platform matrices, floating/mismatched versions, stale vendor metadata, lockfile drift, and Claude binary/SDK patch drift before fetch/build.
+- `scripts/fetch-agent-runtimes.sh --all-platforms` passed for all nine then-modeled exact archives (historical; superseded by the twelve-component RC gate above).
+- `scripts/verify-agent-runtimes.sh` passed version discovery and all four OpenCode behavioral rows (`gate-pauses`, `gate-denies`, `gate-allows`, `cancel`).
+- Target-SDK TypeScript compile and focused Codex/Claude/OpenCode adapter tests pass.
+- Redacted live evidence and remaining native-platform boundaries are recorded in the [Sprint 111 audit](./releases/v1.10.0/sprint-111-agent-runtime-refresh/research/runtime-version-audit.md).
+
+## Sprint 100 historical baseline
 
 Evidence for issue #146. Every cell is pass / fail / **changed-behavior** with the evidence that
 produced it — not a checkmark. Empty cells are stated as untested rather than assumed.

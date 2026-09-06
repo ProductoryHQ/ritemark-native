@@ -1,0 +1,42 @@
+diff --git a/node_modules/@tiptap/core/dist/index.cjs b/node_modules/@tiptap/core/dist/index.cjs
+index 6a7edc7..5cd091e 100644
+--- a/node_modules/@tiptap/core/dist/index.cjs
++++ b/node_modules/@tiptap/core/dist/index.cjs
+@@ -316,6 +316,9 @@ function mergeAttributes(...objects) {
+         .reduce((items, item) => {
+         const mergedAttributes = { ...items };
+         Object.entries(item).forEach(([key, value]) => {
++            if (key === '__proto__') {
++                return;
++            }
+             const exists = mergedAttributes[key];
+             if (!exists) {
+                 mergedAttributes[key] = value;
+diff --git a/node_modules/@tiptap/core/dist/index.js b/node_modules/@tiptap/core/dist/index.js
+index 8efbf7f..e28fc58 100644
+--- a/node_modules/@tiptap/core/dist/index.js
++++ b/node_modules/@tiptap/core/dist/index.js
+@@ -314,6 +314,9 @@ function mergeAttributes(...objects) {
+         .reduce((items, item) => {
+         const mergedAttributes = { ...items };
+         Object.entries(item).forEach(([key, value]) => {
++            if (key === '__proto__') {
++                return;
++            }
+             const exists = mergedAttributes[key];
+             if (!exists) {
+                 mergedAttributes[key] = value;
+diff --git a/node_modules/@tiptap/core/dist/index.umd.js b/node_modules/@tiptap/core/dist/index.umd.js
+index 404ccfc..e3719da 100644
+--- a/node_modules/@tiptap/core/dist/index.umd.js
++++ b/node_modules/@tiptap/core/dist/index.umd.js
+@@ -312,6 +312,9 @@
+           .reduce((items, item) => {
+           const mergedAttributes = { ...items };
+           Object.entries(item).forEach(([key, value]) => {
++              if (key === '__proto__') {
++                  return;
++              }
+               const exists = mergedAttributes[key];
+               if (!exists) {
+                   mergedAttributes[key] = value;

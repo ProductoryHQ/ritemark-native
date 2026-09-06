@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
+import { Fragment } from '@tiptap/pm/model'
+import { TextSelection } from '@tiptap/pm/state'
+import { createNodeFromContent } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -32,6 +35,15 @@ import { CommentMark } from '../extensions/comment/CommentMark'
 import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
+import type { DocumentApplyTarget } from '../types/documentSync'
+import {
+  shouldApplyIncomingEditorValue,
+  shouldPublishEditorChange,
+} from '../editorValueReconciliation'
+import {
+  addTipTapTaskListTurndownRules,
+  preprocessTaskListHTML,
+} from '../utils/taskListRoundTrip'
 
 // Initialize Turndown for HTML to Markdown conversion.
 // Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
@@ -55,43 +67,6 @@ function ensureCommentMarkedPipeline(): void {
   if (commentMarkedRegistered) return
   commentMarkedRegistered = true
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
-}
-
-/**
- * Preprocess HTML to convert GFM task lists to TipTap format
- *
- * marked generates: <ul><li><input type="checkbox" disabled> Task</li></ul>
- * TipTap expects: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">Task</li></ul>
- */
-function preprocessTaskListHTML(html: string): string {
-  const temp = document.createElement('div')
-  temp.innerHTML = html
-
-  // Find all list items that contain a checkbox
-  temp.querySelectorAll('li').forEach(li => {
-    const checkbox = li.querySelector('input[type="checkbox"]')
-    if (checkbox) {
-      // Check if checkbox is at the start (first element child)
-      const firstElement = li.firstElementChild
-      if (firstElement === checkbox) {
-        // This is a task list item
-        const isChecked = checkbox.hasAttribute('checked')
-        li.setAttribute('data-type', 'taskItem')
-        li.setAttribute('data-checked', isChecked ? 'true' : 'false')
-
-        // Remove the checkbox - TipTap renders its own
-        checkbox.remove()
-
-        // Mark parent UL as task list
-        const parentUl = li.parentElement
-        if (parentUl && parentUl.tagName === 'UL') {
-          parentUl.setAttribute('data-type', 'taskList')
-        }
-      }
-    }
-  })
-
-  return temp.innerHTML
 }
 
 /**
@@ -159,54 +134,19 @@ export function preprocessTableHTML(html: string): string {
   return temp.innerHTML
 }
 
-// Custom rule to convert TipTap task list items to GFM syntax
-// TipTap outputs: <li data-type="taskItem" data-checked="true">Task</li>
-// GFM expects: - [x] Task
-//
-// BUG FIX: Handle nested task lists by preserving line breaks and indentation
-// Previously, nested items were flattened to a single line with escaped brackets
-turndownService.addRule('tiptapTaskItem', {
-  filter: function (node) {
-    return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem'
-  },
-  replacement: function (content, node) {
-    const element = node as HTMLElement
-    const isChecked = element.getAttribute('data-checked') === 'true'
-    const checkbox = isChecked ? '[x]' : '[ ]'
+addTipTapTaskListTurndownRules(turndownService)
 
-    // Split content into lines
-    const lines = content.split('\n').filter(line => line.trim())
-
-    // Check if we have nested task list items (lines starting with "- [")
-    // These are already converted by turndown processing child nodes first
-    const hasNestedTasks = lines.some((line, idx) => idx > 0 && line.match(/^- \[[ x]\]/))
-
-    if (hasNestedTasks && lines.length > 1) {
-      // First line is direct content, rest are nested items
-      const firstLine = lines[0].trim()
-      const nestedLines = lines.slice(1).map(line => '  ' + line).join('\n')
-      return `- ${checkbox} ${firstLine}\n${nestedLines}\n`
-    }
-
-    // No nested items - single line (clean up whitespace and newlines)
-    const cleanContent = content.replace(/^\s+|\s+$/g, '').replace(/\n+/g, ' ')
-    return `- ${checkbox} ${cleanContent}\n`
-  }
-})
-
-// Custom rule to handle TipTap task list UL (prevent default list handling)
-turndownService.addRule('tiptapTaskList', {
-  filter: function (node) {
-    return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
-  },
-  replacement: function (content, node) {
-    // Content already formatted by taskItem rule
-    // For nested lists, don't add extra newlines - let parent control formatting
-    const parent = (node as HTMLElement).parentElement
-    const isNested = parent && parent.getAttribute('data-type') === 'taskItem'
-    return isNested ? content : '\n' + content + '\n'
-  }
-})
+/**
+ * Serialize every TipTap document through one canonical Markdown path.
+ *
+ * The editor's incoming-value reconciliation and outgoing change publication
+ * must compare the same representation. Otherwise a harmless TipTap plugin
+ * transaction after opening a file can look like a user edit (for example,
+ * when the source file has a trailing newline but Turndown does not).
+ */
+function serializeEditorHTML(html: string): string {
+  return turndownService.turndown(preprocessTableHTML(html))
+}
 
 // Keep Turndown's default escaping behavior to prevent content corruption
 // The unescape logic below handles loading escaped files correctly
@@ -332,6 +272,8 @@ interface EditorProps {
   imageMappings?: Record<string, string>
   /** Sprint 94 (#81): gate the comment-callout extensions (kill-switch flag). */
   commentCallouts?: boolean
+  syncTarget?: DocumentApplyTarget
+  onExternalApplied?: (target: DocumentApplyTarget) => void
 }
 
 export function Editor({
@@ -343,6 +285,8 @@ export function Editor({
   onSelectionChange,
   imageMappings = {},
   commentCallouts = false,
+  syncTarget,
+  onExternalApplied,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -490,18 +434,20 @@ export function Editor({
     ],
     content: initialContent,
     onCreate: ({ editor }) => {
+      // Establish the baseline from TipTap's parsed document, not the source
+      // bytes. Plugin transactions after creation are then true no-ops.
+      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
       onEditorReady?.(editor)
     },
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML()
-      // Preprocess HTML to fix TipTap table formatting for GFM conversion
-      const cleanedHTML = preprocessTableHTML(html)
-      // Convert HTML back to markdown for storage
-      const markdown = turndownService.turndown(cleanedHTML)
+      const markdown = serializeEditorHTML(editor.getHTML())
 
       // Only call onChange if content actually changed
       // This prevents unnecessary re-renders that close bubble menus
-      if (markdown !== lastOnChangeValue.current) {
+      if (shouldPublishEditorChange({
+        nextMarkdown: markdown,
+        canonicalBaseline: lastOnChangeValue.current,
+      })) {
         lastOnChangeValue.current = markdown
         onChange(markdown)
       }
@@ -764,44 +710,42 @@ export function Editor({
     }
   }, [editor]) // Don't include onEditorReady to avoid re-calling when callback changes
 
-  // Update editor content when value prop changes (e.g., when loading a file)
-  // Skip updates during active editing to prevent bubble menus from closing
+  // Apply host revisions even while focused. A structural transaction preserves
+  // unaffected nodes and maps the selection; setContent is only a guarded fallback.
   useEffect(() => {
     if (!editor) return
 
     // Convert current editor HTML back to markdown to compare with incoming value
-    const currentMarkdown = turndownService.turndown(editor.getHTML())
+    const currentMarkdown = serializeEditorHTML(editor.getHTML())
 
-    // On initial mount, always process the value
-    if (isInitialMount.current) {
+    // Initial mount is an explicit reconciliation reason. Do not infer it from
+    // an empty Markdown projection: an empty heading created by `# ` also
+    // serializes to an empty string until the first title character arrives.
+    const initialMount = isInitialMount.current
+    if (initialMount) {
       isInitialMount.current = false
       lastExternalValue.current = value
-      lastOnChangeValue.current = value
-      // Don't return - let it process the initial content below
+      lastOnChangeValue.current = currentMarkdown
     }
-
-    // Only update if value changed externally (not from editor's own onChange)
-    // This prevents the editor from updating during typing/formatting
-    const isExternalChange = value !== currentMarkdown && value !== lastOnChangeValue.current
 
     // Check if imageMappings changed - need to re-apply them
     const imageMappingsChanged = Object.keys(imageMappings).length > 0 &&
       Object.keys(imageMappings).length !== Object.keys(lastImageMappingsRef.current).length
 
-    if (isExternalChange || currentMarkdown === '' || imageMappingsChanged) {
+    if (shouldApplyIncomingEditorValue({
+      initialMount,
+      incomingValue: value,
+      currentMarkdown,
+      lastOnChangeValue: lastOnChangeValue.current,
+      imageMappingsChanged,
+    })) {
       // Update the ref
       lastImageMappingsRef.current = imageMappings
-      // CURSOR JUMP BUG FIX: Don't update content if editor is focused
-      // This prevents cursor from jumping during autosave cycles
-      if (editor.isFocused) {
-        // Skip update - user is actively editing
-        return
-      }
-
       // Check if value is HTML (starts with common HTML tags)
       // Only check for actual HTML block tags, not random < > characters
       const isHTML = /^<(p|div|h[1-6]|ul|ol|li|blockquote|pre|table|strong|em|code)[\s>]/i.test(value.trim())
 
+      let processedContent: string
       if (!isHTML && value.trim()) {
         // Treat all non-HTML text as markdown (including plain text)
         // marked.js will handle plain text gracefully, converting line breaks to <p> tags
@@ -813,21 +757,80 @@ export function Editor({
           processedHtml = preprocessImageHTML(processedHtml)
           // Apply image mappings to convert relative paths to webview URIs
           processedHtml = applyImageMappings(processedHtml, imageMappings)
-          editor.commands.setContent(processedHtml, false) // emitUpdate: false to prevent loops
+          processedContent = processedHtml
         } catch (error) {
           console.error('Markdown conversion error:', error)
           // Fallback: treat as plain text
-          editor.commands.setContent(`<p>${value.replace(/\n/g, '</p><p>')}</p>`, false)
+          processedContent = `<p>${value.replace(/\n/g, '</p><p>')}</p>`
         }
       } else {
         // Already HTML or empty - still apply image mappings
-        const processedValue = applyImageMappings(value, imageMappings)
-        editor.commands.setContent(processedValue, false) // emitUpdate: false to prevent loops
+        processedContent = applyImageMappings(value, imageMappings)
       }
 
+      const wasFocused = editor.isFocused
+      const { anchor, head } = editor.state.selection
+      const scrollTop = scrollContainer?.scrollTop
+      try {
+        const parsed = createNodeFromContent(processedContent, editor.schema, {
+          slice: false,
+          parseOptions: { preserveWhitespace: 'full' },
+          errorOnInvalidContent: true,
+        })
+        const nextDoc = parsed instanceof Fragment
+          ? editor.schema.topNodeType.create(null, parsed)
+          : parsed
+        const currentDoc = editor.state.doc
+        const start = currentDoc.content.findDiffStart(nextDoc.content)
+        if (start !== null) {
+          const end = currentDoc.content.findDiffEnd(nextDoc.content)
+          if (!end) throw new Error('Could not determine the document update range.')
+          let transaction = editor.state.tr.replace(
+            start,
+            end.a,
+            nextDoc.slice(start, end.b),
+          )
+          const mappedAnchor = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(anchor)))
+          const mappedHead = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(head)))
+          transaction = transaction
+            .setSelection(TextSelection.between(transaction.doc.resolve(mappedAnchor), transaction.doc.resolve(mappedHead)))
+            .setMeta('addToHistory', false)
+            .setMeta('preventUpdate', true)
+            .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
+          if (!transaction.doc.eq(nextDoc)) throw new Error('Structural update did not reproduce the host document.')
+          editor.view.dispatch(transaction)
+        }
+      } catch {
+        console.warn('[EditorSync] structural apply fell back to full replacement')
+        editor.chain()
+          .setContent(processedContent, false)
+          .setMeta('addToHistory', false)
+          .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
+          .run()
+        const position = Math.max(0, Math.min(editor.state.doc.content.size, anchor))
+        editor.view.dispatch(editor.state.tr
+          .setSelection(TextSelection.near(editor.state.doc.resolve(position)))
+          .setMeta('addToHistory', false)
+          .setMeta('preventUpdate', true))
+      }
+
+      // Structural application and the fallback both suppress onUpdate. Keep
+      // the outgoing baseline aligned with the actual parsed TipTap document,
+      // so a later plugin-only update cannot be published as a user edit.
+      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
+
       lastExternalValue.current = value
+      requestAnimationFrame(() => {
+        if (scrollContainer && scrollTop !== undefined) scrollContainer.scrollTop = scrollTop
+        if (wasFocused) editor.view.focus()
+        if (syncTarget) onExternalApplied?.(syncTarget)
+      })
+    } else if (syncTarget) {
+      // The source view already rendered its own accepted edit. It still owes
+      // the host an acknowledgement for the matching canonical revision.
+      requestAnimationFrame(() => onExternalApplied?.(syncTarget))
     }
-  }, [editor, value, imageMappings])
+  }, [editor, value, imageMappings, scrollContainer, syncTarget, onExternalApplied])
 
   // Calculate word count - simple approach using editor state
   const [_wordCount, setWordCount] = useState(0)

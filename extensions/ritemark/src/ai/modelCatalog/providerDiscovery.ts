@@ -14,12 +14,29 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { discoverClaudeModels } from '../../agent/discoverModels';
-import type { ModelEntry } from './schema';
+import type { ModelEntry, ModelThinkingEffort } from './schema';
+import { isExplicitThinkingEffort } from '../../runtime/thinkingEffort';
 
 const PROBE_TIMEOUT_MS = 8_000;
 
-function entry(id: string, label: string, order: number, description = ''): ModelEntry {
-  return { id, label, description, tier: 'medium', deprecated: false, order };
+function entry(
+  id: string,
+  label: string,
+  order: number,
+  description = '',
+  thinkingEffort?: ModelThinkingEffort,
+  resolvedModel?: string,
+): ModelEntry {
+  return {
+    id,
+    label,
+    description,
+    tier: 'medium',
+    deprecated: false,
+    order,
+    ...(thinkingEffort ? { thinkingEffort } : {}),
+    ...(resolvedModel ? { resolvedModel } : {}),
+  };
 }
 
 async function fetchJson(url: string, headers: Record<string, string>): Promise<unknown | null> {
@@ -66,7 +83,16 @@ export async function discoverAnthropic(opts: {
       ...(opts.apiKey ? { anthropicApiKey: opts.apiKey } : {}),
     });
     if (models && models.length > 0) {
-      return models.map((m, i) => entry(m.id, m.label, i, m.description));
+      return models.map((m, i) => entry(
+        m.id,
+        m.label,
+        i,
+        m.description,
+        m.supportsEffort === undefined
+          ? undefined
+          : { levels: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [] },
+        m.resolvedModel,
+      ));
     }
   }
   return null;
@@ -115,13 +141,35 @@ export async function discoverCodex(): Promise<ModelEntry[] | null> {
     const cachePath = path.join(os.homedir(), '.codex', 'models_cache.json');
     const raw = fs.readFileSync(cachePath, 'utf-8');
     const cache = JSON.parse(raw) as {
-      models?: Array<{ slug?: string; display_name?: string; description?: string; visibility?: string; priority?: number }>;
+      models?: Array<{
+        slug?: string;
+        display_name?: string;
+        description?: string;
+        visibility?: string;
+        priority?: number;
+        default_reasoning_effort?: unknown;
+        supported_reasoning_efforts?: unknown[];
+      }>;
     };
     if (!Array.isArray(cache.models)) return null;
     const visible = cache.models
       .filter((m) => m.visibility === 'list' && typeof m.slug === 'string')
       .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
-      .map((m, i) => entry(m.slug as string, m.display_name ?? (m.slug as string), i, m.description ?? ''));
+      .map((m, i) => {
+        const levels = (m.supported_reasoning_efforts ?? []).filter(isExplicitThinkingEffort);
+        const defaultLevel = isExplicitThinkingEffort(m.default_reasoning_effort)
+          ? m.default_reasoning_effort
+          : undefined;
+        return entry(
+          m.slug as string,
+          m.display_name ?? (m.slug as string),
+          i,
+          m.description ?? '',
+          m.supported_reasoning_efforts === undefined
+            ? undefined
+            : { levels, ...(defaultLevel && levels.includes(defaultLevel) ? { defaultLevel } : {}) },
+        );
+      });
     return visible.length > 0 ? visible : null;
   } catch {
     return null;

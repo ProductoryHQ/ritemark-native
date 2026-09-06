@@ -27,10 +27,13 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   PromptResponse,
+  SessionConfigOption,
 } from '@agentclientprotocol/sdk';
 import { AcpClient, type AcpClientHandlers } from './acpClient';
 import { AcpFsProxy, type AcpFsBackend, type AcpWriteApproval } from './acpFsProxy';
 import { traceAcp } from './acpTrace';
+import type { ExplicitThinkingEffort, ThinkingEffortCapability } from '../runtime/thinkingEffort';
+import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 
 /**
  * Mandatory permission env (audit T8). Without OPENCODE_PERMISSION the agent
@@ -64,6 +67,8 @@ export interface AcpManagerConfig {
    * can route it to the right conversation.
    */
   onProgress: (progress: AgentProgress, sessionId: string) => void;
+  /** Live ACP config changes can add/remove thought-level choices mid-session. */
+  onThinkingEffortCapability?: (capability: ThinkingEffortCapability, sessionId: string) => void;
   /** Filesystem backend override (tests inject a fake). */
   fsBackend?: AcpFsBackend;
 }
@@ -86,6 +91,30 @@ interface AcpSessionState {
    * chat the user already saw go idle would come back to life.
    */
   cancelRequested: boolean;
+  /** Full live option set returned by ACP session setup / config mutation. */
+  configOptions: SessionConfigOption[];
+  /** Original provider selection used when Composer returns to Auto. */
+  initialThoughtLevel: string | null;
+  /** Avoid re-applying the same model and accidentally recapturing an override as Auto. */
+  currentModel: string | null;
+}
+
+function thoughtLevelOption(options: SessionConfigOption[]): SessionConfigOption | undefined {
+  return options.find((option) => option.category === 'thought_level' && option.type === 'select');
+}
+
+function optionValues(option: SessionConfigOption | undefined): string[] {
+  if (!option || option.type !== 'select') return [];
+  return option.options.flatMap((entry) => (
+    'value' in entry ? [entry.value] : entry.options.map((child) => child.value)
+  ));
+}
+
+function thoughtLevelCurrent(options: SessionConfigOption[]): string | null {
+  const option = thoughtLevelOption(options);
+  return option?.type === 'select' && typeof option.currentValue === 'string'
+    ? option.currentValue
+    : null;
 }
 
 export class AcpManager {
@@ -129,45 +158,71 @@ export class AcpManager {
    * a second session on the same connection is exactly the supported case now.
    */
   async start(): Promise<string> {
-    if (!this.client) {
-      const fsProxy = new AcpFsProxy({
-        workspaceRoot: this.config.workspaceRoot,
-        backend: this.config.fsBackend,
-        approveWrite: this.config.approveWrite,
-        trace: traceAcp,
-      });
-
-      const handlers: AcpClientHandlers = {
-        requestPermission: (params) => this.config.requestPermission(params),
-        sessionUpdate: (params) => this.handleSessionUpdate(params),
-        readTextFile: fsProxy.readTextFile,
-        writeTextFile: fsProxy.writeTextFile,
-      };
-
-      const client = new AcpClient({
-        command: this.config.binaryPath,
-        args: this.config.args,
-        cwd: this.config.workspaceRoot,
-        env: this.buildSpawnEnv(),
-        handlers,
-        onExit: (code, signal) => this.handleExit(code, signal),
-        onStderr: (line) => traceAcp('manager', 'stderr', line),
-        trace: traceAcp,
-      });
-      this.client = client;
-      await client.initialize();
-    }
-
-    const session = await this.client.newSession(this.config.workspaceRoot, this.config.mcpServers);
+    const client = await this.ensureClient();
+    const session = await client.newSession(this.config.workspaceRoot, this.config.mcpServers);
     this.sessions.set(session.sessionId, {
       sessionId: session.sessionId,
       sawContentThisTurn: false,
       thoughtBuffer: '',
       cancelRequested: false,
+      configOptions: session.configOptions ?? [],
+      initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
+      currentModel: null,
     });
     this.emit(session.sessionId, 'init', 'Starting OpenCode session…');
     traceAcp('manager', 'started', { sessionId: session.sessionId, liveSessions: this.sessions.size });
     return session.sessionId;
+  }
+
+  /** Resume uses ACP session/resume only. session/load is intentionally forbidden. */
+  async resume(sessionId: string): Promise<void> {
+    const client = await this.ensureClient();
+    const session = await client.resumeSession(sessionId, this.config.workspaceRoot, this.config.mcpServers);
+    this.sessions.set(sessionId, {
+      sessionId,
+      sawContentThisTurn: false,
+      thoughtBuffer: '',
+      cancelRequested: false,
+      configOptions: session.configOptions ?? [],
+      initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
+      currentModel: null,
+    });
+    this.emit(sessionId, 'init', 'Resuming OpenCode session…');
+    traceAcp('manager', 'resumed', { liveSessions: this.sessions.size });
+  }
+
+  private async ensureClient(): Promise<AcpClient> {
+    if (this.client) return this.client;
+    const fsProxy = new AcpFsProxy({
+      workspaceRoot: this.config.workspaceRoot,
+      backend: this.config.fsBackend,
+      approveWrite: this.config.approveWrite,
+      trace: traceAcp,
+    });
+    const handlers: AcpClientHandlers = {
+      requestPermission: (params) => this.config.requestPermission(params),
+      sessionUpdate: (params) => this.handleSessionUpdate(params),
+      readTextFile: fsProxy.readTextFile,
+      writeTextFile: fsProxy.writeTextFile,
+    };
+    const client = new AcpClient({
+      command: this.config.binaryPath,
+      args: this.config.args,
+      cwd: this.config.workspaceRoot,
+      env: this.buildSpawnEnv(),
+      handlers,
+      onExit: (code, signal) => this.handleExit(code, signal),
+      onStderr: (line) => traceAcp('manager', 'stderr', line),
+      trace: traceAcp,
+    });
+    this.client = client;
+    try {
+      await client.initialize();
+      return client;
+    } catch (error) {
+      if (this.client === client) this.client = null;
+      throw error;
+    }
   }
 
   /**
@@ -175,8 +230,53 @@ export class AcpManager {
    * value (the `opencode:` composite prefix is dropped before this call).
    */
   async setModel(sessionId: string, providerModel: string): Promise<void> {
-    const client = this.requireSession(sessionId).client;
-    await client.setModel(sessionId, providerModel);
+    const { client, state } = this.requireSession(sessionId);
+    if (state.currentModel === providerModel) return;
+    const result = await client.setModel(sessionId, providerModel);
+    state.configOptions = result.configOptions;
+    const thought = thoughtLevelOption(result.configOptions);
+    state.initialThoughtLevel = thought?.type === 'select' && typeof thought.currentValue === 'string'
+      ? thought.currentValue
+      : null;
+    state.currentModel = providerModel;
+  }
+
+  /** Capability is derived only from the live semantic ACP option. */
+  getThinkingEffortCapability(sessionId: string): ThinkingEffortCapability {
+    const state = this.sessions.get(sessionId);
+    const option = thoughtLevelOption(state?.configOptions ?? []);
+    const selectable = optionValues(option).filter(isExplicitThinkingEffort);
+    const providerDefault = state?.initialThoughtLevel;
+    return {
+      selectable,
+      ...(isExplicitThinkingEffort(providerDefault) ? { defaultLevel: providerDefault } : {}),
+      source: 'runtime-live',
+      supportsAppliedValue: true,
+    };
+  }
+
+  /** Apply a manual value, or restore the original live option value for Auto. */
+  async setThinkingEffort(
+    sessionId: string,
+    effort: ExplicitThinkingEffort | 'auto',
+  ): Promise<ExplicitThinkingEffort | undefined> {
+    const { client, state } = this.requireSession(sessionId);
+    const option = thoughtLevelOption(state.configOptions);
+    if (!option || option.type !== 'select') {
+      if (effort === 'auto') return undefined;
+      throw new Error('OpenCode does not advertise a thought-level option for this session');
+    }
+    const target = effort === 'auto' ? state.initialThoughtLevel : effort;
+    if (!target) return undefined;
+    if (!optionValues(option).includes(target)) {
+      throw new Error(`OpenCode does not advertise thinking effort: ${target}`);
+    }
+    const result = await client.setSessionConfigOption(sessionId, option.id, target);
+    state.configOptions = result.configOptions;
+    const applied = thoughtLevelOption(result.configOptions);
+    return applied?.type === 'select' && isExplicitThinkingEffort(applied.currentValue)
+      ? applied.currentValue
+      : undefined;
   }
 
   /**
@@ -369,6 +469,14 @@ export class AcpManager {
         state.sawContentThisTurn = true;
         const text = update.entries.map((entry) => `- ${entry.content}`).join('\n');
         this.emit(sessionId, 'plan_text', text);
+        break;
+      }
+      case 'config_option_update': {
+        state.configOptions = update.configOptions;
+        this.config.onThinkingEffortCapability?.(
+          this.getThinkingEffortCapability(sessionId),
+          sessionId,
+        );
         break;
       }
       default:

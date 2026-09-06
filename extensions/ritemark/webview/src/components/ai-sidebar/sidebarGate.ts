@@ -9,18 +9,42 @@ export type SidebarView = 'onboarding' | 'claude-setup' | 'codex-setup' | 'openc
 
 export interface SidebarGateInput {
   ready: boolean;
+  /** The active transcript already contains the recovery action for its failed turn. */
+  inlineRecoveryAvailable: boolean;
   /** First run, no agent ready yet, wizard not dismissed. */
   onboardingNeeded: boolean;
+  /** Existing content must never disappear behind an account/setup takeover. */
+  hasConversation: boolean;
+  /** A provider problem cannot block a different ready provider. */
+  hasReadyAlternative: boolean;
   /** Claude selected and its binary/auth is not ready (broken, missing, needs sign-in). */
   needsSetup: boolean;
   showCodexSetup: boolean;
   showOpenCodeSetup: boolean;
 }
 
+/** A dismissed historical failure must no longer suppress the setup surface. */
+export function hasUndismissedInlineRecovery(
+  latestTurn: { id: string; result?: { failureKind?: string } } | undefined,
+  dismissedTurnIds: readonly string[],
+): boolean {
+  const failureKind = latestTurn?.result?.failureKind;
+  return Boolean(
+    latestTurn
+      && !dismissedTurnIds.includes(latestTurn.id)
+      && (failureKind === 'authentication' || failureKind === 'api-key-authentication'),
+  );
+}
+
 export function sidebarGate(i: SidebarGateInput): SidebarView {
-  if (i.ready && i.onboardingNeeded) return 'onboarding';
-  if (i.ready && i.needsSetup) return 'claude-setup';
-  if (i.ready && i.showCodexSetup) return 'codex-setup';
-  if (i.ready && i.showOpenCodeSetup) return 'opencode-setup';
+  // A recoverable failure belongs beside the turn that failed. A setup-status
+  // refresh must not flash that card and immediately replace it with a
+  // full-sidebar wizard. Starting a new conversation removes this condition,
+  // so first-run and empty-thread setup still use the dedicated wizard.
+  if (i.ready && i.inlineRecoveryAvailable) return 'chat';
+  if (i.ready && i.onboardingNeeded && !i.hasConversation) return 'onboarding';
+  if (i.ready && i.needsSetup && !i.hasConversation && !i.hasReadyAlternative) return 'claude-setup';
+  if (i.ready && i.showCodexSetup && !i.hasConversation && !i.hasReadyAlternative) return 'codex-setup';
+  if (i.ready && i.showOpenCodeSetup && !i.hasConversation && !i.hasReadyAlternative) return 'opencode-setup';
   return 'chat';
 }

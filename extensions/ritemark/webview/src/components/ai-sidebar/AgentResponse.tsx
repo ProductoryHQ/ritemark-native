@@ -6,12 +6,19 @@
 
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { useAISidebarStore } from './store';
+import { useActiveConversation, useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
+import { RuntimeNotice } from './RuntimeNotice';
+import {
+  deriveRuntimeAvailabilities,
+  listReadyAlternatives,
+  resolveAvailableRuntimeModel,
+  RUNTIME_LABELS,
+} from './runtimeAvailability';
 
 import type { AgentConversationTurn } from './types';
 
@@ -35,40 +42,184 @@ interface AgentResponseProps {
   turn: AgentConversationTurn;
 }
 
+interface RecoveryNoticeProps {
+  title: string;
+  message: string;
+  tone?: 'warning' | 'progress' | 'success' | 'error';
+  actionLabel?: string;
+  actionIcon?: 'key' | 'sign-in' | 'arrow-counter-clockwise' | 'check';
+  statusLabel?: string;
+  actionDisabled?: boolean;
+  onAction?: () => void;
+}
+
+function RecoveryNotice({
+  title,
+  message,
+  tone = 'warning',
+  actionLabel,
+  actionIcon,
+  statusLabel,
+  actionDisabled = false,
+  onAction,
+}: RecoveryNoticeProps) {
+  return (
+    <RuntimeNotice
+      title={title}
+      message={message}
+      tone={tone}
+      statusLabel={statusLabel}
+      primaryAction={actionLabel && actionIcon && onAction ? {
+        label: actionLabel,
+        icon: actionIcon,
+        onAction,
+        disabled: actionDisabled,
+      } : undefined}
+    />
+  );
+}
+
 export function AgentResponse({ turn }: AgentResponseProps) {
   const { result, activities } = turn;
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
   const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
+  const startLogin = useAISidebarStore((s) => s.startLogin);
+  const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
+  const claudeLoginState = useAISidebarStore((s) => s.claudeLoginState);
+  const claudeLoginTurnId = useAISidebarStore((s) => s.claudeLoginTurnId);
+  const setupError = useAISidebarStore((s) => s.setupError);
+  const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
+  const dismissAuthRecovery = useAISidebarStore((s) => s.dismissAuthRecovery);
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const models = useAISidebarStore((s) => s.models);
+  const codexModels = useAISidebarStore((s) => s.codexModels);
+  const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
+  const activeConversation = useActiveConversation();
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
+  const availabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const alternativeCandidate = listReadyAlternatives(availabilities, 'claude-code')[0] ?? null;
+  const alternativeModelId = alternativeCandidate
+    ? resolveAvailableRuntimeModel(alternativeCandidate, {
+        claude: activeConversation.selectedModel,
+        codex: activeConversation.codexSelectedModel,
+        opencode: activeConversation.opencodeSelectedModel,
+      }, {
+        claude: models,
+        codex: codexModels,
+        opencode: byokProviderModels,
+        acpProviders,
+      }) ?? ''
+    : '';
+  const readyAlternative = alternativeCandidate && alternativeModelId
+    ? alternativeCandidate
+    : null;
+
   if (!result) return null;
+
+  if (result.error && (result.failureKind === 'authentication' || result.failureKind === 'api-key-authentication')) {
+    const usesApiKey = result.failureKind === 'api-key-authentication';
+    const isActiveLoginTurn = !usesApiKey && claudeLoginTurnId === turn.id;
+
+    if (!usesApiKey && dismissedAuthRecoveryTurnIds.includes(turn.id)) {
+      return null;
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'pending') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="progress"
+            title="Finish signing in in your browser"
+            message="Ritemark is waiting for Claude. This card will update automatically when sign-in is complete."
+            statusLabel="Waiting for sign-in…"
+          />
+        </div>
+      );
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'success') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="success"
+            title="You’re signed in to Claude"
+            message="You can continue this conversation now. Resend your last message when you’re ready."
+            actionLabel="OK"
+            actionIcon="check"
+            onAction={() => dismissAuthRecovery(turn.id)}
+          />
+        </div>
+      );
+    }
+
+    if (isActiveLoginTurn && claudeLoginState === 'error') {
+      return (
+        <div style={chatFontStyle}>
+          <RecoveryNotice
+            tone="error"
+            title="Claude sign-in didn’t finish"
+            message={setupError || 'Ritemark could not confirm the sign-in. Please try again.'}
+            actionLabel="Try again"
+            actionIcon="arrow-counter-clockwise"
+            onAction={() => startLogin(turn.id)}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div style={chatFontStyle}>
+        <RuntimeNotice
+          title={usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
+          message={usesApiKey
+            ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
+            : 'Your session expired before Claude could answer. Sign in again or continue with another available agent.'}
+          secondaryAction={readyAlternative ? {
+              label: usesApiKey ? 'Update key' : 'Sign in',
+              icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+              onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
+            } : undefined}
+          primaryAction={readyAlternative ? {
+              label: `Use ${RUNTIME_LABELS[readyAlternative]}`,
+              icon: 'chat-circle' as const,
+              onAction: () => selectRuntimeModel(readyAlternative, alternativeModelId),
+            } : {
+                label: usesApiKey ? 'Update API key' : 'Sign in to Claude',
+                icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+                onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
+              }}
+        />
+        <ActivityDetails activities={activities} metrics={result.metrics} />
+      </div>
+    );
+  }
 
   // Context overflow — friendly error with recovery actions
   if (result.error && isContextOverflowError(result.error)) {
     return (
       <div style={chatFontStyle}>
-        <div className="rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] p-3 space-y-2">
-          <div className="flex items-start gap-2 text-[var(--vscode-editorWarning-foreground)]">
-            <Icon name="warning" size={14} className="shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-medium">Conversation exceeded context window limit</div>
-              <div className="text-[11px] opacity-80">
-                Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity.
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2 ml-[22px]">
-            <button
-              onClick={() => requestNewThread()}
-              className="flex items-center gap-1.5 rounded-md border border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-fainter)]"
-            >
-              <Icon name="arrow-counter-clockwise" size={12} />
-              Start new chat
-            </button>
-          </div>
-        </div>
+        <RecoveryNotice
+          title="Conversation exceeded context window limit"
+          message="Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity."
+          actionLabel="Start new chat"
+          actionIcon="arrow-counter-clockwise"
+          onAction={() => requestNewThread()}
+        />
         <ActivityDetails activities={activities} metrics={result.metrics} />
       </div>
     );

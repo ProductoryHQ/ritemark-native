@@ -78,6 +78,15 @@
 - [ ] Dark + light pass on packaged candidate (dev pass done with Ritemark Dark — the slate/indigo theme; earlier "black skin" observation was VS Code default Dark+ applied by a mislabeled setting in the automation profile, not a theme regression)
 - [ ] Old thread saved with mode "plan" opens as Auto + Plan chip on
 
+## Connectivity / offline banner (GH #193, added 2026-08-08)
+
+- [ ] With normal internet, keep the AI sidebar open for ≥15 min: the **Offline** banner never appears (before the fix it flapped every few minutes on a healthy connection)
+- [ ] Status bar stays on **AI Ready**; no oscillation between AI Ready / AI Offline
+- [ ] Turn Wi-Fi OFF: banner + **AI Offline** appear within ~5 s (DNS fails instantly, so the confirm round lands right after the 5 s delay; a black-hole network that swallows packets takes up to ~21 s — measured)
+- [ ] Turn Wi-Fi back ON: banner disappears on the next round (≤30 s) without clicking anything
+- [ ] **Check again** in the banner responds immediately while offline (button disables → re-enables)
+- [ ] Extension host console shows one `[ritemark connectivity]` line per real state flip, none while stable
+
 ## Visual parity gate (added 2026-08-05 — default-drift lesson)
 
 - [ ] Launch the candidate on a **FRESH profile** (`--user-data-dir` to an empty dir) — never judge chrome from a seasoned profile; several renderings (aux tabs, tree, preview tabs) differ on first run.

@@ -118,7 +118,7 @@ export function SetupWizard() {
               )}
 
               {needsAuth && !loginBlockedByEnvironment && (
-                <PrimaryButton onClick={startLogin} disabled={offlineBlocked}>
+                <PrimaryButton onClick={() => startLogin()} disabled={offlineBlocked}>
                   <Icon name="sign-in" size={14} />
                   Sign in with Claude.ai
                 </PrimaryButton>

@@ -67,6 +67,13 @@ use_repo_node() {
 }
 
 cd "$PROJECT_DIR"
+
+# A production build is also a release-candidate build. It must start from the
+# exact origin/main commit in a new worktree with a pristine physical submodule.
+# This runs before any dependency install or patch application so local machine
+# state cannot become an implicit build input.
+./scripts/verify-release-source.sh --target "$TARGET" --phase pristine
+
 use_repo_node
 
 echo ""
@@ -79,10 +86,35 @@ echo "Target platform:   $TARGET"
 echo ""
 
 # =============================================================================
-# Step 1: Pre-Build Validation
+# Step 1: Materialize frozen dependencies and canonical generated bundles
 # =============================================================================
-echo -e "${BLUE}Step 1/8: Pre-Build Validation${NC}"
+echo -e "${BLUE}Step 1/9: Frozen Dependencies & Canonical Bundles${NC}"
 echo "----------------------------------------"
+
+echo "Installing extension dependencies from package-lock.json..."
+(cd extensions/ritemark && npm ci --legacy-peer-deps)
+
+echo "Installing webview dependencies from package-lock.json..."
+(cd extensions/ritemark/webview && npm ci)
+
+echo "Rebuilding committed webview and extension bundles..."
+(cd extensions/ritemark/webview && npm run build)
+(cd extensions/ritemark && npm run compile)
+
+if ! git diff --quiet -- extensions/ritemark/media/webview.js; then
+  echo -e "${RED}ERROR: clean dependency build changed committed webview.js.${NC}"
+  echo "The committed bundle is stale or the lockfile does not reproduce it."
+  echo "Rebuild and commit the bundle before creating an RC."
+  exit 1
+fi
+
+echo "Applying the canonical VS Code patch stack..."
+./scripts/apply-patches.sh
+
+./scripts/verify-release-source.sh --target "$TARGET" --phase patched
+
+echo "Installing VS Code dependencies from package-lock.json..."
+(cd vscode && npm ci)
 
 if ! ./scripts/validate-build-env.sh; then
   echo ""
@@ -96,7 +128,7 @@ echo ""
 # =============================================================================
 # Step 2: Bundled Agent Runtimes (manifest-driven)
 # =============================================================================
-echo -e "${BLUE}Step 2/8: Bundled Agent Runtimes${NC}"
+echo -e "${BLUE}Step 2/9: Bundled Agent Runtimes${NC}"
 echo "----------------------------------------"
 
 # Materialise Codex + Claude runtimes for the build target before any gulp
@@ -118,7 +150,7 @@ echo ""
 # =============================================================================
 # Step 3: Backup & Build VS Code
 # =============================================================================
-echo -e "${BLUE}Step 3/8: Backing Up & Building VS Code${NC}"
+echo -e "${BLUE}Step 3/9: Backing Up & Building VS Code${NC}"
 echo "----------------------------------------"
 echo ""
 
@@ -168,7 +200,7 @@ echo ""
 # =============================================================================
 # Step 4: Copy RiteMark Extension
 # =============================================================================
-echo -e "${BLUE}Step 4/8: Copying RiteMark Extension${NC}"
+echo -e "${BLUE}Step 4/9: Copying RiteMark Extension${NC}"
 echo "----------------------------------------"
 
 APP_PATH="$PROJECT_DIR/VSCode-$TARGET/Ritemark.app"
@@ -308,7 +340,7 @@ echo ""
 # =============================================================================
 # Step 5: Verify Extension Copy (GUARDRAIL)
 # =============================================================================
-echo -e "${BLUE}Step 5/8: Verifying Extension Copy${NC}"
+echo -e "${BLUE}Step 5/9: Verifying Extension Copy${NC}"
 echo "----------------------------------------"
 
 VALIDATION_FAILED=0
@@ -383,10 +415,34 @@ echo -e "${GREEN}All extension files validated successfully${NC}"
 echo ""
 
 # =============================================================================
-# Step 6: Post-Build Validation
+# Step 6: Provenance + Post-Build Validation
 # =============================================================================
-echo -e "${BLUE}Step 6/8: Post-Build Validation${NC}"
+echo -e "${BLUE}Step 6/9: Provenance & Post-Build Validation${NC}"
 echo "----------------------------------------"
+
+EXTENSION_SHA_PATH="$PROJECT_DIR/VSCode-$TARGET/ritemark-extension-pre-sign.sha256"
+node ./scripts/tree-sha256.mjs "$EXT_DEST" > "$EXTENSION_SHA_PATH"
+if ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"; then
+  echo -e "${RED}Failed to record the pre-sign extension digest${NC}"
+  exit 1
+fi
+EXTENSION_SHA="$(cat "$EXTENSION_SHA_PATH")"
+
+node ./scripts/build-provenance.mjs \
+  --write \
+  --repo "$PROJECT_DIR" \
+  --target "$TARGET" \
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
+
+node ./scripts/build-provenance.mjs \
+  --verify \
+  --repo "$PROJECT_DIR" \
+  --target "$TARGET" \
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
 
 if ! ./scripts/validate-build-output.sh "$TARGET"; then
   echo ""
@@ -400,7 +456,7 @@ echo ""
 # =============================================================================
 # Step 7: Fix Timestamps
 # =============================================================================
-echo -e "${BLUE}Step 7/8: Fixing Timestamps${NC}"
+echo -e "${BLUE}Step 7/9: Fixing Timestamps${NC}"
 echo "----------------------------------------"
 
 # VS Code build sets creation dates to 1980 (ZIP epoch) - fix to current time
@@ -418,9 +474,23 @@ fi
 echo ""
 
 # =============================================================================
-# Step 8: Success
+# Step 8: Final provenance verification
 # =============================================================================
-echo -e "${BLUE}Step 8/8: Build Complete${NC}"
+echo -e "${BLUE}Step 8/9: Final Provenance Verification${NC}"
+echo "----------------------------------------"
+node ./scripts/build-provenance.mjs \
+  --verify \
+  --repo "$PROJECT_DIR" \
+  --target "$TARGET" \
+  --app "$APP_PATH" \
+  --extension-input "$EXT_DEST" \
+  --expected-extension-sha "$EXTENSION_SHA"
+echo ""
+
+# =============================================================================
+# Step 9: Success
+# =============================================================================
+echo -e "${BLUE}Step 9/9: Build Complete${NC}"
 echo "----------------------------------------"
 echo ""
 echo -e "${GREEN}========================================${NC}"

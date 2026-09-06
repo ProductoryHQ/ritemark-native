@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcribe · Option B — Transcript Workbench</title>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --r-surface:#FFFFFF; --r-surface-muted:#F8FAFC; --r-surface-soft:#F1F5F9;
+    --r-hairline:#E2E8F0; --r-hairline-strong:#CBD5E1;
+    --r-ink-strong:#1E1B4B; --r-ink-body:#475569; --r-ink-muted:#64748B; --r-ink-faint:#94A3B8;
+    --r-accent:#4338CA; --r-accent-deep:#3730A3; --r-accent-soft:#E0E7FF; --r-accent-fainter:#C7D2FE;
+    --r-success:#22C55E; --r-success-soft:#DCFCE7;
+    --r-warning:#F59E0B; --r-warning-soft:#FEF3C7;
+    --r-error:#EF4444; --r-error-soft:#FEE2E2;
+    --r-shadow-indigo:0 4px 6px -1px rgba(67,56,202,.25);
+    --r-radius:10px; --r-radius-input:6px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sofia Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       font-size:13px;color:var(--r-ink-strong);background:#D6DCE4;
+       -webkit-font-smoothing:antialiased;padding:32px 24px 56px}
+  button{font-family:inherit;cursor:pointer}
+  .page{max-width:1320px;margin:0 auto}
+
+  .hd{margin-bottom:20px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+       padding:3px 10px;border-radius:4px;background:#E0E7FF;color:#3730A3;margin-bottom:10px}
+  .hd h1{font-size:24px;font-weight:600;letter-spacing:-.2px;margin-bottom:6px}
+  .hd p{font-size:14px;color:var(--r-ink-body);max-width:780px;line-height:1.55}
+  .hd .bet{margin-top:10px;padding-left:12px;border-left:2px solid var(--r-accent);
+           font-size:13px;color:var(--r-ink-body);max-width:780px;line-height:1.5}
+  .hd .bet b{color:var(--r-ink-strong);font-weight:600}
+
+  .win{background:var(--r-surface);border:1px solid #C8D0DA;border-radius:8px;overflow:hidden;
+       box-shadow:0 10px 44px rgba(30,27,75,.20);display:flex;flex-direction:column;height:760px}
+  .titlebar{height:34px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);
+            display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+  .dots{display:flex;gap:6px}.dot{width:11px;height:11px;border-radius:50%;background:#CBD5E1}
+  .titlebar .t{flex:1;text-align:center;font-size:11.5px;color:var(--r-ink-muted);font-weight:500}
+  .body{flex:1;display:flex;min-height:0}
+
+  .actbar{width:48px;background:var(--r-surface-muted);border-right:1px solid var(--r-hairline);
+          display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:2px;flex-shrink:0}
+  .act{width:48px;height:44px;display:flex;align-items:center;justify-content:center;
+       color:var(--r-ink-faint);border-left:2px solid transparent}
+  .act svg{width:20px;height:20px;stroke-width:1.5}
+  .act.on{color:var(--r-accent);border-left-color:var(--r-accent);background:rgba(67,56,202,.06)}
+
+  /* thin launcher sidebar */
+  .side{width:212px;flex-shrink:0;background:var(--r-surface);border-right:1px solid var(--r-hairline);
+        display:flex;flex-direction:column;min-height:0}
+  .side-title{padding:12px 12px 8px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;
+              text-transform:uppercase;color:var(--r-ink-body)}
+  .pad{padding:0 10px 8px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:30px;padding:0 12px;
+       border-radius:var(--r-radius-input);font-size:12px;font-weight:600;border:1px solid transparent;
+       white-space:nowrap;line-height:1}
+  .btn svg{width:14px;height:14px;stroke-width:1.8;flex-shrink:0}
+  .btn-primary{background:var(--r-accent);color:#fff;box-shadow:var(--r-shadow-indigo)}
+  .btn-primary:hover{background:var(--r-accent-deep)}
+  .btn-ghost{background:var(--r-surface);color:var(--r-ink-body);border-color:var(--r-hairline-strong)}
+  .btn-ghost:hover{border-color:var(--r-accent);color:var(--r-accent);background:var(--r-accent-soft)}
+  .btn-block{width:100%}
+  .btn-sm{height:26px;padding:0 10px;font-size:11.5px;border-radius:5px}
+
+  .lrow{display:flex;align-items:center;gap:8px;padding:8px 14px;border-left:2px solid transparent}
+  .lrow:hover{background:var(--r-surface-soft)}
+  .lrow.on{background:var(--r-accent-soft);border-left-color:var(--r-accent)}
+  .lrow .m{min-width:0;flex:1}
+  .lrow .n{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+  .lrow .d{font-size:10.5px;color:var(--r-ink-muted);margin-top:1px}
+  .lrow .st{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .st.done{background:var(--r-success)}.st.run{background:var(--r-accent)}.st.idle{background:var(--r-hairline-strong)}
+  .sec{padding:14px 14px 5px;font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--r-ink-faint)}
+
+  /* main workbench */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--r-surface)}
+  .tabs{height:35px;background:var(--r-surface-muted);border-bottom:1px solid var(--r-hairline);display:flex;flex-shrink:0}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 14px;font-size:12px;color:var(--r-ink-muted);border-right:1px solid var(--r-hairline)}
+  .tab.on{background:var(--r-surface);color:var(--r-ink-strong);font-weight:500;box-shadow:inset 0 2px 0 var(--r-accent)}
+  .tab svg{width:13px;height:13px;stroke-width:1.7;color:var(--r-accent)}
+
+  /* player */
+  .player{border-bottom:1px solid var(--r-hairline);background:var(--r-surface-muted);
+          padding:12px 18px 10px;display:flex;flex-direction:column;gap:9px;flex-shrink:0}
+  .p-top{display:flex;align-items:center;gap:12px}
+  .p-title{font-size:14px;font-weight:600;letter-spacing:-.1px}
+  .p-meta{font-size:11px;color:var(--r-ink-muted);margin-top:2px}
+  .p-actions{margin-left:auto;display:flex;gap:7px;align-items:center}
+  .play{width:34px;height:34px;border-radius:50%;background:var(--r-accent);color:#fff;border:none;
+        display:flex;align-items:center;justify-content:center;box-shadow:var(--r-shadow-indigo);flex-shrink:0}
+  .play svg{width:14px;height:14px;fill:#fff;stroke:none;margin-left:2px}
+  .wave{flex:1;height:38px;display:flex;align-items:center;gap:2px;overflow:hidden}
+  .wave i{display:block;width:3px;border-radius:2px;background:var(--r-hairline-strong);flex-shrink:0}
+  .wave i.p{background:var(--r-accent-fainter)}
+  .wave i.cur{background:var(--r-accent)}
+  .time{font-size:11.5px;color:var(--r-ink-muted);font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:500}
+  .speed{font-size:11px;font-weight:600;color:var(--r-ink-body);border:1px solid var(--r-hairline-strong);
+         border-radius:5px;padding:3px 7px;background:var(--r-surface)}
+
+  /* transcript + rail */
+  .work{flex:1;display:flex;min-height:0}
+  .tr{flex:1;min-width:0;overflow:hidden;padding:16px 22px 0}
+  .spkbar{display:flex;align-items:center;gap:7px;padding-bottom:12px;border-bottom:1px solid var(--r-hairline);margin-bottom:14px;position:relative}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+        padding:4px 10px;border-radius:999px;border:1px solid var(--r-hairline);background:var(--r-surface)}
+  .chip .sw{width:8px;height:8px;border-radius:50%}
+  .chip.k .sw{background:#4338CA}.chip.j .sw{background:#0EA5E9}.chip.u .sw{background:#94A3B8}
+  .chip.editing{border-color:var(--r-accent);box-shadow:0 0 0 3px var(--r-accent-soft)}
+  .spkbar .hint{margin-left:auto;font-size:10.5px;color:var(--r-ink-faint)}
+
+  .pop{position:absolute;top:34px;left:96px;width:250px;background:var(--r-surface);
+       border:1px solid var(--r-hairline-strong);border-radius:var(--r-radius);
+       box-shadow:0 12px 30px rgba(30,27,75,.18);padding:12px;z-index:5}
+  .pop h4{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--r-ink-muted);margin-bottom:8px}
+  .inp{width:100%;height:30px;border:1px solid var(--r-accent);border-radius:var(--r-radius-input);
+       box-shadow:0 0 0 3px var(--r-accent-soft);padding:0 9px;font:inherit;font-size:12.5px;color:var(--r-ink-strong);outline:none}
+  .pop .sub{font-size:11px;color:var(--r-ink-muted);margin:8px 0 10px;line-height:1.4}
+  .pop .acts{display:flex;gap:6px;justify-content:flex-end}
+
+  .seg{display:flex;gap:12px;padding:8px 10px;border-radius:8px;border-left:2px solid transparent;margin-bottom:2px}
+  .seg:hover{background:var(--r-surface-muted)}
+  .seg.now{background:var(--r-accent-soft);border-left-color:var(--r-accent)}
+  .seg .who{width:74px;flex-shrink:0;text-align:right}
+  .seg .who .nm{font-size:11.5px;font-weight:700;line-height:1.3}
+  .seg .who .tt{font-size:10px;color:var(--r-ink-faint);font-variant-numeric:tabular-nums;margin-top:2px}
+  .seg.k .who .nm{color:#3730A3}.seg.j .who .nm{color:#0369A1}.seg.u .who .nm{color:var(--r-ink-muted)}
+  .seg p{font-size:14px;line-height:1.6;color:var(--r-ink-body)}
+  .seg.now p{color:var(--r-ink-strong)}
+  .lowc{border-bottom:2px dotted var(--r-warning);background:var(--r-warning-soft);border-radius:2px;padding:0 1px}
+
+  /* insights rail */
+  .rail{width:284px;flex-shrink:0;border-left:1px solid var(--r-hairline);background:var(--r-surface-muted);
+        display:flex;flex-direction:column;min-height:0}
+  .rail-t{padding:12px 14px 9px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+          color:var(--r-ink-body);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--r-hairline)}
+  .rail-t svg{width:13px;height:13px;stroke-width:1.8;color:var(--r-accent)}
+  .rail-scroll{flex:1;overflow:hidden;padding:12px}
+  .card{background:var(--r-surface);border:1px solid var(--r-hairline);border-radius:var(--r-radius);
+        padding:11px 12px;margin-bottom:9px}
+  .card h5{font-size:10px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--r-accent);
+           margin-bottom:7px;display:flex;align-items:center;gap:6px}
+  .card h5 .n{margin-left:auto;color:var(--r-ink-faint);font-weight:700}
+  .card p{font-size:12px;line-height:1.5;color:var(--r-ink-body)}
+  .card li{list-style:none;font-size:12px;line-height:1.45;color:var(--r-ink-body);
+           padding-left:15px;position:relative;margin-bottom:6px}
+  .card li:last-child{margin-bottom:0}
+  .card li::before{content:'';position:absolute;left:3px;top:6px;width:5px;height:5px;border-radius:1px;background:var(--r-accent-fainter)}
+  .card li .at{color:var(--r-ink-faint);font-size:10.5px;font-variant-numeric:tabular-nums}
+  .quote{font-size:12.5px;line-height:1.5;color:var(--r-ink-strong);font-style:italic;
+         border-left:2px solid var(--r-accent-fainter);padding-left:9px}
+  .quote .src{display:block;font-style:normal;font-size:10.5px;color:var(--r-ink-faint);margin-top:4px}
+  .rail-foot{padding:10px 12px;border-top:1px solid var(--r-hairline);display:flex;gap:7px}
+
+  .notes{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .note{background:var(--r-surface);border:1px solid var(--r-hairline);border-radius:var(--r-radius);padding:14px 16px}
+  .note h3{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--r-accent);margin-bottom:10px}
+  .note li{list-style:none;font-size:12px;line-height:1.5;color:var(--r-ink-body);padding-left:14px;position:relative;margin-bottom:7px}
+  .note li::before{content:'';position:absolute;left:2px;top:7px;width:4px;height:4px;border-radius:50%;background:var(--r-accent-fainter)}
+  .note li b{color:var(--r-ink-strong);font-weight:600}
+  .note.warn h3{color:#B45309}.note.warn li::before{background:#FCD34D}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hd">
+    <span class="tag">Option B</span>
+    <h1>Transcript Workbench</h1>
+    <p>The sidebar is only a launcher. The real surface is a <b>dedicated workbench tab</b> in the editor area: audio player on top, speaker-separated transcript in the middle, insights on the right. Click any line to hear it; rename a speaker once and it changes everywhere.</p>
+    <div class="bet"><b>The bet:</b> transcription is its own craft — reviewing, correcting and attributing speech needs a purpose-built surface, not a text file.</div>
+  </div>
+
+  <div class="win">
+    <div class="titlebar">
+      <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="t">client-call.m4a — Transcript</div>
+      <div style="width:52px"></div>
+    </div>
+
+    <div class="body">
+      <div class="actbar">
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></div>
+        <div class="act on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/></svg></div>
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="6" height="16" rx="1"/><rect x="11" y="4" width="4" height="16" rx="1"/><path d="M17.5 4.8 21 19.4"/></svg></div>
+        <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg></div>
+      </div>
+
+      <div class="side">
+        <div class="side-title">Recordings</div>
+        <div class="pad">
+          <button class="btn btn-primary btn-block">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add recording
+          </button>
+        </div>
+        <div class="sec">Open</div>
+        <div class="lrow on"><span class="st done"></span><div class="m"><div class="n">client-call.m4a</div><div class="d">47 min · 2 speakers</div></div></div>
+        <div class="sec">Transcribing</div>
+        <div class="lrow"><span class="st run"></span><div class="m"><div class="n">board-review-aug.m4a</div><div class="d">47% · ~3 min left</div></div></div>
+        <div class="sec">Library</div>
+        <div class="lrow"><span class="st done"></span><div class="m"><div class="n">discovery-kadri.m4a</div><div class="d">32 min · yesterday</div></div></div>
+        <div class="lrow"><span class="st done"></span><div class="m"><div class="n">workshop-day-2.m4a</div><div class="d">2 h 04 min · 9 Aug</div></div></div>
+        <div class="lrow"><span class="st done"></span><div class="m"><div class="n">sales-sync-0805.m4a</div><div class="d">28 min · 5 Aug</div></div></div>
+        <div class="lrow"><span class="st idle"></span><div class="m"><div class="n">voicememo-041.m4a</div><div class="d">Not transcribed</div></div></div>
+      </div>
+
+      <div class="main">
+        <div class="tabs">
+          <div class="tab on">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 11v2"/><path d="M7.5 7v10"/><path d="M12 4v16"/><path d="M16.5 8v8"/><path d="M21 11v2"/></svg>
+            client-call.m4a
+          </div>
+          <div class="tab">roadmap.md</div>
+        </div>
+
+        <div class="player">
+          <div class="p-top">
+            <div>
+              <div class="p-title">Client call — Nordic Retail</div>
+              <div class="p-meta">12 Aug 2026 · ElevenLabs Scribe · Estonian/English · 2 speakers</div>
+            </div>
+            <div class="p-actions">
+              <button class="btn btn-ghost btn-sm">Re-run with…</button>
+              <button class="btn btn-ghost btn-sm">Export</button>
+            </div>
+          </div>
+          <div class="p-top">
+            <button class="play"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+            <div class="wave" id="wave"></div>
+            <span class="time">12:04 / 47:32</span>
+            <button class="speed">1.25×</button>
+          </div>
+        </div>
+
+        <div class="work">
+          <div class="tr">
+            <div class="spkbar">
+              <span class="chip k"><span class="sw"></span>Kadri</span>
+              <span class="chip j editing"><span class="sw"></span>Speaker 2</span>
+              <span class="chip u"><span class="sw"></span>Unassigned · 3</span>
+              <span class="hint">Click a speaker to rename everywhere</span>
+
+              <div class="pop">
+                <h4>Rename speaker</h4>
+                <input class="inp" value="Jarmo" />
+                <div class="sub">Applies to all 34 segments spoken by Speaker 2.</div>
+                <div class="acts">
+                  <button class="btn btn-ghost btn-sm">Cancel</button>
+                  <button class="btn btn-primary btn-sm">Rename</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="seg k">
+              <div class="who"><div class="nm">Kadri</div><div class="tt">11:42</div></div>
+              <p>Our store managers are still exporting to spreadsheets every Monday morning, and nobody trusts the numbers by Wednesday.</p>
+            </div>
+            <div class="seg j now">
+              <div class="who"><div class="nm">Speaker 2</div><div class="tt">12:04</div></div>
+              <p>Right. And when you say nobody trusts them — is that a data problem or a timing problem? Because those need very different answers.</p>
+            </div>
+            <div class="seg k">
+              <div class="who"><div class="nm">Kadri</div><div class="tt">12:21</div></div>
+              <p>Honestly, timing. The data is fine on Monday. By Wednesday three people have edited the same sheet and we can’t tell which version went to <span class="lowc">Merike</span> and the board.</p>
+            </div>
+            <div class="seg j">
+              <div class="who"><div class="nm">Speaker 2</div><div class="tt">12:48</div></div>
+              <p>So the fix isn’t a better spreadsheet. It’s having one version that’s obviously the current one.</p>
+            </div>
+            <div class="seg k">
+              <div class="who"><div class="nm">Kadri</div><div class="tt">13:02</div></div>
+              <p>Yes. And I need it before the September board meeting, otherwise we’re doing this dance for another quarter.</p>
+            </div>
+          </div>
+
+          <div class="rail">
+            <div class="rail-t">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+              Insights
+            </div>
+            <div class="rail-scroll">
+              <div class="card">
+                <h5>Summary</h5>
+                <p>Weekly store reporting is trusted on Monday and untrusted by Wednesday. Root cause is version drift in shared spreadsheets, not data quality. Kadri needs one authoritative version before the September board.</p>
+              </div>
+              <div class="card">
+                <h5>Decisions <span class="n">3</span></h5>
+                <ul>
+                  <li>Problem reframed as versioning, not data quality <span class="at">12:48</span></li>
+                  <li>Spreadsheet workflow will be replaced, not improved <span class="at">13:15</span></li>
+                  <li>Scope limited to weekly store reports for now <span class="at">28:40</span></li>
+                </ul>
+              </div>
+              <div class="card">
+                <h5>Action items <span class="n">5</span></h5>
+                <ul>
+                  <li><b>Jarmo</b> — draft a one-page proposal by 19 Aug <span class="at">31:07</span></li>
+                  <li><b>Kadri</b> — share last 4 weeks of reports <span class="at">33:20</span></li>
+                </ul>
+              </div>
+              <div class="card">
+                <h5>Key quote</h5>
+                <div class="quote">“By Wednesday three people have edited the same sheet and we can’t tell which version went to the board.”
+                  <span class="src">Kadri · 12:21 — click to play</span></div>
+              </div>
+            </div>
+            <div class="rail-foot">
+              <button class="btn btn-primary btn-sm" style="flex:1">Export to Markdown</button>
+              <button class="btn btn-ghost btn-sm">Recipes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>What’s new</h3>
+      <ul>
+        <li>A <b>custom editor tab</b> for recordings — the biggest new surface in the app</li>
+        <li><b>Audio playback synced to text</b>: click a line to hear it, the playing line highlights</li>
+        <li><b>Speaker chips</b> with one-click global rename, colour-coded through the transcript</li>
+        <li><b>Low-confidence highlighting</b> (amber) on words the engine wasn’t sure about — names, jargon</li>
+        <li>An <b>insights rail</b> with timestamps that jump into the audio</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Why it’s worth it</h3>
+      <ul>
+        <li>You can <b>verify a quote</b> before you send it to a client — the trust problem, solved</li>
+        <li>Corrections stay <b>attached to the recording</b>, not lost in a text file</li>
+        <li>Insights <b>cite their source</b> (12:48), so an LLM claim can be checked in two seconds</li>
+        <li>This is the shape a dedicated transcription tool takes — it can stand next to one</li>
+      </ul>
+    </div>
+    <div class="note warn">
+      <h3>The cost</h3>
+      <ul>
+        <li><b>The heaviest build by far</b> — custom editor, audio pipeline, waveform, a session file format</li>
+        <li>The transcript is <b>no longer just a .md file</b> until you export it</li>
+        <li>Playback needs decoded audio in the webview, and the <b>webview bundle is already 7.6 MB</b> (#107)</li>
+        <li>Realistically a <b>two-phase build</b>: Option A’s pipeline first, this surface second</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  // deterministic pseudo-waveform: 118 bars, 25% played
+  const wave = document.getElementById('wave');
+  const N = 118, playedTo = Math.round(N * 0.254);
+  for (let i = 0; i < N; i++) {
+    const s = Math.sin(i * 0.7) * Math.cos(i * 0.23) + Math.sin(i * 1.9) * 0.5;
+    const h = 5 + Math.abs(s) * 15 + (i % 7) * 0.9;
+    const bar = document.createElement('i');
+    bar.style.height = Math.min(34, h).toFixed(1) + 'px';
+    if (i < playedTo) bar.className = 'p';
+    if (i === playedTo) bar.className = 'cur';
+    wave.appendChild(bar);
+  }
+</script>
+</body>
+</html>
