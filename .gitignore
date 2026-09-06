@@ -1,5 +1,9 @@
 # Dependencies
 node_modules/
+# Also match a node_modules SYMLINK: the trailing-slash pattern above only
+# matches directories, so a linked dependency tree would otherwise be
+# committed as a symlink pointing outside the repository.
+node_modules
 .pnp
 .pnp.js
 

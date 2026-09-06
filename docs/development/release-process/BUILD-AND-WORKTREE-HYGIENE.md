@@ -102,35 +102,51 @@ Warnings are not used for these conditions.
 Worktrees are disposable workspaces; commits and remote branches are the
 retained history.
 
-Run the audit:
+### Reporting is automatic; removal is not
 
 ```bash
-node ./scripts/worktree-hygiene.mjs --check
+node ./scripts/worktree-hygiene.mjs --report   # deletes nothing, safe any time
+node ./scripts/worktree-hygiene.mjs --check    # same classification, terse
+node ./scripts/worktree-hygiene.mjs --clean    # human-authorized only
 ```
 
-Run it at four deterministic points:
+A local scheduled task mails the `--report` output to Jarmo weekly, and the
+`worktree-janitor` agent produces the same report on demand. Neither deletes
+anything. `--clean` runs only after Jarmo has read a report and said so.
 
-1. immediately after a PR is merged or closed;
-2. at sprint close;
-3. before every release-candidate worktree is created;
-4. once each week for the whole repository.
+Nothing is ever removed automatically, because the classifier decides from
+evidence that can be incomplete: it reads Git state and the filesystem, and a
+worktree can hold value neither of them describes.
 
-After reviewing the report, remove only proven-safe entries with:
+### What the classifier holds back, and why
 
-```bash
-node ./scripts/worktree-hygiene.mjs --clean
-```
+The cleaner never removes the primary, current, or locked worktree, and it
+preserves dirty and unreadable ones.
 
-The cleaner never removes the primary, current, or locked worktree. It also
-preserves dirty, unreadable, unpushed, upstream-less, and unmerged worktrees.
-Ordinary worktrees are removable only when their full commit is already an
-ancestor of `origin/main`. `apply-patches.sh` records the exact derived VS Code
-diff in per-worktree Git metadata; a merged development tree with a changed
-submodule is removable only while that fingerprint still matches. Any later
-manual VS Code edit invalidates the proof and makes the tree `BLOCKED` again.
-A marked release worktree is removable when its
-tracked source still matches its marker; generated submodule/build state is
-then deliberately disposable. Branches are retained.
+**Build output.** A non-empty `dist/` or `VSCode-<target>/` blocks the worktree
+whatever Git says. Those directories are ignored, so `git status` reports a
+release worktree holding signed, notarized DMGs as pristine. That output can
+represent hours of compute and spent Apple notarization submissions, and it
+exists nowhere else until it is published.
+
+**Unmerged work.** An unmerged branch needs an upstream and no unpushed
+commits. Once the commit is an ancestor of `origin/main` the work is
+demonstrably in main, so a missing upstream is not a risk — that is simply what
+a branch looks like after a merge deleted its remote.
+
+**Possible hand-editing in `vscode/`.** A changed submodule is *derived state*,
+not user work: `apply-patches.sh` reproduces it exactly. The audit proves this
+per worktree by reading the canonical patch targets and the branding assets that
+`apply-patches.sh` copies, plus the npm/gulp-regenerated directories. Every
+changed path must belong to that set; one path outside it blocks the worktree,
+because CLAUDE.md forbids editing the submodule directly and an unexplained
+change may be someone's work.
+
+Treating a patched submodule as unreviewable instead of proving it derived was
+why the janitor could not reclaim a single development worktree while offering
+to delete the one release worktree that held irreplaceable artifacts.
+
+Branches are always retained.
 
 `--clean` uses `git worktree remove` with an exact path, followed by
 `git worktree prune`. It does not recursively delete a guessed directory.
