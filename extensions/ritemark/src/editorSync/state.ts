@@ -90,6 +90,17 @@ export function normalizeLogicalText(content: string): string {
   return content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
 }
 
+/**
+ * A saved Markdown body always ends in exactly one trailing newline, matching
+ * POSIX/Git conventions. `gray-matter`'s `stringify` already guarantees this
+ * when front matter is present; documents without front matter bypass it and
+ * are written as the editor's Markdown projection verbatim, which never ends
+ * in a newline (Turndown trims all trailing whitespace from its output).
+ */
+export function ensureTrailingNewline(content: string): string {
+  return content.length === 0 || content.endsWith('\n') ? content : `${content}\n`;
+}
+
 export function classifyThreeWay(snapshot: ThreeWaySnapshot): ThreeWaySyncState {
   const diskChanged = snapshot.diskHash !== snapshot.baseDiskHash;
   const modelChanged = snapshot.modelHash !== snapshot.baseModelHash;

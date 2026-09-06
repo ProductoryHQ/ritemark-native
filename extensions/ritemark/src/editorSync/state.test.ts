@@ -6,6 +6,7 @@ import {
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
+  ensureTrailingNewline,
   observeLocalSaveReceipts,
   initializeThreeWayState,
   normalizeLogicalText,
@@ -78,6 +79,18 @@ test('an unmatched disk observation retires only receipts it can order after', (
 
 test('logical normalization ignores one BOM and EOL representation', () => {
   assert.equal(normalizeLogicalText('\uFEFFa\r\nb\r'), 'a\nb\n');
+});
+
+test('ensureTrailingNewline appends exactly one newline when the body lacks one', () => {
+  assert.equal(ensureTrailingNewline('- [ ] plain bullet'), '- [ ] plain bullet\n');
+});
+
+test('ensureTrailingNewline is a no-op when the body already ends in a newline', () => {
+  assert.equal(ensureTrailingNewline('# Canary\n\njust a paragraph\n'), '# Canary\n\njust a paragraph\n');
+});
+
+test('ensureTrailingNewline never turns an empty body into a bare newline', () => {
+  assert.equal(ensureTrailingNewline(''), '');
 });
 
 test('canonical JSON sorts nested object keys without reordering arrays', () => {
