@@ -11,6 +11,15 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
+// Runaway guard for findFiles, not a "top N" cutoff — sorted by mtime AFTER
+// this scan completes, so it must be large enough to cover real workspaces
+// (#194: a 200-file pre-sort cap made recents effectively random in a
+// 1000+ file workspace, since the true newest files often fell outside it).
+const MAX_CANDIDATE_FILES = 5000;
+// Debounce for save-triggered refreshes so rapid saves (e.g. format-on-save
+// touching several files) don't re-render on every single one.
+const SAVE_REFRESH_DEBOUNCE_MS = 2000;
+
 const QUICK_ACTIONS: Array<{ id: string; label: string; icon: string; command: string }> = [
   { id: 'new-ai-task', label: 'New AI task', icon: 'sparkle', command: 'ritemark.newChat' },
   { id: 'open-document', label: 'Open document…', icon: 'file', command: 'workbench.action.files.openFile' },
@@ -40,6 +49,7 @@ function svgIcon(name: string, size: number): string {
 export class HomeViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.homeView';
   private _view: vscode.WebviewView | null = null;
+  private _saveRefreshTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -75,6 +85,17 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
       }
     });
     view.onDidChangeVisibility(() => { if (view.visible) void this.render(); });
+    // The recents list otherwise only re-renders on resolve/visibility —
+    // saves elsewhere leave it stale while the Home view stays visible (#194).
+    const saveListener = vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (!doc.fileName.endsWith('.md') || !this._view?.visible) return;
+      if (this._saveRefreshTimer) clearTimeout(this._saveRefreshTimer);
+      this._saveRefreshTimer = setTimeout(() => { void this.render(); }, SAVE_REFRESH_DEBOUNCE_MS);
+    });
+    view.onDidDispose(() => {
+      saveListener.dispose();
+      if (this._saveRefreshTimer) clearTimeout(this._saveRefreshTimer);
+    });
     void this.render();
   }
 
@@ -91,7 +112,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (!folder) return [];
     try {
-      const files = await vscode.workspace.findFiles('**/*.md', '**/{node_modules,.git,.ritemark}/**', 200);
+      const files = await vscode.workspace.findFiles('**/*.md', '**/{node_modules,.git,.ritemark}/**', MAX_CANDIDATE_FILES);
       const stats = await Promise.all(files.map(async (uri) => {
         try {
           const stat = await vscode.workspace.fs.stat(uri);
