@@ -14,22 +14,42 @@ const EXPECTED_TARGETS = [
 ];
 
 const EXPECTED_COMPONENTS = {
-  codex: ['app-server', 'code-mode-host'],
+  codex: ['app-server', 'code-mode-host', 'windows-sandbox-setup', 'command-runner'],
   claude: ['runtime'],
   opencode: ['runtime'],
 };
+
+// Components that exist for only a subset of targets. Codex's sandbox helpers are
+// Windows-only by construction: the vendor publishes no darwin build, because on macOS
+// the sandbox is the OS seatbelt rather than a spawned helper process.
+const COMPONENT_TARGETS = {
+  'codex/windows-sandbox-setup': ['win32-x64'],
+  'codex/command-runner': ['win32-x64'],
+};
+
+const targetsFor = (agent, component) => COMPONENT_TARGETS[`${agent}/${component}`] ?? EXPECTED_TARGETS;
+
+// Helpers that cannot be smoke-tested: they are IPC endpoints, not CLIs.
+// codex-command-runner expects a pipe handle and codex-windows-sandbox-setup expects a
+// base64 payload, so both exit non-zero on --version and --help. Their manifest rows
+// carry no validationArgs, and fetch-agent-runtimes.sh skips the smoke test when
+// validationArgs is empty.
+const NON_INVOCABLE_COMPONENTS = new Set(['codex/windows-sandbox-setup', 'codex/command-runner']);
 
 const EXPECTED_INSTALL_STEMS = {
   codex: {
     'app-server': 'codex-app-server',
     'code-mode-host': 'codex-code-mode-host',
+    'windows-sandbox-setup': 'codex-windows-sandbox-setup',
+    'command-runner': 'codex-command-runner',
   },
   claude: { runtime: 'claude' },
   opencode: { runtime: 'opencode' },
 };
 
-const EXPECTED_RUNTIME_ROWS = Object.values(EXPECTED_COMPONENTS)
-  .reduce((total, components) => total + components.length * EXPECTED_TARGETS.length, 0);
+const EXPECTED_RUNTIME_ROWS = Object.entries(EXPECTED_COMPONENTS)
+  .reduce((total, [agent, components]) =>
+    total + components.reduce((sum, component) => sum + targetsFor(agent, component).length, 0), 0);
 
 const APPROVED_RUNTIMES = {
   codex: { vendor: 'openai', version: '0.153.0' },
@@ -88,8 +108,14 @@ export function validateAgentRuntimeManifest(manifest, packageJson, packageLock)
     if (expectedInstallName && runtime.installName !== expectedInstallName) {
       errors.push(`${runtimeKey} installName must be ${expectedInstallName}; found ${runtime.installName ?? '<missing>'}`);
     }
-    const validationArg = runtime.component === 'code-mode-host' ? '--help' : '--version';
-    if (!runtime.validationArgs?.includes(validationArg)) errors.push(`${runtimeKey} must validate with ${validationArg}`);
+    if (NON_INVOCABLE_COMPONENTS.has(`${runtime.agent}/${runtime.component}`)) {
+      if (runtime.validationArgs?.length) {
+        errors.push(`${runtimeKey} must not declare validationArgs; it is an IPC helper and cannot be smoke-tested`);
+      }
+    } else {
+      const validationArg = runtime.component === 'code-mode-host' ? '--help' : '--version';
+      if (!runtime.validationArgs?.includes(validationArg)) errors.push(`${runtimeKey} must validate with ${validationArg}`);
+    }
   }
 
   for (const agent of Object.keys(APPROVED_RUNTIMES)) {
@@ -103,8 +129,9 @@ export function validateAgentRuntimeManifest(manifest, packageJson, packageLock)
     for (const component of expectedComponents) {
       const componentRows = rows.filter((row) => row.component === component);
       const targets = componentRows.map((row) => `${row.platform}-${row.arch}`).sort();
-      if (JSON.stringify(targets) !== JSON.stringify(EXPECTED_TARGETS)) {
-        errors.push(`${agent}/${component} targets must be ${EXPECTED_TARGETS.join(', ')}; found ${targets.join(', ') || '<none>'}`);
+      const expectedTargets = [...targetsFor(agent, component)].sort();
+      if (JSON.stringify(targets) !== JSON.stringify(expectedTargets)) {
+        errors.push(`${agent}/${component} targets must be ${expectedTargets.join(', ')}; found ${targets.join(', ') || '<none>'}`);
       }
     }
     if (versions.length !== 1) errors.push(`${agent} component rows must share one version; found ${versions.join(', ')}`);

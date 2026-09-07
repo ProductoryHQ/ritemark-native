@@ -91,6 +91,31 @@ check_version() { # name binary-path expected-substring
     fail "$name reports '$out' but the manifest pins $want"
   fi
 }
+# Codex's Windows sandbox path spawns two helper binaries. They are IPC endpoints, not
+# CLIs — codex-command-runner wants a pipe handle and codex-windows-sandbox-setup wants
+# a base64 payload — so neither can be smoke-tested with --version or --help. Presence
+# is the check. Without them every Codex file/exec tool call fails at runtime with
+# "orchestrator_helper_launch_failed: ... program not found", which is exactly the
+# defect found in the 1.10.0 Windows candidate.
+check_codex_windows_sandbox_helpers() { # app-server-path
+  local app_server="$1"
+  if [[ "$PLATDIR" != "win32-x64" ]]; then
+    skip "codex Windows sandbox helpers are win32-x64 only — not expected on $PLATDIR"
+    return
+  fi
+  if [[ ! -x "$app_server" ]]; then
+    skip "codex app-server is not installed, so its Windows sandbox helpers cannot be checked"
+    return
+  fi
+  local helper missing=0
+  for helper in codex-windows-sandbox-setup codex-command-runner; do
+    if [[ ! -f "$BIN/$helper$EXE_SUFFIX" ]]; then
+      fail "codex app-server is installed but required sandbox helper is missing ($BIN/$helper$EXE_SUFFIX)"
+      missing=1
+    fi
+  done
+  [[ $missing -eq 0 ]] && pass "codex Windows sandbox helpers are installed beside app-server"
+}
 check_codex_code_mode_host() { # app-server-path code-mode-host-path
   local app_server="$1" code_mode_host="$2"
   if [[ ! -x "$app_server" ]]; then
@@ -113,6 +138,7 @@ check_version codex    "$BIN/codex-app-server$EXE_SUFFIX" "$(manifest_version co
 check_codex_code_mode_host \
   "$BIN/codex-app-server$EXE_SUFFIX" \
   "$BIN/codex-code-mode-host$EXE_SUFFIX"
+check_codex_windows_sandbox_helpers "$BIN/codex-app-server$EXE_SUFFIX"
 
 if $VERSIONS_ONLY; then
   echo; echo "(--versions: stopping before the behavioural checks)"
