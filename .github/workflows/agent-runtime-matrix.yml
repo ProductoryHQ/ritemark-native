@@ -10,6 +10,7 @@ on:
       - 'extensions/ritemark/package-lock.json'
       - 'scripts/fetch-agent-runtimes.sh'
       - 'scripts/verify-agent-runtimes.sh'
+      - 'scripts/lib/verify-opencode.mjs'
       - 'scripts/validate-agent-runtime-manifest.mjs'
       - 'scripts/validate-agent-runtime-manifest.test.mjs'
 
