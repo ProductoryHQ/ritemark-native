@@ -16,6 +16,7 @@ import { Writable, Readable } from 'node:stream';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const [, , BIN, EXT] = process.argv;
 if (!BIN || !EXT) {
@@ -26,12 +27,38 @@ if (!BIN || !EXT) {
 // Ritemark injects exactly this. If OpenCode ever ignores it, the gate is gone —
 // note that with the variable ABSENT, OpenCode's own default is "*": "allow".
 const OPENCODE_PERMISSION = '{"edit":"ask","bash":"ask","webfetch":"ask"}';
-const acp = await import(`${EXT}/node_modules/@agentclientprotocol/sdk/dist/acp.js`);
+// Node's ESM loader only accepts file:// URLs for absolute paths. On Windows a bare
+// "C:\..." specifier is read as protocol "c:" and rejected with
+// ERR_UNSUPPORTED_ESM_URL_SCHEME, which crashed this probe and surfaced as three
+// bogus OpenCode gate failures. pathToFileURL is correct on POSIX too.
+const acpEntry = path.join(EXT, 'node_modules', '@agentclientprotocol', 'sdk', 'dist', 'acp.js');
+const acp = await import(pathToFileURL(acpEntry).href);
 
 function tmpws(prefix) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.writeFileSync(path.join(dir, 'README.md'), '# verification workspace\n');
   return dir;
+}
+
+// Windows holds a directory open while a process has it as its cwd, and
+// proc.kill() only requests termination — it does not wait. Removing the
+// workspace on the next line therefore raced the agent's exit and threw EBUSY,
+// aborting the probe and reporting all three gates as failures. Wait for the
+// real exit, then let fs retry for stragglers. POSIX is unaffected: the wait
+// resolves immediately and no retries are needed.
+function killAndWait(proc, ms = 10000) {
+  return new Promise((resolve) => {
+    if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+    const done = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} done(); }, ms);
+    proc.once('exit', done);
+    try { proc.kill('SIGTERM'); } catch { done(); }
+  });
+}
+
+async function cleanup(proc, ws) {
+  await killAndWait(proc);
+  fs.rmSync(ws, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
 
 async function connect(ws) {
@@ -84,7 +111,7 @@ async function runGate(decision, target) {
   try {
     const s = await openSession(conn, ws);
     model = s.model;
-    if (!model) { proc.kill('SIGTERM'); return { skipped: true }; }
+    if (!model) { await cleanup(proc, ws); return { skipped: true }; }
     await Promise.race([
       conn.prompt({
         sessionId: s.sessionId,
@@ -96,8 +123,7 @@ async function runGate(decision, target) {
     console.log(`  (${decision} run error: ${err.message})`);
   }
   const exists = fs.existsSync(file);
-  proc.kill('SIGTERM');
-  fs.rmSync(ws, { recursive: true, force: true });
+  await cleanup(proc, ws);
   return { skipped: false, prompted: state.prompts.length > 0, exists, model };
 }
 
@@ -109,7 +135,7 @@ async function runCancel() {
   try {
     const s = await openSession(conn, ws);
     model = s.model;
-    if (!model) { proc.kill('SIGTERM'); return { skipped: true }; }
+    if (!model) { await cleanup(proc, ws); return { skipped: true }; }
     const turn = conn.prompt({
       sessionId: s.sessionId,
       prompt: [{ type: 'text', text: 'Count slowly from 1 to 100, one number per line, with a short comment after each.' }],
@@ -123,7 +149,7 @@ async function runCancel() {
     }
     const atCancel = state.chunks;
     if (atCancel === 0) {
-      proc.kill('SIGTERM');
+      await cleanup(proc, ws);
       return { skipped: true, error: 'no streaming started within 30s — cancel not exercised mid-flight' };
     }
     conn.cancel({ sessionId: s.sessionId });
@@ -134,11 +160,10 @@ async function runCancel() {
     await new Promise((r) => setTimeout(r, 1500));
     const alive = proc.exitCode === null;
     const out = { skipped: false, settled: settled.ok, stopReason: settled.r?.stopReason, atCancel, after: state.chunks, alive };
-    proc.kill('SIGTERM');
-    fs.rmSync(ws, { recursive: true, force: true });
+    await cleanup(proc, ws);
     return out;
   } catch (err) {
-    proc.kill('SIGTERM');
+    await cleanup(proc, ws);
     return { skipped: true, error: err.message };
   }
 }
