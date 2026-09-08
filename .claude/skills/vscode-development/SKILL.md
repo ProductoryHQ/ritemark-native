@@ -258,10 +258,10 @@ Because the host is one flat bundle, new code must not reintroduce the layout as
 | Context | Required | Why |
 |---|---|---|
 | Production builds | arm64 Node pinned by `vscode/.nvmrc` | Clean build and CI must use the submodule-owned toolchain version, not a machine default |
-| Dev mode (`./vscode/scripts/code.sh`) | Node v22.21.1 arm64 (`nvm use` at repo root) | Matches the repo-root development pin. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
+| Dev mode (`./vscode/scripts/code.sh`) | Node v22.22.1 arm64 (`nvm use` at repo root) | Matches the repo-root development pin. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
 | Webview Vite build | Node v20 (uses compiled rollup) | OK |
 
-Repo root `.nvmrc` pins 22.21.1. `nvm use` from repo root picks it up automatically. x64/Rosetta Node fails all builds (missing arm64 native binaries).
+Repo root `.nvmrc` pins 22.22.1, matching `vscode/.nvmrc`. `nvm use` from repo root picks it up automatically. Keep the two in step: VS Code 1.117's `preinstall` gate reads the submodule's pin and hard-fails anything older, so a lower root pin makes `npm install` in `vscode/` abort before it starts. x64/Rosetta Node fails all builds (missing arm64 native binaries).
 
 Simple dev launch:
 

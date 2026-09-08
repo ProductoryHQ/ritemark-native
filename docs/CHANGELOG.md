@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.10.1] — unreleased
+
+Maintenance release for all platforms: macOS (Apple Silicon and Intel) and Windows.
+
+### Fixed
+- **The Codex setup pane no longer loops.** With no Claude account signed in, choosing Use Codex brought up a setup pane that unmounted and remounted on a roughly two-second cycle, making the button hard to click. Codex sign-in polling ran every 2000 ms while the pane was open and each status push briefly re-derived runtime availability as `checking`, which withdrew the pane. Affected macOS and Windows equally
+- **Codex file and exec tools work again on Windows.** In the default and recommended `workspace-write` sandbox mode, every Codex turn that read or wrote a file failed with `orchestrator_helper_launch_failed: ... program not found`. Codex's Windows sandbox path spawns two helper binaries — `codex-windows-sandbox-setup` and `codex-command-runner` — that the vendor publishes as separate artifacts and that the installer was not shipping. Chat worked throughout, so the runtime looked healthy until a file was touched. Setting the sandbox to full access appeared to fix it only because that path bypasses the sandbox and never spawns a helper
+
+- **Saving a document that ends in a list no longer drops the trailing newline** ([#254](https://github.com/ProductoryHQ/ritemark-native/issues/254)). Landed after 1.10.0 was cut, so it reaches Windows first and macOS in the next release that builds for it
+- **Home lists the documents actually opened recently** ([#194](https://github.com/ProductoryHQ/ritemark-native/issues/194)). Same timing: Windows first, macOS next
+
+### Changed
+- The binary manifest now supports **platform-scoped components**, so a component can legitimately exist for a subset of targets instead of all three. The two Codex sandbox helpers are win32-x64 only: the vendor ships no darwin build, because on macOS the sandbox is the OS seatbelt rather than a spawned process
+- Components that are IPC endpoints rather than CLIs are checked for **presence** instead of being smoke-tested. `codex-command-runner` expects a pipe handle and `codex-windows-sandbox-setup` expects a base64 payload, so both exit non-zero on `--version` and `--help`; the validator now rejects `validationArgs` on them rather than requiring it
+
+---
+
+## [1.10.0] — 2026-09-05
+
+Durable Agent Conversations + Reliable Editing. Sprints 109-115.
 
 ### Added
 - **Transcribe Insights in any language** — search common languages or enter any language or dialect; Auto follows a recognized transcript language and otherwise falls back to English, while quotes and speaker attribution remain verbatim.
@@ -49,22 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fast save-and-continue no longer becomes a false disk conflict.** The coordinator matches a later disk snapshot to the exact content snapshot VS Code successfully wrote, so a user's own delayed save can advance the common base while newer visible typing remains local-only. An external write that lands immediately after Save is never inferred to be local from a racy path reread.
 - **A blank document accepts `# ` as its first H1.** The editor no longer mistakes TipTap's structurally empty heading for an uninitialized document or replaces it with a paragraph before the title is typed.
 - **No timer can replace unresolved local work.** The former ten-second forced reload, bounded self-hash heuristic, and competing webview booleans are removed; multi-view delivery is epoch-scoped, retry-bounded, and stale-message safe.
-
-## [1.10.1] — unreleased (Windows only)
-
-Windows-only hotfix for v1.10.0. macOS is unaffected and stays on 1.10.0.
-
-### Fixed
-- **Codex file and exec tools work again on Windows.** In the default and recommended `workspace-write` sandbox mode, every Codex turn that read or wrote a file failed with `orchestrator_helper_launch_failed: ... program not found`. Codex's Windows sandbox path spawns two helper binaries — `codex-windows-sandbox-setup` and `codex-command-runner` — that the vendor publishes as separate artifacts and that the installer was not shipping. Chat worked throughout, so the runtime looked healthy until a file was touched. Setting the sandbox to full access appeared to fix it only because that path bypasses the sandbox and never spawns a helper
-
-- **Saving a document that ends in a list no longer drops the trailing newline** ([#254](https://github.com/ProductoryHQ/ritemark-native/issues/254)). Landed after 1.10.0 was cut, so it reaches Windows first and macOS in the next release that builds for it
-- **Home lists the documents actually opened recently** ([#194](https://github.com/ProductoryHQ/ritemark-native/issues/194)). Same timing: Windows first, macOS next
-
-### Changed
-- The binary manifest now supports **platform-scoped components**, so a component can legitimately exist for a subset of targets instead of all three. The two Codex sandbox helpers are win32-x64 only: the vendor ships no darwin build, because on macOS the sandbox is the OS seatbelt rather than a spawned process
-- Components that are IPC endpoints rather than CLIs are checked for **presence** instead of being smoke-tested. `codex-command-runner` expects a pipe handle and `codex-windows-sandbox-setup` expects a base64 payload, so both exit non-zero on `--version` and `--help`; the validator now rejects `validationArgs` on them rather than requiring it
-
----
 
 ## [1.9.0] — 2026-08-20
 
