@@ -68,65 +68,18 @@ assert.equal(sidebarGate({ ...base, showOpenCodeSetup: true }), 'opencode-setup'
 // Not-ready sidebar falls through to the chat shell (its own loading state).
 assert.equal(sidebarGate({ ...base, ready: false, needsSetup: true }), 'chat')
 
-// --- Sticky setup view across a transient 'checking' probe tick ---------
+// --- Sprint 108: no sticky/'checking' compensation left in this gate -----
 //
-// Regression for the Codex onboarding flicker: a background status refresh
-// (Codex/Claude login polling, or any other recheck) can report 'checking'
-// for an instant while the user is looking at a setup view. The caller
-// (AISidebar) computes needsSetup / showCodexSetup / showOpenCodeSetup by
-// EXCLUDING the 'checking' state, so on that instant all three go false —
-// without the sticky check, the gate falls through to 'chat' and then back
-// to the setup view on the next tick once the probe resolves. That is the
-// ~2s flicker Jarmo hit. On today's (pre-fix) code this whole block fails,
-// because sidebarGate ignores its second argument entirely.
-
-// Codex: already showing codex-setup, then a checking tick with all three
-// setup flags now false (as AISidebar would compute them) — must stay put.
-assert.equal(
-  sidebarGate({ ...base, selectedRuntimeChecking: true }, 'codex-setup'),
-  'codex-setup',
-  'a transient checking tick must not tear down an already-visible Codex setup view',
-)
-
-// Claude: same protection — the "asymmetry" the diagnosis called out (Claude
-// setup had no explicit needs-configuration guard either) must not reappear
-// as a gap here.
-assert.equal(
-  sidebarGate({ ...base, selectedRuntimeChecking: true }, 'claude-setup'),
-  'claude-setup',
-  'a transient checking tick must not tear down an already-visible Claude setup view',
-)
-
-// OpenCode: same protection, for consistency across all three setup surfaces.
-assert.equal(
-  sidebarGate({ ...base, selectedRuntimeChecking: true }, 'opencode-setup'),
-  'opencode-setup',
-  'a transient checking tick must not tear down an already-visible OpenCode setup view',
-)
-
-// A checking tick while chat (or nothing) was previously showing must NOT
-// newly enter a setup view — stickiness only preserves a setup view that was
-// already visible, it never conjures one out of a bare 'checking' probe.
-assert.equal(sidebarGate({ ...base, selectedRuntimeChecking: true }, 'chat'), 'chat')
-assert.equal(sidebarGate({ ...base, selectedRuntimeChecking: true }), 'chat')
-
-// A conversation appearing mid-probe still wins over stickiness — existing
-// content is never hidden behind a setup takeover, even while checking.
-assert.equal(
-  sidebarGate({ ...base, selectedRuntimeChecking: true, hasConversation: true }, 'codex-setup'),
-  'chat',
-)
-
-// A ready alternative appearing mid-probe still wins over stickiness too.
-assert.equal(
-  sidebarGate({ ...base, selectedRuntimeChecking: true, hasReadyAlternative: true }, 'codex-setup'),
-  'chat',
-)
-
-// Once the probe actually settles ready (usable), the caller's showCodexSetup
-// input would already be false AND selectedRuntimeChecking would be false —
-// stickiness only applies to the 'checking' instant, so a settled state falls
-// through normally regardless of the stale previousView.
-assert.equal(sidebarGate({ ...base }, 'codex-setup'), 'chat')
+// Pre-108, a background refresh tick (`agent:status-checking`) forced every
+// runtime's phase back to 'checking' for the round trip, so this gate needed
+// a `selectedRuntimeChecking` + `previousView` sticky branch to stop an
+// already-visible setup view from being torn down and redrawn. The root fix
+// lives in store.ts: a refresh no longer overwrites a KNOWN phase, so
+// `needsSetup` / `showCodexSetup` / `showOpenCodeSetup` / `onboardingNeeded`
+// never flip during a refresh in the first place — the caller's inputs to
+// this gate are just stable. `sidebarGate` is a pure function of `i` again,
+// with no second argument and no 'checking'-shaped branch. The equivalent
+// regression coverage (a refresh tick changes nothing) now lives at the
+// store level, in bootstrapState.test.ts.
 
 console.log('sidebarGate tests passed.')

@@ -26,7 +26,7 @@ export interface RuntimeAvailability {
 
 export type RuntimeHydration = Record<
   AgentId,
-  { phase: 'checking' | 'ready' | 'error'; error: string | null }
+  { phase: 'checking' | 'ready' | 'error'; error: string | null; refreshing?: boolean }
 >;
 
 export interface RuntimeAvailabilityInput {

@@ -3,6 +3,17 @@
  * AI sidebar renders. Extracted from AISidebar.tsx's render ternary so the
  * contract "a ready Claude with no conversation goes STRAIGHT to chat — no
  * 'Claude is ready' welcome card" is unit-testable.
+ *
+ * Sprint 108: this used to also carry a `selectedRuntimeChecking` sticky
+ * branch that kept an already-visible setup view up during a transient
+ * refresh tick. That was a symptom-level compensation for a store bug: a
+ * background re-check (`agent:status-checking`) overwrote a runtime's LAST
+ * KNOWN phase with 'checking', so every input here (`needsSetup`,
+ * `showCodexSetup`, `onboardingNeeded`, ...) would flicker false/true for the
+ * duration of the round trip. The root fix (see `runtimeHydration` in
+ * store.ts) makes a refresh leave the known phase alone, so none of this
+ * gate's inputs move during a re-check any more — the sticky branch is
+ * removed rather than kept alongside the real fix.
  */
 
 export type SidebarView = 'onboarding' | 'claude-setup' | 'codex-setup' | 'opencode-setup' | 'chat';
@@ -21,16 +32,6 @@ export interface SidebarGateInput {
   needsSetup: boolean;
   showCodexSetup: boolean;
   showOpenCodeSetup: boolean;
-  /**
-   * The SELECTED runtime's own probe is mid-refresh right now (e.g. a login
-   * poll tick, or any other background status recheck). This is distinct from
-   * `needsSetup` / `showCodexSetup` / `showOpenCodeSetup`, which already
-   * exclude the 'checking' state so a first-load spinner doesn't get treated
-   * as "setup needed". `selectedRuntimeChecking` exists only to let a setup
-   * view that is ALREADY showing survive that same transient tick — see the
-   * sticky check below.
-   */
-  selectedRuntimeChecking?: boolean;
 }
 
 /** A dismissed historical failure must no longer suppress the setup surface. */
@@ -46,14 +47,7 @@ export function hasUndismissedInlineRecovery(
   );
 }
 
-const SETUP_VIEWS: readonly SidebarView[] = ['claude-setup', 'codex-setup', 'opencode-setup'];
-
-/**
- * @param previousView The view this same gate returned last render (default
- * 'chat' for a first call / no history). Used ONLY for the sticky-setup
- * check below; every other branch is a pure function of `i`.
- */
-export function sidebarGate(i: SidebarGateInput, previousView: SidebarView = 'chat'): SidebarView {
+export function sidebarGate(i: SidebarGateInput): SidebarView {
   // A recoverable failure belongs beside the turn that failed. A setup-status
   // refresh must not flash that card and immediately replace it with a
   // full-sidebar wizard. Starting a new conversation removes this condition,
@@ -63,26 +57,6 @@ export function sidebarGate(i: SidebarGateInput, previousView: SidebarView = 'ch
   if (i.ready && i.needsSetup && !i.hasConversation && !i.hasReadyAlternative) return 'claude-setup';
   if (i.ready && i.showCodexSetup && !i.hasConversation && !i.hasReadyAlternative) return 'codex-setup';
   if (i.ready && i.showOpenCodeSetup && !i.hasConversation && !i.hasReadyAlternative) return 'opencode-setup';
-
-  // Sticky setup surface: a background probe (Codex/Claude login polling,
-  // any other status recheck) can report 'checking' for an instant while the
-  // user is looking at a setup view. `needsSetup` / `showCodexSetup` /
-  // `showOpenCodeSetup` all go false for that instant — with no protection
-  // here that flips the gate to 'chat' and back to the setup view a moment
-  // later, which is the ~2s onboarding flicker. Once a setup view is already
-  // showing, a mere 'checking' tick on the SAME selected runtime must not
-  // tear it down; the terminal branches above (or the fallthrough below)
-  // still win the moment the runtime becomes usable, a conversation starts,
-  // or another provider becomes ready.
-  if (
-    i.ready
-    && i.selectedRuntimeChecking
-    && !i.hasConversation
-    && !i.hasReadyAlternative
-    && SETUP_VIEWS.includes(previousView)
-  ) {
-    return previousView;
-  }
 
   return 'chat';
 }

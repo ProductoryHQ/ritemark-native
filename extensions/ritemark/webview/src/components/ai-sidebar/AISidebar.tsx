@@ -10,7 +10,7 @@ import { useAISidebarStore, useActiveConversation } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
-import { hasUndismissedInlineRecovery, sidebarGate, type SidebarView } from './sidebarGate';
+import { hasUndismissedInlineRecovery, sidebarGate } from './sidebarGate';
 import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
@@ -148,10 +148,6 @@ export function AISidebar() {
   });
   const selectedRuntimeAvailability = runtimeAvailabilities[selectedAgent];
   const readyAlternatives = listReadyAlternatives(runtimeAvailabilities, selectedAgent);
-  // See the sidebarGate call below: sticky setup view across a transient
-  // 'checking' probe tick, scoped to the runtime it was shown for.
-  const previousSidebarViewRef = useRef<SidebarView>('chat');
-  const previousSidebarAgentRef = useRef(selectedAgent);
   const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
   const [runtimeTimedOut, setRuntimeTimedOut] = useState(false);
   const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'Codex' : 'OpenCode';
@@ -212,16 +208,6 @@ export function AISidebar() {
     && !selectedRuntimeAvailability.usable
     && !hasAnyRuntimeConversation
     && selectedRuntimeAvailability.state === 'needs-configuration';
-  // Sticky setup view (see sidebarGate's own comment): a transient 'checking'
-  // tick on the selected runtime must not tear down a setup surface the user
-  // is already looking at. The stickiness is only valid for the runtime it
-  // was shown for — switching runtimes resets it back to 'chat' so a
-  // 'checking' probe on the newly-selected runtime can't inherit the old
-  // runtime's setup view.
-  if (previousSidebarAgentRef.current !== selectedAgent) {
-    previousSidebarViewRef.current = 'chat';
-    previousSidebarAgentRef.current = selectedAgent;
-  }
   const sidebarView = sidebarGate({
     ready,
     inlineRecoveryAvailable,
@@ -235,9 +221,7 @@ export function AISidebar() {
     needsSetup,
     showCodexSetup: Boolean(showCodexSetup),
     showOpenCodeSetup: Boolean(showOpenCodeSetup),
-    selectedRuntimeChecking: selectedRuntimeAvailability.state === 'checking',
-  }, previousSidebarViewRef.current);
-  previousSidebarViewRef.current = sidebarView;
+  });
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
     : (isCodex || isOpenCode)
