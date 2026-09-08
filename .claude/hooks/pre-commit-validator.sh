@@ -67,10 +67,27 @@ STAGED_WEBVIEW_INPUTS=$(
 if [[ -n "$STAGED_WEBVIEW_INPUTS" ]]; then
   STAGED_BUNDLE=$(git diff --cached --name-only -- "extensions/ritemark/media/webview.js" 2>/dev/null || true)
   if [[ -z "$STAGED_BUNDLE" ]]; then
-    echo "ERROR: Webview production inputs changed but webview.js not updated!"
-    echo "  Changed: $(echo "$STAGED_WEBVIEW_INPUTS" | wc -l | tr -d ' ') production input(s)"
-    echo "  Fix: cd extensions/ritemark/webview && npm run build"
-    ERRORS=$((ERRORS + 1))
+    # Inputs moved but the bundle did not. That is usually a forgotten rebuild,
+    # but it is also the correct outcome for an input change that provably does
+    # not reach the output -- removing a platform-specific optional native
+    # dependency, for example. Rebuilding settles which one this is instead of
+    # rejecting both. Only reached when inputs are staged and the bundle is not.
+    bundle_hash() { { shasum -a 256 "$1" 2>/dev/null || sha256sum "$1" 2>/dev/null; } | cut -d" " -f1; }
+    BUNDLE_BEFORE=$(bundle_hash extensions/ritemark/media/webview.js)
+    echo "Webview inputs changed without a bundle change - rebuilding to confirm..."
+    if ! (cd extensions/ritemark/webview && npm run build >/dev/null 2>&1); then
+      echo "ERROR: Webview inputs changed and the verification rebuild failed"
+      ERRORS=$((ERRORS + 1))
+    else
+      BUNDLE_AFTER=$(bundle_hash extensions/ritemark/media/webview.js)
+      if [[ -n "$BUNDLE_BEFORE" && "$BUNDLE_BEFORE" == "$BUNDLE_AFTER" ]]; then
+        echo "OK: webview bundle is current (rebuild reproduced it byte-for-byte)"
+      else
+        echo "ERROR: Webview production inputs changed but webview.js was stale!"
+        echo "  The bundle has been rebuilt - stage extensions/ritemark/media/webview.js and retry."
+        ERRORS=$((ERRORS + 1))
+      fi
+    fi
   fi
 fi
 
