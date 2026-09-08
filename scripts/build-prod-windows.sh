@@ -75,11 +75,16 @@ else
     exit 1
 fi
 
-# Check Python
-if command -v python &> /dev/null; then
-    echo "  Python: $(python --version)"
+# Check Python. `command -v` alone is not enough on Windows: the Microsoft
+# Store App Execution Alias under ...\Microsoft\WindowsApps\ resolves but only
+# prints "Python was not found" and exits 49. See scripts/lib/resolve-python.sh.
+# shellcheck source=lib/resolve-python.sh
+. "$ROOT_DIR/scripts/lib/resolve-python.sh"
+PYTHON="$(ritemark_resolve_python)" || PYTHON=""
+if [ -n "$PYTHON" ]; then
+    echo "  Python: $("$PYTHON" --version)"
 else
-    echo -e "${RED}  Error: Python not found${NC}"
+    ritemark_python_not_found_message
     exit 1
 fi
 

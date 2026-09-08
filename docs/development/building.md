@@ -8,7 +8,7 @@ This guide covers how to build distributable installers for macOS and Windows.
 
 ### All Platforms
 
--   Node.js 22.21.1 (match `vscode/.nvmrc`)
+-   Node.js 22.22.1 (match `vscode/.nvmrc`)
     
 -   Yarn 1.x
     
@@ -116,7 +116,7 @@ Cross-compiles Windows application from macOS and packages as ZIP.
 
 **Prerequisites:**
 
--   Node.js 22.21.1
+-   Node.js 22.22.1
     
 -   ImageMagick (for icon conversion)
     
@@ -194,7 +194,7 @@ docker run --rm -i \
 
 ### Windows build fails
 
-1.  Check Node version: `node -v` (must match `vscode/.nvmrc`, currently `22.21.1`)
+1.  Check Node version: `node -v` (must match `vscode/.nvmrc`, currently `22.22.1`)
     
 2.  Clean and retry: `rm -rf VSCode-win32-x64 out-build`
     

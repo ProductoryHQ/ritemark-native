@@ -4,9 +4,12 @@ How to set up a development environment for Ritemark Native.
 
 ## Prerequisites
 
-- **Node.js 22.21.1** (match `vscode/.nvmrc`, use [nvm](https://github.com/nvm-sh/nvm))
+- **Node.js 22.22.1** (match `vscode/.nvmrc`, use [nvm](https://github.com/nvm-sh/nvm))
 - **Yarn 1.x**
-- **Python 3.x** (required by VS Code build)
+- **Python 3.x** (required by VS Code build). On Windows, install from
+  [python.org](https://www.python.org/downloads/) — the Microsoft Store alias
+  stubs under `...\Microsoft\WindowsApps\` are not real interpreters and the
+  build scripts skip them on purpose.
 - **macOS** (primary development platform)
 
 ## Quick Start

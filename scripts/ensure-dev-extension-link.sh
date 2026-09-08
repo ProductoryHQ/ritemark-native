@@ -16,6 +16,9 @@ elif [[ $# -ne 0 ]]; then
   exit 2
 fi
 
+# shellcheck source=lib/extension-link.sh
+. "$SCRIPT_DIR/lib/extension-link.sh"
+
 EXTENSION_SOURCE="$PROJECT_ROOT/extensions/ritemark"
 EXTENSION_LINK="$PROJECT_ROOT/vscode/extensions/ritemark"
 EXPECTED_TARGET="../../extensions/ritemark"
@@ -28,8 +31,11 @@ fi
 mkdir -p "$PROJECT_ROOT/vscode/extensions"
 
 if [[ -L "$EXTENSION_LINK" ]]; then
-  if [[ "$(readlink "$EXTENSION_LINK")" == "$EXPECTED_TARGET" ]]; then
-    echo "Extension symlink already correct: $EXTENSION_LINK -> $EXPECTED_TARGET"
+  # Resolved-path comparison, not raw readlink: a Windows junction reads back
+  # as an absolute path and would fail a literal match on every run, deleting
+  # a good link. See scripts/lib/extension-link.sh.
+  if ritemark_link_points_at "$EXTENSION_LINK" "$EXTENSION_SOURCE"; then
+    echo "Extension link already correct: $EXTENSION_LINK -> $EXTENSION_SOURCE"
     exit 0
   fi
 
@@ -40,5 +46,5 @@ elif [[ -e "$EXTENSION_LINK" ]]; then
   exit 1
 fi
 
-ln -s "$EXPECTED_TARGET" "$EXTENSION_LINK"
-echo "Created extension symlink: $EXTENSION_LINK -> $EXPECTED_TARGET"
+ritemark_link_create "$EXTENSION_LINK" "$EXTENSION_SOURCE" "$EXPECTED_TARGET"
+echo "Created extension link: $EXTENSION_LINK -> $EXTENSION_SOURCE"

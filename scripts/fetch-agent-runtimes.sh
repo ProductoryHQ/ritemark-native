@@ -129,20 +129,17 @@ node "${SCRIPT_DIR}/validate-agent-runtime-manifest.mjs"
 # ---------------------------------------------------------------------------
 # Python interpreter detection
 # ---------------------------------------------------------------------------
-# Windows runners and many Git Bash / PowerShell setups expose only `python`,
-# not `python3`. macOS / Linux / Homebrew typically have both. Resolve once
-# so manifest parsing works on every host the build runs on.
+# Resolve once so manifest parsing works on every host the build runs on.
 # (Codex review on PR #57: the Windows packaging gate would otherwise abort
-# before fetching a single binary on a Windows host.)
-PYTHON=""
-for py in python3 python; do
-  if command -v "$py" >/dev/null 2>&1; then
-    PYTHON="$py"
-    break
-  fi
-done
+# before fetching a single binary on a Windows host.) The resolver validates
+# that the candidate actually executes -- a Microsoft Store alias stub answers
+# `command -v` but only prints "Python was not found" and exits 49. See
+# scripts/lib/resolve-python.sh.
+# shellcheck source=lib/resolve-python.sh
+. "${SCRIPT_DIR}/lib/resolve-python.sh"
+PYTHON="$(ritemark_resolve_python)" || PYTHON=""
 if [[ -z "${PYTHON}" ]]; then
-  echo "ERROR: neither python3 nor python found in PATH" >&2
+  ritemark_python_not_found_message
   exit 1
 fi
 

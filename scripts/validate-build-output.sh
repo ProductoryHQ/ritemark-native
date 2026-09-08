@@ -8,6 +8,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -39,7 +41,8 @@ esac
 # script. macOS `stat` uses BSD flags (`-f%z`); GNU stat on Git Bash uses
 # `-c%s`. Codex review on PR #57: hard-coded `stat -f%z` returned 0 on
 # Windows and the size gates failed on perfectly valid build outputs. Same
-# for `python3` — Windows often only has `python` on PATH.
+# for `python3` — Windows often only has `python` on PATH, and what it does
+# have may be a Microsoft Store alias stub.
 file_size() {
   local f="$1"
   local s
@@ -47,13 +50,11 @@ file_size() {
   echo "${s:-0}"
 }
 
-PYTHON=""
-for py in python3 python; do
-  if command -v "$py" >/dev/null 2>&1; then
-    PYTHON="$py"
-    break
-  fi
-done
+# The resolver also proves the candidate executes: a Microsoft Store alias stub
+# answers `command -v` but only prints "Python was not found" and exits 49.
+# shellcheck source=lib/resolve-python.sh
+. "$SCRIPT_DIR/lib/resolve-python.sh"
+PYTHON="$(ritemark_resolve_python)" || PYTHON=""
 
 echo "========================================"
 echo "Post-Build Output Validation"
@@ -256,7 +257,8 @@ else
   # bytes are byte-identical, so re-running adds no value and introduces
   # signing-stage fragility.
   if [[ -z "$PYTHON" ]]; then
-    echo -e "  ${RED}FAIL${NC}: neither python3 nor python found in PATH (needed to parse manifest.json)"
+    echo -e "  ${RED}FAIL${NC}: no working Python interpreter found in PATH (needed to parse manifest.json)"
+    ritemark_python_not_found_message
     ERRORS=$((ERRORS + 1))
     PYTHON_FOR_PARSE=""
   else

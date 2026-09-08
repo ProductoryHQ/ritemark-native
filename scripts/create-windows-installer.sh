@@ -93,8 +93,12 @@ fi
 echo "  ✓ Bundled agent runtimes present"
 
 # Defer to validate-build-output.sh for full Check 5 (manifest-driven arch
-# verification). Skip if the host doesn't have python3/file (older macOS).
-if command -v python3 >/dev/null 2>&1 && command -v file >/dev/null 2>&1; then
+# verification). Skip if the host has no working Python / `file` (older macOS).
+# A Microsoft Store alias stub answers `command -v` but never runs, so resolve
+# through scripts/lib/resolve-python.sh rather than probing python3 directly.
+# shellcheck source=lib/resolve-python.sh
+. "$SCRIPT_DIR/lib/resolve-python.sh"
+if ritemark_resolve_python >/dev/null && command -v file >/dev/null 2>&1; then
     if ! "$SCRIPT_DIR/validate-build-output.sh" win32-x64 >/dev/null 2>&1; then
         echo -e "${YELLOW}WARNING: validate-build-output.sh win32-x64 reported issues${NC}"
         echo "  Re-running with full output for diagnosis:"

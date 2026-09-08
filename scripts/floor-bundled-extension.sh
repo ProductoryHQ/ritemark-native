@@ -24,6 +24,8 @@
 #                      build suffix is stripped before appending "-0".
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 EXT_DIR="${1:?usage: floor-bundled-extension.sh <bundled-ext-dir> <base-version>}"
 RAW_VERSION="${2:?usage: floor-bundled-extension.sh <bundled-ext-dir> <base-version>}"
 
@@ -38,8 +40,13 @@ if [ ! -f "$PKG" ]; then
   exit 1
 fi
 
-PY=python3
-command -v "$PY" >/dev/null 2>&1 || PY=python
+# shellcheck source=lib/resolve-python.sh
+. "$SCRIPT_DIR/lib/resolve-python.sh"
+PY="$(ritemark_resolve_python)" || PY=""
+if [ -z "$PY" ]; then
+  ritemark_python_not_found_message
+  exit 1
+fi
 
 "$PY" - "$PKG" "$FLOOR_VERSION" <<'PYEOF'
 import json, sys

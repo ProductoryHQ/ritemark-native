@@ -18,6 +18,9 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 PATCHES_DIR="$ROOT_DIR/patches/vscode"
 VSCODE_DIR="$ROOT_DIR/vscode"
 
+# shellcheck source=lib/extension-link.sh
+. "$SCRIPT_DIR/lib/extension-link.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -339,6 +342,7 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
 
     EXTENSION_LINK="$VSCODE_DIR/extensions/ritemark"
     EXTENSION_TARGET="../../extensions/ritemark"
+    EXTENSION_SOURCE="$ROOT_DIR/extensions/ritemark"
 
     mkdir -p "$VSCODE_DIR/extensions"
 
@@ -348,22 +352,32 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
             exit 1
         fi
         echo "Extension remains absent for the staged Windows shell build"
-    elif [ ! -e "$EXTENSION_LINK" ]; then
-        echo -n "Creating extension symlink... "
-        ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
+    elif [ ! -e "$EXTENSION_LINK" ] && [ ! -L "$EXTENSION_LINK" ]; then
+        echo -n "Creating extension link... "
+        ritemark_link_create "$EXTENSION_LINK" "$EXTENSION_SOURCE" "$EXTENSION_TARGET" || exit 1
         echo -e "${GREEN}Done${NC}"
     elif [ -L "$EXTENSION_LINK" ]; then
-        CURRENT_TARGET=$(readlink "$EXTENSION_LINK")
-        if [ "$CURRENT_TARGET" = "$EXTENSION_TARGET" ]; then
-            echo "Extension symlink already correct"
+        # Compare RESOLVED paths, not raw readlink output: a Windows junction
+        # always reads back as an absolute path, so a literal comparison
+        # against "$EXTENSION_TARGET" would delete a perfectly good link on
+        # every run. See scripts/lib/extension-link.sh.
+        if ritemark_link_points_at "$EXTENSION_LINK" "$EXTENSION_SOURCE"; then
+            echo "Extension link already correct"
         else
-            echo -n "Fixing extension symlink... "
+            echo -n "Fixing extension link... "
             rm "$EXTENSION_LINK"
-            ln -s "$EXTENSION_TARGET" "$EXTENSION_LINK"
+            ritemark_link_create "$EXTENSION_LINK" "$EXTENSION_SOURCE" "$EXTENSION_TARGET" || exit 1
             echo -e "${GREEN}Done${NC}"
         fi
     else
-        echo -e "${YELLOW}Extension path exists as directory; leaving in place${NC}"
+        # A physical directory here fails the pre-commit invariant
+        # (`[[ -L "vscode/extensions/ritemark" ]]`) and decouples the build
+        # from edits in extensions/ritemark. Never silently replace it -- it
+        # may hold unique work -- but never call it fine either.
+        echo -e "${YELLOW}WARNING: $EXTENSION_LINK is a physical directory, not a link${NC}" >&2
+        echo -e "${YELLOW}  The build will not track edits in extensions/ritemark, and${NC}" >&2
+        echo -e "${YELLOW}  .claude/hooks/pre-commit-validator.sh will block commits.${NC}" >&2
+        echo -e "${YELLOW}  Confirm it holds no unique work, remove it, then rerun.${NC}" >&2
     fi
 
     echo "========================================"

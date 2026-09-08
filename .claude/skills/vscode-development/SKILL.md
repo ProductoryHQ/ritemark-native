@@ -253,15 +253,32 @@ Because the host is one flat bundle, new code must not reintroduce the layout as
 
 (This rule + the build description above are mirrored to the Codex canon by the scheduled `harness-equalizer` — do not hand-edit `.codex/**` / `AGENTS.md`.)
 
+## Extension link on Windows
+
+`vscode/extensions/ritemark` must be a link (`.claude/hooks/pre-commit-validator.sh`
+check 1 requires `[[ -L ]]`). With Developer Mode OFF, Git Bash's `ln -s` does
+not link — it silently deep-copies (534 MB, 32k files), which looks correct in
+`ls` while decoupling the build from edits in `extensions/ritemark`.
+
+`scripts/apply-patches.sh` and `scripts/ensure-dev-extension-link.sh` both go
+through `scripts/lib/extension-link.sh`, which creates a directory junction via
+`cmd /c mklink /J` (no admin rights required) and asserts the result is a link.
+Any new code that touches this path must do the same, and must compare
+**resolved** paths rather than raw `readlink` output — a junction always reads
+back as an absolute path, so a literal comparison against
+`../../extensions/ritemark` deletes a perfectly good link on every run.
+
+Regression tests: `bash scripts/test-dev-extension-link.sh`.
+
 ## Node Versions
 
 | Context | Required | Why |
 |---|---|---|
 | Production builds | arm64 Node pinned by `vscode/.nvmrc` | Clean build and CI must use the submodule-owned toolchain version, not a machine default |
-| Dev mode (`./vscode/scripts/code.sh`) | Node v22.21.1 arm64 (`nvm use` at repo root) | Matches the repo-root development pin. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
+| Dev mode (`./vscode/scripts/code.sh`) | Node v22.22.1 arm64 (`nvm use` at repo root) | Matches `vscode/.nvmrc`. VS Code 1.117.0 requires `>= 22.22.1` and its preinstall gate hard-fails on 22.21.1. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
 | Webview Vite build | Node v20 (uses compiled rollup) | OK |
 
-Repo root `.nvmrc` pins 22.21.1. `nvm use` from repo root picks it up automatically. x64/Rosetta Node fails all builds (missing arm64 native binaries).
+Repo root `.nvmrc` pins 22.22.1, matching `vscode/.nvmrc`. `nvm use` from repo root picks it up automatically. Keep the two in step on every VS Code upstream bump — a stale root pin fails the submodule's preinstall engine gate. x64/Rosetta Node fails all builds (missing arm64 native binaries).
 
 Simple dev launch:
 

@@ -170,7 +170,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (13)
+### Current patches (15)
 
 | Patch | Purpose |
 | --- | --- |
@@ -187,6 +187,8 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |
 | `012-ritemark-shell-watchdog.patch` | Quarantines a broken user-dir copy of `ritemark.ritemark` on activation failure and falls back to the bundled built-in |
 | `013-ritemark-configuration-defaults.patch` | product.json `configurationDefaults` apply on desktop (trust off, `*.md` → Ritemark editor, theme/tree/preview defaults) |
+| `014-ritemark-save-receipts.patch` | Binds the local-save receipt to the exact logical text snapshot handed to the file service, so a two-writer conflict is not suppressed |
+| `015-ritemark-help-menu-policy.patch` | One Help-menu allowlist for native + custom menubars; unknown future VS Code Help contributions stay hidden |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 
@@ -218,7 +220,7 @@ ritemark-native/
 │   ├── webview/                 # React webview (TipTap editor + AI sidebar)
 │   ├── media/                   # webview.js bundle (~7.6 MB IIFE — see GH #107)
 │   └── binaries/agents/         # Bundled agent binaries (gitignored) + manifest.json
-├── patches/vscode/              # Numbered patch files (001-*.patch … 010-*.patch)
+├── patches/vscode/              # Numbered patch files (001-*.patch … 015-*.patch)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output (macOS)
