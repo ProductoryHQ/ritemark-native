@@ -40,8 +40,21 @@ shipping quietly: a component can now be declared as belonging to one platform
 instead of all of them, and the two helpers are checked for presence rather
 than by running them (they are not designed to be run directly).
 
+## Also in this build
+
+Two unrelated fixes landed after 1.10.0 was cut and ride along in the Windows
+build:
+
+- **Saving a document that ends in a list no longer drops the trailing
+  newline** ([#254](https://github.com/ProductoryHQ/ritemark-native/issues/254))
+- **Home now lists the documents you actually opened recently**
+  ([#194](https://github.com/ProductoryHQ/ritemark-native/issues/194))
+
 ## Upgrading
 
-Windows users get this through the normal in-app update. macOS stays on 1.10.0
-— there is no macOS build of 1.10.1, and nothing in it would change anything
-for you.
+Windows users get this through the normal in-app update.
+
+macOS stays on 1.10.0. The Codex fix does not apply there, but the two fixes
+above do — they will reach macOS in the next release that builds for it. We
+chose not to spend a full macOS rebuild and two notarization cycles on them
+while the Windows defect was live in users' hands.

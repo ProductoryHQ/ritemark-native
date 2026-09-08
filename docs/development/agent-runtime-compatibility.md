@@ -1,5 +1,61 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.10.1 Windows sandbox helpers — 2026-09-08
+
+Measured on Windows 11 x64 (Smart App Control in enforcement) against the
+win32-x64 binaries fetched from the v1.10.1 manifest. No runtime version moved:
+Codex `0.153.0`, Claude Code `2.1.239`, OpenCode `1.18.21` are unchanged from
+v1.10.0. Only components were added.
+
+The v1.10.0 Windows installer shipped Codex with file and exec tools that
+failed on every turn in the default `workspace-write` sandbox mode with
+`orchestrator_helper_launch_failed: ... program not found`. Codex's Windows
+sandbox path spawns `codex-windows-sandbox-setup` and `codex-command-runner`,
+published by OpenAI as separate `rust-v0.153.0` artifacts and absent from the
+manifest. Setting the sandbox to full access appeared to work only because that
+path bypasses the sandbox and never spawns a helper — which is why the gap
+survived v1.10.0 validation. Both helpers are win32-x64 only: no darwin build
+exists, because on macOS the sandbox is the OS seatbelt rather than a spawned
+process. Manifest schema 2 now models platform-scoped components, and the
+validator rejects a stray darwin row for either helper.
+
+Neither helper can be smoke-tested. `codex-command-runner` expects a pipe handle
+and `codex-windows-sandbox-setup` expects a base64 payload, so both exit
+non-zero on `--version` and `--help`. Their manifest rows carry no
+`validationArgs`; the fetcher skips the smoke test when that field is empty and
+the validator rejects `validationArgs` on them. Presence beside
+`codex-app-server` is the check.
+
+`./scripts/verify-agent-runtimes.sh` results on this host:
+
+| Check | Result |
+|---|---|
+| codex code-mode host installed beside app-server and starts | PASS |
+| codex Windows sandbox helpers installed beside app-server | PASS |
+| OpenCode: a write pauses for host approval | PASS |
+| OpenCode: host denial blocks the write | PASS |
+| OpenCode: host approval permits the write | PASS |
+| OpenCode: session/cancel honoured, shared subprocess preserved | PASS |
+
+The OpenCode permission gate is a HARD GATE and this is the first time it has
+been measured on Windows at all. The harness could not previously run there:
+`scripts/lib/verify-opencode.mjs` loaded the ACP SDK through a bare Windows
+absolute path, which Node's ESM loader rejects, and each probe removed its temp
+workspace on the line after `proc.kill()`, which throws `EBUSY` on Windows
+because the directory is still the exiting process's cwd. Both crashes were
+reported as three OpenCode gate failures — runtime defects that did not exist.
+Fixed in [#262](https://github.com/ProductoryHQ/ritemark-native/pull/262).
+
+**NOT PROVEN on this host** — the run reported three SKIPs, all of the form
+"<agent> has no manifest version to compare against" (claude, opencode, codex).
+Version discovery was therefore not exercised, and these are recorded as not
+proven rather than as passes.
+
+Also not proven here: signed-package validation and the packaged-installer
+canary. Both remain release gates and must run against the CI-built installer,
+not a local drop-in — the v1.10.0 defect was in packaging, so a local drop-in
+proves the wrong thing.
+
 ## v1.10.0 service-compatibility correction — 2026-09-03
 
 The bundled Codex `0.149.0` candidate is invalidated. A real GPT-5.6-Sol RUNDEV

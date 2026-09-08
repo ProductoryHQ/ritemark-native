@@ -1,6 +1,6 @@
 # Release Plan — v1.10.1 Windows Codex Sandbox Hotfix
 
-**Status:** Planned. Not built, not released. Fix committed on `codex/fix-windows-sandbox-helpers` ([PR #261](https://github.com/ProductoryHQ/ritemark-native/pull/261)); nothing is dispatchable until that merges to `main`.<br>
+**Status:** Release candidate. Not built, not released. Both fixes are merged to `main`: [#261](https://github.com/ProductoryHQ/ritemark-native/pull/261) (sandbox helper binaries) and [#262](https://github.com/ProductoryHQ/ritemark-native/pull/262) (Windows runtime probe). Build commit is `743089a07665fb1182ee601d22c48e68d3720538`, confirmed equal to the `origin/main` tip.<br>
 **Target:** v1.10.1<br>
 **Release type:** Windows-only hotfix. Shell-tier (touches `extensions/ritemark/binaries/agents/`) — full app rebuild, not the extension lane<br>
 **Platforms:** win32-x64 only. macOS stays on v1.10.0<br>
@@ -60,7 +60,9 @@ Ordered. Each step blocks the next.
 
 ## Known Gaps (not fixed here)
 
-- **Pre-commit Check 11 compares only `agent@version` pairs.** Adding a new component under an unchanged version does not trip it. This is the hole that let the same class of defect through twice; the first was the macOS `codex-code-mode-host`. Needs a separate fix that diffs the component set, not just versions.
+- **The pre-commit hook was not installed on the Windows development machine at all.** `.git/hooks/pre-commit` did not exist and `core.hooksPath` was unset, so all twelve checks — including the symlink, bundle-freshness and Settings-stub invariants CLAUDE.md calls critical — were silently skipped for every commit made there. This, not a flaw in Check 11, is why `7249845c` landed without the matrix update that Check 11 requires. Measured: the check fingerprints the manifest as a multiset of `agent@version`, which went from 12 entries to 14 across that commit, so it would have fired. The first incident (`50a6ce16`, macOS `code-mode-host`, 9 to 12 rows) did update the matrix, so the check worked there too. Hook installed 2026-09-08 and verified passing; `scripts/setup.sh` still does not install it, which is the remaining fix.
+- **A narrower Check 11 gap does exist.** The fingerprint is blind to component identity, platform and install name as long as the row count and versions are unchanged, so swapping one component for another under the same `agent@version` would pass unnoticed. Not what happened here.
+- **`docs/development/agent-runtime-compatibility.md` is stale** — last updated 2026-09-03, with no mention of the two Windows sandbox helpers. It should have accompanied `7249845c` and is a genuine outstanding deliverable for this release.
 - **`scripts/lib/verify-opencode.mjs:29` passes a Windows absolute path to a dynamic `import()`**, which Node's ESM loader rejects without `pathToFileURL()`. `verify-agent-runtimes.sh` therefore cannot complete on Windows: it reports three OpenCode failures that are harness crashes, not runtime defects. This weakens Gate 1 on the platform this release targets. Pre-existing since 2026-07-22 (sprint-100); not introduced by PR #261.
 
 ## Verification Evidence
