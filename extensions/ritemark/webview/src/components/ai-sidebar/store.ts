@@ -245,7 +245,15 @@ interface AISidebarState {
   bootstrapGeneration: number;
   bootstrapError: string | null;
   sidebarStatusRevisions: Record<'claude-code' | 'codex' | 'opencode' | 'discovery', number>;
-  runtimeHydration: Record<AgentId, { phase: 'checking' | 'ready' | 'error'; error: string | null }>;
+  /**
+   * Sprint 108: `phase` is the LAST KNOWN answer for a runtime — it only
+   * moves to 'checking' when nothing has been learned yet (genuine first
+   * load). `refreshing` is the separate "a probe is in flight right now"
+   * flag; a re-check must not discard a known ready/error phase, only flag
+   * that a fresher answer is on the way. See runtimeAvailability.ts for how
+   * a known phase overrides (or doesn't) the underlying status objects.
+   */
+  runtimeHydration: Record<AgentId, { phase: 'checking' | 'ready' | 'error'; error: string | null; refreshing: boolean }>;
 
   // ── Agent config: catalogs + availability (APP-GLOBAL) ──
   agenticEnabled: boolean;
@@ -819,9 +827,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     bootstrapError: null,
     sidebarStatusRevisions: { 'claude-code': 0, codex: 0, opencode: 0, discovery: 0 },
     runtimeHydration: {
-      'claude-code': { phase: 'checking', error: null },
-      codex: { phase: 'checking', error: null },
-      opencode: { phase: 'checking', error: null },
+      'claude-code': { phase: 'checking', error: null, refreshing: false },
+      codex: { phase: 'checking', error: null, refreshing: false },
+      opencode: { phase: 'checking', error: null, refreshing: false },
     },
 
     agenticEnabled: false,
@@ -2346,13 +2354,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           });
           break;
 
-        case 'agent:status-checking':
+        case 'agent:status-checking': {
           if (message.generation !== get().bootstrapGeneration) break;
           if (message.revision < get().sidebarStatusRevisions[message.runtimeId]) break;
+          // A re-check in flight is NOT the same fact as "unknown". Keep
+          // whatever phase/error is already known (possibly still 'checking'
+          // on a genuine first load) and only raise the in-flight flag — see
+          // the `runtimeHydration` doc comment above for why.
+          const current = get().runtimeHydration[message.runtimeId];
           set({
             runtimeHydration: {
               ...get().runtimeHydration,
-              [message.runtimeId]: { phase: 'checking', error: null },
+              [message.runtimeId]: { ...current, refreshing: true },
             },
             sidebarStatusRevisions: {
               ...get().sidebarStatusRevisions,
@@ -2360,6 +2373,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             },
           });
           break;
+        }
 
         case 'agent:runtime-status-error':
           if (message.generation !== get().bootstrapGeneration) break;
@@ -2367,7 +2381,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set({
             runtimeHydration: {
               ...get().runtimeHydration,
-              [message.runtimeId]: { phase: 'error', error: message.error },
+              [message.runtimeId]: { phase: 'error', error: message.error, refreshing: false },
             },
             sidebarStatusRevisions: {
               ...get().sidebarStatusRevisions,
@@ -2538,7 +2552,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             conversations,
             runtimeHydration: {
               ...get().runtimeHydration,
-              opencode: { phase: message.error ? 'error' : 'ready', error: message.error ?? null },
+              opencode: { phase: message.error ? 'error' : 'ready', error: message.error ?? null, refreshing: false },
             },
             ...(message.revision !== undefined ? {
               sidebarStatusRevisions: { ...get().sidebarStatusRevisions, opencode: message.revision },
@@ -2577,6 +2591,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               codex: {
                 phase: message.status.state === 'checking' ? 'checking' : 'ready',
                 error: null,
+                refreshing: false,
               },
             },
             ...(message.revision !== undefined ? {
@@ -2880,7 +2895,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             ...(loginSucceeded && !inlineLoginSucceeded ? { claudeLoginTurnId: null } : {}),
             runtimeHydration: {
               ...get().runtimeHydration,
-              'claude-code': { phase: 'ready', error: null },
+              'claude-code': { phase: 'ready', error: null, refreshing: false },
             },
             ...(message.revision !== undefined ? {
               sidebarStatusRevisions: { ...get().sidebarStatusRevisions, 'claude-code': message.revision },
@@ -2899,7 +2914,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             ...(message.generation !== undefined ? {
               runtimeHydration: {
                 ...get().runtimeHydration,
-                'claude-code': { phase: 'error', error: message.error },
+                'claude-code': { phase: 'error', error: message.error, refreshing: false },
               },
             } : {}),
             ...(message.revision !== undefined ? {
