@@ -53,7 +53,7 @@ test('rejects a missing Codex code-mode host component', () => {
     && runtime.platform === 'win32'
   ));
   const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('manifest must contain 12 runtime component rows')));
+  assert.ok(errors.some((error) => error.includes('manifest must contain 14 runtime component rows')));
   assert.ok(errors.some((error) => error.includes('codex/code-mode-host targets must be')));
 });
 
@@ -89,6 +89,29 @@ test('rejects a unique but undiscoverable Codex sidecar install name', () => {
   codeModeHost.installName = 'codex-code-mode-host-0.153.0';
   const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
   assert.ok(errors.some((error) => error.includes('installName must be codex-code-mode-host')));
+});
+
+test('requires the Windows-only Codex sandbox helpers', () => {
+  const { manifest, packageJson, packageLock } = fixture();
+  manifest.runtimes = manifest.runtimes.filter((runtime) => runtime.component !== 'windows-sandbox-setup');
+  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
+  assert.ok(errors.some((error) => error.includes('manifest must contain 14 runtime component rows')));
+  assert.ok(errors.some((error) => error.includes('codex/windows-sandbox-setup targets must be win32-x64')));
+});
+
+test('rejects a darwin row for a Windows-only Codex component', () => {
+  const { manifest, packageJson, packageLock } = fixture();
+  const helper = manifest.runtimes.find((runtime) => runtime.component === 'command-runner');
+  manifest.runtimes.push({ ...helper, platform: 'darwin', arch: 'arm64', installName: 'codex-command-runner' });
+  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
+  assert.ok(errors.some((error) => error.includes('codex/command-runner targets must be win32-x64')));
+});
+
+test('rejects validationArgs on a Codex IPC helper that cannot be smoke-tested', () => {
+  const { manifest, packageJson, packageLock } = fixture();
+  manifest.runtimes.find((runtime) => runtime.component === 'windows-sandbox-setup').validationArgs = ['--version'];
+  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
+  assert.ok(errors.some((error) => error.includes('must not declare validationArgs')));
 });
 
 test('rejects stale OpenCode vendor identity', () => {

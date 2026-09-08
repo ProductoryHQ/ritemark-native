@@ -69,6 +69,24 @@ inputs. Shipping only `codex-app-server` lets chat start but makes file tools
 fail at first use. The manifest validator therefore requires a complete
 app-server and code-mode-host platform matrix.
 
+On Windows only, Codex's default and recommended `workspace-write` sandbox mode
+spawns two further helper binaries, resolved next to the app-server:
+
+```
+<binaries>/agents/win32-x64/codex-windows-sandbox-setup.exe
+<binaries>/agents/win32-x64/codex-command-runner.exe
+```
+
+Neither has a darwin build: on macOS the sandbox is the OS seatbelt, not a
+spawned process. Both are IPC endpoints rather than CLIs — the command runner
+wants a pipe handle and the sandbox setup wants a base64 payload — so neither
+can be smoke-tested with `--version` or `--help`. Their manifest rows carry no
+`validationArgs`; presence beside `codex-app-server` is the check. Omitting
+either makes every Codex file/exec tool fail at runtime with
+`orchestrator_helper_launch_failed: ... program not found`. Setting the sandbox
+to full access appears to work only because that path bypasses the sandbox
+entirely and never spawns a helper.
+
 If a future Codex release reorganises this (for example, merges the app-server back into the main `codex` binary as a subcommand), the manifest entry's `invocationMode` field flips to `cli-subcommand` and the extension code reads the manifest to pick the spawn strategy. The wrong value here will silently break runtime startup, so it is derived from inspecting the actual upstream artifact, not from documentation.
 
 ## Manifest schema (`manifest.json`)
@@ -80,14 +98,14 @@ Top-level:
 | `schemaVersion` | Manifest schema version. Bump when the structure changes. |
 | `generated` | ISO date the manifest entries were last verified. |
 | `description` | Human-readable purpose. |
-| `runtimes` | Array of runtime component entries (one per required component × platform × arch). |
+| `runtimes` | Array of runtime component entries (one per required component × each target that component supports). |
 
 Each entry in `runtimes`:
 
 | Field | Description |
 |---|---|
 | `agent` | `codex`, `claude`, or `opencode`. |
-| `component` | Component identity. Codex requires `app-server` and `code-mode-host`; Claude and OpenCode use `runtime`. |
+| `component` | Component identity. Codex requires `app-server` and `code-mode-host` on every target, plus `windows-sandbox-setup` and `command-runner` on win32-x64 only; Claude and OpenCode use `runtime`. |
 | `vendor` | `openai`, `anthropic`, or `anomalyco`. |
 | `version` | Pinned upstream version. Never `latest`. |
 | `platform` | `darwin` or `win32`. |

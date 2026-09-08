@@ -50,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A blank document accepts `# ` as its first H1.** The editor no longer mistakes TipTap's structurally empty heading for an uninitialized document or replaces it with a paragraph before the title is typed.
 - **No timer can replace unresolved local work.** The former ten-second forced reload, bounded self-hash heuristic, and competing webview booleans are removed; multi-view delivery is epoch-scoped, retry-bounded, and stale-message safe.
 
+## [1.10.1] — unreleased (Windows only)
+
+Windows-only hotfix for v1.10.0. macOS is unaffected and stays on 1.10.0.
+
+### Fixed
+- **Codex file and exec tools work again on Windows.** In the default and recommended `workspace-write` sandbox mode, every Codex turn that read or wrote a file failed with `orchestrator_helper_launch_failed: ... program not found`. Codex's Windows sandbox path spawns two helper binaries — `codex-windows-sandbox-setup` and `codex-command-runner` — that the vendor publishes as separate artifacts and that the installer was not shipping. Chat worked throughout, so the runtime looked healthy until a file was touched. Setting the sandbox to full access appeared to fix it only because that path bypasses the sandbox and never spawns a helper
+
+### Changed
+- The binary manifest now supports **platform-scoped components**, so a component can legitimately exist for a subset of targets instead of all three. The two Codex sandbox helpers are win32-x64 only: the vendor ships no darwin build, because on macOS the sandbox is the OS seatbelt rather than a spawned process
+- Components that are IPC endpoints rather than CLIs are checked for **presence** instead of being smoke-tested. `codex-command-runner` expects a pipe handle and `codex-windows-sandbox-setup` expects a base64 payload, so both exit non-zero on `--version` and `--help`; the validator now rejects `validationArgs` on them rather than requiring it
+
+---
+
 ## [1.9.0] — 2026-08-20
 
 Sprint 108 — Transcribe.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2",
-  "generated": "2026-09-03",
+  "generated": "2026-09-07",
   "description": "Source-of-truth manifest for bundled agent runtime components. The fetch script reads this to download, verify (sha256), extract, and install runtime binaries into binaries/agents/<platform>-<arch>/<installName>. Binary payloads are gitignored; only this manifest and the README are tracked.",
   "runtimes": [
     {
@@ -143,6 +143,48 @@
       "validationArgs": [
         "--help"
       ],
+      "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
+      "license": {
+        "spdx": "Apache-2.0",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/openai/codex/blob/main/LICENSE"
+      }
+    },
+    {
+      "agent": "codex",
+      "component": "windows-sandbox-setup",
+      "vendor": "openai",
+      "version": "0.153.0",
+      "platform": "win32",
+      "arch": "x64",
+      "sourceType": "github-release",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFilename": "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFormat": "tar.gz",
+      "sha256": "809dd2c0b6f2e27ec6139f67793dbf1822a041817235d04d088b01342bb00a47",
+      "archivePath": "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe",
+      "installName": "codex-windows-sandbox-setup.exe",
+      "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
+      "license": {
+        "spdx": "Apache-2.0",
+        "redistribution": "permitted",
+        "noticeUrl": "https://github.com/openai/codex/blob/main/LICENSE"
+      }
+    },
+    {
+      "agent": "codex",
+      "component": "command-runner",
+      "vendor": "openai",
+      "version": "0.153.0",
+      "platform": "win32",
+      "arch": "x64",
+      "sourceType": "github-release",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFilename": "codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+      "archiveFormat": "tar.gz",
+      "sha256": "69f395830e485fc7ef5d9e8be63d6ffc624b8f7b0cd705dc22ec9fa1998a3c52",
+      "archivePath": "codex-command-runner-x86_64-pc-windows-msvc.exe",
+      "installName": "codex-command-runner.exe",
       "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows",
       "license": {
         "spdx": "Apache-2.0",
