@@ -1,0 +1,197 @@
+diff --git a/scripts/test-release-source-integrity.sh b/scripts/test-release-source-integrity.sh
+index 760c23c2..6bc8c824 100755
+--- a/scripts/test-release-source-integrity.sh
++++ b/scripts/test-release-source-integrity.sh
+@@ -12,6 +12,30 @@ git_identity() {
+   git -C "$1" config user.email "guard-test@ritemark.local"
+ }
+ 
++# Create a real directory link on every host.
++#
++# Git Bash without native symlink support does not link on `ln -s` — it silently
++# deep-copies the directory. Two checks below assert that verify-release-source.sh
++# REJECTS a symlinked tree, so a copy makes them assert nothing, and the paired
++# non-recursive `rm` then fails outright on a real directory. A Windows junction
++# needs no elevation and Git Bash reports it as a symlink, so `[ -L ]` and a plain
++# `rm` both behave as the tests expect.
++make_dir_link() { # <target> <link>   target may be relative to the link's directory
++  local target="$1" link="$2" abs
++  case "$(uname -s)" in
++    MINGW*|MSYS*|CYGWIN*)
++      case "$target" in
++        /*|[A-Za-z]:*) abs="$target" ;;
++        *) abs="$(cd "$(dirname "$link")/$(dirname "$target")" && pwd)/$(basename "$target")" ;;
++      esac
++      MSYS_NO_PATHCONV=1 cmd /c mklink /J "$(cygpath -w "$link")" "$(cygpath -w "$abs")" >/dev/null
++      ;;
++    *)
++      ln -s "$target" "$link"
++      ;;
++  esac
++}
++
+ expect_failure() {
+   local expected="$1"
+   shift
+@@ -101,7 +125,7 @@ echo "PASS: dry-run validates dependent patches sequentially without changing th
+ echo "PASS: accepted clean exact main source"
+ 
+ mkdir -p "$SUPER/vscode/extensions"
+-ln -s ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
++make_dir_link ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
+ expect_failure "extension must already be staged outside VS Code" \
+   "$SUPER/scripts/apply-patches.sh" --extension-layout absent
+ rm "$SUPER/vscode/extensions/ritemark"
+@@ -132,7 +156,7 @@ echo "PASS: derived VS Code marker detects later manual edits"
+ 
+ printf 'canonical derived patch\n' >>"$SUPER/vscode/package-lock.json"
+ mkdir -p "$SUPER/vscode/extensions"
+-ln -s ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
++make_dir_link ../../extensions/ritemark "$SUPER/vscode/extensions/ritemark"
+ node "$SCRIPT_DIR/vscode-derived-state.mjs" --write --repo "$SUPER" >/dev/null
+ "$SCRIPT_DIR/verify-release-source.sh" \
+   --repo "$SUPER" --expected-ref origin/main --phase patched >/dev/null
+@@ -180,7 +204,7 @@ git -C "$SUPER" worktree remove --force "$CREATED_RELEASE"
+ echo "PASS: release creator produced a new detached physical checkout"
+ 
+ mkdir -p "$TEST_ROOT/shared-dependencies"
+-ln -s "$TEST_ROOT/shared-dependencies" "$SUPER/extensions/ritemark/node_modules"
++make_dir_link "$TEST_ROOT/shared-dependencies" "$SUPER/extensions/ritemark/node_modules"
+ expect_failure "dependency directory is shared through a symlink" \
+   "$SCRIPT_DIR/verify-release-source.sh" --repo "$SUPER" --expected-ref origin/main
+ rm "$SUPER/extensions/ritemark/node_modules"
+@@ -203,7 +227,7 @@ rm "$SUPER/uncommitted.txt"
+ 
+ git -C "$SUPER" submodule deinit -f vscode >/dev/null
+ rm -rf "$SUPER/vscode"
+-ln -s "$VSCODE_SOURCE" "$SUPER/vscode"
++make_dir_link "$VSCODE_SOURCE" "$SUPER/vscode"
+ expect_failure "vscode is a symlink" \
+   "$SCRIPT_DIR/verify-release-source.sh" --repo "$SUPER" --expected-ref origin/main
+ rm "$SUPER/vscode"
+diff --git a/scripts/test-worktree-hygiene.sh b/scripts/test-worktree-hygiene.sh
+index 3ec45797..a004d52b 100755
+--- a/scripts/test-worktree-hygiene.sh
++++ b/scripts/test-worktree-hygiene.sh
+@@ -7,6 +7,16 @@ TEST_ROOT="$(mktemp -d -t ritemark-worktree-hygiene-test.XXXXXX)"
+ TEST_ROOT="$(cd "$TEST_ROOT" && pwd -P)"
+ trap 'rm -rf "$TEST_ROOT"' EXIT
+ 
++# The audit prints paths as Git reports them. On Git Bash that is a native
++# Windows path (C:/Users/...), while `pwd -P` yields the MSYS form (/tmp/...),
++# so assertions built from TEST_ROOT never matched and every path-bearing check
++# failed on Windows. Compare against the shape the tool actually prints.
++if command -v cygpath >/dev/null 2>&1; then
++  TEST_ROOT_REPORTED="$(cygpath -m "$TEST_ROOT")"
++else
++  TEST_ROOT_REPORTED="$TEST_ROOT"
++fi
++
+ REPO="$TEST_ROOT/repo"
+ REMOTE="$TEST_ROOT/repo.git"
+ VSCODE_SOURCE="$TEST_ROOT/vscode-source"
+@@ -120,28 +130,28 @@ assert_contains() {
+     exit 1
+   fi
+ }
+-assert_contains "REVIEW   $TEST_ROOT/wt-merged-clean — fully pushed/merged with verified derived VS Code state"
+-assert_contains "BLOCKED  $TEST_ROOT/wt-merged-dirty — uncommitted superproject changes"
+-assert_contains "KEEP     $TEST_ROOT/wt-active — active/unmerged"
++assert_contains "REVIEW   $TEST_ROOT_REPORTED/wt-merged-clean — fully pushed/merged with verified derived VS Code state"
++assert_contains "BLOCKED  $TEST_ROOT_REPORTED/wt-merged-dirty — uncommitted superproject changes"
++assert_contains "KEEP     $TEST_ROOT_REPORTED/wt-active — active/unmerged"
+ echo "PASS: audit classified clean, dirty, and active worktrees correctly"
+ 
+ # Build output is invisible to git status because dist/ is ignored; the audit
+ # must look at the filesystem or it will offer up notarized release artifacts.
+-assert_contains "BLOCKED  $TEST_ROOT/wt-output — build output present: dist/ (1 entry)"
++assert_contains "BLOCKED  $TEST_ROOT_REPORTED/wt-output — build output present: dist/ (1 entry)"
+ echo "PASS: build output blocks an otherwise-clean merged worktree"
+ 
+ # A merged branch whose remote was deleted on merge is the normal post-merge
+ # state, not unpushed work.
+-assert_contains "REVIEW   $TEST_ROOT/wt-remote-gone — fully pushed and merged"
++assert_contains "REVIEW   $TEST_ROOT_REPORTED/wt-remote-gone — fully pushed and merged"
+ echo "PASS: a merged branch with no upstream is still reclaimable"
+ 
+ # vscode dirt that apply-patches.sh reproduces is derived state, not user work.
+-assert_contains "REVIEW   $TEST_ROOT/wt-derived — fully pushed and merged"
++assert_contains "REVIEW   $TEST_ROOT_REPORTED/wt-derived — fully pushed and merged"
+ assert_contains "regenerated by apply-patches.sh"
+ echo "PASS: a patched vscode submodule no longer blocks a merged worktree"
+ 
+ # One path outside that set is possible hand-editing and must be held back.
+-assert_contains "BLOCKED  $TEST_ROOT/wt-handedited — local changes need review"
++assert_contains "BLOCKED  $TEST_ROOT_REPORTED/wt-handedited — local changes need review"
+ assert_contains "hand-edited.txt"
+ echo "PASS: an unexpected vscode path blocks the worktree"
+ 
+diff --git a/scripts/verify-release-source.sh b/scripts/verify-release-source.sh
+index 786b2439..3b079315 100755
+--- a/scripts/verify-release-source.sh
++++ b/scripts/verify-release-source.sh
+@@ -102,6 +102,20 @@ ERRORS=0
+ pass() { printf '  PASS  %s\n' "$1"; }
+ fail() { printf '  FAIL  %s\n' "$1" >&2; ERRORS=$((ERRORS + 1)); }
+ 
++# Resolve a directory to a form that compares equal across path flavours. Git
++# Bash reports one physical directory as /tmp/... when reached through a
++# junction and as /c/Users/.../Temp/... when reached directly, so comparing
++# 'pwd -P' output as plain strings gives a false mismatch on Windows.
++canonical_dir() {
++  local resolved
++  resolved="$(cd "$1" && pwd -P)"
++  if command -v cygpath >/dev/null 2>&1; then
++    cygpath -m "$resolved"
++  else
++    printf "%s" "$resolved"
++  fi
++}
++
+ echo "Release source integrity gate"
+ echo "  repository: $PROJECT_ROOT"
+ echo "  expected:   $EXPECTED_REF"
+@@ -219,15 +233,36 @@ if [[ "$PHASE" == "patched" ]]; then
+     fi
+   elif [[ ! -L "$EXTENSION_LINK" ]]; then
+     fail "patched vscode is missing the extension symlink"
+-  elif [[ "$(readlink "$EXTENSION_LINK")" != "../../extensions/ritemark" ]]; then
+-    fail "extension symlink has a non-canonical target: $(readlink "$EXTENSION_LINK")"
+   else
+-    LINK_TARGET="$(cd "$(dirname "$EXTENSION_LINK")/$(readlink "$EXTENSION_LINK")" && pwd -P)"
+-    SOURCE_EXTENSION="$(cd "$PROJECT_ROOT/extensions/ritemark" && pwd -P)"
+-    if [[ "$LINK_TARGET" == "$SOURCE_EXTENSION" ]]; then
+-      pass "vscode extension link resolves inside the same release worktree"
++    EXTENSION_LINK_RAW="$(readlink "$EXTENSION_LINK")"
++    # A POSIX checkout must carry the canonical relative target so the worktree
++    # stays relocatable, and that requirement is unchanged there. Git Bash
++    # cannot create such a link without elevation (ln -s silently deep-copies
++    # instead), so the only supported Windows form is a directory junction,
++    # which always reports an absolute target. Accept that form on Windows,
++    # then hold both forms to the property this check actually protects: the
++    # link must resolve to this worktree's own extension source.
++    CANONICAL_LINK_FORM=0
++    case "$(uname -s)" in
++      MINGW*|MSYS*|CYGWIN*)
++        CANONICAL_LINK_FORM=1
++        ;;
++      *)
++        if [[ "$EXTENSION_LINK_RAW" == "../../extensions/ritemark" ]]; then
++          CANONICAL_LINK_FORM=1
++        fi
++        ;;
++    esac
++    if [[ "$CANONICAL_LINK_FORM" != "1" ]]; then
++      fail "extension symlink has a non-canonical target: $EXTENSION_LINK_RAW"
+     else
+-      fail "extension link escapes this release worktree: $LINK_TARGET"
++      LINK_TARGET="$(canonical_dir "$EXTENSION_LINK")"
++      SOURCE_EXTENSION="$(canonical_dir "$PROJECT_ROOT/extensions/ritemark")"
++      if [[ "$LINK_TARGET" == "$SOURCE_EXTENSION" ]]; then
++        pass "vscode extension link resolves inside the same release worktree"
++      else
++        fail "extension link escapes this release worktree: $LINK_TARGET"
++      fi
+     fi
+   fi
+ 
