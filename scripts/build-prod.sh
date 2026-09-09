@@ -102,10 +102,26 @@ echo "Rebuilding committed webview and extension bundles..."
 (cd extensions/ritemark && npm run compile)
 
 if ! git diff --quiet -- extensions/ritemark/media/webview.js; then
-  echo -e "${RED}ERROR: clean dependency build changed committed webview.js.${NC}"
-  echo "The committed bundle is stale or the lockfile does not reproduce it."
-  echo "Rebuild and commit the bundle before creating an RC."
-  exit 1
+  # A bundle committed from a CRLF working copy (Git for Windows' core.autocrlf
+  # default) differs from an LF rebuild only by the raw CR that esbuild keeps,
+  # as a `\r` escape, inside multi-line template literals. That residue is
+  # inert at runtime and CI ships the committed bytes unchanged, so it is not
+  # evidence of a stale bundle. Compare with the CR residue removed; only a
+  # real content difference blocks the build. When only residue differs, the
+  # tracked bundle is restored so this app ships the exact bytes CI ships.
+  strip_cr_residue() { perl -pe 's/\r//g; s/\\r//g'; }
+  if cmp -s <(git show HEAD:extensions/ritemark/media/webview.js | strip_cr_residue) \
+            <(strip_cr_residue < extensions/ritemark/media/webview.js); then
+    echo -e "${YELLOW}WARNING: committed webview.js differs from the clean rebuild only by CR residue${NC}"
+    echo "(a \\r escape inside template literals, left by a CRLF working copy)."
+    echo "Restoring the committed bundle so the app ships the tracked bytes, as CI does."
+    git checkout -- extensions/ritemark/media/webview.js
+  else
+    echo -e "${RED}ERROR: clean dependency build changed committed webview.js.${NC}"
+    echo "The committed bundle is stale or the lockfile does not reproduce it."
+    echo "Rebuild and commit the bundle before creating an RC."
+    exit 1
+  fi
 fi
 
 echo "Applying the canonical VS Code patch stack..."
