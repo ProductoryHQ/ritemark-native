@@ -1,2 +1,21 @@
 # Patch files must stay LF — CRLF corrupts unified diff format
 *.patch text eol=lf
+
+# Source and config text is LF on every platform. A CRLF working copy (Git for
+# Windows' core.autocrlf default) leaks into build output: esbuild keeps the raw
+# CR of a multi-line template literal as a `\r` escape, so a webview bundle
+# committed from a CRLF checkout differs from a clean LF rebuild and fails the
+# release build's reproducibility gate (v1.10.1, 2026-09-09).
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
