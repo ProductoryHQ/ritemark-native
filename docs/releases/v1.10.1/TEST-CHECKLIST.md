@@ -27,6 +27,8 @@ Driven by Claude over CDP against the app copied out of the signed DMG, isolated
 - [x] Home → **Recent documents** lists `zz-newest.md`, `ends-with-list.md`, `newer.md`, `older.md`, `README.md` — the true mtime order; none of the 220 older files leak in ([#194](https://github.com/ProductoryHQ/ritemark-native/issues/194)).
 - [x] `ends-with-list.md` opens in the Ritemark editor (3 list items rendered). After appending text to the last item and saving, the file on disk ends in exactly one `0a` (`gamma delta\n`) ([#254](https://github.com/ProductoryHQ/ritemark-native/issues/254)).
 - [x] AI sidebar shows a resolved model, `Claude Code · Anthropic · Sonnet 5`, with no mismatch or unavailability warning.
+- [x] Baseline comparison on the installed v1.10.0 (same fixture, same steps, isolated profile): the saved file ends without a newline (last byte `61`), reproducing #254; v1.10.1 ends in `0a`.
+- [ ] **Pre-existing, not a v1.10.1 regression, not a blocker:** both v1.10.0 and v1.10.1 rewrite a tight bullet list (`- alpha`) as a loose one on save (`-   alpha`, a whitespace-only line between items). Worth its own issue; the task-list round trip verified for v1.10.0 is a separate path.
 - [ ] Onboarding pane with Claude signed out and Codex signed in — Jarmo (Gate 2); the build Mac's keychain holds Jarmo's Claude credentials.
 
 ## Mounted x64 DMG hard checks — 2026-09-09
