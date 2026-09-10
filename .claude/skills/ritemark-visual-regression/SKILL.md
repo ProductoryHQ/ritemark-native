@@ -109,6 +109,22 @@ If macOS locks during a RUNDEV session, continue only through the already-author
 
 Write `regression-results.md` inside the QA folder with the ten results, evidence paths, and release decision. Leave the app open on that report unless the user asks otherwise.
 
+## Scripted packaged-build canary
+
+`scripts/packaged-canary.sh <Ritemark.app> <out-dir>` drives a packaged build over CDP with an
+isolated user-data directory and a seeded workspace, and prints one PASS/FAIL line per check:
+no trust dialog; a typing burst with Enter in the middle of a list item on a plain and on a
+front-matter document, followed by undo and redo; the saved file ending in exactly one newline
+and front matter preserved; the task fixture opening without touching the file, checkbox and
+text on one row, toggle + save persisting `- [x]`; Slash → Task List surviving autosave, save,
+close and reopen as an empty checkbox; Home recents. It exits non-zero on any failure.
+
+Run it before every Gate ask, on the app copied out of the signed DMG, never on RUNDEV. It
+exists because the v1.10.1 candidate canary paused one to two seconds between steps and never
+exercised the host echo window; typing at tool speed with autosave on is what exposed the
+regression. Add a `window.__rmSyncTrace` probe (see the automation skill) when a result needs
+explaining, not as a release gate.
+
 ## Stop conditions
 
 Stop release progression and report `RELEASE BLOCKED` when any test shows data loss, stale editor state, a false disk-conflict warning, an unusable core control, or a crash. Preserve the failing fixture and screenshots. Do not notarize or dispatch paid multi-platform builds from a failed RC.
