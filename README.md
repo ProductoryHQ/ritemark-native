@@ -43,9 +43,9 @@ A native desktop app for writing, structured data, and AI automation—all in on
 
 ## Download
 
-- **macOS (Apple Silicon / M1+):** [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-arm64.dmg)
-- **macOS (Intel):** [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-x64.dmg)
-- **Windows (x64):** [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-Setup.exe)
+- **macOS (Apple Silicon / M1+):** [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-arm64.dmg)
+- **macOS (Intel):** [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-x64.dmg)
+- **Windows (x64):** [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-Setup.exe)
 
 Links are pinned to a specific release tag on purpose. `releases/latest/download/...`
 resolves against whatever release is newest, so a platform-partial release — one that

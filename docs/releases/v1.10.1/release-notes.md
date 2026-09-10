@@ -43,6 +43,22 @@ quietly.
 macOS was never affected by this one — there the sandbox is built into the
 operating system and needs no helper.
 
+## Typing, checklists and undo
+
+Three things that made the editor feel unreliable are fixed.
+
+- **Your text stays as you typed it.** A moment after each edit the app used to
+  hand the document back to the editor, and the editor sometimes treated that
+  as a change from outside: a brief "clean-up" while typing, an Enter inside a
+  list that did nothing, a new checklist item that turned into `[ ]` text.
+  Documents with front matter had this since 1.10.0; the trailing-newline fix
+  below had spread it to every document.
+- **Undo is one step again.** Cmd+Z (Ctrl+Z on Windows) undoes exactly your last
+  action, and redo brings it back without duplicating list items. Undo from the
+  Edit menu still uses VS Code's document history and can behave differently.
+- **Checklist items line up.** The checkbox and its text sit on one line, and an
+  empty checklist item survives saving and reopening.
+
 ## Two editor fixes
 
 - **Saving a document that ends in a list no longer drops the trailing newline**
