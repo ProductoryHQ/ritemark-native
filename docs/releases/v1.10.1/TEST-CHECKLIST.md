@@ -8,6 +8,19 @@ Release evidence for the v1.10.1 Codex Reliability maintenance release (all thre
 - **macOS x64**: CI run `34264252795` (`main@640e2aac`, Node 22.22.1 x64) extracted with `extract-macos-x64-artifact.sh` (extension attestation matches). Signed from the release worktree with `RITEMARK_RELEASE_COMMIT=640e2aac…`: 45 components, 0 failures, hardened runtime, secure timestamp, all Electron libraries and all four agent binaries (`claude`, `codex-app-server`, `codex-code-mode-host`, `opencode`) carry Team ID `JKBSC3ZDT5`, all Mach-O x86_64 (the only arm64 slice is inside the universal `fsevents.node`). `create-dmg` could not drive Finder from a non-interactive session (AppleScript -1743), so the DMG was built the v1.8.1 way: `ditto` → UDRW with volume icon → `hdiutil convert` UDZO zlib-9 → `codesign`. Result `dist/Ritemark-1.10.1-darwin-x64.dmg`, 666,268,813 bytes, SHA-256 `d42d42f51be5b8c21888c03bdf86b9a2da505da62fbb5e1c1529bcd635ccbf20`, built **2026-09-09 17:16:34 EEST** (hardening clock). **Not notarized.**
 - **macOS arm64**: the first release worktree at `640e2aac` could not build: `build-prod.sh` Step 1 refused because the committed `media/webview.js` differs from a clean `npm ci` + `vite build` by 11 two-byte `\r` escapes inside `className` template literals (bundle committed from a Windows autocrlf checkout in `e4321178`). Harness fix [#268](https://github.com/ProductoryHQ/ritemark-native/pull/268) merged as `daf90f5a` (diff against `640e2aac`: `scripts/build-prod.sh` only); the root-cause fix [#267](https://github.com/ProductoryHQ/ritemark-native/pull/267) (LF rebuild + `.gitattributes`) is deferred to the next release. Rebuilt in a second fresh worktree `.worktrees/release-daf90f5adc70` (Node 22.22.1 arm64): preflight passed, Step 1 took the documented CR-residue path and restored the tracked bundle, both provenance verifications and post-build validation passed. Signed: 47 components, 0 failures. DMG built the same `hdiutil` way: `dist/Ritemark-1.10.1-darwin-arm64.dmg`, 625,106,078 bytes, SHA-256 `13c061d86a9fbf5a91257d94d8c1e2ff0a546800df1940ceb0ee01e03e0875fb`, built **2026-09-09 20:13:14 EEST** (hardening clock). **Not notarized.** Embedded provenance records `sourceCommit=daf90f5a` (harness tip); product bytes are those of `640e2aac`, where the tag goes (D1).
 
+## Candidate 3 — fix train (2026-09-10)
+
+Both earlier candidates are discarded (Jarmo, 2026-09-10): the v1.10.1 source carried a typing-level regression. Fixes on `fix/v1.10.1-editor-sync-tasklist` (PR #271), plan and outcome in `docs/development/releases/v1.10.1/fix-plan.md`.
+
+- [x] Bug 1 (host echo re-applied over typing): canonical projection on both sides. RUNDEV trace with autosave: only `peer-edit` updates, `matches: true`, no external apply, no lost keystrokes, saved file ends in one `\n`; front-matter document identical.
+- [x] Bug 2 (checkbox above text): first text node `A`, checkbox/text centres 1 px apart; screenshot inspected.
+- [x] Bug 3 (empty task item → literal `[ ]`): Slash → Task List survives autosave, save, close and reopen as an empty checkbox; typing then saves `- [ ] todo`.
+- [x] Bug 4 (two undo stacks): after the override, Cmd+Z shows `editor-update` + matching echo only, no `undo-redo`; redo restores without duplication.
+- [x] Data-loss gate: `- [ ] A` / `- [x] B` open with hash unchanged and a clean tab; toggle + save writes `- [x] A` / `- [x] B`.
+- [x] `test:editor-sync`, `test:task-list-roundtrip`, remaining chain green; integration test failure is environmental and identical on `main`.
+- [ ] Packaged arm64 canary at human typing speed (Q4, Q6, Q8) on the rebuilt DMG.
+- [ ] Gate 2 (Jarmo) on the rebuilt arm64, x64 and Windows artifacts, including Edit-menu Undo (known limitation, document behaviour).
+
 ## Mounted arm64 DMG hard checks — 2026-09-09
 
 - [x] Extension present; `webview.js` 8,844,056 bytes, SHA-256 `fec38a94…` — byte-identical to the x64 and Windows bundle.

@@ -1,6 +1,6 @@
 # v1.10.1 fix plan — editor sync regression and task-list defects
 
-**Status:** DRAFT, awaiting Jarmo's approval. No fix code is written before the approval phrase.<br>
+**Status:** APPROVED 2026-09-10 (Jarmo: Claude owns every workstream; D2, D3, D4 delegated to Claude). Implemented on `fix/v1.10.1-editor-sync-tasklist`, PR #271. See section 8 for what changed against the plan.<br>
 **Decision already taken (Jarmo, 2026-09-10):** the current candidate artifacts (arm64 DMG `13c061d8…`, x64 DMG `d42d42f5…`, Windows installer `c4315264…`) are discarded. None is notarized or published. The version stays 1.10.1.<br>
 **Approach:** patch, not rewrite. Both Claude and Codex reached the same conclusion independently: the sync subsystem (Sprint 115) is sound; the defects are two narrow conversion gaps and one CSS-visible parsing artifact.
 
@@ -96,3 +96,14 @@ Environment: unit tests run in any worktree after `npm ci` in `extensions/ritema
 - Tight/loose list shape preservation on save.
 - Visual-regression skill: the canary must type at human speed; paused steps hid this race.
 - `store_url` host correction (`build-windows.yml`) before Partner Center.
+
+## 8. Outcome (2026-09-10)
+
+- **D2 revised while implementing.** The webview never compared hashes; it compared strings (`payload.content === contentRef.current` in `App.tsx`, and `shouldApplyIncomingEditorValue`). Changing `logicalHash` would have fixed nothing and broken the shell's save receipts (patch 014 hashes the persisted bytes, newline included). The fix is `canonicalMarkdownProjection`, applied by the host when it builds every load/sync payload and by the webview when it compares. Hashing untouched, `ensureTrailingNewline` kept.
+- **D3 = bare marker.** Empty task items persist as `- [ ]`; the parser accepts the bare marker and only the bare marker.
+- **D4 = yes.** `.gitattributes` from #267 is in the train; #267 itself is superseded and can be closed.
+- **A fourth defect surfaced from the sync trace: two undo stacks.** VS Code forwards every webview keydown to the workbench; the built-in `undo` matched with no `when` and its custom-editor implementation ran the text document's undo (each sync `applyEdit` is an undo stop). Together with ProseMirror's own undo, one Cmd+Z undid twice and the host pushed the older text back as `undo-redo`. Fixed by shadowing `undo`/`redo` with no-op commands while a Ritemark editor is active and no input has focus; a `-undo` removal rule does not reach the built-in binding. Edit-menu Undo remains on VS Code's document stack (known limitation). Likely present in v1.10.0.
+- **Evidence** (RUNDEV, `window.__rmSyncTrace` probe): typing burst with Enter mid-item and autosave on shows only `peer-edit` updates with `matches: true` and no external apply; Cmd+Z shows `editor-update` plus a matching echo and no `undo-redo`; redo restores without duplication. Task fixture: first text node exactly `A`, checkbox and text centres 1 px apart; toggle + save writes `- [x] A` / `- [x] B`; Slash → Task List → save → reopen keeps an empty checkbox, typing then saves `- [ ] todo`.
+- **Tests.** `test:editor-sync` (now also `editorUndoKeybindings.test.ts`) and `test:task-list-roundtrip` green; the full chain is green except `ClaudeCodeNodeExecutor.integration.test.ts`, which fails identically on pristine `main` (`Cannot find module 'vscode'`: it needs the extension host).
+- **#270** (list shape normalisation on save) is the follow-up already filed by Jarmo; nothing here changes it.
+- **Process lesson for the visual-regression skill:** the release canary paused 1–2 s between steps and never exercised the echo window; typing at human speed, and a trace of host updates, is what exposed all four defects.
