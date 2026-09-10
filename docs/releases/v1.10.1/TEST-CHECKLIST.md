@@ -18,7 +18,8 @@ Both earlier candidates are discarded (Jarmo, 2026-09-10): the v1.10.1 source ca
 - [x] Bug 4 (two undo stacks): after the override, Cmd+Z shows `editor-update` + matching echo only, no `undo-redo`; redo restores without duplication.
 - [x] Data-loss gate: `- [ ] A` / `- [x] B` open with hash unchanged and a clean tab; toggle + save writes `- [x] A` / `- [x] B`.
 - [x] `test:editor-sync`, `test:task-list-roundtrip`, remaining chain green; integration test failure is environmental and identical on `main`.
-- [ ] Packaged arm64 canary at human typing speed (Q4, Q6, Q8) on the rebuilt DMG.
+- [x] **arm64 candidate 3 built and signed** from `23493cef` in `.worktrees/release-23493cef1f4d` (Node 22.22.1 arm64): preflight passed, `build-prod.sh` clean with the committed bundle reproduced byte-for-byte, 47 components signed, 0 failures. DMG `dist/Ritemark-1.10.1-darwin-arm64.dmg`, 625,107,367 bytes, SHA-256 `bbd9e048bed390e163301c684ca028d9b649a3bd25f853a2e0a07854e180b090`, built **2026-09-10 14:33:36 EEST** (hardening clock). **Not notarized.** Mounted-DMG hard checks: extension present, `webview.js` 8,844,955 bytes = committed `6ebdda86…`, node_modules 86 / completeness check passed, app and DMG Team ID `JKBSC3ZDT5`, `ritemarkVersion` 1.10.1, provenance `darwin-arm64` / `23493cef` / vscode `10c8e557`, deep signature and hardened runtime OK, all four agent binaries re-signed and executing, undo override present in bundle and manifest, `spctl` rejected as expected.
+- [x] Packaged arm64 canary at typing speed on the app copied out of that DMG (isolated profile, autosave on): 15/15 — no trust dialog; plain and front-matter bursts with Enter mid-item intact; undo changes the document and redo restores it exactly; saved plain file ends in one newline, front matter preserved; task fixture opens untouched, text starts with `A`, checkbox and text on one row, toggle + save writes `- [x] A` / `- [x] B`; Slash → Task List survives autosave, saves as bare `- [ ]`, reopens as a checkbox, typing saves `- [ ] todo`; Home recents lead with the newest files. Screenshot `tasks.png` inspected.
 - [ ] Gate 2 (Jarmo) on the rebuilt arm64, x64 and Windows artifacts, including Edit-menu Undo (known limitation, document behaviour).
 
 ## Mounted arm64 DMG hard checks — 2026-09-09
@@ -73,6 +74,6 @@ Driven by Claude over CDP against the app copied out of the signed DMG, isolated
 
 | Platform | Artifact | Gate 1 (technical) | Notarized / stapled | Gate 2 (Jarmo) |
 | --- | --- | --- | --- | --- |
-| Windows x64 | `c4315264…f1f4e5` | passed (CI roundtrip, 46 PEs) | n/a | open |
-| macOS x64 | `d42d42f5…cbf20` (pre-notarization) | passed 2026-09-09 | pending | open |
-| macOS arm64 | `13c061d8…75fb` (pre-notarization) | passed 2026-09-09 | pending | open |
+| Windows x64 | rebuild from `23493cef` in progress | pending | n/a | open |
+| macOS x64 | rebuild from `23493cef` in progress | pending | pending | open |
+| macOS arm64 | `bbd9e048…b090` (candidate 3, pre-notarization) | passed 2026-09-10 | pending | open |
