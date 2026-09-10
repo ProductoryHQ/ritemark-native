@@ -35,6 +35,7 @@ import {
   reduceDocumentViewSync,
   selectDocumentSyncAction,
 } from './documentSyncReducer'
+import { canonicalMarkdownProjection } from './editorValueReconciliation'
 import {
   isDocumentHostMessage,
   type DocumentEditPayload,
@@ -244,7 +245,7 @@ function App() {
           if (message.revision < currentRevisionRef.current) return
           dispatchDocumentViewSync(message)
           const optimisticEditPending = pendingClientSequenceRef.current !== undefined || queuedEditRef.current !== undefined
-          const payloadMatchesOptimisticView = message.payload.content === contentRef.current
+          const payloadMatchesOptimisticView = canonicalMarkdownProjection(message.payload.content) === canonicalMarkdownProjection(contentRef.current)
             && (message.payload.fileType === 'csv'
               || canonicalJson(message.payload.properties) === canonicalJson(propertiesRef.current))
           if (optimisticEditPending && !payloadMatchesOptimisticView) return
