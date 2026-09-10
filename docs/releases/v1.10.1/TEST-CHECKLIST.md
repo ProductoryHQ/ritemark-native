@@ -24,7 +24,8 @@ Both earlier candidates are discarded (Jarmo, 2026-09-10): the v1.10.1 source ca
 - [x] **Windows candidate 3**: CI run `34472311244` (`main@23493cef`, dispatched with `source_commit`). `Ritemark-Setup.exe` SHA-256 `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250`, sidecar records `source_commit` and `workflow_commit` `23493cef`; publisher `Productory Services OÜ`; roundtrip `status: passed` (standard-user install, registry, uninstall); **Windows PE check: 46 file(s), 0 failures** (both Codex sandbox helpers packaged). Preserved as `dist/Ritemark-1.10.1-win32-x64-setup.exe` with `.sha256.txt` and `win32-roundtrip-evidence/`. The sidecar's `store_url` still names `downloads.ritemark.app`; corrected before Partner Center, after publication.
 - [x] Repository restored to public after the Windows build.
 - [x] **Ten-test visual regression matrix on the candidate 3 arm64 app** (packaged, isolated profile): all ten PASS — chrome renders without a trust dialog; folder + file via File Browser; `# ` in an empty file renders H1; list continuation and exit; task list via slash menu; 3×3 table filled with Tab, GFM table on disk; explicit save with no conflict warning; two tabs, close and reopen; model `Claude · Sonnet 5`, permission `Auto`, effort `Auto`, and one read-only request that summarised the active document correctly (`Done in 5.7s`, workspace unchanged); round-trip gate for the table (reopen identical, harmless edit yields only that diff) and for task markers. Dirty marker: dirty right after an edit, clean after autosave, clean after reopen. Observation: `Ctrl+Cmd+I` opens the Build with Agent panel rather than the chat composer in the packaged build.
-- [ ] Gate 2 (Jarmo) on the rebuilt arm64, x64 and Windows artifacts, including Edit-menu Undo (known limitation, document behaviour).
+- [x] Gate 2 (Jarmo, 2026-09-10): macOS approved on the candidate 3 artifacts ("Gate 2 läbitud, notariseeri ja avalda"). Windows installer test still in progress; the Windows asset and its feed entry follow when it passes.
+- [x] **arm64 notarized and stapled** after the hardening window (DMG 14:33:36, submitted 15:48:18): Apple submission `e988f454-0501-4db6-9345-0ab5cbd31139` Accepted, `stapler validate` passed, Gatekeeper `accepted`. Post-staple SHA-256 `0dc7d8e72dfa15a6d0412f8b3653980473123e8fb57d57049de1220bf065c17a` (the `.sha256` sidecar was regenerated; the pre-staple hash was `bbd9e048…`). Tag `v1.10.1` pushed on `23493cef`.
 
 ## Mounted arm64 DMG hard checks — 2026-09-09
 
@@ -79,5 +80,5 @@ Driven by Claude over CDP against the app copied out of the signed DMG, isolated
 | Platform | Artifact | Gate 1 (technical) | Notarized / stapled | Gate 2 (Jarmo) |
 | --- | --- | --- | --- | --- |
 | Windows x64 | `93f9adce…77250` (candidate 3) | passed (CI roundtrip, 46 PEs) | n/a | open |
-| macOS x64 | `f14095ae…cd8de` (candidate 3, pre-notarization) | passed 2026-09-10 | pending | open |
-| macOS arm64 | `bbd9e048…b090` (candidate 3, pre-notarization) | passed 2026-09-10 | pending | open |
+| macOS x64 | `f14095ae…cd8de` (pre-notarization) | passed 2026-09-10 | in progress | approved 2026-09-10 |
+| macOS arm64 | `0dc7d8e7…c17a` (stapled) | passed 2026-09-10 | notarized + stapled | approved 2026-09-10 |
