@@ -732,7 +732,7 @@ jobs:
             "source_commit=$((git rev-parse HEAD).Trim())"
             "workflow_ref=$env:GITHUB_WORKFLOW_REF"
             "workflow_commit=$env:GITHUB_SHA"
-            "store_url=https://downloads.ritemark.app/windows/v${{ steps.release.outputs.version }}/Ritemark-Setup.exe"
+            "store_url=https://getritemark.com/windows/v${{ steps.release.outputs.version }}/Ritemark-Setup.exe"
             'Partner Center must receive this same file and SHA-256.'
           ) | Set-Content -LiteralPath installer-output/Ritemark-Setup.sha256.txt -Encoding utf8NoBOM
 
