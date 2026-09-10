@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.10.1] — unreleased
+## [1.10.1] — 2026-09-10
 
 Maintenance release for all platforms: macOS (Apple Silicon and Intel) and Windows.
 
