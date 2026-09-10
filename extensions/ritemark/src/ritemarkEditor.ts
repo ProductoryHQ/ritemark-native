@@ -23,7 +23,7 @@ import {
 } from './workspaceFileLinks';
 import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
-import { ensureTrailingNewline } from './editorSync/state';
+import { canonicalMarkdownProjection, ensureTrailingNewline } from './editorSync/state';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 
 // Properties type for front-matter
@@ -193,8 +193,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Markdown: existing flow with added fields
     const parsed = this.extractFrontMatter(document.getText());
+    // Views compare host payloads against their own Markdown projection, which
+    // never carries the persisted trailing newline or gray-matter's leading one.
+    // Send the projection form, or the echo of an accepted edit is mistaken for
+    // an external change and re-applied over the user's typing.
+    const content = canonicalMarkdownProjection(parsed.content);
     const imageMappings = this.transformImagePaths(
-      parsed.content,
+      content,
       document.uri,
       webview
     );
@@ -227,7 +232,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       type: 'load',
       fileType: 'markdown',
       filename,
-      content: parsed.content,
+      content,
       properties: parsed.properties,
       hasProperties: parsed.hasProperties,
       imageMappings,
