@@ -565,6 +565,21 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Cmd+Z / Cmd+Shift+Z inside the Ritemark editor: the webview's ProseMirror
+  // history handles the keystroke natively, but the webview host forwards every
+  // keydown to the workbench, where the built-in `undo`/`redo` commands reach the
+  // custom editor's text-document undo stack (each sync applyEdit is an undo
+  // stop there). Two stacks undoing one keystroke fought through the sync
+  // coordinator: a phantom first Cmd+Z, lost Enters, duplicated items on redo.
+  // Shadow the built-in commands while a Ritemark editor is active and no
+  // workbench input has focus, so the editor's own history is the only one.
+  // A removal rule (`-undo`) does not reach the built-in binding; a positive
+  // binding with a `when` clause does.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.editor.undoHandledByEditor', () => undefined),
+    vscode.commands.registerCommand('ritemark.editor.redoHandledByEditor', () => undefined),
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.newDocument', async () => {
       await createDraftAndOpen('md', RitemarkEditorProvider.viewType);
