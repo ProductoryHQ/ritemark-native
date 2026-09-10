@@ -101,6 +101,24 @@ export function ensureTrailingNewline(content: string): string {
   return content.length === 0 || content.endsWith('\n') ? content : `${content}\n`;
 }
 
+/**
+ * The form in which the webview and the host compare Markdown *content*: the
+ * editor's own projection. Turndown never emits a leading or trailing newline
+ * and always uses LF, while the persisted body carries a trailing newline
+ * (`ensureTrailingNewline`, `gray-matter`) and, behind front matter, may start
+ * with one. Line endings follow the document's EOL. None of that is content.
+ *
+ * Every payload the host sends to a view and every equality check a view makes
+ * against a host payload must go through this function, otherwise the host's
+ * echo of an accepted edit looks like an external change and the view re-parses
+ * a document it already owns (v1.10.1 typing regression). The webview keeps a
+ * byte-identical twin in `webview/src/editorValueReconciliation.ts`; both test
+ * files share the same vector table.
+ */
+export function canonicalMarkdownProjection(content: string): string {
+  return normalizeLogicalText(content).replace(/^\n+/, '').replace(/\n+$/, '');
+}
+
 export function classifyThreeWay(snapshot: ThreeWaySnapshot): ThreeWaySyncState {
   const diskChanged = snapshot.diskHash !== snapshot.baseDiskHash;
   const modelChanged = snapshot.modelHash !== snapshot.baseModelHash;

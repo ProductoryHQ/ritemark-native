@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   canCompleteViewResolution,
   canonicalJson,
+  canonicalMarkdownProjection,
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
@@ -140,4 +141,32 @@ test('resolution waits for every visible view but not dormant views', () => {
     { visible: false, disposed: false, acknowledgedRevision: 1 },
     { visible: true, disposed: true, acknowledgedRevision: 0 },
   ]), true);
+});
+
+// Shared with webview/src/editorValueReconciliation.test.ts — keep both tables identical.
+const canonicalProjectionVectors: Array<[string, string, string]> = [
+  ['alpha\n', 'alpha', 'trailing newline added by ensureTrailingNewline'],
+  ['alpha\n\n\n', 'alpha', 'several trailing newlines'],
+  ['\nalpha', 'alpha', 'leading newline left by gray-matter behind front matter'],
+  ['\n\n# Title\n\nbody\n', '# Title\n\nbody', 'both ends trimmed, inner blank line kept'],
+  ['alpha\r\nbeta\r\n', 'alpha\nbeta', 'CRLF document compares as LF'],
+  ['\uFEFFalpha\n', 'alpha', 'UTF-8 BOM'],
+  ['', '', 'empty document'],
+  ['\n', '', 'newline-only document'],
+  ['  indented', '  indented', 'leading spaces are content'],
+  ['alpha  \n', 'alpha  ', 'trailing spaces before the newline are content'],
+  ['- [ ]', '- [ ]', 'a bare task marker is content'],
+];
+
+test('canonicalMarkdownProjection makes the persisted body and the editor projection compare equal', () => {
+  for (const [input, expected, why] of canonicalProjectionVectors) {
+    assert.equal(canonicalMarkdownProjection(input), expected, why);
+  }
+});
+
+test('canonicalMarkdownProjection is idempotent', () => {
+  for (const [input] of canonicalProjectionVectors) {
+    const once = canonicalMarkdownProjection(input);
+    assert.equal(canonicalMarkdownProjection(once), once);
+  }
 });

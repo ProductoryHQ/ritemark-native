@@ -24,7 +24,7 @@ export function transformTaskListElements(root: Element): void {
     }
 
     const items = directElementChildren(list, 'li')
-    const itemKinds = items.map(item => ({ item, checkbox: leadingTaskCheckbox(item) }))
+    const itemKinds = items.map(item => ({ item, checkbox: leadingTaskMarker(item) }))
     const taskCount = itemKinds.filter(({ checkbox }) => checkbox !== null).length
     if (taskCount === 0) {
       continue
@@ -33,11 +33,15 @@ export function transformTaskListElements(root: Element): void {
     for (const { item, checkbox } of itemKinds) {
       if (!checkbox) continue
       item.setAttribute('data-type', 'taskItem')
-      item.setAttribute(
-        'data-checked',
-        checkbox.hasAttribute('checked') ? 'true' : 'false',
-      )
-      checkbox.parentNode?.removeChild(checkbox)
+      item.setAttribute('data-checked', checkbox.checked ? 'true' : 'false')
+      const container = checkbox.node.parentNode
+      container?.removeChild(checkbox.node)
+      // `marked` separates the checkbox from the item text with whitespace,
+      // and with a newline in a loose list (`<input …> \nA`). Once the checkbox
+      // is gone that whitespace is a leading text node the editor preserves
+      // verbatim, and `white-space: break-spaces` renders the newline, which
+      // pushes the item text one line below its checkbox.
+      if (container) trimLeadingWhitespace(container)
     }
 
     if (taskCount === items.length) {
@@ -91,7 +95,10 @@ export function addTipTapTaskListTurndownRules(service: TurndownService): void {
       }
 
       const cleanContent = content.trim().replace(/\n+/g, ' ')
-      return `- ${checkbox} ${cleanContent}\n`
+      // A trailing space after the marker does not survive normalisation, and
+      // `- [ ]` alone is not a GFM task item, so persist the empty item as the
+      // bare marker and let `leadingTaskMarker` read it back.
+      return cleanContent ? `- ${checkbox} ${cleanContent}\n` : `- ${checkbox}\n`
     },
   })
 
@@ -122,18 +129,81 @@ function directElementChildren(node: Node, name: string): Element[] {
   )
 }
 
-function leadingTaskCheckbox(listItem: Element): Element | null {
+interface LeadingTaskMarker {
+  /** The node that carries the marker: `marked`'s checkbox, or the bare `[ ]` text. */
+  node: Node
+  checked: boolean
+}
+
+/** GFM task marker with nothing after it: the whole text is `[ ]` or `[x]`. */
+const BARE_TASK_MARKER = /^\s*\[([ xX])\]\s*$/
+
+function leadingTaskMarker(listItem: Element): LeadingTaskMarker | null {
   const first = firstElementChild(listItem)
-  if (!first || !hasOnlyWhitespaceBefore(listItem, first)) return null
+  const container = first && first.nodeName.toLowerCase() === 'p' && hasOnlyWhitespaceBefore(listItem, first)
+    ? first
+    : listItem
 
-  const container = first.nodeName.toLowerCase() === 'p' ? first : listItem
   const candidate = firstElementChild(container)
-
-  return candidate?.nodeName.toLowerCase() === 'input' &&
+  if (
+    candidate?.nodeName.toLowerCase() === 'input' &&
     candidate.getAttribute('type')?.toLowerCase() === 'checkbox' &&
     hasOnlyWhitespaceBefore(container, candidate)
-    ? candidate
-    : null
+  ) {
+    return { node: candidate, checked: candidate.hasAttribute('checked') }
+  }
+
+  // An empty task item is persisted as a bare `- [ ]` (see the Turndown rule
+  // below). GFM parsers only recognise a marker that is followed by text, so
+  // `marked` leaves the bare form as the literal item text `[ ]`. Accept that
+  // literal, and only that literal, as an empty task item; `[ ] text` stays
+  // what the author wrote.
+  const text = leadingTextNode(container)
+  const match = text?.nodeValue?.match(BARE_TASK_MARKER)
+  if (text && match && !hasContentAfter(container, text)) {
+    return { node: text, checked: match[1] !== ' ' }
+  }
+  return null
+}
+
+function leadingTextNode(parent: Node): Node | null {
+  for (const child of Array.from(parent.childNodes)) {
+    if (child.nodeType === 8) continue
+    if (child.nodeType === 3) {
+      if (!child.nodeValue?.trim()) continue
+      return child
+    }
+    return null
+  }
+  return null
+}
+
+function hasContentAfter(parent: Node, target: Node): boolean {
+  let seen = false
+  for (const child of Array.from(parent.childNodes)) {
+    if (child === target) {
+      seen = true
+      continue
+    }
+    if (!seen || child.nodeType === 8) continue
+    if (child.nodeType === 3 && !child.nodeValue?.trim()) continue
+    return true
+  }
+  return false
+}
+
+function trimLeadingWhitespace(parent: Node): void {
+  for (const child of Array.from(parent.childNodes)) {
+    if (child.nodeType === 8) continue
+    if (child.nodeType !== 3) return
+    const value = child.nodeValue ?? ''
+    if (!value.trim()) {
+      parent.removeChild(child)
+      continue
+    }
+    child.nodeValue = value.replace(/^\s+/, '')
+    return
+  }
 }
 
 function hasOnlyWhitespaceBefore(parent: Node, target: Node): boolean {

@@ -759,6 +759,23 @@
         "key": "ctrl+b",
         "command": "-workbench.action.toggleSidebarVisibility",
         "when": "activeCustomEditorId == ritemark.editor"
+      },
+      {
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "command": "ritemark.editor.undoHandledByEditor",
+        "when": "activeCustomEditorId == ritemark.editor && !inputFocus"
+      },
+      {
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "command": "ritemark.editor.redoHandledByEditor",
+        "when": "activeCustomEditorId == ritemark.editor && !inputFocus"
+      },
+      {
+        "key": "ctrl+y",
+        "command": "ritemark.editor.redoHandledByEditor",
+        "when": "activeCustomEditorId == ritemark.editor && !inputFocus"
       }
     ]
   },
@@ -768,7 +785,7 @@
     "pretest": "npm run test:conversations && npm run test:thinking-effort && npm run test:sprint113-language && npm run test:editor-sync && npm run test:claude-auth && npm run test:security-backports",
     "test:thinking-effort": "npx tsx src/runtime/thinkingEffort.test.ts && npx tsx webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts",
     "test:sprint113-language": "npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx webview/src/components/transcribe/workbench/InsightsLanguageCombobox.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts",
-    "test:editor-sync": "npx tsx src/editorSync/state.test.ts && npx tsx src/editorSync/protocol.test.ts && npx tsx src/editorSync/delivery.test.ts && npx tsx src/editorSync/saveReceipt.test.ts && npx tsx webview/src/documentSyncReducer.test.ts && npx tsx webview/src/editorValueReconciliation.test.ts && npm run test:task-list-roundtrip",
+    "test:editor-sync": "npx tsx src/editorSync/state.test.ts && npx tsx src/editorSync/protocol.test.ts && npx tsx src/editorSync/delivery.test.ts && npx tsx src/editorSync/saveReceipt.test.ts && npx tsx webview/src/documentSyncReducer.test.ts && npx tsx webview/src/editorValueReconciliation.test.ts && npm run test:task-list-roundtrip && npx tsx src/editorUndoKeybindings.test.ts",
     "test:task-list-roundtrip": "npx tsx webview/src/utils/taskListRoundTrip.test.ts",
     "test:security-backports": "npx tsx webview/src/utils/securityBackports.test.ts",
     "test:claude-auth": "npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts",
