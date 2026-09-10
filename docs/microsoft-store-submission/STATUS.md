@@ -1,10 +1,10 @@
 # Microsoft Store status
 
-Last updated: **2026-09-02**
+Last updated: **2026-09-10**
 
 ## High-level status
 
-**Preparation is active. Publication is blocked.** Productory's verified company account is active, `Ritemark` is reserved, and its EXE/MSI submission is in draft. The verified state now appears across the relevant Partner Center surfaces. Installer hosting is not configured, no final signed Windows candidate is approved, and the current screenshots are release references rather than Store-ready Windows captures.
+**Preparation is active. Publication is blocked.** Productory's verified company account is active, `Ritemark` is reserved, and its EXE/MSI submission is in draft. The verified state now appears across the relevant Partner Center surfaces. The v1.10.1 Windows candidate 3 passes the local package audit on Windows 11 (see [`release-candidates/v1.10.1-candidate-3.md`](./release-candidates/v1.10.1-candidate-3.md)). It still has to be uploaded to its immutable `getritemark.com` path, hash-checked from there, and tested on a clean Windows 11 machine.
 
 ## Account and Partner Center
 
@@ -42,14 +42,14 @@ Last updated: **2026-09-02**
 
 ## Hosting and package
 
-- [ ] `downloads.ritemark.app` DNS resolves.
-- [ ] HTTPS certificate and direct-download behavior pass.
+- [x] Installer host resolves — `getritemark.com` (`downloads.ritemark.app` never resolved and is dropped).
+- [x] HTTPS certificate and direct-download behavior pass — `/windows/v1.10.0/Ritemark-Setup.exe` returns HTTP 200 as `application/vnd.microsoft.portable-executable` (2026-09-10).
 - [ ] Release Gate 1 authorizes the Windows build.
-- [ ] Signed x64 standalone EXE built from the approved commit.
-- [ ] Installer and installed PE signature audit passes.
-- [ ] Standard-user silent install and uninstall pass.
-- [ ] Defender scan passes.
-- [ ] Versioned installer URL contains the exact tested bytes.
+- [x] Signed x64 standalone EXE built from the approved commit — v1.10.1 candidate 3, CI run `34472311244` at `23493cef`.
+- [x] Installer and installed PE signature audit passes — installer `Valid` with timestamp; 46/46 installed PE files `Valid` (2026-09-10).
+- [x] Standard-user silent install and uninstall pass — Store parameters, exit 0, one Apps & Features entry at `1.10.1`, full cleanup, user data kept (2026-09-10).
+- [x] Defender scan passes — no threats (2026-09-10).
+- [ ] Versioned installer URL contains the exact tested bytes — `getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` returned HTTP 404 on 2026-09-10; upload pending.
 - [ ] Fresh URL download matches the recorded SHA-256.
 
 ## Store media
@@ -79,5 +79,5 @@ Last updated: **2026-09-02**
 1. Obtain Jarmo's explicit approval for the IARC Terms of Use/adult-status attestation, then save the generated ratings.
 2. Add the English Store listing and save its text-only draft after action-time approval of the exact copy.
 3. Resolve the support-contact URL field, which has cleared input and remains blank.
-4. Configure `downloads.ritemark.app` DNS/HTTPS and the versioned path convention.
+4. Upload v1.10.1 candidate 3 to `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, then download it fresh and match SHA-256 `93f9adce…d77250`.
 5. Do not add a placeholder package URL or submit until the approved Windows candidate exists.

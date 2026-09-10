@@ -40,7 +40,7 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 | Field | Stable value / candidate source |
 |---|---|
 | Expected filename | `Ritemark-Setup.exe` |
-| Package URL | Copy from the approved release-candidate record; expected pattern: `https://downloads.ritemark.app/windows/v{VERSION}/Ritemark-Setup.exe` |
+| Package URL | Copy from the approved release-candidate record; expected pattern: `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe` |
 | Installer parameters | `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CURRENTUSER` |
 | Installer type | Standalone/offline EXE; no setup-time payload downloads |
 | Signature publisher | `Productory Services OÜ` |

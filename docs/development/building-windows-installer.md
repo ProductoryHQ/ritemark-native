@@ -49,9 +49,9 @@ The command fails on an unsigned or invalid PE, a Productory-owned file with the
 Partner Center should fetch:
 
 ```text
-https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe
+https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe
 ```
 
-Before submission, download that URL and compare its SHA-256 with the workflow's `Ritemark-Setup.sha256.txt`. The GitHub Release direct-download file must be the same installer with the same hash. No separate channel infrastructure is required.
+Before submission, download that URL and compare its SHA-256 with the workflow's `Ritemark-Setup.sha256.txt`. Sidecars built before #274 still name `downloads.ritemark.app` in `store_url`; that host never resolved, so enter the `getritemark.com` URL by hand. The GitHub Release direct-download file must be the same installer with the same hash. No separate channel infrastructure is required.
 
 See the [Partner Center and SAC handoff](./releases/v1.10.0/sprint-114-trusted-windows-install/research/partner-center-and-sac-handoff.md).

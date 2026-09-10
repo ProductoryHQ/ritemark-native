@@ -33,7 +33,7 @@ Before dispatching the final Windows workflow:
 | Package format | `Ritemark-Setup.exe` |
 | Architecture | x64 |
 | Hosting | Productory-controlled HTTPS infrastructure/CDN |
-| URL shape | `https://downloads.ritemark.app/windows/v{VERSION}/Ritemark-Setup.exe` |
+| URL shape | `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe` |
 | URL behavior | Direct installer response; no HTML/interstitial/login |
 | URL mutability | Immutable after submission |
 | Installer type | Standalone/offline; no setup-time payload download |

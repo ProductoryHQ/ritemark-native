@@ -1,6 +1,6 @@
 # Microsoft Store visual assets
 
-Last inventory: **2026-09-01**
+Last inventory: **2026-09-10**
 
 ## Microsoft requirements used here
 
@@ -53,6 +53,19 @@ Capture 5–7 images from the exact installed candidate on Windows 11. Prefer a 
 5. Integrated agent assistance beside the document.
 6. Reopened/pinned conversation workflow.
 7. Export or another primary end-user result.
+
+## Final Windows screenshots — v1.10.1 candidate 3
+
+Captured on 2026-09-10 at 1920×1080 from the installed signed candidate (`93f9adce…`), using a synthetic "Harbour Lane Bakery" project and a disposable profile. Files are in [`assets/store-screenshots/1.10.1/`](./assets/store-screenshots/1.10.1/); order and captions are recorded in [`release-candidates/v1.10.1-candidate-3.md`](./release-candidates/v1.10.1-candidate-3.md).
+
+| File | Subject from the capture plan |
+|---|---|
+| `01-visual-markdown-editing.png` | 1, 2 and 3 — visual editing, project files, a table |
+| `02-agent-edits-open-document.png` | 5 — agent assistance beside the document |
+| `03-export-pdf-word.png` | 7 — export |
+| `04-recipe-document.png` | 2 — project files and a formatted document |
+
+Plan item 4 (transcription) is left out, because the Windows on-device engine is not available yet. Item 6 (reopened/pinned conversation) is left out, because the conversation list is too narrow to read at this size.
 
 ## Final screenshot acceptance checklist
 

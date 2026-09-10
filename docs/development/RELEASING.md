@@ -36,7 +36,7 @@ Windows installers are produced by the manually dispatched `Build Windows (x64)`
 
 The workflow must finish payload PE signing, Inno setup/uninstaller signing, publisher/timestamp verification, standard-user silent install, installed-tree/product-registration checks, and uninstall before it uploads the installer. The expected publisher is `Productory Services OÜ`.
 
-For v1.10.0, Partner Center ingests `https://downloads.ritemark.app/windows/v1.10.0/Ritemark-Setup.exe`. GitHub Release retains the same bytes as a secondary direct download. Kristiina tests that SHA-256 on a clean Windows 11 machine with Smart App Control On; Jarmo approves the same file for Gate 2.
+Partner Center ingests `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe`, one immutable path per candidate (`downloads.ritemark.app` never resolved and is not used). GitHub Release retains the same bytes as a secondary direct download. Kristiina tests that SHA-256 on a clean Windows 11 machine with Smart App Control On; Jarmo approves the same file for Gate 2.
 
 Operator commands and evidence requirements are in [Building and Verifying the Windows Installer](./building-windows-installer.md). Partner Center and clean-machine ownership are in the [Sprint 114 handoff](./releases/v1.10.0/sprint-114-trusted-windows-install/research/partner-center-and-sac-handoff.md).
 
