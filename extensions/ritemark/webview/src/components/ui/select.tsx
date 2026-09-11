@@ -49,7 +49,11 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md shadow-md',
+        // Issue #272: without a cap, popper-positioned content sizes to its
+        // widest child (option descriptions) and can exceed the webview's
+        // own viewport — the sidebar frame — since Radix can only reposition
+        // the popover, not shrink it, when content is inherently too wide.
+        'relative z-50 max-h-96 min-w-[8rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md shadow-md',
         'bg-surface',
         'border border-hairline',
         'text-ink-strong',
