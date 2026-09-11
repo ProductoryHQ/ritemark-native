@@ -32,7 +32,7 @@ Before dispatching the final Windows workflow:
 |---|---|
 | Package format | `Ritemark-Setup.exe` |
 | Architecture | x64 |
-| Hosting | Productory-controlled HTTPS infrastructure/CDN |
+| Hosting | Productory-controlled Cloudflare R2 bucket behind managed DNS and HTTPS |
 | URL shape | `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe` |
 | URL behavior | Direct installer response; no HTML/interstitial/login |
 | URL mutability | Immutable after submission |
@@ -83,6 +83,8 @@ After uploading the exact tested installer:
 5. Verify Authenticode again on the downloaded file.
 6. Record response timestamp, final URL after redirects, content length, and SHA-256.
 7. Lock the object against in-place replacement.
+
+Use [`scripts/publish-store-installer.mjs`](../../scripts/publish-store-installer.mjs) for the guarded upload and streaming public verification. The command performs both an authenticated destination check and an atomic `If-None-Match: *` upload; it has no overwrite mode. Cloudflare's indefinite `windows/` bucket lock is a second, service-side protection against replacement or deletion.
 
 If a rebuild is required, use a new path such as `v1.10.0-candidate-2`. Do not replace the previous bytes.
 

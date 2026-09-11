@@ -13,12 +13,12 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 | Architecture | `x64` |
 | Install context | Per-user / current user; normal install does not require an administrator account |
 | Package language | English (`en`) |
-| Store listing language | English (United Kingdom), subject to confirmation in the live draft |
+| Store listing language | English (United Kingdom); language page not yet added to the live draft |
 | Minimum OS | Windows 10 x64-compatible; clean Windows 11 is the certification and Smart App Control baseline |
-| Category | Proposed: `Productivity`; confirm the current Partner Center taxonomy |
-| Pricing | **Pending Jarmo decision** |
-| Markets | **Pending Jarmo decision** |
-| Age rating | Complete the live Partner Center questionnaire; do not infer a rating |
+| Category | `Productivity` — confirmed in the live Partner Center taxonomy |
+| Pricing | `Free: no payment necessary` |
+| Markets | All 240 regions; do not add future regions automatically |
+| Age rating | Questionnaire and preview complete; IARC Terms/adult-status attestation and final Save pending |
 
 ## Publisher and public information
 
@@ -37,15 +37,17 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 
 ## Package fields
 
+Current candidate: v1.10.1 candidate 3. Hosted bytes are verified; Store-specific approval and clean-machine testing remain pending.
+
 | Field | Stable value / candidate source |
 |---|---|
 | Expected filename | `Ritemark-Setup.exe` |
-| Package URL | Copy from the approved release-candidate record; expected pattern: `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe` |
+| Package URL | `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` |
 | Installer parameters | `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CURRENTUSER` |
 | Installer type | Standalone/offline EXE; no setup-time payload downloads |
 | Signature publisher | `Productory Services OÜ` |
-| SHA-256 | Copy from the approved release-candidate record |
-| Version | Copy from the approved release-candidate record |
+| SHA-256 | `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250` |
+| Version | `1.10.1` |
 | Uninstall | Inno Setup uninstaller; standard-user silent uninstall and cleanup must pass |
 | Custom return-code handling | Leave unset unless final installer testing identifies a required mapping |
 | Non-Microsoft driver or NT service dependency | None expected; verify for every candidate |
@@ -64,7 +66,7 @@ Copy the full text from [`LISTING-COPY.md`](./LISTING-COPY.md).
 | What's new | Leave blank for the first Store submission; use version-specific copy for later updates |
 | Search terms | Seven prepared terms; within the current Store limit |
 | Applicable license terms | Use `https://www.productory.ai/en/terms/` |
-| Screenshot set | **Pending installed-Windows capture** |
+| Screenshot set | Four installed-Windows v1.10.1 images selected; Jarmo review and Partner Center preview pending |
 | 1:1 Store logo | `assets/store-logo-1x1.png` |
 | 2:3 poster art | Optional/recommended; no final asset prepared |
 

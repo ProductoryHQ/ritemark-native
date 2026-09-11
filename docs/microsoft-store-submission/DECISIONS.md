@@ -24,14 +24,21 @@ This log captures material Store decisions that must survive individual releases
 | 2026-09-01 | Declare generative AI and use conservative IARC content answers. | General-purpose AI output may include sensitive text categories even though they are not Ritemark's focus; visual depictions are not declared. |
 | 2026-09-02 | Record Partner Center account verification as propagated to the Store listing surface. | The stale verification warning disappeared after refresh, so listing preparation can continue. |
 | 2026-09-02 | Keep the conservative IARC answers after reviewing the generated preview. | The preview produces ratings from `12+` through region-specific `18+`; legal attestation and final save still require Jarmo's explicit approval. |
+| 2026-09-07 | Use Cloudflare R2 bucket `ritemark-downloads-prod` behind the apex domain `getritemark.com` for Store installer delivery. | This is the smallest low-cost architecture available in the existing Cloudflare account: managed DNS and TLS, a direct object response, no login page, and no separate CDN/origin service. |
+| 2026-09-07 | Use `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe` as the immutable package pattern. | Each released build gets a new versioned key. A submitted key must never receive different bytes; rebuilds require a new candidate/version and URL. |
+| 2026-09-07 | Keep the R2 development URL disabled and require TLS 1.2 or newer on the custom domain. | Only the production hostname is public; the rate-limited development hostname is not a supported download route. |
+| 2026-09-07 | Publish Store installers with the repository's guarded S3-compatible tool, atomic `If-None-Match: *`, and an indefinite R2 lock on `windows/`. | The client refuses existing keys while the service-side retention rule prevents overwrite and deletion; neither mechanism depends on operator memory alone. |
+| 2026-09-07 | Publish the approved v1.10.0 installer at `https://getritemark.com/windows/v1.10.0/Ritemark-Setup.exe`. | A fresh anonymous download matched the approved `430929984`-byte size and SHA-256 `7ada28ad…32f3`; the URL is now immutable and must never receive different bytes. |
 
 ## Open decisions
+
+Reconciliation on 2026-09-11: v1.10.1 candidate 3 supersedes v1.10.0 for Store submission. Both hosted objects stay immutable. PR #275 supplies the Windows audit/screenshots; PR #277 records the later successful publication. The guarded uploader and its operational documentation are retained as release-independent tooling. See [reconciliation evidence](./evidence/reconciliation-2026-09-11.md).
 
 | Decision | Owner | Needed by |
 |---|---|---|
 | Public support email | Jarmo | Before support information is finalized |
 | Final screenshot set and order | Jarmo | Before final draft review |
-| Exact package candidate/hash | Release manager + Jarmo | Before package section is finalized |
+| Exact Store candidate/hash | Jarmo: v1.10.1 candidate 3, `93f9adce…d77250`; direct-release approval is recorded, Store approval pending | Before package section is finalized |
 | Submit authorization | Jarmo | After all validation and clean-Windows evidence |
 
 ## Change procedure

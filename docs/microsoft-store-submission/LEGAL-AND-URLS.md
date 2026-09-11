@@ -1,6 +1,6 @@
 # Legal, support, and public URLs
 
-Last external check: **2026-09-01**
+Last installer HTTP/TLS check: **2026-09-11**. Legal/support page checks remain dated 2026-09-01.
 
 ## Canonical submission URLs
 
@@ -11,7 +11,7 @@ Last external check: **2026-09-01**
 | Product support | `https://ritemark.app/en/support/` | HTTP 200 | Yes |
 | Privacy policy | `https://www.productory.ai/en/privacy/` | HTTP 200 | Yes |
 | License / terms | `https://www.productory.ai/en/terms/` | HTTP 200 | Yes |
-| Installer host | `https://getritemark.com` | HTTP 200 for `/windows/v1.10.0/Ritemark-Setup.exe` on 2026-09-10 | Yes |
+| Installer host | `https://getritemark.com` | Public DNS, valid HTTPS, direct v1.10.1 response, and fresh-download hash passed | Yes |
 
 Use explicit `/en/` policy URLs so the English Store listing does not depend on location-based redirects.
 
@@ -40,7 +40,7 @@ Ritemark's source repository is MIT-licensed, but the public Store listing shoul
 
 ## Installer hosting
 
-Installers are hosted on `getritemark.com`. The previously reserved `downloads.ritemark.app` has never resolved (DNS failure on 2026-09-01 and 2026-09-08) and is not used.
+The production host is `getritemark.com`, backed by Cloudflare R2. DNS, HTTPS, and direct object delivery were verified with a safe probe on 2026-09-07. Both v1.10.0 (2026-09-07) and v1.10.1 (2026-09-10) were uploaded to the versioned key under the indefinite `windows/` lock and downloaded again from the final URL with the approved SHA-256.
 
 Required behavior, checked for every candidate:
 
@@ -55,6 +55,8 @@ Required behavior, checked for every candidate:
 Expected pattern:
 
 `https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe`
+
+The complete architecture and operational procedure are in [`HOSTING-AND-DOWNLOADS.md`](./HOSTING-AND-DOWNLOADS.md). Probe evidence is in [`evidence/hosting-probe-2026-09-07.md`](./evidence/hosting-probe-2026-09-07.md).
 
 ## Public support identity
 

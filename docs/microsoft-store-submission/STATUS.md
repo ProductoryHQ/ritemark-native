@@ -1,10 +1,10 @@
 # Microsoft Store status
 
-Last updated: **2026-09-10**
+Last updated: **2026-09-11**
 
 ## High-level status
 
-**Preparation is active. Publication is blocked.** Productory's verified company account is active, `Ritemark` is reserved, and its EXE/MSI submission is in draft. The verified state now appears across the relevant Partner Center surfaces. The v1.10.1 Windows candidate 3 passes the local package audit on Windows 11 (see [`release-candidates/v1.10.1-candidate-3.md`](./release-candidates/v1.10.1-candidate-3.md)). It still has to be uploaded to its immutable `getritemark.com` path, hash-checked from there, and tested on a clean Windows 11 machine.
+**Preparation is active. Store submission is still blocked on non-hosting evidence and Partner Center work.** The current candidate is v1.10.1 candidate 3, published to the immutable R2 URL on 2026-09-10. The anonymous download matched the approved size and SHA-256. Windows developer-machine signature, Defender, install/use/uninstall and SAC checks pass; clean-machine testing (Kristiina), screenshot approval, Partner Center completion and explicit Store submission approval remain open.
 
 ## Account and Partner Center
 
@@ -42,32 +42,38 @@ Last updated: **2026-09-10**
 
 ## Hosting and package
 
-- [x] Installer host resolves — `getritemark.com` (`downloads.ritemark.app` never resolved and is dropped).
-- [x] HTTPS certificate and direct-download behavior pass — `/windows/v1.10.0/Ritemark-Setup.exe` returns HTTP 200 as `application/vnd.microsoft.portable-executable` (2026-09-10).
-- [ ] Release Gate 1 authorizes the Windows build.
-- [x] Signed x64 standalone EXE built from the approved commit — v1.10.1 candidate 3, CI run `34472311244` at `23493cef`.
-- [x] Installer and installed PE signature audit passes — installer `Valid` with timestamp; 46/46 installed PE files `Valid` (2026-09-10).
-- [x] Standard-user silent install and uninstall pass — Store parameters, exit 0, one Apps & Features entry at `1.10.1`, full cleanup, user data kept (2026-09-10).
-- [x] Defender scan passes — no threats (2026-09-10).
-- [ ] Versioned installer URL contains the exact tested bytes — `getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` returned HTTP 404 on 2026-09-10; upload pending.
-- [ ] Fresh URL download matches the recorded SHA-256.
+- [x] `getritemark.com` public A and AAAA resolution passes.
+- [x] HTTPS certificate validation and TLS 1.2 minimum configuration pass.
+- [x] Anonymous direct-download probe passes with no redirect, login, cookie, or HTML interstitial.
+- [x] Release Gate 1 authorized the Windows build.
+- [x] Signed x64 standalone EXE built from approved product commit `23493cef1f4d38cd997be5509e057cb75560fb5c`.
+- [x] Installer and installed PE signature audit passes.
+- [x] Standard-user silent install and uninstall pass.
+- [x] Defender scan passes — no threats on 2026-09-10 (developer machine).
+- [x] Repository upload tool validates the exact local size/hash, requires the versioned key confirmation, and uses conditional `If-None-Match: *` upload.
+- [x] Real v1.10.0 plan check passes: approved local identity and unused public destination (`404`).
+- [x] One-year R2 Object Read & Write account token exists for `ritemark-downloads-prod` only and is stored outside the repository.
+- [x] Guarded R2 upload command refuses the existing public object before attempting an upload.
+- [x] Production immutability control `windows-immutable` for `windows/` is configured, indefinite, enabled, and verified in Cloudflare Dashboard.
+- [x] Versioned installer URL contains the exact tested bytes.
+- [x] Fresh URL download matches the recorded SHA-256 and byte length.
 
 ## Store media
 
 - [x] Seven 2880×1800 reference screenshots collected.
 - [x] Reference screenshots copied into this hub.
-- [ ] Final screenshots captured from an installed Windows candidate.
+- [x] Four 1920×1080 screenshots captured from installed v1.10.1 candidate 3; see ASSETS.md.
 - [ ] Final screenshots contain no development-host title, test-only UI, private project names, secrets, or misleading platform chrome.
-- [ ] At least four final screenshots selected and ordered.
+- [x] Four final screenshots selected and ordered; Jarmo approval and Partner Center preview remain pending.
 - [ ] Captions reviewed in the English listing.
 - [ ] 1:1 logo preview approved in Partner Center.
 
-## Certification and release Gate 2
+## Store certification (separate from completed direct-release gates)
 
 - [ ] Certification notes finalized.
 - [ ] Partner Center package validation passes.
 - [ ] Clean Windows 11 / Smart App Control On test passes.
-- [ ] Install, launch, edit/save, and uninstall evidence refers to the exact hosted SHA-256.
+- [x] Developer-machine install, launch, edit/save, and uninstall evidence refers to the exact hosted v1.10.1 SHA-256. Clean-machine evidence remains pending.
 - [ ] Final Partner Center review completed without placeholders.
 - [ ] Jarmo explicitly approves **Submit to the Store** for the exact candidate.
 - [ ] Microsoft certification passes.
@@ -76,8 +82,7 @@ Last updated: **2026-09-10**
 
 ## Immediate next actions
 
-1. Obtain Jarmo's explicit approval for the IARC Terms of Use/adult-status attestation, then save the generated ratings.
-2. Add the English Store listing and save its text-only draft after action-time approval of the exact copy.
-3. Resolve the support-contact URL field, which has cleared input and remains blank.
-4. Upload v1.10.1 candidate 3 to `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, then download it fresh and match SHA-256 `93f9adce…d77250`.
-5. Do not add a placeholder package URL or submit until the approved Windows candidate exists.
+1. Kristiina: record clean Windows 11 / Smart App Control On evidence against the hosted v1.10.1 SHA-256.
+2. Jarmo: approve the four installed-Windows screenshots and the exact Store candidate.
+3. Finish the English listing, IARC attestation, certification notes, and package validation in Partner Center.
+4. Do not select **Submit to the Store** until Jarmo explicitly approves the complete draft and exact hosted candidate.
