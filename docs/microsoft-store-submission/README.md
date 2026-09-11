@@ -14,7 +14,7 @@ Last reviewed: **2026-09-01**
 | English Store listing | `Ritemark` reserved; EXE/MSI draft active | Complete draft sections after account-state propagation and field decisions |
 | Public product/support pages | Ready | Recheck immediately before submission |
 | Privacy and terms | Ready at Productory URLs | Use the approved Productory pages, not the 404 Ritemark paths |
-| Installer hosting | Blocked | Configure DNS and HTTPS for `downloads.ritemark.app` |
+| Installer hosting | Ready | `getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe`; upload each candidate to its own versioned path |
 | Signed Windows package | Pending | Build only after the release Gate 1 approval |
 | Store screenshots | Reference set only | Capture the installed Windows build; current images show a development host |
 | Submission | Not authorized | Keep as draft until the final candidate and all checks pass |

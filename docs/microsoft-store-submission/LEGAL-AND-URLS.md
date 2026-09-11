@@ -11,7 +11,7 @@ Last external check: **2026-09-01**
 | Product support | `https://ritemark.app/en/support/` | HTTP 200 | Yes |
 | Privacy policy | `https://www.productory.ai/en/privacy/` | HTTP 200 | Yes |
 | License / terms | `https://www.productory.ai/en/terms/` | HTTP 200 | Yes |
-| Installer host | `https://downloads.ritemark.app` | DNS did not resolve | **No — blocked** |
+| Installer host | `https://getritemark.com` | HTTP 200 for `/windows/v1.10.0/Ritemark-Setup.exe` on 2026-09-10 | Yes |
 
 Use explicit `/en/` policy URLs so the English Store listing does not depend on location-based redirects.
 
@@ -38,11 +38,11 @@ Before every submission:
 
 Ritemark's source repository is MIT-licensed, but the public Store listing should use the stable Productory terms URL rather than a repository URL that may become unavailable.
 
-## Installer hosting blocker
+## Installer hosting
 
-`downloads.ritemark.app` must be configured before a package can be added to the final draft.
+Installers are hosted on `getritemark.com`. The previously reserved `downloads.ritemark.app` has never resolved (DNS failure on 2026-09-01 and 2026-09-08) and is not used.
 
-Required behavior:
+Required behavior, checked for every candidate:
 
 - DNS resolves publicly;
 - HTTPS certificate is valid;
@@ -54,7 +54,7 @@ Required behavior:
 
 Expected pattern:
 
-`https://downloads.ritemark.app/windows/v{VERSION}/Ritemark-Setup.exe`
+`https://getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe`
 
 ## Public support identity
 
