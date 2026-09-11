@@ -123,8 +123,14 @@ export async function fileIdentity(filePath) {
   if (!details.isFile()) throw new Error(`not a regular file: ${filePath}`);
 
   const hash = createHash('sha256');
-  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
-  return { size: details.size, sha256: hash.digest('hex') };
+  const md5 = createHash('md5');
+  let size = 0;
+  for await (const chunk of createReadStream(filePath)) {
+    size += chunk.length;
+    hash.update(chunk);
+    md5.update(chunk);
+  }
+  return { size, sha256: hash.digest('hex'), contentMD5: md5.digest('base64') };
 }
 
 export async function assertLocalIdentity(options) {
@@ -192,11 +198,16 @@ export async function assertR2KeyUnused(client, bucket, key) {
 }
 
 export async function putNewObject(client, options) {
+  // Derive the server-enforced checksum from the same stream that passed the
+  // approved SHA-256 check. Never recompute it from the later upload stream.
+  const identity = await assertLocalIdentity(options);
+  const body = createReadStream(options.file);
   try {
     return await client.send(new PutObjectCommand({
       Bucket: options.bucket,
       Key: options.key,
-      Body: createReadStream(options.file),
+      Body: body,
+      ContentMD5: identity.contentMD5,
       ContentLength: options.size,
       ContentType: INSTALLER_CONTENT_TYPE,
       ContentDisposition: `attachment; filename="${INSTALLER_NAME}"`,
@@ -208,10 +219,15 @@ export async function putNewObject(client, options) {
       },
     }));
   } catch (error) {
+    if (error?.name === 'BadDigest') {
+      throw new Error('R2 rejected the upload checksum; the file changed after verification or in transit. No object was committed.');
+    }
     if (error?.$metadata?.httpStatusCode === 412 || error?.name === 'PreconditionFailed') {
       throw new Error(`atomic no-overwrite check rejected the upload because ${options.key} already exists`);
     }
     throw error;
+  } finally {
+    body.destroy();
   }
 }
 

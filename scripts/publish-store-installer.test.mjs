@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,11 +9,58 @@ import {
   assertPublicKeyUnused,
   installerKey,
   parseArgs,
+  putNewObject,
   verifyPublicObject,
 } from './publish-store-installer.mjs';
 
 const body = Buffer.from('Ritemark installer hosting test\n');
 const sha256 = '08e310d8f007eac55128a67baae94b644e19f81475a8d58af06b72ace0239444';
+
+for (const mutation of ['none', 'before-stream', 'during-stream']) {
+  test(`upload binds verified bytes to server checksum: ${mutation}`, async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'ritemark-store-hosting-'));
+    const file = path.join(directory, 'installer.exe');
+    const original = Buffer.alloc(512 * 1024, 'a');
+    const changed = Buffer.alloc(original.length, 'b');
+    let committed = false;
+    try {
+      await writeFile(file, original);
+      const client = {
+        async send(command) {
+          assert.equal(command.input.IfNoneMatch, '*');
+          assert.equal(command.input.ContentMD5, createHash('md5').update(original).digest('base64'));
+          if (mutation === 'before-stream') await writeFile(file, changed);
+          const received = createHash('md5');
+          let chunks = 0;
+          for await (const chunk of command.input.Body) {
+            received.update(chunk);
+            if (++chunks === 1 && mutation === 'during-stream') await writeFile(file, changed);
+          }
+          // Model R2's documented Content-MD5 validation before committing.
+          if (received.digest('base64') !== command.input.ContentMD5) {
+            throw Object.assign(new Error('checksum mismatch'), { name: 'BadDigest' });
+          }
+          committed = true;
+          return { ETag: 'test' };
+        },
+      };
+      const upload = putNewObject(client, {
+        file, size: original.length,
+        sha256: createHash('sha256').update(original).digest('hex'),
+        bucket: 'test', key: installerKey('1.10.1'), version: '1.10.1',
+      });
+      if (mutation === 'none') {
+        await upload;
+        assert.equal(committed, true);
+      } else {
+        await assert.rejects(upload, /R2 rejected the upload checksum/);
+        assert.equal(committed, false);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 test('builds the immutable versioned installer key', () => {
   assert.equal(installerKey('1.10.0'), 'windows/v1.10.0/Ritemark-Setup.exe');
