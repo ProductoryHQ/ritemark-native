@@ -54,10 +54,12 @@ function resolveProvider(
   const remotePC = remote?.providers[provider] ?? null;
   const cachePC = cache?.providers[provider] ?? null;
   const bundledPC = bundled.providers[provider] ?? null;
+  const remoteIsCurrent = isCatalogAtLeastAsFresh(remote, bundled);
+  const cacheIsCurrent = isCatalogAtLeastAsFresh(cache, bundled);
   // A structurally valid but empty provider is not a usable catalog source. It
   // must not erase the compiled offline floor and leave a picker with no rows.
-  const usableRemotePC = remotePC && remotePC.models.length > 0 ? remotePC : null;
-  const usableCachePC = cachePC && cachePC.models.length > 0 ? cachePC : null;
+  const usableRemotePC = remoteIsCurrent && remotePC && remotePC.models.length > 0 ? remotePC : null;
+  const usableCachePC = cacheIsCurrent && cachePC && cachePC.models.length > 0 ? cachePC : null;
   const bestCatalog = usableRemotePC ?? usableCachePC ?? bundledPC; // curated metadata + defaults
 
   const live = discovery[provider];
@@ -107,6 +109,14 @@ function resolveProvider(
     }
   }
   return { models: sorted, defaults, source };
+}
+
+/** An older or undated remote/cache snapshot cannot hide a newer bundled floor. */
+export function isCatalogAtLeastAsFresh(candidate: ModelCatalog | null, bundled: ModelCatalog): boolean {
+  if (!candidate) return false;
+  const candidateTime = Date.parse(candidate.updatedAt);
+  const bundledTime = Date.parse(bundled.updatedAt);
+  return Number.isFinite(candidateTime) && Number.isFinite(bundledTime) && candidateTime >= bundledTime;
 }
 
 /**

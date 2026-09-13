@@ -7,116 +7,105 @@ import { fileURLToPath } from 'node:url';
 import { validateAgentRuntimeManifest } from './validate-agent-runtime-manifest.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const readJson = (relativePath) => JSON.parse(fs.readFileSync(path.join(repoRoot, relativePath), 'utf8'));
+const readJson = relativePath => JSON.parse(fs.readFileSync(path.join(repoRoot, relativePath), 'utf8'));
 const fixture = () => ({
   manifest: readJson('extensions/ritemark/binaries/agents/manifest.json'),
   packageJson: readJson('extensions/ritemark/package.json'),
   packageLock: readJson('extensions/ritemark/package-lock.json'),
 });
+const validateMutation = mutate => {
+  const data = fixture();
+  mutate(data);
+  return validateAgentRuntimeManifest(data.manifest, data.packageJson, data.packageLock);
+};
 
-test('checked-in manifest and dependency pins are internally consistent', () => {
+test('checked-in runtime package manifest and SDK pins are consistent', () => {
   const { manifest, packageJson, packageLock } = fixture();
   assert.deepEqual(validateAgentRuntimeManifest(manifest, packageJson, packageLock), []);
 });
 
-test('rejects Claude binary and SDK drift', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  packageJson.dependencies['@anthropic-ai/claude-agent-sdk'] = '0.3.240';
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('Claude binary/SDK patch mismatch')));
-  assert.ok(errors.some((error) => error.includes('package-lock root Claude SDK pin')));
+test('rejects Claude runtime and SDK patch drift', () => {
+  const errors = validateMutation(({ packageJson }) => {
+    packageJson.dependencies['@anthropic-ai/claude-agent-sdk'] = '0.3.269';
+  });
+  assert.ok(errors.some(error => error.includes('approved snapshot 0.3.270')));
+  assert.ok(errors.some(error => error.includes('patch mismatch')));
 });
 
-test('rejects an unapproved runtime snapshot even when all platform rows agree', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  for (const runtime of manifest.runtimes.filter((entry) => entry.agent === 'codex')) {
-    runtime.version = '0.154.0';
-    runtime.sourceUrl = runtime.sourceUrl.replace('0.153.0', '0.154.0');
-  }
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('version must be approved snapshot 0.153.0')));
+test('rejects an unapproved runtime snapshot across all targets', () => {
+  const errors = validateMutation(({ manifest }) => {
+    for (const row of manifest.runtimes.filter(entry => entry.agent === 'opencode' && entry.component === 'runtime')) row.version = '1.18.29';
+  });
+  assert.ok(errors.some(error => error.includes('approved snapshot 1.18.30')));
 });
 
-test('rejects a missing Claude platform package from the lockfile', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  delete packageLock.packages['node_modules/@anthropic-ai/claude-agent-sdk'].optionalDependencies['@anthropic-ai/claude-agent-sdk-win32-x64'];
-  delete packageLock.packages['node_modules/@anthropic-ai/claude-agent-sdk-win32-x64'];
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('@anthropic-ai/claude-agent-sdk-win32-x64 must be present')));
+test('requires every Claude SDK optional platform package at the exact SDK pin', () => {
+  const errors = validateMutation(({ packageLock }) => {
+    delete packageLock.packages['node_modules/@anthropic-ai/claude-agent-sdk'].optionalDependencies['@anthropic-ai/claude-agent-sdk-win32-x64'];
+    delete packageLock.packages['node_modules/@anthropic-ai/claude-agent-sdk-win32-x64'];
+  });
+  assert.ok(errors.some(error => error.includes('@anthropic-ai/claude-agent-sdk-win32-x64 must be present')));
 });
 
-test('rejects a missing Codex code-mode host component', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  manifest.runtimes = manifest.runtimes.filter((runtime) => !(
-    runtime.agent === 'codex'
-    && runtime.component === 'code-mode-host'
-    && runtime.platform === 'win32'
-  ));
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('manifest must contain 14 runtime component rows')));
-  assert.ok(errors.some((error) => error.includes('codex/code-mode-host targets must be')));
+test('requires the exact Codex package member set for every target', () => {
+  const errors = validateMutation(({ manifest }) => {
+    manifest.runtimes.find(row => row.agent === 'codex' && row.platform === 'win32').members.pop();
+  });
+  assert.ok(errors.some(error => error.includes('member count must be 6')));
+  assert.ok(errors.some(error => error.includes('is missing windows-sandbox-setup')));
 });
 
-test('uses a supported smoke argument for each Codex component', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  const codeModeHost = manifest.runtimes.find((runtime) => runtime.component === 'code-mode-host');
-  codeModeHost.validationArgs = ['--version'];
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('code-mode-host') && error.includes('must validate with --help')));
+test('requires supported Codex smoke arguments', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const row = manifest.runtimes.find(entry => entry.agent === 'codex' && entry.platform === 'darwin');
+    row.members.find(member => member.component === 'code-mode-host').validationArgs = ['--version'];
+  });
+  assert.ok(errors.some(error => error.includes('code-mode-host') && error.includes('must validate with --help')));
 });
 
-test('rejects component install-name collisions on one target', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  const codeModeHost = manifest.runtimes.find((runtime) => (
-    runtime.agent === 'codex'
-    && runtime.component === 'code-mode-host'
-    && runtime.platform === 'darwin'
-    && runtime.arch === 'arm64'
-  ));
-  codeModeHost.installName = 'codex-app-server';
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('darwin-arm64/codex-app-server installName is duplicated')));
+test('rejects an unsafe or duplicate installed dependency path', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const rows = manifest.runtimes.filter(row => row.agent === 'opencode' && row.platform === 'darwin' && row.arch === 'arm64');
+    rows.find(row => row.component === 'ripgrep').installPath = '../opencode';
+  });
+  assert.ok(errors.some(error => error.includes('archive/install path is unsafe')));
 });
 
-test('rejects a unique but undiscoverable Codex sidecar install name', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  const codeModeHost = manifest.runtimes.find((runtime) => (
-    runtime.agent === 'codex'
-    && runtime.component === 'code-mode-host'
-    && runtime.platform === 'darwin'
-    && runtime.arch === 'arm64'
-  ));
-  codeModeHost.installName = 'codex-code-mode-host-0.153.0';
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('installName must be codex-code-mode-host')));
+test('requires the Windows Codex helper executables and forbids them on macOS', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const windows = manifest.runtimes.find(row => row.agent === 'codex' && row.platform === 'win32');
+    const helper = windows.members.find(member => member.component === 'command-runner');
+    windows.members = windows.members.filter(member => member.component !== 'command-runner');
+    manifest.runtimes.find(row => row.agent === 'codex' && row.platform === 'darwin').members.push(helper);
+  });
+  assert.ok(errors.some(error => error.includes('is missing command-runner')));
+  assert.ok(errors.some(error => error.includes('is not expected')));
 });
 
-test('requires the Windows-only Codex sandbox helpers', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  manifest.runtimes = manifest.runtimes.filter((runtime) => runtime.component !== 'windows-sandbox-setup');
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('manifest must contain 14 runtime component rows')));
-  assert.ok(errors.some((error) => error.includes('codex/windows-sandbox-setup targets must be win32-x64')));
+test('rejects validation arguments on IPC-only Codex helpers', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const row = manifest.runtimes.find(entry => entry.agent === 'codex' && entry.platform === 'win32');
+    row.members.find(member => member.component === 'windows-sandbox-setup').validationArgs = ['--version'];
+  });
+  assert.ok(errors.some(error => error.includes('windows-sandbox-setup') && error.includes('must not declare validationArgs')));
 });
 
-test('rejects a darwin row for a Windows-only Codex component', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  const helper = manifest.runtimes.find((runtime) => runtime.component === 'command-runner');
-  manifest.runtimes.push({ ...helper, platform: 'darwin', arch: 'arm64', installName: 'codex-command-runner' });
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('codex/command-runner targets must be win32-x64')));
+test('rejects stale OpenCode ripgrep and vendor identity', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const row = manifest.runtimes.find(entry => entry.agent === 'opencode' && entry.component === 'ripgrep');
+    row.version = '15.0.0';
+    row.vendor = 'other';
+  });
+  assert.ok(errors.some(error => error.includes('vendor must be BurntSushi')));
+  assert.ok(errors.some(error => error.includes('approved snapshot 15.1.0')));
 });
 
-test('rejects validationArgs on a Codex IPC helper that cannot be smoke-tested', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  manifest.runtimes.find((runtime) => runtime.component === 'windows-sandbox-setup').validationArgs = ['--version'];
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('must not declare validationArgs')));
-});
-
-test('rejects stale OpenCode vendor identity', () => {
-  const { manifest, packageJson, packageLock } = fixture();
-  manifest.runtimes.find((runtime) => runtime.agent === 'opencode').vendor = 'sst';
-  const errors = validateAgentRuntimeManifest(manifest, packageJson, packageLock);
-  assert.ok(errors.some((error) => error.includes('vendor must be anomalyco')));
+test('requires approved license evidence and target architecture', () => {
+  const errors = validateMutation(({ manifest }) => {
+    const row = manifest.runtimes.find(entry => entry.agent === 'claude' && entry.platform === 'darwin' && entry.arch === 'arm64');
+    row.license.noticeUrl = 'https://example.invalid/license';
+    row.expectedFileArchPattern = 'Mach-O 64-bit executable x86_64';
+  });
+  assert.ok(errors.some(error => error.includes('license notice URL')));
+  assert.ok(errors.some(error => error.includes('must declare the arm64 architecture')));
 });

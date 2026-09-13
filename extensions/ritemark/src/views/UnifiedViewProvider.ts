@@ -52,7 +52,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
-import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME, BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
+import { BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
 import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -63,6 +63,7 @@ import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
+import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
 import {
@@ -109,6 +110,8 @@ import {
   AgentSidebarBootstrapError,
 } from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
+
+const _browserToolsInjector = new BrowserToolsInjector();
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -557,8 +560,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // Browser MCP server for Claude Code (in-process server)
           let mcpServers: Record<string, unknown> | undefined;
           if (isClaudeCode && browserEnabled) {
-            const server = await createBrowserMcpServer();
-            mcpServers = { [BROWSER_MCP_SERVER_NAME]: server };
+            mcpServers = await _browserToolsInjector.getMcpServers(true);
           }
 
           const byokKeys = await this._readByokKeys();

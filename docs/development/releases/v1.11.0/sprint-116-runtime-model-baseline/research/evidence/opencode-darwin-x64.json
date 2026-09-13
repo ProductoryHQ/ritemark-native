@@ -1,0 +1,55 @@
+{
+  "url": "https://registry.npmjs.org/opencode-darwin-x64/1.18.30",
+  "capturedAt": "2026-09-13T08:59:17.914Z",
+  "sha256": "e1cae21c86ca4178fe54fe4740e44e3cbec432c77f5effe987f765e6da4bb0c1",
+  "data": {
+    "os": [
+      "darwin"
+    ],
+    "cpu": [
+      "x64"
+    ],
+    "dist": {
+      "shasum": "f83b85d25fbc9fac50f475859f26ab06476ab876",
+      "tarball": "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.18.30.tgz",
+      "fileCount": 2,
+      "integrity": "sha512-VW9LBLU1Y8GQICT2gAIzL1syK8ac5/BFaSHB6vtVetQuwBE/NKZkAKq4VBVn/87cdkFA645AVnZrUy3SLqdkwA==",
+      "signatures": [
+        {
+          "sig": "MEQCIGlRPav7Xtmn03yw2Ag1td4u/GHaGxrn/lDK74EeO9NWAiAUolQrfj7K/IMpH78PfFG2WCmA1CsgHkx5d2L5rKscNw==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 149749980
+    },
+    "name": "opencode-darwin-x64",
+    "_from": "file:opencode-darwin-x64-1.18.30.tgz",
+    "_npmUser": {
+      "name": "GitHub Actions",
+      "email": "npm-oidc-no-reply@github.com",
+      "trustedPublisher": {
+        "id": "github",
+        "oidcConfigId": "oidc:d6639060-f768-4879-ab9b-5e2faaf201ee"
+      }
+    },
+    "_resolved": "/home/runner/_work/opencode/opencode/packages/opencode/dist/opencode-darwin-x64/opencode-darwin-x64-1.18.30.tgz",
+    "_integrity": "sha512-VW9LBLU1Y8GQICT2gAIzL1syK8ac5/BFaSHB6vtVetQuwBE/NKZkAKq4VBVn/87cdkFA645AVnZrUy3SLqdkwA==",
+    "_npmVersion": "11.6.2",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "thdxr",
+        "email": "d@ironbay.co"
+      }
+    ],
+    "_nodeVersion": "24.13.0",
+    "_hasShrinkwrap": false,
+    "preferUnplugged": true,
+    "_npmOperationalInternal": {
+      "tmp": "tmp/opencode-darwin-x64_1.18.30_1788924767983_0.043108302680142874",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "opencode-darwin-x64@1.18.30",
+    "version": "1.18.30"
+  }
+}

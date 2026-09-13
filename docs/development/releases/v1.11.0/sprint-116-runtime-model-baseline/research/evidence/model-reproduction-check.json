@@ -1,0 +1,40 @@
+{
+  "capturedAt": "2026-09-13T09:39:53.619Z",
+  "inputs": "Previously captured sanitized cache shape and published catalog",
+  "cacheEffort": {
+    "modelsReturned": 6,
+    "modelsWithEffort": 0
+  },
+  "staticCatalogCases": [
+    {
+      "name": "remote only",
+      "source": "remote",
+      "newBundledModelVisible": false,
+      "ids": [
+        "gpt-5.3-codex",
+        "codex-spark",
+        "gpt-5.2-codex"
+      ]
+    },
+    {
+      "name": "cache only",
+      "source": "cache",
+      "newBundledModelVisible": false,
+      "ids": [
+        "gpt-5.3-codex",
+        "codex-spark",
+        "gpt-5.2-codex"
+      ]
+    },
+    {
+      "name": "remote and cache",
+      "source": "remote",
+      "newBundledModelVisible": false,
+      "ids": [
+        "gpt-5.3-codex",
+        "codex-spark",
+        "gpt-5.2-codex"
+      ]
+    }
+  ]
+}

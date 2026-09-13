@@ -1,0 +1,19 @@
+{
+  "provider": "acp",
+  "capturedAt": "2026-09-13T14:46:27.096Z",
+  "auditBinaryDir": "/private/tmp/ritemark-s116-audit-YfLYRv/binaries/darwin-arm64",
+  "checks": [
+    {
+      "name": "ACP free-route streaming cancellation",
+      "status": "PASS",
+      "selectedModel": "opencode/big-pickle",
+      "stopReason": "cancelled",
+      "chunksAtCancel": 1,
+      "chunksAfter": 1,
+      "processAlive": true
+    }
+  ],
+  "diagnostics": {
+    "stderrTail": []
+  }
+}

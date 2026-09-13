@@ -22,6 +22,7 @@ export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
 
 /** Canonical Codex agent model identifiers. */
 export const CODEX_MODEL_IDS = {
+  ASTRA: 'gpt-6-astra',
   SOL: 'gpt-5.6-sol',
   TERRA: 'gpt-5.6-terra',
   LUNA: 'gpt-5.6-luna',
@@ -30,6 +31,59 @@ export const CODEX_MODEL_IDS = {
   GPT_5_4_MINI: 'gpt-5.4-mini',
   GPT_5_3_CODEX_SPARK: 'gpt-5.3-codex-spark',
 } as const;
+
+export const CLAUDE_MODEL_IDS = {
+  SONNET_5: 'claude-sonnet-5',
+  OPUS_5: 'claude-opus-5',
+  OPUS_4_8: 'claude-opus-4-8',
+  FABLE_5_1: 'claude-fable-5-1',
+  FABLE_5: 'claude-fable-5',
+  HAIKU_4_5: 'claude-haiku-4-5-20251001',
+} as const;
+
+export const OPENAI_MODEL_IDS = {
+  ASTRA: CODEX_MODEL_IDS.ASTRA,
+  SOL: CODEX_MODEL_IDS.SOL,
+  TERRA: CODEX_MODEL_IDS.TERRA,
+  LUNA: CODEX_MODEL_IDS.LUNA,
+  GPT_5_2: 'gpt-5.2',
+  GPT_5_1: 'gpt-5.1',
+  GPT_5_MINI: 'gpt-5-mini',
+  GPT_5_NANO: 'gpt-5-nano',
+  GPT_4O: 'gpt-4o',
+  GPT_4O_MINI: 'gpt-4o-mini',
+} as const;
+
+export const GEMINI_MODEL_IDS = {
+  PRO_3_1_PREVIEW: 'gemini-3.1-pro-preview',
+  FLASH_3_8: 'gemini-3.8-flash',
+  FLASH_LITE_3_5: 'gemini-3.5-flash-lite',
+  PRO_2_5: 'gemini-2.5-pro',
+  FLASH_2_5: 'gemini-2.5-flash',
+  FLASH_LITE_2_5: 'gemini-2.5-flash-lite',
+} as const;
+
+export const OPENAI_IMAGE_MODEL_IDS = {
+  IMAGE_2: 'gpt-image-2',
+  IMAGE_1_5: 'gpt-image-1.5',
+  IMAGE_1: 'gpt-image-1',
+  DALL_E_3: 'dall-e-3',
+} as const;
+
+export const GEMINI_IMAGE_MODEL_IDS = {
+  FLASH_3_1: 'gemini-3.1-flash-image',
+  PRO_3: 'gemini-3-pro-image',
+  FLASH_2_5: 'gemini-2.5-flash-image',
+} as const;
+
+export const OPENROUTER_MODEL_IDS = {
+  LLAMA_3_3_70B_INSTRUCT: 'meta-llama/llama-3.3-70b-instruct',
+} as const;
+
+/** Compose OpenCode's provider-qualified route without duplicating model IDs. */
+export function toOpenCodeModelId(provider: string, modelId: string): string {
+  return `${provider}/${modelId}`;
+}
 
 /**
  * Model configuration
@@ -51,7 +105,7 @@ export interface ModelConfig {
 }
 
 /**
- * OpenAI LLM Models (January 2026)
+ * OpenAI LLM Models (September 2026)
  *
  * Note: Model IDs verified against OpenAI API
  * Run `openai.models.list()` to get current list
@@ -59,9 +113,9 @@ export interface ModelConfig {
 export const OPENAI_LLM_MODELS: ModelConfig[] = [
   // GPT-5 Family (Responses API)
   {
-    id: 'gpt-5.2',
-    name: 'GPT-5.2',
-    description: 'Latest flagship model with enhanced reasoning',
+    id: OPENAI_MODEL_IDS.ASTRA,
+    name: 'GPT-6 Astra',
+    description: 'Most capable model for complex, demanding work',
     api: 'responses',
     reasoning: 'medium',
     contextWindow: 400000,
@@ -70,7 +124,51 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
     costTier: 'high',
   },
   {
-    id: 'gpt-5.1',
+    id: OPENAI_MODEL_IDS.SOL,
+    name: 'GPT-5.6 Sol',
+    description: 'Reliable agentic workhorse for everyday tasks',
+    api: 'responses',
+    reasoning: 'low',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
+  {
+    id: OPENAI_MODEL_IDS.TERRA,
+    name: 'GPT-5.6 Terra',
+    description: 'Balanced agentic model for everyday work',
+    api: 'responses',
+    reasoning: 'medium',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'medium',
+  },
+  {
+    id: OPENAI_MODEL_IDS.LUNA,
+    name: 'GPT-5.6 Luna',
+    description: 'Fast and affordable agentic model',
+    api: 'responses',
+    reasoning: 'medium',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'low',
+  },
+  {
+    id: OPENAI_MODEL_IDS.GPT_5_2,
+    name: 'GPT-5.2',
+    description: 'Stable Flow default with enhanced reasoning',
+    api: 'responses',
+    reasoning: 'medium',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
+  {
+    id: OPENAI_MODEL_IDS.GPT_5_1,
     name: 'GPT-5.1',
     description: 'Previous flagship, excellent for complex tasks',
     api: 'responses',
@@ -81,7 +179,7 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
     costTier: 'high',
   },
   {
-    id: 'gpt-5-mini',
+    id: OPENAI_MODEL_IDS.GPT_5_MINI,
     name: 'GPT-5 Mini',
     description: 'Cost-efficient with good reasoning',
     api: 'responses',
@@ -92,7 +190,7 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
     costTier: 'medium',
   },
   {
-    id: 'gpt-5-nano',
+    id: OPENAI_MODEL_IDS.GPT_5_NANO,
     name: 'GPT-5 Nano',
     description: 'Fastest and cheapest, basic tasks',
     api: 'responses',
@@ -105,7 +203,7 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
 
   // GPT-4 Family (Chat Completions API)
   {
-    id: 'gpt-4o',
+    id: OPENAI_MODEL_IDS.GPT_4O,
     name: 'GPT-4o',
     description: 'Previous gen multimodal, great for tools',
     api: 'chat',
@@ -116,7 +214,7 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
     costTier: 'medium',
   },
   {
-    id: 'gpt-4o-mini',
+    id: OPENAI_MODEL_IDS.GPT_4O_MINI,
     name: 'GPT-4o Mini',
     description: 'Fast and cheap, good for simple tasks',
     api: 'chat',
@@ -129,7 +227,7 @@ export const OPENAI_LLM_MODELS: ModelConfig[] = [
 ];
 
 /**
- * OpenAI Image Models (January 2026)
+ * OpenAI Image Models (September 2026)
  */
 export interface ImageModelConfig {
   id: string;
@@ -149,25 +247,36 @@ export interface ImageModelConfig {
 
 export const OPENAI_IMAGE_MODELS: ImageModelConfig[] = [
   {
-    id: 'gpt-image-1.5',
-    name: 'GPT Image 1.5',
-    description: 'Latest image model with best quality',
+    id: OPENAI_IMAGE_MODEL_IDS.IMAGE_2,
+    name: 'GPT Image 2',
+    description: 'Current image generation and editing model',
     supportsEdit: true,
     returnsBase64: true,
     sizes: ['1024x1024', '1536x1024', '1024x1536'],
     qualities: ['low', 'medium', 'high', 'auto'],
   },
   {
-    id: 'gpt-image-1',
+    id: OPENAI_IMAGE_MODEL_IDS.IMAGE_1_5,
+    name: 'GPT Image 1.5',
+    description: 'Deprecated; migrate saved flows to GPT Image 2',
+    supportsEdit: true,
+    returnsBase64: true,
+    sizes: ['1024x1024', '1536x1024', '1024x1536'],
+    qualities: ['low', 'medium', 'high', 'auto'],
+    deprecated: true,
+  },
+  {
+    id: OPENAI_IMAGE_MODEL_IDS.IMAGE_1,
     name: 'GPT Image 1',
     description: 'Previous generation image model',
     supportsEdit: true,
     returnsBase64: true,
     sizes: ['1024x1024', '1536x1024', '1024x1536'],
     qualities: ['low', 'medium', 'high'],
+    deprecated: true,
   },
   {
-    id: 'dall-e-3',
+    id: OPENAI_IMAGE_MODEL_IDS.DALL_E_3,
     name: 'DALL-E 3',
     description: 'Legacy model (deprecated May 2026)',
     supportsEdit: false,
@@ -179,14 +288,14 @@ export const OPENAI_IMAGE_MODELS: ImageModelConfig[] = [
 ];
 
 /**
- * Gemini LLM Models (January 2026)
+ * Gemini LLM Models (September 2026)
  *
  * Model IDs from: https://ai.google.dev/gemini-api/docs/models
  */
 export const GEMINI_LLM_MODELS: ModelConfig[] = [
   {
-    id: 'gemini-3-pro-preview',
-    name: 'Gemini 3 Pro',
+    id: GEMINI_MODEL_IDS.PRO_3_1_PREVIEW,
+    name: 'Gemini 3.1 Pro',
     description: 'Most capable Gemini model with reasoning',
     api: 'chat',
     reasoning: 'medium',
@@ -196,9 +305,9 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
     costTier: 'high',
   },
   {
-    id: 'gemini-3-flash-preview',
-    name: 'Gemini 3 Flash',
-    description: 'Fast Gemini 3 for quick tasks',
+    id: GEMINI_MODEL_IDS.FLASH_3_8,
+    name: 'Gemini 3.8 Flash',
+    description: 'Current fast Gemini model',
     api: 'chat',
     reasoning: 'low',
     contextWindow: 1000000,
@@ -207,7 +316,18 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
     costTier: 'medium',
   },
   {
-    id: 'gemini-2.5-pro',
+    id: GEMINI_MODEL_IDS.FLASH_LITE_3_5,
+    name: 'Gemini 3.5 Flash Lite',
+    description: 'Current low-cost Gemini model',
+    api: 'chat',
+    reasoning: 'none',
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'low',
+  },
+  {
+    id: GEMINI_MODEL_IDS.PRO_2_5,
     name: 'Gemini 2.5 Pro',
     description: 'Powerful Gemini for complex tasks',
     api: 'chat',
@@ -218,7 +338,7 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
     costTier: 'high',
   },
   {
-    id: 'gemini-2.5-flash',
+    id: GEMINI_MODEL_IDS.FLASH_2_5,
     name: 'Gemini 2.5 Flash',
     description: 'Fast and efficient (stable)',
     api: 'chat',
@@ -229,7 +349,7 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
     costTier: 'low',
   },
   {
-    id: 'gemini-2.5-flash-lite',
+    id: GEMINI_MODEL_IDS.FLASH_LITE_2_5,
     name: 'Gemini 2.5 Flash Lite',
     description: 'Cheapest Gemini model',
     api: 'chat',
@@ -242,58 +362,39 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
 ];
 
 /**
- * Gemini Image Models (January 2026)
+ * Gemini Image Models (September 2026)
  *
- * Includes both Imagen 4 and native Gemini image models (Nano Banana)
- * Model IDs from: https://ai.google.dev/gemini-api/docs/imagen
+ * Native Gemini image models (Nano Banana)
+ * Model IDs from: https://ai.google.dev/gemini-api/docs/models
  */
 export const GEMINI_IMAGE_MODELS: ImageModelConfig[] = [
-  // Imagen 4 family
   {
-    id: 'imagen-4.0-fast-generate-001',
-    name: 'Imagen 4 Fast',
-    description: 'Fastest, $0.02/image',
-    supportsEdit: false,
+    id: GEMINI_IMAGE_MODEL_IDS.FLASH_3_1,
+    name: 'Gemini 3.1 Flash Image',
+    description: 'Current fast native image generation and editing model',
+    supportsEdit: true,
     returnsBase64: true,
     sizes: ['1024x1024', '1536x1024', '1024x1536'],
     qualities: ['standard'],
   },
   {
-    id: 'imagen-4.0-generate-001',
-    name: 'Imagen 4',
-    description: 'Best quality text-to-image, $0.04/image',
-    supportsEdit: false,
+    id: GEMINI_IMAGE_MODEL_IDS.PRO_3,
+    name: 'Gemini 3 Pro Image',
+    description: 'High-fidelity native image generation and editing model',
+    supportsEdit: true,
     returnsBase64: true,
-    sizes: ['1024x1024', '1536x1024', '1024x1536', '2048x2048'],
+    sizes: ['1024x1024', '1536x1024', '1024x1536'],
     qualities: ['standard', 'hd'],
   },
   {
-    id: 'imagen-4.0-ultra-generate-001',
-    name: 'Imagen 4 Ultra',
-    description: '2K resolution, highest fidelity',
-    supportsEdit: false,
-    returnsBase64: true,
-    sizes: ['1024x1024', '2048x2048'],
-    qualities: ['standard', 'hd', 'ultra'],
-  },
-  // Gemini native image generation (Nano Banana)
-  {
-    id: 'gemini-2.5-flash-image',
-    name: 'Nano Banana Flash',
-    description: 'Fast native image generation',
+    id: GEMINI_IMAGE_MODEL_IDS.FLASH_2_5,
+    name: 'Gemini 2.5 Flash Image',
+    description: 'Deprecated; migrate saved flows to Gemini 3.1 Flash Image',
     supportsEdit: true,
     returnsBase64: true,
     sizes: ['1024x1024'],
     qualities: ['standard'],
-  },
-  {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Nano Banana Pro',
-    description: '14 reference images, character consistency',
-    supportsEdit: true,
-    returnsBase64: true,
-    sizes: ['1024x1024', '1536x1024', '1024x1536'],
-    qualities: ['standard', 'hd'],
+    deprecated: true,
   },
 ];
 
@@ -306,19 +407,19 @@ export const GEMINI_IMAGE_MODELS: ImageModelConfig[] = [
  */
 export const DEFAULT_MODELS = {
   /** Default for Ritemark AI Assistant (needs tools + streaming) */
-  assistant: 'gpt-4o-mini',
+  assistant: OPENAI_MODEL_IDS.GPT_4O_MINI,
 
   /** Default for Flow LLM nodes - OpenAI */
-  flowLLM: 'gpt-5.2',
+  flowLLM: OPENAI_MODEL_IDS.GPT_5_2,
 
   /** Default for Flow LLM nodes - Gemini */
-  flowLLMGemini: 'gemini-2.5-flash',
+  flowLLMGemini: GEMINI_MODEL_IDS.FLASH_2_5,
 
   /** Default for Flow Image nodes - OpenAI */
-  flowImage: 'gpt-image-1.5',
+  flowImage: OPENAI_IMAGE_MODEL_IDS.IMAGE_2,
 
   /** Default for Flow Image nodes - Gemini */
-  flowImageGemini: 'imagen-4.0-fast-generate-001',
+  flowImageGemini: GEMINI_IMAGE_MODEL_IDS.FLASH_3_1,
 } as const;
 
 /**

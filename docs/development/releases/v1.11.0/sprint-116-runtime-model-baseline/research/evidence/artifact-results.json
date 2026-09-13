@@ -1,0 +1,328 @@
+[
+  {
+    "key": "codex/app-server/darwin-arm64",
+    "capturedAt": "2026-09-13T09:02:29.739Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-aarch64-apple-darwin.tar.gz",
+    "archiveFilename": "codex-app-server-aarch64-apple-darwin.tar.gz",
+    "sha256": "a88883f1d2b68379eac51bd22be869eb768482aa9dcc1f9a69be86ef71dc6abd",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-app-server-aarch64-apple-darwin",
+      "size": 171099968,
+      "licenseFiles": []
+    },
+    "binarySha256": "2fc485696e5df06fc492fb310599752775fde726585149eaa7aeadb9117d235a",
+    "file": "Mach-O 64-bit executable arm64",
+    "startup": {
+      "status": "PASS",
+      "args": [
+        "--version"
+      ],
+      "output": "codex-app-server 0.154.0\n"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/app-server/win32-x64",
+    "capturedAt": "2026-09-13T09:02:29.743Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+    "archiveFilename": "codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+    "sha256": "7801a4595d80a4427dfc53600bd5070d55fe3c44c51438c3e1d10f40f7f0e225",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-app-server-x86_64-pc-windows-msvc.exe",
+      "size": 230817072,
+      "licenseFiles": []
+    },
+    "binarySha256": "6fe58c486f793629317d73e66f804dcfad6561aa8ed9b2c9ff647f7843b4b350",
+    "file": "PE32+ executable (console) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/app-server/darwin-x64",
+    "capturedAt": "2026-09-13T09:02:29.743Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-x86_64-apple-darwin.tar.gz",
+    "archiveFilename": "codex-app-server-x86_64-apple-darwin.tar.gz",
+    "sha256": "43ea79c9679c97ede45128749619a7576ad775eea61153afb0f18260e5160690",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-app-server-x86_64-apple-darwin",
+      "size": 183817328,
+      "licenseFiles": []
+    },
+    "binarySha256": "41bb0e094ec7b21758dffe08681a00d43334bb33e81a32eacdfce9d9db9861e6",
+    "file": "Mach-O 64-bit executable x86_64",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/code-mode-host/darwin-x64",
+    "capturedAt": "2026-09-13T09:02:56.225Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+    "archiveFilename": "codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+    "sha256": "a0fa6141e591f44dc2d86a589cfe797212317bfb9fa3a6c73131e4dbb93387fe",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-code-mode-host-x86_64-apple-darwin",
+      "size": 65865664,
+      "licenseFiles": []
+    },
+    "binarySha256": "c558d3ebbd3b810e6e30ef5bb90c50db4807f566073dbdd04f015659ec9dddf9",
+    "file": "Mach-O 64-bit executable x86_64",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/windows-sandbox-setup/win32-x64",
+    "capturedAt": "2026-09-13T09:03:03.373Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.tar.gz",
+    "archiveFilename": "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.tar.gz",
+    "sha256": "2d766c7f0985e4b9cfcca9f64ee67222c3a55debff6d9d97a3e1a10e3ea346ed",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe",
+      "size": 15467312,
+      "licenseFiles": []
+    },
+    "binarySha256": "ea27f90a0746e2464a829cd6e1de0dcafb77c8be603de899661e8c006ef33937",
+    "file": "PE32+ executable (console) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "IPC helper; must be exercised through parent runtime on Windows"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/command-runner/win32-x64",
+    "capturedAt": "2026-09-13T09:03:06.012Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+    "archiveFilename": "codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+    "sha256": "2f7f3a9dd2ffbdc201e87d7117531470a3e36066e0e6a8a28dd39dbb446c82e9",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-command-runner-x86_64-pc-windows-msvc.exe",
+      "size": 8218416,
+      "licenseFiles": []
+    },
+    "binarySha256": "a57ca8beb786a05f36c97309e8a716610c70ced9946dc1437bbbaf4566c0c403",
+    "file": "PE32+ executable (GUI) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "IPC helper; must be exercised through parent runtime on Windows"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/code-mode-host/win32-x64",
+    "capturedAt": "2026-09-13T09:02:59.076Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+    "archiveFilename": "codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+    "sha256": "656b475bb80d258e3244dc57a1556eb3ce2180791a649ced5e2c8e199c340891",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-code-mode-host-x86_64-pc-windows-msvc.exe",
+      "size": 72496432,
+      "licenseFiles": []
+    },
+    "binarySha256": "7b4987007702973dfeb49ec9a0c11f737488890e208ccb04f7a147769c4bb1f1",
+    "file": "PE32+ executable (console) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "claude/runtime/darwin-arm64",
+    "capturedAt": "2026-09-13T09:03:07.595Z",
+    "version": "2.1.270",
+    "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.270.tgz",
+    "archiveFilename": "claude-code-darwin-arm64-2.1.270.tgz",
+    "sha256": "1233c82cf589f08ca89906a6ec5c074423d8e329fdf3a1f5eb9331da2a67d461",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 4,
+      "member": "package/claude",
+      "size": 207500480,
+      "licenseFiles": [
+        "package/LICENSE.md"
+      ]
+    },
+    "binarySha256": "a506b6d970a4cf44f6abdb53a81ddcd5d3b0ce042a95c502fe9d1f946bdb8807",
+    "file": "Mach-O 64-bit executable arm64",
+    "startup": {
+      "status": "PASS",
+      "args": [
+        "--version"
+      ],
+      "output": "2.1.270 (Claude Code)\n"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "codex/code-mode-host/darwin-arm64",
+    "capturedAt": "2026-09-13T09:02:54.848Z",
+    "version": "0.154.0",
+    "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+    "archiveFilename": "codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+    "sha256": "500ee2a02ea598ae519052e7d7d8e201d1db01986f30c214ef4143645dc86fad",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 1,
+      "member": "codex-code-mode-host-aarch64-apple-darwin",
+      "size": 62786144,
+      "licenseFiles": []
+    },
+    "binarySha256": "426d73aaeb2aeef45e98b5add99e8ef9594a31673d281489bb2cb06b38c27423",
+    "file": "Mach-O 64-bit executable arm64",
+    "startup": {
+      "status": "PASS",
+      "args": [
+        "--help"
+      ],
+      "output": "Usage: codex-code-mode-host [OPTIONS]\n\nOptions:\n      --listen <URL>               Transport endpoint: `stdio`, `stdio://`, or `grpc://IP:PORT`\n                                   [default: stdio]\n      --otel-trace-listen <URL>    Optional WebSocket endpoint that streams only raw OTLP trace\n                                   batches\n      --otel-trace-exporter <URL>  Optional OTLP/HTTP JSON trace exporter endpoint, analogous to\n                                   `otel.trace_exporter` in app-server configuration\n  -h, --help                       Print help\n"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "claude/runtime/win32-x64",
+    "capturedAt": "2026-09-13T09:03:25.685Z",
+    "version": "2.1.270",
+    "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.270.tgz",
+    "archiveFilename": "claude-code-win32-x64-2.1.270.tgz",
+    "sha256": "abd989279998f7a6604cfef5dc3b0219738f7b26a7b64ffcf4d172073c9f2648",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 4,
+      "member": "package/claude.exe",
+      "size": 227051168,
+      "licenseFiles": [
+        "package/LICENSE.md"
+      ]
+    },
+    "binarySha256": "fd7f35ec7761195ab5ba4eff423e48a78a7849e78f60d93ec31256cdb1a9ec7e",
+    "file": "PE32+ executable (console) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "claude/runtime/darwin-x64",
+    "capturedAt": "2026-09-13T09:03:08.182Z",
+    "version": "2.1.270",
+    "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.270.tgz",
+    "archiveFilename": "claude-code-darwin-x64-2.1.270.tgz",
+    "sha256": "aea6314b241d64d5590e56877ff5e4ed9f28bb9bc871e9b1d0e27d4fe3492584",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 4,
+      "member": "package/claude",
+      "size": 216316928,
+      "licenseFiles": [
+        "package/LICENSE.md"
+      ]
+    },
+    "binarySha256": "b3ee3237a019b8a5abb3008f1c7ddd46295a0e6e65ab94545a79c9b997dc8928",
+    "file": "Mach-O 64-bit executable x86_64",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "opencode/runtime/darwin-x64",
+    "capturedAt": "2026-09-13T09:03:46.490Z",
+    "version": "1.18.30",
+    "sourceUrl": "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.18.30.tgz",
+    "archiveFilename": "opencode-darwin-x64-1.18.30.tgz",
+    "sha256": "d7119bd0adbacf86c1176f07b35d429909d1d702ca0c90dcd31415e66220f590",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 2,
+      "member": "package/bin/opencode",
+      "size": 149749840,
+      "licenseFiles": []
+    },
+    "binarySha256": "a0db851dd5c9538896aeecce1cd13af510d62a6873d2eb5030955548e5779156",
+    "file": "Mach-O 64-bit executable x86_64",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "opencode/runtime/win32-x64",
+    "capturedAt": "2026-09-13T09:03:46.497Z",
+    "version": "1.18.30",
+    "sourceUrl": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.18.30.tgz",
+    "archiveFilename": "opencode-windows-x64-1.18.30.tgz",
+    "sha256": "1a5cc50f529cf359fbb6d1a1750c6ae521799f463d00a0215e6eff579a08b036",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 2,
+      "member": "package/bin/opencode.exe",
+      "size": 179793448,
+      "licenseFiles": []
+    },
+    "binarySha256": "c1bdbb18767048e1853af4238311b3f7e16ff2f91b68fb4c7ced3c5175347eea",
+    "file": "PE32+ executable (console) x86-64, for MS Windows",
+    "startup": {
+      "status": "NOT_RUN",
+      "reason": "Requires native target runner"
+    },
+    "status": "PASS_ARTIFACT"
+  },
+  {
+    "key": "opencode/runtime/darwin-arm64",
+    "capturedAt": "2026-09-13T09:03:34.186Z",
+    "version": "1.18.30",
+    "sourceUrl": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.18.30.tgz",
+    "archiveFilename": "opencode-darwin-arm64-1.18.30.tgz",
+    "sha256": "25b722fcdc8c46aebcb6501e1156dc1dc5a392492cc278c65b7775311674e7f8",
+    "publisherIntegrityVerified": true,
+    "archive": {
+      "memberCount": 2,
+      "member": "package/bin/opencode",
+      "size": 144272354,
+      "licenseFiles": []
+    },
+    "binarySha256": "2d0c9c339bb91046c6ea951c97664bc2f8a8eaca707f31fbfbb7bc73c4eddc62",
+    "file": "Mach-O 64-bit executable arm64",
+    "startup": {
+      "status": "PASS",
+      "args": [
+        "--version"
+      ],
+      "output": "1.18.30\n"
+    },
+    "status": "PASS_ARTIFACT"
+  }
+]

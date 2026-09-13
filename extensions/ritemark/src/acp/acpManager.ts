@@ -34,6 +34,7 @@ import { AcpFsProxy, type AcpFsBackend, type AcpWriteApproval } from './acpFsPro
 import { traceAcp } from './acpTrace';
 import type { ExplicitThinkingEffort, ThinkingEffortCapability } from '../runtime/thinkingEffort';
 import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import * as path from 'path';
 
 /**
  * Mandatory permission env (audit T8). Without OPENCODE_PERMISSION the agent
@@ -52,6 +53,8 @@ export interface AcpManagerConfig {
   args?: string[];
   /** Provider/BYOK env vars injected at spawn (merged over process.env). */
   byokEnv?: Record<string, string>;
+  /** Runtime-owned command directories prepended for child-process discovery. */
+  pathEntries?: string[];
   /**
    * MCP stdio server descriptors to pass to session/new. Populated by
    * BrowserToolsInjector when the browser-agent-control feature flag is on.
@@ -401,9 +404,12 @@ export class AcpManager {
    * to disk or sent to the webview.
    */
   private buildSpawnEnv(): NodeJS.ProcessEnv {
+    const inheritedPath = this.config.byokEnv?.PATH ?? process.env.PATH ?? '';
+    const managedPath = [...(this.config.pathEntries ?? []), inheritedPath].filter(Boolean).join(path.delimiter);
     return {
       ...process.env,
       ...this.config.byokEnv,
+      ...(managedPath ? { PATH: managedPath } : {}),
       OPENCODE_PERMISSION,
     };
   }

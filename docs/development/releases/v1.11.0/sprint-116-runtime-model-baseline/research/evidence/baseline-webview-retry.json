@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-09-13T09:14:02.241Z",
+  "reason": "Install existing webview lockfile dependencies after ERR_MODULE_NOT_FOUND zustand",
+  "results": [
+    {
+      "name": "webview/src/components/ai-sidebar/bootstrapState.test.ts",
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-1-1789290841928' }\n[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-2-1789290841929' }\nAgent sidebar bootstrap store tests passed.\n",
+      "stderr": "[vscode] acquireVsCodeApi not available\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/conversationRouting.test.ts",
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "Conversation routing tests passed.\n",
+      "stderr": "[vscode] acquireVsCodeApi not available\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/runtimeSwitching.test.ts",
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "Runtime switching tests passed.\n",
+      "stderr": "[vscode] acquireVsCodeApi not available\n"
+    }
+  ]
+}

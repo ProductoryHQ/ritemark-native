@@ -1,0 +1,42 @@
+{
+  "provider": "codex",
+  "capturedAt": "2026-09-13T09:12:45.533Z",
+  "checks": [
+    {
+      "name": "file tools through code-mode host",
+      "status": "PASS",
+      "terminalStatus": "completed",
+      "fixtureChanged": true,
+      "itemTypes": [
+        "userMessage",
+        "reasoning",
+        "fileChange",
+        "agentMessage"
+      ]
+    },
+    {
+      "name": "explicit cancellation",
+      "status": "FAIL",
+      "error": "RPC turn/interrupt: -32600 no active turn to interrupt"
+    },
+    {
+      "name": "read-only plan question contract",
+      "status": "PASS",
+      "terminalStatus": "completed",
+      "requests": [
+        {
+          "method": "item/tool/requestUserInput",
+          "keys": [
+            "autoResolutionMs",
+            "isBlocking",
+            "itemId",
+            "questions",
+            "threadId",
+            "turnId"
+          ]
+        }
+      ]
+    }
+  ],
+  "model": "gpt-6-astra"
+}

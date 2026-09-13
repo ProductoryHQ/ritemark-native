@@ -1,0 +1,11 @@
+{
+  "provider": "claude",
+  "capturedAt": "2026-09-13T09:29:45.878Z",
+  "checks": [
+    {
+      "name": "explicit cancellation",
+      "status": "FAIL",
+      "error": "Claude Code returned an error result: [ede_diagnostic] result_type=user last_content_type=n/a stop_reason=null"
+    }
+  ]
+}

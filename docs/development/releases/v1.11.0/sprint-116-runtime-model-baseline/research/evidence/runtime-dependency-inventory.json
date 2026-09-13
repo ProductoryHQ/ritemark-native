@@ -1,0 +1,440 @@
+{
+  "capturedAt": "2026-09-13T09:58:20.841831+00:00",
+  "status": "STATIC_INVENTORY_ONLY",
+  "components": [
+    {
+      "component": "codex/app-server/darwin-arm64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-app-server-aarch64-apple-darwin",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "linkedLibraries": [
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+        "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+        "/usr/lib/liblzma.5.dylib",
+        "/usr/lib/libbz2.1.0.dylib",
+        "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+        "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libiconv.2.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "codex/app-server/darwin-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-app-server-x86_64-apple-darwin",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "linkedLibraries": [
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+        "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+        "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+        "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libiconv.2.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "codex/app-server/win32-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-app-server-x86_64-pc-windows-msvc.exe",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "importedDlls": [
+        "kernel32.dll",
+        "combase.dll",
+        "advapi32.dll",
+        "shell32.dll",
+        "ws2_32.dll",
+        "shlwapi.dll",
+        "oleaut32.dll",
+        "userenv.dll",
+        "api-ms-win-core-apiquery-l2-1-0.dll",
+        "ntdll.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "api-ms-win-core-winrt-l1-1-0.dll",
+        "bcryptprimitives.dll",
+        "secur32.dll",
+        "bcrypt.dll",
+        "crypt32.dll",
+        "user32.dll",
+        "iphlpapi.dll",
+        "netapi32.dll",
+        "winhttp.dll"
+      ],
+      "delayImportDirectory": "Entry d 0000000000000000 00000000 Delay Import Directory"
+    },
+    {
+      "component": "codex/code-mode-host/darwin-arm64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-code-mode-host-aarch64-apple-darwin",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "linkedLibraries": [
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+        "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libiconv.2.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "codex/code-mode-host/darwin-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-code-mode-host-x86_64-apple-darwin",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "linkedLibraries": [
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libobjc.A.dylib",
+        "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+        "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libiconv.2.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "codex/code-mode-host/win32-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-code-mode-host-x86_64-pc-windows-msvc.exe",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "importedDlls": [
+        "kernel32.dll",
+        "advapi32.dll",
+        "bcryptprimitives.dll",
+        "secur32.dll",
+        "bcrypt.dll",
+        "crypt32.dll",
+        "combase.dll",
+        "user32.dll",
+        "ntdll.dll",
+        "shell32.dll",
+        "ws2_32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "WINMM.dll",
+        "dbghelp.dll"
+      ],
+      "delayImportDirectory": "Entry d 0000000000000000 00000000 Delay Import Directory"
+    },
+    {
+      "component": "codex/windows-sandbox-setup/win32-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "importedDlls": [
+        "KERNEL32.dll",
+        "advapi32.dll",
+        "oleaut32.dll",
+        "bcryptprimitives.dll",
+        "secur32.dll",
+        "bcrypt.dll",
+        "crypt32.dll",
+        "ole32.dll",
+        "combase.dll",
+        "user32.dll",
+        "ntdll.dll",
+        "shell32.dll",
+        "ws2_32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "fwpuclnt.dll",
+        "netapi32.dll"
+      ],
+      "delayImportDirectory": "Entry d 0000000000000000 00000000 Delay Import Directory"
+    },
+    {
+      "component": "codex/command-runner/win32-x64",
+      "version": "0.154.0",
+      "archiveMembers": [
+        {
+          "path": "codex-command-runner-x86_64-pc-windows-msvc.exe",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [],
+      "importedDlls": [
+        "kernel32.dll",
+        "bcryptprimitives.dll",
+        "ws2_32.dll",
+        "advapi32.dll",
+        "bcrypt.dll",
+        "combase.dll",
+        "ntdll.dll",
+        "shell32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "user32.dll"
+      ],
+      "delayImportDirectory": "Entry d 0000000000000000 00000000 Delay Import Directory"
+    },
+    {
+      "component": "claude/runtime/darwin-arm64",
+      "version": "2.1.270",
+      "archiveMembers": [
+        {
+          "path": "package/claude",
+          "type": "file"
+        },
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/LICENSE.md",
+          "type": "file"
+        },
+        {
+          "path": "package/README.md",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "@anthropic-ai/claude-code-darwin-arm64",
+          "version": "2.1.270",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "linkedLibraries": [
+        "/usr/lib/libicucore.A.dylib",
+        "/usr/lib/libresolv.9.dylib",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "claude/runtime/darwin-x64",
+      "version": "2.1.270",
+      "archiveMembers": [
+        {
+          "path": "package/claude",
+          "type": "file"
+        },
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/LICENSE.md",
+          "type": "file"
+        },
+        {
+          "path": "package/README.md",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "@anthropic-ai/claude-code-darwin-x64",
+          "version": "2.1.270",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "linkedLibraries": [
+        "/usr/lib/libicucore.A.dylib",
+        "/usr/lib/libresolv.9.dylib",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "claude/runtime/win32-x64",
+      "version": "2.1.270",
+      "archiveMembers": [
+        {
+          "path": "package/claude.exe",
+          "type": "file"
+        },
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/LICENSE.md",
+          "type": "file"
+        },
+        {
+          "path": "package/README.md",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "@anthropic-ai/claude-code-win32-x64",
+          "version": "2.1.270",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "importedDlls": [
+        "kernel32.dll",
+        "ntdll.dll",
+        "bcryptprimitives.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "fwpuclnt.dll",
+        "netapi32.dll",
+        "bcrypt.dll"
+      ],
+      "delayImportDirectory": "Entry d 000000000539db98 000001a0 Delay Import Directory"
+    },
+    {
+      "component": "opencode/runtime/darwin-arm64",
+      "version": "1.18.30",
+      "archiveMembers": [
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/bin/opencode",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "opencode-darwin-arm64",
+          "version": "1.18.30",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "linkedLibraries": [
+        "/usr/lib/libicucore.A.dylib",
+        "/usr/lib/libresolv.9.dylib",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "opencode/runtime/darwin-x64",
+      "version": "1.18.30",
+      "archiveMembers": [
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/bin/opencode",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "opencode-darwin-x64",
+          "version": "1.18.30",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "linkedLibraries": [
+        "/usr/lib/libicucore.A.dylib",
+        "/usr/lib/libresolv.9.dylib",
+        "/usr/lib/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "nonSystemInstallNames": []
+    },
+    {
+      "component": "opencode/runtime/win32-x64",
+      "version": "1.18.30",
+      "archiveMembers": [
+        {
+          "path": "package/package.json",
+          "type": "file"
+        },
+        {
+          "path": "package/bin/opencode.exe",
+          "type": "file"
+        }
+      ],
+      "packageMetadata": [
+        {
+          "name": "opencode-windows-x64",
+          "version": "1.18.30",
+          "dependencies": null,
+          "optionalDependencies": null,
+          "peerDependencies": null,
+          "scripts": null
+        }
+      ],
+      "importedDlls": [
+        "ntdll.dll",
+        "USERENV.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "KERNEL32.dll",
+        "USER32.dll",
+        "SHELL32.dll",
+        "OLEAUT32.dll"
+      ],
+      "delayImportDirectory": "Entry d 0000000005adfc28 00000120 Delay Import Directory"
+    }
+  ],
+  "remaining": [
+    "Independent upstream component/dependency discovery beyond existing manifest",
+    "Lazy downloads and spawned tools in clean staged runtime",
+    "Native Windows and Intel behavior with default sandbox",
+    "No accidental dependency on developer PATH, node_modules, SDK caches or preinstalled tools"
+  ]
+}

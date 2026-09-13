@@ -139,41 +139,49 @@ export async function discoverGemini(apiKey: string | null): Promise<ModelEntry[
 export async function discoverCodex(): Promise<ModelEntry[] | null> {
   try {
     const cachePath = path.join(os.homedir(), '.codex', 'models_cache.json');
-    const raw = fs.readFileSync(cachePath, 'utf-8');
-    const cache = JSON.parse(raw) as {
-      models?: Array<{
-        slug?: string;
-        display_name?: string;
-        description?: string;
-        visibility?: string;
-        priority?: number;
-        default_reasoning_effort?: unknown;
-        supported_reasoning_efforts?: unknown[];
-      }>;
-    };
-    if (!Array.isArray(cache.models)) return null;
-    const visible = cache.models
-      .filter((m) => m.visibility === 'list' && typeof m.slug === 'string')
-      .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
-      .map((m, i) => {
-        const levels = (m.supported_reasoning_efforts ?? []).filter(isExplicitThinkingEffort);
-        const defaultLevel = isExplicitThinkingEffort(m.default_reasoning_effort)
-          ? m.default_reasoning_effort
-          : undefined;
-        return entry(
-          m.slug as string,
-          m.display_name ?? (m.slug as string),
-          i,
-          m.description ?? '',
-          m.supported_reasoning_efforts === undefined
-            ? undefined
-            : { levels, ...(defaultLevel && levels.includes(defaultLevel) ? { defaultLevel } : {}) },
-        );
-      });
-    return visible.length > 0 ? visible : null;
+    return parseCodexModelsCache(JSON.parse(fs.readFileSync(cachePath, 'utf-8')));
   } catch {
     return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Normalize the current object-valued effort schema and the legacy string schema. */
+export function parseCodexModelsCache(raw: unknown): ModelEntry[] | null {
+  if (!isRecord(raw) || !Array.isArray(raw.models)) return null;
+
+  const visible = raw.models
+    .filter((model): model is Record<string, unknown> => (
+      isRecord(model) && model.visibility === 'list' && typeof model.slug === 'string'
+    ))
+    .sort((a, b) => (
+      (typeof a.priority === 'number' ? a.priority : 0)
+      - (typeof b.priority === 'number' ? b.priority : 0)
+    ))
+    .map((model, index) => {
+      const currentLevels = model.supported_reasoning_levels;
+      const legacyLevels = model.supported_reasoning_efforts;
+      const rawLevels = Array.isArray(currentLevels)
+        ? currentLevels.map((level) => isRecord(level) ? level.effort : undefined)
+        : Array.isArray(legacyLevels) ? legacyLevels : null;
+      const levels = (rawLevels ?? []).filter(isExplicitThinkingEffort);
+      const rawDefault = model.default_reasoning_level ?? model.default_reasoning_effort;
+      const defaultLevel = isExplicitThinkingEffort(rawDefault) && levels.includes(rawDefault)
+        ? rawDefault
+        : undefined;
+      const slug = model.slug as string;
+      return entry(
+        slug,
+        typeof model.display_name === 'string' ? model.display_name : slug,
+        index,
+        typeof model.description === 'string' ? model.description : '',
+        rawLevels === null ? undefined : { levels, ...(defaultLevel ? { defaultLevel } : {}) },
+      );
+    });
+  return visible.length > 0 ? visible : null;
 }
 
 /**

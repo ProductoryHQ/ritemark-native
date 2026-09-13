@@ -45,6 +45,8 @@ function fixture() {
 	write(source, 'binaries/agents/manifest.json', '{"runtimes":[]}');
 	for (const target of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
 		write(source, `binaries/agents/${target}/agent`, target);
+		write(source, `binaries/agents/${target}/codex/bin/codex-app-server${target === 'win32-x64' ? '.exe' : ''}`, 'codex');
+		write(source, `binaries/agents/${target}/opencode-path/rg${target === 'win32-x64' ? '.exe' : ''}`, 'ripgrep');
 	}
 	write(source, 'binaries/darwin-arm64/libwhisper.1.dylib', 'native');
 	try {
@@ -64,6 +66,8 @@ test('target copy is immutable and filters foreign native payloads', () => {
 			copyExtensionForTarget({ source, destination, target });
 			assert.equal(fs.readFileSync(path.join(destination, '.hidden'), 'utf8'), 'kept');
 			assert.ok(fs.existsSync(path.join(destination, 'binaries/agents', target, 'agent')));
+			assert.ok(fs.existsSync(path.join(destination, 'binaries/agents', target, 'codex/bin')));
+			assert.ok(fs.existsSync(path.join(destination, 'binaries/agents', target, 'opencode-path')));
 			for (const foreign of ['darwin-arm64', 'darwin-x64', 'win32-x64'].filter(value => value !== target)) {
 				assert.equal(fs.existsSync(path.join(destination, 'binaries/agents', foreign)), false);
 			}

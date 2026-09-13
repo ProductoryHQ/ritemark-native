@@ -1,157 +1,59 @@
 # Bundled Agent Runtimes
 
-Ritemark ships Codex, Claude, and OpenCode agent runtimes inside the Ritemark `.app` (macOS) and Windows installer so a clean install has working app-owned runtimes without requiring the user to install Node, npm, or set `PATH`.
+Ritemark ships app-owned Claude, Codex, and OpenCode runtimes. A clean install does not depend on a user-installed runtime or `PATH` tool.
 
-## Layout
+## Approved v1.11.0 snapshot
 
-```text
-extensions/ritemark/binaries/agents/
-├── manifest.json          ← source of truth (tracked)
-├── README.md              ← this file (tracked)
-├── darwin-arm64/          ← payloads, gitignored
-│   ├── codex-app-server
-│   ├── codex-code-mode-host
-│   ├── claude
-│   └── opencode
-├── darwin-x64/            ← payloads, gitignored
-│   ├── codex-app-server
-│   ├── codex-code-mode-host
-│   ├── claude
-│   └── opencode
-└── win32-x64/             ← payloads, gitignored
-    ├── codex-app-server.exe
-    ├── codex-code-mode-host.exe
-    ├── claude.exe
-    └── opencode.exe
-```
+| Runtime | Version | Companion dependency | Source rows |
+|---|---:|---|---:|
+| Codex | 0.154.0 | Complete official app-server package; bundled ripgrep 15.2.0 and platform resources | 3 |
+| Claude Code | 2.1.270 | `@anthropic-ai/claude-agent-sdk` 0.3.270 with all eight optional platform packages | 3 |
+| OpenCode | 1.18.30 | ACP SDK 1.4.0 and runtime-owned ripgrep 15.1.0 | 6 |
 
-The platform subdirectories are populated by `scripts/fetch-agent-runtimes.sh` (Phase B). Binary payloads are listed in the root `.gitignore` and never committed.
+The schema-v3 manifest contains 12 downloaded source rows. They produce 25 approved installed files: 16 Codex package members, three Claude runtimes, three OpenCode runtimes, and three OpenCode ripgrep binaries. Every archive and installed file has an exact SHA-256.
 
-## What is bundled
+Claude Code and its Agent SDK move in lockstep: runtime `2.1.270` pairs with SDK `0.3.270`. The validator also requires every SDK optional platform package at that exact version. Anthropic runtime redistribution remains covered by the product-owner decision recorded on 2026-05-06 and the legal URL in each manifest row.
 
-| Agent | Vendor | Version | Source | License |
-|---|---|---|---|---|
-| Codex | OpenAI | 0.153.0 (`rust-v0.153.0`) | GitHub Releases — `codex-app-server-*` and `codex-code-mode-host-*` archives | Apache-2.0 |
-| Claude | Anthropic | 2.1.239 (SDK pinned `0.3.239`) | npm optional packages — `@anthropic-ai/claude-code-<platform>-<arch>` | Proprietary (`LicenseRef-Anthropic-Proprietary`); redistribution permitted by product-owner decision — see "Claude redistribution paper trail" below |
-| OpenCode | anomalyco | 1.18.21 (ACP SDK pinned `1.4.0`) | npm optional packages — `opencode-<platform>-<arch>` | MIT |
-
-Versions are pinned in `manifest.json`. Updates ship inside Ritemark releases (Sprint 64, Q4 decision). A separate runtime update channel is not in scope for this sprint.
-
-**Claude is a two-part pin.** The bundled binary and `@anthropic-ai/claude-agent-sdk` must move
-together: Anthropic publishes them in lockstep (same patch number, same day — `2.1.239` ↔ `0.3.239`),
-and Ritemark runs the bundled binary *through* the SDK. The SDK is therefore declared as an exact
-version in `extensions/ritemark/package.json`, not a caret range. A caret let them drift once
-already: `^0.3.156` resolved to `0.3.159` against a bundled `2.1.156`. When bumping the binary, bump
-the SDK to the matching patch in the same commit.
-
-### Claude redistribution paper trail
-
-Anthropic publishes the `@anthropic-ai/claude-code-<platform>-<arch>` packages under a proprietary license (LICENSE.md inside each package: "© Anthropic PBC. All rights reserved."), with the public legal terms at the URL recorded in `manifest.json` under `license.noticeUrl`.
-
-Redistribution of these binaries inside the Ritemark installer was approved by product-owner Jarmo Tuisk on **2026-05-06** during Sprint 64 Phase A planning. The decision is also reflected in `docs/development/sprints/sprint-64-bundled-agent-runtimes/sprint-plan.md` (Risks table) and follows the audit input in `docs/internal/analysis/2026-05-06-codex-startup-and-binary-audit.md`.
-
-If Anthropic's published terms change, this README and the manifest must be re-validated before the next Ritemark release that ships bundled Claude binaries.
-
-## Codex invocation contract
-
-Codex 0.153.0 publishes a standalone `codex-app-server` binary that is **not** the same as the `codex` CLI. The `manifest.json` records this as `invocationMode: "direct-app-server"`, which means Ritemark spawns the extracted binary directly:
+## Installed layout
 
 ```text
-<binaries>/agents/<platform>-<arch>/codex-app-server[.exe]
+binaries/agents/<platform>-<arch>/
+├── claude[.exe]
+├── opencode[.exe]
+├── opencode-path/
+│   └── rg[.exe]
+└── codex/
+    ├── bin/
+    │   ├── codex-app-server[.exe]
+    │   └── codex-code-mode-host[.exe]
+    ├── codex-package.json
+    ├── codex-path/
+    │   └── rg[.exe]
+    └── codex-resources/
+        ├── zsh/bin/zsh                         # macOS
+        ├── codex-command-runner.exe            # Windows
+        └── codex-windows-sandbox-setup.exe     # Windows
 ```
 
-Ritemark must **not** invoke `codex app-server` as a subcommand; the `codex` CLI is not bundled.
+The Codex tree is copied without flattening because app-server resolves code-mode-host, ripgrep, shell resources, and Windows sandbox helpers relative to the official package. OpenCode receives only `opencode-path` at the front of its subprocess `PATH`; this prevents a first-use ripgrep download and does not couple OpenCode to Codex's package.
 
-Codex 0.153.0 also enables Code Mode file tools through a sibling
-`codex-code-mode-host[.exe]` process. The app-server resolves that executable
-next to itself, so both version-matched components are mandatory packaging
-inputs. Shipping only `codex-app-server` lets chat start but makes file tools
-fail at first use. The manifest validator therefore requires a complete
-app-server and code-mode-host platform matrix.
+Payload directories and `.sha256` sidecars are generated and gitignored. The manifest, validator, fetcher, and this notice are tracked.
 
-On Windows only, Codex's default and recommended `workspace-write` sandbox mode
-spawns two further helper binaries, resolved next to the app-server:
-
-```
-<binaries>/agents/win32-x64/codex-windows-sandbox-setup.exe
-<binaries>/agents/win32-x64/codex-command-runner.exe
-```
-
-Neither has a darwin build: on macOS the sandbox is the OS seatbelt, not a
-spawned process. Both are IPC endpoints rather than CLIs — the command runner
-wants a pipe handle and the sandbox setup wants a base64 payload — so neither
-can be smoke-tested with `--version` or `--help`. Their manifest rows carry no
-`validationArgs`; presence beside `codex-app-server` is the check. Omitting
-either makes every Codex file/exec tool fail at runtime with
-`orchestrator_helper_launch_failed: ... program not found`. Setting the sandbox
-to full access appears to work only because that path bypasses the sandbox
-entirely and never spawns a helper.
-
-If a future Codex release reorganises this (for example, merges the app-server back into the main `codex` binary as a subcommand), the manifest entry's `invocationMode` field flips to `cli-subcommand` and the extension code reads the manifest to pick the spawn strategy. The wrong value here will silently break runtime startup, so it is derived from inspecting the actual upstream artifact, not from documentation.
-
-## Manifest schema (`manifest.json`)
-
-Top-level:
-
-| Field | Description |
-|---|---|
-| `schemaVersion` | Manifest schema version. Bump when the structure changes. |
-| `generated` | ISO date the manifest entries were last verified. |
-| `description` | Human-readable purpose. |
-| `runtimes` | Array of runtime component entries (one per required component × each target that component supports). |
-
-Each entry in `runtimes`:
-
-| Field | Description |
-|---|---|
-| `agent` | `codex`, `claude`, or `opencode`. |
-| `component` | Component identity. Codex requires `app-server` and `code-mode-host` on every target, plus `windows-sandbox-setup` and `command-runner` on win32-x64 only; Claude and OpenCode use `runtime`. |
-| `vendor` | `openai`, `anthropic`, or `anomalyco`. |
-| `version` | Pinned upstream version. Never `latest`. |
-| `platform` | `darwin` or `win32`. |
-| `arch` | `arm64` or `x64`. |
-| `sourceType` | `github-release` (Codex) or `npm-optional-package` (Claude/OpenCode). |
-| `sourceUrl` | Direct download URL for the archive. |
-| `npmPackage` | npm package name (only for `sourceType: npm-optional-package`). |
-| `archiveFilename` | Filename the archive is saved as locally. |
-| `archiveFormat` | `tar.gz` (current state for all entries; covers both Codex tarballs and npm tarballs). |
-| `sha256` | SHA-256 of the downloaded archive. **Verified before extraction.** |
-| `archivePath` | Path inside the archive to the runnable binary. |
-| `installName` | What the binary is renamed to inside `binaries/agents/<platform>-<arch>/`. |
-| `invocationMode` | Codex only. `direct-app-server` or `cli-subcommand`. |
-| `validationArgs` | Args passed to the installed binary as a smoke test (e.g. `["--help"]`, `["--version"]`). |
-| `expectedFileArchPattern` | Substring that must appear in `file <binary>` output to validate architecture. |
-| `license.spdx` | SPDX identifier. Anthropic uses `LicenseRef-Anthropic-Proprietary` (non-standard SPDX). |
-| `license.redistribution` | `permitted` (Apache-2.0) or `permitted-by-vendor-confirmation` (Anthropic). |
-| `license.noticeUrl` | URL to the upstream license / legal terms. |
-
-## Fetch workflow
-
-`scripts/fetch-agent-runtimes.sh` materializes runtimes deterministically from the manifest. For diagnosis, the equivalent macOS arm64 Codex steps are:
+## Fetch and verification
 
 ```bash
-mkdir -p extensions/ritemark/binaries/agents/darwin-arm64
-curl -L -o /tmp/codex.tar.gz \
-  https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-app-server-aarch64-apple-darwin.tar.gz
-echo "4293c483605cae9e3fa413add08ec394bb5f8e52c1762567444551f7c763e143  /tmp/codex.tar.gz" | shasum -a 256 -c
-tar -xzf /tmp/codex.tar.gz -C /tmp
-mv /tmp/codex-app-server-aarch64-apple-darwin \
-  extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
-chmod +x extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server
+./scripts/fetch-agent-runtimes.sh
+./scripts/fetch-agent-runtimes.sh --platform win32 --arch x64
+./scripts/fetch-agent-runtimes.sh --all-platforms
+./scripts/fetch-agent-runtimes.sh --verify-only
 ```
 
-The fetch script automates this for all twelve runtime component entries and adds POSIX exec-bit / PE-header validation plus the manifest `validationArgs` smoke test. Before any download, `scripts/validate-agent-runtime-manifest.mjs` hard-fails incomplete component/platform rows, duplicate or noncanonical install names, non-exact versions, stale vendor metadata, lockfile drift, or a Claude binary/SDK patch mismatch. Pull requests that change this contract also run the native `Agent Runtime Matrix` on Intel macOS and Windows x64 before merge.
+The fetcher validates the manifest before network access, caches archives by digest, verifies archive hashes, rejects absolute paths, traversal, links, and device members, preserves the exact Codex package file set, checks installed hashes and architectures, and runs native smoke arguments. It promotes a complete staged Codex directory as one unit. Foreign-target binaries are inspected but never executed.
 
-## Update process
+`scripts/validate-agent-runtime-manifest.mjs` rejects version drift, missing targets or Codex members, unsafe or duplicate install paths, unsupported smoke arguments, and SDK/lockfile mismatch. The Agent Runtime Matrix repeats native Intel macOS and Windows checks on pull requests.
 
-1. Bump the upstream `version` in `manifest.json`.
-2. Re-fetch the new archives (locally or in CI).
-3. Recompute and update each `sha256`.
-4. Update `expectedFileArchPattern` only if upstream rebuilds with different toolchain output.
-5. Update `archivePath` and `installName` only if upstream changes the artifact layout (rare).
-6. Re-verify `invocationMode` for Codex and confirm whether the matching release still requires `codex-code-mode-host` — do not assume either contract stayed the same.
-7. Bump `generated` to the new date.
-8. Regenerate `extensions/ritemark/package-lock.json` and run `node scripts/validate-agent-runtime-manifest.mjs`.
-9. Ship a new Ritemark release; users get the new runtime via the standard Ritemark app update.
+## Update and rollback
 
-A Settings "Check for updates" button (Sprint 64, Phase E) wires into Ritemark's existing app-update check — there is no separate runtime update channel.
+Update the manifest, validator allowlist, SDK pin, lockfile, evidence, and this notice in one sprint. Inspect the complete upstream package and first-use behavior before approving a new snapshot. Never mix Codex app-server with members from another package version.
+
+The Sprint 116 rollback snapshot is commit `30ea2ab32d15be161991d1bb8924a4c4ca331f8c`: Codex 0.153.0, Claude Code 2.1.239 with SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0. A rollback restores the manifest, fetch/validation contract, adapters, SDK lockfile, and catalog together.

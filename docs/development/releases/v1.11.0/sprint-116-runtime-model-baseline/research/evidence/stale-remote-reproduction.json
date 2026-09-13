@@ -1,0 +1,14 @@
+{
+  "capturedAt": "2026-09-13T09:21:19.985Z",
+  "remoteUpdatedAt": "2026-07-25T09:30:00Z",
+  "candidateUpdatedAt": "2026-09-13T09:21:19.981Z",
+  "candidateId": "gpt-6-astra",
+  "resolvedSource": "remote",
+  "resolvedIds": [
+    "gpt-5.3-codex",
+    "codex-spark",
+    "gpt-5.2-codex"
+  ],
+  "resolvedDefault": "gpt-5.3-codex",
+  "newBundledModelVisible": false
+}

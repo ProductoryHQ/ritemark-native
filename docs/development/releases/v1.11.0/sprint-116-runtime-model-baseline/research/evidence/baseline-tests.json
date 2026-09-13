@@ -1,0 +1,302 @@
+{
+  "capturedAt": "2026-09-13T09:08:16.114Z",
+  "node": "v22.22.1",
+  "extension": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark",
+  "results": [
+    {
+      "name": "TypeScript compile (no emit)",
+      "capturedAt": "2026-09-13T09:08:12.234Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "."
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "src/runtime/continuation.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.066Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/runtime/continuation.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "continuation.test.ts: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/runtime/thinkingEffort.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.187Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/runtime/thinkingEffort.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "thinkingEffort.test.ts: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/runtime/runtimeErrorPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.296Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/runtime/runtimeErrorPresentation.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "runtimeErrorPresentation tests passed.\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/agent/AgentRunner.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.453Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/agent/AgentRunner.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "AgentRunner lifecycle tests passed.\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/agent/ClaudeCodeRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.575Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/agent/ClaudeCodeRuntime.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "✓ Test 1: id is \"claude-code\"\n✓ Test 2: cancel() interrupts the underlying AgentSession\n✓ Test 3: dispose() closes the session and clears pending questions\n✓ Test 4: respondToApproval() routes plan approval correctly\n✓ Test 5: conversations hold independent sessions\n✓ Test 6: SDK result errors remain failed turns\n✓ Test 7: every advertised Claude effort reaches the SDK without inventing an applied value\n✓ Test 8: OAuth failures carry the authentication recovery category\n✓ Test 9: API-key failures use the AI Settings recovery category\n\nAll 9 ClaudeCodeRuntime tests passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/codex/codexApproval.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.686Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/codex/codexApproval.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "✓ Test 1: Command approval with real Codex method name\n✓ Test 2: File change approval with real Codex method name\n✓ Test 3: Old method name \"execCommandApproval\" correctly denied\n✓ Test 4: Unknown method denied\n✓ Test 5: Command as string (not array) handled\n✓ Test 6: Legacy \"changes\" key handled for file approval\n✓ Test 7: Method name constants match Codex protocol spec\n✓ Test 8: ReviewDecision values match Codex protocol (accept/decline, not approved/denied)\n✓ Test 9: Default approval policy is \"untrusted\" (always ask)\n✓ Test 10: threadId propagated out of ApprovalRouteResult (Sprint 99 B3)\n\nAll 10 tests passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/codex/CodexRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:08:13.829Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/codex/CodexRuntime.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "✓ Test 1: id is \"codex\"\n✓ Test 2: session.cancel() calls turnInterrupt() for its own thread\n✓ Test 3: dispose() tears down the app server and all sessions\n✓ Test 4: respondToApproval() maps to sendApprovalResponse()\n✓ Test 5: respondToApproval() approved=false maps to \"decline\"\n✓ Test 6: B3 — streamed deltas route by threadId, orphans dropped\n✓ Test 7: B2 — turn/completed clears only the completing thread\n✓ Test 8: B1 — a conversation switching approval/browser mode cannot reset a sibling\n✓ Test 9: B4 — exit fans out to all conversations\n✓ Test 10: cancel declines outstanding approvals\n✓ Test 11: compatible native thread resume checkpoints and accepts exactly once\n✓ Test 10: buildCodexBaseInstructions — context is the base, no silent replace\n✓ Test 13: Codex 0.149 request_user_input tolerates isBlocking\n✓ Test 14: Codex effort is isolated, plan-safe, and Auto-restorable\n✓ Test 15: every advertised Codex effort reaches turn/start unchanged\n\nAll 15 CodexRuntime tests passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/acp/acpClient.test.ts",
+      "capturedAt": "2026-09-13T09:08:14.369Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/acp/acpClient.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "acpClient.test.ts: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/acp/acpManager.test.ts",
+      "capturedAt": "2026-09-13T09:08:14.823Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/acp/acpManager.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "✓ sole-session cancel settles as cancelled with no user-facing error\nacpManager.test.ts: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/acp/AcpRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:08:14.998Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/acp/AcpRuntime.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "✓ Test 1: id is \"opencode\"\n✓ Test 2: session.cancel() cancels and drops that session only\n✓ Test 3: runtime.dispose() disposes the shared manager\n✓ Test 4: respondToApproval() resolves pending approval\n✓ Test 5: disposing one session rejects only its own approvals\n✓ Test 6: prompt() calls setModel and manager.prompt()\n✓ Test 6b: ACP effort applies before prompt and Auto restores the live default\n✓ Test 6c: rejected ACP effort falls back to Auto and still prompts\n✓ Test 6d: every live-advertised ACP effort is forwarded unchanged\n✓ Test 7: C1 — write-approval state is per session, no cross-chat bypass\n✓ Test 8: unroutable write is denied\n✓ Test 9: dispose() cancels the upstream turn before forgetting the session\n✓ Test 10: \"No provider available\" becomes an actionable message\n✓ Test 11: a hung OpenCode turn times out and cancels the session\n✓ Test 12: ACP session/resume is used without session/load\n✓ Test 9: buildAcpPromptText — context prefix, order, image count\n✓ Test 10: capability context is once-per-session\n✓ Test 13: ACP provider evidence accepts dispatch once\n\nAll 15 AcpRuntime tests passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/ai/modelCatalog/modelCatalog.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.129Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/ai/modelCatalog/modelCatalog.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "  ok   validateCatalog accepts the bundled baseline (round-trip)\n  ok   validateCatalog throws on wrong schemaVersion\n  ok   validateCatalog throws on malformed model entry (missing id)\n  ok   validateCatalog throws on bad tier\n  ok   validateCatalog accepts canonical effort metadata and rejects invented levels\n  ok   validateCatalog drops unknown provider keys (forward-compat)\n  ok   bundled-only resolves every provider from the bundled floor\n  ok   live probe wins and is enriched with curated metadata\n  ok   live aliases with one resolved identity collapse to one explicit default-marked row\n  ok   matching labels without resolved identity are never merged\n  ok   live effort metadata overrides a stale curated capability\n  ok   live explicit Auto-only capability overrides the bundled effort floor\n  ok   live model keeps bundled effort when a newer remote catalog omits the field\n  ok   remote is used when no live probe, in preference to bundled\n  ok   remote model keeps the exact-pin bundled effort floor when the remote schema predates it\n  ok   cache is used when no live and no remote\n  ok   empty remote/cache providers cannot erase the bundled selectable floor\n  ok   a source containing only future-gated models falls back to this build bundled floor\n  ok   minAppVersion filters entries above the running app version\n  ok   deprecated catalog model absent from a live probe is preserved + flagged (R2)\n  ok   versionLt compares dotted-numeric versions correctly\n\nmodelCatalog: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/utils/bundledAgentRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.254Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/utils/bundledAgentRuntime.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "bundledAgentRuntime.test.ts passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "src/views/agentSidebarBootstrap.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.372Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "src/views/agentSidebarBootstrap.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "Agent sidebar bootstrap tests passed.\n",
+      "stderr": ""
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/modelPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.482Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/modelPresentation.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "modelPresentation.test.ts: consistent model naming passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/runtimeAvailability.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.582Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/runtimeAvailability.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "runtimeAvailability tests passed.\n",
+      "stderr": ""
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/bootstrapState.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.714Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/bootstrapState.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'zustand' imported from /Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/webview/src/components/ai-sidebar/store.ts\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:985:11)\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\n    at resolveBase (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:8141)\n    at resolveDirectory (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:9227)\n    at resolveTsPaths (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:10757)\n    at resolve2 (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:11938)\n    at nextResolve (node:internal/modules/esm/hooks:748:28) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/conversationRouting.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.809Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/conversationRouting.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'zustand' imported from /Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/webview/src/components/ai-sidebar/store.ts\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:985:11)\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\n    at resolveBase (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:8141)\n    at resolveDirectory (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:9227)\n    at resolveTsPaths (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:10757)\n    at resolve2 (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:11938)\n    at nextResolve (node:internal/modules/esm/hooks:748:28) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/runtimeSwitching.test.ts",
+      "capturedAt": "2026-09-13T09:08:15.935Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/runtimeSwitching.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'zustand' imported from /Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/webview/src/components/ai-sidebar/store.ts\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:985:11)\n    at nextResolve (node:internal/modules/esm/hooks:748:28)\n    at resolveBase (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:8141)\n    at resolveDirectory (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:9227)\n    at resolveTsPaths (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:10757)\n    at resolve2 (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/register-CqMfTiWi.mjs:2:11938)\n    at nextResolve (node:internal/modules/esm/hooks:748:28) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/continuationPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:08:16.026Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/continuationPresentation.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "continuationPresentation.test.ts: all tests passed\n",
+      "stderr": ""
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts",
+      "capturedAt": "2026-09-13T09:08:16.114Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "--import",
+        "tsx",
+        "webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "thinkingEffortGeometry tests passed.\n",
+      "stderr": ""
+    }
+  ]
+}

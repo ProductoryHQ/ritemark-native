@@ -8,6 +8,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -54,6 +56,19 @@ for py in python3 python; do
     break
   fi
 done
+
+file_sha256() {
+  local f="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$f" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$f" | awk '{print $1}'
+  elif [[ -n "$PYTHON" ]]; then
+    "$PYTHON" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$f"
+  else
+    return 1
+  fi
+}
 
 echo "========================================"
 echo "Post-Build Output Validation"
@@ -246,7 +261,7 @@ if [[ ! -f "$MANIFEST" ]]; then
   echo -e "  ${RED}FAIL${NC}: manifest.json missing at $MANIFEST"
   ERRORS=$((ERRORS + 1))
 else
-  # Emit one line per matching entry: installName|expectedFileArchPattern
+  # Expand schema-v3 source rows into one line per installed package file.
   # NOTE: We do NOT execute the binary from inside the bundle here. macOS .app
   # bundles are codesigned later in the release flow; modifying any byte under
   # Resources invalidates the embedded signature, and Gatekeeper will SIGKILL
@@ -255,30 +270,23 @@ else
   # validationArgs smoke test on the source binary at fetch time — post-copy
   # bytes are byte-identical, so re-running adds no value and introduces
   # signing-stage fragility.
-  if [[ -z "$PYTHON" ]]; then
-    echo -e "  ${RED}FAIL${NC}: neither python3 nor python found in PATH (needed to parse manifest.json)"
+  if ! command -v node >/dev/null 2>&1; then
+    echo -e "  ${RED}FAIL${NC}: node is missing from PATH (needed to parse manifest.json)"
     ERRORS=$((ERRORS + 1))
-    PYTHON_FOR_PARSE=""
+    NODE_FOR_PARSE=""
   else
-    PYTHON_FOR_PARSE="$PYTHON"
+    NODE_FOR_PARSE="node"
   fi
-  if [[ -n "$PYTHON_FOR_PARSE" ]]; then
-  ENTRIES=$("$PYTHON_FOR_PARSE" -c "
-import json
-with open('$MANIFEST') as f:
-    m = json.load(f)
-for r in m['runtimes']:
-    if r['platform'] == '$MANIFEST_PLATFORM' and r['arch'] == '$MANIFEST_ARCH':
-        print(f\"{r['installName']}|{r['expectedFileArchPattern']}\")
-")
+  if [[ -n "$NODE_FOR_PARSE" ]]; then
+  ENTRIES=$(node "$SCRIPT_DIR/list-agent-runtime-files.mjs" "$MANIFEST" "$MANIFEST_PLATFORM" "$MANIFEST_ARCH" --records)
 
   if [[ -z "$ENTRIES" ]]; then
     echo -e "  ${RED}FAIL${NC}: no manifest entries for ${MANIFEST_PLATFORM}-${MANIFEST_ARCH}"
     ERRORS=$((ERRORS + 1))
   else
-    while IFS='|' read -r install_name arch_pattern; do
-      bin_path="$AGENTS_IN_APP/$install_name"
-      echo -n "  Checking $install_name... "
+    while IFS='|' read -r install_path arch_pattern executable expected_sha; do
+      bin_path="$AGENTS_IN_APP/$install_path"
+      echo -n "  Checking $install_path... "
 
       if [[ ! -f "$bin_path" ]]; then
         echo -e "${RED}FAIL${NC} (not in app bundle)"
@@ -289,9 +297,32 @@ for r in m['runtimes']:
 
       # Exec bit only meaningful on POSIX targets. fetch-agent-runtimes.sh
       # intentionally skips chmod +x for win32 .exe (Windows ignores exec bit).
-      if [[ "$MANIFEST_PLATFORM" != "win32" ]] && [[ ! -x "$bin_path" ]]; then
+      if [[ "$executable" == "1" ]] && [[ "$MANIFEST_PLATFORM" != "win32" ]] && [[ ! -x "$bin_path" ]]; then
         echo -e "${RED}FAIL${NC} (exec bit missing)"
         ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      actual_sha=$(file_sha256 "$bin_path" || true)
+      signed_windows_executable=false
+      if [[ "$MANIFEST_PLATFORM" == "win32" ]] && [[ "$executable" == "1" ]] && [[ "${RITEMARK_RUNTIME_FILES_SIGNED:-0}" == "1" ]]; then
+        signed_windows_executable=true
+      fi
+      if [[ "$actual_sha" != "$expected_sha" ]] && [[ "$signed_windows_executable" == false ]]; then
+        echo -e "${RED}FAIL${NC} (SHA-256 mismatch)"
+        echo "    Expected: $expected_sha"
+        echo "    Got:      ${actual_sha:-<unavailable>}"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+      if [[ ! -f "$bin_path.sha256" ]] || ! grep -qF "$expected_sha" "$bin_path.sha256"; then
+        echo -e "${RED}FAIL${NC} (SHA-256 sidecar missing or stale)"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+
+      if [[ "$executable" != "1" ]]; then
+        echo -e "${GREEN}OK${NC} (metadata; SHA-256 verified)"
         continue
       fi
 
@@ -328,12 +359,22 @@ for r in m['runtimes']:
         continue
       fi
 
-      if [[ "$win32_fallback_used" == true ]]; then
+      if [[ "$signed_windows_executable" == true ]]; then
+        echo -e "${GREEN}OK${NC} (signed PE; unsigned SHA-256 retained in sidecar; $file_out)"
+      elif [[ "$win32_fallback_used" == true ]]; then
         echo -e "${GREEN}OK${NC} (PE32+/x86-64 tokens + MZ magic; file output: $file_out)"
       else
         echo -e "${GREEN}OK${NC} ($file_out)"
       fi
     done <<< "$ENTRIES"
+
+    expected_tree=$(node "$SCRIPT_DIR/list-agent-runtime-files.mjs" "$MANIFEST" "$MANIFEST_PLATFORM" "$MANIFEST_ARCH" --paths-with-sidecars | sort)
+    actual_tree=$(cd "$AGENTS_IN_APP" && find . -type f -print | sed 's#^\./##' | sort)
+    if [[ "$actual_tree" != "$expected_tree" ]]; then
+      echo -e "  ${RED}FAIL${NC}: installed runtime tree differs from the approved manifest"
+      diff <(printf '%s\n' "$expected_tree") <(printf '%s\n' "$actual_tree") || true
+      ERRORS=$((ERRORS + 1))
+    fi
   fi
   fi
 fi
@@ -351,23 +392,30 @@ echo ""
 # Check 7: Windows Code Signing Verification (win32 only, opt-in)
 # -----------------------------------------------------------------------------
 if [[ "$TARGET" == "win32-x64" ]]; then
+  if [[ "${RITEMARK_RUNTIME_FILES_SIGNED:-0}" == "1" ]] && [[ "${RITEMARK_SKIP_SIGNING_CHECK:-1}" != "0" ]]; then
+    echo -e "${RED}FAIL${NC}: signed-runtime mode requires RITEMARK_SKIP_SIGNING_CHECK=0"
+    ERRORS=$((ERRORS + 1))
+  fi
   if [[ "${RITEMARK_SKIP_SIGNING_CHECK:-1}" == "1" ]]; then
     echo "Signing check: SKIPPED (RITEMARK_SKIP_SIGNING_CHECK=1, default)"
     echo "  Set RITEMARK_SKIP_SIGNING_CHECK=0 to enforce signature verification."
     echo ""
   else
     echo "Checking Authenticode signatures..."
-    SIGNTOOL=$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path "*/x64/signtool.exe" 2>/dev/null | sort -V | tail -1)
+    SIGNTOOL="${SIGNTOOL_PATH:-$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path "*/x64/signtool.exe" 2>/dev/null | sort -V | tail -1)}"
     if [[ -z "$SIGNTOOL" ]]; then
-      echo -e "  ${YELLOW}WARN${NC}: signtool.exe not found — cannot verify signatures"
-      WARNINGS=$((WARNINGS + 1))
+      if [[ "${RITEMARK_RUNTIME_FILES_SIGNED:-0}" == "1" ]]; then
+        echo -e "  ${RED}FAIL${NC}: signtool.exe not found — signed runtime files cannot be verified"
+        ERRORS=$((ERRORS + 1))
+      else
+        echo -e "  ${YELLOW}WARN${NC}: signtool.exe not found — cannot verify signatures"
+        WARNINGS=$((WARNINGS + 1))
+      fi
     else
-      SIGN_TARGETS=("$BUILD_DIR/Ritemark.exe")
+      SIGN_TARGETS=("$APP_PATH/Ritemark.exe")
       AGENTS_SIGN_DIR="$EXT_PATH/binaries/agents/win32-x64"
       if [[ -d "$AGENTS_SIGN_DIR" ]]; then
-        for exe in "$AGENTS_SIGN_DIR"/*.exe; do
-          [[ -f "$exe" ]] && SIGN_TARGETS+=("$exe")
-        done
+        while IFS= read -r -d '' exe; do SIGN_TARGETS+=("$exe"); done < <(find "$AGENTS_SIGN_DIR" -type f -name '*.exe' -print0)
       fi
 
       for stgt in "${SIGN_TARGETS[@]}"; do

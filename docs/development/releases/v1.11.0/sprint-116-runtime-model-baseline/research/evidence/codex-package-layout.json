@@ -1,0 +1,186 @@
+{
+  "capturedAt": "2026-09-13T15:00:11.325Z",
+  "release": "rust-v0.154.0",
+  "status": "PASS",
+  "productLayoutRecommendation": "binaries/agents/<target>/codex/<official package tree>",
+  "packages": [
+    {
+      "target": "darwin-arm64",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
+      "archive": "codex-app-server-package-aarch64-apple-darwin.tar.gz",
+      "archiveSha256": "7bf20c1843bdcff086c89a294299833f20146ebbdba03e7f49f020b7adbfff7b",
+      "expectedArchiveSha256": "7bf20c1843bdcff086c89a294299833f20146ebbdba03e7f49f020b7adbfff7b",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "exactMemberSet": "PASS",
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.154.0",
+        "target": "aarch64-apple-darwin",
+        "variant": "codex-app-server",
+        "entrypoint": "bin/codex-app-server",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      },
+      "members": [
+        {
+          "path": "bin/codex-app-server",
+          "sha256": "2fc485696e5df06fc492fb310599752775fde726585149eaa7aeadb9117d235a",
+          "size": 171099968,
+          "executable": true,
+          "file": "Mach-O 64-bit executable arm64"
+        },
+        {
+          "path": "bin/codex-code-mode-host",
+          "sha256": "3eae1653e89fa1b4703ccbfb0ac16d4fd3423b99ccd90dc95a8aabf9fa4e25c8",
+          "size": 62786144,
+          "executable": true,
+          "file": "Mach-O 64-bit executable arm64"
+        },
+        {
+          "path": "codex-package.json",
+          "sha256": "d811f124d4aa726cd5a92e094612f474e7b2d56d8f72949683a582d5cb6da1d0",
+          "size": 222,
+          "executable": false,
+          "file": "JSON data"
+        },
+        {
+          "path": "codex-path/rg",
+          "sha256": "6bbb665c5a40785e74c7ccf1c2e606efa7e70b09540c1e00787c3f88827e668d",
+          "size": 4030432,
+          "executable": true,
+          "file": "Mach-O 64-bit executable arm64"
+        },
+        {
+          "path": "codex-resources/zsh/bin/zsh",
+          "sha256": "25649b16e12a7b1b26686a9553d8a141866ee445319fddb5263d57784f0fd10b",
+          "size": 754208,
+          "executable": true,
+          "file": "Mach-O 64-bit executable arm64"
+        }
+      ]
+    },
+    {
+      "target": "darwin-x64",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
+      "archive": "codex-app-server-package-x86_64-apple-darwin.tar.gz",
+      "archiveSha256": "4fddde3689d2aa0058c06138a84b05f87bdbff8cd556fba5816a97ac0469a4d4",
+      "expectedArchiveSha256": "4fddde3689d2aa0058c06138a84b05f87bdbff8cd556fba5816a97ac0469a4d4",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "exactMemberSet": "PASS",
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.154.0",
+        "target": "x86_64-apple-darwin",
+        "variant": "codex-app-server",
+        "entrypoint": "bin/codex-app-server",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      },
+      "members": [
+        {
+          "path": "bin/codex-app-server",
+          "sha256": "41bb0e094ec7b21758dffe08681a00d43334bb33e81a32eacdfce9d9db9861e6",
+          "size": 183817328,
+          "executable": true,
+          "file": "Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "bin/codex-code-mode-host",
+          "sha256": "506caee46bb1b5e651c974b4783e3211f908bd37d1468ce94d02687e661926c8",
+          "size": 65865664,
+          "executable": true,
+          "file": "Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "codex-package.json",
+          "sha256": "024804a9cf46bdb4670bc6eb2c870d63a90b1e711be79af32cab81db39e425f7",
+          "size": 221,
+          "executable": false,
+          "file": "JSON data"
+        },
+        {
+          "path": "codex-path/rg",
+          "sha256": "58e0c7beb529788590a5fbff13f04ed58bb92633735a4ebedea0e5ae0fd51be7",
+          "size": 4437184,
+          "executable": true,
+          "file": "Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "codex-resources/zsh/bin/zsh",
+          "sha256": "dc1ab818a9519d34a119fba373db9538067d76527cf8faa4ae739d0556493754",
+          "size": 762544,
+          "executable": true,
+          "file": "Mach-O 64-bit executable x86_64"
+        }
+      ]
+    },
+    {
+      "target": "win32-x64",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+      "archive": "codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+      "archiveSha256": "5f8b43e030c0aeeb7bdb3d5e03fff4c68ba94fa2df0ae437c490811f54660d74",
+      "expectedArchiveSha256": "5f8b43e030c0aeeb7bdb3d5e03fff4c68ba94fa2df0ae437c490811f54660d74",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "exactMemberSet": "PASS",
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.154.0",
+        "target": "x86_64-pc-windows-msvc",
+        "variant": "codex-app-server",
+        "entrypoint": "bin/codex-app-server.exe",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      },
+      "members": [
+        {
+          "path": "bin/codex-app-server.exe",
+          "sha256": "6fe58c486f793629317d73e66f804dcfad6561aa8ed9b2c9ff647f7843b4b350",
+          "size": 230817072,
+          "executable": true,
+          "file": "PE32+ executable (console) x86-64, for MS Windows"
+        },
+        {
+          "path": "bin/codex-code-mode-host.exe",
+          "sha256": "7b4987007702973dfeb49ec9a0c11f737488890e208ccb04f7a147769c4bb1f1",
+          "size": 72496432,
+          "executable": true,
+          "file": "PE32+ executable (console) x86-64, for MS Windows"
+        },
+        {
+          "path": "codex-package.json",
+          "sha256": "a3299f10a82a8a354e8b8c75f5db97940acc40f6e83ee95a05af257827fc176a",
+          "size": 237,
+          "executable": false,
+          "file": "JSON data"
+        },
+        {
+          "path": "codex-path/rg.exe",
+          "sha256": "14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680",
+          "size": 4218880,
+          "executable": true,
+          "file": "PE32+ executable (console) x86-64, for MS Windows"
+        },
+        {
+          "path": "codex-resources/codex-command-runner.exe",
+          "sha256": "a57ca8beb786a05f36c97309e8a716610c70ced9946dc1437bbbaf4566c0c403",
+          "size": 8218416,
+          "executable": true,
+          "file": "PE32+ executable (GUI) x86-64, for MS Windows"
+        },
+        {
+          "path": "codex-resources/codex-windows-sandbox-setup.exe",
+          "sha256": "ea27f90a0746e2464a829cd6e1de0dcafb77c8be603de899661e8c006ef33937",
+          "size": 15467312,
+          "executable": true,
+          "file": "PE32+ executable (console) x86-64, for MS Windows"
+        }
+      ]
+    }
+  ]
+}

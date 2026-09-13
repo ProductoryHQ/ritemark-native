@@ -1,0 +1,72 @@
+{
+  "capturedAt": "2026-09-13T14:34:13.764Z",
+  "adapter": "unchanged CodexSession + CodexAppServer",
+  "binary": "0.154.0",
+  "variant": "default",
+  "auditTransportAdjustment": null,
+  "protocol": [
+    {
+      "scope": "rpc:request",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:notification",
+      "method": "initialized"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:error",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "turn/start"
+    }
+  ],
+  "checks": [
+    {
+      "name": "session audit",
+      "status": "FAIL",
+      "error": "completion timeout"
+    }
+  ],
+  "processDiagnostics": {
+    "stderrTail": [
+      "{\"timestamp\":\"2026-09-13T14:34:14.913294Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_small: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:14.914153Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_large: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:18.867802Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-observability\",\"error\":\"OAuth refresh credentials for server cloudflare-observability are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:18.867810Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-bindings\",\"error\":\"OAuth refresh credentials for server cloudflare-bindings are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:18.867810Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare\",\"error\":\"OAuth refresh credentials for server cloudflare are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:18.935425Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-builds\",\"error\":\"OAuth refresh credentials for server cloudflare-builds are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:34:19.993872Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"figma\",\"error\":\"OAuth refresh credentials for server figma are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}"
+    ],
+    "exit": null
+  }
+}

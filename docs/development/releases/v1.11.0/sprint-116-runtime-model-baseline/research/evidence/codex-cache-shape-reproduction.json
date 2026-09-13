@@ -1,0 +1,88 @@
+{
+  "capturedAt": "2026-09-13T09:19:17.503Z",
+  "cacheClientVersion": "0.153.0",
+  "cacheSha256": "6eca9f428f25adf3af80254608516cf919b6a30d5cf36cbd0588f00a7cbded48",
+  "observedKeys": [
+    "default_reasoning_level",
+    "supported_reasoning_levels[].effort"
+  ],
+  "parserExpectedKeys": [
+    "default_reasoning_effort",
+    "supported_reasoning_efforts[]"
+  ],
+  "rows": [
+    {
+      "id": "gpt-6-astra",
+      "expectedDefault": "medium",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "actual": null
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "expectedDefault": "low",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "actual": null
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "expectedDefault": "medium",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "actual": null
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "expectedDefault": "medium",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "actual": null
+    },
+    {
+      "id": "gpt-5.5",
+      "expectedDefault": "medium",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "actual": null
+    },
+    {
+      "id": "gpt-5.3-codex-spark",
+      "expectedDefault": "high",
+      "expectedLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "actual": null
+    }
+  ]
+}

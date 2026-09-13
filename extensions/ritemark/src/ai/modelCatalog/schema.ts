@@ -28,7 +28,7 @@ export interface ModelThinkingEffort {
 
 /** A single selectable model, as shown in a picker row. */
 export interface ModelEntry {
-  /** Provider model id (bare, e.g. `claude-sonnet-5`; composite for opencode, e.g. `google/gemini-3.1-pro-preview`). */
+  /** Provider model id; OpenCode entries use a provider-qualified composite id. */
   id: string;
   /** Runtime-reported canonical identity for a live request alias. */
   resolvedModel?: string;
@@ -152,7 +152,9 @@ function validateProviderCatalog(raw: unknown, where: string): ProviderCatalog {
 export function validateCatalog(raw: unknown): ModelCatalog {
   if (!isObject(raw)) fail('root is not an object');
   if (raw.schemaVersion !== 1) fail(`schemaVersion must be 1 (got ${JSON.stringify(raw.schemaVersion)})`);
-  if (typeof raw.updatedAt !== 'string') fail('updatedAt must be a string');
+  if (typeof raw.updatedAt !== 'string' || !Number.isFinite(Date.parse(raw.updatedAt))) {
+    fail('updatedAt must be a parseable ISO-8601 timestamp');
+  }
   if (!isObject(raw.providers)) fail('providers must be an object');
 
   const providers: Partial<Record<Provider, ProviderCatalog>> = {};

@@ -1,0 +1,22 @@
+{
+  "key": "codex/command-runner/win32-x64",
+  "capturedAt": "2026-09-13T09:03:06.012Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+  "archiveFilename": "codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+  "sha256": "2f7f3a9dd2ffbdc201e87d7117531470a3e36066e0e6a8a28dd39dbb446c82e9",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-command-runner-x86_64-pc-windows-msvc.exe",
+    "size": 8218416,
+    "licenseFiles": []
+  },
+  "binarySha256": "a57ca8beb786a05f36c97309e8a716610c70ced9946dc1437bbbaf4566c0c403",
+  "file": "PE32+ executable (GUI) x86-64, for MS Windows",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "IPC helper; must be exercised through parent runtime on Windows"
+  },
+  "status": "PASS_ARTIFACT"
+}

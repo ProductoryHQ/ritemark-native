@@ -1,0 +1,13 @@
+{
+  "provider": "codex",
+  "capturedAt": "2026-09-13T09:52:18.921Z",
+  "auditBinaryDir": "/private/tmp/ritemark-s116-audit-YfLYRv/baseline-codex-0.153.0",
+  "checks": [
+    {
+      "name": "file tools through code-mode host",
+      "status": "FAIL",
+      "error": "thread/start: timeout"
+    }
+  ],
+  "model": "gpt-6-astra"
+}

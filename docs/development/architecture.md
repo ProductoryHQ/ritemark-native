@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-07 (Codex Windows sandbox helpers — platform-scoped manifest components)
+**Last updated:** 2026-09-13 (Sprint 116 complete runtime packages and catalog freshness floor)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -350,7 +350,7 @@ Each runtime was integrated independently. The result is three structurally simi
 | **Session manager** | `AgentRunner.ts` (1235 LOC) | `CodexManager.ts` (906 LOC) | `AcpManager.ts` (286 LOC) |
 | **Auth** | Claude OAuth / Anthropic API key | ChatGPT OAuth built into binary | BYOK — env-var injection from Settings |
 | **Approval** | `agent-answer-plan` webview message → PlanApprovalCard | `codex-approve` → CodexApprovalCard | `acp-approval-response` → CodexApprovalCard (shared shape, different message type) |
-| **Browser tools** | `BrowserMcpServer` injected via `AgentSessionConfig.mcpServers` | `codexBrowserTools.ts` — dynamic tool injection via Codex protocol | Not implemented |
+| **Browser tools** | `BrowserToolsInjector` → in-process MCP server | `BrowserToolsInjector` → Codex dynamic-tool projection | `BrowserToolsInjector` → ACP stdio MCP adapter |
 | **File attachments** | Full `FileAttachment` (image/pdf/text) | Images converted to data URLs; PDF/text not supported | No attachment support |
 | **Model config** | `modelCatalog.getModels('anthropic')` — live `/v1/models` → catalog | `modelCatalog.getModels('codex')` — `~/.codex` cache → catalog | `modelCatalog.getModels('opencode')` — curated BYOK — all via `src/ai/modelCatalog` (Sprint 89) |
 | **Webview execute message** | `ai-execute-agent` | `codex-execute` | `acp-execute` |
@@ -372,6 +372,16 @@ src/agent/ClaudeCodeRuntime.ts   → implements AgentRuntime, wraps AgentRunner/
 src/codex/CodexRuntime.ts        → implements AgentRuntime, wraps CodexAppServer+CodexAuth
 src/acp/AcpRuntime.ts            → implements AgentRuntime, wraps AcpManager
 ```
+
+### Bundled runtime package contract (Sprint 116)
+
+`extensions/ritemark/binaries/agents/manifest.json` schema v3 describes complete downloadable sources rather than assuming one archive equals one runnable component. The v1.11 baseline has 12 source rows and 25 installed files across `darwin-arm64`, `darwin-x64`, and `win32-x64`.
+
+- Codex installs the official package unchanged under `<target>/codex/`. `codex-app-server` runs from `codex/bin/` and resolves its version-matched code-mode-host, ripgrep, zsh, and Windows sandbox helpers from that preserved tree.
+- Claude Code remains a flat target runtime and shares its patch number with the exact Claude Agent SDK. The validator requires all eight SDK optional packages at that exact version.
+- OpenCode remains a flat target runtime. Its own ripgrep is installed under `<target>/opencode-path/`; `AcpRuntime` prepends only that directory to the OpenCode subprocess `PATH`, avoiding both first-use download and dependence on Codex resources.
+- `fetch-agent-runtimes.mjs` verifies archive and installed hashes, rejects unsafe archive entries, enforces the exact Codex member set, then promotes the staged package. Native smoke tests run only on the matching host; Intel macOS and Windows execution stay in the runtime matrix workflow.
+- `list-agent-runtime-files.mjs` expands source rows into the exact installed target tree used by staging, installer, and build-output validation, including checksums and generated sidecars.
 
 **`AgentRuntime` interface:**
 
@@ -812,7 +822,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 - **Release builds are clean-room builds** — an RC starts in a new detached exact-`origin/main` worktree with a physical pristine VS Code submodule at the recorded gitlink. Dependencies come from lockfiles, patches come from Git, output starts empty, and the app carries verified provenance. A development worktree is never promoted into an RC. Full contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
 - **Extension source has one authority** — `extensions/ritemark/` is canonical. Development and local macOS builds symlink it into the same worktree's `vscode/extensions/ritemark`; CI and Windows packaging may create a same-worktree physical copy for platform/tooling constraints. A copy is derived build state, never an editable source or a cross-worktree dependency.
 - **Webview is sandboxed** — no filesystem/Node access; everything through `bridge.ts`. Never give the webview direct FS access to "simplify" things. ARCH-9 hardens this boundary; it must not dissolve it.
-- **Model catalog is the single authority** — model lists + defaults resolve through `src/ai/modelCatalog/` (live provider probes → remote `ritemark-public` catalog → cache → bundled baseline), evolved from the static `modelConfig.ts` registry in Sprint 89 (GH #109). Never hardcode model ids in runtimes, views, or the webview; add models by editing the published catalog (no app release). The single-authority spirit is preserved; the mechanism is now dynamic + remotely updatable.
+- **Model IDs and catalog resolution have separate authorities** — canonical IDs and stable defaults live in `src/ai/modelConfig.ts`; `src/ai/modelCatalog/` projects them into provider/runtime lists and resolves availability through live probe → eligible remote → eligible cache → bundled floor. A remote/cache snapshot older than the bundled `updatedAt` cannot hide a newer app baseline. Never hardcode model IDs in runtimes, views, or Flow executors.
 - **Flows are JSON + pluggable executors** — new automation capability = new node executor, not a new engine.
 - **Features ON by default, gated by flags** — never delete code to disable (broke Settings in v1.3.0). Disable only via `src/features/flags.ts` and only on explicit instruction.
 - **Layout invariants owned by patch 002** — sidebar, terminal, titlebar placement is contractual; enforced by `.claude/hooks/pre-commit-validator.sh`.
@@ -840,6 +850,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-13 | Sprint 116 | **Complete runtime and model baseline.** Manifest schema v3 installs complete vendor packages: Codex 0.154.0 preserves its official package tree, Claude Code 2.1.270 pairs with Agent SDK 0.3.270, and OpenCode 1.18.30 owns ripgrep 15.1.0 through a scoped PATH entry; ACP stays 1.4.0. Codex cache effort parsing supports current and legacy schemas, explicit unknown thread events are dropped, and immediate Stop handles the measured pre-active-turn race. Canonical model IDs/defaults are refreshed in `modelConfig.ts`; catalog resolution rejects stale static snapshots below the bundled floor. |
 | 2026-09-03 | v1.10.0 RC bugfix | **Codex service-compatibility correction.** The bundled `0.149.0` app-server was invalidated after a real GPT-5.6 turn returned a newer-runtime requirement and failed to decode the service's current `max` effort value. The exact cross-platform app-server + code-mode-host manifest now pins official Codex `0.153.0`; the generated protocol subset remains backward compatible, manifest mutation gates pass, and a fresh-profile RUNDEV canary proves `Bundled with app · Ready · v0.153.0` plus a real GPT-5.6 response. Native Intel/Windows and packaged-app canaries remain release gates. |
 | 2026-09-03 | v1.10.0 RC bugfix | **Provider-scoped runtime availability.** Probe completion is no longer confused with authenticated usability: one normalized availability union now drives the gate, recovery cards, Composer Send guard, and explicit ready-runtime fallback. Signing out of Claude cannot hide or disable connected Codex/OpenCode; transcripts remain visible, runtime+model changes are atomic, status refreshes cannot rebind non-empty conversations, and logout interrupts/releases only the affected provider's sessions. |
 | 2026-09-01 | v1.10.0 RC bugfix | **Storage-isolated Agent Chat bootstrap.** A packaged upgraded profile exposed that the pre-Sprint-109 global→workspace localStorage copier still ran synchronously inside `agent:bootstrap`; quota exhaustion aborted the handler before catalogs committed. Workspace selection is now side-effect-free, host rollout selects storage authority after bootstrap, host modes inventory legacy data read-only, and legacy rollback reads existing global data in place without duplicating it. Quota-full regressions are mandatory bootstrap/conversation QA. |

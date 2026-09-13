@@ -1,0 +1,25 @@
+{
+  "key": "codex/code-mode-host/darwin-arm64",
+  "capturedAt": "2026-09-13T09:02:54.848Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+  "archiveFilename": "codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+  "sha256": "500ee2a02ea598ae519052e7d7d8e201d1db01986f30c214ef4143645dc86fad",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-code-mode-host-aarch64-apple-darwin",
+    "size": 62786144,
+    "licenseFiles": []
+  },
+  "binarySha256": "426d73aaeb2aeef45e98b5add99e8ef9594a31673d281489bb2cb06b38c27423",
+  "file": "Mach-O 64-bit executable arm64",
+  "startup": {
+    "status": "PASS",
+    "args": [
+      "--help"
+    ],
+    "output": "Usage: codex-code-mode-host [OPTIONS]\n\nOptions:\n      --listen <URL>               Transport endpoint: `stdio`, `stdio://`, or `grpc://IP:PORT`\n                                   [default: stdio]\n      --otel-trace-listen <URL>    Optional WebSocket endpoint that streams only raw OTLP trace\n                                   batches\n      --otel-trace-exporter <URL>  Optional OTLP/HTTP JSON trace exporter endpoint, analogous to\n                                   `otel.trace_exporter` in app-server configuration\n  -h, --help                       Print help\n"
+  },
+  "status": "PASS_ARTIFACT"
+}

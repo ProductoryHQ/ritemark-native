@@ -1,0 +1,18 @@
+{
+  "provider": "acp",
+  "capturedAt": "2026-09-13T14:42:20.773Z",
+  "auditBinaryDir": "/private/tmp/ritemark-s116-audit-YfLYRv/binaries/darwin-arm64",
+  "checks": [
+    {
+      "name": "ACP initialize and session capabilities",
+      "status": "FAIL",
+      "error": "ACP connection closed"
+    }
+  ],
+  "diagnostics": {
+    "stderrTail": [
+      "\u001b[91m\u001b[1mError: \u001b[0mUnexpected error",
+      "ServeError"
+    ]
+  }
+}

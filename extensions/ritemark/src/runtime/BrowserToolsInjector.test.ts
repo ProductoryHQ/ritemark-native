@@ -1,5 +1,5 @@
 /**
- * Tests for BrowserToolsInjector.getAcpMcpServers.
+ * Tests for BrowserToolsInjector runtime projections.
  *
  * Run: npx tsx src/runtime/BrowserToolsInjector.test.ts
  */
@@ -95,4 +95,23 @@ const injector = new BrowserToolsInjector();
   console.log('✓ Test 4: adapter path is absolute');
 }
 
-console.log('\nAll 4 tests passed!');
+// Test 5: Codex dynamic tools are gated and exposed through the shared injector
+{
+  assert.strictEqual(injector.getCodexDynamicTools(false), undefined);
+  const tools = injector.getCodexDynamicTools(true) ?? [];
+  assert.strictEqual(tools.length, 6, 'Codex must receive the six shared browser actions');
+  assert.deepStrictEqual(
+    tools.map(tool => tool.name),
+    [
+      'ritemark_browser_navigate',
+      'ritemark_browser_click',
+      'ritemark_browser_fill',
+      'ritemark_browser_type',
+      'ritemark_browser_scroll',
+      'ritemark_browser_snapshot',
+    ],
+  );
+  console.log('✓ Test 5: Codex dynamic tools come through BrowserToolsInjector');
+}
+
+console.log('\nAll 5 tests passed!');

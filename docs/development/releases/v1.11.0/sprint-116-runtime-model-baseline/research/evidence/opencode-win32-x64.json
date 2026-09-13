@@ -1,0 +1,55 @@
+{
+  "url": "https://registry.npmjs.org/opencode-windows-x64/1.18.30",
+  "capturedAt": "2026-09-13T08:59:17.914Z",
+  "sha256": "841fdcba5e20d2d64d1c5194ac376e744cb7d8e5493ce0d2007a470fbdbf48a1",
+  "data": {
+    "os": [
+      "win32"
+    ],
+    "cpu": [
+      "x64"
+    ],
+    "dist": {
+      "shasum": "92eec66a3bf7e337751707449bd5d38af441ddef",
+      "tarball": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.18.30.tgz",
+      "fileCount": 2,
+      "integrity": "sha512-E00yRyUDQvdmf8AYQNYDYgZuLkWW0mBqBrACHPwfCCBZdyC8Sa4nUtQq27nAIOPAp2jfyrpH3WJBxT2GVpT42w==",
+      "signatures": [
+        {
+          "sig": "MEQCIGFa/G7NQ1u/o3ReSSL8qZkA5xAY9eoUmSwluZ2hzSe6AiAAh3dVlhkWU9MTfTI3QflF2fKLS3ocOT6VAeOOMEw0ig==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 179793588
+    },
+    "name": "opencode-windows-x64",
+    "_from": "file:opencode-windows-x64-1.18.30.tgz",
+    "_npmUser": {
+      "name": "GitHub Actions",
+      "email": "npm-oidc-no-reply@github.com",
+      "trustedPublisher": {
+        "id": "github",
+        "oidcConfigId": "oidc:382ba855-4539-4277-95e0-59f33cec83ff"
+      }
+    },
+    "_resolved": "/home/runner/_work/opencode/opencode/packages/opencode/dist/opencode-windows-x64/opencode-windows-x64-1.18.30.tgz",
+    "_integrity": "sha512-E00yRyUDQvdmf8AYQNYDYgZuLkWW0mBqBrACHPwfCCBZdyC8Sa4nUtQq27nAIOPAp2jfyrpH3WJBxT2GVpT42w==",
+    "_npmVersion": "11.6.2",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "thdxr",
+        "email": "d@ironbay.co"
+      }
+    ],
+    "_nodeVersion": "24.13.0",
+    "_hasShrinkwrap": false,
+    "preferUnplugged": true,
+    "_npmOperationalInternal": {
+      "tmp": "tmp/opencode-windows-x64_1.18.30_1788924769910_0.23537742648695126",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "opencode-windows-x64@1.18.30",
+    "version": "1.18.30"
+  }
+}

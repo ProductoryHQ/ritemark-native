@@ -1,0 +1,13 @@
+{
+  "provider": "codex",
+  "capturedAt": "2026-09-13T09:15:30.423Z",
+  "checks": [
+    {
+      "name": "explicit cancellation",
+      "status": "PASS",
+      "terminalStatus": "interrupted",
+      "activeEvent": "item/agentMessage/delta"
+    }
+  ],
+  "model": "gpt-6-astra"
+}

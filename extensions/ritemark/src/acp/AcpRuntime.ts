@@ -16,7 +16,7 @@
 import * as crypto from 'crypto';
 import { AcpManager } from './acpManager';
 import { traceAcp } from './acpTrace';
-import { findBundledAgentRuntime, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
+import { findBundledAgentRuntime, findBundledOpenCodePathEntries, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
 import { BrowserIpcServer } from '../browser/BrowserIpcServer';
 import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
 import {
@@ -244,7 +244,16 @@ export class AcpSession implements RuntimeSession {
           }),
         ]);
         this.markDispatchAccepted();
-        config.onCodexComplete?.({ status: result?.stopReason ?? 'completed' });
+        // ACP calls a successful terminal state `end_turn`, while the shared
+        // Ritemark/Codex result contract calls it `completed`. Forwarding the
+        // wire value made the webview show a red Failed marker after OpenCode
+        // had already edited the document and streamed its final answer.
+        const status = result?.stopReason === 'end_turn' || !result?.stopReason
+          ? 'completed'
+          : result.stopReason === 'cancelled'
+            ? 'interrupted'
+            : result.stopReason;
+        config.onCodexComplete?.({ status });
       } catch (err) {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.
@@ -501,6 +510,7 @@ export class AcpRuntime implements AgentRuntime {
 
     this._manager = new AcpManager({
       binaryPath: runtime.path,
+      pathEntries: findBundledOpenCodePathEntries(runtime.path),
       workspaceRoot: config.workspacePath,
       byokEnv: config.byokEnv ?? {},
       mcpServers,

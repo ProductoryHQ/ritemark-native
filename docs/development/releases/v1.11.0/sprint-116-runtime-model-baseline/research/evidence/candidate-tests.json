@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-09-13T09:07:49.369Z",
+  "node": "v22.22.1",
+  "extension": "/private/tmp/ritemark-s116-audit-YfLYRv/candidate-extension",
+  "results": [
+    {
+      "name": "TypeScript compile (no emit)",
+      "capturedAt": "2026-09-13T09:07:49.367Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "."
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

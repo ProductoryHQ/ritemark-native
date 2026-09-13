@@ -1,0 +1,158 @@
+{
+  "url": "https://registry.npmjs.org/@agentclientprotocol/sdk/latest",
+  "capturedAt": "2026-09-13T08:59:16.111Z",
+  "sha256": "a4482bb6fa3a80b2ce8b0764cdcd7f2481e7049487a8a5e818661b87b550d89d",
+  "data": {
+    "bugs": {
+      "url": "https://github.com/agentclientprotocol/typescript-sdk/issues"
+    },
+    "dist": {
+      "shasum": "01dd53874b97f50b325f9172a8f0714971e0d3ab",
+      "tarball": "https://registry.npmjs.org/@agentclientprotocol/sdk/-/sdk-1.4.0.tgz",
+      "fileCount": 170,
+      "integrity": "sha512-/eufudw+aFY1LKLolT6yFE6UMmYRl7fMJ/DEONSIyR6wI3slHWITBsANRGqXEY8FRzqUxwh7QEaGiZHcJPVThg==",
+      "signatures": [
+        {
+          "sig": "MEQCIHhO/dZW72ZYaA+dsiAaF4LTelGxl1L2LHjofgOrDWyJAiBL1iZ8PENV+ZZDg3+GZs4gel/iZQDOCKhmb1xGWUWkkQ==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIFnC51nwYaJWTSmwMuVhW/77eF13iLerf/HB2pXCdqJwAiEAlxb2VQMwfzJjrCIB63Pp7/ZGWNTyEJNpuOvBK1vmjh4=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@agentclientprotocol%2fsdk@1.4.0",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "unpackedSize": 5586531
+    },
+    "main": "dist/acp.js",
+    "name": "@agentclientprotocol/sdk",
+    "type": "module",
+    "types": "dist/acp.d.ts",
+    "author": {
+      "name": "Zed Industries"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/acp.d.ts",
+        "import": "./dist/acp.js",
+        "default": "./dist/acp.js"
+      },
+      "./experimental/v2": {
+        "types": "./dist/v2/acp.d.ts",
+        "import": "./dist/v2/acp.js",
+        "default": "./dist/v2/acp.js"
+      },
+      "./experimental/node": {
+        "types": "./dist/node-adapter.d.ts",
+        "import": "./dist/node-adapter.js",
+        "default": "./dist/node-adapter.js"
+      },
+      "./schema/schema.json": "./schema/schema.json",
+      "./experimental/server": {
+        "types": "./dist/server.d.ts",
+        "import": "./dist/server.js",
+        "default": "./dist/server.js"
+      },
+      "./experimental/ws-client": {
+        "types": "./dist/ws-stream.d.ts",
+        "import": "./dist/ws-stream.js",
+        "default": "./dist/ws-stream.js"
+      },
+      "./experimental/http-client": {
+        "types": "./dist/http-stream.d.ts",
+        "import": "./dist/http-stream.js",
+        "default": "./dist/http-stream.js"
+      },
+      "./schema/v2/schema.unstable.json": "./schema/v2/schema.unstable.json"
+    },
+    "gitHead": "e6463f444093ed7c5f1cc937c3f32afb5853e906",
+    "license": "Apache-2.0",
+    "scripts": {
+      "lint": "eslint",
+      "test": "vitest run",
+      "build": "tsc",
+      "check": "npm run generate:check && npm run lint && npm run format:check && npm run spellcheck && npm run build && npm run test && npm run docs:ts:verify",
+      "clean": "rm -rf dist tsconfig.tsbuildinfo",
+      "format": "prettier --write .",
+      "generate": "node scripts/generate.js",
+      "lint:fix": "eslint --fix",
+      "spellcheck": "./scripts/spellcheck.sh",
+      "format:check": "prettier --check .",
+      "docs:ts:build": "cd src && typedoc --options typedoc.json && typedoc --options typedoc.v2.json && echo 'TypeScript documentation generated in ./src/docs'",
+      "docs:ts:verify": "cd src && typedoc --options typedoc.json --emit none && typedoc --options typedoc.v2.json --emit none && echo 'TypeDoc verification passed'",
+      "generate:check": "node scripts/generate.js --skip-download --check",
+      "spellcheck:fix": "./scripts/spellcheck.sh --write-changes"
+    },
+    "_npmUser": {
+      "name": "GitHub Actions",
+      "email": "npm-oidc-no-reply@github.com",
+      "trustedPublisher": {
+        "id": "github",
+        "oidcConfigId": "oidc:a35577a2-b809-4b08-8da4-c4ed14180ab9"
+      }
+    },
+    "homepage": "https://github.com/agentclientprotocol/typescript-sdk#readme",
+    "repository": {
+      "url": "git+https://github.com/agentclientprotocol/typescript-sdk.git",
+      "type": "git"
+    },
+    "_npmVersion": "12.0.2",
+    "description": "The Agent Client Protocol (ACP) is a protocol that standardizes communication between *code editors* (interactive programs for viewing and editing source code) and *coding agents* (programs that use generative AI to autonomously modify code).",
+    "directories": {
+      "example": "examples"
+    },
+    "maintainers": [
+      {
+        "name": "benbrandt",
+        "email": "benjamin.j.brandt@gmail.com"
+      },
+      {
+        "name": "aguzubiaga",
+        "email": "sup@aguz.me"
+      },
+      {
+        "name": "cirwin",
+        "email": "conrad.irwin@gmail.com"
+      }
+    ],
+    "_nodeVersion": "24.19.0",
+    "publishConfig": {
+      "access": "public"
+    },
+    "_hasShrinkwrap": false,
+    "devDependencies": {
+      "ws": "^8.18.0",
+      "tsx": "^4.21.0",
+      "zod": "^3.25.0 || ^4.0.0",
+      "eslint": "^10.6.0",
+      "vitest": "^4.1.0",
+      "globals": "^17.7.0",
+      "typedoc": "^0.28.16",
+      "prettier": "^3.9.6",
+      "@types/ws": "^8.5.13",
+      "@eslint/js": "^10.0.1",
+      "typescript": "^6.0.2",
+      "@types/node": "^26.0.1",
+      "http-server": "^14.1.1",
+      "@hey-api/openapi-ts": "^0.99.0",
+      "typedoc-github-theme": "^0.4.0",
+      "eslint-config-prettier": "^10.1.8",
+      "@typescript-eslint/parser": "^8.65.0",
+      "@typescript-eslint/eslint-plugin": "^8.65.0"
+    },
+    "peerDependencies": {
+      "zod": "^3.25.0 || ^4.0.0"
+    },
+    "_npmOperationalInternal": {
+      "tmp": "tmp/sdk_1.4.0_1787266839550_0.47342138194365013",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "@agentclientprotocol/sdk@1.4.0",
+    "version": "1.4.0"
+  }
+}

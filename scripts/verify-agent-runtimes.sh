@@ -75,8 +75,9 @@ echo "--- version discovery ---"
 manifest_version() {
   node -e "
     const m=require('$EXT/binaries/agents/manifest.json');
-    const r=m.runtimes.find(x=>x.agent==='$1' && x.component==='$2');
-    process.stdout.write(r ? r.version : '');
+    const r=m.runtimes.find(x=>x.agent==='$1' && (x.component==='$2' || x.members?.some(y=>y.component==='$2')));
+    const member=r?.members?.find(y=>y.component==='$2');
+    process.stdout.write(member?.version || r?.version || '');
   " 2>/dev/null
 }
 check_version() { # name binary-path expected-substring
@@ -109,8 +110,8 @@ check_codex_windows_sandbox_helpers() { # app-server-path
   fi
   local helper missing=0
   for helper in codex-windows-sandbox-setup codex-command-runner; do
-    if [[ ! -f "$BIN/$helper$EXE_SUFFIX" ]]; then
-      fail "codex app-server is installed but required sandbox helper is missing ($BIN/$helper$EXE_SUFFIX)"
+    if [[ ! -f "$BIN/codex/codex-resources/$helper$EXE_SUFFIX" ]]; then
+      fail "codex app-server is installed but required sandbox helper is missing ($BIN/codex/codex-resources/$helper$EXE_SUFFIX)"
       missing=1
     fi
   done
@@ -134,11 +135,12 @@ check_codex_code_mode_host() { # app-server-path code-mode-host-path
 }
 check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude runtime)"
 check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode runtime)"
-check_version codex    "$BIN/codex-app-server$EXE_SUFFIX" "$(manifest_version codex app-server)"
+check_version opencode-ripgrep "$BIN/opencode-path/rg$EXE_SUFFIX" "$(manifest_version opencode ripgrep)"
+check_version codex    "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" "$(manifest_version codex app-server)"
 check_codex_code_mode_host \
-  "$BIN/codex-app-server$EXE_SUFFIX" \
-  "$BIN/codex-code-mode-host$EXE_SUFFIX"
-check_codex_windows_sandbox_helpers "$BIN/codex-app-server$EXE_SUFFIX"
+  "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" \
+  "$BIN/codex/bin/codex-code-mode-host$EXE_SUFFIX"
+check_codex_windows_sandbox_helpers "$BIN/codex/bin/codex-app-server$EXE_SUFFIX"
 
 if $VERSIONS_ONLY; then
   echo; echo "(--versions: stopping before the behavioural checks)"
@@ -155,7 +157,7 @@ if [[ ! -x "$BIN/opencode$EXE_SUFFIX" ]]; then
 elif [[ ! -d "$EXT/node_modules/@agentclientprotocol/sdk" ]]; then
   skip "@agentclientprotocol/sdk not installed — run npm install in extensions/ritemark"
 else
-  OUT="$(node "$ROOT/scripts/lib/verify-opencode.mjs" "$BIN/opencode$EXE_SUFFIX" "$EXT" 2>&1)" || true
+  OUT="$(PATH="$BIN/opencode-path:${PATH:-}" node "$ROOT/scripts/lib/verify-opencode.mjs" "$BIN/opencode$EXE_SUFFIX" "$EXT" 2>&1)" || true
   echo "$OUT" | sed 's/^/  /'
   echo "$OUT" | grep -q '^RESULT gate-pauses PASS'  && pass "a write pauses for host approval"      || fail "a write did NOT pause for host approval"
   echo "$OUT" | grep -q '^RESULT gate-denies PASS'  && pass "host denial blocks the write"          || fail "host denial did NOT block the write"

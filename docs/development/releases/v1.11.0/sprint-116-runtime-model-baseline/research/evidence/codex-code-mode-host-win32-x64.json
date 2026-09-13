@@ -1,0 +1,22 @@
+{
+  "key": "codex/code-mode-host/win32-x64",
+  "capturedAt": "2026-09-13T09:02:59.076Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+  "archiveFilename": "codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+  "sha256": "656b475bb80d258e3244dc57a1556eb3ce2180791a649ced5e2c8e199c340891",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-code-mode-host-x86_64-pc-windows-msvc.exe",
+    "size": 72496432,
+    "licenseFiles": []
+  },
+  "binarySha256": "7b4987007702973dfeb49ec9a0c11f737488890e208ccb04f7a147769c4bb1f1",
+  "file": "PE32+ executable (console) x86-64, for MS Windows",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

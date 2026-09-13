@@ -1,0 +1,25 @@
+{
+  "key": "opencode/runtime/darwin-arm64",
+  "capturedAt": "2026-09-13T09:03:34.186Z",
+  "version": "1.18.30",
+  "sourceUrl": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.18.30.tgz",
+  "archiveFilename": "opencode-darwin-arm64-1.18.30.tgz",
+  "sha256": "25b722fcdc8c46aebcb6501e1156dc1dc5a392492cc278c65b7775311674e7f8",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 2,
+    "member": "package/bin/opencode",
+    "size": 144272354,
+    "licenseFiles": []
+  },
+  "binarySha256": "2d0c9c339bb91046c6ea951c97664bc2f8a8eaca707f31fbfbb7bc73c4eddc62",
+  "file": "Mach-O 64-bit executable arm64",
+  "startup": {
+    "status": "PASS",
+    "args": [
+      "--version"
+    ],
+    "output": "1.18.30\n"
+  },
+  "status": "PASS_ARTIFACT"
+}

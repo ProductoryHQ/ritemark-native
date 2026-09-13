@@ -385,7 +385,7 @@ interface LLMNodeConfigProps {
 }
 
 // Model config is received from extension - use helper functions
-import { getLLMModels, getImageModels, getDefaultLLMModel, getDefaultImageModel } from '../../config/modelConfig';
+import { getLLMModels, getImageModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection } from '../../config/modelConfig';
 
 function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const provider = data.provider || 'openai';
@@ -649,6 +649,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
 
   // Fetch models when provider changes
   React.useEffect(() => {
@@ -721,7 +722,14 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
         </Select>
       </Field>
 
-      <Field label="Model" description={error ? `⚠️ ${error}` : loading ? 'Loading models...' : undefined}>
+      <Field
+        label="Model"
+        description={loading
+          ? 'Loading models...'
+          : modelOptions.unavailable
+            ? 'Saved model is no longer available. Choose a replacement.'
+            : error ? `⚠️ ${error}` : undefined}
+      >
         <Select
           value={data.model || models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
@@ -731,7 +739,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
             <SelectValue placeholder={loading ? 'Loading...' : 'Select model'} />
           </SelectTrigger>
           <SelectContent>
-            {models.map((m) => (
+            {modelOptions.models.map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
