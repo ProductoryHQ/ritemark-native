@@ -107,6 +107,9 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 7b | Hardening period (**≥60 min since x64 DMG build, no new bugs**) → notarize + staple x64 | Agent | **REQUIRES Gate 2 cleared + 60-min window** |
 | 8 | GitHub Release + canonical update-feed publication | Agent | — |
 | 9 | Switch repo public; recommend `product-marketer` for changelog/notes | Agent | — |
+| 9b | Post-release issue sweep — close what the release resolved, citing the version; partial or reputation-dependent issues go to Jarmo | Agent | — |
+| 10 | Release closeout — verify every published asset against local `dist/` (size + SHA-256 vs GitHub digests and the canonical feed) → archive the local-only evidence to `docs/releases/vX.Y.Z/evidence/` → clear `dist/` + `VSCode-<target>/` → `worktree-hygiene.mjs --check` reports `REVIEW` | Agent | **Closeout gate — clear only after verification passes and the evidence is pushed** |
+| 11 | `node ./scripts/worktree-hygiene.mjs --clean` on the reviewed list | **Jarmo** | **Human-authorized — never run by the agent** |
 
 **⛔⛔ NOTARIZATION-ORDER HARD RULE.** Jarmo ALWAYS tests the **un-notarized** build; notarization is the last step before publish, run only after the gate passes. There must be a **≥60-minute hardening period between DMG build and notarization** (let late bugs surface). Apple notarization is a limited/rate-sensitive resource — a team-eligibility hold (case 102892219755) once cost weeks. NEVER spend a submission on an untested or unsettled build. If a bug surfaces during the hardening window, rebuild → clock + gate reset. Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening → notarize → publish.**
 
@@ -140,7 +143,11 @@ node ./scripts/worktree-hygiene.mjs --check
 ./scripts/release-preflight.sh
 ```
 
-Review before using `--clean`; never override a `BLOCKED` worktree. Shell RCs
+`--clean` is human-authorized — Jarmo reads the report and says go; never
+override a `BLOCKED` worktree or delete one by hand. A previous release
+worktree still `BLOCKED` for build output means its closeout never ran: flag
+it as a warning and finish it (Closeout Gate below) rather than building
+beside it. Shell RCs
 may only come from the exact `origin/main` commit in a new detached worktree
 with a physical pristine VS Code submodule, frozen dependency installs, empty
 output, and matching embedded provenance. Any source change invalidates the
@@ -191,7 +198,7 @@ Verify the local build:
 | ~~Info.plist version wrong~~ | NOT a blocker — `CFBundleShortVersionString` always shows VS Code base version; Ritemark version lives in `product.json` (`ritemarkVersion`) |
 | **Agent runtime bumped without re-verification** | If `extensions/ritemark/binaries/agents/manifest.json` changed a runtime `version` since the last release tag, `docs/development/agent-runtime-compatibility.md` MUST have been re-verified for those versions — see below |
 
-**SOFT WARNINGS** (proceed but flag to Jarmo): DMG older than app build, uncommitted changes, open sprint WIP, notarization pending, release notes missing or out-of-date.
+**SOFT WARNINGS** (proceed but flag to Jarmo): DMG older than app build, uncommitted changes, open sprint WIP, notarization pending, release notes missing or out-of-date, previous release worktree not closed out (still `BLOCKED` for build output).
 
 ### Step 2b — Bundled agent runtime verification (when a runtime version changed)
 
@@ -268,6 +275,7 @@ If ANY blockers exist, REFUSE to proceed.
 9. **Always generate `TEST-CHECKLIST.md`** — before asking Jarmo to test (see Test Checklist below).
 10. **arm64 local, x64 from CI** — NEVER cross-compile x64 from arm64.
 11. **Always update canonical release metadata** — no release is complete until the update feed is regenerated, published, and verified against the shipped assets.
+13. **Always close out a published release** — after the issue sweep, verify the published assets against the local `dist/` (size + SHA-256 vs GitHub digests and the canonical feed), archive the local-only evidence to `docs/releases/vX.Y.Z/evidence/`, then clear the Git-ignored build output so the worktree classifies `REVIEW`. Clearing before verification passes is forbidden; `--clean` remains Jarmo's call; never override `BLOCKED` or delete a worktree by hand. A release whose worktree is still `BLOCKED` for build output is not finished.
 
 ## Test Checklist Generation (MANDATORY)
 
@@ -303,6 +311,27 @@ release_date: "YYYY-MM-DD"
 ```
 
 **Skip conditions:** hotfix with no user-facing changes, OR Jarmo says "skip marketing". Otherwise, always recommend product-marketer routing after a successful release.
+
+## Post-Release: Closeout Gate (MANDATORY)
+
+Runs after the marketing handoff and the issue sweep, for every full release.
+The release worktree still holds everything it built — v1.10.1 sat at 15.7 GB
+four days after publication — and `worktree-hygiene.mjs` correctly refuses to
+remove a worktree whose `dist/` or `VSCode-<target>/` is non-empty. That
+refusal lifts only through the closeout; it is never bypassed.
+
+| Sub-step | Pass condition | Owner |
+| --- | --- | --- |
+| 1 Verify | `diff` of GitHub asset digests + sizes against recomputed local `dist/` hashes is empty; the canonical feed's entry for this version matches; build-time sidecars match | Agent |
+| 2 Archive | `docs/releases/vX.Y.Z/evidence/` (sidecars, `update-feed.json`, Windows roundtrip `.result.json`, `published-assets.txt`, `closeout.md`) committed from the main checkout and pushed | Agent |
+| 3 Clear | `dist/` and `VSCode-<target>/` deleted inside the release worktree; `--check` prints `REVIEW … verified disposable release worktree` | Agent — **only after 1 and 2** |
+| 4 Remove | `node ./scripts/worktree-hygiene.mjs --clean` | **Jarmo** — after reading the audit; it removes every `REVIEW` entry |
+
+BLOCK sub-step 3 on any diff in sub-step 1 or an unpushed sub-step 2. Never
+run `--clean`, never override `BLOCKED`, never delete a worktree directory by
+hand, and never run a closeout while another release is mid-flight. A
+`BLOCKED`-for-build-output verdict after sub-step 3 is a bug to report, not a
+verdict to work around. Commands: `release` skill, Step 10.
 
 ## Windows Build Notes
 
@@ -344,7 +373,7 @@ When you BLOCK a release, surface the reason clearly:
 ```
 RELEASE BLOCKED
 
-Gate: [Gate 1 / Gate 2 / Pre-flight / Update feed]
+Gate: [Gate 1 / Gate 2 / Pre-flight / Update feed / Closeout]
 Reason: [specific failure]
 Fix: [what must change before release can proceed]
 ```

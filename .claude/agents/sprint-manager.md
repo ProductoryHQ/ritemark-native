@@ -165,7 +165,7 @@ The user can override with one sentence. Do NOT silently switch tracks mid-sprin
 - Remove debug code
 - Update documentation
 - Final code review
-- Run `node ./scripts/worktree-hygiene.mjs --check`; after merge/close, review and run `--clean` only for entries classified `REMOVE`
+- Run `node ./scripts/worktree-hygiene.mjs --check` after merge/close and report the `REVIEW` entries; `--clean` is human-authorized (Jarmo says go after reading the report) — never run it yourself
 
 **Transition:** Auto (when cleanup complete)
 

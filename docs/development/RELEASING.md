@@ -42,6 +42,21 @@ Operator commands and evidence requirements are in [Building and Verifying the W
 
 This is the slower path on purpose — it's changing the actual signed app, so it gets the full test-then-harden-then-publish treatment.
 
+## After a shell release: closing out
+
+Building a shell release leaves a big folder behind on the Mac — the release worktree. For v1.10.1 it was about 15 GB: the two built Mac apps, the installers, and a full copy of VS Code. The cleanup script deliberately refuses to remove that folder while the installers are still inside it, because until they are published it is the only copy.
+
+Once the release is out, Claude closes it out:
+
+1. Checks that every file on the GitHub release is byte-for-byte what was built — sizes and SHA-256 hashes, plus the update feed the app reads.
+2. Saves the small evidence files — the hashes, the update feed, the Windows install-test results — into the repo under `docs/releases/vX.Y.Z/evidence/`, so they outlive the folder.
+3. Deletes the built apps and installers from that folder. Only after step 1 passed and step 2 is pushed.
+4. Tells you the folder is ready to remove and asks for your go-ahead.
+
+Your only job is step 4: say "go", or ask Claude to hold it. The removal command is the same one the weekly worktree email offers you, and nothing removes a worktree without you saying so. Until you do, the folder stays — it just no longer holds anything that exists nowhere else.
+
+Extension releases don't need this. They are built in the normal checkout and leave nothing big behind.
+
 ## How to tell which one is happening
 
 You don't have to — Claude will say "this ships as an extension release" or "this needs a shell release" before asking you to test anything. If you're ever unsure, just ask.
