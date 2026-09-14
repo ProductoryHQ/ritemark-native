@@ -1,0 +1,21 @@
+{
+  "node": "v22.22.1",
+  "platform": "darwin",
+  "method": "Actual manifest validator and installer with fake vscode appRoot and test-only userData override; real local filesystem under mkdtemp. Actual React component rendered on server.",
+  "updater": {
+    "manifestAccepted": true,
+    "validationErrors": [],
+    "result": {
+      "success": true,
+      "version": "1.0.0-ext.1"
+    },
+    "escapedIntendedExtensionsRoot": true,
+    "siblingSentinelPreserved": false
+  },
+  "markdown": {
+    "rendered": "<div class=\"rendered-markdown\"><style>.audit-placeholder{position:fixed;inset:0}</style>\n<img src=\"https://audit.invalid/pixel\" alt=\"synthetic\" /></div>",
+    "rawStylePreserved": true,
+    "externalImagePreserved": true,
+    "limitation": "No browser was opened and no external request was made. CSP/style/image consequences are source analysis, not browser reproduction."
+  }
+}

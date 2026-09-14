@@ -1,0 +1,20 @@
+{
+  "installedAppVersion": "1.10.1",
+  "installedExtensionVersion": "1.10.1-0",
+  "installedSourceCommit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+  "auditSourceCommit": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "shellInputDiffPaths": [],
+  "loadedAuditExtensionVerified": false,
+  "appLaunched": false,
+  "startupIsolationConcerns": [
+    {
+      "source": "extensions/ritemark/src/extension.ts:875 -> update/activationIntegrity.ts:105",
+      "observation": "Activation cleanup uses profile globalState confirmation but UserExtensionInstaller resolves a fixed os.homedir()/.ritemark/extensions root. A fresh --user-data-dir alone does not isolate this cleanup. Isolate or prove non-mutating before launch."
+    },
+    {
+      "source": "extensions/ritemark/src/extension.ts:151",
+      "observation": "Starter-pack seeding would mutate ~/.claude if empty; preflight observed existing nonempty skills directory so this seed branch returns. No user skill content was read."
+    }
+  ],
+  "checkedInWebviewSha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+}

@@ -1,0 +1,3907 @@
+{
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "since": "2026-06-01",
+  "method": "Non-merge commits reachable from pinned HEAD; source/script/patch files; .test files excluded. Co-change counts only commits with 2\u201320 selected files to reduce broad sweep distortion. Co-change is association, not proof of required coupling. Renames remain Git numstat labels.",
+  "commitCount": 198,
+  "hotspots": [
+    {
+      "path": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "commits": 39,
+      "added": 2352,
+      "deleted": 1870,
+      "recent": [
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "9f7b7f00a9b9d76f3b699568e17a06ad18332803",
+          "date": "2026-09-01",
+          "subject": "fix: close Agent Chat review edge cases"
+        },
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "3e4d931fd61bb1c707e723026b4572158f3d6ef3",
+          "date": "2026-09-01",
+          "subject": "fix: persist Claude auth recovery"
+        },
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        },
+        {
+          "commit": "0c72ee65a58db16f9fcf826bacf85ef518a9a33f",
+          "date": "2026-08-29",
+          "subject": "fix: keep conversation undo actions valid"
+        },
+        {
+          "commit": "9a3c248d6b2ce22609e8c3191e23a5d3e55cf859",
+          "date": "2026-08-29",
+          "subject": "fix: use native conversation delete notifications"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+      "commits": 34,
+      "added": 3663,
+      "deleted": 2081,
+      "recent": [
+        {
+          "commit": "e432117872a0f7e4c2eebf4f7fcc59473476d8d5",
+          "date": "2026-09-08",
+          "subject": "fix(ai-sidebar): stop a status refresh from overwriting a known runtime phase"
+        },
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "a74e92fe2390b216c26a69e3a99d9e8004c8024a",
+          "date": "2026-09-01",
+          "subject": "fix: isolate Agent Chat bootstrap from storage quota"
+        },
+        {
+          "commit": "9f7b7f00a9b9d76f3b699568e17a06ad18332803",
+          "date": "2026-09-01",
+          "subject": "fix: close Agent Chat review edge cases"
+        },
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "3734057711b71a7511eed5a1a498bb128c116905",
+          "date": "2026-09-01",
+          "subject": "fix: close Claude auth recovery edge cases"
+        },
+        {
+          "commit": "d0490a9dc49f3d2c1a23b4f0c4006d83de8869db",
+          "date": "2026-09-01",
+          "subject": "fix: complete Claude sign-in recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+      "commits": 21,
+      "added": 652,
+      "deleted": 288,
+      "recent": [
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "a74e92fe2390b216c26a69e3a99d9e8004c8024a",
+          "date": "2026-09-01",
+          "subject": "fix: isolate Agent Chat bootstrap from storage quota"
+        },
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "e6a1b2df94c29c7c2f541276a26d0b99b687a29c",
+          "date": "2026-08-27",
+          "subject": "fix: prioritize model in compact composer"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/extension.ts",
+      "commits": 19,
+      "added": 238,
+      "deleted": 43,
+      "recent": [
+        {
+          "commit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+          "date": "2026-09-10",
+          "subject": "fix(v1.10.1): editor sync echo regression and task-list read-back (#271)"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        },
+        {
+          "commit": "f2e54cb708511305bd10a6dfba3080d8000cbebb",
+          "date": "2026-08-15",
+          "subject": "Sprint 108: Transcription Workbench \u2014 audio in, document out (#202)"
+        },
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "26467852ce417146d183e1a39e8bfbbc0d8f2ec6",
+          "date": "2026-08-05",
+          "subject": "feat(ui): Jarmo test-pass polish pack \u2014 mode dropdown, folder tree, (#180)"
+        },
+        {
+          "commit": "f1dcf9b2f9d8c1101db3aa1d85d0b60262386da9",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-106): Home and first-task launcher (#74) (#171)"
+        },
+        {
+          "commit": "17046ad9bab280801444c4fe59beb8a5445df253",
+          "date": "2026-07-12",
+          "subject": "fix(sprint-93): address pr-reviewer findings on PR #141"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "commits": 18,
+      "added": 332,
+      "deleted": 152,
+      "recent": [
+        {
+          "commit": "e432117872a0f7e4c2eebf4f7fcc59473476d8d5",
+          "date": "2026-09-08",
+          "subject": "fix(ai-sidebar): stop a status refresh from overwriting a known runtime phase"
+        },
+        {
+          "commit": "f05ddc482e936a4d3e5d428193567a1346624a03",
+          "date": "2026-09-08",
+          "subject": "fix(ai-sidebar): make setup views survive a transient checking probe"
+        },
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "a74e92fe2390b216c26a69e3a99d9e8004c8024a",
+          "date": "2026-09-01",
+          "subject": "fix: isolate Agent Chat bootstrap from storage quota"
+        },
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "3734057711b71a7511eed5a1a498bb128c116905",
+          "date": "2026-09-01",
+          "subject": "fix: close Claude auth recovery edge cases"
+        },
+        {
+          "commit": "d0490a9dc49f3d2c1a23b4f0c4006d83de8869db",
+          "date": "2026-09-01",
+          "subject": "fix: complete Claude sign-in recovery"
+        },
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 18,
+      "added": 140,
+      "deleted": 30,
+      "recent": [
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        },
+        {
+          "commit": "fc976da963d2df1f24f63fc1c30688397e1eb456",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-105): comments command center (#164, #165) (#170)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/ritemarkEditor.ts",
+      "commits": 17,
+      "added": 444,
+      "deleted": 596,
+      "recent": [
+        {
+          "commit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+          "date": "2026-09-10",
+          "subject": "fix(v1.10.1): editor sync echo regression and task-list read-back (#271)"
+        },
+        {
+          "commit": "409395c7de3dff748aedc71728ce81ea2805b72d",
+          "date": "2026-09-06",
+          "subject": "fix: preserve trailing newline when saving Markdown without front matter (#254)"
+        },
+        {
+          "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+          "date": "2026-09-01",
+          "subject": "fix: make agent chat bootstrap atomic"
+        },
+        {
+          "commit": "c0343a92432e3a43ce825c6cee54d16a2275c684",
+          "date": "2026-08-24",
+          "subject": "fix: make editor disk synchronization reliable"
+        },
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "50de57b595ad0eef6bcea0805ada38228715e76e",
+          "date": "2026-08-05",
+          "subject": "fix(editor): self-edit silence + tree title alignment (#182)"
+        },
+        {
+          "commit": "fa8915cc7e8acae233110e69aa4fd8c918791063",
+          "date": "2026-08-05",
+          "subject": "feat: one-word Folder terminology, simplified File menu, reliable (#178)"
+        },
+        {
+          "commit": "fc976da963d2df1f24f63fc1c30688397e1eb456",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-105): comments command center (#164, #165) (#170)"
+        }
+      ]
+    },
+    {
+      "path": "scripts/validate-qa.sh",
+      "commits": 14,
+      "added": 45,
+      "deleted": 10,
+      "recent": [
+        {
+          "commit": "c6e6e36390c4dda5901a311343089f450f24a7ef",
+          "date": "2026-09-05",
+          "subject": "fix(release): anchor cross-machine provenance verification to the release commit"
+        },
+        {
+          "commit": "8a04f5431804e4d1f19e863d42b80f97a79cb6f3",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest macOS extension before signing"
+        },
+        {
+          "commit": "bba9182cf348d262fbf05fd65161304e2a4bb149",
+          "date": "2026-09-04",
+          "subject": "fix(release): preserve PE overlay identity"
+        },
+        {
+          "commit": "22b1a0a15285503f0a60788b82bcdf10c68b808a",
+          "date": "2026-09-04",
+          "subject": "fix(windows): attest non-PE payload after signing"
+        },
+        {
+          "commit": "59b23d5c144ff5382008c0ab2dbe4c86c3400af2",
+          "date": "2026-09-04",
+          "subject": "fix(windows): isolate extension from shell packaging"
+        },
+        {
+          "commit": "690d253940b6ceaa683a9e3b5dde1d089fa3b47b",
+          "date": "2026-09-03",
+          "subject": "fix: normalize Claude authentication failures"
+        },
+        {
+          "commit": "13f20f1b6f462e7b7508ba5767687641943fa91b",
+          "date": "2026-09-02",
+          "subject": "fix: harden RC editor and dependency invariants (#244)"
+        },
+        {
+          "commit": "3d79ffbbac02d339b683cdcc8b4bcce56f47b5ae",
+          "date": "2026-09-02",
+          "subject": "fix: keep release source immutable across targets"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/features/flags.ts",
+      "commits": 13,
+      "added": 131,
+      "deleted": 13,
+      "recent": [
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        },
+        {
+          "commit": "f2e54cb708511305bd10a6dfba3080d8000cbebb",
+          "date": "2026-08-15",
+          "subject": "Sprint 108: Transcription Workbench \u2014 audio in, document out (#202)"
+        },
+        {
+          "commit": "f1dcf9b2f9d8c1101db3aa1d85d0b60262386da9",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-106): Home and first-task launcher (#74) (#171)"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        },
+        {
+          "commit": "ca59e7569b21dab9594888527d23f430427a02fc",
+          "date": "2026-07-15",
+          "subject": "feat(comments): Sprint 94 comment callouts \u2014 anchored + /// margin notes (#81)"
+        },
+        {
+          "commit": "9a8b8fe4c978985d235dd95e6f541d6aa6ecf8c4",
+          "date": "2026-07-01",
+          "subject": "feat(sprint-89): model gateway \u2014 live resolver + publishable catalog (#109)"
+        },
+        {
+          "commit": "a454d947004388770562cb0fff5f5d87711c67ed",
+          "date": "2026-06-10",
+          "subject": "feat(sprint-82): draw.io diagram embedding \u2014 editor, click-to-edit, /diagram command (R1, R3-R5)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/agent/AgentRunner.ts",
+      "commits": 12,
+      "added": 561,
+      "deleted": 136,
+      "recent": [
+        {
+          "commit": "690d253940b6ceaa683a9e3b5dde1d089fa3b47b",
+          "date": "2026-09-03",
+          "subject": "fix: normalize Claude authentication failures"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "45de4852a91f0a546445656e10a73c524b078d55",
+          "date": "2026-08-24",
+          "subject": "feat: support any-language transcribe insights"
+        },
+        {
+          "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+          "date": "2026-08-24",
+          "subject": "fix(ai): polish thinking effort review findings"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "83d46aa532b76d52f53b7cfa5d9197909a20b37c",
+          "date": "2026-08-05",
+          "subject": "fix(agent): the selected model is the model that runs (drift fix 1-3) (#183)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/agent/types.ts",
+      "commits": 12,
+      "added": 87,
+      "deleted": 19,
+      "recent": [
+        {
+          "commit": "690d253940b6ceaa683a9e3b5dde1d089fa3b47b",
+          "date": "2026-09-03",
+          "subject": "fix: normalize Claude authentication failures"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "45de4852a91f0a546445656e10a73c524b078d55",
+          "date": "2026-08-24",
+          "subject": "feat: support any-language transcribe insights"
+        },
+        {
+          "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+          "date": "2026-08-24",
+          "subject": "fix(ai): polish thinking effort review findings"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "83d46aa532b76d52f53b7cfa5d9197909a20b37c",
+          "date": "2026-08-05",
+          "subject": "fix(agent): the selected model is the model that runs (drift fix 1-3) (#183)"
+        },
+        {
+          "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/acp/AcpRuntime.ts",
+      "commits": 12,
+      "added": 779,
+      "deleted": 129,
+      "recent": [
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "c3d53fa73110cc3d56b4dd5ac258069f1fd7369f",
+          "date": "2026-07-23",
+          "subject": "feat(sprint-101): unified agent capability context (#154)"
+        },
+        {
+          "commit": "498b00c699f500e96e0b4dcf134aa880df8b2af5",
+          "date": "2026-07-23",
+          "subject": "fix: OpenCode turns time out instead of hanging forever"
+        },
+        {
+          "commit": "ff5794719c8728f1ee9c90887eaff25e705bc75c",
+          "date": "2026-07-22",
+          "subject": "fix(sprint-100): address qa-validator findings"
+        },
+        {
+          "commit": "517d70c23c1121d47e2612a4b330b908fbffabc2",
+          "date": "2026-07-22",
+          "subject": "feat(sprint-100): prove both hard gates; translate the no-model error"
+        },
+        {
+          "commit": "61f8f4b36f0037d21cd031b447b88bc48879aef4",
+          "date": "2026-07-22",
+          "subject": "fix(sprint-99): cancel an ACP session before disposing it (Codex review)"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        }
+      ]
+    },
+    {
+      "path": "scripts/test-release-source-integrity.sh",
+      "commits": 11,
+      "added": 356,
+      "deleted": 35,
+      "recent": [
+        {
+          "commit": "8a04f5431804e4d1f19e863d42b80f97a79cb6f3",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest macOS extension before signing"
+        },
+        {
+          "commit": "ca7d263f661b754de711f1ba1e5c6ccb41dad324",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind PE identity across signing"
+        },
+        {
+          "commit": "7f1408c864e327decbc0bf4db87d775f183a9c1c",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind both staged payload digests"
+        },
+        {
+          "commit": "597ef48bbc9e2d6c4b2fb3b36a6d8edaa865a352",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind post-sign attestation record"
+        },
+        {
+          "commit": "22b1a0a15285503f0a60788b82bcdf10c68b808a",
+          "date": "2026-09-04",
+          "subject": "fix(windows): attest non-PE payload after signing"
+        },
+        {
+          "commit": "865dba5e05e6bde49ccfc99f6b32be5f75428fea",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest staged extension payload"
+        },
+        {
+          "commit": "3c02cb92c20a179a928f203203452258c3bd5b18",
+          "date": "2026-09-04",
+          "subject": "fix(windows): preserve workbench icon font"
+        },
+        {
+          "commit": "99c59439661f368e3f553129b5af87daf2ce2371",
+          "date": "2026-09-04",
+          "subject": "fix(release): bind staged Windows shell state"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+      "commits": 11,
+      "added": 453,
+      "deleted": 95,
+      "recent": [
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "45de4852a91f0a546445656e10a73c524b078d55",
+          "date": "2026-08-24",
+          "subject": "feat: support any-language transcribe insights"
+        },
+        {
+          "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+          "date": "2026-08-24",
+          "subject": "fix(ai): polish thinking effort review findings"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/App.tsx",
+      "commits": 10,
+      "added": 336,
+      "deleted": 76,
+      "recent": [
+        {
+          "commit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+          "date": "2026-09-10",
+          "subject": "fix(v1.10.1): editor sync echo regression and task-list read-back (#271)"
+        },
+        {
+          "commit": "13f20f1b6f462e7b7508ba5767687641943fa91b",
+          "date": "2026-09-02",
+          "subject": "fix: harden RC editor and dependency invariants (#244)"
+        },
+        {
+          "commit": "ca6e5c44ca24b209a52efda6ddeecddb0fcc9c32",
+          "date": "2026-08-25",
+          "subject": "fix(editor): preserve stale edits across sync revisions"
+        },
+        {
+          "commit": "c0343a92432e3a43ce825c6cee54d16a2275c684",
+          "date": "2026-08-24",
+          "subject": "fix: make editor disk synchronization reliable"
+        },
+        {
+          "commit": "fc976da963d2df1f24f63fc1c30688397e1eb456",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-105): comments command center (#164, #165) (#170)"
+        },
+        {
+          "commit": "ca59e7569b21dab9594888527d23f430427a02fc",
+          "date": "2026-07-15",
+          "subject": "feat(comments): Sprint 94 comment callouts \u2014 anchored + /// margin notes (#81)"
+        },
+        {
+          "commit": "249239d2a00a239309a641e75df56e9e24453bb0",
+          "date": "2026-07-02",
+          "subject": "feat(export): SVG/draw.io export integrity + atomic saveAsMarkdown (#127, #76)"
+        },
+        {
+          "commit": "ca72c0f9acbb39760b9a4c9fbea28243301eeb8f",
+          "date": "2026-06-10",
+          "subject": "Add basic Excel editing and fix multi-sheet selector (#110)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/runtime/AgentRuntime.ts",
+      "commits": 10,
+      "added": 218,
+      "deleted": 7,
+      "recent": [
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        },
+        {
+          "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+          "date": "2026-08-27",
+          "subject": "fix: canonicalize Claude model aliases"
+        },
+        {
+          "commit": "45de4852a91f0a546445656e10a73c524b078d55",
+          "date": "2026-08-24",
+          "subject": "feat: support any-language transcribe insights"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+      "commits": 10,
+      "added": 402,
+      "deleted": 286,
+      "recent": [
+        {
+          "commit": "7165e00d3a95832378c6e0c8aedaf4a9c21d8e0d",
+          "date": "2026-08-27",
+          "subject": "fix: keep empty thread rail spacing at 4px"
+        },
+        {
+          "commit": "1146e1487ffc3eb8be822f91c303153911effc2a",
+          "date": "2026-08-27",
+          "subject": "fix: finish compact sidebar controls"
+        },
+        {
+          "commit": "334d13789a6dad08d1ff5a394551b36163d7595d",
+          "date": "2026-08-27",
+          "subject": "fix: use four pixel thread rail spacing"
+        },
+        {
+          "commit": "396481aa38e8bdee89c523ed609585f2862097f5",
+          "date": "2026-08-27",
+          "subject": "fix: remove thread rail button spacing"
+        },
+        {
+          "commit": "967a8821392b68a28caa6ae5639987ddca371273",
+          "date": "2026-08-23",
+          "subject": "fix(conversations): soften rail pin affordance"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        },
+        {
+          "commit": "4c66df0ac3f0ed0ad60d3a5e5c01ea1da73e74ec",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-104): bounded multi-prompt queue for composer and comments (#162) (#169)"
+        },
+        {
+          "commit": "0fec43f2fddbed62cb1914f53e20af0bb8942e2d",
+          "date": "2026-07-25",
+          "subject": "fix(ui): thread rail robot icons use brand indigo instead of runtime brand colors"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/codex/CodexRuntime.ts",
+      "commits": 10,
+      "added": 1092,
+      "deleted": 187,
+      "recent": [
+        {
+          "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+          "date": "2026-08-24",
+          "subject": "fix(ai): polish thinking effort review findings"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)"
+        },
+        {
+          "commit": "c3d53fa73110cc3d56b4dd5ac258069f1fd7369f",
+          "date": "2026-07-23",
+          "subject": "feat(sprint-101): unified agent capability context (#154)"
+        },
+        {
+          "commit": "d024433bb52db26907595353adcf015085de28ea",
+          "date": "2026-07-21",
+          "subject": "fix(sprint-99): Stop no longer shows a protocol error, and no longer strands approvals"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        },
+        {
+          "commit": "ae90079d06e406a81de614000d5fbd5892c2cc11",
+          "date": "2026-07-15",
+          "subject": "feat(sprint-96): bump Codex runtime 0.135.0 \u2192 0.144.4 for GPT-5.6 (partial #146)"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/acp/acpManager.ts",
+      "commits": 9,
+      "added": 666,
+      "deleted": 149,
+      "recent": [
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "ff5794719c8728f1ee9c90887eaff25e705bc75c",
+          "date": "2026-07-22",
+          "subject": "fix(sprint-100): address qa-validator findings"
+        },
+        {
+          "commit": "ff3506a7a816ed9ba9050e7cc4f91a1e60d0157a",
+          "date": "2026-07-22",
+          "subject": "feat(sprint-100): bump Claude 2.1.217 + OpenCode 1.18.4; drop the cancel process-kill"
+        },
+        {
+          "commit": "d024433bb52db26907595353adcf015085de28ea",
+          "date": "2026-07-21",
+          "subject": "fix(sprint-99): Stop no longer shows a protocol error, and no longer strands approvals"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        },
+        {
+          "commit": "da997d4cd7c784b9eef6ac8e4333f9c16b6054bd",
+          "date": "2026-06-08",
+          "subject": "feat(sprint-79): runtime unification \u2014 AgentRuntime interface + registry + unified dispatch"
+        },
+        {
+          "commit": "a9bf3ac507f74fc701849b8e672b77e0ce6a4b14",
+          "date": "2026-06-01",
+          "subject": "fix(sprint-76): single approval per edit + coalesce OpenCode reasoning"
+        }
+      ]
+    },
+    {
+      "path": "scripts/build-prod.sh",
+      "commits": 8,
+      "added": 162,
+      "deleted": 28,
+      "recent": [
+        {
+          "commit": "daf90f5adc70f4de2bd76459331e20cf2b06e643",
+          "date": "2026-09-09",
+          "subject": "fix(build): treat CR residue in the committed webview bundle as reproducible (#268)"
+        },
+        {
+          "commit": "8a04f5431804e4d1f19e863d42b80f97a79cb6f3",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest macOS extension before signing"
+        },
+        {
+          "commit": "5e7b670bdfdba5a4a5e6daa4aecae1e28296db44",
+          "date": "2026-09-02",
+          "subject": "build: enforce reproducible releases and safe worktree cleanup"
+        },
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "61be9d0bb483054a0387f63088d9987ccffa211b",
+          "date": "2026-08-05",
+          "subject": "fix(build): stamp Info.plist with Ritemark version, not VS Code's (#175)"
+        },
+        {
+          "commit": "06150c02e676c90158c169c19d4f342ba423af86",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-98): publish guards, canary ring, and a watchdog fix found in dev validation"
+        },
+        {
+          "commit": "f2772f800e319e9293ec10ea3e93b00b302de489",
+          "date": "2026-07-15",
+          "subject": "fix(sprint-95): text-work bugfixes for v1.8.3 (#103, #135, #142)"
+        },
+        {
+          "commit": "a345e091a3ed211aa9ca3f865adb53acd3b8f567",
+          "date": "2026-07-10",
+          "subject": "feat(sprint-92): esbuild-bundle the extension host (#105)"
+        }
+      ]
+    },
+    {
+      "path": "scripts/build-provenance.mjs",
+      "commits": 8,
+      "added": 428,
+      "deleted": 49,
+      "recent": [
+        {
+          "commit": "c6e6e36390c4dda5901a311343089f450f24a7ef",
+          "date": "2026-09-05",
+          "subject": "fix(release): anchor cross-machine provenance verification to the release commit"
+        },
+        {
+          "commit": "8a04f5431804e4d1f19e863d42b80f97a79cb6f3",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest macOS extension before signing"
+        },
+        {
+          "commit": "ca7d263f661b754de711f1ba1e5c6ccb41dad324",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind PE identity across signing"
+        },
+        {
+          "commit": "7f1408c864e327decbc0bf4db87d775f183a9c1c",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind both staged payload digests"
+        },
+        {
+          "commit": "597ef48bbc9e2d6c4b2fb3b36a6d8edaa865a352",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind post-sign attestation record"
+        },
+        {
+          "commit": "22b1a0a15285503f0a60788b82bcdf10c68b808a",
+          "date": "2026-09-04",
+          "subject": "fix(windows): attest non-PE payload after signing"
+        },
+        {
+          "commit": "865dba5e05e6bde49ccfc99f6b32be5f75428fea",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest staged extension payload"
+        },
+        {
+          "commit": "5e7b670bdfdba5a4a5e6daa4aecae1e28296db44",
+          "date": "2026-09-02",
+          "subject": "build: enforce reproducible releases and safe worktree cleanup"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/conversations/ConversationController.ts",
+      "commits": 8,
+      "added": 987,
+      "deleted": 121,
+      "recent": [
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "3e4d931fd61bb1c707e723026b4572158f3d6ef3",
+          "date": "2026-09-01",
+          "subject": "fix: persist Claude auth recovery"
+        },
+        {
+          "commit": "0c72ee65a58db16f9fcf826bacf85ef518a9a33f",
+          "date": "2026-08-29",
+          "subject": "fix: keep conversation undo actions valid"
+        },
+        {
+          "commit": "9a3c248d6b2ce22609e8c3191e23a5d3e55cf859",
+          "date": "2026-08-29",
+          "subject": "fix: use native conversation delete notifications"
+        },
+        {
+          "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+          "date": "2026-08-24",
+          "subject": "fix(ai): polish thinking effort review findings"
+        },
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+          "date": "2026-08-23",
+          "subject": "feat(conversations): add durable project chat history"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/acp/acpClient.ts",
+      "commits": 8,
+      "added": 383,
+      "deleted": 61,
+      "recent": [
+        {
+          "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+          "date": "2026-08-24",
+          "subject": "feat(ai): add composer thinking effort"
+        },
+        {
+          "commit": "9553f58e4f3a56d6bd42cb72a7cbdf36f955d92f",
+          "date": "2026-08-24",
+          "subject": "runtime: refresh bundled agent snapshot"
+        },
+        {
+          "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+          "date": "2026-08-23",
+          "subject": "feat(ai): resume durable agent conversations"
+        },
+        {
+          "commit": "ff3506a7a816ed9ba9050e7cc4f91a1e60d0157a",
+          "date": "2026-07-22",
+          "subject": "feat(sprint-100): bump Claude 2.1.217 + OpenCode 1.18.4; drop the cancel process-kill"
+        },
+        {
+          "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions"
+        },
+        {
+          "commit": "e244d60826aa066c9a7ad18d974bf63e0f731d79",
+          "date": "2026-07-21",
+          "subject": "docs(sprint-99): Phase-0 ACP spike result \u2014 D1 confirmed, and a dead catch removed"
+        },
+        {
+          "commit": "da997d4cd7c784b9eef6ac8e4333f9c16b6054bd",
+          "date": "2026-06-08",
+          "subject": "feat(sprint-79): runtime unification \u2014 AgentRuntime interface + registry + unified dispatch"
+        },
+        {
+          "commit": "6b009ee562ac6e91fcf813ffa59ea643cb9d5b25",
+          "date": "2026-06-01",
+          "subject": "feat(sprint-76): Phase 1 \u2014 ACP client core (R1)"
+        }
+      ]
+    },
+    {
+      "path": "patches/vscode/002-ritemark-ui-layout.patch",
+      "commits": 8,
+      "added": 128,
+      "deleted": 33,
+      "recent": [
+        {
+          "commit": "f41add56549b4edb4685c6f38257cfe2266ede88",
+          "date": "2026-08-05",
+          "subject": "fix(ui): hr breathing room (24px measured) + pixel-exact tree/title alignment (#186)"
+        },
+        {
+          "commit": "50de57b595ad0eef6bcea0805ada38228715e76e",
+          "date": "2026-08-05",
+          "subject": "fix(editor): self-edit silence + tree title alignment (#182)"
+        },
+        {
+          "commit": "26467852ce417146d183e1a39e8bfbbc0d8f2ec6",
+          "date": "2026-08-05",
+          "subject": "feat(ui): Jarmo test-pass polish pack \u2014 mode dropdown, folder tree, (#180)"
+        },
+        {
+          "commit": "fa8915cc7e8acae233110e69aa4fd8c918791063",
+          "date": "2026-08-05",
+          "subject": "feat: one-word Folder terminology, simplified File menu, reliable (#178)"
+        },
+        {
+          "commit": "94f06550eb09d3c5874c8391574933bfd8a7b058",
+          "date": "2026-08-05",
+          "subject": "fix: chat file links open in Ritemark + writer-voice Project empty state (#176)"
+        },
+        {
+          "commit": "e8290e4574ad1f0fa788f5d610363522ff135ed4",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-106): Home first in Activity Bar + Home view design pass (#74) (#172)"
+        },
+        {
+          "commit": "86511d1de77846a9e2000c1b53d4d1882c15919b",
+          "date": "2026-07-11",
+          "subject": "fix(sprint-91): restore File Browser title lost in patch 002 regen"
+        },
+        {
+          "commit": "c6a8891dc9009a83c33ea03d43676a4fe4416e2f",
+          "date": "2026-07-11",
+          "subject": "feat(sprint-91): W3 File Browser buttons always visible + W2 OneDrive error fix"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/daemon/Scheduler.ts",
+      "commits": 8,
+      "added": 407,
+      "deleted": 127,
+      "recent": [
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "00df767e5f3e38961b73fddefe828a47b8c4fcf6",
+          "date": "2026-06-10",
+          "subject": "feat(daemon): Sprint 80 hardening \u2014 runtime factory, schedule picker, approve UX, tests"
+        },
+        {
+          "commit": "628fb43a635ad107b5ec67db2cc3cffba04b70b7",
+          "date": "2026-06-08",
+          "subject": "fix(daemon): address Codex PR review + complete frontmatter round-trip"
+        },
+        {
+          "commit": "0f1903f04c531b0fa004ca7554ed29cae774b033",
+          "date": "2026-06-08",
+          "subject": "fix(daemon): address Codex PR review \u2014 schedule serialization, concurrent-run guard, review count accuracy"
+        },
+        {
+          "commit": "5779a9b3b6a25ee550849df161b6eb00809200ff",
+          "date": "2026-06-08",
+          "subject": "fix(daemon): correctness pass on Sprint 80 \u2014 isolation, approval gate, flag gate"
+        },
+        {
+          "commit": "27f81698965f7cd6a9050afcc33e24c998914bf5",
+          "date": "2026-06-08",
+          "subject": "feat(daemon): wire Sprint 79 runtime \u2014 real AgentTaskHandler + schedule editor field"
+        },
+        {
+          "commit": "6a6f2cfcee5c8c12b91b42c3ce2a8478e0cf669a",
+          "date": "2026-06-08",
+          "subject": "feat(daemon): Agent Library SCHEDULED section \u2014 run history UI"
+        },
+        {
+          "commit": "b714dd2cadc0a63d18a1bbee3ac014b53392fda7",
+          "date": "2026-06-07",
+          "subject": "feat(daemon): Sprint 80 scheduled tasks daemon infra \u2014 Sprint 79-independent"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/daemon/index.ts",
+      "commits": 8,
+      "added": 239,
+      "deleted": 50,
+      "recent": [
+        {
+          "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+          "date": "2026-08-05",
+          "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)"
+        },
+        {
+          "commit": "00df767e5f3e38961b73fddefe828a47b8c4fcf6",
+          "date": "2026-06-10",
+          "subject": "feat(daemon): Sprint 80 hardening \u2014 runtime factory, schedule picker, approve UX, tests"
+        },
+        {
+          "commit": "0f1903f04c531b0fa004ca7554ed29cae774b033",
+          "date": "2026-06-08",
+          "subject": "fix(daemon): address Codex PR review \u2014 schedule serialization, concurrent-run guard, review count accuracy"
+        },
+        {
+          "commit": "5779a9b3b6a25ee550849df161b6eb00809200ff",
+          "date": "2026-06-08",
+          "subject": "fix(daemon): correctness pass on Sprint 80 \u2014 isolation, approval gate, flag gate"
+        },
+        {
+          "commit": "27f81698965f7cd6a9050afcc33e24c998914bf5",
+          "date": "2026-06-08",
+          "subject": "feat(daemon): wire Sprint 79 runtime \u2014 real AgentTaskHandler + schedule editor field"
+        },
+        {
+          "commit": "6a6f2cfcee5c8c12b91b42c3ce2a8478e0cf669a",
+          "date": "2026-06-08",
+          "subject": "feat(daemon): Agent Library SCHEDULED section \u2014 run history UI"
+        },
+        {
+          "commit": "b714dd2cadc0a63d18a1bbee3ac014b53392fda7",
+          "date": "2026-06-07",
+          "subject": "feat(daemon): Sprint 80 scheduled tasks daemon infra \u2014 Sprint 79-independent"
+        },
+        {
+          "commit": "da997d4cd7c784b9eef6ac8e4333f9c16b6054bd",
+          "date": "2026-06-08",
+          "subject": "feat(sprint-79): runtime unification \u2014 AgentRuntime interface + registry + unified dispatch"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/editorSync/state.ts",
+      "commits": 7,
+      "added": 200,
+      "deleted": 15,
+      "recent": [
+        {
+          "commit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+          "date": "2026-09-10",
+          "subject": "fix(v1.10.1): editor sync echo regression and task-list read-back (#271)"
+        },
+        {
+          "commit": "409395c7de3dff748aedc71728ce81ea2805b72d",
+          "date": "2026-09-06",
+          "subject": "fix: preserve trailing newline when saving Markdown without front matter (#254)"
+        },
+        {
+          "commit": "65909afb87f3f9224c36c1227b33bc5913b39897",
+          "date": "2026-08-31",
+          "subject": "fix: reject superseded save receipt matches"
+        },
+        {
+          "commit": "2e49177736a1f0fb9f386e012678e42b33d1a29f",
+          "date": "2026-08-31",
+          "subject": "fix: order save receipts against disk reads"
+        },
+        {
+          "commit": "5f85f5c32075b7e530a08242ae601309a4651b30",
+          "date": "2026-08-31",
+          "subject": "fix: harden editor save reconciliation"
+        },
+        {
+          "commit": "ca6e5c44ca24b209a52efda6ddeecddb0fcc9c32",
+          "date": "2026-08-25",
+          "subject": "fix(editor): preserve stale edits across sync revisions"
+        },
+        {
+          "commit": "c0343a92432e3a43ce825c6cee54d16a2275c684",
+          "date": "2026-08-24",
+          "subject": "fix: make editor disk synchronization reliable"
+        }
+      ]
+    },
+    {
+      "path": "scripts/tree-sha256.mjs",
+      "commits": 7,
+      "added": 210,
+      "deleted": 26,
+      "recent": [
+        {
+          "commit": "bc078b6f646517db2998764a7b1d4547f25aab09",
+          "date": "2026-09-04",
+          "subject": "fix(release): verify x64 artifact extraction"
+        },
+        {
+          "commit": "9d266e7adb5ce92ec53384b76495afc04d6c8f75",
+          "date": "2026-09-04",
+          "subject": "fix(release): preserve x64 artifact identity"
+        },
+        {
+          "commit": "bba9182cf348d262fbf05fd65161304e2a4bb149",
+          "date": "2026-09-04",
+          "subject": "fix(release): preserve PE overlay identity"
+        },
+        {
+          "commit": "ca7d263f661b754de711f1ba1e5c6ccb41dad324",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind PE identity across signing"
+        },
+        {
+          "commit": "7f1408c864e327decbc0bf4db87d775f183a9c1c",
+          "date": "2026-09-04",
+          "subject": "fix(windows): bind both staged payload digests"
+        },
+        {
+          "commit": "22b1a0a15285503f0a60788b82bcdf10c68b808a",
+          "date": "2026-09-04",
+          "subject": "fix(windows): attest non-PE payload after signing"
+        },
+        {
+          "commit": "865dba5e05e6bde49ccfc99f6b32be5f75428fea",
+          "date": "2026-09-04",
+          "subject": "fix(release): attest staged extension payload"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+      "commits": 7,
+      "added": 283,
+      "deleted": 138,
+      "recent": [
+        {
+          "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+          "date": "2026-09-03",
+          "subject": "fix: isolate agent runtime availability"
+        },
+        {
+          "commit": "d0490a9dc49f3d2c1a23b4f0c4006d83de8869db",
+          "date": "2026-09-01",
+          "subject": "fix: complete Claude sign-in recovery"
+        },
+        {
+          "commit": "b4a6c619a22a632ebd07cfe1ec10daa0d2a1b0b9",
+          "date": "2026-09-01",
+          "subject": "fix: harmonize AI recovery alerts"
+        },
+        {
+          "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+          "date": "2026-09-01",
+          "subject": "fix: settle shared Claude auth recovery"
+        },
+        {
+          "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+          "date": "2026-09-01",
+          "subject": "fix: recover expired Claude sessions in chat"
+        },
+        {
+          "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+          "date": "2026-08-04",
+          "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)"
+        },
+        {
+          "commit": "79bb4fe781ee9aa36a85e201dbd5967741ac152e",
+          "date": "2026-07-21",
+          "subject": "feat(sprint-99): the thread rail \u2014 parallel chats become visible"
+        }
+      ]
+    },
+    {
+      "path": "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+      "commits": 7,
+      "added": 1062,
+      "deleted": 55,
+      "recent": [
+        {
+          "commit": "90e0f77970dec02f6879498296dfdc5b0040add5",
+          "date": "2026-08-31",
+          "subject": "fix: bind save receipts to exact written snapshot"
+        },
+        {
+          "commit": "2e49177736a1f0fb9f386e012678e42b33d1a29f",
+          "date": "2026-08-31",
+          "subject": "fix: order save receipts against disk reads"
+        },
+        {
+          "commit": "340d8775cc79e6e524972849b44cce819dddbd0c",
+          "date": "2026-08-31",
+          "subject": "fix: trust only confirmed save receipts"
+        },
+        {
+          "commit": "420cd53ce94587333021a49e0b2770fe5e6b18da",
+          "date": "2026-08-31",
+          "subject": "fix: capture post-participant save receipts"
+        },
+        {
+          "commit": "5f85f5c32075b7e530a08242ae601309a4651b30",
+          "date": "2026-08-31",
+          "subject": "fix: harden editor save reconciliation"
+        },
+        {
+          "commit": "ca6e5c44ca24b209a52efda6ddeecddb0fcc9c32",
+          "date": "2026-08-25",
+          "subject": "fix(editor): preserve stale edits across sync revisions"
+        },
+        {
+          "commit": "c0343a92432e3a43ce825c6cee54d16a2275c684",
+          "date": "2026-08-24",
+          "subject": "fix: make editor disk synchronization reliable"
+        }
+      ]
+    }
+  ],
+  "coChanges": [
+    {
+      "a": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+      "commits": 18
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+      "commits": 14
+    },
+    {
+      "a": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 12
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 12
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+      "commits": 11
+    },
+    {
+      "a": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+      "commits": 9
+    },
+    {
+      "a": "extensions/ritemark/src/ritemarkEditor.ts",
+      "b": "extensions/ritemark/webview/src/App.tsx",
+      "commits": 7
+    },
+    {
+      "a": "scripts/build-provenance.mjs",
+      "b": "scripts/test-release-source-integrity.sh",
+      "commits": 7
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+      "commits": 7
+    },
+    {
+      "a": "extensions/ritemark/src/agent/AgentRunner.ts",
+      "b": "extensions/ritemark/src/agent/types.ts",
+      "commits": 7
+    },
+    {
+      "a": "extensions/ritemark/src/daemon/Scheduler.ts",
+      "b": "extensions/ritemark/src/daemon/index.ts",
+      "commits": 7
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+      "b": "extensions/ritemark/src/runtime/AgentRuntime.ts",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+      "b": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/daemon/Scheduler.ts",
+      "b": "extensions/ritemark/src/extension.ts",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/daemon/index.ts",
+      "b": "extensions/ritemark/src/extension.ts",
+      "commits": 6
+    },
+    {
+      "a": "extensions/ritemark/src/conversations/ConversationController.ts",
+      "b": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+      "b": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/runtime/AgentRuntime.ts",
+      "b": "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/runtime/AgentRuntime.ts",
+      "b": "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/extension.ts",
+      "b": "extensions/ritemark/src/features/flags.ts",
+      "commits": 5
+    },
+    {
+      "a": "extensions/ritemark/src/extension.ts",
+      "b": "extensions/ritemark/src/ritemarkEditor.ts",
+      "commits": 4
+    },
+    {
+      "a": "scripts/build-provenance.mjs",
+      "b": "scripts/validate-qa.sh",
+      "commits": 4
+    },
+    {
+      "a": "scripts/validate-build-output.sh",
+      "b": "scripts/validate-qa.sh",
+      "commits": 4
+    },
+    {
+      "a": "scripts/test-release-source-integrity.sh",
+      "b": "scripts/validate-qa.sh",
+      "commits": 4
+    },
+    {
+      "a": "scripts/build-provenance.mjs",
+      "b": "scripts/tree-sha256.mjs",
+      "commits": 4
+    }
+  ],
+  "commits": [
+    {
+      "commit": "23493cef1f4d38cd997be5509e057cb75560fb5c",
+      "date": "2026-09-10",
+      "subject": "fix(v1.10.1): editor sync echo regression and task-list read-back (#271)",
+      "files": [
+        "extensions/ritemark/src/editorSync/state.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/editorValueReconciliation.ts",
+        "extensions/ritemark/webview/src/utils/taskListRoundTrip.ts"
+      ]
+    },
+    {
+      "commit": "daf90f5adc70f4de2bd76459331e20cf2b06e643",
+      "date": "2026-09-09",
+      "subject": "fix(build): treat CR residue in the committed webview bundle as reproducible (#268)",
+      "files": [
+        "scripts/build-prod.sh"
+      ]
+    },
+    {
+      "commit": "e432117872a0f7e4c2eebf4f7fcc59473476d8d5",
+      "date": "2026-09-08",
+      "subject": "fix(ai-sidebar): stop a status refresh from overwriting a known runtime phase",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/runtimeAvailability.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "f05ddc482e936a4d3e5d428193567a1346624a03",
+      "date": "2026-09-08",
+      "subject": "fix(ai-sidebar): make setup views survive a transient checking probe",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts"
+      ]
+    },
+    {
+      "commit": "358b3be80716ba7e0b24bc43af99c342aaeca76b",
+      "date": "2026-09-08",
+      "subject": "docs(v1.10.1): close the release loose ends and correct the Check 11 finding",
+      "files": [
+        "scripts/setup.sh"
+      ]
+    },
+    {
+      "commit": "a5e057e031d9ea3378a48e5305c90b6e0a8da25d",
+      "date": "2026-09-08",
+      "subject": "fix(qa): make the OpenCode runtime probe work on Windows",
+      "files": [
+        "scripts/lib/verify-opencode.mjs"
+      ]
+    },
+    {
+      "commit": "7249845c481fd484be54cdc2911fc52c43651f68",
+      "date": "2026-09-07",
+      "subject": "fix(codex): bundle the Windows sandbox helper binaries",
+      "files": [
+        "scripts/validate-agent-runtime-manifest.mjs",
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "3e4dd9ef07e1c8549ea1dec37908861ad0d5947f",
+      "date": "2026-09-06",
+      "subject": "fix(hygiene): report instead of deleting, and fix both classifier inversions",
+      "files": [
+        "scripts/test-worktree-hygiene.sh",
+        "scripts/worktree-hygiene.mjs"
+      ]
+    },
+    {
+      "commit": "409395c7de3dff748aedc71728ce81ea2805b72d",
+      "date": "2026-09-06",
+      "subject": "fix: preserve trailing newline when saving Markdown without front matter (#254)",
+      "files": [
+        "extensions/ritemark/src/editorSync/state.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts"
+      ]
+    },
+    {
+      "commit": "c6e6e36390c4dda5901a311343089f450f24a7ef",
+      "date": "2026-09-05",
+      "subject": "fix(release): anchor cross-machine provenance verification to the release commit",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/codesign-app.sh",
+        "scripts/create-dmg.sh",
+        "scripts/validate-build-output.sh",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "d4e8e92ba40847ac5bbdc7865f50d1291738a729",
+      "date": "2026-09-05",
+      "subject": "test(windows): preserve utf8 roundtrip evidence",
+      "files": [
+        "scripts/verify-windows-installer-roundtrip.ps1"
+      ]
+    },
+    {
+      "commit": "3afba50c8843ecdf12470174e83d47ca0bdc057d",
+      "date": "2026-09-05",
+      "subject": "fix(windows): replay preserved installer verification",
+      "files": [
+        "scripts/verify-windows-installer-roundtrip.ps1",
+        "scripts/windows-standard-user-registry-probe.ps1"
+      ]
+    },
+    {
+      "commit": "caf2e1a00661b397d1ed4e2c2a48c96b65dba79e",
+      "date": "2026-09-05",
+      "subject": "fix(windows): verify registry in user context",
+      "files": [
+        "scripts/windows-standard-user-registry-probe.ps1"
+      ]
+    },
+    {
+      "commit": "c70dd2b422c7e0a9fd1b5d8203e54c400e90607d",
+      "date": "2026-09-05",
+      "subject": "fix(windows): isolate release test user environment",
+      "files": []
+    },
+    {
+      "commit": "4eae566d025ef22723db268aec945afb9c90c7f1",
+      "date": "2026-09-05",
+      "subject": "fix(windows): isolate standard-user installer test",
+      "files": []
+    },
+    {
+      "commit": "bc078b6f646517db2998764a7b1d4547f25aab09",
+      "date": "2026-09-04",
+      "subject": "fix(release): verify x64 artifact extraction",
+      "files": [
+        "scripts/extract-macos-x64-artifact.sh",
+        "scripts/release-extension-preflight.sh",
+        "scripts/tree-sha256.mjs"
+      ]
+    },
+    {
+      "commit": "9d266e7adb5ce92ec53384b76495afc04d6c8f75",
+      "date": "2026-09-04",
+      "subject": "fix(release): preserve x64 artifact identity",
+      "files": [
+        "scripts/tree-sha256.mjs"
+      ]
+    },
+    {
+      "commit": "8a04f5431804e4d1f19e863d42b80f97a79cb6f3",
+      "date": "2026-09-04",
+      "subject": "fix(release): attest macOS extension before signing",
+      "files": [
+        "scripts/build-prod.sh",
+        "scripts/build-provenance.mjs",
+        "scripts/codesign-app.sh",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "bba9182cf348d262fbf05fd65161304e2a4bb149",
+      "date": "2026-09-04",
+      "subject": "fix(release): preserve PE overlay identity",
+      "files": [
+        "scripts/release-extension-preflight.sh",
+        "scripts/tree-sha256.mjs",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "ca7d263f661b754de711f1ba1e5c6ccb41dad324",
+      "date": "2026-09-04",
+      "subject": "fix(windows): bind PE identity across signing",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/tree-sha256.mjs"
+      ]
+    },
+    {
+      "commit": "7f1408c864e327decbc0bf4db87d775f183a9c1c",
+      "date": "2026-09-04",
+      "subject": "fix(windows): bind both staged payload digests",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/tree-sha256.mjs"
+      ]
+    },
+    {
+      "commit": "597ef48bbc9e2d6c4b2fb3b36a6d8edaa865a352",
+      "date": "2026-09-04",
+      "subject": "fix(windows): bind post-sign attestation record",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/test-release-source-integrity.sh"
+      ]
+    },
+    {
+      "commit": "22b1a0a15285503f0a60788b82bcdf10c68b808a",
+      "date": "2026-09-04",
+      "subject": "fix(windows): attest non-PE payload after signing",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/tree-sha256.mjs",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "17fe89e5506092e10ea93adf0ae8771b2ad766a2",
+      "date": "2026-09-04",
+      "subject": "fix(windows): finalize extension before attestation",
+      "files": []
+    },
+    {
+      "commit": "865dba5e05e6bde49ccfc99f6b32be5f75428fea",
+      "date": "2026-09-04",
+      "subject": "fix(release): attest staged extension payload",
+      "files": [
+        "scripts/build-provenance.mjs",
+        "scripts/create-dmg.sh",
+        "scripts/release-extension-preflight.sh",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/test-stage-extension-for-shell-build.sh",
+        "scripts/tree-sha256.mjs"
+      ]
+    },
+    {
+      "commit": "3c02cb92c20a179a928f203203452258c3bd5b18",
+      "date": "2026-09-04",
+      "subject": "fix(windows): preserve workbench icon font",
+      "files": [
+        "scripts/apply-patches.sh",
+        "scripts/test-release-source-integrity.sh"
+      ]
+    },
+    {
+      "commit": "99c59439661f368e3f553129b5af87daf2ce2371",
+      "date": "2026-09-04",
+      "subject": "fix(release): bind staged Windows shell state",
+      "files": [
+        "scripts/apply-patches.sh",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/verify-release-source.sh",
+        "scripts/vscode-derived-state.mjs"
+      ]
+    },
+    {
+      "commit": "55a6ea3551749d213d13fe60308089a12f6e5289",
+      "date": "2026-09-04",
+      "subject": "fix(release): keep staged shell provenance fail-closed",
+      "files": [
+        "scripts/test-release-source-integrity.sh",
+        "scripts/verify-release-source.sh",
+        "scripts/vscode-derived-state.mjs"
+      ]
+    },
+    {
+      "commit": "59b23d5c144ff5382008c0ab2dbe4c86c3400af2",
+      "date": "2026-09-04",
+      "subject": "fix(windows): isolate extension from shell packaging",
+      "files": [
+        "scripts/stage-extension-for-shell-build.sh",
+        "scripts/test-stage-extension-for-shell-build.sh",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e",
+      "date": "2026-09-03",
+      "subject": "fix: isolate agent runtime availability",
+      "files": [
+        "extensions/ritemark/src/agent/claudeStatusEvents.ts",
+        "extensions/ritemark/src/codex/codexProtocol.ts",
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/RuntimeAvailabilityNotice.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/RuntimeNotice.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/runtimeAvailability.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "scripts/validate-agent-runtime-manifest.mjs"
+      ]
+    },
+    {
+      "commit": "690d253940b6ceaa683a9e3b5dde1d089fa3b47b",
+      "date": "2026-09-03",
+      "subject": "fix: normalize Claude authentication failures",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/conversations/types.ts",
+        "extensions/ritemark/src/runtime/runtimeErrorPresentation.ts",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "13f20f1b6f462e7b7508ba5767687641943fa91b",
+      "date": "2026-09-02",
+      "subject": "fix: harden RC editor and dependency invariants (#244)",
+      "files": [
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/editorValueReconciliation.ts",
+        "scripts/ensure-dev-extension-link.sh",
+        "scripts/setup.sh",
+        "scripts/test-dev-extension-link.sh",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "ba75bf3eb3bb760443f25814b07e84105111f3c6",
+      "date": "2026-09-02",
+      "subject": "test: harden task list regression harness",
+      "files": []
+    },
+    {
+      "commit": "69401802f130ee201beef3764f9fcc936574de97",
+      "date": "2026-09-02",
+      "subject": "fix(editor): preserve task lists across reopen",
+      "files": [
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/utils/taskListRoundTrip.ts",
+        "extensions/ritemark/webview/src/utils/turndownService.ts"
+      ]
+    },
+    {
+      "commit": "75be13cc21d7597befdc6f8f713e34402e7f50b8",
+      "date": "2026-09-02",
+      "subject": "fix: fetch Windows runtimes before local copy",
+      "files": [
+        "scripts/build-windows-local.ps1"
+      ]
+    },
+    {
+      "commit": "3d79ffbbac02d339b683cdcc8b4bcce56f47b5ae",
+      "date": "2026-09-02",
+      "subject": "fix: keep release source immutable across targets",
+      "files": [
+        "scripts/apply-patches.sh",
+        "scripts/build-prod-windows.sh",
+        "scripts/build-windows-local.ps1",
+        "scripts/copy-extension-for-target.mjs",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/validate-qa.sh",
+        "scripts/verify-release-source.sh"
+      ]
+    },
+    {
+      "commit": "48353a36c41a9fefcdea89b881b69ffe1555cc1c",
+      "date": "2026-09-02",
+      "subject": "fix: make clean RC preflight self-contained",
+      "files": [
+        "scripts/create-release-worktree.sh",
+        "scripts/test-ci-asset-parity.sh"
+      ]
+    },
+    {
+      "commit": "5e7b670bdfdba5a4a5e6daa4aecae1e28296db44",
+      "date": "2026-09-02",
+      "subject": "build: enforce reproducible releases and safe worktree cleanup",
+      "files": [
+        "scripts/apply-patches.sh",
+        "scripts/build-prod-windows.sh",
+        "scripts/build-prod.sh",
+        "scripts/build-provenance.mjs",
+        "scripts/codesign-app.sh",
+        "scripts/create-dmg.sh",
+        "scripts/create-release-worktree.sh",
+        "scripts/release-extension-preflight.sh",
+        "scripts/release-preflight.sh",
+        "scripts/test-release-source-integrity.sh",
+        "scripts/test-worktree-hygiene.sh",
+        "scripts/validate-build-output.sh",
+        "scripts/validate-qa.sh",
+        "scripts/verify-release-source.sh",
+        "scripts/vscode-derived-state.mjs",
+        "scripts/worktree-hygiene.mjs"
+      ]
+    },
+    {
+      "commit": "750c5460256e495f18f6f67c20c887ec5ccb7ed3",
+      "date": "2026-09-02",
+      "subject": "fix: keep Help menu focused on Ritemark",
+      "files": [
+        "patches/vscode/015-ritemark-help-menu-policy.patch"
+      ]
+    },
+    {
+      "commit": "a74e92fe2390b216c26a69e3a99d9e8004c8024a",
+      "date": "2026-09-01",
+      "subject": "fix: isolate Agent Chat bootstrap from storage quota",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/aiDisclosure.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/modelPresentation.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "9f7b7f00a9b9d76f3b699568e17a06ad18332803",
+      "date": "2026-09-01",
+      "subject": "fix: close Agent Chat review edge cases",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/src/views/agentSidebarBootstrap.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "80be7da21d2410831e3df16bfd2cf52c73e010bf",
+      "date": "2026-09-01",
+      "subject": "fix: make agent chat bootstrap atomic",
+      "files": [
+        "extensions/ritemark/src/ai/modelCatalog/resolver.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/src/views/agentSidebarBootstrap.ts",
+        "extensions/ritemark/src/views/agentSidebarProtocol.ts",
+        "extensions/ritemark/src/views/webviewAssetUri.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "3734057711b71a7511eed5a1a498bb128c116905",
+      "date": "2026-09-01",
+      "subject": "fix: close Claude auth recovery edge cases",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "d0490a9dc49f3d2c1a23b4f0c4006d83de8869db",
+      "date": "2026-09-01",
+      "subject": "fix: complete Claude sign-in recovery",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/OnboardingWizard.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/SetupWizard.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "b4a6c619a22a632ebd07cfe1ec10daa0d2a1b0b9",
+      "date": "2026-09-01",
+      "subject": "fix: harmonize AI recovery alerts",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ActivityStatusLine.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx"
+      ]
+    },
+    {
+      "commit": "3e4d931fd61bb1c707e723026b4572158f3d6ef3",
+      "date": "2026-09-01",
+      "subject": "fix: persist Claude auth recovery",
+      "files": [
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/types.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationProjection.ts"
+      ]
+    },
+    {
+      "commit": "adba9553f8de6059b232faf61bfb2a16923e9138",
+      "date": "2026-09-01",
+      "subject": "fix: settle shared Claude auth recovery",
+      "files": [
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/claudeLogin.ts",
+        "extensions/ritemark/src/agent/index.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/runtimeErrorPresentation.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "ac1ef4558867421f045f9f2972f2187c6fb24d7b",
+      "date": "2026-09-01",
+      "subject": "fix: keep Claude auth recovery visible",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts"
+      ]
+    },
+    {
+      "commit": "006a0b9514e0433d4edd574752f58b4e368e0a74",
+      "date": "2026-09-01",
+      "subject": "fix: recover expired Claude sessions in chat",
+      "files": [
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/claudeLogin.ts",
+        "extensions/ritemark/src/agent/claudeStatusEvents.ts",
+        "extensions/ritemark/src/agent/index.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/runtimeErrorPresentation.ts",
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "90e0f77970dec02f6879498296dfdc5b0040add5",
+      "date": "2026-08-31",
+      "subject": "fix: bind save receipts to exact written snapshot",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+        "extensions/ritemark/src/editorSync/saveReceipt.ts",
+        "patches/vscode/014-ritemark-save-receipts.patch"
+      ]
+    },
+    {
+      "commit": "65909afb87f3f9224c36c1227b33bc5913b39897",
+      "date": "2026-08-31",
+      "subject": "fix: reject superseded save receipt matches",
+      "files": [
+        "extensions/ritemark/src/editorSync/state.ts"
+      ]
+    },
+    {
+      "commit": "2e49177736a1f0fb9f386e012678e42b33d1a29f",
+      "date": "2026-08-31",
+      "subject": "fix: order save receipts against disk reads",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+        "extensions/ritemark/src/editorSync/state.ts"
+      ]
+    },
+    {
+      "commit": "340d8775cc79e6e524972849b44cce819dddbd0c",
+      "date": "2026-08-31",
+      "subject": "fix: trust only confirmed save receipts",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts"
+      ]
+    },
+    {
+      "commit": "420cd53ce94587333021a49e0b2770fe5e6b18da",
+      "date": "2026-08-31",
+      "subject": "fix: capture post-participant save receipts",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts"
+      ]
+    },
+    {
+      "commit": "5f85f5c32075b7e530a08242ae601309a4651b30",
+      "date": "2026-08-31",
+      "subject": "fix: harden editor save reconciliation",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+        "extensions/ritemark/src/editorSync/state.ts",
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/editorValueReconciliation.ts",
+        "scripts/validate-qa.sh"
+      ]
+    },
+    {
+      "commit": "50a6ce1642873ac7bd8bea00f4281e9d168fd9c9",
+      "date": "2026-08-31",
+      "subject": "fix: bundle Codex code mode host",
+      "files": [
+        "scripts/create-windows-installer.sh",
+        "scripts/fetch-agent-runtimes.sh",
+        "scripts/validate-agent-runtime-manifest.mjs",
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "0c72ee65a58db16f9fcf826bacf85ef518a9a33f",
+      "date": "2026-08-29",
+      "subject": "fix: keep conversation undo actions valid",
+      "files": [
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/conversations/conversationDeleteNotification.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ConversationsPanel.tsx"
+      ]
+    },
+    {
+      "commit": "9a3c248d6b2ce22609e8c3191e23a5d3e55cf859",
+      "date": "2026-08-29",
+      "subject": "fix: use native conversation delete notifications",
+      "files": [
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/conversations/conversationDeleteNotification.ts",
+        "extensions/ritemark/src/conversations/protocol.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ConversationsPanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "7165e00d3a95832378c6e0c8aedaf4a9c21d8e0d",
+      "date": "2026-08-27",
+      "subject": "fix: keep empty thread rail spacing at 4px",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx"
+      ]
+    },
+    {
+      "commit": "1146e1487ffc3eb8be822f91c303153911effc2a",
+      "date": "2026-08-27",
+      "subject": "fix: finish compact sidebar controls",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+        "extensions/ritemark/webview/src/components/ui/Icon.tsx"
+      ]
+    },
+    {
+      "commit": "334d13789a6dad08d1ff5a394551b36163d7595d",
+      "date": "2026-08-27",
+      "subject": "fix: use four pixel thread rail spacing",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx"
+      ]
+    },
+    {
+      "commit": "396481aa38e8bdee89c523ed609585f2862097f5",
+      "date": "2026-08-27",
+      "subject": "fix: remove thread rail button spacing",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx"
+      ]
+    },
+    {
+      "commit": "e6a1b2df94c29c7c2f541276a26d0b99b687a29c",
+      "date": "2026-08-27",
+      "subject": "fix: prioritize model in compact composer",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx"
+      ]
+    },
+    {
+      "commit": "2b32eec1327bfc996f543ffb1c83892025d96987",
+      "date": "2026-08-27",
+      "subject": "fix: canonicalize Claude model aliases",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/ai/modelCatalog/index.ts",
+        "extensions/ritemark/src/ai/modelCatalog/providerDiscovery.ts",
+        "extensions/ritemark/src/ai/modelCatalog/resolver.ts",
+        "extensions/ritemark/src/ai/modelCatalog/schema.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "ca6e5c44ca24b209a52efda6ddeecddb0fcc9c32",
+      "date": "2026-08-25",
+      "subject": "fix(editor): preserve stale edits across sync revisions",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+        "extensions/ritemark/src/editorSync/state.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/documentSyncReducer.ts"
+      ]
+    },
+    {
+      "commit": "c0343a92432e3a43ce825c6cee54d16a2275c684",
+      "date": "2026-08-24",
+      "subject": "fix: make editor disk synchronization reliable",
+      "files": [
+        "extensions/ritemark/src/editorSync/DocumentSyncCoordinator.ts",
+        "extensions/ritemark/src/editorSync/delivery.ts",
+        "extensions/ritemark/src/editorSync/protocol.ts",
+        "extensions/ritemark/src/editorSync/state.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/bridge.ts",
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx",
+        "extensions/ritemark/webview/src/components/dialogs/DocumentConflictDialog.tsx",
+        "extensions/ritemark/webview/src/components/header/DocumentHeader.tsx",
+        "extensions/ritemark/webview/src/components/header/DocumentSyncAction.ts",
+        "extensions/ritemark/webview/src/components/header/SpreadsheetToolbar.tsx",
+        "extensions/ritemark/webview/src/components/ui/dialog.tsx",
+        "extensions/ritemark/webview/src/documentSyncReducer.ts",
+        "extensions/ritemark/webview/src/types/documentSync.ts"
+      ]
+    },
+    {
+      "commit": "45de4852a91f0a546445656e10a73c524b078d55",
+      "date": "2026-08-24",
+      "subject": "feat: support any-language transcribe insights",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/speech/insights.ts",
+        "extensions/ritemark/src/speech/insightsLanguage.ts",
+        "extensions/ritemark/src/speech/insightsMarkdown.ts",
+        "extensions/ritemark/src/speech/insightsParsing.ts",
+        "extensions/ritemark/src/transcriptWorkbenchProvider.ts",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/InsightsLanguageCombobox.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/InsightsRail.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Workbench.tsx"
+      ]
+    },
+    {
+      "commit": "90e241712b07c91e05adeb076d24580c874c0158",
+      "date": "2026-08-24",
+      "subject": "refactor(windows): focus sprint on trusted install",
+      "files": [
+        "scripts/codesign-windows.sh",
+        "scripts/create-windows-installer.sh",
+        "scripts/find-windows-signing-tools.ps1",
+        "scripts/sign-windows-file.ps1",
+        "scripts/test-windows-release-contract.sh",
+        "scripts/validate-build-output.sh",
+        "scripts/validate-qa.sh",
+        "scripts/validate-windows-build-trust.sh",
+        "scripts/verify-windows-signatures.ps1",
+        "scripts/windows-build-contract.ps1",
+        "scripts/windows-signature-policy.ps1"
+      ]
+    },
+    {
+      "commit": "3f87e26e33f59b5e4adac96c6da1ffc0611b0ff1",
+      "date": "2026-08-24",
+      "subject": "build(windows): enforce trusted installer chain",
+      "files": [
+        "scripts/codesign-windows.sh",
+        "scripts/create-windows-installer.sh",
+        "scripts/find-windows-signing-tools.ps1",
+        "scripts/sign-windows-file.ps1",
+        "scripts/test-windows-release-contract.sh",
+        "scripts/validate-build-output.sh",
+        "scripts/validate-qa.sh",
+        "scripts/validate-windows-build-trust.sh",
+        "scripts/verify-windows-signatures.ps1",
+        "scripts/windows-build-contract.ps1",
+        "scripts/windows-signature-policy.ps1"
+      ]
+    },
+    {
+      "commit": "74cb608910647bee4763ffeb363e0f516e7c0b1d",
+      "date": "2026-08-24",
+      "subject": "fix: center singleton effort slider",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/thinkingEffortGeometry.ts"
+      ]
+    },
+    {
+      "commit": "1830913044fb59ddadd965818ccda3dc7e4f83a6",
+      "date": "2026-08-24",
+      "subject": "fix: align thinking effort slider endpoints",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx"
+      ]
+    },
+    {
+      "commit": "cb7dfda4e787b4c60137e8dbdf6604891130c318",
+      "date": "2026-08-24",
+      "subject": "fix(transcribe): harden insights workbench layout",
+      "files": [
+        "extensions/ritemark/webview/src/components/transcribe/workbench/InsightsRail.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Waveform.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Workbench.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/layout.ts"
+      ]
+    },
+    {
+      "commit": "363b393454364ad2ffa39ec412504e53cf3cf47f",
+      "date": "2026-08-24",
+      "subject": "fix(ai): envelope effort slider thumb",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx"
+      ]
+    },
+    {
+      "commit": "8752982053ef1b60a23b404129e83489a5422643",
+      "date": "2026-08-24",
+      "subject": "feat(transcribe): create language-aware insights documents",
+      "files": [
+        "extensions/ritemark/src/speech/insights.ts",
+        "extensions/ritemark/src/speech/insightsLanguage.ts",
+        "extensions/ritemark/src/speech/insightsMarkdown.ts",
+        "extensions/ritemark/src/speech/insightsParsing.ts",
+        "extensions/ritemark/src/speech/speakerNames.ts",
+        "extensions/ritemark/src/speech/types.ts",
+        "extensions/ritemark/src/speech/workbenchProtocol.ts",
+        "extensions/ritemark/src/transcriptWorkbenchProvider.ts",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/InsightsRail.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Workbench.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/playback.ts"
+      ]
+    },
+    {
+      "commit": "fec18d8eee4e4b75a288e5afb4e7601f956c05a3",
+      "date": "2026-08-24",
+      "subject": "fix(ai): polish thinking effort review findings",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts",
+        "extensions/ritemark/src/ai/modelConfig.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx"
+      ]
+    },
+    {
+      "commit": "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec",
+      "date": "2026-08-24",
+      "subject": "feat(ai): add composer thinking effort",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/discoverModels.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts",
+        "extensions/ritemark/src/ai/modelCatalog/providerDiscovery.ts",
+        "extensions/ritemark/src/ai/modelCatalog/resolver.ts",
+        "extensions/ritemark/src/ai/modelCatalog/schema.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/codex/codexAppServer.ts",
+        "extensions/ritemark/src/codex/codexProtocol.ts",
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/conversations/protocol.ts",
+        "extensions/ritemark/src/conversations/types.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/capabilities.ts",
+        "extensions/ritemark/src/runtime/index.ts",
+        "extensions/ritemark/src/runtime/thinkingEffort.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationProjection.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/promptQueue.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "5c16cd19c6f4cf7285b0cbf46b6fd85fbed01325",
+      "date": "2026-08-24",
+      "subject": "ci: verify agent runtimes on native hosts",
+      "files": [
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "9553f58e4f3a56d6bd42cb72a7cbdf36f955d92f",
+      "date": "2026-08-24",
+      "subject": "runtime: refresh bundled agent snapshot",
+      "files": [
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/codex/codexProtocol.ts",
+        "scripts/fetch-agent-runtimes.sh",
+        "scripts/validate-agent-runtime-manifest.mjs",
+        "scripts/validate-qa.sh",
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "7f3a11a659171ed8d014ede5feebc58424083329",
+      "date": "2026-08-23",
+      "subject": "feat(ai): resume durable agent conversations",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/codex/codexAppServer.ts",
+        "extensions/ritemark/src/codex/codexProtocol.ts",
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/conversations/contextPack.ts",
+        "extensions/ritemark/src/conversations/protocol.ts",
+        "extensions/ritemark/src/conversations/types.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/continuation.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/UnifiedConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/continuationPresentation.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationProjection.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "967a8821392b68a28caa6ae5639987ddca371273",
+      "date": "2026-08-23",
+      "subject": "fix(conversations): soften rail pin affordance",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx"
+      ]
+    },
+    {
+      "commit": "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80",
+      "date": "2026-08-23",
+      "subject": "feat(conversations): add durable project chat history",
+      "files": [
+        "extensions/ritemark/src/conversations/ConversationController.ts",
+        "extensions/ritemark/src/conversations/ConversationCutoverState.ts",
+        "extensions/ritemark/src/conversations/ConversationStore.ts",
+        "extensions/ritemark/src/conversations/ConversationTitleGenerator.ts",
+        "extensions/ritemark/src/conversations/ConversationTitlePolicy.ts",
+        "extensions/ritemark/src/conversations/LegacyConversationMigrator.ts",
+        "extensions/ritemark/src/conversations/identityColor.ts",
+        "extensions/ritemark/src/conversations/projectScope.ts",
+        "extensions/ritemark/src/conversations/protocol.ts",
+        "extensions/ritemark/src/conversations/runtimeAttachmentPolicy.ts",
+        "extensions/ritemark/src/conversations/types.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/bridge.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatHistoryPanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ConversationBubbleIcon.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ConversationTooltip.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ConversationsPanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadCapDialog.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationProjection.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationSelectors.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/threadStatus.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "extensions/ritemark/webview/src/components/ui/Icon.tsx"
+      ]
+    },
+    {
+      "commit": "ff32a6814c40703e77d8c6bf50bf7bf29b842c26",
+      "date": "2026-08-17",
+      "subject": "fix(transcribe): never hide a project's recordings in silence",
+      "files": [
+        "extensions/ritemark/src/views/TranscribeViewProvider.ts",
+        "extensions/ritemark/webview/src/components/transcribe/TranscribePanel.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/types.ts"
+      ]
+    },
+    {
+      "commit": "8ab2796041262c1ca88a207ee5aa3e6abd35e2b7",
+      "date": "2026-08-15",
+      "subject": "fix(release): don't trust a hollow vanilla-VS-Code cache",
+      "files": [
+        "scripts/release-preflight.sh"
+      ]
+    },
+    {
+      "commit": "f2e54cb708511305bd10a6dfba3080d8000cbebb",
+      "date": "2026-08-15",
+      "subject": "Sprint 108: Transcription Workbench \u2014 audio in, document out (#202)",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/speech/JobManager.ts",
+        "extensions/ritemark/src/speech/SessionStore.ts",
+        "extensions/ritemark/src/speech/TranscriptionEngine.ts",
+        "extensions/ritemark/src/speech/activeTranscript.ts",
+        "extensions/ritemark/src/speech/audioPrep.ts",
+        "extensions/ritemark/src/speech/autoExport.ts",
+        "extensions/ritemark/src/speech/durationProbe.ts",
+        "extensions/ritemark/src/speech/engineRegistry.ts",
+        "extensions/ritemark/src/speech/engines/elevenLabsEngine.ts",
+        "extensions/ritemark/src/speech/engines/whisperLocalEngine.ts",
+        "extensions/ritemark/src/speech/exportTranscript.ts",
+        "extensions/ritemark/src/speech/index.ts",
+        "extensions/ritemark/src/speech/insights.ts",
+        "extensions/ritemark/src/speech/insightsParsing.ts",
+        "extensions/ritemark/src/speech/paths.ts",
+        "extensions/ritemark/src/speech/segmentFolding.ts",
+        "extensions/ritemark/src/speech/transcriptMarkdown.ts",
+        "extensions/ritemark/src/speech/types.ts",
+        "extensions/ritemark/src/transcriptWorkbenchProvider.ts",
+        "extensions/ritemark/src/views/TranscribeViewProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/settings/RitemarkSettings.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/TranscribePanel.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/types.ts",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/InsightsRail.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Waveform.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/Workbench.tsx",
+        "extensions/ritemark/webview/src/components/transcribe/workbench/playback.ts",
+        "extensions/ritemark/webview/src/components/ui/button.tsx",
+        "extensions/ritemark/webview/src/main.tsx"
+      ]
+    },
+    {
+      "commit": "9534c4e08d3f1398a3f10d25a8703161c596509f",
+      "date": "2026-08-08",
+      "subject": "fix(ai): offline banner hysteresis \u2014 multi-endpoint probe race, 2-round verdict (#193) (#198)",
+      "files": [
+        "extensions/ritemark/src/ai/connectivity.ts",
+        "extensions/ritemark/src/ai/connectivityPolicy.ts"
+      ]
+    },
+    {
+      "commit": "90a076429012a2f69875c8d953f670fd03cb20d1",
+      "date": "2026-08-07",
+      "subject": "fix: Home recents show truly newest files + refresh on save (#194)",
+      "files": [
+        "extensions/ritemark/src/views/HomeViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "0745684f4294c632425adb99020567ed9dec93c8",
+      "date": "2026-08-06",
+      "subject": "fix(release): Windows installer \u2014 correct version source, wine-absolute SourcePath, output path (#191)",
+      "files": [
+        "scripts/create-windows-installer.sh"
+      ]
+    },
+    {
+      "commit": "f41add56549b4edb4685c6f38257cfe2266ede88",
+      "date": "2026-08-05",
+      "subject": "fix(ui): hr breathing room (24px measured) + pixel-exact tree/title alignment (#186)",
+      "files": [
+        "patches/vscode/002-ritemark-ui-layout.patch"
+      ]
+    },
+    {
+      "commit": "49c5805d7c87cfbeca3b0a8683d2195bfa665501",
+      "date": "2026-08-05",
+      "subject": "feat(sprint-107): Clean Start \u2014 first-open fix (patch 013), daemon consent, tab healer + Codex review round (#185)",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/daemon/workspaceConsent.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/utils/stickyTabHealer.ts",
+        "extensions/ritemark/src/views/AgentLibraryViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatLinks.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentIndex.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentModel.ts",
+        "patches/vscode/013-ritemark-configuration-defaults.patch",
+        "scripts/build-prod.sh"
+      ]
+    },
+    {
+      "commit": "1749bf1e09d48132114ea449c836d17b5426ece5",
+      "date": "2026-08-05",
+      "subject": "fix(comments): toolbar overview counts mid-sentence @agent mentions (#184)",
+      "files": [
+        "extensions/ritemark/webview/src/extensions/comment/commentIndex.ts"
+      ]
+    },
+    {
+      "commit": "83d46aa532b76d52f53b7cfa5d9197909a20b37c",
+      "date": "2026-08-05",
+      "subject": "fix(agent): the selected model is the model that runs (drift fix 1-3) (#183)",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "50de57b595ad0eef6bcea0805ada38228715e76e",
+      "date": "2026-08-05",
+      "subject": "fix(editor): self-edit silence + tree title alignment (#182)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "patches/vscode/002-ritemark-ui-layout.patch"
+      ]
+    },
+    {
+      "commit": "26467852ce417146d183e1a39e8bfbbc0d8f2ec6",
+      "date": "2026-08-05",
+      "subject": "feat(ui): Jarmo test-pass polish pack \u2014 mode dropdown, folder tree, (#180)",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/views/HomeViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ActivityStatusLine.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/RunningIndicator.tsx",
+        "patches/vscode/002-ritemark-ui-layout.patch",
+        "patches/vscode/003-ritemark-menu-cleanup.patch"
+      ]
+    },
+    {
+      "commit": "fa8915cc7e8acae233110e69aa4fd8c918791063",
+      "date": "2026-08-05",
+      "subject": "feat: one-word Folder terminology, simplified File menu, reliable (#178)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "patches/vscode/002-ritemark-ui-layout.patch",
+        "patches/vscode/003-ritemark-menu-cleanup.patch"
+      ]
+    },
+    {
+      "commit": "67b8d49e4bd735945e8e3cd5319ae2d294db8b58",
+      "date": "2026-08-05",
+      "subject": "feat(home): folderless Home is the same launcher (#74 follow-up) (#177)",
+      "files": [
+        "extensions/ritemark/src/views/HomeViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "94f06550eb09d3c5874c8391574933bfd8a7b058",
+      "date": "2026-08-05",
+      "subject": "fix: chat file links open in Ritemark + writer-voice Project empty state (#176)",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/RenderedMarkdown.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatLinks.ts",
+        "patches/vscode/002-ritemark-ui-layout.patch",
+        "patches/vscode/003-ritemark-menu-cleanup.patch"
+      ]
+    },
+    {
+      "commit": "61be9d0bb483054a0387f63088d9987ccffa211b",
+      "date": "2026-08-05",
+      "subject": "fix(build): stamp Info.plist with Ritemark version, not VS Code's (#175)",
+      "files": [
+        "scripts/build-prod.sh"
+      ]
+    },
+    {
+      "commit": "35008e3aca98c0c42a8c17ae2b37c9c82ca01cd9",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-107): R4 \u2014 remove the \"Claude is ready\" welcome card (#174)",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/SetupWizard.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/sidebarGate.ts"
+      ]
+    },
+    {
+      "commit": "f7a7d19f42db4e31dae33b412226f131de57fb84",
+      "date": "2026-08-04",
+      "subject": "fix(sprint-106): Home CTA is a single-line button (design canon) (#173)",
+      "files": [
+        "extensions/ritemark/src/views/HomeViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "e8290e4574ad1f0fa788f5d610363522ff135ed4",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-106): Home first in Activity Bar + Home view design pass (#74) (#172)",
+      "files": [
+        "extensions/ritemark/src/views/HomeViewProvider.ts",
+        "patches/vscode/002-ritemark-ui-layout.patch"
+      ]
+    },
+    {
+      "commit": "f1dcf9b2f9d8c1101db3aa1d85d0b60262386da9",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-106): Home and first-task launcher (#74) (#171)",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/views/HomeViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "fc976da963d2df1f24f63fc1c30688397e1eb456",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-105): comments command center (#164, #165) (#170)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "extensions/ritemark/webview/src/components/header/CommentsMenuButton.tsx",
+        "extensions/ritemark/webview/src/components/header/DocumentHeader.tsx",
+        "extensions/ritemark/webview/src/extensions/comment/commentIndex.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentTaskStatus.ts"
+      ]
+    },
+    {
+      "commit": "4c66df0ac3f0ed0ad60d3a5e5c01ea1da73e74ec",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-104): bounded multi-prompt queue for composer and comments (#162) (#169)",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/QueuePanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadCapDialog.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/promptQueue.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e",
+      "date": "2026-08-04",
+      "subject": "feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/discoverModels.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/flows/nodes/ClaudeCodeNodeExecutor.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/capabilities.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ActivityDetails.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ActivityStatusLine.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentPlanApproval.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/PlanReviewCard.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/UnifiedConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/activityState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/lifecycle.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/threadStatus.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "scripts/qa/plan-truth-matrix.sh"
+      ]
+    },
+    {
+      "commit": "8531e2aa25c05707bc7501f024f79e633815d89a",
+      "date": "2026-08-03",
+      "subject": "Add AI transparency disclosure (#166)",
+      "files": [
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AIInformation.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/aiDisclosure.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/settings/RitemarkSettings.tsx"
+      ]
+    },
+    {
+      "commit": "612ce49b88619569bb4a90fae865ce23d9c0b039",
+      "date": "2026-07-25",
+      "subject": "feat(ai): add Claude Opus 5 to bundled model catalog",
+      "files": [
+        "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts"
+      ]
+    },
+    {
+      "commit": "0fec43f2fddbed62cb1914f53e20af0bb8942e2d",
+      "date": "2026-07-25",
+      "subject": "fix(ui): thread rail robot icons use brand indigo instead of runtime brand colors",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatHistoryPanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadCapDialog.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/threadStatus.ts"
+      ]
+    },
+    {
+      "commit": "c3d53fa73110cc3d56b4dd5ac258069f1fd7369f",
+      "date": "2026-07-23",
+      "subject": "feat(sprint-101): unified agent capability context (#154)",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/ai/capabilityContext.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "498b00c699f500e96e0b4dcf134aa880df8b2af5",
+      "date": "2026-07-23",
+      "subject": "fix: OpenCode turns time out instead of hanging forever",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts"
+      ]
+    },
+    {
+      "commit": "844123043042e6e1c57873c7a4b1b062c0a5075e",
+      "date": "2026-07-23",
+      "subject": "fix: OpenCode receives cross-runtime handoff when switched mid-conversation",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "ff5794719c8728f1ee9c90887eaff25e705bc75c",
+      "date": "2026-07-22",
+      "subject": "fix(sprint-100): address qa-validator findings",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "scripts/lib/verify-opencode.mjs",
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "848aa668110c641e9ddf798e435d19a0a3054cce",
+      "date": "2026-07-22",
+      "subject": "feat(sprint-100): make runtime verification repeatable and required",
+      "files": [
+        "scripts/lib/verify-opencode.mjs",
+        "scripts/verify-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "517d70c23c1121d47e2612a4b330b908fbffabc2",
+      "date": "2026-07-22",
+      "subject": "feat(sprint-100): prove both hard gates; translate the no-model error",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts"
+      ]
+    },
+    {
+      "commit": "ff3506a7a816ed9ba9050e7cc4f91a1e60d0157a",
+      "date": "2026-07-22",
+      "subject": "feat(sprint-100): bump Claude 2.1.217 + OpenCode 1.18.4; drop the cancel process-kill",
+      "files": [
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpManager.ts"
+      ]
+    },
+    {
+      "commit": "94b762f91c5551151422459ed635d76d53b2018a",
+      "date": "2026-07-22",
+      "subject": "fix(sprint-98): carry op:delete through the feed; keep canary on stable app releases",
+      "files": [
+        "extensions/ritemark/src/update/updateFeed.ts",
+        "extensions/ritemark/src/update/updateResolver.ts",
+        "extensions/ritemark/src/update/updateService.ts",
+        "scripts/generate-update-feed.mjs"
+      ]
+    },
+    {
+      "commit": "61f8f4b36f0037d21cd031b447b88bc48879aef4",
+      "date": "2026-07-22",
+      "subject": "fix(sprint-99): cancel an ACP session before disposing it (Codex review)",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts"
+      ]
+    },
+    {
+      "commit": "69e9c48bb53eb43803fa6bfbf109e0ad536f7856",
+      "date": "2026-07-22",
+      "subject": "fix(sprint-99): correct userPrompt field in the kill-switch test",
+      "files": []
+    },
+    {
+      "commit": "55d72fc9148beea9b1a518f1739ff13bbc5e7cea",
+      "date": "2026-07-22",
+      "subject": "feat(sprint-99): make the parallelChats kill-switch real",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "a8d15a589bc08faed1efbf1fed97c831362e97a5",
+      "date": "2026-07-22",
+      "subject": "refactor(sprint-99): delete the compat mirror; components read the active conversation",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/LegacyConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/UnifiedConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "401c6da862b7657dcfbb0525c5f3cc75a0e61022",
+      "date": "2026-07-22",
+      "subject": "feat(sprint-99): serialize browser tools across chats; architecture gate",
+      "files": [
+        "extensions/ritemark/src/browser/BrowserActionTools.ts"
+      ]
+    },
+    {
+      "commit": "90f73f48c9a5f26e7c67044c01130d45d279d496",
+      "date": "2026-07-22",
+      "subject": "fix(sprint-99): rail polish \u2014 top border, activity-bar harmony, focus ring",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx"
+      ]
+    },
+    {
+      "commit": "79bb4fe781ee9aa36a85e201dbd5967741ac152e",
+      "date": "2026-07-21",
+      "subject": "feat(sprint-99): the thread rail \u2014 parallel chats become visible",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatHistoryPanel.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadCapDialog.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ThreadRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/composerQueue.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/threadStatus.ts",
+        "extensions/ritemark/webview/src/components/ui/Icon.tsx"
+      ]
+    },
+    {
+      "commit": "d024433bb52db26907595353adcf015085de28ea",
+      "date": "2026-07-21",
+      "subject": "fix(sprint-99): Stop no longer shows a protocol error, and no longer strands approvals",
+      "files": [
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts"
+      ]
+    },
+    {
+      "commit": "cf6b0d15741a7655ba3cdbb75a366d0c5ca3cae6",
+      "date": "2026-07-21",
+      "subject": "fix(sprint-99): New Chat no longer wipes every conversation's agent memory",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "e492b552654398fb1bacacb3a0579e49d10cd04f",
+      "date": "2026-07-21",
+      "subject": "feat(sprint-99): Phase 1 \u2014 conversations own their runtime sessions",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/codex/codexAppServer.ts",
+        "extensions/ritemark/src/codex/codexApproval.ts",
+        "extensions/ritemark/src/codex/codexProtocol.ts",
+        "extensions/ritemark/src/codex/index.ts",
+        "extensions/ritemark/src/daemon/handlers/AgentTaskHandler.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/index.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationRouting.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/conversationState.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "e244d60826aa066c9a7ad18d974bf63e0f731d79",
+      "date": "2026-07-21",
+      "subject": "docs(sprint-99): Phase-0 ACP spike result \u2014 D1 confirmed, and a dead catch removed",
+      "files": [
+        "extensions/ritemark/src/acp/acpClient.ts"
+      ]
+    },
+    {
+      "commit": "a29b01fcd76bfe7fbbce0623351105d9842b7d1a",
+      "date": "2026-07-21",
+      "subject": "fix(sprint-99): concurrent tool approvals no longer overwrite each other",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts"
+      ]
+    },
+    {
+      "commit": "06150c02e676c90158c169c19d4f342ba423af86",
+      "date": "2026-07-21",
+      "subject": "feat(sprint-98): publish guards, canary ring, and a watchdog fix found in dev validation",
+      "files": [
+        "extensions/ritemark/src/update/updateFeed.ts",
+        "extensions/ritemark/src/update/updateService.ts",
+        "patches/vscode/012-ritemark-shell-watchdog.patch",
+        "scripts/build-prod.sh",
+        "scripts/check-bundled-extension-complete.sh",
+        "scripts/ext-install-smoke-test.sh",
+        "scripts/generate-update-feed.mjs",
+        "scripts/promote-extension-release.sh",
+        "scripts/release-extension.sh"
+      ]
+    },
+    {
+      "commit": "517afeffe6fbddd099d6c896779a193dff79af93",
+      "date": "2026-07-21",
+      "subject": "feat(sprint-98): copy-then-overlay installer \u2014 an update can no longer ship a partial extension",
+      "files": [
+        "extensions/ritemark/src/update/bundledExtensionPath.ts",
+        "extensions/ritemark/src/update/updateManifest.ts",
+        "extensions/ritemark/src/update/userExtensionInstaller.ts"
+      ]
+    },
+    {
+      "commit": "a6d2dc18bc3d74540956c842c574428fbf7ce1e5",
+      "date": "2026-07-21",
+      "subject": "feat(sprint-98): patch 012 shell watchdog \u2014 quarantine broken user-dir extension",
+      "files": [
+        "patches/vscode/012-ritemark-shell-watchdog.patch"
+      ]
+    },
+    {
+      "commit": "6e863145a69c84be2fb3ba4c0f5bee74ea9a9e60",
+      "date": "2026-07-16",
+      "subject": "fix(sprint-97): multi-block comment = one comment (#150) + dark hover contrast (#151)",
+      "files": [
+        "extensions/ritemark/webview/src/components/FormattingBubbleMenu.tsx",
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx",
+        "extensions/ritemark/webview/src/extensions/comment/CommentMark.ts",
+        "extensions/ritemark/webview/src/extensions/comment/CommentNode.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentTurndownRules.ts"
+      ]
+    },
+    {
+      "commit": "80b7848a11e40d1c179aeda8cf2dd0b3959c6b68",
+      "date": "2026-07-16",
+      "subject": "fix: add \"Check again\" to AI Offline badge (#125)",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/OfflineBanner.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "ae90079d06e406a81de614000d5fbd5892c2cc11",
+      "date": "2026-07-15",
+      "subject": "feat(sprint-96): bump Codex runtime 0.135.0 \u2192 0.144.4 for GPT-5.6 (partial #146)",
+      "files": [
+        "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts"
+      ]
+    },
+    {
+      "commit": "f2772f800e319e9293ec10ea3e93b00b302de489",
+      "date": "2026-07-15",
+      "subject": "fix(sprint-95): text-work bugfixes for v1.8.3 (#103, #135, #142)",
+      "files": [
+        "extensions/ritemark/src/update/updateService.ts",
+        "extensions/ritemark/src/update/userExtensionInstaller.ts",
+        "extensions/ritemark/src/update/versionComparison.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "scripts/build-prod-windows.sh",
+        "scripts/build-prod.sh",
+        "scripts/floor-bundled-extension.sh"
+      ]
+    },
+    {
+      "commit": "5f3e29410af0dd643735d4e57fe9cce6ad4ee4ec",
+      "date": "2026-07-15",
+      "subject": "fix(webview): cache-bust webview.js with ?v=<mtime> so rebuilds actually load (#81)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts"
+      ]
+    },
+    {
+      "commit": "2f88fb22a5f00620209cbac09602b0c07b8c7051",
+      "date": "2026-07-15",
+      "subject": "fix: default dictation chunk duration to 5s for better Estonian accuracy (#136)",
+      "files": [
+        "extensions/ritemark/webview/src/components/DictationSettingsModal.tsx"
+      ]
+    },
+    {
+      "commit": "af43d451eba667f55c2edabd220518520ef2f660",
+      "date": "2026-07-15",
+      "subject": "fix(comments): assign the agent from an @mention anywhere in the note (#81)",
+      "files": [
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx",
+        "extensions/ritemark/webview/src/extensions/comment/CommentNode.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentMarkedExtension.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentModel.ts"
+      ]
+    },
+    {
+      "commit": "a630d52f70804c27a8e00f488e4e62e0bf7cd699",
+      "date": "2026-07-15",
+      "subject": "feat(comments): inline @mention chip, drop the separate agent badge (#81)",
+      "files": [
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx"
+      ]
+    },
+    {
+      "commit": "45eb37ddaf7638ef7e1e53ad01e2d44112944c1b",
+      "date": "2026-07-15",
+      "subject": "feat(comments): edit an existing comment from the rail bubble (#81)",
+      "files": [
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx"
+      ]
+    },
+    {
+      "commit": "7a8d009ff607dff7899095f2fc8baa03da991b15",
+      "date": "2026-07-15",
+      "subject": "feat(comments): Sprint 94 Gate B \u2014 Send-to-AI relay + audit polish (#81)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "extensions/ritemark/webview/src/extensions/comment/CommentNode.ts"
+      ]
+    },
+    {
+      "commit": "ca59e7569b21dab9594888527d23f430427a02fc",
+      "date": "2026-07-15",
+      "subject": "feat(comments): Sprint 94 comment callouts \u2014 anchored + /// margin notes (#81)",
+      "files": [
+        "extensions/ritemark/src/export/v2/htmlPipeline.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/components/FormattingBubbleMenu.tsx",
+        "extensions/ritemark/webview/src/components/MarginCommentRail.tsx",
+        "extensions/ritemark/webview/src/extensions/comment/CommentMark.ts",
+        "extensions/ritemark/webview/src/extensions/comment/CommentNode.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentMarkedExtension.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentModel.ts",
+        "extensions/ritemark/webview/src/extensions/comment/commentTurndownRules.ts"
+      ]
+    },
+    {
+      "commit": "17046ad9bab280801444c4fe59beb8a5445df253",
+      "date": "2026-07-12",
+      "subject": "fix(sprint-93): address pr-reviewer findings on PR #141",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/update/userExtensionInstaller.ts",
+        "scripts/release-extension.sh"
+      ]
+    },
+    {
+      "commit": "daf88b2892f145f5faaedad921657e468bb7f2e2",
+      "date": "2026-07-12",
+      "subject": "fix(sprint-93): address pr-reviewer findings",
+      "files": [
+        "scripts/release-extension.sh"
+      ]
+    },
+    {
+      "commit": "f85544e4c95e85b45760b390d67c651221a5f4d3",
+      "date": "2026-07-12",
+      "subject": "feat(sprint-93): W3.5 - rollback safety (N-1 retention + activation integrity)",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/update/activationIntegrity.ts",
+        "extensions/ritemark/src/update/index.ts",
+        "extensions/ritemark/src/update/userExtensionInstaller.ts"
+      ]
+    },
+    {
+      "commit": "92402f99528804eb2c79beb423721dc50f7b8460",
+      "date": "2026-07-12",
+      "subject": "docs+test(sprint-93): W3.4 - confirm apply-on-next-start mechanism, regression test",
+      "files": []
+    },
+    {
+      "commit": "a30989e0110553cd1f567599d62344660bb72ffe",
+      "date": "2026-07-12",
+      "subject": "feat(sprint-93): W3.1-W3.3 - silent extension updates + relaunch status bar",
+      "files": [
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/update/index.ts",
+        "extensions/ritemark/src/update/updateService.ts",
+        "extensions/ritemark/src/update/updateStatusBar.ts"
+      ]
+    },
+    {
+      "commit": "80d4809b68602c23e3ab7f73b9cb0180e431b621",
+      "date": "2026-07-12",
+      "subject": "feat(sprint-93): W2 - one-command extension release, fixed file enumeration",
+      "files": [
+        "scripts/release-extension-preflight.sh"
+      ]
+    },
+    {
+      "commit": "031b6d6fe45cd4d880359afe89e5af54458fdc64",
+      "date": "2026-07-12",
+      "subject": "fix(sprint-92): address qa-validator findings - audit doc, test gap, dep dedup",
+      "files": [
+        "extensions/ritemark/src/utils/bundledAgentRuntime.ts"
+      ]
+    },
+    {
+      "commit": "a345e091a3ed211aa9ca3f865adb53acd3b8f567",
+      "date": "2026-07-10",
+      "subject": "feat(sprint-92): esbuild-bundle the extension host (#105)",
+      "files": [
+        "extensions/ritemark/src/runtime/BrowserToolsInjector.ts",
+        "extensions/ritemark/src/utils/bundledAgentRuntime.ts",
+        "scripts/build-prod.sh",
+        "scripts/validate-build-env.sh",
+        "scripts/validate-build-output.sh"
+      ]
+    },
+    {
+      "commit": "86511d1de77846a9e2000c1b53d4d1882c15919b",
+      "date": "2026-07-11",
+      "subject": "fix(sprint-91): restore File Browser title lost in patch 002 regen",
+      "files": [
+        "patches/vscode/002-ritemark-ui-layout.patch"
+      ]
+    },
+    {
+      "commit": "c9e8220bfbdebf246c22ca32bbd97dbf8b1a71af",
+      "date": "2026-07-11",
+      "subject": "feat(sprint-91): W1-5 signing verification in validate-build-output.sh",
+      "files": [
+        "scripts/validate-build-output.sh"
+      ]
+    },
+    {
+      "commit": "dacc1d49db3f082e9e942dcb1c074c288f0c56bb",
+      "date": "2026-07-11",
+      "subject": "feat(sprint-91): W1 Windows code-signing wiring + SAC workaround doc",
+      "files": [
+        "scripts/codesign-windows.sh"
+      ]
+    },
+    {
+      "commit": "c6a8891dc9009a83c33ea03d43676a4fe4416e2f",
+      "date": "2026-07-11",
+      "subject": "feat(sprint-91): W3 File Browser buttons always visible + W2 OneDrive error fix",
+      "files": [
+        "patches/vscode/002-ritemark-ui-layout.patch",
+        "patches/vscode/011-ritemark-cloud-file-error.patch"
+      ]
+    },
+    {
+      "commit": "9a8b8fe4c978985d235dd95e6f541d6aa6ecf8c4",
+      "date": "2026-07-01",
+      "subject": "feat(sprint-89): model gateway \u2014 live resolver + publishable catalog (#109)",
+      "files": [
+        "extensions/ritemark/src/agent/claudeModels.ts",
+        "extensions/ritemark/src/agent/index.ts",
+        "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts",
+        "extensions/ritemark/src/ai/modelCatalog/index.ts",
+        "extensions/ritemark/src/ai/modelCatalog/providerDiscovery.ts",
+        "extensions/ritemark/src/ai/modelCatalog/remoteSource.ts",
+        "extensions/ritemark/src/ai/modelCatalog/resolver.ts",
+        "extensions/ritemark/src/ai/modelCatalog/schema.ts",
+        "extensions/ritemark/src/ai/modelConfig.ts",
+        "extensions/ritemark/src/codex/codexModels.ts",
+        "extensions/ritemark/src/codex/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/flows/FlowEditorProvider.ts",
+        "extensions/ritemark/src/flows/nodes/LLMNodeExecutor.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "2f02263ca85fbb7361e1d7de04614fa7d90661d1",
+      "date": "2026-07-02",
+      "subject": "fix(image): allow inserting SVG via image picker (Sprint 90 R6)",
+      "files": [
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/utils/imageWriter.ts"
+      ]
+    },
+    {
+      "commit": "249239d2a00a239309a641e75df56e9e24453bb0",
+      "date": "2026-07-02",
+      "subject": "feat(export): SVG/draw.io export integrity + atomic saveAsMarkdown (#127, #76)",
+      "files": [
+        "extensions/ritemark/src/export/saveAsMarkdown.ts",
+        "extensions/ritemark/src/export/v2/imageSource.ts",
+        "extensions/ritemark/src/export/v2/pdfHtmlExporter.ts",
+        "extensions/ritemark/src/export/v2/wordHtmlExporter.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/lib/mermaid.ts",
+        "extensions/ritemark/webview/src/lib/svgRasterExport.ts"
+      ]
+    },
+    {
+      "commit": "8d433107db52c04d799a6a09b0f75c6b42b1cfee",
+      "date": "2026-06-10",
+      "subject": "fix(sprint-80): delegate microphone to webview iframes + honest dictation errors",
+      "files": [
+        "extensions/ritemark/webview/src/hooks/useVoiceDictation.ts",
+        "patches/vscode/004-ritemark-build-system.patch",
+        "scripts/codesign-app.sh"
+      ]
+    },
+    {
+      "commit": "e04485cfd4e2dcd03efef67ed67ecfea378aa8aa",
+      "date": "2026-06-12",
+      "subject": "feat(drawio): autosave, live embed refresh, insert handshake, double-click UX",
+      "files": [
+        "extensions/ritemark/src/drawioEditorProvider.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/components/Editor.tsx",
+        "extensions/ritemark/webview/src/components/ResizableImage.tsx"
+      ]
+    },
+    {
+      "commit": "4d5a5c3902dff32eb8a7243fbfa9affba5c8b8ff",
+      "date": "2026-06-12",
+      "subject": "fix(drawio): reset VS Code's default webview body padding (20px right overflow)",
+      "files": [
+        "extensions/ritemark/src/drawioEditorProvider.ts"
+      ]
+    },
+    {
+      "commit": "a6d8d6e8d60777f06fcb43aa306b9e5d2aa8f5bb",
+      "date": "2026-06-12",
+      "subject": "fix(drawio): host the app in the webview document \u2014 iframe hosting cannot work",
+      "files": [
+        "extensions/ritemark/src/drawioEditorProvider.ts",
+        "scripts/vendor-drawio.sh"
+      ]
+    },
+    {
+      "commit": "a454d947004388770562cb0fff5f5d87711c67ed",
+      "date": "2026-06-10",
+      "subject": "feat(sprint-82): draw.io diagram embedding \u2014 editor, click-to-edit, /diagram command (R1, R3-R5)",
+      "files": [
+        "extensions/ritemark/src/drawioEditorProvider.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/webview/src/components/ResizableImage.tsx",
+        "extensions/ritemark/webview/src/components/ui/Icon.tsx",
+        "extensions/ritemark/webview/src/extensions/blockItems.ts"
+      ]
+    },
+    {
+      "commit": "1df0f7cd5cebcb186415e2749dae36bc6c6fdbd5",
+      "date": "2026-06-10",
+      "subject": "feat(sprint-82): vendor draw.io v30.0.4 offline bundle (R2)",
+      "files": [
+        "scripts/vendor-drawio.sh"
+      ]
+    },
+    {
+      "commit": "4519d5a86f16fc0fd1743d0c303f86662ccecd01",
+      "date": "2026-06-11",
+      "subject": "fix(excel): UI polish round 2 + sprint renumber 80\u219281",
+      "files": [
+        "extensions/ritemark/webview/src/components/DataTable.tsx",
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx"
+      ]
+    },
+    {
+      "commit": "5b4d6227a6b5079526b8cda9fc7e8abed7b3d3cc",
+      "date": "2026-06-11",
+      "subject": "fix(excel): PR #115 review round \u2014 shadcn buttons + user doc update",
+      "files": [
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx"
+      ]
+    },
+    {
+      "commit": "a94b59016c3b5027706a77aeceee5a276e19407e",
+      "date": "2026-06-10",
+      "subject": "Anchor Excel grid at A1 so row numbers match real cell addresses",
+      "files": [
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx"
+      ]
+    },
+    {
+      "commit": "2c5613e8ea54376b3ea895382988819a24249e4e",
+      "date": "2026-06-10",
+      "subject": "Address PR #115 review: dirty-refresh confirm + empty-sheet editing",
+      "files": [
+        "extensions/ritemark/src/excelEditorProvider.ts",
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx"
+      ]
+    },
+    {
+      "commit": "ca72c0f9acbb39760b9a4c9fbea28243301eeb8f",
+      "date": "2026-06-10",
+      "subject": "Add basic Excel editing and fix multi-sheet selector (#110)",
+      "files": [
+        "extensions/ritemark/src/excelDocument.ts",
+        "extensions/ritemark/src/excelEditorProvider.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/SpreadsheetViewer.tsx"
+      ]
+    },
+    {
+      "commit": "00df767e5f3e38961b73fddefe828a47b8c4fcf6",
+      "date": "2026-06-10",
+      "subject": "feat(daemon): Sprint 80 hardening \u2014 runtime factory, schedule picker, approve UX, tests",
+      "files": [
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/cron.ts",
+        "extensions/ritemark/src/daemon/handlers/AgentTaskHandler.ts",
+        "extensions/ritemark/src/daemon/handlers/GitSyncHandler.ts",
+        "extensions/ritemark/src/daemon/handlers/ScriptHandler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/runtime/index.ts",
+        "extensions/ritemark/src/runtime/runtimeFactory.ts",
+        "extensions/ritemark/src/views/AgentLibraryViewProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx",
+        "extensions/ritemark/webview/src/components/agent/ScheduleEditor.tsx",
+        "extensions/ritemark/webview/src/components/agent/cronSchedule.ts"
+      ]
+    },
+    {
+      "commit": "27ca7ad4ddf4f74100653d491a6c7adfc2b84753",
+      "date": "2026-06-08",
+      "subject": "feat(daemon): enable scheduled-tasks-daemon by default (status: stable)",
+      "files": [
+        "extensions/ritemark/src/features/flags.ts"
+      ]
+    },
+    {
+      "commit": "628fb43a635ad107b5ec67db2cc3cffba04b70b7",
+      "date": "2026-06-08",
+      "subject": "fix(daemon): address Codex PR review + complete frontmatter round-trip",
+      "files": [
+        "extensions/ritemark/src/agent/discovery.ts",
+        "extensions/ritemark/src/daemon/DaemonResultStore.ts",
+        "extensions/ritemark/src/daemon/DaemonStatusEvents.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts"
+      ]
+    },
+    {
+      "commit": "0f1903f04c531b0fa004ca7554ed29cae774b033",
+      "date": "2026-06-08",
+      "subject": "fix(daemon): address Codex PR review \u2014 schedule serialization, concurrent-run guard, review count accuracy",
+      "files": [
+        "extensions/ritemark/src/agent/discovery.ts",
+        "extensions/ritemark/src/daemon/DaemonResultStore.ts",
+        "extensions/ritemark/src/daemon/DaemonStatusEvents.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/index.ts"
+      ]
+    },
+    {
+      "commit": "5779a9b3b6a25ee550849df161b6eb00809200ff",
+      "date": "2026-06-08",
+      "subject": "fix(daemon): correctness pass on Sprint 80 \u2014 isolation, approval gate, flag gate",
+      "files": [
+        "extensions/ritemark/src/daemon/AgentDaemon.ts",
+        "extensions/ritemark/src/daemon/DaemonSession.ts",
+        "extensions/ritemark/src/daemon/ScheduledTask.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/handlers/AgentTaskHandler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx"
+      ]
+    },
+    {
+      "commit": "27f81698965f7cd6a9050afcc33e24c998914bf5",
+      "date": "2026-06-08",
+      "subject": "feat(daemon): wire Sprint 79 runtime \u2014 real AgentTaskHandler + schedule editor field",
+      "files": [
+        "extensions/ritemark/src/daemon/ScheduledTask.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/handlers/AgentTaskHandler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx"
+      ]
+    },
+    {
+      "commit": "6a6f2cfcee5c8c12b91b42c3ce2a8478e0cf669a",
+      "date": "2026-06-08",
+      "subject": "feat(daemon): Agent Library SCHEDULED section \u2014 run history UI",
+      "files": [
+        "extensions/ritemark/src/daemon/DaemonResultStore.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/views/AgentLibraryViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "b714dd2cadc0a63d18a1bbee3ac014b53392fda7",
+      "date": "2026-06-07",
+      "subject": "feat(daemon): Sprint 80 scheduled tasks daemon infra \u2014 Sprint 79-independent",
+      "files": [
+        "extensions/ritemark/src/daemon/DaemonResultStore.ts",
+        "extensions/ritemark/src/daemon/DaemonStatusEvents.ts",
+        "extensions/ritemark/src/daemon/ScheduledTask.ts",
+        "extensions/ritemark/src/daemon/Scheduler.ts",
+        "extensions/ritemark/src/daemon/handlers/AgentTaskHandler.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/daemon/scheduleParser.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/features/flags.ts"
+      ]
+    },
+    {
+      "commit": "67b76377bd3ea6d3ea7e10a2379bb9e62d9a9de6",
+      "date": "2026-06-08",
+      "subject": "fix(sprint-79): address Codex review \u2014 cancel correct runtime + forward browser opt-out",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "f903e3d4710c07d1ff8addf8486ad60d062f80f0",
+      "date": "2026-06-08",
+      "subject": "fix(sprint-79): unified approval policy (Auto/Ask/Plan) + restore dropped per-turn context",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/UnifiedConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "4201a18295942ca04e813d0bcdc4d9a38472dfcb",
+      "date": "2026-06-08",
+      "subject": "fix(sprint-79): wire browser tools (S7) in agent-execute handler",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "90c34a839807d2e22487df2b8efbeb3d0e8e159a",
+      "date": "2026-06-08",
+      "subject": "fix(sprint-79): wire all lifecycle callbacks in agent-execute handler",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "48b5b0f1d77517ceb912a15f82a6ead6666f1a27",
+      "date": "2026-06-08",
+      "subject": "feat(sprint-79): W5+W7 \u2014 file attachments, model config consolidation, debt cleanup",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/agent/index.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/ai/modelConfig.ts",
+        "extensions/ritemark/src/features/flags.ts"
+      ]
+    },
+    {
+      "commit": "da997d4cd7c784b9eef6ac8e4333f9c16b6054bd",
+      "date": "2026-06-08",
+      "subject": "feat(sprint-79): runtime unification \u2014 AgentRuntime interface + registry + unified dispatch",
+      "files": [
+        "extensions/ritemark/src/acp/AcpRuntime.ts",
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts",
+        "extensions/ritemark/src/browser/BrowserIpcServer.ts",
+        "extensions/ritemark/src/browser/browserMcpAdapter.ts",
+        "extensions/ritemark/src/codex/CodexRuntime.ts",
+        "extensions/ritemark/src/codex/index.ts",
+        "extensions/ritemark/src/daemon/AgentDaemon.ts",
+        "extensions/ritemark/src/daemon/DaemonResultStore.ts",
+        "extensions/ritemark/src/daemon/DaemonSession.ts",
+        "extensions/ritemark/src/daemon/DaemonStatusEvents.ts",
+        "extensions/ritemark/src/daemon/index.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/runtime/AgentRuntime.ts",
+        "extensions/ritemark/src/runtime/BrowserToolsInjector.ts",
+        "extensions/ritemark/src/runtime/RuntimeRegistry.ts",
+        "extensions/ritemark/src/runtime/UnifiedApprovalGate.ts",
+        "extensions/ritemark/src/runtime/index.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts"
+      ]
+    },
+    {
+      "commit": "457db50e9e82a81dcfd30703330d5327ee5c9474",
+      "date": "2026-06-06",
+      "subject": "fix(ci): wrap fs.promises with EMFILE retry for Windows gulp build",
+      "files": []
+    },
+    {
+      "commit": "c245697eba7520721cbd0bfd0009022d1b2011a7",
+      "date": "2026-06-03",
+      "subject": "fix(sprint-78): show plan content in Claude plan-approval card",
+      "files": [
+        "extensions/ritemark/src/agent/AgentRunner.ts",
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts"
+      ]
+    },
+    {
+      "commit": "3df9d6c48f5249b2626cdd5207d4f919c0eededc",
+      "date": "2026-06-03",
+      "subject": "fix(sprint-78): refresh annotation screenshot chip on same-URL viewport changes (Codex P2)",
+      "files": [
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "6809186170bc5225ab3605f55ecf48d19a4c8cd8",
+      "date": "2026-06-03",
+      "subject": "fix(sprint-78): gate browser_snapshot on read-share consent (Codex P1)",
+      "files": [
+        "extensions/ritemark/src/browser/browserMcpServer.ts",
+        "extensions/ritemark/src/browser/codexBrowserTools.ts",
+        "patches/vscode/010-ritemark-browser-action-bridge.patch"
+      ]
+    },
+    {
+      "commit": "42ab5e549473049fd3f430a162f4c1f626808bee",
+      "date": "2026-06-03",
+      "subject": "fix(sprint-78): refresh OpenCode provider flags when BYOK keys change (stretch)",
+      "files": [
+        "extensions/ritemark/src/acp/acpKeyEnv.ts",
+        "extensions/ritemark/src/acp/index.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "9242f281be55a1c322b3ea7a1f00b2a2183a1f0d",
+      "date": "2026-06-02",
+      "subject": "fix(sprint-78): repair corrupt patch 010 hunk headers + rebuild webview bundle",
+      "files": [
+        "patches/vscode/010-ritemark-browser-action-bridge.patch"
+      ]
+    },
+    {
+      "commit": "6e05b0ae4cbe6deb417f3b9543e62046d5c7c9c5",
+      "date": "2026-06-02",
+      "subject": "feat(sprint-77): rebuild agent configurator on real Claude Code schema + library fixes",
+      "files": [
+        "extensions/ritemark/src/agent/cronUtils.ts",
+        "extensions/ritemark/src/agent/discovery.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/views/AgentLibraryViewProvider.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx",
+        "extensions/ritemark/webview/src/components/agent/ScheduleField.tsx",
+        "extensions/ritemark/webview/src/components/agent/agentSchema.ts",
+        "extensions/ritemark/webview/src/components/agent/index.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/LegacyConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/SelectedContextTab.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "extensions/ritemark/webview/src/components/header/DocumentHeader.tsx",
+        "extensions/ritemark/webview/src/components/ui/textarea.tsx",
+        "extensions/ritemark/webview/src/extensions/FileLinkSuggestionList.tsx",
+        "extensions/ritemark/webview/src/extensions/FileLinkSuggestions.tsx"
+      ]
+    },
+    {
+      "commit": "e4186ffcc65d515db81880104f009e1094c9564a",
+      "date": "2026-06-02",
+      "subject": "feat(browser): add browser_snapshot MCP tool + annotation screenshot chip (#88, #73)",
+      "files": [
+        "extensions/ritemark/src/browser/BrowserActionTools.ts",
+        "extensions/ritemark/src/browser/browserMcpServer.ts",
+        "extensions/ritemark/src/browser/codexBrowserTools.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "patches/vscode/010-ritemark-browser-action-bridge.patch"
+      ]
+    },
+    {
+      "commit": "06462d79444c444e2c0ae687caffd91df5583223",
+      "date": "2026-06-02",
+      "subject": "fix(release): sign bundled AI agent binaries under our Developer ID",
+      "files": [
+        "scripts/codesign-app.sh"
+      ]
+    },
+    {
+      "commit": "4a88f54e15fbf0dcb08567f8f2896855e33bd4aa",
+      "date": "2026-06-01",
+      "subject": "feat(sprint-77): Unified Agent Library + Agent Configurator Panel (R1-R8)",
+      "files": [
+        "extensions/ritemark/src/agent/cronUtils.ts",
+        "extensions/ritemark/src/agent/discovery.ts",
+        "extensions/ritemark/src/agent/iconPack.ts",
+        "extensions/ritemark/src/extension.ts",
+        "extensions/ritemark/src/ritemarkEditor.ts",
+        "extensions/ritemark/src/views/AgentLibraryViewProvider.ts",
+        "extensions/ritemark/webview/src/App.tsx",
+        "extensions/ritemark/webview/src/components/agent/AgentConfiguratorPanel.tsx",
+        "extensions/ritemark/webview/src/components/agent/ProvenanceBadge.tsx",
+        "extensions/ritemark/webview/src/components/agent/ScheduleField.tsx",
+        "extensions/ritemark/webview/src/components/agent/index.ts"
+      ]
+    },
+    {
+      "commit": "a9bf3ac507f74fc701849b8e672b77e0ce6a4b14",
+      "date": "2026-06-01",
+      "subject": "fix(sprint-76): single approval per edit + coalesce OpenCode reasoning",
+      "files": [
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "be54dcef437fbff41710c3bfcd7fee50422d1c44",
+      "date": "2026-06-01",
+      "subject": "feat(sprint-76): OpenCode/ACP webview \u2014 model picker, settings, approvals (checkpoint)",
+      "files": [
+        "extensions/ritemark/src/acp/acpFsProxy.ts",
+        "extensions/ritemark/src/ai/modelConfig.ts",
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/utils/runtimeTrace.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AISidebar.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/AgentSelector.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/OpenCodeSetupView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/UnifiedConversationView.tsx",
+        "extensions/ritemark/webview/src/components/ai-sidebar/store.ts",
+        "extensions/ritemark/webview/src/components/ai-sidebar/types.ts",
+        "extensions/ritemark/webview/src/components/settings/RitemarkSettings.tsx"
+      ]
+    },
+    {
+      "commit": "e92c2a4e92d2109483e3fb5359e1dbd16d75954c",
+      "date": "2026-06-01",
+      "subject": "feat(sprint-76): Phases 3-6 host side \u2014 keys, dispatch, models, flag (R3a/R4/R5/R6/R7)",
+      "files": [
+        "extensions/ritemark/src/acp/acpKeyEnv.ts",
+        "extensions/ritemark/src/acp/index.ts",
+        "extensions/ritemark/src/ai/modelConfig.ts",
+        "extensions/ritemark/src/features/flags.ts",
+        "extensions/ritemark/src/flows/FlowEditorProvider.ts",
+        "extensions/ritemark/src/settings/RitemarkSettingsProvider.ts",
+        "extensions/ritemark/src/views/UnifiedViewProvider.ts"
+      ]
+    },
+    {
+      "commit": "454f98c82e05d8b291d0971aae44ae694e36983c",
+      "date": "2026-06-01",
+      "subject": "feat(sprint-76): Phase 2 \u2014 OpenCode bundling & runtime discovery (R2)",
+      "files": [
+        "extensions/ritemark/src/agent/types.ts",
+        "extensions/ritemark/src/utils/bundledAgentRuntime.ts",
+        "scripts/fetch-agent-runtimes.sh"
+      ]
+    },
+    {
+      "commit": "6b009ee562ac6e91fcf813ffa59ea643cb9d5b25",
+      "date": "2026-06-01",
+      "subject": "feat(sprint-76): Phase 1 \u2014 ACP client core (R1)",
+      "files": [
+        "extensions/ritemark/src/acp/acpClient.ts",
+        "extensions/ritemark/src/acp/acpFsProxy.ts",
+        "extensions/ritemark/src/acp/acpManager.ts",
+        "extensions/ritemark/src/acp/acpTrace.ts",
+        "extensions/ritemark/src/acp/index.ts"
+      ]
+    },
+    {
+      "commit": "e9285ab6d6d04a3319d3c66cd38854e33fde2aa8",
+      "date": "2026-06-01",
+      "subject": "fix(sprint-74): respect composer queue for @mentions + slash commands (#82)",
+      "files": [
+        "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx"
+      ]
+    },
+    {
+      "commit": "670d48b25c47599fa7322bba9a75cfccab7f21aa",
+      "date": "2026-06-01",
+      "subject": "fix(sprint-74): pre-fill link Display Text when editing existing link (#93)",
+      "files": [
+        "extensions/ritemark/webview/src/components/FormattingBubbleMenu.tsx"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "method": "Fresh normal-mode app process after verified closure of both writers. Read the same on-disk fixtures through actual newly constructed controllers; no seed, race, preference or completion operation is replayed.",
+  "at": 1789300832325,
+  "pid": 21662,
+  "previousPid": 15957,
+  "hosts": [
+    {
+      "at": 1789300832328,
+      "hostPid": 21875,
+      "driverMode": 1,
+      "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+      "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage",
+      "workspaceFile": null,
+      "workspaceFolders": [],
+      "hotExit": "onExit",
+      "autoSave": "off",
+      "ritemark": {
+        "active": true,
+        "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+        "version": "1.10.1"
+      },
+      "documents": [],
+      "tabs": [
+        {
+          "active": true,
+          "viewColumn": 1,
+          "tabs": []
+        }
+      ],
+      "terminals": [
+        "bash"
+      ]
+    }
+  ],
+  "readbacks": [
+    {
+      "hostPid": 21875,
+      "inspector": {
+        "hostPid": 21875,
+        "productModuleCached": true,
+        "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/out/extension.js",
+        "providerClass": "_UnifiedViewProvider",
+        "controllerClass": "ConversationController",
+        "storeClass": "ConversationStore",
+        "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage/ritemark.ritemark/conversations/v1",
+        "scope": {
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "descriptor": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          }
+        },
+        "runtimeSessionCount": 0,
+        "interception": null
+      },
+      "records": [
+        {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000001",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 1",
+          "identityColorSlot": 0,
+          "createdAt": "2026-09-13T11:56:03.306Z",
+          "lastActivityAt": "2026-09-13T11:56:03.306Z",
+          "revision": 3,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "working",
+            "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000001"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000001",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000001",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.305Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {
+              "codex": "high",
+              "claude-code": "low"
+            }
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000002",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 2",
+          "identityColorSlot": 1,
+          "createdAt": "2026-09-13T11:56:03.320Z",
+          "lastActivityAt": "2026-09-13T11:56:03.320Z",
+          "revision": 3,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "working",
+            "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000002"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000002",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000002",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.320Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {
+              "codex": "high",
+              "claude-code": "low"
+            }
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000003",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 3",
+          "identityColorSlot": 2,
+          "createdAt": "2026-09-13T11:56:03.655Z",
+          "lastActivityAt": "2026-09-13T11:56:03.655Z",
+          "revision": 2,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "working",
+            "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000003"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000003",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000003",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.653Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {
+              "claude-code": "low"
+            }
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000004",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 4",
+          "identityColorSlot": 3,
+          "createdAt": "2026-09-13T11:56:03.787Z",
+          "lastActivityAt": "2026-09-13T11:56:03.787Z",
+          "revision": 3,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "working",
+            "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000004"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000004",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.787Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {
+              "codex": "auto"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "artifacts": {
+    "out/extension.js": {
+      "bytes": 4915383,
+      "sha256": "d8a4f5a0403f70aaf4941df2d84e57931a970b3e000af7e487c4d0a9736e15ff"
+    },
+    "media/webview.js": {
+      "bytes": 8844955,
+      "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+    },
+    "package.json": {
+      "bytes": 34089,
+      "sha256": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605"
+    }
+  },
+  "view": {
+    "userPromptVisible": true,
+    "assistantResultVisible": false,
+    "workingVisible": false
+  },
+  "completed": true
+}

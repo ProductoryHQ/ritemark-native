@@ -1,0 +1,108 @@
+{
+  "method": "Actual source classes, injected filesystem barrier for conversation writes, actual local filesystem for transcript writes, shared synthetic schedule state for two scheduler instances. Component reproductions, not an Electron/Windows end-to-end claim.",
+  "node": "v22.22.1",
+  "platform": "darwin",
+  "conversation": {
+    "successfulWriters": 2,
+    "returnedRevisions": [
+      2,
+      2
+    ],
+    "durableRevision": 2,
+    "retainedActorEvents": [
+      "actor-b"
+    ],
+    "lostAcknowledgedEvent": true
+  },
+  "singleStoreControl": {
+    "firstAttemptOutcomes": [
+      "fulfilled",
+      "rejected"
+    ],
+    "durableRevisionAfterExplicitRetry": 3,
+    "retainedActorEvents": [
+      "actor-a",
+      "actor-b"
+    ]
+  },
+  "transcript": {
+    "trials": [
+      {
+        "outcomes": [
+          "ENOENT",
+          "fulfilled"
+        ],
+        "durableLabel": "actor-a"
+      },
+      {
+        "outcomes": [
+          "ENOENT",
+          "fulfilled"
+        ],
+        "durableLabel": "actor-a"
+      },
+      {
+        "outcomes": [
+          "fulfilled",
+          "ENOENT"
+        ],
+        "durableLabel": "actor-b"
+      },
+      {
+        "outcomes": [
+          "fulfilled",
+          "ENOENT"
+        ],
+        "durableLabel": "actor-b"
+      },
+      {
+        "outcomes": [
+          "ENOENT",
+          "fulfilled"
+        ],
+        "durableLabel": "actor-a"
+      },
+      {
+        "outcomes": [
+          "fulfilled",
+          "ENOENT"
+        ],
+        "durableLabel": "actor-b"
+      },
+      {
+        "outcomes": [
+          "ENOENT",
+          "fulfilled"
+        ],
+        "durableLabel": "actor-a"
+      },
+      {
+        "outcomes": [
+          "ENOENT",
+          "fulfilled"
+        ],
+        "durableLabel": "actor-a"
+      },
+      {
+        "outcomes": [
+          "fulfilled",
+          "ENOENT"
+        ],
+        "durableLabel": "actor-b"
+      },
+      {
+        "outcomes": [
+          "fulfilled",
+          "ENOENT"
+        ],
+        "durableLabel": "actor-b"
+      }
+    ],
+    "failedSaves": 10
+  },
+  "scheduler": {
+    "schedulerInstances": 2,
+    "sharedScheduleState": true,
+    "executionsInSameSlot": 2
+  }
+}

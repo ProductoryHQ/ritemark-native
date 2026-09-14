@@ -1,0 +1,19 @@
+{
+  "method": "Selected synthetic-profile log evidence. Startup timing/host messages are observations without CPU attribution; second-window CDP bind warning came from the audit CLI args, not a demonstrated normal user action.",
+  "rendererFirstLaunch": [
+    "2026-09-13 13:33:23.869 [info] Started local extension host with pid 52261.",
+    "2026-09-13 13:33:23.874 [info] Started initializing default profile extensions in extensions installation folder. file:///private/tmp/ritemark-audit-normal-bg5jgmun/extensions",
+    "2026-09-13 13:33:24.018 [info] Completed initializing default profile extensions in extensions installation folder. file:///private/tmp/ritemark-audit-normal-bg5jgmun/extensions",
+    "2026-09-13 13:33:24.132 [error] Problems processing product icons definitions in file:///private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/producticons/ritemark-product-icon-theme.json:",
+    "Invalid font weight in font 'phosphor-400'. Ignoring setting.",
+    "2026-09-13 13:33:26.630 [info] [perf] Render performance baseline is 9ms",
+    "2026-09-13 13:33:29.367 [info] Extension host (LocalProcess pid: 52261) is unresponsive.",
+    "2026-09-13 13:33:29.556 [info] Extension host (LocalProcess pid: 52261) is responsive.",
+    "2026-09-13 13:33:29.640 [info] UNRESPONSIVE extension host: received responsive event and cancelling profiling session",
+    "2026-09-13 13:33:29.869 [info] UNRESPONSIVE extension host: starting to profile NOW"
+  ],
+  "cliPortMessages": [
+    "[56613:0913/133926.738101:ERROR:net/socket/socket_posix.cc:153] bind() failed: Address already in use (48)",
+    "[56613:0913/133926.738223:ERROR:content/browser/devtools/devtools_http_handler.cc:310] Cannot start http server for devtools."
+  ]
+}

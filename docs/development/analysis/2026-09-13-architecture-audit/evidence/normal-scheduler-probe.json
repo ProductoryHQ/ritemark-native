@@ -1,0 +1,339 @@
+{
+  "method": "Actual FlowSchedulers in the two normal-mode extension hosts. A new daily schedule for the current local minute is within the ordinary five-minute grace window. Existing experimental flag enabled only in the synthetic profile for the probe, then restored. The only side effect is SaveFile of the trigger object to unique local timestamp files. Read actual VS Code workspaceState SQLite records read-only; no mocked scheduler clock, storage or executor.",
+  "flowPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/.ritemark/flows/audit-normal-schedule-1789296197736.flow.json",
+  "flow": {
+    "id": "audit-normal-schedule-1789296197736",
+    "name": "Audit duplicate schedule",
+    "description": "Synthetic audit fixture: trigger to local Save File only; no agent, external service or user files.",
+    "version": 1,
+    "created": "2026-09-13T10:43:17.736Z",
+    "modified": "2026-09-13T10:43:17.736Z",
+    "inputs": [],
+    "schedule": {
+      "enabled": false,
+      "type": "daily",
+      "time": "13:43"
+    },
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "label": "Synthetic trigger",
+          "inputs": []
+        }
+      },
+      {
+        "id": "save",
+        "type": "save-file",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "data": {
+          "label": "Audit local output",
+          "sourceNodeId": "trigger",
+          "format": "markdown",
+          "folder": "audit-schedule-results-audit-normal-schedule-1789296197736",
+          "filename": "audit-run-{{timestamp}}"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger-save",
+        "source": "trigger",
+        "target": "save"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "stage": "enabled",
+      "at": 1789296197748,
+      "hosts": [
+        {
+          "at": 1789296197743,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 4,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789296197746,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        }
+      ],
+      "previousSetting": false
+    },
+    {
+      "stage": "observed",
+      "at": 1789296209454,
+      "waitedMs": 11703,
+      "outputs": [
+        {
+          "name": "audit-run-1789296207765.md",
+          "content": "[object Object]",
+          "mtimeMs": 1789296207766.7996
+        },
+        {
+          "name": "audit-run-1789296208696.md",
+          "content": "[object Object]",
+          "mtimeMs": 1789296208698.7334
+        }
+      ],
+      "runtimeStates": [
+        {
+          "workspaceStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/workspaceStorage/51ea22fffda5fbc2f5545f21d58f09b9",
+          "recordKey": "ritemark.ritemark",
+          "state": {
+            "lastRunAt": "2026-09-13T10:43:28.705Z",
+            "lastScheduledFor": "2026-09-13T10:43:00.000Z",
+            "lastStatus": "success",
+            "lastError": null
+          }
+        },
+        {
+          "workspaceStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/workspaceStorage/cbba2b458ecb9a68ca31eed69d16233f",
+          "recordKey": "ritemark.ritemark",
+          "state": {
+            "lastRunAt": "2026-09-13T10:43:27.771Z",
+            "lastScheduledFor": "2026-09-13T10:43:00.000Z",
+            "lastStatus": "success",
+            "lastError": null
+          }
+        }
+      ],
+      "hosts": [
+        {
+          "at": 1789296209453,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 4,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789296209454,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        }
+      ]
+    }
+  ],
+  "outputCount": 2,
+  "stateCount": 2,
+  "sameSlotInBothWindows": true,
+  "bothSucceeded": true,
+  "completed": true,
+  "fixtureScheduleDisabled": true,
+  "settingRestored": true
+}

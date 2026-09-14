@@ -1,0 +1,575 @@
+{
+  "method": "Correlate preserved actual provider/job/store state, real webviews and host events. Existing provider reference was found with local V8 scope inspection; no source re-evaluation or replacement product objects. Syntax checks do not rerun app behavior.",
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "singleHostPipelineAndViewPassed": true,
+  "liveJobMisclassifiedBySecondHost": true,
+  "originalHostCompletedSameJob": true,
+  "sequentialRenameControlPassed": true,
+  "twoAcknowledgedRenamesLostOneChange": true,
+  "bothActualViewsReadLostChange": true,
+  "limits": [
+    "Silent WAV fixture, held synthetic engine response; no Whisper inference, cloud transcription, native model dispatch or speech fidelity claim.",
+    "Store saves were paused before the original implementation; no tmp-file collision is claimed for this sequential-release app test.",
+    "Initial wrong body selector and terminal observer timeout are retained as harness failures. Fresh job started only after terminal state was confirmed.",
+    "A and B Memento snapshots differ; an intermediate on-disk SQLite record and crash after peer recovery were not measured.",
+    "No app restart or actual audio playback in this run."
+  ],
+  "initialProbeError": "Error: Matching normal-mode webview not found: document.body.dataset.editorType==='transcribe-panel'&&document.body.innerText.includes('pending.wav')\n    at findWebview (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-speech-tools.mjs:33:8)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-speech-recovery-probe.mjs?run=1789309534533:26:38",
+  "resumePreconditionError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'failed'\n- 'transcribing'\n\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-speech-recovery-finish-probe.mjs?run=1789309658954:15:43\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+  "engineReleases": [
+    {
+      "kind": "success",
+      "at": 1789309535495
+    },
+    {
+      "kind": "observer-timeout",
+      "at": 1789309656413
+    },
+    {
+      "kind": "success",
+      "at": 1789309701954
+    }
+  ],
+  "saveHoldDurations": [
+    {
+      "hostPid": 60859,
+      "heldMs": 4
+    },
+    {
+      "hostPid": 69268,
+      "heldMs": 109
+    }
+  ],
+  "hostEventRecords": 42,
+  "sourceContext": {
+    "extensions/ritemark/src/speech/JobManager.ts": {
+      "sha256": "b3315f3ef0cfdfbde4be715611f7ef00ee3a04132ec41cd1bb477ba4508ef51f",
+      "excerpts": [
+        {
+          "start": 86,
+          "end": 111,
+          "lines": [
+            "  /**",
+            "   * Turn any job that was mid-flight when the app closed into an explicit",
+            "   * `interrupted` row (R2). Called once during activation.",
+            "   */",
+            "  async recoverInterrupted(): Promise<TranscriptionJob[]> {",
+            "    const stored = this.deps.state.get<TranscriptionJob[]>(INFLIGHT_KEY, []);",
+            "    const recovered: TranscriptionJob[] = [];",
+            "",
+            "    for (const job of stored) {",
+            "      const interrupted: TranscriptionJob = {",
+            "        ...job,",
+            "        state: 'interrupted',",
+            "        endedAt: new Date().toISOString(),",
+            "        error: {",
+            "          code: 'unknown',",
+            "          message: 'Ritemark closed while this recording was being transcribed.',",
+            "          retryable: true,",
+            "        },",
+            "      };",
+            "      this.jobs.set(interrupted.id, interrupted);",
+            "      recovered.push(interrupted);",
+            "    }",
+            "",
+            "    await this.deps.state.update(INFLIGHT_KEY, []);",
+            "    for (const job of recovered) this.emit({ type: 'job-updated', job });",
+            "    return recovered;"
+          ]
+        },
+        {
+          "start": 114,
+          "end": 146,
+          "lines": [
+            "  enqueue(request: EnqueueRequest): TranscriptionJob {",
+            "    const id = `job-${Date.now().toString(36)}-${++this.counter}`;",
+            "    const job: TranscriptionJob = {",
+            "      id,",
+            "      audioPath: request.audioPath,",
+            "      audioName: path.basename(request.audioPath),",
+            "      durationSec: request.durationSec,",
+            "      engine: request.engineId,",
+            "      state: 'queued',",
+            "      progress: { phase: 'queued', percent: null },",
+            "      startedAt: new Date().toISOString(),",
+            "    };",
+            "",
+            "    this.jobs.set(id, job);",
+            "    this.requests.set(id, request);",
+            "    this.queue.push(id);",
+            "    this.emit({ type: 'job-updated', job });",
+            "",
+            "    void this.pump();",
+            "    return job;",
+            "  }",
+            "",
+            "  /** Stops the run, kills the child process, and cleans up temp files. */",
+            "  cancel(jobId: string): void {",
+            "    const controller = this.controllers.get(jobId);",
+            "    if (controller) {",
+            "      controller.abort();",
+            "      return;",
+            "    }",
+            "",
+            "    // Not started yet \u2014 drop it from the queue so it never runs.",
+            "    const queuedAt = this.queue.indexOf(jobId);",
+            "    if (queuedAt >= 0) {"
+          ]
+        },
+        {
+          "start": 150,
+          "end": 188,
+          "lines": [
+            "    }",
+            "  }",
+            "",
+            "  private async pump(): Promise<void> {",
+            "    if (this.running) return;",
+            "    this.running = true;",
+            "",
+            "    try {",
+            "      while (this.queue.length > 0) {",
+            "        const jobId = this.queue.shift();",
+            "        if (!jobId) break;",
+            "        const job = this.jobs.get(jobId);",
+            "        const request = this.requests.get(jobId);",
+            "        if (!job || !request || job.state !== 'queued') continue;",
+            "        await this.run(job, request);",
+            "      }",
+            "    } finally {",
+            "      this.running = false;",
+            "    }",
+            "  }",
+            "",
+            "  private async run(job: TranscriptionJob, request: EnqueueRequest): Promise<void> {",
+            "    const controller = new AbortController();",
+            "    this.controllers.set(job.id, controller);",
+            "",
+            "    const tempFiles: Array<string | null> = [];",
+            "",
+            "    try {",
+            "      const engine = this.deps.registry.get(job.engine);",
+            "",
+            "      this.update(job.id, { state: 'preparing', progress: { phase: 'preparing', percent: null } });",
+            "      await this.persistInflight();",
+            "",
+            "      const prepared = await prepareAudio({",
+            "        sourcePath: job.audioPath,",
+            "        accepts: engine.acceptsExtensions,",
+            "        workDir: this.deps.workDir,",
+            "        jobId: job.id,",
+            "      });"
+          ]
+        },
+        {
+          "start": 215,
+          "end": 248,
+          "lines": [
+            "      const session = buildSession({",
+            "        audioPath: job.audioPath,",
+            "        durationSec: job.durationSec,",
+            "        engineId: job.engine,",
+            "        workspaceRoot: request.workspaceRoot,",
+            "        peaks,",
+            "        result,",
+            "      });",
+            "      await this.deps.store.save(session);",
+            "",
+            "      const done = this.update(job.id, {",
+            "        state: 'done',",
+            "        progress: { phase: 'saving', percent: 100 },",
+            "        endedAt: new Date().toISOString(),",
+            "        sessionId: session.id,",
+            "      });",
+            "",
+            "      await this.persistInflight();",
+            "      if (done) this.emit({ type: 'job-completed', job: done, session });",
+            "    } catch (error) {",
+            "      const info = toErrorInfo(error, controller.signal.aborted);",
+            "      const failed = this.update(job.id, {",
+            "        state: info.code === 'cancelled' ? 'cancelled' : 'failed',",
+            "        endedAt: new Date().toISOString(),",
+            "        error: info,",
+            "      });",
+            "      await this.persistInflight();",
+            "      if (failed && info.code !== 'cancelled') {",
+            "        this.emit({ type: 'job-failed', job: failed, error: info });",
+            "      }",
+            "    } finally {",
+            "      this.controllers.delete(job.id);",
+            "      this.requests.delete(job.id);",
+            "      await cleanupTemp(tempFiles);"
+          ]
+        },
+        {
+          "start": 266,
+          "end": 270,
+          "lines": [
+            "  /** Only genuinely in-flight jobs are persisted; finished ones need no recovery. */",
+            "  private async persistInflight(): Promise<void> {",
+            "    const inflight = this.list().filter((job) => !isTerminal(job.state));",
+            "    await this.deps.state.update(INFLIGHT_KEY, inflight);",
+            "  }"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/speech/SessionStore.ts": {
+      "sha256": "e265b70b9f52a18a5bc47a5d4b5bcc9cc931b6533b04694e07b0bc5b66e9ec62",
+      "excerpts": [
+        {
+          "start": 58,
+          "end": 73,
+          "lines": [
+            "  async save(session: TranscriptSession): Promise<void> {",
+            "    await this.ensureDir();",
+            "    const next: TranscriptSession = { ...session, updatedAt: new Date().toISOString() };",
+            "    // Write-then-rename: a crash mid-write must not leave a truncated session",
+            "    // where a working one used to be.",
+            "    const target = this.file(session.id);",
+            "    const temp = `${target}.tmp`;",
+            "    await fsp.writeFile(temp, JSON.stringify(next), 'utf-8');",
+            "    await fsp.rename(temp, target);",
+            "  }",
+            "",
+            "  async get(sessionId: string): Promise<TranscriptSession | null> {",
+            "    try {",
+            "      const raw = await fsp.readFile(this.file(sessionId), 'utf-8');",
+            "      return JSON.parse(raw) as TranscriptSession;",
+            "    } catch {"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/speech/index.ts": {
+      "sha256": "d71b818e2a1c7261a2a65881a7ea5449a63c76811dd20e0abc84eb7112bed5e0",
+      "excerpts": [
+        {
+          "start": 56,
+          "end": 63,
+          "lines": [
+            "  const store = new SessionStore(sessionStoreDir(context.globalStorageUri.fsPath));",
+            "  const jobs = new JobManager({",
+            "    registry,",
+            "    store,",
+            "    workDir: speechWorkDir(),",
+            "    state: context.globalState,",
+            "  });",
+            ""
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/extension.ts": {
+      "sha256": "6419808c176906d54be648498b6d399f35492fb079d4c1efe987ac329d76a817",
+      "excerpts": [
+        {
+          "start": 405,
+          "end": 443,
+          "lines": [
+            "",
+            "    const { TranscriptWorkbenchProvider } = require('./transcriptWorkbenchProvider') as typeof import('./transcriptWorkbenchProvider');",
+            "",
+            "    const { setTranscriptDocumentResolver } = require('./speech/activeTranscript') as typeof import('./speech/activeTranscript');",
+            "",
+            "    const speech = createSpeechSubsystem(context);",
+            "    void speech.jobs.recoverInterrupted();",
+            "",
+            "    // So \"ask Claude about this recording\" means the transcript, not the",
+            "    // unreadable .m4a the workbench tab is technically showing.",
+            "    setTranscriptDocumentResolver((audioPath) => speech.store.getSavedDocumentSync(audioPath));",
+            "",
+            "",
+            "    const workbenchProvider = new TranscriptWorkbenchProvider(",
+            "      context,",
+            "      speech.registry,",
+            "      speech.jobs,",
+            "      speech.store,",
+            "    );",
+            "    context.subscriptions.push(",
+            "      workbenchProvider,",
+            "      vscode.window.registerCustomEditorProvider(TranscriptWorkbenchProvider.viewType, workbenchProvider, {",
+            "        webviewOptions: { retainContextWhenHidden: true },",
+            "        supportsMultipleEditorsPerDocument: false,",
+            "      }),",
+            "    );",
+            "",
+            "    const transcribeViewProvider = new TranscribeViewProvider(",
+            "      context.extensionUri,",
+            "      speech.registry,",
+            "      speech.jobs,",
+            "      speech.store,",
+            "      context.globalState,",
+            "    );",
+            "    context.subscriptions.push(",
+            "      transcribeViewProvider,",
+            "      vscode.window.registerWebviewViewProvider(TranscribeViewProvider.viewType, transcribeViewProvider, {",
+            "        webviewOptions: { retainContextWhenHidden: true },",
+            "      }),"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/transcriptWorkbenchProvider.ts": {
+      "sha256": "f06bb9e5dc46e215912cd7249967ac004b17a10fc16a5d80cb923b209d62fe3b",
+      "excerpts": [
+        {
+          "start": 153,
+          "end": 174,
+          "lines": [
+            "  /**",
+            "   * R8: renaming is a session-level edit, applied once and persisted, so every",
+            "   * segment and every future export agree without touching the transcript text.",
+            "   */",
+            "  private async _renameSpeaker(fsPath: string, speakerId: string, label: string): Promise<void> {",
+            "    const session = await this._store.get(sessionIdForPath(fsPath));",
+            "    if (!session) return;",
+            "",
+            "    const normalized = normalizeSpeakerLabel(label);",
+            "    if (!normalized) return;",
+            "",
+            "    await this._store.save({",
+            "      ...session,",
+            "      speakers: session.speakers.map((speaker) =>",
+            "        speaker.id === speakerId ? { ...speaker, label: normalized } : speaker,",
+            "      ),",
+            "    });",
+            "",
+            "    const panel = this._panels.get(fsPath);",
+            "    if (panel) await this._push(fsPath, panel);",
+            "  }",
+            ""
+          ]
+        },
+        {
+          "start": 252,
+          "end": 256,
+          "lines": [
+            "",
+            "      // Re-read: a speaker rename may have landed while the model was thinking.",
+            "      const latest = (await this._store.get(session.id)) ?? session;",
+            "      await this._store.save({ ...latest, insights });",
+            "      void panel.webview.postMessage({ type: 'workbench:insightsState', state: 'idle' });"
+          ]
+        },
+        {
+          "start": 399,
+          "end": 443,
+          "lines": [
+            "  private async _push(fsPath: string, panel: vscode.WebviewPanel): Promise<void> {",
+            "    const [session, engines, runtimeReady] = await Promise.all([",
+            "      this._store.get(sessionIdForPath(fsPath)),",
+            "      this._registry.statuses(),",
+            "      // R10: with no runtime configured the rail explains what to set up",
+            "      // rather than offering a button that fails.",
+            "      getSetupStatus()",
+            "        .then((status) => status.authenticated)",
+            "        .catch(() => false),",
+            "    ]);",
+            "",
+            "    const job = this._jobs",
+            "      .list()",
+            "      .find((candidate) => candidate.audioPath === fsPath && isActive(candidate));",
+            "",
+            "    const projectedSession = session?.insights",
+            "      ? {",
+            "          ...session,",
+            "          insights: {",
+            "            ...session.insights,",
+            "            language: coerceInsightsLanguageMetadata(session.insights.language),",
+            "          },",
+            "        }",
+            "      : session;",
+            "",
+            "    void panel.webview.postMessage({",
+            "      type: 'workbench:state',",
+            "      data: {",
+            "        audioUri: panel.webview.asWebviewUri(vscode.Uri.file(fsPath)).toString(),",
+            "        audioName: path.basename(fsPath),",
+            "        session: projectedSession,",
+            "        job: job ?? null,",
+            "        engines,",
+            "        savedDocument:",
+            "          session?.exportPath && fs.existsSync(session.exportPath)",
+            "            ? { name: path.basename(session.exportPath), path: session.exportPath }",
+            "            : null,",
+            "        runtimeReady,",
+            "      },",
+            "    });",
+            "  }",
+            "",
+            "  private _getHtml(webview: vscode.Webview, audioUri: vscode.Uri): string {",
+            "    const nonce = getNonce();",
+            "    const scriptUri = webview.asWebviewUri("
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/views/TranscribeViewProvider.ts": {
+      "sha256": "0e0d6ee8d39219876311a102fa3211b79eaf5daa03d37a29146dfe7718e97112",
+      "excerpts": [
+        {
+          "start": 297,
+          "end": 329,
+          "lines": [
+            "  private async _pushState(): Promise<void> {",
+            "    if (!this._view) return;",
+            "",
+            "    const root = currentWorkspaceRoot();",
+            "    const [engines, allSessions] = await Promise.all([",
+            "      this._registry.statuses(),",
+            "      // Every session, then partitioned here. The library is project-scoped \u2014",
+            "      // a folder must not show another project's recordings \u2014 but the panel",
+            "      // still has to be able to SAY that the others exist. Filtering them out",
+            "      // in the store made an empty library indistinguishable from \"you have",
+            "      // never transcribed anything\", which reads as data loss.",
+            "      this._store.listWithAudioState(),",
+            "    ]);",
+            "",
+            "    const belongsHere = (session: TranscriptSession): boolean =>",
+            "      (session.workspaceRoot ?? null) === root;",
+            "    const mine = allSessions.filter(belongsHere);",
+            "    const elsewhere = allSessions.filter((session) => !belongsHere(session));",
+            "    const sessions = this._showAllProjects ? allSessions : mine;",
+            "",
+            "    const jobs = this._jobs.list();",
+            "    const activeJobPaths = new Set(",
+            "      jobs.filter((job) => isActive(job)).map((job) => job.audioPath),",
+            "    );",
+            "",
+            "    const recordings: RecordingSummary[] = sessions.map((session) => ({",
+            "      sessionId: session.id,",
+            "      audioPath: session.audioPath,",
+            "      audioName: path.basename(session.audioPath),",
+            "      durationSec: session.durationSec,",
+            "      engine: session.engine,",
+            "      speakerCount: session.speakers.length,",
+            "      speakerSeparation: session.speakerSeparation,"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/webview/src/components/transcribe/TranscribePanel.tsx": {
+      "sha256": "608d1ffb2e1b27c4ba7c85e25c74d242e7192b42b30724d962e4520289768c76",
+      "excerpts": [
+        {
+          "start": 60,
+          "end": 67,
+          "lines": [
+            "    return <div className=\"p-4 text-xs text-ink-muted\">Loading\u2026</div>;",
+            "  }",
+            "",
+            "  const activeJobs = state.jobs.filter(isActiveJob);",
+            "  const attentionJobs = state.jobs.filter(",
+            "    (job) => job.state === 'failed' || job.state === 'interrupted',",
+            "  );",
+            "  const nothingReady = usableEngines.length === 0;"
+          ]
+        },
+        {
+          "start": 155,
+          "end": 163,
+          "lines": [
+            "        {attentionJobs.length > 0 && (",
+            "          <Section title=\"Needs attention\">",
+            "            {attentionJobs.map((job) => (",
+            "              <AttentionRow key={job.id} job={job} />",
+            "            ))}",
+            "          </Section>",
+            "        )}",
+            "",
+            "        {state.recordings.length > 0 && ("
+          ]
+        },
+        {
+          "start": 479,
+          "end": 499,
+          "lines": [
+            "function AttentionRow({ job }: { job: TranscriptionJob }) {",
+            "  const interrupted = job.state === 'interrupted';",
+            "  return (",
+            "    <div className=\"mx-3 mb-2 rounded-lg border border-ritemark-error/30 bg-ritemark-error-soft/60 p-2.5\">",
+            "      <div className=\"truncate text-xs font-semibold\" title={job.audioName}>",
+            "        {job.audioName}",
+            "      </div>",
+            "      <p className=\"mt-1 text-[10.5px] leading-relaxed text-ritemark-error\">",
+            "        {job.error?.message ?? (interrupted ? 'Interrupted.' : 'Transcription failed.')}",
+            "      </p>",
+            "      <div className=\"mt-2 flex gap-2\">",
+            "        {job.error?.retryable !== false && (",
+            "          <Button",
+            "            variant=\"secondary\"",
+            "            size=\"sm\"",
+            "            onClick={() => vscode.postMessage({ type: 'transcribe:importPath', path: job.audioPath })}",
+            "          >",
+            "            Try again",
+            "          </Button>",
+            "        )}",
+            "      </div>"
+          ]
+        }
+      ]
+    }
+  },
+  "history": [
+    "45de4852a91f0a546445656e10a73c524b078d55 2026-08-24T20:01:00+03:00 feat: support any-language transcribe insights",
+    "8752982053ef1b60a23b404129e83489a5422643 2026-08-24T13:15:06+03:00 feat(transcribe): create language-aware insights documents",
+    "f2e54cb708511305bd10a6dfba3080d8000cbebb 2026-08-15T12:38:02+02:00 Sprint 108: Transcription Workbench \u2014 audio in, document out (#202)"
+  ],
+  "screenshot": {
+    "file": "normal-speech-false-interrupted.png",
+    "inspected": "Actual second workspace window shows the Needs Attention message while A is held.",
+    "sha256": "38e34a401851377ed846971d88b5be520d758d842725bbad0b010061cf285037"
+  },
+  "capturedOwnedProcessesStopped": 20,
+  "portClosed": true,
+  "temporaryPeakPathsAbsent": 3,
+  "productArtifactsUnchanged": 4,
+  "syntaxChecks": [
+    {
+      "file": "normal-speech-cleanup-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-client.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-final-state-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-recovery-finish-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-recovery-observed-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-recovery-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-store-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-tools.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "speech-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-driver/index.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-speech-driver/speech-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    }
+  ],
+  "pythonAstChecks": 2
+}

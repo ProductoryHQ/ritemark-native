@@ -1,0 +1,667 @@
+{
+  "method": "Correlate preserved host responses, real disk snapshots, controlled rename candidates, actual webview receipt IDs, new-process readbacks and cleanup. Source/history and syntax checks supplement, not replace, the application observations.",
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "storageComparisonsPassed": true,
+  "mainProbePartialFailure": "Error: Matching normal-mode webview not found: !window.__auditStoreHostPid && document.body.innerText.includes('Synthetic shared-store audit request; no native dispatch.')\n    at findWebview (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-store-tools.mjs:33:8)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-store-probe.mjs?run=1789300561946:106:14",
+  "viewFollowupPassed": true,
+  "viewTimingLimit": "The first projection was not observed during initial view opening. Its precise cause was not isolated; the follow-up method string mentioning hydration is descriptive timing context, not a proven product cause.",
+  "restartPassed": true,
+  "nativeDispatchLimit": "Actual cached host controller/store objects, but synthetic controller ingress and controlled rename timing. No live native model turn, natural race-frequency or ordinary UI gesture claim.",
+  "releaseObservations": [
+    {
+      "hostPid": 16170,
+      "conversationId": "00000000-0000-4000-8000-a00600000002",
+      "heldMs": 315,
+      "reason": "explicit-release"
+    },
+    {
+      "hostPid": 16170,
+      "conversationId": "00000000-0000-4000-8000-a00600000003",
+      "heldMs": 112,
+      "reason": "explicit-release"
+    },
+    {
+      "hostPid": 16170,
+      "conversationId": "00000000-0000-4000-8000-a00600000004",
+      "heldMs": 950,
+      "reason": "explicit-release"
+    },
+    {
+      "hostPid": 18431,
+      "conversationId": "00000000-0000-4000-8000-a00600000003",
+      "heldMs": 115,
+      "reason": "explicit-release"
+    },
+    {
+      "hostPid": 18431,
+      "conversationId": "00000000-0000-4000-8000-a00600000004",
+      "heldMs": 954,
+      "reason": "explicit-release"
+    }
+  ],
+  "sourceContext": {
+    "extensions/ritemark/src/conversations/ConversationStore.ts": {
+      "sha256": "bcdf71018ffe67e847b6dc933f57d746b862b565be0b5611a2d01dcdcf121615",
+      "excerpts": [
+        {
+          "start": 235,
+          "end": 272,
+          "lines": [
+            "",
+            "  create(input: ConversationCreateInputV1): Promise<ConversationRecordV1> {",
+            "    return this.serialized(async () => {",
+            "      await this.ensureInitialized();",
+            "      const conversationId = input.conversationId ?? this.randomId();",
+            "      assertConversationId(conversationId);",
+            "      if (projectScopeId(input.scope) !== input.scopeId) {",
+            "        throw new ConversationStoreError('invalid-record', 'Scope ID does not match its canonical descriptor');",
+            "      }",
+            "      if (await this.readTombstone(conversationId)) throw new ConversationStoreError('deleted', 'Conversation was deleted');",
+            "      if (await this.recordExists(conversationId)) throw new ConversationStoreError('already-exists', 'Conversation already exists');",
+            "",
+            "      const createdAt = input.createdAt ?? this.timestamp();",
+            "      const { index } = await this.reconcile();",
+            "      const identityColorSlot = allocateConversationIdentityColorSlot(",
+            "        this.identityColorOwners(index.entries, input.scopeId),",
+            "      );",
+            "      const record: ConversationRecordV1 = decodeConversationRecordV1({",
+            "        schemaVersion: CONVERSATION_SCHEMA_VERSION,",
+            "        conversationId,",
+            "        scopeId: input.scopeId,",
+            "        scope: input.scope,",
+            "        title: input.title,",
+            "        identityColorSlot,",
+            "        createdAt,",
+            "        lastActivityAt: input.lastActivityAt ?? createdAt,",
+            "        revision: 1,",
+            "        bindingGeneration: 0,",
+            "        lifecycle: input.lifecycle ?? { state: 'idle' },",
+            "        runtimeSummary: runtimeSummaryFor({ events: input.events ?? [] }),",
+            "        events: input.events ?? [],",
+            "        composerPreferences: input.composerPreferences ?? { thinkingEffortByRuntime: {} },",
+            "        ...(input.continuations ? { continuations: input.continuations } : {}),",
+            "        ...(input.migration ? { migration: input.migration } : {}),",
+            "      });",
+            "",
+            "      await this.writeRecord(record);",
+            "      await this.updateIndexBestEffort();"
+          ]
+        },
+        {
+          "start": 277,
+          "end": 328,
+          "lines": [
+            "  checkpoint(update: ConversationCheckpointV1): Promise<ConversationRecordV1> {",
+            "    return this.serialized(async () => {",
+            "      await this.ensureInitialized();",
+            "      await this.reconcile();",
+            "      assertConversationId(update.conversationId);",
+            "      if (await this.readTombstone(update.conversationId)) throw new ConversationStoreError('deleted', 'Conversation was deleted');",
+            "      const current = await this.readRecord(update.conversationId);",
+            "      if (!current) throw new ConversationStoreError('not-found', 'Conversation does not exist');",
+            "      if (current.bindingGeneration !== update.bindingGeneration) {",
+            "        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');",
+            "      }",
+            "      if (update.expectedRevision !== undefined && current.revision !== update.expectedRevision) {",
+            "        throw new ConversationStoreError('stale-revision', 'Conversation revision is stale');",
+            "      }",
+            "",
+            "      const events = [...current.events, ...(update.appendEvents ?? [])];",
+            "      const continuations = { ...(current.continuations ?? {}) };",
+            "      if (update.continuationUpdate) {",
+            "        const { runtimeId, descriptor } = update.continuationUpdate;",
+            "        if (descriptor === null) delete continuations[runtimeId];",
+            "        else continuations[runtimeId] = descriptor;",
+            "      }",
+            "      const next: ConversationRecordV1 = decodeConversationRecordV1({",
+            "        ...current,",
+            "        title: update.title ?? current.title,",
+            "        lifecycle: update.lifecycle ?? current.lifecycle,",
+            "        composerPreferences: update.composerPreferences ?? current.composerPreferences,",
+            "        events,",
+            "        runtimeSummary: runtimeSummaryFor({ events }),",
+            "        revision: current.revision + 1,",
+            "        lastActivityAt: this.timestamp(),",
+            "        ...(Object.keys(continuations).length > 0 ? { continuations } : { continuations: undefined }),",
+            "      });",
+            "",
+            "      await this.writeRecord(next);",
+            "      await this.updateIndexBestEffort();",
+            "      return next;",
+            "    });",
+            "  }",
+            "",
+            "  /**",
+            "   * Persist the latest Composer preference atomically. Range input can emit",
+            "   * several changes before an earlier disk write completes, so this mutation",
+            "   * must read and merge the record inside the store's serialization boundary.",
+            "   */",
+            "  setComposerThinkingEffort(input: {",
+            "    conversationId: string;",
+            "    scopeId: string;",
+            "    bindingGeneration: number;",
+            "    agentId: AgentId;",
+            "    thinkingEffort: ThinkingEffort;",
+            "  }): Promise<ConversationRecordV1> {"
+          ]
+        },
+        {
+          "start": 330,
+          "end": 378,
+          "lines": [
+            "      await this.ensureInitialized();",
+            "      await this.reconcile();",
+            "      assertConversationId(input.conversationId);",
+            "      if (await this.readTombstone(input.conversationId)) {",
+            "        throw new ConversationStoreError('deleted', 'Conversation was deleted');",
+            "      }",
+            "      const current = await this.readRecord(input.conversationId);",
+            "      if (!current) throw new ConversationStoreError('not-found', 'Conversation does not exist');",
+            "      if (current.scopeId !== input.scopeId) {",
+            "        throw new ConversationStoreError('not-found', 'Conversation does not belong to the current project');",
+            "      }",
+            "      if (current.bindingGeneration !== input.bindingGeneration) {",
+            "        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');",
+            "      }",
+            "",
+            "      const next = decodeConversationRecordV1({",
+            "        ...current,",
+            "        composerPreferences: {",
+            "          thinkingEffortByRuntime: {",
+            "            ...current.composerPreferences.thinkingEffortByRuntime,",
+            "            [input.agentId]: input.thinkingEffort,",
+            "          },",
+            "        },",
+            "        revision: current.revision + 1,",
+            "        // Draft controls are not conversation activity and must not reorder",
+            "        // the user's recent-chat rail.",
+            "        lastActivityAt: current.lastActivityAt,",
+            "      });",
+            "",
+            "      await this.writeRecord(next);",
+            "      await this.updateIndexBestEffort();",
+            "      return next;",
+            "    });",
+            "  }",
+            "",
+            "  delete(conversationId: string, bindingGeneration: number): Promise<ConversationDeleteResultV1> {",
+            "    return this.serialized(async () => {",
+            "      await this.ensureInitialized();",
+            "      await this.reconcile();",
+            "      assertConversationId(conversationId);",
+            "      const existingTombstone = await this.readTombstone(conversationId);",
+            "      if (existingTombstone) throw new ConversationStoreError('deleted', 'Conversation was already deleted');",
+            "      const record = await this.readRecord(conversationId);",
+            "      if (!record) throw new ConversationStoreError('not-found', 'Conversation does not exist');",
+            "      if (record.bindingGeneration !== bindingGeneration) {",
+            "        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');",
+            "      }",
+            "",
+            "      const deletedAt = this.timestamp();"
+          ]
+        },
+        {
+          "start": 521,
+          "end": 526,
+          "lines": [
+            "",
+            "  private identityColorOwners(",
+            "    entries: readonly ConversationSummaryV1[],",
+            "    scopeId: string,",
+            "  ): Array<ConversationIdentityColorOwner & { conversationId: string }> {",
+            "    const live = entries"
+          ]
+        },
+        {
+          "start": 709,
+          "end": 713,
+          "lines": [
+            "  private async atomicWrite(target: string, contents: string): Promise<void> {",
+            "    const temp = `${target}.tmp-${this.randomId()}`;",
+            "    await this.fs.writeFile(temp, contents);",
+            "    await this.fs.rename(temp, target);",
+            "  }"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "0c72ee65a58db16f9fcf826bacf85ef518a9a33f 2026-08-29T11:03:51+03:00 fix: keep conversation undo actions valid",
+        "9a3c248d6b2ce22609e8c3191e23a5d3e55cf859 2026-08-29T10:48:33+03:00 fix: use native conversation delete notifications",
+        "fec18d8eee4e4b75a288e5afb4e7601f956c05a3 2026-08-24T13:17:50+03:00 fix(ai): polish thinking effort review findings",
+        "5e51826b79f7e1555ed0b781c7f7ea3114dd4cec 2026-08-24T12:55:23+03:00 feat(ai): add composer thinking effort"
+      ]
+    },
+    "extensions/ritemark/src/conversations/ConversationController.ts": {
+      "sha256": "ae9007d8c376d8145459fd041ee5598f264442a564921b495f513e6a689c5d6f",
+      "excerpts": [
+        {
+          "start": 143,
+          "end": 166,
+          "lines": [
+            "      }",
+            "      if (request.type === 'conversation/accept-turn') return this.acceptTurn(request);",
+            "      if (request.type === 'conversation/set-composer-preference') {",
+            "        const updated = await this.dependencies.store.setComposerThinkingEffort({",
+            "          conversationId: request.conversationId,",
+            "          scopeId: this.dependencies.currentScope().scopeId,",
+            "          bindingGeneration: request.bindingGeneration,",
+            "          agentId: request.agentId,",
+            "          thinkingEffort: request.thinkingEffort,",
+            "        });",
+            "        this.emitChanged(updated);",
+            "        return result(request, { conversation: projectConversation(updated) });",
+            "      }",
+            "      if (request.type === 'conversation/rename') {",
+            "        const current = await this.requireCurrentScope(request.conversationId);",
+            "        const title = normalizeManualTitle(request.title);",
+            "        if (!title) throw new ConversationProtocolError('title must contain visible text');",
+            "        const renamed = await this.dependencies.store.checkpoint({",
+            "          conversationId: current.conversationId,",
+            "          bindingGeneration: request.bindingGeneration,",
+            "          expectedRevision: current.revision,",
+            "          title,",
+            "        });",
+            "        this.emitChanged(renamed);"
+          ]
+        },
+        {
+          "start": 453,
+          "end": 490,
+          "lines": [
+            "  async completeRuntimeTurn(input: {",
+            "    conversationId: string;",
+            "    bindingGeneration: number;",
+            "    runtimeId: AgentId;",
+            "    text: string;",
+            "    status: 'completed' | 'failed' | 'cancelled';",
+            "    error?: string;",
+            "    failureKind?: RuntimeFailureKind;",
+            "    appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;",
+            "    turnId?: string;",
+            "    generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;",
+            "  }): Promise<ConversationRecordV1> {",
+            "    const initial = await this.requireCurrentScope(input.conversationId);",
+            "    const firstUserMessage = initial.events.find((event) => event.kind === 'user-message');",
+            "    const turnId = input.turnId ?? (",
+            "      initial.lifecycle.state === 'working' || initial.lifecycle.state === 'needs-user'",
+            "        ? initial.lifecycle.activeTurnId",
+            "        : this.randomId()",
+            "    );",
+            "    const occurredAt = this.now().toISOString();",
+            "    const terminalEventId = this.randomId();",
+            "    const record = await this.mutateLatest(",
+            "      input.conversationId,",
+            "      input.bindingGeneration,",
+            "      (current) => {",
+            "        const activeTurnMatches = (current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user')",
+            "          && current.lifecycle.activeTurnId === turnId;",
+            "        const activeUser = current.events.find(",
+            "          (event) => event.kind === 'user-message' && event.turnId === turnId,",
+            "        );",
+            "        // A runtime switched away from this turn. Its late final must not append",
+            "        // content or make the newer runtime look idle.",
+            "        if (!activeTurnMatches || activeUser?.runtimeId !== input.runtimeId) return null;",
+            "        const sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;",
+            "        const appendEvents = input.text",
+            "          ? [{",
+            "              kind: 'assistant-message' as const,",
+            "              eventId: terminalEventId,"
+          ]
+        },
+        {
+          "start": 768,
+          "end": 816,
+          "lines": [
+            "   * checkpoint, receipt, and final callbacks can legitimately race each other.",
+            "   */",
+            "  private async mutateLatest(",
+            "    conversationId: string,",
+            "    bindingGeneration: number,",
+            "    build: (",
+            "      current: ConversationRecordV1,",
+            "    ) => Omit<ConversationCheckpointV1, 'conversationId' | 'bindingGeneration' | 'expectedRevision'> | null,",
+            "  ): Promise<ConversationRecordV1> {",
+            "    for (let attempt = 0; attempt < 5; attempt += 1) {",
+            "      const current = await this.requireCurrentScope(conversationId);",
+            "      if (current.bindingGeneration !== bindingGeneration) {",
+            "        throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');",
+            "      }",
+            "      const update = build(current);",
+            "      if (!update) return current;",
+            "      try {",
+            "        return await this.dependencies.store.checkpoint({",
+            "          ...update,",
+            "          conversationId,",
+            "          bindingGeneration,",
+            "          expectedRevision: current.revision,",
+            "        });",
+            "      } catch (error) {",
+            "        if (!(error instanceof ConversationStoreError) || error.code !== 'stale-revision' || attempt === 4) {",
+            "          throw error;",
+            "        }",
+            "      }",
+            "    }",
+            "    throw new ConversationStoreError('stale-revision', 'Conversation revision changed repeatedly');",
+            "  }",
+            "",
+            "  private async requireVisibleScope(conversationId: string, recovery: boolean): Promise<ConversationRecordV1> {",
+            "    const record = await this.dependencies.store.get(conversationId);",
+            "    if (!record) throw new ConversationStoreError('not-found', 'Conversation does not exist');",
+            "    this.assertVisibleScope(record, recovery);",
+            "    return record;",
+            "  }",
+            "",
+            "  private assertVisibleScope(record: ConversationRecordV1, recovery: boolean): void {",
+            "    const currentScopeId = this.dependencies.currentScope().scopeId;",
+            "    const recoveryScopeId = unassignedLegacyScope().scopeId;",
+            "    if (record.scopeId === currentScopeId) return;",
+            "    if (recovery && record.scopeId === recoveryScopeId) return;",
+            "    throw new ConversationStoreError('not-found', 'Conversation does not belong to the current project');",
+            "  }",
+            "",
+            "  private emitChanged(record: ConversationRecordV1): void {",
+            "    this.dependencies.emit?.({"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e 2026-09-03T22:46:49+03:00 fix: isolate agent runtime availability",
+        "3e4d931fd61bb1c707e723026b4572158f3d6ef3 2026-09-01T11:34:15+03:00 fix: persist Claude auth recovery",
+        "0c72ee65a58db16f9fcf826bacf85ef518a9a33f 2026-08-29T11:03:51+03:00 fix: keep conversation undo actions valid",
+        "9a3c248d6b2ce22609e8c3191e23a5d3e55cf859 2026-08-29T10:48:33+03:00 fix: use native conversation delete notifications"
+      ]
+    },
+    "extensions/ritemark/src/conversations/projectScope.ts": {
+      "sha256": "585616a411c18124909db6621b7b569caf07a1ca56a28d3a4643aa948ef33e76",
+      "excerpts": [
+        {
+          "start": 40,
+          "end": 77,
+          "lines": [
+            "  });",
+            "}",
+            "",
+            "export function projectScopeId(descriptor: ProjectScopeDescriptorV1): string {",
+            "  return `ps1-${createHash('sha256').update(canonicalProjectScopeJson(descriptor)).digest('hex').slice(0, 40)}`;",
+            "}",
+            "",
+            "export function resolveProjectScope(input: ProjectScopeInput): ResolvedProjectScopeV1 {",
+            "  const platform = input.platform ?? process.platform;",
+            "  const workspaceFileUri = input.workspaceFileUri",
+            "    ? normalizeProjectUri(input.workspaceFileUri, platform)",
+            "    : null;",
+            "  const folderUris = [...new Set((input.folderUris ?? []).map((uri) => normalizeProjectUri(uri, platform)))].sort();",
+            "",
+            "  const descriptor: ProjectScopeDescriptorV1 = {",
+            "    kind: workspaceFileUri",
+            "      ? 'workspace-file'",
+            "      : folderUris.length === 0",
+            "        ? 'no-folder'",
+            "        : folderUris.length === 1",
+            "          ? 'single-root'",
+            "          : 'multi-root',",
+            "    workspaceFileUri,",
+            "    folderUris,",
+            "  };",
+            "",
+            "  return { scopeId: projectScopeId(descriptor), descriptor };",
+            "}",
+            "",
+            "export function unassignedLegacyScope(): ResolvedProjectScopeV1 {",
+            "  const descriptor: ProjectScopeDescriptorV1 = {",
+            "    kind: 'unassigned-legacy',",
+            "    workspaceFileUri: null,",
+            "    folderUris: [],",
+            "  };",
+            "  return { scopeId: projectScopeId(descriptor), descriptor };",
+            "}"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "d0a896a892493cc1ad19e8b0dce8dc1124aa5b80 2026-08-23T14:45:03+03:00 feat(conversations): add durable project chat history"
+      ]
+    },
+    "extensions/ritemark/src/views/UnifiedViewProvider.ts": {
+      "sha256": "42397a2471310bfa71354dd65c9c0461c313e7413f2fe5dbe6360c0557cf4679",
+      "excerpts": [
+        {
+          "start": 203,
+          "end": 217,
+          "lines": [
+            "    const conversationStore = new ConversationStore(conversationStoreDir(globalStorageUri.fsPath));",
+            "    const conversationCutover = new ConversationCutoverState(conversationStore);",
+            "    this._conversationController = new ConversationController({",
+            "      store: conversationStore,",
+            "      currentScope: () => resolveProjectScope({",
+            "        workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,",
+            "        folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),",
+            "        platform: process.platform,",
+            "      }),",
+            "      stopConversation: (conversationId) => this._stopConversationSessions(conversationId),",
+            "      emit: (event) => { void this._view?.webview.postMessage(event); },",
+            "      rolloutMode: () => conversationCutover.resolve(isEnabled('durableAgentConversations')),",
+            "      markHostAuthority: () => conversationCutover.establishHostAuthority(),",
+            "      migrator: new LegacyConversationMigrator(conversationStore),",
+            "    });"
+          ]
+        },
+        {
+          "start": 824,
+          "end": 839,
+          "lines": [
+            "              if (!terminalCheckpointWritten) {",
+            "                terminalCheckpointWritten = true;",
+            "                this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({",
+            "                  conversationId,",
+            "                  bindingGeneration,",
+            "                  runtimeId: agentId as AgentId,",
+            "                  turnId: conversationTurnId,",
+            "                  text: result.text ?? '',",
+            "                  status: error ? 'failed' : 'completed',",
+            "                  error,",
+            "                  failureKind,",
+            "                  appliedThinkingEffort,",
+            "                  generateTitle: titleGeneration,",
+            "                }), hostConversationEnabled);",
+            "              }",
+            "              if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {"
+          ]
+        },
+        {
+          "start": 2431,
+          "end": 2454,
+          "lines": [
+            "  private _runConversationCheckpoint(",
+            "    conversationId: string,",
+            "    operation: () => Promise<unknown>,",
+            "    enabled = true,",
+            "  ): void {",
+            "    void this._queueConversationCheckpoint(conversationId, operation, enabled)",
+            "      .catch((error: unknown) => this._handleConversationCheckpointError(error));",
+            "  }",
+            "",
+            "  private _queueConversationCheckpoint(",
+            "    conversationId: string,",
+            "    operation: () => Promise<unknown>,",
+            "    enabled = true,",
+            "  ): Promise<void> {",
+            "    if (!enabled) return Promise.resolve();",
+            "    const previous = this._conversationCheckpointQueues.get(conversationId) ?? Promise.resolve();",
+            "    const next = previous.catch(() => { /* prior caller reports its own failure */ })",
+            "      .then(async () => { await operation(); });",
+            "    this._conversationCheckpointQueues.set(conversationId, next);",
+            "    void next.catch(() => { /* caller owns reporting */ }).then(() => {",
+            "      if (this._conversationCheckpointQueues.get(conversationId) === next) {",
+            "        this._conversationCheckpointQueues.delete(conversationId);",
+            "      }",
+            "    });"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e 2026-09-03T22:46:49+03:00 fix: isolate agent runtime availability",
+        "9f7b7f00a9b9d76f3b699568e17a06ad18332803 2026-09-01T17:31:57+03:00 fix: close Agent Chat review edge cases",
+        "80be7da21d2410831e3df16bfd2cf52c73e010bf 2026-09-01T17:20:05+03:00 fix: make agent chat bootstrap atomic",
+        "3e4d931fd61bb1c707e723026b4572158f3d6ef3 2026-09-01T11:34:15+03:00 fix: persist Claude auth recovery"
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/store.ts": {
+      "sha256": "00f692c2870560fec2d5e55421b01f1fd302980d784fa94bca69afb0b3663146",
+      "excerpts": [
+        {
+          "start": 1119,
+          "end": 1137,
+          "lines": [
+            "    setThinkingEffort: (effort) => {",
+            "      const state = get();",
+            "      const conversation = activeConversation();",
+            "      if (!conversation) return;",
+            "      const runtimeId = conversation.pendingRuntime.runtimeId;",
+            "      patchConversation(conversation.id, (current) => ({",
+            "        thinkingEffortByRuntime: { ...current.thinkingEffortByRuntime, [runtimeId]: effort },",
+            "      }));",
+            "      const summary = state.hostConversations.find((item) => item.conversationId === conversation.id);",
+            "      if (summary && state.conversationRolloutMode !== 'legacy') {",
+            "        postConversationRequest({",
+            "          type: 'conversation/set-composer-preference',",
+            "          conversationId: conversation.id,",
+            "          bindingGeneration: summary.bindingGeneration,",
+            "          agentId: runtimeId,",
+            "          thinkingEffort: effort,",
+            "        });",
+            "      }",
+            "    },"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "e432117872a0f7e4c2eebf4f7fcc59473476d8d5 2026-09-08T21:20:34+03:00 fix(ai-sidebar): stop a status refresh from overwriting a known runtime phase",
+        "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e 2026-09-03T22:46:49+03:00 fix: isolate agent runtime availability",
+        "a74e92fe2390b216c26a69e3a99d9e8004c8024a 2026-09-01T18:22:59+03:00 fix: isolate Agent Chat bootstrap from storage quota",
+        "9f7b7f00a9b9d76f3b699568e17a06ad18332803 2026-09-01T17:31:57+03:00 fix: close Agent Chat review edge cases"
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/ThinkingEffortControl.tsx": {
+      "sha256": "f7b5fb88c7da2479a1581496baadb76a6a9901a05f68d379725515d1dab78d40",
+      "excerpts": [
+        {
+          "start": 90,
+          "end": 107,
+          "lines": [
+            "          title={supported ? `Thinking effort: ${currentLabel}` : disabledReason}",
+            "          onClick={(event) => {",
+            "            if (!supported) event.preventDefault();",
+            "          }}",
+            "          className=\"flex h-6 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-transparent px-1.5 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)] aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:bg-transparent max-[360px]:w-6 max-[360px]:px-1\"",
+            "        >",
+            "          <span className=\"max-[360px]:hidden\">{triggerLabel}</span>",
+            "          <Icon name={COMPACT_ICONS[value]} size={14} tone=\"inherit\" className=\"hidden max-[360px]:block\" />",
+            "        </button>",
+            "      </Popover.Trigger>",
+            "",
+            "      {supported ? (",
+            "        <Popover.Portal>",
+            "          <Popover.Content",
+            "            side=\"top\"",
+            "            align=\"start\"",
+            "            sideOffset={8}",
+            "            collisionPadding={8}"
+          ]
+        },
+        {
+          "start": 154,
+          "end": 174,
+          "lines": [
+            "                  if (!next) return;",
+            "                  setLastManual(next);",
+            "                  onChange(next);",
+            "                }}",
+            "              />",
+            "            </div>",
+            "",
+            "            <div className=\"mt-3 border-t border-[var(--r-hairline)] pt-3\">",
+            "              <label className=\"flex min-h-7 cursor-pointer items-center gap-2 text-[12px] font-medium text-[var(--r-ink-body)]\">",
+            "                <input",
+            "                  type=\"checkbox\"",
+            "                  checked={value === 'auto'}",
+            "                  onChange={(event) => {",
+            "                    if (event.target.checked) {",
+            "                      onChange('auto');",
+            "                    } else if (manual) {",
+            "                      onChange(manual);",
+            "                    }",
+            "                  }}",
+            "                  className=\"h-4 w-4 rounded border-[var(--r-hairline-strong,var(--r-hairline))] accent-[var(--r-accent)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)]\"",
+            "                />"
+          ]
+        },
+        {
+          "start": 189,
+          "end": 199,
+          "lines": []
+        }
+      ],
+      "recentPathHistory": [
+        "1146e1487ffc3eb8be822f91c303153911effc2a 2026-08-27T20:31:33+03:00 fix: finish compact sidebar controls",
+        "74cb608910647bee4763ffeb363e0f516e7c0b1d 2026-08-24T15:03:21+03:00 fix: center singleton effort slider",
+        "1830913044fb59ddadd965818ccda3dc7e4f83a6 2026-08-24T14:54:42+03:00 fix: align thinking effort slider endpoints",
+        "363b393454364ad2ffa39ec412504e53cf3cf47f 2026-08-24T14:22:02+03:00 fix(ai): envelope effort slider thumb"
+      ]
+    }
+  },
+  "historyLimit": "Recent path history records provenance; it does not establish the first vulnerable commit.",
+  "syntaxChecks": [
+    {
+      "file": "normal-store-client.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-final-cleanup-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-restart-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-shutdown.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-stop-before-restart-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-tools.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-view-finish-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "store-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-driver/index.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-store-driver/store-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    }
+  ],
+  "pythonAstChecks": 2,
+  "eventRecords": 30,
+  "stoppedProcessesPerLaunch": [
+    18,
+    12
+  ],
+  "screenshotSha256": "46f97ae992bbc266bb85a3220783fd241c2bf6a02883cec1fb19bd871046541f"
+}

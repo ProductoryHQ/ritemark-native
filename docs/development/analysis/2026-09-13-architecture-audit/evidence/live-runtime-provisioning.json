@@ -1,0 +1,46 @@
+{
+  "method": "Independent APFS clone of installed, signed darwin-arm64 runtime directory; source and destination file bytes compared. Manifest is byte-identical to baseline. This is development-test provisioning, not a fresh release build or archive-checksum revalidation.",
+  "manifestSha256": "1d4e9bed86b76e09586f3c8d7a81f4f5b8513d1500d1ec6c3745f1765ac143ee",
+  "files": [
+    {
+      "name": "claude",
+      "bytes": 324973632,
+      "sha256": "648ebf4a78f442f710a7905ffa40afa40bb4f990c71943ec62c9e40106607051"
+    },
+    {
+      "name": "claude.sha256",
+      "bytes": 73,
+      "sha256": "e614dc88b34c24cc816d7809aef048410923bc02a5f8cc8533fba1e8bd206cc3"
+    },
+    {
+      "name": "codex-app-server",
+      "bytes": 171629600,
+      "sha256": "2c965118276888af7b3ca525ad41d800d24ca3d00ffcdb6874cc948100718570"
+    },
+    {
+      "name": "codex-app-server.sha256",
+      "bytes": 83,
+      "sha256": "0fedb4a5e40913c13394a8a5b7e33f257a55879e2401556a8fb5b8117538b90c"
+    },
+    {
+      "name": "codex-code-mode-host",
+      "bytes": 62422688,
+      "sha256": "ddb8706945b42d242b560e0a91498a0cc383f1ec4ed8e180848c462c89764656"
+    },
+    {
+      "name": "codex-code-mode-host.sha256",
+      "bytes": 87,
+      "sha256": "079355b663950b6c7aa2b9c5ba7c49af7aea3cfc1b62bb284246142481e8177a"
+    },
+    {
+      "name": "opencode",
+      "bytes": 143108224,
+      "sha256": "6326ccd2a62d2a423de865ba5a69e105c48d3d363d88195faab939cd7fa3c186"
+    },
+    {
+      "name": "opencode.sha256",
+      "bytes": 75,
+      "sha256": "8099a8004dcd688a3eef9f058b76f04b1dfaae757c120c21448f3ddfa23f3039"
+    }
+  ]
+}

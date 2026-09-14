@@ -1,0 +1,288 @@
+{
+  "method": "Verify actual normal-mode audit extension and open the synthetic draw.io SVG through its real custom editor.",
+  "pid": 84955,
+  "expectedExtensionPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+  "host": {
+    "at": 1789298113880,
+    "hostPid": 85175,
+    "driverMode": 1,
+    "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+    "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+    "workspaceFile": null,
+    "workspaceFolders": [
+      "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+    ],
+    "hotExit": "onExit",
+    "autoSave": "off",
+    "ritemark": {
+      "active": true,
+      "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+      "version": "1.10.1"
+    },
+    "documents": [],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": []
+      }
+    ],
+    "terminals": [
+      "bash"
+    ]
+  },
+  "openRequestedAt": 1789298113885,
+  "drawioReadyAt": 1789298114988,
+  "view": {
+    "targetId": "C8AAB38E0A58FA02C0E290764DD35CCB",
+    "contextId": 2,
+    "text": "File\nEdit\nView\nArrange\nExtras\nHelp\nScratchpad\nDrag elements here\nGeneral\nText\nHeading\n\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\nVertical Container\nHorizontal Container\nList\nItem 1\nItem 2\nItem 3\nList Item\nLabel\nLabel\nSource\nLabel\nSource\nTarget\nMisc\nAdvanced\nBasic\nArrows\nFlowchart\nEntity Relation\nUML\n+\nMore Shapes\nDiagram\nStyle\nView\nGrid\nPage View\nBackground\nChange...\nBackground Color\nShadow\nOptions\nConnection Arrows\nConnection Points\nGuides\nPaper Size\nEdit Data...\nClear Default Style\n\nAUDIT BASE\nPage-1",
+    "bridge": {
+      "loaded": true,
+      "events": [
+        "host:drawio:load",
+        "out:load",
+        "drawio:init",
+        "out:load",
+        "out:load",
+        "drawio:load",
+        "drawio:load"
+      ]
+    },
+    "editable": [],
+    "resources": [
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/styles/grapheditor.css",
+        "decodedBodySize": 59472,
+        "duration": 4
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/styles/high-contrast.css",
+        "decodedBodySize": 2852,
+        "duration": 3.9000000953674316
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/bootstrap.js",
+        "decodedBodySize": 9728,
+        "duration": 4
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/images/spin.gif",
+        "decodedBodySize": 2290,
+        "duration": 4.099999904632568
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/main.js",
+        "decodedBodySize": 447,
+        "duration": 3.9000000953674316
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/PreConfig.js",
+        "decodedBodySize": 838,
+        "duration": 8.799999952316284
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/app.min.js",
+        "decodedBodySize": 9314094,
+        "duration": 60.90000009536743
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/mxgraph/css/common.css",
+        "decodedBodySize": 3549,
+        "duration": 17.200000047683716
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/PostConfig.js",
+        "decodedBodySize": 178,
+        "duration": 5
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/startup.js",
+        "decodedBodySize": 17079,
+        "duration": 5.799999952316284
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/resources/dia.txt",
+        "decodedBodySize": 51899,
+        "duration": 5.700000047683716
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/shapes-14-6-5.min.js",
+        "decodedBodySize": 1442105,
+        "duration": 8.900000095367432
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/extensions.min.js",
+        "decodedBodySize": 4782385,
+        "duration": 62
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/js/stencils.min.js",
+        "decodedBodySize": 7584826,
+        "duration": 89.69999980926514
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/core.js",
+        "decodedBodySize": 141073,
+        "duration": 5
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/output/svg.js",
+        "decodedBodySize": 159164,
+        "duration": 21
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/ui/safe.js",
+        "decodedBodySize": 6364,
+        "duration": 26.700000047683716
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/input/asciimath.js",
+        "decodedBodySize": 103833,
+        "duration": 27.700000047683716
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/input/tex.js",
+        "decodedBodySize": 149233,
+        "duration": 37.5
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/math4/es5/fonts/mathjax-tex-font/svg.js",
+        "decodedBodySize": 1417106,
+        "duration": 35.69999980926514
+      },
+      {
+        "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/media/drawio/images/github-logo.svg",
+        "decodedBodySize": 5268,
+        "duration": 19.799999952316284
+      }
+    ]
+  },
+  "hostAfter": {
+    "at": 1789298114993,
+    "hostPid": 85175,
+    "driverMode": 1,
+    "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+    "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+    "workspaceFile": null,
+    "workspaceFolders": [
+      "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+    ],
+    "hotExit": "onExit",
+    "autoSave": "off",
+    "ritemark": {
+      "active": true,
+      "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+      "version": "1.10.1"
+    },
+    "documents": [
+      {
+        "file": "diagram.drawio.svg",
+        "version": 1,
+        "dirty": false,
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"90\" content=\"&lt;mxfile&gt;&lt;diagram name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;900&quot; dy=&quot;700&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; page=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;audit-cell&quot; value=&quot;AUDIT BASE&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;100&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;\"><rect x=\"1\" y=\"1\" width=\"180\" height=\"70\" fill=\"#dae8fc\"/><text x=\"12\" y=\"40\">AUDIT BASE</text></svg>\n",
+        "length": 851,
+        "sha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433"
+      }
+    ],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": [
+          {
+            "label": "diagram.drawio.svg",
+            "active": true,
+            "dirty": false,
+            "uri": "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace/diagram.drawio.svg",
+            "viewType": "ritemark.drawioEditor"
+          }
+        ]
+      }
+    ],
+    "terminals": [
+      "bash"
+    ]
+  },
+  "processes": [
+    {
+      "pid": 84955,
+      "ppid": 84679,
+      "rssKiB": 184112,
+      "command": "/Applications/Ritemark.app/Contents/MacOS/Ritemark --new-window --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --extensions-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/extensions --remote-debugging-port=9239 --disable-telemetry --disable-workspace-trust --skip-welcome --skip-release-notes /private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+    },
+    {
+      "pid": 84957,
+      "ppid": 84955,
+      "rssKiB": 122208,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (GPU).app/Contents/MacOS/Ritemark Helper (GPU) --type=gpu-process --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --gpu-preferences=SAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAAAwAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708988185955192 --seatbelt-client=33"
+    },
+    {
+      "pid": 84958,
+      "ppid": 84955,
+      "rssKiB": 41904,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-GB --service-sandbox-type=network --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708989122997041 --seatbelt-client=35"
+    },
+    {
+      "pid": 84964,
+      "ppid": 84955,
+      "rssKiB": 213776,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Renderer).app/Contents/MacOS/Ritemark Helper (Renderer) --type=renderer --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --app-path=/Applications/Ritemark.app/Contents/Resources/app --enable-sandbox --enable-blink-features=HighlightAPI --max-active-webgl-contexts=32 --remote-debugging-port=9239 --disable-blink-features=FontMatchingCTMigration,StandardizedBrowserZoom, --lang=en-GB --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=4 --time-ticks-at-unix-epoch=-1787941686105443 --launch-time-ticks=1356388965079 --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708990060038890 --vscode-window-config=vscode:2ad68c1a-fb40-460b-9ad0-652bfaf79026 --seatbelt-client=52"
+    },
+    {
+      "pid": 85173,
+      "ppid": 84955,
+      "rssKiB": 69744,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708990997080739"
+    },
+    {
+      "pid": 85174,
+      "ppid": 84955,
+      "rssKiB": 58688,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708991934122588"
+    },
+    {
+      "pid": 85175,
+      "ppid": 84955,
+      "rssKiB": 106496,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Plugin).app/Contents/MacOS/Ritemark Helper (Plugin) --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --dns-result-order=ipv4first --experimental-network-inspection --inspect-port=0 --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708992871164437"
+    },
+    {
+      "pid": 85193,
+      "ppid": 85175,
+      "rssKiB": 60640,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Plugin).app/Contents/MacOS/Ritemark Helper (Plugin) /Applications/Ritemark.app/Contents/Resources/app/extensions/json-language-features/server/dist/node/jsonServerMain --node-ipc --clientProcessId=85175"
+    },
+    {
+      "pid": 85240,
+      "ppid": 84955,
+      "rssKiB": 139456,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Renderer).app/Contents/MacOS/Ritemark Helper (Renderer) --type=renderer --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --app-path=/Applications/Ritemark.app/Contents/Resources/app --enable-sandbox --enable-blink-features=HighlightAPI --max-active-webgl-contexts=32 --remote-debugging-port=9239 --disable-blink-features=FontMatchingCTMigration,StandardizedBrowserZoom, --lang=en-GB --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=8 --time-ticks-at-unix-epoch=-1787941686105443 --launch-time-ticks=1356394754720 --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708993808206286 --vscode-window-config=vscode:2ad68c1a-fb40-460b-9ad0-652bfaf79026 --seatbelt-client=90"
+    },
+    {
+      "pid": 85243,
+      "ppid": 84955,
+      "rssKiB": 62112,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper --type=utility --utility-sub-type=node.mojom.NodeService --lang=en-GB --service-sandbox-type=none --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708994745248135"
+    },
+    {
+      "pid": 85313,
+      "ppid": 85175,
+      "rssKiB": 65216,
+      "command": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1/binaries/agents/darwin-arm64/codex-app-server"
+    },
+    {
+      "pid": 85580,
+      "ppid": 84955,
+      "rssKiB": 358944,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Renderer).app/Contents/MacOS/Ritemark Helper (Renderer) --type=renderer --user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile --standard-schemes=vscode-webview,vscode-file --enable-sandbox --secure-schemes=vscode-webview,vscode-file --cors-schemes=vscode-webview,vscode-file --fetch-schemes=vscode-webview,vscode-file --service-worker-schemes=vscode-webview --code-cache-schemes=vscode-webview,vscode-file --app-path=/Applications/Ritemark.app/Contents/Resources/app --enable-sandbox --enable-blink-features=HighlightAPI --max-active-webgl-contexts=32 --remote-debugging-port=9239 --disable-blink-features=FontMatchingCTMigration,StandardizedBrowserZoom, --lang=en-GB --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=10 --time-ticks-at-unix-epoch=-1787941686105443 --launch-time-ticks=1356427804444 --shared-files --field-trial-handle=1718379636,r,1434630625991762660,10197276594588902103,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708995682289984 --vscode-window-config=vscode:2ad68c1a-fb40-460b-9ad0-652bfaf79026 --seatbelt-client=99"
+    },
+    {
+      "pid": 85249,
+      "ppid": 85243,
+      "rssKiB": 1200,
+      "command": "/bin/bash --noprofile --norc"
+    }
+  ],
+  "completed": true
+}

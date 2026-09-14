@@ -1,0 +1,4 @@
+npm error Exit handler never called!
+npm error This is an error with npm itself. Please report this error at:
+npm error   <https://github.com/npm/cli/issues>
+npm error A complete log of this run can be found in: /private/tmp/ritemark-architecture-audit-npm-cache/_logs/2026-09-13T08_58_17_445Z-debug-0.log

@@ -1,0 +1,76 @@
+{
+  "method": "Node --check of normal/native harness files; Python AST parse; JSONL parse. Artifact syntax only, not proof of conclusions.",
+  "node": "v22.22.1",
+  "checks": [
+    {
+      "file": "native-acp-lifecycle-probe.cjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "native-codex-lifecycle-probe.cjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-cleanup-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-client.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-driver/index.cjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-multiwindow-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-recovery-finish-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-recovery-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-scheduler-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-startup-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-tools.mjs",
+      "exitCode": 0,
+      "output": ""
+    }
+  ],
+  "pythonAstPassed": true,
+  "jsonl": [
+    {
+      "file": "normal-driver-events-52261.jsonl",
+      "parsedRecords": 12
+    },
+    {
+      "file": "normal-driver-events-54235.jsonl",
+      "parsedRecords": 40
+    },
+    {
+      "file": "normal-driver-events-56633.jsonl",
+      "parsedRecords": 11
+    }
+  ]
+}

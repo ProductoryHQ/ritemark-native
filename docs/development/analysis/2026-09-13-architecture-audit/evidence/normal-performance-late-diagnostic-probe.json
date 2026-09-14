@@ -1,0 +1,138 @@
+[
+  {
+    "target": "1C24174ACA230A9C96CCA4E21D0D5BB3",
+    "context": {
+      "id": 2,
+      "origin": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln",
+      "name": "",
+      "uniqueId": "3114716517445338756.412733830116742915",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "8BF6E08856BC2E6DD8A01256988B4F6C"
+      }
+    },
+    "value": {
+      "visibility": "hidden",
+      "frameId": "active-frame",
+      "ready": "complete",
+      "body": "Claude can work with your files\n\n\"Reorganize my research notes\"\n\"Create an outline from these files\"\n\"Find all mentions of X and summarize\"\nYou are interacting with AI\nClaude Code · Anthropic · Sonnet 5. AI can be wrong—review its output and changes.\nWhat may be shared?\nDon’t show again\nActive: note.md\nSonnet 5\nAuto",
+      "root": {},
+      "editables": [],
+      "resources": [
+        {
+          "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/media/webview.js?v=1789288800896",
+          "duration": 347.5
+        }
+      ],
+      "observer": null
+    }
+  },
+  {
+    "target": "1C24174ACA230A9C96CCA4E21D0D5BB3",
+    "context": {
+      "id": 1,
+      "origin": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln",
+      "name": "",
+      "uniqueId": "-4581397631297860999.1447588107819943757",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "1C24174ACA230A9C96CCA4E21D0D5BB3"
+      }
+    },
+    "value": {
+      "visibility": "hidden",
+      "ready": "complete",
+      "body": "",
+      "editables": [],
+      "resources": [],
+      "observer": null
+    }
+  },
+  {
+    "target": "4258BE7F2756ED15DA0E01B87124345E",
+    "context": {
+      "id": 11,
+      "origin": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5",
+      "name": "",
+      "uniqueId": "6772190590152929236.-671635132832579542",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "9C9B12281D288E3F3126DD8E668482C6"
+      }
+    },
+    "value": {
+      "visibility": "hidden",
+      "frameId": "active-frame",
+      "ready": "complete",
+      "body": "ET\nRetry document update\nRetry document update\nNormal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665",
+      "root": {},
+      "editables": [
+        {
+          "tag": "DIV",
+          "classes": "tiptap ProseMirror prose prose-lg max-w-none focus:outline-none",
+          "value": "true"
+        }
+      ],
+      "resources": [
+        {
+          "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/media/webview.js?v=1789288800896",
+          "duration": 95.09999990463257
+        }
+      ],
+      "observer": {
+        "installedAt": 477,
+        "longTasks": [
+          {
+            "startTime": 235.70000004768372,
+            "duration": 170,
+            "name": "self"
+          },
+          {
+            "startTime": 417,
+            "duration": 51,
+            "name": "self"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "target": "4258BE7F2756ED15DA0E01B87124345E",
+    "context": {
+      "id": 10,
+      "origin": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5",
+      "name": "",
+      "uniqueId": "1980640283828126995.-5543879301055288254",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "4258BE7F2756ED15DA0E01B87124345E"
+      }
+    },
+    "value": {
+      "visibility": "hidden",
+      "ready": "complete",
+      "body": "",
+      "editables": [],
+      "resources": [],
+      "observer": {
+        "installedAt": 23.800000190734863,
+        "longTasks": [
+          {
+            "startTime": 261.80000019073486,
+            "duration": 170,
+            "name": "same-origin-descendant"
+          },
+          {
+            "startTime": 443.10000014305115,
+            "duration": 51,
+            "name": "same-origin-descendant"
+          }
+        ]
+      }
+    }
+  }
+]

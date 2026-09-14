@@ -1,0 +1,70 @@
+{
+  "method": "Node --check syntax only, not behavioral coverage",
+  "checks": [
+    {
+      "file": "live-cleanup-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-client.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-csv-row-limit-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-excel-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-excel-repeat-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-host-history-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-markdown-history-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-markdown-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-markdown-split-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-restart-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-runtime-inventory-probe.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-tools.mjs",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "file": "live-driver/index.cjs",
+      "exit": 0,
+      "stderr": ""
+    }
+  ]
+}

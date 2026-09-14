@@ -1,0 +1,35 @@
+{
+  "body": "ET\nReview changes\nReview changes\nAudit note\n\nEXTERNAL_CLEAN paragraph.\n\nStable selection area. HUMAN_UNSAVED HUMAN_UNSAVED HUMAN UNSAVED",
+  "buttons": [
+    {
+      "text": "",
+      "disabled": false,
+      "title": "Properties"
+    },
+    {
+      "text": "ET",
+      "disabled": false,
+      "title": "Start dictation (Estonian)"
+    },
+    {
+      "text": "",
+      "disabled": false,
+      "title": "Select language"
+    },
+    {
+      "text": "Review changes",
+      "disabled": false,
+      "title": "Review changes"
+    },
+    {
+      "text": "",
+      "disabled": false,
+      "title": "Export"
+    },
+    {
+      "text": "",
+      "disabled": false,
+      "title": "Add block"
+    }
+  ]
+}

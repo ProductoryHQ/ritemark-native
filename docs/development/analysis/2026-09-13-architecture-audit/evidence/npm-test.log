@@ -1,0 +1,28 @@
+
+> ritemark@1.10.1 pretest
+> npm run test:conversations && npm run test:thinking-effort && npm run test:sprint113-language && npm run test:editor-sync && npm run test:claude-auth && npm run test:security-backports
+
+
+> ritemark@1.10.1 test:conversations
+> npx tsx src/runtime/continuation.test.ts && npx tsx src/conversations/contextPack.test.ts && npx tsx src/conversations/identityColor.test.ts && npx tsx src/conversations/runtimeAttachmentPolicy.test.ts && npx tsx src/conversations/types.test.ts && npx tsx src/conversations/projectScope.test.ts && npx tsx src/conversations/ConversationStore.test.ts && npx tsx src/conversations/ConversationController.test.ts && npx tsx src/conversations/conversationDeleteNotification.test.ts && npx tsx src/conversations/ConversationCutoverState.test.ts && npx tsx src/conversations/LegacyConversationMigrator.test.ts && npx tsx src/conversations/ConversationTitlePolicy.test.ts && npx tsx src/conversations/ConversationTitleGenerator.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageReadOnly.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts && npx tsx webview/src/components/ai-sidebar/conversationSelectors.test.ts && npx tsx webview/src/components/ai-sidebar/conversationProjection.test.ts && npx tsx webview/src/components/ai-sidebar/continuationPresentation.test.ts
+
+node:net:1918
+      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                    ^
+
+Error: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/31090.pipe
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2119:5)
+    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537
+    at new Promise (<anonymous>)
+    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)
+    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/31090.pipe',
+  port: -1
+}
+
+Node.js v22.22.1

@@ -1,0 +1,292 @@
+{
+  "method": "Verify recorded before/after/restoration and cleanup evidence; capture source/history and harness syntax. Does not replay GUI or claim native-agent delivery.",
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "comparisonsPassed": true,
+  "sourceContext": {
+    "extensions/ritemark/webview/src/components/ai-sidebar/RenderedMarkdown.tsx": {
+      "sha256": "5e91cd5e09c11061985b9a1d4383c5e0a8c05715e250f2e80bc57f4576f688b6",
+      "excerpts": [
+        {
+          "start": 13,
+          "end": 33,
+          "lines": [
+            "",
+            "// Configure marked for safety + good defaults",
+            "marked.setOptions({",
+            "  gfm: true,",
+            "  breaks: true,",
+            "});",
+            "",
+            "interface RenderedMarkdownProps {",
+            "  content: string;",
+            "  className?: string;",
+            "}",
+            "",
+            "export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) {",
+            "  const html = useMemo(() => {",
+            "    if (!content) return '';",
+            "    try {",
+            "      return marked.parse(content) as string;",
+            "    } catch {",
+            "      return content;",
+            "    }",
+            "  }, [content]);"
+          ]
+        },
+        {
+          "start": 68,
+          "end": 74,
+          "lines": [
+            "  return (",
+            "    <div",
+            "      className={cn('rendered-markdown', className)}",
+            "      onClick={handleClick}",
+            "      dangerouslySetInnerHTML={{ __html: html }}",
+            "    />",
+            "  );"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "94f06550eb09d3c5874c8391574933bfd8a7b058 2026-08-05T10:11:06+02:00 fix: chat file links open in Ritemark + writer-voice Project empty state (#176)",
+        "bd07995578e84fe84b88f469a160fdd93a338105 2026-04-24T21:01:07+03:00 feat(sprint-52): design foundations + Phosphor icon migration",
+        "320f9c2bc9a02829065e5e4a6107c942ad1a3e05 2026-03-03T21:27:35+02:00 fix: rewrite Codex protocol from generated types, unify chat UI components",
+        "de8d8360d9d80a8ac799b6a55d47e8729bf1350c 2026-02-14T23:24:30+02:00 fix: merge duplicate sidebar headers, improve settings sliders and chat font sizing"
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/ChatBubbles.tsx": {
+      "sha256": "80142454f963b113bbab1968deee6c84ee9c2efaeb46963300b02fc7502875a4",
+      "excerpts": [
+        {
+          "start": 60,
+          "end": 84,
+          "lines": [
+            "              </span>",
+            "            )",
+            "          )}",
+            "        </div>",
+            "      )}",
+            "      {children}",
+            "    </div>",
+            "  );",
+            "}",
+            "",
+            "// \u2500\u2500 AI Response \u2500\u2500",
+            "",
+            "interface AIResponseBubbleProps {",
+            "  content: string;",
+            "  className?: string;",
+            "}",
+            "",
+            "export function AIResponseBubble({ content, className }: AIResponseBubbleProps) {",
+            "  if (!content) return null;",
+            "  return (",
+            "    <div style={chatFontStyle}>",
+            "      <RenderedMarkdown content={content} className={className} />",
+            "    </div>",
+            "  );",
+            "}"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "bd07995578e84fe84b88f469a160fdd93a338105 2026-04-24T21:01:07+03:00 feat(sprint-52): design foundations + Phosphor icon migration",
+        "b44566d748f1350face1b9a737b806d206774ffe 2026-03-06T20:13:02+02:00 fix: show plan preview and active file context in agent chat",
+        "320f9c2bc9a02829065e5e4a6107c942ad1a3e05 2026-03-03T21:27:35+02:00 fix: rewrite Codex protocol from generated types, unify chat UI components"
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/CodexView.tsx": {
+      "sha256": "59761db3aa9e59493b33fecca238bbd174823be8d7b7f4e098563452cbb46e2e",
+      "excerpts": [
+        {
+          "start": 175,
+          "end": 204,
+          "lines": [
+            "          <span>{runtimeLabel}</span>",
+            "        </div>",
+            "      )}",
+            "",
+            "      {/* User message */}",
+            "      <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>",
+            "        {turn.userPrompt}",
+            "      </UserPromptBubble>",
+            "",
+            "      {/* Collapsible activities */}",
+            "      {hasActivities && (",
+            "        <ActivitySection",
+            "          activities={turn.activities}",
+            "          isRunning={turn.isRunning}",
+            "          lastActivity={lastActivity}",
+            "        />",
+            "      )}",
+            "",
+            "      {/* Approval dialog */}",
+            "      {turn.approval && (",
+            "        <ApprovalCard",
+            "          approval={turn.approval}",
+            "          onApprove={onApprove}",
+            "          onReject={onReject}",
+            "          agentLabel={runtimeLabel}",
+            "        />",
+            "      )}",
+            "",
+            "      {turn.pendingQuestion && (",
+            "        <AgentQuestion"
+          ]
+        },
+        {
+          "start": 233,
+          "end": 239,
+          "lines": [
+            "",
+            "      {/* Streaming text */}",
+            "      {turn.streamingText && !shouldHideStreamingBubble && (",
+            "        <AIResponseBubble content={turn.streamingText} />",
+            "      )}",
+            "",
+            "      {/* The conversation-level ActivityStatusLine covers the starting state \u2014"
+          ]
+        },
+        {
+          "start": 445,
+          "end": 457,
+          "lines": [
+            "      )}",
+            "",
+            "      {/* Actions */}",
+            "      <div className=\"flex flex-wrap items-center gap-2 px-2.5 py-2 border-t border-[var(--r-hairline)]\">",
+            "        <Button variant=\"default\" size=\"sm\" className=\"flex-1 basis-[45%] whitespace-nowrap\" onClick={() => onApprove(approval.requestId)}>",
+            "          <Icon name=\"check\" size={12} /> Approve",
+            "        </Button>",
+            "        <Button variant=\"outline\" size=\"sm\" className=\"flex-1 basis-[45%] whitespace-nowrap\" onClick={() => onReject(approval.requestId)}>",
+            "          <Icon name=\"x\" size={12} /> Reject",
+            "        </Button>",
+            "      </div>",
+            "    </div>",
+            "  );"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "26467852ce417146d183e1a39e8bfbbc0d8f2ec6 2026-08-05T13:53:14+02:00 feat(ui): Jarmo test-pass polish pack \u2014 mode dropdown, folder tree, (#180)",
+        "ee46fb2738b8cd1d8c17594850cf103ce2c4bc5e 2026-08-04T14:44:51+02:00 feat(sprint-103): truthful agent plans and activity state (#132, #161) (#168)",
+        "a8d15a589bc08faed1efbf1fed97c831362e97a5 2026-07-22T12:37:35+02:00 refactor(sprint-99): delete the compat mirror; components read the active conversation",
+        "f903e3d4710c07d1ff8addf8486ad60d062f80f0 2026-06-08T14:57:55+03:00 fix(sprint-79): unified approval policy (Auto/Ask/Plan) + restore dropped per-turn context"
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/AgentResponse.tsx": {
+      "sha256": "22e1d88cc570ab3b8b87ba0c9c4451174fae892f9c15b20d325f8fbb77a07d7d",
+      "excerpts": [
+        {
+          "start": 255,
+          "end": 270,
+          "lines": [
+            "",
+            "  // Success result",
+            "  return (",
+            "    <div style={chatFontStyle}>",
+            "      {result.text && (",
+            "        <RenderedMarkdown content={result.text} />",
+            "      )}",
+            "",
+            "      {/* Plan preview card */}",
+            "      {needsApproval && displayPlanText && (",
+            "        <div className=\"mt-2 max-h-[300px] overflow-y-auto rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60 px-3 py-2\">",
+            "          <div className=\"text-[10px] font-medium text-[var(--r-ink-muted)] uppercase tracking-wide mb-1.5\">Plan</div>",
+            "          <div className=\"text-[12px]\">",
+            "            <RenderedMarkdown content={displayPlanText} />",
+            "          </div>",
+            "        </div>"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e 2026-09-03T22:46:49+03:00 fix: isolate agent runtime availability",
+        "d0490a9dc49f3d2c1a23b4f0c4006d83de8869db 2026-09-01T12:53:03+03:00 fix: complete Claude sign-in recovery",
+        "b4a6c619a22a632ebd07cfe1ec10daa0d2a1b0b9 2026-09-01T12:16:28+03:00 fix: harmonize AI recovery alerts",
+        "adba9553f8de6059b232faf61bfb2a16923e9138 2026-09-01T11:15:39+03:00 fix: settle shared Claude auth recovery"
+      ]
+    },
+    "extensions/ritemark/src/views/UnifiedViewProvider.ts": {
+      "sha256": "42397a2471310bfa71354dd65c9c0461c313e7413f2fe5dbe6360c0557cf4679",
+      "excerpts": [
+        {
+          "start": 785,
+          "end": 797,
+          "lines": [
+            "            onProgress: (progress) => {",
+            "              if (!isCurrentRuntimeTurn()) return;",
+            "              if (isClaudeCode) {",
+            "                this._view?.webview.postMessage({ type: 'agent-progress', conversationId, agentId, progress });",
+            "              } else {",
+            "                if (progress.type === 'text') {",
+            "                  streamedResponseText += progress.message;",
+            "                  this._view?.webview.postMessage({ type: 'codex-streaming', conversationId, delta: progress.message });",
+            "                } else {",
+            "                  this._view?.webview.postMessage({ type: 'codex-progress', conversationId, progress });",
+            "                }",
+            "              }",
+            "            },"
+          ]
+        },
+        {
+          "start": 814,
+          "end": 823,
+          "lines": [
+            "              this._view?.webview.postMessage({",
+            "                type: 'agent-result', conversationId,",
+            "                agentId,",
+            "                text: result.text ?? '',",
+            "                filesModified: result.filesModified ?? [],",
+            "                metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },",
+            "                error,",
+            "                failureKind,",
+            "              });",
+            "              this._refreshExplorerForAgentWrites(result.filesModified);"
+          ]
+        },
+        {
+          "start": 2218,
+          "end": 2228,
+          "lines": [
+            "    return `<!DOCTYPE html>",
+            "<html lang=\"en\">",
+            "<head>",
+            "  <meta charset=\"UTF-8\">",
+            "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
+            "  <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: data:; font-src ${webview.cspSource} data:;\">",
+            "  <title>Ritemark AI</title>",
+            "  <style>",
+            "    * { margin: 0; padding: 0; box-sizing: border-box; }",
+            "    body {",
+            "      font-family: var(--vscode-font-family);"
+          ]
+        }
+      ],
+      "recentPathHistory": [
+        "43e9934287b49fd6f0b3b3efd9bcb53ba5d5df7e 2026-09-03T22:46:49+03:00 fix: isolate agent runtime availability",
+        "9f7b7f00a9b9d76f3b699568e17a06ad18332803 2026-09-01T17:31:57+03:00 fix: close Agent Chat review edge cases",
+        "80be7da21d2410831e3df16bfd2cf52c73e010bf 2026-09-01T17:20:05+03:00 fix: make agent chat bootstrap atomic",
+        "3e4d931fd61bb1c707e723026b4572158f3d6ef3 2026-09-01T11:34:15+03:00 fix: persist Claude auth recovery"
+      ]
+    }
+  },
+  "historyLimit": "Recent path history establishes provenance only, not the first vulnerable commit or regression cause.",
+  "syntaxChecks": [
+    {
+      "file": "formats-security-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "formats-security-cleanup-probe.mjs",
+      "nodeCheckExitCode": 0
+    }
+  ],
+  "pythonAstCheck": "passed",
+  "currentSecurityHostEvents": 2,
+  "screenshots": {
+    "formats-security-baseline.png": "c61b54601aee9693496af026aaea0c7e57328cee400f36da7fce18fec284e44e",
+    "formats-security-styled-controls.png": "c7690dec16bc5bb1f43109856d36be62751c8ee9060ccb98ee3f125e57cc3d38"
+  },
+  "stoppedProcesses": 12
+}

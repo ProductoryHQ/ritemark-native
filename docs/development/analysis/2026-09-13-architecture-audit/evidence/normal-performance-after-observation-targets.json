@@ -1,0 +1,32 @@
+[
+  {
+    "id": "D031AE636C41C7140743A1C54CE890BE",
+    "type": "page",
+    "title": "note.md — workspace",
+    "url": "vscode-file://vscode-app/Applications/Ritemark.app/Contents/Resources/app/out/vs/code/electron-browser/workbench/workbench.html"
+  },
+  {
+    "id": "1C24174ACA230A9C96CCA4E21D0D5BB3",
+    "type": "iframe",
+    "title": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln/index.html?id=faf93859-601a-4a10-8e08-51bcf578d4af&amp;parentId=1&amp;origin=9b14bba1-c27c-451b-b304-e3870c8aab35&amp;swVersion=4&amp;extensionId=ritemark.ritemark&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app&amp;purpose=webviewView",
+    "url": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln/index.html?id=faf93859-601a-4a10-8e08-51bcf578d4af&parentId=1&origin=9b14bba1-c27c-451b-b304-e3870c8aab35&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView"
+  },
+  {
+    "id": "00DB1EDE1EED0D326E05ACEBE2C074EA",
+    "type": "iframe",
+    "title": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5/index.html?id=488f0541-b262-4049-b2da-3b1e680599a5&amp;parentId=1&amp;origin=2ca6077b-69b9-438f-a2b2-6b7f2b5edb50&amp;swVersion=4&amp;extensionId=ritemark.ritemark&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app",
+    "url": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5/index.html?id=488f0541-b262-4049-b2da-3b1e680599a5&parentId=1&origin=2ca6077b-69b9-438f-a2b2-6b7f2b5edb50&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app"
+  },
+  {
+    "id": "AAC0761174C84E438B8154831A1B97E6",
+    "type": "service_worker",
+    "title": "Service Worker vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5/service-worker.js?v=4&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;remoteAuthority=",
+    "url": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5/service-worker.js?v=4&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&remoteAuthority="
+  },
+  {
+    "id": "BFAAD3EA1DC2E422DFFEFFF1A41F1C8D",
+    "type": "worker",
+    "title": "TextMateWorker",
+    "url": "blob:vscode-file://vscode-app/7901a081-21d8-4341-b340-fd6b0ccb3514"
+  }
+]

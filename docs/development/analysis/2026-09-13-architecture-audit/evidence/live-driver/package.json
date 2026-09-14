@@ -1,0 +1,9 @@
+{
+  "name": "ritemark-architecture-audit-driver",
+  "displayName": "Ritemark Architecture Audit Driver",
+  "publisher": "ritemark-audit",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.94.0" },
+  "activationEvents": ["*"],
+  "main": "./index.cjs"
+}

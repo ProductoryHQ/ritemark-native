@@ -1,0 +1,345 @@
+{
+  "method": "Actual Excel custom provider and React DataTable in the audit extension. Synthetic XLSX, real cell edit through DOM mouse event + CDP text/key input, external SheetJS file replacement, then normal VS Code Save command. No direct mutation of provider buffers.",
+  "steps": [
+    {
+      "stage": "initial",
+      "at": 1789293682419,
+      "host": {
+        "at": 1789293682410,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 4,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "diskValue": "baseline",
+      "cells": [
+        "item",
+        "value",
+        "alpha",
+        "baseline"
+      ]
+    },
+    {
+      "stage": "human-unsaved",
+      "at": 1789293682459,
+      "host": {
+        "at": 1789293682454,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 4,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "diskValue": "baseline",
+      "visible": "book.xlsx\nOpen in Excel\nfx\nB2\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nHUMAN EDIT\n\t\n\tAdd row"
+    },
+    {
+      "stage": "external-replacement",
+      "at": 1789293683679,
+      "host": {
+        "at": 1789293683669,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 4,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "diskValue": "EXTERNAL SAVED",
+      "visible": "book.xlsx\nRefresh\nRefresh\nOpen in Excel\nfx\nB2\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nHUMAN EDIT\n\t\n\tAdd row"
+    },
+    {
+      "stage": "save-after-external-replacement",
+      "at": 1789293683881,
+      "host": {
+        "at": 1789293683879,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 4,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "saveResult": {
+        "ok": true,
+        "host": {
+          "at": 1789293683687,
+          "hostPid": 879,
+          "ritemark": {
+            "active": true,
+            "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 6,
+              "dirty": true,
+              "length": 67,
+              "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+              "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+            },
+            {
+              "file": "second.md",
+              "version": 4,
+              "dirty": true,
+              "length": 81,
+              "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+              "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": true,
+                  "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "second.md",
+                  "active": false,
+                  "dirty": true,
+                  "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "activeTerminal": "bash",
+          "terminals": [
+            "bash"
+          ]
+        }
+      },
+      "diskValue": "HUMAN EDIT",
+      "visible": "book.xlsx\nRefresh\nRefresh\nOpen in Excel\nfx\nB2\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nHUMAN EDIT\n\t\n\tAdd row",
+      "dialogs": [
+        "Excel editing is basic: edited cells replace formulas with plain values, and complex formatting may be simplified when the file is saved.",
+        "Source: Ritemark Editor\nOK\nOpt Out\nPrivacy Policy\nTerms of Use\nRitemark collects anonymous usage data to improve the product. No personal information is collected."
+      ]
+    }
+  ],
+  "externalValueOverwritten": true,
+  "saveCompleted": true,
+  "confirmationDialogObserved": true,
+  "completed": true
+}

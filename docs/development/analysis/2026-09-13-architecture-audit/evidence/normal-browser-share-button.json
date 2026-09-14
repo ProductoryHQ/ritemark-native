@@ -1,0 +1,10 @@
+{
+  "share": [
+    {
+      "html": "<a class=\"monaco-button small browser-share-toggle monaco-text-button\" tabindex=\"0\" role=\"button\" custom-hover=\"true\" aria-disabled=\"false\" aria-label=\"Share with Agent\" aria-pressed=\"false\"><span class=\"codicon codicon-agent\"></span></a>",
+      "parent": "<div class=\"browser-share-toggle-container\" style=\"display: none;\"><a class=\"monaco-button small browser-share-toggle monaco-text-button\" tabindex=\"0\" role=\"button\" custom-hover=\"true\" aria-disabled=\"false\" aria-label=\"Share with Agent\" aria-pressed=\"false\"><span class=\"codicon codicon-agent\"></span></a></div>",
+      "visible": false
+    }
+  ],
+  "page": "AUDIT PAGE A () — workspace"
+}

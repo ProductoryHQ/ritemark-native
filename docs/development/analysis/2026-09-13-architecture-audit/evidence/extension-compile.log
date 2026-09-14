@@ -1,0 +1,12 @@
+
+> ritemark@1.10.1 compile
+> tsc --noEmit -p ./ && node esbuild.config.mjs
+
+
+  out/extension.js                       4.7mb ⚠️
+  out/browser/browserMcpAdapter.js       9.0kb
+  out/extension.js.map                   9.4mb
+  out/browser/browserMcpAdapter.js.map  16.3kb
+
+⚡ Done in 205ms
+[esbuild] build complete

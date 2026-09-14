@@ -1,0 +1,41 @@
+{
+  "reason": "The first probe looked for literal underscores in the serialized Markdown. TipTap correctly escaped them as backslash-underscore; typing and dirty propagation had succeeded. The repeat uses a marker with spaces.",
+  "host": {
+    "at": 1789293207208,
+    "hostPid": 879,
+    "ritemark": {
+      "active": true,
+      "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+      "version": "1.10.1"
+    },
+    "documents": [
+      {
+        "file": "note.md",
+        "version": 4,
+        "dirty": true,
+        "length": 95,
+        "sha256": "39143ee7dfdf0130a911d5fe3bb11889ffa4cb3beee285f9df89d326d24aab49",
+        "text": "# Audit note\n\nEXTERNAL\\_CLEAN paragraph.\n\nStable selection area. HUMAN\\_UNSAVED HUMAN\\_UNSAVED\n"
+      }
+    ],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": [
+          {
+            "label": "note.md",
+            "active": true,
+            "dirty": true,
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+            "viewType": "ritemark.editor"
+          }
+        ]
+      }
+    ],
+    "activeTerminal": "bash",
+    "terminals": [
+      "bash"
+    ]
+  }
+}

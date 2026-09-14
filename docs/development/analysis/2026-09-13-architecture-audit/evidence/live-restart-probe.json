@@ -1,0 +1,545 @@
+{
+  "method": "Recovery probe in the synthetic profile: append a unique unsaved marker, request CDP Browser.close, require the exact own app PID to terminate, then launch the same profile/extension and inspect recovered VS Code and webview state. This shutdown trigger is distinct from OS crash, power loss and the native menu Quit path.",
+  "steps": [
+    {
+      "stage": "unsaved-before-close",
+      "at": 1789294543756,
+      "host": {
+        "at": 1789294543756,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 7,
+            "dirty": true,
+            "length": 91,
+            "sha256": "b293f8ceedf3d01fbeb4281e1690cd01dfb843e92040dd7d999663c982d5aaaa",
+            "text": "# Audit note\n\nEXTERNAL\\_CONFLICT paragraph.\n\nStable selection area. RECOVERY 1789294543718\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": false,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          },
+          {
+            "file": "table.csv",
+            "version": 2,
+            "dirty": false,
+            "length": 218913,
+            "sha256": "37f1304954c111d5ba770a454514e0e0db6cdba275867a0cba3d0f62b4f11dfb",
+            "text": "item,value\r\nrow-00000,ROW LIMIT HUMAN EDIT\r\nrow-00001,value-1\r\nrow-00002,value-2\r\nrow-00003,value-3\r\nrow-00004,value-4\r\nrow-00005,value-5\r\nrow-00006,value-6\r\nrow-00007,value-7\r\nrow-00008,value-8\r\nrow-00009,value-9\r\nrow-00010,value-10\r\nrow-00011,value-11\r\nrow-00012,value-12\r\nrow-00013,value-13\r\nrow-00014,value-14\r\nrow-00015,value-15\r\nrow-00016,value-16\r\nrow-00017,value-17\r\nrow-00018,value-18\r\nrow-00019,value-19\r\nrow-00020,value-20\r\nrow-00021,value-21\r\nrow-00022,value-22\r\nrow-00023,value-23\r\nrow-00024,value-24\r\nrow-00025,value-25\r\nrow-00026,value-26\r\nrow-00027,value-27\r\nrow-00028,value-28\r\nrow-00029,value-29\r\nrow-00030,value-30\r\nrow-00031,value-31\r\nrow-00032,value-32\r\nrow-00033,value-33\r\nrow-00034,value-34\r\nrow-00035,value-35\r\nrow-00036,value-36\r\nrow-00037,value-37\r\nrow-00038,value-38\r\nrow-00039,value-39\r\nrow-00040,value-40\r\nrow-00041,value-41\r\nrow-00042,value-42\r\nrow-00043,value-43\r\nrow-00044,value-44\r\nrow-00045,value-45\r\nrow-00046,value-46\r\nrow-00047,value-47\r\nrow-00048,value-48\r\nrow-00049,value-49\r\nrow-00050,value-50\r\nrow-00051,value-51\r\nrow-00052,value-52\r\nrow-00053,value-53\r\nrow-00054,value-54\r\nrow-00055,value-55\r\nrow-00056,value-56\r\nrow-00057,value-57\r\nrow-00058,value-58\r\nrow-00059,value-59\r\nrow-00060,value-60\r\nrow-00061,value-61\r\nrow-00062,value-62\r\nrow-00063,value-63\r\nrow-00064,value-64\r\nrow-00065,value-65\r\nrow-00066,value-66\r\nrow-00067,value-67\r\nrow-00068,value-68\r\nrow-00069,value-69\r\nrow-00070,value-70\r\nrow-00071,value-71\r\nrow-00072,value-72\r\nrow-00073,value-73\r\nrow-00074,value-74\r\nrow-00075,value-75\r\nrow-00076,value-76\r\nrow-00077,value-77\r\nrow-00078,value-78\r\nrow-00079,value-79\r\nrow-00080,value-80\r\nrow-00081,value-81\r\nrow-00082,value-82\r\nrow-00083,value-83\r\nrow-00084,value-84\r\nrow-00085,value-85\r\nrow-00086,value-86\r\nrow-00087,value-87\r\nrow-00088,value-88\r\nrow-00089,value-89\r\nrow-00090,value-90\r\nrow-00091,value-91\r\nrow-00092,value-92\r\nrow-00093,value-93\r\nrow-00094,value-94\r\nrow-00095,value-95\r\nrow-00096,value-96\r\nrow-00097,value-97\r\nrow-00098,value-98\r\nrow-00099,value-99\r\nrow-00100,value-100\r\nrow-00101,value-101\r\nrow-00102,value-102\r\nrow-00103,value-103\r\nrow-00104,value-104\r\nrow-00105,value-105\r\nrow-00106,value-106\r\nrow-00107,value-107\r\nrow-00108,value-108\r\nrow-00109,value-109\r\nrow-00110,value-110\r\nrow-00111,value-111\r\nrow-00112,value-112\r\nrow-00113,value-113\r\nrow-00114,value-114\r\nrow-00115,value-115\r\nrow-00116,value-116\r\nrow-00117,value-117\r\nrow-00118,value-118\r\nrow-00119,value-119\r\nrow-00120,value-120\r\nrow-00121,value-121\r\nrow-00122,value-122\r\nrow-00123,value-123\r\nrow-00124,value-124\r\nrow-00125,value-125\r\nrow-00126,value-126\r\nrow-00127,value-127\r\nrow-00128,value-128\r\nrow-00129,value-129\r\nrow-00130,value-130\r\nrow-00131,value-131\r\nrow-00132,value-132\r\nrow-00133,value-133\r\nrow-00134,value-134\r\nrow-00135,value-135\r\nrow-00136,value-136\r\nrow-00137,value-137\r\nrow-00138,value-138\r\nrow-00139,value-139\r\nrow-00140,value-140\r\nrow-00141,value-141\r\nrow-00142,value-142\r\nrow-00143,value-143\r\nrow-00144,value-144\r\nrow-00145,value-145\r\nrow-00146,value-146\r\nrow-00147,value-147\r\nrow-00148,value-148\r\nrow-00149,value-149\r\nrow-00150,value-150\r\nrow-00151,value-151\r\nrow-00152,value-152\r\nrow-00153,value-153\r\nrow-00154,value-154\r\nrow-00155,value-155\r\nrow-00156,value-156\r\nrow-00157,value-157\r\nrow-00158,value-158\r\nrow-00159,value-159\r\nrow-00160,value-160\r\nrow-00161,value-161\r\nrow-00162,value-162\r\nrow-00163,value-163\r\nrow-00164,value-164\r\nrow-00165,value-165\r\nrow-00166,value-166\r\nrow-00167,value-167\r\nrow-00168,value-168\r\nrow-00169,value-169\r\nrow-00170,value-170\r\nrow-00171,value-171\r\nrow-00172,value-172\r\nrow-00173,value-173\r\nrow-00174,value-174\r\nrow-00175,value-175\r\nrow-00176,value-176\r\nrow-00177,value-177\r\nrow-00178,value-178\r\nrow-00179,value-179\r\nrow-00180,value-180\r\nrow-00181,value-181\r\nrow-00182,value-182\r\nrow-00183,value-183\r\nrow-00184,value-184\r\nrow-00185,value-185\r\nrow-00186,value-186\r\nrow-00187,value-187\r\nrow-00188,value-188\r\nrow-00189,value-189\r\nrow-00190,value-190\r\nrow-00191,value-191\r\nrow-00192,value-192\r\nrow-00193,value-193\r\nrow-00194,v"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              },
+              {
+                "label": "table.csv",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/table.csv",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          },
+          {
+            "active": false,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n",
+      "marker": " RECOVERY 1789294543718",
+      "pid": 584
+    },
+    {
+      "stage": "close-request",
+      "at": 1789294552267,
+      "responseError": "Error: CDP timeout: Browser.close"
+    },
+    {
+      "stage": "old-pid-terminated",
+      "at": 1789294552271,
+      "pid": 584,
+      "exists": false
+    },
+    {
+      "stage": "restarted",
+      "at": 1789294552279,
+      "pid": 37003,
+      "previousPid": 584,
+      "start": 1789294552278
+    },
+    {
+      "stage": "restored-host",
+      "at": 1789294577348,
+      "host": {
+        "at": 1789294577346,
+        "hostPid": 37234,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 1,
+            "dirty": false,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 1,
+            "dirty": false,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              },
+              {
+                "label": "table.csv",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/table.csv",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          },
+          {
+            "active": false,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+    }
+  ],
+  "samples": [
+    {
+      "sinceLaunchMs": 648,
+      "state": {
+        "ready": "complete",
+        "title": "",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": null
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": null,
+        "auxiliaryVisible": false,
+        "editorVisible": false,
+        "tabs": []
+      }
+    },
+    {
+      "sinceLaunchMs": 750,
+      "state": {
+        "ready": "complete",
+        "title": "",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": null,
+        "auxiliaryVisible": false,
+        "editorVisible": false,
+        "tabs": []
+      }
+    },
+    {
+      "sinceLaunchMs": 1093,
+      "state": {
+        "ready": "complete",
+        "title": "",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv",
+            "selected": "false"
+          },
+          {
+            "label": "second.md",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 1219,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv",
+            "selected": "false"
+          },
+          {
+            "label": "second.md",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 1322,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 1567,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "IFRAME",
+          "id": "",
+          "classes": "webview ",
+          "label": null
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 1670,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 4046,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "IFRAME",
+          "id": "",
+          "classes": "webview ",
+          "label": null
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "Ritemark AI",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 4155,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "TEXTAREA",
+          "id": "",
+          "classes": "xterm-helper-textarea",
+          "label": "Terminal 1\nRun the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience\nUse ⌥F1 for terminal accessibility help"
+        },
+        "terminalVisible": true,
+        "auxiliaryTitle": "Terminal",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 4259,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "TEXTAREA",
+          "id": "",
+          "classes": "xterm-helper-textarea",
+          "label": "Terminal 1, bash\nRun the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience\nUse ⌥F1 for terminal accessibility help"
+        },
+        "terminalVisible": true,
+        "auxiliaryTitle": "Terminal",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    },
+    {
+      "sinceLaunchMs": 5512,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] note.md — workspace",
+        "active": {
+          "tag": "IFRAME",
+          "id": "",
+          "classes": "webview ready",
+          "label": null
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "Ritemark AI",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": [
+          {
+            "label": "note.md, Editor Group 1",
+            "selected": "true"
+          },
+          {
+            "label": "book.xlsx, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "table.csv, Editor Group 1",
+            "selected": "false"
+          },
+          {
+            "label": "second.md, Editor Group 2",
+            "selected": "true"
+          }
+        ]
+      }
+    }
+  ],
+  "unsavedHostRecovered": false,
+  "diskUnchanged": true,
+  "completed": true
+}

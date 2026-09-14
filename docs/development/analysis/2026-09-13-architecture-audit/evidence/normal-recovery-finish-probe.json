@@ -1,0 +1,127 @@
+{
+  "method": "Resume the same running recovery session after correcting a malformed dynamic DOM selector in the harness. No second edit, restart or external disk write. Original error preserved in normal-recovery-probe.json.",
+  "steps": [
+    {
+      "stage": "xlsx-restored",
+      "at": 1789295871426,
+      "host": {
+        "at": 1789295871421,
+        "hostPid": 54235,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 1,
+            "dirty": true,
+            "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+            "length": 79,
+            "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "book.xlsx\nOpen in Excel\nfx\nNo cell selected\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nRECOVERED XLSX 1789295746665\n\t\n\tAdd row",
+      "diskCell": "baseline"
+    },
+    {
+      "stage": "both-recovered-and-saved",
+      "at": 1789295871486,
+      "host": {
+        "at": 1789295871484,
+        "hostPid": 54235,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 1,
+            "dirty": false,
+            "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+            "length": 79,
+            "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "diskMarkdown": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+      "diskCell": "RECOVERED XLSX 1789295746665"
+    }
+  ],
+  "completed": true,
+  "markdownRecovered": true,
+  "xlsxRecovered": true,
+  "recoveredWorkSaved": true
+}

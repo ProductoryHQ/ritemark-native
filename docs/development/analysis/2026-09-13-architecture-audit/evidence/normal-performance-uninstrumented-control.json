@@ -1,0 +1,10 @@
+{
+  "html": "<h1>Normal mode audit</h1><p>Unsaved recovery baseline. PERSISTENT HUMAN 1789295746665</p>",
+  "resources": [
+    {
+      "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/media/webview.js?v=1789288800896",
+      "duration": 139
+    }
+  ],
+  "timeOrigin": 1789311073951.9
+}

@@ -1,0 +1,9 @@
+{
+  "method": "Actual registered speech JobManager/SessionStore and globalState in two normal-mode extension hosts. Only the synthetic audio transcription boundary is held/released; production prepareAudio, peaks, jobs, persistence and UI remain active. No whisper/model/cloud request; this is an ownership/recovery test, not transcription fidelity.",
+  "startedAt": 1789309658956,
+  "stages": [],
+  "pidA": 60859,
+  "pendingJobId": "job-mtzwp6d4-2",
+  "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'failed'\n- 'transcribing'\n\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-speech-recovery-finish-probe.mjs?run=1789309658954:15:43\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+  "finishedAt": 1789309658962
+}

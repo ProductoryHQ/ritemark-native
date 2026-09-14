@@ -1,0 +1,773 @@
+{
+  "method": "Actual registered transcript providers perform speaker rename through _renameSpeaker in two production hosts. Two fixture-only wrappers hold save before invoking the original save, capturing stale whole-session candidates; releases are sequential, so this tests lost changes independently of the already-proven shared temp filename collision. Synthetic method ingress; real store, real readbacks and real webviews.",
+  "startedAt": 1789309763611,
+  "pidA": 60859,
+  "pidB": 69268,
+  "stages": [
+    {
+      "name": "seed",
+      "at": 1789309763618,
+      "value": {
+        "session": {
+          "id": "shared_wav-3ug5a9",
+          "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+          "audioFingerprint": "32044:1789309345029",
+          "durationSec": 1,
+          "createdAt": "2026-09-13T14:29:23.617Z",
+          "updatedAt": "2026-09-13T14:29:23.617Z",
+          "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+          "engine": "elevenlabs",
+          "language": "en",
+          "speakerSeparation": "diarized",
+          "speakers": [
+            {
+              "id": "speaker_0",
+              "label": "AUDIT SPEAKER ZERO",
+              "colorIndex": 0
+            },
+            {
+              "id": "speaker_1",
+              "label": "AUDIT SPEAKER ONE",
+              "colorIndex": 1
+            }
+          ],
+          "segments": [
+            {
+              "id": "audit-0",
+              "start": 0,
+              "end": 0.5,
+              "text": "AUDIT shared transcript first sentence.",
+              "speaker": "speaker_0"
+            },
+            {
+              "id": "audit-1",
+              "start": 0.5,
+              "end": 1,
+              "text": "AUDIT shared transcript second sentence.",
+              "speaker": "speaker_1"
+            }
+          ],
+          "peaks": [
+            0,
+            0.2,
+            0.4,
+            0.2,
+            0
+          ]
+        },
+        "syntheticSeed": true
+      }
+    },
+    {
+      "name": "sequential-two-host-control",
+      "at": 1789309763629,
+      "value": {
+        "id": "shared_wav-3ug5a9",
+        "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+        "audioFingerprint": "32044:1789309345029",
+        "durationSec": 1,
+        "createdAt": "2026-09-13T14:29:23.617Z",
+        "updatedAt": "2026-09-13T14:29:23.625Z",
+        "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+        "engine": "elevenlabs",
+        "language": "en",
+        "speakerSeparation": "diarized",
+        "speakers": [
+          {
+            "id": "speaker_0",
+            "label": "AUDIT SEQUENTIAL ZERO",
+            "colorIndex": 0
+          },
+          {
+            "id": "speaker_1",
+            "label": "AUDIT SEQUENTIAL ONE",
+            "colorIndex": 1
+          }
+        ],
+        "segments": [
+          {
+            "id": "audit-0",
+            "start": 0,
+            "end": 0.5,
+            "text": "AUDIT shared transcript first sentence.",
+            "speaker": "speaker_0"
+          },
+          {
+            "id": "audit-1",
+            "start": 0.5,
+            "end": 1,
+            "text": "AUDIT shared transcript second sentence.",
+            "speaker": "speaker_1"
+          }
+        ],
+        "peaks": [
+          0,
+          0.2,
+          0.4,
+          0.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "both-workbenches-open",
+      "at": 1789309765477,
+      "value": {
+        "a": {
+          "targetId": "CDB1C77E71DFB15575099FBF9F5D1A9A",
+          "text": "shared.wav\nElevenLabs Scribe · en · 2 speakers\nSave to document\n00:00 / 00:01\n1×\nAUDIT SEQUENTIAL ZERO\nAUDIT SEQUENTIAL ONE\nClick a speaker to rename everywhere\nAUDIT SEQUENTIAL ZERO\n00:00\n\nAUDIT shared transcript first sentence.\n\nAUDIT SEQUENTIAL ONE\n00:00\n\nAUDIT shared transcript second sentence.\n\nINSIGHTS\nInsights language\n\nAuto selected.\n\nAuto · English\n\nPull the summary, decisions, action items and key quotes out of this recording.\n\nGenerate insights"
+        },
+        "b": {
+          "targetId": "CCCBC73CE96B0A58C481B3E029A4C96F",
+          "text": "shared.wav\nElevenLabs Scribe · en · 2 speakers\nSave to document\n00:00 / 00:01\n1×\nAUDIT SEQUENTIAL ZERO\nAUDIT SEQUENTIAL ONE\nClick a speaker to rename everywhere\nAUDIT SEQUENTIAL ZERO\n00:00\n\nAUDIT shared transcript first sentence.\n\nAUDIT SEQUENTIAL ONE\n00:00\n\nAUDIT shared transcript second sentence.\n\nINSIGHTS\nInsights language\n\nAuto selected.\n\nAuto · English\n\nPull the summary, decisions, action items and key quotes out of this recording.\n\nGenerate insights"
+        }
+      }
+    },
+    {
+      "name": "both-stale-candidates-held",
+      "at": 1789309765484,
+      "value": {
+        "a": {
+          "hostPid": 60859,
+          "providerClass": "TranscriptWorkbenchProvider",
+          "jobsClass": "JobManager",
+          "storeClass": "SessionStore",
+          "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+          "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "workspaceFile": null,
+          "runtimeSessionCount": 0,
+          "jobs": [
+            {
+              "id": "job-mtzwsnna-3",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "done",
+              "progress": {
+                "phase": "saving",
+                "percent": 100
+              },
+              "startedAt": "2026-09-13T14:28:18.742Z",
+              "endedAt": "2026-09-13T14:28:21.956Z",
+              "sessionId": "pending_wav-1mja513"
+            },
+            {
+              "id": "job-mtzwp6d4-2",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "failed",
+              "progress": {
+                "phase": "transcribing",
+                "percent": 0
+              },
+              "startedAt": "2026-09-13T14:25:36.376Z",
+              "endedAt": "2026-09-13T14:27:36.415Z",
+              "error": {
+                "code": "unknown",
+                "message": "Audit engine observer-timeout",
+                "retryable": true
+              }
+            },
+            {
+              "id": "job-mtzwp4yd-1",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav",
+              "audioName": "control.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "done",
+              "progress": {
+                "phase": "saving",
+                "percent": 100
+              },
+              "startedAt": "2026-09-13T14:25:34.549Z",
+              "endedAt": "2026-09-13T14:25:35.497Z",
+              "sessionId": "control_wav-br86v1"
+            }
+          ],
+          "inflight": [],
+          "heldEngines": [],
+          "engineBoundaryStubbed": true,
+          "storeGate": {
+            "state": "held",
+            "candidate": {
+              "id": "shared_wav-3ug5a9",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+              "audioFingerprint": "32044:1789309345029",
+              "durationSec": 1,
+              "createdAt": "2026-09-13T14:29:23.617Z",
+              "updatedAt": "2026-09-13T14:29:23.625Z",
+              "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+              "engine": "elevenlabs",
+              "language": "en",
+              "speakerSeparation": "diarized",
+              "speakers": [
+                {
+                  "id": "speaker_0",
+                  "label": "AUDIT CONCURRENT ZERO",
+                  "colorIndex": 0
+                },
+                {
+                  "id": "speaker_1",
+                  "label": "AUDIT SEQUENTIAL ONE",
+                  "colorIndex": 1
+                }
+              ],
+              "segments": [
+                {
+                  "id": "audit-0",
+                  "start": 0,
+                  "end": 0.5,
+                  "text": "AUDIT shared transcript first sentence.",
+                  "speaker": "speaker_0"
+                },
+                {
+                  "id": "audit-1",
+                  "start": 0.5,
+                  "end": 1,
+                  "text": "AUDIT shared transcript second sentence.",
+                  "speaker": "speaker_1"
+                }
+              ],
+              "peaks": [
+                0,
+                0.2,
+                0.4,
+                0.2,
+                0
+              ]
+            },
+            "heldAt": 1789309765481
+          },
+          "operations": [
+            {
+              "id": "audit-speech-rename-1",
+              "status": "completed",
+              "speakerId": "speaker_0",
+              "label": "AUDIT SEQUENTIAL ZERO",
+              "startedAt": 1789309763619,
+              "finishedAt": 1789309763621
+            },
+            {
+              "id": "audit-speech-rename-2",
+              "status": "running",
+              "speakerId": "speaker_0",
+              "label": "AUDIT CONCURRENT ZERO",
+              "startedAt": 1789309765481
+            }
+          ],
+          "panels": [
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav",
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav"
+          ]
+        },
+        "b": {
+          "hostPid": 69268,
+          "providerClass": "TranscriptWorkbenchProvider",
+          "jobsClass": "JobManager",
+          "storeClass": "SessionStore",
+          "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+          "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "runtimeSessionCount": 0,
+          "jobs": [
+            {
+              "id": "job-mtzwsnna-3",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "interrupted",
+              "progress": {
+                "phase": "preparing",
+                "percent": null
+              },
+              "startedAt": "2026-09-13T14:28:18.742Z",
+              "endedAt": "2026-09-13T14:28:20.380Z",
+              "error": {
+                "code": "unknown",
+                "message": "Ritemark closed while this recording was being transcribed.",
+                "retryable": true
+              }
+            }
+          ],
+          "inflight": [],
+          "heldEngines": [],
+          "engineBoundaryStubbed": false,
+          "storeGate": {
+            "state": "held",
+            "candidate": {
+              "id": "shared_wav-3ug5a9",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+              "audioFingerprint": "32044:1789309345029",
+              "durationSec": 1,
+              "createdAt": "2026-09-13T14:29:23.617Z",
+              "updatedAt": "2026-09-13T14:29:23.625Z",
+              "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+              "engine": "elevenlabs",
+              "language": "en",
+              "speakerSeparation": "diarized",
+              "speakers": [
+                {
+                  "id": "speaker_0",
+                  "label": "AUDIT SEQUENTIAL ZERO",
+                  "colorIndex": 0
+                },
+                {
+                  "id": "speaker_1",
+                  "label": "AUDIT CONCURRENT ONE",
+                  "colorIndex": 1
+                }
+              ],
+              "segments": [
+                {
+                  "id": "audit-0",
+                  "start": 0,
+                  "end": 0.5,
+                  "text": "AUDIT shared transcript first sentence.",
+                  "speaker": "speaker_0"
+                },
+                {
+                  "id": "audit-1",
+                  "start": 0.5,
+                  "end": 1,
+                  "text": "AUDIT shared transcript second sentence.",
+                  "speaker": "speaker_1"
+                }
+              ],
+              "peaks": [
+                0,
+                0.2,
+                0.4,
+                0.2,
+                0
+              ]
+            },
+            "heldAt": 1789309765482
+          },
+          "operations": [
+            {
+              "id": "audit-speech-rename-1",
+              "status": "completed",
+              "speakerId": "speaker_1",
+              "label": "AUDIT SEQUENTIAL ONE",
+              "startedAt": 1789309763624,
+              "finishedAt": 1789309763626
+            },
+            {
+              "id": "audit-speech-rename-2",
+              "status": "running",
+              "speakerId": "speaker_1",
+              "label": "AUDIT CONCURRENT ONE",
+              "startedAt": 1789309765482
+            }
+          ],
+          "panels": [
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a-acknowledged-and-saved",
+      "at": 1789309765589,
+      "value": {
+        "aResult": {
+          "id": "audit-speech-rename-2",
+          "status": "completed",
+          "speakerId": "speaker_0",
+          "label": "AUDIT CONCURRENT ZERO",
+          "startedAt": 1789309765481,
+          "finishedAt": 1789309765486
+        },
+        "afterA": {
+          "id": "shared_wav-3ug5a9",
+          "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+          "audioFingerprint": "32044:1789309345029",
+          "durationSec": 1,
+          "createdAt": "2026-09-13T14:29:23.617Z",
+          "updatedAt": "2026-09-13T14:29:25.485Z",
+          "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+          "engine": "elevenlabs",
+          "language": "en",
+          "speakerSeparation": "diarized",
+          "speakers": [
+            {
+              "id": "speaker_0",
+              "label": "AUDIT CONCURRENT ZERO",
+              "colorIndex": 0
+            },
+            {
+              "id": "speaker_1",
+              "label": "AUDIT SEQUENTIAL ONE",
+              "colorIndex": 1
+            }
+          ],
+          "segments": [
+            {
+              "id": "audit-0",
+              "start": 0,
+              "end": 0.5,
+              "text": "AUDIT shared transcript first sentence.",
+              "speaker": "speaker_0"
+            },
+            {
+              "id": "audit-1",
+              "start": 0.5,
+              "end": 1,
+              "text": "AUDIT shared transcript second sentence.",
+              "speaker": "speaker_1"
+            }
+          ],
+          "peaks": [
+            0,
+            0.2,
+            0.4,
+            0.2,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "b-acknowledged-overwrites-a",
+      "at": 1789309765697,
+      "value": {
+        "bResult": {
+          "id": "audit-speech-rename-2",
+          "status": "completed",
+          "speakerId": "speaker_1",
+          "label": "AUDIT CONCURRENT ONE",
+          "startedAt": 1789309765482,
+          "finishedAt": 1789309765593
+        },
+        "afterB": {
+          "id": "shared_wav-3ug5a9",
+          "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+          "audioFingerprint": "32044:1789309345029",
+          "durationSec": 1,
+          "createdAt": "2026-09-13T14:29:23.617Z",
+          "updatedAt": "2026-09-13T14:29:25.591Z",
+          "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+          "engine": "elevenlabs",
+          "language": "en",
+          "speakerSeparation": "diarized",
+          "speakers": [
+            {
+              "id": "speaker_0",
+              "label": "AUDIT SEQUENTIAL ZERO",
+              "colorIndex": 0
+            },
+            {
+              "id": "speaker_1",
+              "label": "AUDIT CONCURRENT ONE",
+              "colorIndex": 1
+            }
+          ],
+          "segments": [
+            {
+              "id": "audit-0",
+              "start": 0,
+              "end": 0.5,
+              "text": "AUDIT shared transcript first sentence.",
+              "speaker": "speaker_0"
+            },
+            {
+              "id": "audit-1",
+              "start": 0.5,
+              "end": 1,
+              "text": "AUDIT shared transcript second sentence.",
+              "speaker": "speaker_1"
+            }
+          ],
+          "peaks": [
+            0,
+            0.2,
+            0.4,
+            0.2,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "both-hosts-read-lost-rename",
+      "at": 1789309765701,
+      "value": {
+        "a": {
+          "id": "shared_wav-3ug5a9",
+          "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+          "audioFingerprint": "32044:1789309345029",
+          "durationSec": 1,
+          "createdAt": "2026-09-13T14:29:23.617Z",
+          "updatedAt": "2026-09-13T14:29:25.591Z",
+          "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+          "engine": "elevenlabs",
+          "language": "en",
+          "speakerSeparation": "diarized",
+          "speakers": [
+            {
+              "id": "speaker_0",
+              "label": "AUDIT SEQUENTIAL ZERO",
+              "colorIndex": 0
+            },
+            {
+              "id": "speaker_1",
+              "label": "AUDIT CONCURRENT ONE",
+              "colorIndex": 1
+            }
+          ],
+          "segments": [
+            {
+              "id": "audit-0",
+              "start": 0,
+              "end": 0.5,
+              "text": "AUDIT shared transcript first sentence.",
+              "speaker": "speaker_0"
+            },
+            {
+              "id": "audit-1",
+              "start": 0.5,
+              "end": 1,
+              "text": "AUDIT shared transcript second sentence.",
+              "speaker": "speaker_1"
+            }
+          ],
+          "peaks": [
+            0,
+            0.2,
+            0.4,
+            0.2,
+            0
+          ]
+        },
+        "b": {
+          "id": "shared_wav-3ug5a9",
+          "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav",
+          "audioFingerprint": "32044:1789309345029",
+          "durationSec": 1,
+          "createdAt": "2026-09-13T14:29:23.617Z",
+          "updatedAt": "2026-09-13T14:29:25.591Z",
+          "workspaceRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+          "engine": "elevenlabs",
+          "language": "en",
+          "speakerSeparation": "diarized",
+          "speakers": [
+            {
+              "id": "speaker_0",
+              "label": "AUDIT SEQUENTIAL ZERO",
+              "colorIndex": 0
+            },
+            {
+              "id": "speaker_1",
+              "label": "AUDIT CONCURRENT ONE",
+              "colorIndex": 1
+            }
+          ],
+          "segments": [
+            {
+              "id": "audit-0",
+              "start": 0,
+              "end": 0.5,
+              "text": "AUDIT shared transcript first sentence.",
+              "speaker": "speaker_0"
+            },
+            {
+              "id": "audit-1",
+              "start": 0.5,
+              "end": 1,
+              "text": "AUDIT shared transcript second sentence.",
+              "speaker": "speaker_1"
+            }
+          ],
+          "peaks": [
+            0,
+            0.2,
+            0.4,
+            0.2,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "both-real-views-show-lost-rename",
+      "at": 1789309765710,
+      "value": {
+        "a": {
+          "targetId": "CDB1C77E71DFB15575099FBF9F5D1A9A",
+          "text": "shared.wav\nElevenLabs Scribe · en · 2 speakers\nSave to document\n00:00 / 00:01\n1×\nAUDIT SEQUENTIAL ZERO\nAUDIT CONCURRENT ONE\nClick a speaker to rename everywhere\nAUDIT SEQUENTIAL ZERO\n00:00\n\nAUDIT shared transcript first sentence.\n\nAUDIT CONCURRENT ONE\n00:00\n\nAUDIT shared transcript second sentence.\n\nINSIGHTS\nInsights language\n\nAuto selected.\n\nAuto · English\n\nPull the summary, decisions, action items and key quotes out of this recording.\n\nGenerate insights"
+        },
+        "b": {
+          "targetId": "CCCBC73CE96B0A58C481B3E029A4C96F",
+          "text": "shared.wav\nElevenLabs Scribe · en · 2 speakers\nSave to document\n00:00 / 00:01\n1×\nAUDIT SEQUENTIAL ZERO\nAUDIT CONCURRENT ONE\nClick a speaker to rename everywhere\nAUDIT SEQUENTIAL ZERO\n00:00\n\nAUDIT shared transcript first sentence.\n\nAUDIT CONCURRENT ONE\n00:00\n\nAUDIT shared transcript second sentence.\n\nINSIGHTS\nInsights language\n\nAuto selected.\n\nAuto · English\n\nPull the summary, decisions, action items and key quotes out of this recording.\n\nGenerate insights"
+        }
+      }
+    },
+    {
+      "name": "observers-restored",
+      "at": 1789309765715,
+      "value": {
+        "a": {
+          "hostPid": 60859,
+          "providerClass": "TranscriptWorkbenchProvider",
+          "jobsClass": "JobManager",
+          "storeClass": "SessionStore",
+          "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+          "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "workspaceFile": null,
+          "runtimeSessionCount": 0,
+          "jobs": [
+            {
+              "id": "job-mtzwsnna-3",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "done",
+              "progress": {
+                "phase": "saving",
+                "percent": 100
+              },
+              "startedAt": "2026-09-13T14:28:18.742Z",
+              "endedAt": "2026-09-13T14:28:21.956Z",
+              "sessionId": "pending_wav-1mja513"
+            },
+            {
+              "id": "job-mtzwp6d4-2",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "failed",
+              "progress": {
+                "phase": "transcribing",
+                "percent": 0
+              },
+              "startedAt": "2026-09-13T14:25:36.376Z",
+              "endedAt": "2026-09-13T14:27:36.415Z",
+              "error": {
+                "code": "unknown",
+                "message": "Audit engine observer-timeout",
+                "retryable": true
+              }
+            },
+            {
+              "id": "job-mtzwp4yd-1",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav",
+              "audioName": "control.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "done",
+              "progress": {
+                "phase": "saving",
+                "percent": 100
+              },
+              "startedAt": "2026-09-13T14:25:34.549Z",
+              "endedAt": "2026-09-13T14:25:35.497Z",
+              "sessionId": "control_wav-br86v1"
+            }
+          ],
+          "inflight": [],
+          "heldEngines": [],
+          "engineBoundaryStubbed": false,
+          "storeGate": null,
+          "operations": [
+            {
+              "id": "audit-speech-rename-1",
+              "status": "completed",
+              "speakerId": "speaker_0",
+              "label": "AUDIT SEQUENTIAL ZERO",
+              "startedAt": 1789309763619,
+              "finishedAt": 1789309763621
+            },
+            {
+              "id": "audit-speech-rename-2",
+              "status": "completed",
+              "speakerId": "speaker_0",
+              "label": "AUDIT CONCURRENT ZERO",
+              "startedAt": 1789309765481,
+              "finishedAt": 1789309765486
+            }
+          ],
+          "panels": [
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav",
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav"
+          ]
+        },
+        "b": {
+          "hostPid": 69268,
+          "providerClass": "TranscriptWorkbenchProvider",
+          "jobsClass": "JobManager",
+          "storeClass": "SessionStore",
+          "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+          "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "runtimeSessionCount": 0,
+          "jobs": [
+            {
+              "id": "job-mtzwsnna-3",
+              "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+              "audioName": "pending.wav",
+              "durationSec": 1,
+              "engine": "whisper-local",
+              "state": "interrupted",
+              "progress": {
+                "phase": "preparing",
+                "percent": null
+              },
+              "startedAt": "2026-09-13T14:28:18.742Z",
+              "endedAt": "2026-09-13T14:28:20.380Z",
+              "error": {
+                "code": "unknown",
+                "message": "Ritemark closed while this recording was being transcribed.",
+                "retryable": true
+              }
+            }
+          ],
+          "inflight": [],
+          "heldEngines": [],
+          "engineBoundaryStubbed": false,
+          "storeGate": null,
+          "operations": [
+            {
+              "id": "audit-speech-rename-1",
+              "status": "completed",
+              "speakerId": "speaker_1",
+              "label": "AUDIT SEQUENTIAL ONE",
+              "startedAt": 1789309763624,
+              "finishedAt": 1789309763626
+            },
+            {
+              "id": "audit-speech-rename-2",
+              "status": "completed",
+              "speakerId": "speaker_1",
+              "label": "AUDIT CONCURRENT ONE",
+              "startedAt": 1789309765482,
+              "finishedAt": 1789309765593
+            }
+          ],
+          "panels": [
+            "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/shared.wav"
+          ]
+        }
+      }
+    }
+  ],
+  "completed": true,
+  "finishedAt": 1789309765716
+}

@@ -1,0 +1,83 @@
+{
+  "method": "Node --check on performance observers, analyzer and cleanup helpers; Python AST parse. Functional results are validated by analyze-performance.mjs, not by syntax checks.",
+  "javascript": [
+    {
+      "file": "analyze-performance.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-calibration-cleanup-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-cleanup-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-client.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-diagnostic-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-final-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-late-diagnostic-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-light-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-measured-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-observed-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-profile-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-tools.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "normal-performance-warm-load-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    }
+  ],
+  "python": [
+    "prepare-performance-probe.py"
+  ],
+  "clientSession": {
+    "id": 74901,
+    "exitCode": 0,
+    "source": "write_stdin returned terminal exit_code 0 after explicit exit following verified app cleanup"
+  }
+}

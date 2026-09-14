@@ -1,0 +1,48 @@
+[
+  {
+    "at": 1789310796333,
+    "hostPid": 98994,
+    "driverMode": 1,
+    "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+    "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/performance-profile/User/globalStorage",
+    "workspaceFile": null,
+    "workspaceFolders": [
+      "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+    ],
+    "hotExit": "onExit",
+    "autoSave": "off",
+    "ritemark": {
+      "active": true,
+      "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+      "version": "1.10.1"
+    },
+    "documents": [
+      {
+        "file": "note.md",
+        "version": 1,
+        "dirty": false,
+        "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+        "length": 79,
+        "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+      }
+    ],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": [
+          {
+            "label": "note.md",
+            "active": true,
+            "dirty": false,
+            "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+            "viewType": "ritemark.editor"
+          }
+        ]
+      }
+    ],
+    "terminals": [
+      "bash"
+    ]
+  }
+]

@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {driver,findWebview,waitFor,writeEvidence,evidence} from './normal-speech-tools.mjs';
+const prior=JSON.parse(fs.readFileSync(path.join(evidence,'normal-speech-recovery-observed-probe.json'),'utf8'));assert.ok(prior.completed);
+const {pidA,pidB}=prior;
+const report={method:'Actual registered transcript providers perform speaker rename through _renameSpeaker in two production hosts. Two fixture-only wrappers hold save before invoking the original save, capturing stale whole-session candidates; releases are sequential, so this tests lost changes independently of the already-proven shared temp filename collision. Synthetic method ingress; real store, real readbacks and real webviews.',startedAt:Date.now(),pidA,pidB,stages:[]};
+const save=()=>writeEvidence('normal-speech-store-probe.json',report),stage=(name,value)=>{report.stages.push({name,at:Date.now(),value});save();console.log(JSON.stringify({stage:name}));};
+const api=(pid,operation,extra={})=>driver('/speech-audit',{operation,...extra},pid),inspect=pid=>api(pid,'inspect'),read=pid=>api(pid,'read',{file:'shared.wav'});
+const rename=(pid,speakerId,label)=>api(pid,'rename',{speakerId,label});
+const done=(pid,id)=>waitFor(async()=>{const o=(await inspect(pid)).operations.find(o=>o.id===id);return o?.status!=='running'?o:false;},10000);
+let a,b;
+try{
+ stage('seed',await api(pidA,'seed'));
+ const seqA=await rename(pidA,'speaker_0','AUDIT SEQUENTIAL ZERO');assert.equal((await done(pidA,seqA.id)).status,'completed');
+ const seqB=await rename(pidB,'speaker_1','AUDIT SEQUENTIAL ONE');assert.equal((await done(pidB,seqB.id)).status,'completed');
+ const sequential=await read(pidA);assert.deepEqual(sequential.speakers.map(s=>s.label),['AUDIT SEQUENTIAL ZERO','AUDIT SEQUENTIAL ONE']);stage('sequential-two-host-control',sequential);
+ await api(pidA,'open',{file:'shared.wav'});a=await findWebview("document.body.innerText.includes('AUDIT shared transcript first sentence.')");await a.evaluate("window.__auditSpeechShared='A'");
+ await api(pidB,'open',{file:'shared.wav'});b=await findWebview("window.__auditSpeechShared!=='A'&&document.body.innerText.includes('AUDIT shared transcript first sentence.')");await b.evaluate("window.__auditSpeechShared='B'");assert.notEqual(a.targetId,b.targetId);
+ stage('both-workbenches-open',{a:{targetId:a.targetId,text:await a.evaluate('document.body.innerText')},b:{targetId:b.targetId,text:await b.evaluate('document.body.innerText')}});
+ await api(pidA,'hold-next-save');await api(pidB,'hold-next-save');
+ const ra=await rename(pidA,'speaker_0','AUDIT CONCURRENT ZERO'),rb=await rename(pidB,'speaker_1','AUDIT CONCURRENT ONE');
+ const held=await waitFor(async()=>{const aa=await inspect(pidA),bb=await inspect(pidB);return aa.storeGate?.state==='held'&&bb.storeGate?.state==='held'?{a:aa,b:bb}:false;});
+ assert.deepEqual(held.a.storeGate.candidate.speakers.map(s=>s.label),['AUDIT CONCURRENT ZERO','AUDIT SEQUENTIAL ONE']);assert.deepEqual(held.b.storeGate.candidate.speakers.map(s=>s.label),['AUDIT SEQUENTIAL ZERO','AUDIT CONCURRENT ONE']);stage('both-stale-candidates-held',held);
+ await api(pidA,'release-save');const aResult=await done(pidA,ra.id);assert.equal(aResult.status,'completed');const afterA=await read(pidA);assert.deepEqual(afterA.speakers.map(s=>s.label),['AUDIT CONCURRENT ZERO','AUDIT SEQUENTIAL ONE']);stage('a-acknowledged-and-saved',{aResult,afterA});
+ await api(pidB,'release-save');const bResult=await done(pidB,rb.id);assert.equal(bResult.status,'completed');const afterB=await read(pidB);assert.deepEqual(afterB.speakers.map(s=>s.label),['AUDIT SEQUENTIAL ZERO','AUDIT CONCURRENT ONE']);stage('b-acknowledged-overwrites-a',{bResult,afterB});
+ stage('both-hosts-read-lost-rename',{a:await read(pidA),b:await read(pidB)});
+ await api(pidA,'refresh');await api(pidB,'refresh');
+ await waitFor(async()=>{const texts=await Promise.all([a.evaluate('document.body.innerText'),b.evaluate('document.body.innerText')]);return texts.every(t=>t.includes('AUDIT SEQUENTIAL ZERO')&&t.includes('AUDIT CONCURRENT ONE')&&!t.includes('AUDIT CONCURRENT ZERO'))?texts:false;});
+ stage('both-real-views-show-lost-rename',{a:{targetId:a.targetId,text:await a.evaluate('document.body.innerText')},b:{targetId:b.targetId,text:await b.evaluate('document.body.innerText')}});
+ await api(pidA,'reset-observer');await api(pidB,'reset-observer');stage('observers-restored',{a:await inspect(pidA),b:await inspect(pidB)});
+ report.completed=true;
+}catch(e){report.error=String(e.stack??e);throw e;}finally{report.finishedAt=Date.now();save();a?.close();b?.close();}

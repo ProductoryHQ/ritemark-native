@@ -1,0 +1,1001 @@
+{
+  "method": "Actual cached AcpRuntime browser dispatcher and production BrowserActionTools/shell/Playwright. Synthetic A/B caller labels only; no native model sessions. Consent dialogs are actual shell dialogs in custom style. Revocation uses the existing hidden share-toggle DOM handler and is not ordinary accessible UI.",
+  "startedAt": 1789308494724,
+  "stages": [
+    {
+      "name": "initial",
+      "at": 1789308494737,
+      "value": {
+        "inspection": {
+          "hostPid": 37926,
+          "platform": "darwin",
+          "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1/index.cjs",
+          "runtimeClass": "AcpRuntime",
+          "runtimeSessionCount": 0,
+          "acpManagerStarted": false,
+          "urls": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+          ],
+          "metadata": {
+            "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+            "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+            "title": "AUDIT PAGE A",
+            "focused": false,
+            "visible": true,
+            "loading": false,
+            "sharedWithAgent": true,
+            "annotationMode": false
+          },
+          "commands": [
+            "workbench.action.browser.goBack",
+            "workbench.action.browser.goForward",
+            "workbench.action.browser.reload",
+            "workbench.action.browser.hardReload",
+            "workbench.action.browser.focusUrlInput",
+            "workbench.action.browser.openExternal",
+            "workbench.action.browser.openSettings",
+            "workbench.action.browser.clearGlobalStorage",
+            "workbench.action.browser.clearWorkspaceStorage",
+            "workbench.action.browser.clearEphemeralStorage",
+            "workbench.action.browser.toggleDevTools",
+            "workbench.action.browser.addElementToChat",
+            "workbench.action.browser.addConsoleLogsToChat",
+            "workbench.action.browser.addFocusedElementToChat",
+            "workbench.action.browser.zoomIn",
+            "workbench.action.browser.zoomOut",
+            "workbench.action.browser.resetZoom",
+            "workbench.action.browser.showFind",
+            "workbench.action.browser.hideFind",
+            "workbench.action.browser.findNext",
+            "workbench.action.browser.findPrevious",
+            "workbench.action.browser.quickOpen",
+            "workbench.action.browser.open",
+            "workbench.action.browser.openFromViewMenu",
+            "workbench.action.browser.newTab",
+            "workbench.action.browser.closeAll",
+            "workbench.action.browser.closeAllInGroup",
+            "workbench.action.browser.getActiveContext",
+            "workbench.action.browser.getActiveSummary",
+            "workbench.action.browser.captureActiveViewport",
+            "workbench.action.browser.toggleAnnotationMode",
+            "workbench.action.browser.getAnnotationMode",
+            "workbench.action.browser.ensureActiveBrowserShared",
+            "workbench.action.browser.ensureActiveBrowserControlShared",
+            "workbench.action.browser.agentNavigate",
+            "workbench.action.browser.agentClick",
+            "workbench.action.browser.agentFill",
+            "workbench.action.browser.agentType",
+            "workbench.action.browser.agentScroll",
+            "workbench.action.browser.agentSnapshot"
+          ],
+          "jobs": [
+            {
+              "id": "audit-browser-1",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT DENIED"
+              },
+              "startedAt": 1789308225846,
+              "status": "completed",
+              "finishedAt": 1789308239543,
+              "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+            },
+            {
+              "id": "audit-browser-2",
+              "actor": "A",
+              "tool": "browser_snapshot",
+              "params": {},
+              "startedAt": 1789308350763,
+              "status": "completed",
+              "finishedAt": 1789308350767,
+              "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+            },
+            {
+              "id": "audit-browser-3",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT MUST STAY DENIED"
+              },
+              "startedAt": 1789308350767,
+              "status": "completed",
+              "finishedAt": 1789308415167,
+              "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT MUST STAY DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+            }
+          ]
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "AUDIT MUST STAY DENIED",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        },
+        "note": "Job 1 succeeded but its native consent interaction was not observed. Its AUDIT DENIED payload name does not mean the action was denied."
+      }
+    },
+    {
+      "name": "read-denied",
+      "at": 1789308494738,
+      "value": {
+        "id": "audit-browser-2",
+        "actor": "A",
+        "tool": "browser_snapshot",
+        "params": {},
+        "startedAt": 1789308350763,
+        "status": "completed",
+        "finishedAt": 1789308350767,
+        "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+      }
+    },
+    {
+      "name": "fresh-revoke",
+      "at": 1789308494748,
+      "value": {
+        "before": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": true,
+          "annotationMode": false
+        },
+        "control": {
+          "visible": false,
+          "label": "Share with Agent"
+        },
+        "after": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": false,
+          "annotationMode": false
+        }
+      }
+    },
+    {
+      "name": "control-deny-dialog",
+      "at": 1789308494754,
+      "value": {
+        "text": "Deny\nAllow Control\nAllow AI to control this browser tab?\nThe AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions.",
+        "buttons": [
+          "Deny",
+          "Allow Control",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "control-deny-screenshot",
+      "at": 1789308495338,
+      "value": "normal-browser-deny-visible.png"
+    },
+    {
+      "name": "control-denied",
+      "at": 1789308495343,
+      "value": {
+        "beforeDeny": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "AUDIT MUST STAY DENIED",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        },
+        "denied": {
+          "id": "audit-browser-4",
+          "actor": "A",
+          "tool": "browser_fill",
+          "params": {
+            "selector": "#entry",
+            "value": "AUDIT OBSERVED DENY"
+          },
+          "startedAt": 1789308494749,
+          "status": "completed",
+          "finishedAt": 1789308495341,
+          "result": "Error: Browser control consent was not granted for this tab.\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A"
+        },
+        "afterDeny": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "AUDIT MUST STAY DENIED",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        }
+      }
+    },
+    {
+      "name": "control-allow-dialog",
+      "at": 1789308495354,
+      "value": {
+        "text": "Deny\nAllow Control\nAllow AI to control this browser tab?\nThe AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions.",
+        "buttons": [
+          "Deny",
+          "Allow Control",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "after-control-allow",
+      "at": 1789308495364,
+      "value": {
+        "dialogs": [
+          {
+            "text": "Deny\nAllow\nShare this browser page with the agent?\nThe agent will be able to read and modify browser content and saved data, including cookies.\nDon't ask again",
+            "buttons": [
+              "Deny",
+              "Allow",
+              ""
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "read-allow-screenshot",
+      "at": 1789308495465,
+      "value": "normal-browser-read-consent.png"
+    },
+    {
+      "name": "control-allowed",
+      "at": 1789308495577,
+      "value": {
+        "allowed": {
+          "id": "audit-browser-5",
+          "actor": "A",
+          "tool": "browser_fill",
+          "params": {
+            "selector": "#entry",
+            "value": "AUDIT CONTROL ALLOWED"
+          },
+          "startedAt": 1789308495345,
+          "status": "completed",
+          "finishedAt": 1789308495500,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT CONTROL ALLOWED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "AUDIT CONTROL ALLOWED",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        },
+        "inspection": {
+          "hostPid": 37926,
+          "platform": "darwin",
+          "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1/index.cjs",
+          "runtimeClass": "AcpRuntime",
+          "runtimeSessionCount": 0,
+          "acpManagerStarted": false,
+          "urls": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+          ],
+          "metadata": {
+            "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+            "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+            "title": "AUDIT PAGE A",
+            "focused": false,
+            "visible": true,
+            "loading": false,
+            "sharedWithAgent": true,
+            "annotationMode": false
+          },
+          "commands": [
+            "workbench.action.browser.goBack",
+            "workbench.action.browser.goForward",
+            "workbench.action.browser.reload",
+            "workbench.action.browser.hardReload",
+            "workbench.action.browser.focusUrlInput",
+            "workbench.action.browser.openExternal",
+            "workbench.action.browser.openSettings",
+            "workbench.action.browser.clearGlobalStorage",
+            "workbench.action.browser.clearWorkspaceStorage",
+            "workbench.action.browser.clearEphemeralStorage",
+            "workbench.action.browser.toggleDevTools",
+            "workbench.action.browser.addElementToChat",
+            "workbench.action.browser.addConsoleLogsToChat",
+            "workbench.action.browser.addFocusedElementToChat",
+            "workbench.action.browser.zoomIn",
+            "workbench.action.browser.zoomOut",
+            "workbench.action.browser.resetZoom",
+            "workbench.action.browser.showFind",
+            "workbench.action.browser.hideFind",
+            "workbench.action.browser.findNext",
+            "workbench.action.browser.findPrevious",
+            "workbench.action.browser.quickOpen",
+            "workbench.action.browser.open",
+            "workbench.action.browser.openFromViewMenu",
+            "workbench.action.browser.newTab",
+            "workbench.action.browser.closeAll",
+            "workbench.action.browser.closeAllInGroup",
+            "workbench.action.browser.getActiveContext",
+            "workbench.action.browser.getActiveSummary",
+            "workbench.action.browser.captureActiveViewport",
+            "workbench.action.browser.toggleAnnotationMode",
+            "workbench.action.browser.getAnnotationMode",
+            "workbench.action.browser.ensureActiveBrowserShared",
+            "workbench.action.browser.ensureActiveBrowserControlShared",
+            "workbench.action.browser.agentNavigate",
+            "workbench.action.browser.agentClick",
+            "workbench.action.browser.agentFill",
+            "workbench.action.browser.agentType",
+            "workbench.action.browser.agentScroll",
+            "workbench.action.browser.agentSnapshot"
+          ],
+          "jobs": [
+            {
+              "id": "audit-browser-1",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT DENIED"
+              },
+              "startedAt": 1789308225846,
+              "status": "completed",
+              "finishedAt": 1789308239543,
+              "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+            },
+            {
+              "id": "audit-browser-2",
+              "actor": "A",
+              "tool": "browser_snapshot",
+              "params": {},
+              "startedAt": 1789308350763,
+              "status": "completed",
+              "finishedAt": 1789308350767,
+              "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+            },
+            {
+              "id": "audit-browser-3",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT MUST STAY DENIED"
+              },
+              "startedAt": 1789308350767,
+              "status": "completed",
+              "finishedAt": 1789308415167,
+              "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT MUST STAY DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+            },
+            {
+              "id": "audit-browser-4",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT OBSERVED DENY"
+              },
+              "startedAt": 1789308494749,
+              "status": "completed",
+              "finishedAt": 1789308495341,
+              "result": "Error: Browser control consent was not granted for this tab.\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A"
+            },
+            {
+              "id": "audit-browser-5",
+              "actor": "A",
+              "tool": "browser_fill",
+              "params": {
+                "selector": "#entry",
+                "value": "AUDIT CONTROL ALLOWED"
+              },
+              "startedAt": 1789308495345,
+              "status": "completed",
+              "finishedAt": 1789308495500,
+              "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT CONTROL ALLOWED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "caller-a-observed-a",
+      "at": 1789308495696,
+      "value": {
+        "result": {
+          "id": "audit-browser-6",
+          "actor": "A",
+          "tool": "browser_snapshot",
+          "params": {},
+          "startedAt": 1789308495587,
+          "status": "completed",
+          "finishedAt": 1789308495591,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT CONTROL ALLOWED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+        },
+        "metadata": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": true,
+          "annotationMode": false
+        }
+      }
+    },
+    {
+      "name": "caller-b-navigated-b",
+      "at": 1789308495822,
+      "value": {
+        "result": {
+          "id": "audit-browser-7",
+          "actor": "B",
+          "tool": "browser_navigate",
+          "params": {
+            "type": "url",
+            "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+          },
+          "startedAt": 1789308495699,
+          "status": "completed",
+          "finishedAt": 1789308495753,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [ref=e4]: BASE B\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+        },
+        "metadata": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html",
+          "title": "AUDIT PAGE B",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": true,
+          "annotationMode": false
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html",
+          "title": "AUDIT PAGE B",
+          "entry": "BASE B",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        }
+      }
+    },
+    {
+      "name": "caller-a-filled-b",
+      "at": 1789308496051,
+      "value": {
+        "result": {
+          "id": "audit-browser-8",
+          "actor": "A",
+          "tool": "browser_fill",
+          "params": {
+            "selector": "#entry",
+            "value": "AUDIT A INTENDED FOR A"
+          },
+          "startedAt": 1789308495823,
+          "status": "completed",
+          "finishedAt": 1789308495834,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [active] [ref=e4]: AUDIT A INTENDED FOR A\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html",
+          "title": "AUDIT PAGE B",
+          "entry": "AUDIT A INTENDED FOR A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        },
+        "metadata": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html",
+          "title": "AUDIT PAGE B",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": true,
+          "annotationMode": false
+        },
+        "screenshot": "normal-browser-wrong-target.png"
+      }
+    },
+    {
+      "name": "queue-both-pending",
+      "at": 1789308496173,
+      "value": {
+        "click": {
+          "id": "audit-browser-10",
+          "actor": "A",
+          "tool": "browser_click",
+          "params": {
+            "selector": "#late"
+          },
+          "startedAt": 1789308496167,
+          "status": "running"
+        },
+        "navigate": {
+          "id": "audit-browser-11",
+          "actor": "B",
+          "tool": "browser_navigate",
+          "params": {
+            "type": "url",
+            "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+          },
+          "startedAt": 1789308496169,
+          "status": "running"
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "BASE A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "waiting",
+          "lateExists": false
+        }
+      }
+    },
+    {
+      "name": "queue-serializes-actions",
+      "at": 1789308499090,
+      "value": {
+        "clicked": {
+          "id": "audit-browser-10",
+          "actor": "A",
+          "tool": "browser_click",
+          "params": {
+            "selector": "#late"
+          },
+          "startedAt": 1789308496167,
+          "status": "completed",
+          "finishedAt": 1789308499026,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [ref=e4]: BASE A\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 1\"\n  - status [ref=e9]: ready\n  - button \"Delayed mark A\" [active] [ref=e10]"
+        },
+        "navigated": {
+          "id": "audit-browser-11",
+          "actor": "B",
+          "tool": "browser_navigate",
+          "params": {
+            "type": "url",
+            "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+          },
+          "startedAt": 1789308496169,
+          "status": "completed",
+          "finishedAt": 1789308499045,
+          "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [ref=e4]: BASE B\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html",
+          "title": "AUDIT PAGE B",
+          "entry": "BASE B",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "not armed",
+          "lateExists": false
+        }
+      }
+    },
+    {
+      "name": "pending-before-revoke",
+      "at": 1789308499454,
+      "value": {
+        "pendingJob": {
+          "id": "audit-browser-13",
+          "actor": "A",
+          "tool": "browser_click",
+          "params": {
+            "selector": "#late"
+          },
+          "startedAt": 1789308499199,
+          "status": "running"
+        },
+        "pendingDom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "BASE A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "waiting",
+          "lateExists": false
+        }
+      }
+    },
+    {
+      "name": "revoke-during-pending",
+      "at": 1789308499464,
+      "value": {
+        "before": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": true,
+          "annotationMode": false
+        },
+        "control": {
+          "visible": false,
+          "label": "Share with Agent"
+        },
+        "after": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": false,
+          "annotationMode": false
+        }
+      }
+    },
+    {
+      "name": "pending-after-revoke",
+      "at": 1789308501753,
+      "value": {
+        "pendingEnd": {
+          "id": "audit-browser-13",
+          "actor": "A",
+          "tool": "browser_click",
+          "params": {
+            "selector": "#late"
+          },
+          "startedAt": 1789308499199,
+          "status": "completed",
+          "finishedAt": 1789308499464,
+          "result": "Error: Page \"428f4e1d-f59a-452c-8dea-e1cfa26d7cfa\" not found"
+        },
+        "dom": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "BASE A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "ready",
+          "lateExists": true
+        },
+        "metadata": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": false,
+          "annotationMode": false
+        }
+      }
+    },
+    {
+      "name": "read-denied-after-revoke",
+      "at": 1789308501757,
+      "value": {
+        "id": "audit-browser-14",
+        "actor": "B",
+        "tool": "browser_snapshot",
+        "params": {},
+        "startedAt": 1789308501755,
+        "status": "completed",
+        "finishedAt": 1789308501756,
+        "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+      }
+    },
+    {
+      "name": "control-prompts-after-revoke",
+      "at": 1789308501768,
+      "value": {
+        "text": "Deny\nAllow Control\nAllow AI to control this browser tab?\nThe AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions.",
+        "buttons": [
+          "Deny",
+          "Allow Control",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "control-denied-after-revoke",
+      "at": 1789308501781,
+      "value": {
+        "beforeFinal": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "BASE A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "ready",
+          "lateExists": true
+        },
+        "finalDenied": {
+          "id": "audit-browser-15",
+          "actor": "B",
+          "tool": "browser_fill",
+          "params": {
+            "selector": "#entry",
+            "value": "AUDIT AFTER REVOKE DENIED"
+          },
+          "startedAt": 1789308501759,
+          "status": "completed",
+          "finishedAt": 1789308501773,
+          "result": "Error: Browser control consent was not granted for this tab.\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A"
+        },
+        "afterFinal": {
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "entry": "BASE A",
+          "clicks": 0,
+          "lateClicks": 0,
+          "delay": "ready",
+          "lateExists": true
+        }
+      }
+    },
+    {
+      "name": "final-inspection",
+      "at": 1789308501787,
+      "value": {
+        "hostPid": 37926,
+        "platform": "darwin",
+        "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1/index.cjs",
+        "runtimeClass": "AcpRuntime",
+        "runtimeSessionCount": 0,
+        "acpManagerStarted": false,
+        "urls": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+        ],
+        "metadata": {
+          "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+          "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+          "title": "AUDIT PAGE A",
+          "focused": false,
+          "visible": true,
+          "loading": false,
+          "sharedWithAgent": false,
+          "annotationMode": false
+        },
+        "commands": [
+          "workbench.action.browser.goBack",
+          "workbench.action.browser.goForward",
+          "workbench.action.browser.reload",
+          "workbench.action.browser.hardReload",
+          "workbench.action.browser.focusUrlInput",
+          "workbench.action.browser.openExternal",
+          "workbench.action.browser.openSettings",
+          "workbench.action.browser.clearGlobalStorage",
+          "workbench.action.browser.clearWorkspaceStorage",
+          "workbench.action.browser.clearEphemeralStorage",
+          "workbench.action.browser.toggleDevTools",
+          "workbench.action.browser.addElementToChat",
+          "workbench.action.browser.addConsoleLogsToChat",
+          "workbench.action.browser.addFocusedElementToChat",
+          "workbench.action.browser.zoomIn",
+          "workbench.action.browser.zoomOut",
+          "workbench.action.browser.resetZoom",
+          "workbench.action.browser.showFind",
+          "workbench.action.browser.hideFind",
+          "workbench.action.browser.findNext",
+          "workbench.action.browser.findPrevious",
+          "workbench.action.browser.quickOpen",
+          "workbench.action.browser.open",
+          "workbench.action.browser.openFromViewMenu",
+          "workbench.action.browser.newTab",
+          "workbench.action.browser.closeAll",
+          "workbench.action.browser.closeAllInGroup",
+          "workbench.action.browser.getActiveContext",
+          "workbench.action.browser.getActiveSummary",
+          "workbench.action.browser.captureActiveViewport",
+          "workbench.action.browser.toggleAnnotationMode",
+          "workbench.action.browser.getAnnotationMode",
+          "workbench.action.browser.ensureActiveBrowserShared",
+          "workbench.action.browser.ensureActiveBrowserControlShared",
+          "workbench.action.browser.agentNavigate",
+          "workbench.action.browser.agentClick",
+          "workbench.action.browser.agentFill",
+          "workbench.action.browser.agentType",
+          "workbench.action.browser.agentScroll",
+          "workbench.action.browser.agentSnapshot"
+        ],
+        "jobs": [
+          {
+            "id": "audit-browser-1",
+            "actor": "A",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT DENIED"
+            },
+            "startedAt": 1789308225846,
+            "status": "completed",
+            "finishedAt": 1789308239543,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-2",
+            "actor": "A",
+            "tool": "browser_snapshot",
+            "params": {},
+            "startedAt": 1789308350763,
+            "status": "completed",
+            "finishedAt": 1789308350767,
+            "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+          },
+          {
+            "id": "audit-browser-3",
+            "actor": "A",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT MUST STAY DENIED"
+            },
+            "startedAt": 1789308350767,
+            "status": "completed",
+            "finishedAt": 1789308415167,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT MUST STAY DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-4",
+            "actor": "A",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT OBSERVED DENY"
+            },
+            "startedAt": 1789308494749,
+            "status": "completed",
+            "finishedAt": 1789308495341,
+            "result": "Error: Browser control consent was not granted for this tab.\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A"
+          },
+          {
+            "id": "audit-browser-5",
+            "actor": "A",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT CONTROL ALLOWED"
+            },
+            "startedAt": 1789308495345,
+            "status": "completed",
+            "finishedAt": 1789308495500,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT CONTROL ALLOWED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-6",
+            "actor": "A",
+            "tool": "browser_snapshot",
+            "params": {},
+            "startedAt": 1789308495587,
+            "status": "completed",
+            "finishedAt": 1789308495591,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT CONTROL ALLOWED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-7",
+            "actor": "B",
+            "tool": "browser_navigate",
+            "params": {
+              "type": "url",
+              "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+            },
+            "startedAt": 1789308495699,
+            "status": "completed",
+            "finishedAt": 1789308495753,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [ref=e4]: BASE B\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-8",
+            "actor": "A",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT A INTENDED FOR A"
+            },
+            "startedAt": 1789308495823,
+            "status": "completed",
+            "finishedAt": 1789308495834,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [active] [ref=e4]: AUDIT A INTENDED FOR A\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-9",
+            "actor": "A",
+            "tool": "browser_navigate",
+            "params": {
+              "type": "url",
+              "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html"
+            },
+            "startedAt": 1789308496061,
+            "status": "completed",
+            "finishedAt": 1789308496080,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [ref=e4]: BASE A\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-10",
+            "actor": "A",
+            "tool": "browser_click",
+            "params": {
+              "selector": "#late"
+            },
+            "startedAt": 1789308496167,
+            "status": "completed",
+            "finishedAt": 1789308499026,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [ref=e4]: BASE A\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 1\"\n  - status [ref=e9]: ready\n  - button \"Delayed mark A\" [active] [ref=e10]"
+          },
+          {
+            "id": "audit-browser-11",
+            "actor": "B",
+            "tool": "browser_navigate",
+            "params": {
+              "type": "url",
+              "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+            },
+            "startedAt": 1789308496169,
+            "status": "completed",
+            "finishedAt": 1789308499045,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nTitle: AUDIT PAGE B\nPage summary after action:\nPage Title: AUDIT PAGE B\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE B\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target B. No external requests or form submission.\n  - text: Audit field B\n  - textbox \"Audit field B\" [ref=e4]: BASE B\n  - button \"Mark B\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-12",
+            "actor": "A",
+            "tool": "browser_navigate",
+            "params": {
+              "type": "url",
+              "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html"
+            },
+            "startedAt": 1789308499092,
+            "status": "completed",
+            "finishedAt": 1789308499112,
+            "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [active] [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [ref=e4]: BASE A\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+          },
+          {
+            "id": "audit-browser-13",
+            "actor": "A",
+            "tool": "browser_click",
+            "params": {
+              "selector": "#late"
+            },
+            "startedAt": 1789308499199,
+            "status": "completed",
+            "finishedAt": 1789308499464,
+            "result": "Error: Page \"428f4e1d-f59a-452c-8dea-e1cfa26d7cfa\" not found"
+          },
+          {
+            "id": "audit-browser-14",
+            "actor": "B",
+            "tool": "browser_snapshot",
+            "params": {},
+            "startedAt": 1789308501755,
+            "status": "completed",
+            "finishedAt": 1789308501756,
+            "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+          },
+          {
+            "id": "audit-browser-15",
+            "actor": "B",
+            "tool": "browser_fill",
+            "params": {
+              "selector": "#entry",
+              "value": "AUDIT AFTER REVOKE DENIED"
+            },
+            "startedAt": 1789308501759,
+            "status": "completed",
+            "finishedAt": 1789308501773,
+            "result": "Error: Browser control consent was not granted for this tab.\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A"
+          }
+        ]
+      }
+    }
+  ],
+  "completed": true,
+  "finishedAt": 1789308501787
+}

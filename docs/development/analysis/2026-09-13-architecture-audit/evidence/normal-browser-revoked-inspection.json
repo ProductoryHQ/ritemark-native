@@ -1,0 +1,79 @@
+{
+  "hostPid": 37926,
+  "platform": "darwin",
+  "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1/index.cjs",
+  "runtimeClass": "AcpRuntime",
+  "runtimeSessionCount": 0,
+  "acpManagerStarted": false,
+  "urls": [
+    "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+    "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-b.html"
+  ],
+  "metadata": {
+    "pageId": "428f4e1d-f59a-452c-8dea-e1cfa26d7cfa",
+    "url": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html",
+    "title": "AUDIT PAGE A",
+    "focused": false,
+    "visible": true,
+    "loading": false,
+    "sharedWithAgent": false,
+    "annotationMode": false
+  },
+  "commands": [
+    "workbench.action.browser.goBack",
+    "workbench.action.browser.goForward",
+    "workbench.action.browser.reload",
+    "workbench.action.browser.hardReload",
+    "workbench.action.browser.focusUrlInput",
+    "workbench.action.browser.openExternal",
+    "workbench.action.browser.openSettings",
+    "workbench.action.browser.clearGlobalStorage",
+    "workbench.action.browser.clearWorkspaceStorage",
+    "workbench.action.browser.clearEphemeralStorage",
+    "workbench.action.browser.toggleDevTools",
+    "workbench.action.browser.addElementToChat",
+    "workbench.action.browser.addConsoleLogsToChat",
+    "workbench.action.browser.addFocusedElementToChat",
+    "workbench.action.browser.zoomIn",
+    "workbench.action.browser.zoomOut",
+    "workbench.action.browser.resetZoom",
+    "workbench.action.browser.showFind",
+    "workbench.action.browser.hideFind",
+    "workbench.action.browser.findNext",
+    "workbench.action.browser.findPrevious",
+    "workbench.action.browser.quickOpen",
+    "workbench.action.browser.open",
+    "workbench.action.browser.openFromViewMenu",
+    "workbench.action.browser.newTab",
+    "workbench.action.browser.closeAll",
+    "workbench.action.browser.closeAllInGroup",
+    "workbench.action.browser.getActiveContext",
+    "workbench.action.browser.getActiveSummary",
+    "workbench.action.browser.captureActiveViewport",
+    "workbench.action.browser.toggleAnnotationMode",
+    "workbench.action.browser.getAnnotationMode",
+    "workbench.action.browser.ensureActiveBrowserShared",
+    "workbench.action.browser.ensureActiveBrowserControlShared",
+    "workbench.action.browser.agentNavigate",
+    "workbench.action.browser.agentClick",
+    "workbench.action.browser.agentFill",
+    "workbench.action.browser.agentType",
+    "workbench.action.browser.agentScroll",
+    "workbench.action.browser.agentSnapshot"
+  ],
+  "jobs": [
+    {
+      "id": "audit-browser-1",
+      "actor": "A",
+      "tool": "browser_fill",
+      "params": {
+        "selector": "#entry",
+        "value": "AUDIT DENIED"
+      },
+      "startedAt": 1789308225846,
+      "status": "completed",
+      "finishedAt": 1789308239543,
+      "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+{
+  "method": "Normal-mode actual Markdown webview loading. Instrumented renderer CPU/profile and coverage, fresh view per trial, warm app/OS cache. CPU throttling is a sensitivity experiment, not Windows emulation.",
+  "at": 1789311209041,
+  "pid": 98767,
+  "fixture": {
+    "name": "note.md",
+    "bytes": 79,
+    "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+  },
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.5.0",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 14,
+    "totalMemory": 25769803776
+  },
+  "instrumentation": "Auto-attach without pausing new iframe, CPU throttle, Performance metrics, 1 ms CPU sampling and precise block coverage with metric start checked against bundle request; profiler start checked separately and may follow download/compilation. Main-thread long tasks collected by buffered observer. All trials instrumented; timings are not uninstrumented production benchmarks.",
+  "trials": [
+    {
+      "index": 1,
+      "rate": 1,
+      "attached": [
+        {
+          "sessionId": "0CC8B07D4F7B78F0043D1DEEDB36DB22",
+          "targetId": "4258BE7F2756ED15DA0E01B87124345E",
+          "type": "iframe",
+          "url": "",
+          "waitingForDebugger": false,
+          "trial": 1,
+          "setupAt": 1789311209820,
+          "before": [
+            {
+              "name": "Timestamp",
+              "value": 1363676.519755
+            },
+            {
+              "name": "AudioHandlers",
+              "value": 0
+            },
+            {
+              "name": "AudioWorkletProcessors",
+              "value": 0
+            },
+            {
+              "name": "Documents",
+              "value": 6
+            },
+            {
+              "name": "Frames",
+              "value": 11
+            },
+            {
+              "name": "JSEventListeners",
+              "value": 252
+            },
+            {
+              "name": "LayoutObjects",
+              "value": 56
+            },
+            {
+              "name": "MediaKeySessions",
+              "value": 0
+            },
+            {
+              "name": "MediaKeys",
+              "value": 0
+            },
+            {
+              "name": "Nodes",
+              "value": 178
+            },
+            {
+              "name": "Resources",
+              "value": 4
+            },
+            {
+              "name": "ContextLifecycleStateObservers",
+              "value": 14
+            },
+            {
+              "name": "V8PerContextDatas",
+              "value": 3
+            },
+            {
+              "name": "WorkerGlobalScopes",
+              "value": 1
+            },
+            {
+              "name": "UACSSResources",
+              "value": 0
+            },
+            {
+              "name": "RTCPeerConnections",
+              "value": 0
+            },
+            {
+              "name": "ResourceFetchers",
+              "value": 7
+            },
+            {
+              "name": "AdSubframes",
+              "value": 0
+            },
+            {
+              "name": "DetachedScriptStates",
+              "value": 2
+            },
+            {
+              "name": "ArrayBufferContents",
+              "value": 12
+            },
+            {
+              "name": "LayoutCount",
+              "value": 0
+            },
+            {
+              "name": "RecalcStyleCount",
+              "value": 0
+            },
+            {
+              "name": "LayoutDuration",
+              "value": 0
+            },
+            {
+              "name": "RecalcStyleDuration",
+              "value": 0
+            },
+            {
+              "name": "DevToolsCommandDuration",
+              "value": 0.00001
+            },
+            {
+              "name": "ScriptDuration",
+              "value": 0
+            },
+            {
+              "name": "V8CompileDuration",
+              "value": 0
+            },
+            {
+              "name": "TaskDuration",
+              "value": 0.000036
+            },
+            {
+              "name": "TaskOtherDuration",
+              "value": 0.000026
+            },
+            {
+              "name": "ThreadTime",
+              "value": 0.000045
+            },
+            {
+              "name": "ProcessTime",
+              "value": 6.324878
+            },
+            {
+              "name": "JSHeapUsedSize",
+              "value": 42550304
+            },
+            {
+              "name": "JSHeapTotalSize",
+              "value": 45793280
+            },
+            {
+              "name": "FirstMeaningfulPaint",
+              "value": 0
+            },
+            {
+              "name": "DomContentLoaded",
+              "value": 1363676.516794
+            },
+            {
+              "name": "NavigationStart",
+              "value": 1363676.498598
+            }
+          ],
+          "metricsStartedAt": 1789311209828,
+          "profileStartedAt": 1789311209937,
+          "instrumented": true,
+          "resumedAt": 1789311209940
+        }
+      ],
+      "startedAt": 1789311209784,
+      "openCommandReturnedAt": 1789311209810,
+      "readyObservedAt": 1789311210309,
+      "ready": {
+        "text": "Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665",
+        "html": "<h1>Normal mode audit</h1><p>Unsaved recovery baseline. PERSISTENT HUMAN 1789295746665</p>",
+        "now": 476.09999990463257,
+        "timeOrigin": 1789311209833.2,
+        "editorType": null
+      },
+      "targetId": "4258BE7F2756ED15DA0E01B87124345E"
+    }
+  ],
+  "errors": [],
+  "hosts": [
+    {
+      "at": 1789311209044,
+      "hostPid": 98994,
+      "driverMode": 1,
+      "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+      "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/performance-profile/User/globalStorage",
+      "workspaceFile": null,
+      "workspaceFolders": [
+        "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+      ],
+      "hotExit": "onExit",
+      "autoSave": "off",
+      "ritemark": {
+        "active": true,
+        "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+        "version": "1.10.1"
+      },
+      "documents": [
+        {
+          "file": "note.md",
+          "version": 1,
+          "dirty": false,
+          "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+          "length": 79,
+          "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+        }
+      ],
+      "tabs": [
+        {
+          "active": true,
+          "viewColumn": 1,
+          "tabs": [
+            {
+              "label": "note.md",
+              "active": true,
+              "dirty": false,
+              "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+              "viewType": "ritemark.editor"
+            }
+          ]
+        }
+      ],
+      "terminals": [
+        "bash"
+      ]
+    }
+  ],
+  "browser": {
+    "Browser": "Chrome/142.0.7444.265",
+    "Protocol-Version": "1.3",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Ritemark/1.117.0 Chrome/142.0.7444.265 Electron/39.8.7 Safari/537.36",
+    "V8-Version": "14.2.231.22",
+    "WebKit-Version": "537.36 (@d338888ca0a7c26fddcfb09a503db016a13a972b)"
+  },
+  "error": "Error: CDP observation timeout: Runtime.evaluate\n    at Timeout._onTimeout (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-performance-measured-load-probe.mjs?run=1789311209040:23:68)\n    at listOnTimeout (node:internal/timers:585:17)\n    at process.processTimers (node:internal/timers:521:7)"
+}

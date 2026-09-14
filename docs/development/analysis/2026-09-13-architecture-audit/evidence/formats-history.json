@@ -1,0 +1,171 @@
+{
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "fileChangedHistory": [
+    "c0343a92432e3a43ce825c6cee54d16a2275c684 2026-08-24 fix: make editor disk synchronization reliable",
+    "34672d3652052725924016816198e87b2b3f935b 2026-01-29 feat: text editor polish - refresh button and image improvements"
+  ],
+  "drawioHistory": [
+    "e04485cfd4e2dcd03efef67ed67ecfea378aa8aa 2026-06-12 feat(drawio): autosave, live embed refresh, insert handshake, double-click UX",
+    "4d5a5c3902dff32eb8a7243fbfa9affba5c8b8ff 2026-06-12 fix(drawio): reset VS Code's default webview body padding (20px right overflow)",
+    "a6d8d6e8d60777f06fcb43aa306b9e5d2aa8f5bb 2026-06-12 fix(drawio): host the app in the webview document \u2014 iframe hosting cannot work",
+    "a454d947004388770562cb0fff5f5d87711c67ed 2026-06-10 feat(sprint-82): draw.io diagram embedding \u2014 editor, click-to-edit, /diagram command (R1, R3-R5)"
+  ],
+  "preSyncChangeCommit": "a735e9cf13ab8bff2977a96f288c99ea50506b4e",
+  "preSyncViewerRoutes": [
+    {
+      "line": 562,
+      "source": "  // Route to PDFViewer for PDF files"
+    },
+    {
+      "line": 563,
+      "source": "  if (fileType === 'pdf') {"
+    },
+    {
+      "line": 564,
+      "source": "    return ("
+    },
+    {
+      "line": 565,
+      "source": "      <PDFViewer"
+    },
+    {
+      "line": 566,
+      "source": "        content={content}"
+    },
+    {
+      "line": 567,
+      "source": "        filename={filename}"
+    },
+    {
+      "line": 568,
+      "source": "        workerSrc={workerSrc}"
+    },
+    {
+      "line": 569,
+      "source": "        canSaveAsMarkdown={features.saveAsMarkdownFromPreview}"
+    },
+    {
+      "line": 570,
+      "source": "      />"
+    },
+    {
+      "line": 571,
+      "source": "    )"
+    },
+    {
+      "line": 572,
+      "source": "  }"
+    },
+    {
+      "line": 573,
+      "source": ""
+    },
+    {
+      "line": 574,
+      "source": "  // Route to DOCXViewer for Word documents"
+    },
+    {
+      "line": 575,
+      "source": "  if (fileType === 'docx') {"
+    },
+    {
+      "line": 576,
+      "source": "    return ("
+    },
+    {
+      "line": 577,
+      "source": "      <DOCXViewer"
+    },
+    {
+      "line": 578,
+      "source": "        content={content}"
+    },
+    {
+      "line": 579,
+      "source": "        filename={filename}"
+    },
+    {
+      "line": 580,
+      "source": "        canSaveAsMarkdown={features.saveAsMarkdownFromPreview}"
+    },
+    {
+      "line": 581,
+      "source": "      />"
+    },
+    {
+      "line": 582,
+      "source": "    )"
+    },
+    {
+      "line": 583,
+      "source": "  }"
+    }
+  ],
+  "preSyncHeaderConsumer": [
+    {
+      "line": 611,
+      "source": "      {/* Document Header - Sticky with Properties and Export buttons */}"
+    },
+    {
+      "line": 612,
+      "source": "      <DocumentHeader"
+    },
+    {
+      "line": 613,
+      "source": "        onPropertiesClick={handlePropertiesClick}"
+    },
+    {
+      "line": 614,
+      "source": "        onExportClick={handleExportClick}"
+    },
+    {
+      "line": 615,
+      "source": "        onContentsClick={contentsClick}"
+    },
+    {
+      "line": 616,
+      "source": "        contentsButtonRef={contentsButtonRef}"
+    },
+    {
+      "line": 617,
+      "source": "        contentsActive={inlineTocShown}"
+    },
+    {
+      "line": 618,
+      "source": "        propertiesActive={propertiesPanelShown}"
+    },
+    {
+      "line": 619,
+      "source": "        agentActive={agentPanelShown}"
+    },
+    {
+      "line": 620,
+      "source": "        onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}"
+    },
+    {
+      "line": 621,
+      "source": "        commentsSlot={features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined}"
+    },
+    {
+      "line": 622,
+      "source": "        hasFileChanged={showFileChangeNotification}"
+    },
+    {
+      "line": 623,
+      "source": "        onRefresh={() => {"
+    },
+    {
+      "line": 624,
+      "source": "          setShowFileChangeNotification(false)"
+    },
+    {
+      "line": 625,
+      "source": "          sendToExtension('refresh')"
+    },
+    {
+      "line": 626,
+      "source": "        }}"
+    }
+  ],
+  "interpretation": "The shared fileChanged case was removed in c0343a92. The earlier PDF/DOCX early-return branches already did not receive the header change flag. This history does not prove that the current preview defect began in that synchronization commit."
+}

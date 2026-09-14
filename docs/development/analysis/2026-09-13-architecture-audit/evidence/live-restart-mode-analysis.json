@@ -1,0 +1,28 @@
+{
+  "method": "Immutable git objects at the audit VS Code gitlink, read from the existing primary submodule object database. No primary checkout modification. Audit shell patches contain no backupPath/extensionDevelopment/workingCopyBackup changes.",
+  "gitlink": "10c8e557c8b9f9ed0a87f61f1c9a44bde731c409",
+  "interpretation": "The --extensionDevelopmentPath window is not registered for a durable backupPath. With undefined backupWorkspaceHome the service is InMemoryWorkingCopyBackupService. The recovery-negative dev run cannot establish a normal installed-extension hot-exit defect.",
+  "sources": [
+    {
+      "path": "src/vs/platform/windows/electron-main/windowsMainService.ts",
+      "blob": "a392fb01cb439f288f46b4d89d208521768d8b1e",
+      "start": 1676,
+      "end": 1694,
+      "excerpt": "\tprivate async doOpenInBrowserWindow(window: ICodeWindow, configuration: INativeWindowConfiguration, options: IOpenBrowserWindowOptions, defaultProfile: IUserDataProfile): Promise<void> {\n\n\t\t// Register window for backups unless the window\n\t\t// is for extension development, where we do not\n\t\t// keep any backups.\n\n\t\tif (!configuration.extensionDevelopmentPath) {\n\t\t\tif (isWorkspaceIdentifier(configuration.workspace)) {\n\t\t\t\tconfiguration.backupPath = this.backupMainService.registerWorkspaceBackup({\n\t\t\t\t\tworkspace: configuration.workspace,\n\t\t\t\t\tremoteAuthority: configuration.remoteAuthority\n\t\t\t\t});\n\t\t\t} else if (isSingleFolderWorkspaceIdentifier(configuration.workspace)) {\n\t\t\t\tconfiguration.backupPath = this.backupMainService.registerFolderBackup({\n\t\t\t\t\tfolderUri: configuration.workspace.uri,\n\t\t\t\t\tremoteAuthority: configuration.remoteAuthority\n\t\t\t\t});\n\t\t\t} else {\n"
+    },
+    {
+      "path": "src/vs/workbench/services/workingCopy/common/workingCopyBackupService.ts",
+      "blob": "f747a3468abe07175df6f22fb7d586e9f68e72ba",
+      "start": 125,
+      "end": 141,
+      "excerpt": "\tconstructor(\n\t\tbackupWorkspaceHome: URI | undefined,\n\t\t@IFileService protected fileService: IFileService,\n\t\t@ILogService private readonly logService: ILogService\n\t) {\n\t\tsuper();\n\n\t\tthis.impl = this._register(this.initialize(backupWorkspaceHome));\n\t}\n\n\tprivate initialize(backupWorkspaceHome: URI | undefined): WorkingCopyBackupServiceImpl | InMemoryWorkingCopyBackupService {\n\t\tif (backupWorkspaceHome) {\n\t\t\treturn new WorkingCopyBackupServiceImpl(backupWorkspaceHome, this.fileService, this.logService);\n\t\t}\n\n\t\treturn new InMemoryWorkingCopyBackupService();\n\t}"
+    },
+    {
+      "path": "src/vs/workbench/services/workingCopy/electron-browser/workingCopyBackupService.ts",
+      "blob": "ac4b7ec16ce8b1d0f7c6d9b905fbda43184a10de",
+      "start": 24,
+      "end": 28,
+      "excerpt": "\t\t@ILifecycleService private readonly lifecycleService: ILifecycleService\n\t) {\n\t\tsuper(environmentService.backupPath ? URI.file(environmentService.backupPath).with({ scheme: environmentService.userRoamingDataHome.scheme }) : undefined, fileService, logService);\n\n\t\tthis.registerListeners();"
+    }
+  ]
+}

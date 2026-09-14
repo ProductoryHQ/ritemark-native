@@ -1,0 +1,24 @@
+{
+  "method": "Actual CodexNodeExecutor, fake EventEmitter transport, synthetic successful completion delivered before/after awaited turnStart response. The 60-second timeout is accelerated to 20 ms. This tests ordering tolerance, not an observation of native protocol ordering.",
+  "trials": [
+    {
+      "eventOrder": "after-response",
+      "result": {
+        "text": "Synthetic completed result",
+        "files": []
+      },
+      "disposed": true,
+      "interrupted": false
+    },
+    {
+      "eventOrder": "before-response",
+      "result": {
+        "text": "",
+        "files": [],
+        "error": "Codex timed out after 1 minutes"
+      },
+      "disposed": true,
+      "interrupted": true
+    }
+  ]
+}

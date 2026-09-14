@@ -1,0 +1,796 @@
+{
+  "method": "Two actual normal-mode Ritemark windows and extension hosts share one synthetic file. The first opens the folder, the second a .code-workspace referring to the same folder, using VS Code supported distinct window identities. No mocked coordinator/store and no direct model mutation. Tests saved propagation, two unsaved drafts, Save in A, explicit conflict resolution in B, then propagation back to A.",
+  "steps": [
+    {
+      "stage": "second-window-requested",
+      "at": 1789295966552,
+      "mainPid": 54023,
+      "cliPid": 56613,
+      "args": [
+        "/Applications/Ritemark.app/Contents/MacOS/Ritemark",
+        "--new-window",
+        "--user-data-dir=/private/tmp/ritemark-audit-normal-bg5jgmun/profile",
+        "--extensions-dir=/private/tmp/ritemark-audit-normal-bg5jgmun/extensions",
+        "--remote-debugging-port=9238",
+        "--disable-telemetry",
+        "--disable-workspace-trust",
+        "--skip-welcome",
+        "--skip-release-notes",
+        "/private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace"
+      ]
+    },
+    {
+      "stage": "two-windows-open",
+      "at": 1789295968489,
+      "hosts": [
+        {
+          "at": 1789295967891,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline.\n",
+              "length": 46,
+              "sha256": "c3ad0190d6f1301b721a2dff0640c91cc0e91e291ce1e6716b88382d7429480c"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789295967899,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": []
+            }
+          ],
+          "terminals": []
+        }
+      ],
+      "targets": [
+        "1810B2DB281C4711F22FE0A30C3F2F1E",
+        "A1FDCF382AA15648E3C8BDB9A7113DD8"
+      ],
+      "disk": "# Shared audit document\n\nTwo-window baseline.\n"
+    },
+    {
+      "stage": "saved-a-visible-in-clean-b",
+      "at": 1789295969728,
+      "hosts": [
+        {
+          "at": 1789295969724,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 2,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969\n",
+              "length": 72,
+              "sha256": "2442c6029a6d489e68e7c80ac98e29e14ef331d58c91f6bdcd2433490fde021d"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789295969726,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 2,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969\n",
+              "length": 72,
+              "sha256": "2442c6029a6d489e68e7c80ac98e29e14ef331d58c91f6bdcd2433490fde021d"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": []
+        }
+      ],
+      "views": [
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969",
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969"
+      ],
+      "disk": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969\n"
+    },
+    {
+      "stage": "two-independent-drafts",
+      "at": 1789295969852,
+      "hosts": [
+        {
+          "at": 1789295969851,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": true,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW A UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "5fbec5c2cd9802d38866659950c14b8de08c897791a4f763b266563840653d4a"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": true,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789295969851,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": true,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": true,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": []
+        }
+      ],
+      "views": [
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW A UNSAVED 1789295965969",
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969"
+      ],
+      "disk": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969\n"
+    },
+    {
+      "stage": "b-preserves-draft-and-reports-conflict",
+      "at": 1789295969969,
+      "hosts": [
+        {
+          "at": 1789295969968,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW A UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "5fbec5c2cd9802d38866659950c14b8de08c897791a4f763b266563840653d4a"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789295969968,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": true,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": true,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": []
+        }
+      ],
+      "disk": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW A UNSAVED 1789295965969\n",
+      "visibleB": "ET\nReview changes\nReview changes\nShared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969",
+      "messagesB": [
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 2,
+          "acknowledgedRevision": 1,
+          "attempt": 1
+        },
+        {
+          "type": "document:update",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "revision": 2,
+          "baseDiskHash": "2442c6029a6d489e68e7c80ac98e29e14ef331d58c91f6bdcd2433490fde021d",
+          "modelHash": "2442c6029a6d489e68e7c80ac98e29e14ef331d58c91f6bdcd2433490fde021d",
+          "payloadHash": "2e613274b1cb3e946a461233fea19143070a4d4f84ef9fe9590233563cee6cdb",
+          "reason": "external",
+          "attempt": 1,
+          "payload": {
+            "fileType": "markdown",
+            "filename": "shared.md",
+            "content": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969",
+            "properties": {},
+            "hasProperties": false,
+            "imageMappings": {},
+            "features": {
+              "voiceDictation": true,
+              "markdownExport": true,
+              "saveAsMarkdownFromPreview": true,
+              "commentCallouts": true
+            }
+          }
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 2,
+          "acknowledgedRevision": 1,
+          "attempt": 1
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 2,
+          "acknowledgedRevision": 1
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "synced",
+          "revision": 2,
+          "acknowledgedRevision": 2
+        },
+        {
+          "type": "document:edit-result",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "clientSequence": 1,
+          "status": "accepted",
+          "revision": 3,
+          "payloadHash": "468e48c23285eb42fd04bfdae69c78868dba9a4377247a610a54a981fdcc02e5"
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 3,
+          "acknowledgedRevision": 2,
+          "attempt": 1
+        },
+        {
+          "type": "document:update",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "revision": 3,
+          "baseDiskHash": "2442c6029a6d489e68e7c80ac98e29e14ef331d58c91f6bdcd2433490fde021d",
+          "modelHash": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df",
+          "payloadHash": "468e48c23285eb42fd04bfdae69c78868dba9a4377247a610a54a981fdcc02e5",
+          "reason": "peer-edit",
+          "attempt": 1,
+          "payload": {
+            "fileType": "markdown",
+            "filename": "shared.md",
+            "content": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969",
+            "properties": {},
+            "hasProperties": false,
+            "imageMappings": {},
+            "features": {
+              "voiceDictation": true,
+              "markdownExport": true,
+              "saveAsMarkdownFromPreview": true,
+              "commentCallouts": true
+            }
+          }
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 3,
+          "acknowledgedRevision": 2,
+          "attempt": 1
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 3,
+          "acknowledgedRevision": 2
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "applying",
+          "revision": 3,
+          "acknowledgedRevision": 2
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "local-only",
+          "revision": 3,
+          "acknowledgedRevision": 3
+        },
+        {
+          "type": "document:conflict",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "conflictRevision": 1,
+          "revision": 3,
+          "diskHash": "5fbec5c2cd9802d38866659950c14b8de08c897791a4f763b266563840653d4a",
+          "filename": "shared.md"
+        },
+        {
+          "type": "document:sync-state",
+          "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+          "documentSessionId": "1c8c36cd-9093-4ded-a23c-1a55395594a1",
+          "viewEpoch": "16b64377-3f31-442c-ae61-085e139e15c8",
+          "state": "conflict",
+          "revision": 3,
+          "acknowledgedRevision": 3,
+          "conflictRevision": 1,
+          "diskHash": "5fbec5c2cd9802d38866659950c14b8de08c897791a4f763b266563840653d4a"
+        }
+      ]
+    },
+    {
+      "stage": "explicit-b-resolution-reaches-a",
+      "at": 1789295970191,
+      "hosts": [
+        {
+          "at": 1789295970189,
+          "hostPid": 54235,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": null,
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "note.md",
+              "version": 1,
+              "dirty": false,
+              "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+              "length": 79,
+              "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+            },
+            {
+              "file": "shared.md",
+              "version": 4,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "note.md",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                },
+                {
+                  "label": "book.xlsx",
+                  "active": false,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                  "viewType": "ritemark.excelViewer"
+                }
+              ]
+            }
+          ],
+          "terminals": [
+            "bash"
+          ]
+        },
+        {
+          "at": 1789295970190,
+          "hostPid": 56633,
+          "driverMode": 1,
+          "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+          "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+          "workspaceFile": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/second.code-workspace",
+          "workspaceFolders": [
+            "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+          ],
+          "hotExit": "onExit",
+          "autoSave": "off",
+          "ritemark": {
+            "active": true,
+            "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+            "version": "1.10.1"
+          },
+          "documents": [
+            {
+              "file": "shared.md",
+              "version": 3,
+              "dirty": false,
+              "text": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n",
+              "length": 103,
+              "sha256": "b61f119d4ee07f7b6736cff7092aaea00277f8b46d41a17343786546f25346df"
+            }
+          ],
+          "tabs": [
+            {
+              "active": true,
+              "viewColumn": 1,
+              "tabs": [
+                {
+                  "label": "shared.md",
+                  "active": true,
+                  "dirty": false,
+                  "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/shared.md",
+                  "viewType": "ritemark.editor"
+                }
+              ]
+            }
+          ],
+          "terminals": []
+        }
+      ],
+      "views": [
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969",
+        "Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969"
+      ],
+      "disk": "# Shared audit document\n\nTwo-window baseline. FIRST SAVED 1789295965969 WINDOW B UNSAVED 1789295965969\n"
+    }
+  ],
+  "hostPids": [
+    54235,
+    56633
+  ],
+  "completed": true,
+  "savedPropagation": true,
+  "unsavedConflictPreserved": true,
+  "explicitResolutionPropagated": true
+}

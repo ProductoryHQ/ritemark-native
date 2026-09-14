@@ -1,0 +1,70 @@
+{
+  "hostPid": 60859,
+  "providerClass": "TranscriptWorkbenchProvider",
+  "jobsClass": "JobManager",
+  "storeClass": "SessionStore",
+  "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+  "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+  "workspaceFolders": [
+    "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+  ],
+  "workspaceFile": null,
+  "runtimeSessionCount": 0,
+  "jobs": [
+    {
+      "id": "job-mtzwp6d4-2",
+      "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+      "audioName": "pending.wav",
+      "durationSec": 1,
+      "engine": "whisper-local",
+      "state": "transcribing",
+      "progress": {
+        "phase": "transcribing",
+        "percent": 0
+      },
+      "startedAt": "2026-09-13T14:25:36.376Z"
+    },
+    {
+      "id": "job-mtzwp4yd-1",
+      "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav",
+      "audioName": "control.wav",
+      "durationSec": 1,
+      "engine": "whisper-local",
+      "state": "done",
+      "progress": {
+        "phase": "saving",
+        "percent": 100
+      },
+      "startedAt": "2026-09-13T14:25:34.549Z",
+      "endedAt": "2026-09-13T14:25:35.497Z",
+      "sessionId": "control_wav-br86v1"
+    }
+  ],
+  "inflight": [
+    {
+      "id": "job-mtzwp6d4-2",
+      "audioPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+      "audioName": "pending.wav",
+      "durationSec": 1,
+      "engine": "whisper-local",
+      "state": "preparing",
+      "progress": {
+        "phase": "preparing",
+        "percent": null
+      },
+      "startedAt": "2026-09-13T14:25:36.376Z"
+    }
+  ],
+  "heldEngines": [
+    {
+      "sourcePath": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/pending.wav",
+      "heldAt": 1789309536408
+    }
+  ],
+  "engineBoundaryStubbed": true,
+  "storeGate": null,
+  "operations": [],
+  "panels": [
+    "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/speech-audit/control.wav"
+  ]
+}

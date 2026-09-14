@@ -1,0 +1,227 @@
+{
+  "method": "Repeat normal cell-edit / external replacement / Save after explicitly refreshing a clean workbook. Record modal dialogs separately from nonmodal notifications. Observe disk writes and the ordinary Save result.",
+  "steps": [
+    {
+      "stage": "refreshed-clean",
+      "at": 1789294154897,
+      "host": {
+        "at": 1789294154895,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 9,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "REPEAT BASELINE",
+      "dialogs": {
+        "modal": [],
+        "notifications": [
+          "Refreshed book.xlsx",
+          "Source: Ritemark Editor\nOK\nOpt Out\nPrivacy Policy\nTerms of Use\nRitemark collects anonymous usage data to improve the product. No personal information is collected."
+        ]
+      }
+    },
+    {
+      "stage": "external-replacement",
+      "at": 1789294156027,
+      "host": {
+        "at": 1789294156021,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 9,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "REPEAT EXTERNAL",
+      "visible": "book.xlsx\nRefresh\nRefresh\nOpen in Excel\nfx\nB2\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nREPEAT HUMAN\n\t\n\tAdd row",
+      "dialogs": {
+        "modal": [],
+        "notifications": [
+          "Refreshed book.xlsx",
+          "Source: Ritemark Editor\nOK\nOpt Out\nPrivacy Policy\nTerms of Use\nRitemark collects anonymous usage data to improve the product. No personal information is collected."
+        ]
+      }
+    },
+    {
+      "stage": "saved",
+      "at": 1789294156038,
+      "host": {
+        "at": 1789294156033,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 9,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "REPEAT HUMAN",
+      "visible": "book.xlsx\nRefresh\nRefresh\nOpen in Excel\nfx\nB2\n\t\nA\n\t\nB\n\t\n\n1\t\nitem\n\t\nvalue\n\t\n2\t\nalpha\n\t\nREPEAT HUMAN\n\t\n\tAdd row",
+      "dialogs": {
+        "modal": [],
+        "notifications": [
+          "Refreshed book.xlsx",
+          "Source: Ritemark Editor\nOK\nOpt Out\nPrivacy Policy\nTerms of Use\nRitemark collects anonymous usage data to improve the product. No personal information is collected."
+        ]
+      }
+    }
+  ],
+  "externalChangeOverwritten": true,
+  "saveReturnedWithoutInterveningUIAction": true,
+  "modalAfterSave": [],
+  "completed": true
+}

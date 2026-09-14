@@ -1,0 +1,189 @@
+{
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "method": "Actual AcpManager/AcpClient and locked ACP SDK, bundled native OpenCode. Isolated child XDG directories/environment, synthetic workspace and deny-only filesystem/permission callbacks. Concurrent cold session opens, warm control, owned-process crash, restart and dispose. No prompt/model turn or file-tool invocation.",
+  "fixture": "/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-audit-acp-4ezSR7",
+  "platform": "darwin",
+  "node": "v22.22.1",
+  "events": [
+    {
+      "atMs": 185,
+      "kind": "trace:client",
+      "message": "spawn"
+    },
+    {
+      "atMs": 759,
+      "kind": "trace:client",
+      "message": "initialized"
+    },
+    {
+      "atMs": 997,
+      "kind": "trace:client",
+      "message": "newSession"
+    },
+    {
+      "atMs": 997,
+      "kind": "progress",
+      "type": "init",
+      "message": "Starting OpenCode session…",
+      "sessionId": "ses_f658fa19fffe4MkkuIfqOwyTlL"
+    },
+    {
+      "atMs": 997,
+      "kind": "trace:manager",
+      "message": "started"
+    },
+    {
+      "atMs": 1001,
+      "kind": "trace:manager",
+      "message": "session-update:ignored"
+    },
+    {
+      "atMs": 1001,
+      "kind": "trace:client",
+      "message": "newSession"
+    },
+    {
+      "atMs": 1001,
+      "kind": "progress",
+      "type": "init",
+      "message": "Starting OpenCode session…",
+      "sessionId": "ses_f658fa195ffemPQjk6TRehhVkG"
+    },
+    {
+      "atMs": 1001,
+      "kind": "trace:manager",
+      "message": "started"
+    },
+    {
+      "atMs": 1124,
+      "kind": "child-exit",
+      "pid": 76565,
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    {
+      "atMs": 1124,
+      "kind": "trace:client",
+      "message": "exit"
+    },
+    {
+      "atMs": 1124,
+      "kind": "trace:manager",
+      "message": "agent-exit"
+    },
+    {
+      "atMs": 1150,
+      "kind": "trace:client",
+      "message": "spawn"
+    },
+    {
+      "atMs": 1600,
+      "kind": "trace:client",
+      "message": "initialized"
+    },
+    {
+      "atMs": 1856,
+      "kind": "trace:client",
+      "message": "newSession"
+    },
+    {
+      "atMs": 1856,
+      "kind": "progress",
+      "type": "init",
+      "message": "Starting OpenCode session…",
+      "sessionId": "ses_f658f9e40ffeXZLdNo2T6L3TjS"
+    },
+    {
+      "atMs": 1856,
+      "kind": "trace:manager",
+      "message": "started"
+    },
+    {
+      "atMs": 1867,
+      "kind": "child-exit",
+      "pid": 76580,
+      "code": null,
+      "signal": "SIGTERM"
+    },
+    {
+      "atMs": 1867,
+      "kind": "trace:client",
+      "message": "exit"
+    }
+  ],
+  "children": [
+    {
+      "pid": 76565,
+      "command": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/opencode",
+      "args": [
+        "acp"
+      ],
+      "exited": true,
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    {
+      "pid": 76580,
+      "command": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/opencode",
+      "args": [
+        "acp"
+      ],
+      "exited": true,
+      "code": null,
+      "signal": "SIGTERM"
+    }
+  ],
+  "cases": [
+    {
+      "name": "concurrent cold session opens",
+      "results": [
+        {
+          "ok": true,
+          "value": "ses_f658fa19fffe4MkkuIfqOwyTlL"
+        },
+        {
+          "ok": false,
+          "error": "ACP client is not initialized"
+        }
+      ],
+      "childCount": 1,
+      "liveSessionCount": 1
+    },
+    {
+      "name": "warm session open control",
+      "passed": true,
+      "distinctSessionIds": true,
+      "liveSessionCount": 2,
+      "childCount": 1
+    },
+    {
+      "name": "native crash during session open",
+      "passed": true,
+      "outstandingResult": {
+        "ok": false,
+        "error": "ACP connection closed"
+      },
+      "liveSessionCountAfterExit": 0
+    },
+    {
+      "name": "native restart after confirmed exit",
+      "passed": true,
+      "firstPid": 76565,
+      "replacementPid": 76580,
+      "liveSessionCount": 1
+    },
+    {
+      "name": "normal dispose",
+      "passed": true,
+      "observedExitWithinMs": 22,
+      "liveSessionCount": 0
+    }
+  ],
+  "completed": true,
+  "binary": {
+    "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/opencode",
+    "bytes": 143108224,
+    "sha256": "6326ccd2a62d2a423de865ba5a69e105c48d3d363d88195faab939cd7fa3c186"
+  },
+  "allOwnedChildrenExited": true
+}

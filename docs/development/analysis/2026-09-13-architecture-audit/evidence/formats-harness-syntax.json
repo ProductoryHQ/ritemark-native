@@ -1,0 +1,58 @@
+{
+  "method": "Node --check, Python AST and JSONL parsing. Artifact syntax only, not audit completion.",
+  "node": "v22.22.1",
+  "checks": [
+    {
+      "file": "formats-cleanup-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-client.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-drawio-conflict-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-driver/index.cjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-pdf-pages-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-preflight-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-preview-probe.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "formats-tools.mjs",
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "file": "make-format-fixtures.cjs",
+      "exitCode": 0,
+      "output": ""
+    }
+  ],
+  "pythonAstPassed": true,
+  "jsonl": [
+    {
+      "file": "formats-driver-events-85175.jsonl",
+      "parsedRecords": 44
+    }
+  ]
+}

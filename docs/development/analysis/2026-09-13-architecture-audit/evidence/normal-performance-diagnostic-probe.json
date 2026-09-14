@@ -1,0 +1,71 @@
+[
+  {
+    "target": "1C24174ACA230A9C96CCA4E21D0D5BB3",
+    "context": {
+      "id": 2,
+      "origin": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln",
+      "name": "",
+      "uniqueId": "3114716517445338756.412733830116742915",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "8BF6E08856BC2E6DD8A01256988B4F6C"
+      }
+    },
+    "value": {
+      "ready": "complete",
+      "body": "Claude can work with your files\n\n\"Reorganize my research notes\"\n\"Create an outline from these files\"\n\"Find all mentions of X and summarize\"\nYou are interacting with AI\nClaude Code · Anthropic · Sonnet 5. AI can be wrong—review its output and changes.\nWhat may be shared?\nDon’t show again\nActive: note.md\nSonnet 5\nAuto",
+      "root": {},
+      "editables": [],
+      "resources": [
+        {
+          "name": "https://file+.vscode-resource.vscode-cdn.net/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/media/webview.js?v=1789288800896",
+          "duration": 347.5
+        }
+      ],
+      "observer": null
+    }
+  },
+  {
+    "target": "1C24174ACA230A9C96CCA4E21D0D5BB3",
+    "context": {
+      "id": 1,
+      "origin": "vscode-webview://1qoqcuh8lqfeeumckv65el08k54rp457967gr4g260kstolq3lln",
+      "name": "",
+      "uniqueId": "-4581397631297860999.1447588107819943757",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "1C24174ACA230A9C96CCA4E21D0D5BB3"
+      }
+    },
+    "value": {
+      "ready": "complete",
+      "body": "",
+      "editables": [],
+      "resources": [],
+      "observer": null
+    }
+  },
+  {
+    "target": "A858E4F7B861A5749FEF8119C240D309",
+    "context": {
+      "id": 3,
+      "origin": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5",
+      "name": "",
+      "uniqueId": "-8555750691123545108.6375853179395751366",
+      "auxData": {
+        "isDefault": true,
+        "type": "default",
+        "frameId": "A858E4F7B861A5749FEF8119C240D309"
+      }
+    },
+    "value": {
+      "ready": "complete",
+      "body": "",
+      "editables": [],
+      "resources": [],
+      "observer": null
+    }
+  }
+]

@@ -1,0 +1,64 @@
+{
+  "method": "Parse actual SVG content attribute and decode compressed mxfile payload; compare embedded graph cell IDs, not absent literal text in compressed bytes.",
+  "steps": [
+    {
+      "stage": "baseline",
+      "svgSha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433",
+      "cells": [
+        {
+          "id": "0",
+          "value": null
+        },
+        {
+          "id": "1",
+          "value": null
+        },
+        {
+          "id": "audit-cell",
+          "value": "AUDIT BASE"
+        }
+      ]
+    },
+    {
+      "stage": "external-disk-and-host-updated",
+      "svgSha256": "639a360b0e01f35c2a82ba28b033d8e8c9194c70b2fc885e6e7b33189054742f",
+      "cells": [
+        {
+          "id": "0",
+          "value": null
+        },
+        {
+          "id": "1",
+          "value": null
+        },
+        {
+          "id": "audit-cell",
+          "value": "AUDIT EXTERNAL"
+        },
+        {
+          "id": "external-cell",
+          "value": "EXTERNAL ACTOR BOX"
+        }
+      ]
+    },
+    {
+      "stage": "production-autosave",
+      "svgSha256": "b1a306df418663f545f96a9d221c5495cea637b16883db545b72c5d977ff8913",
+      "cells": [
+        {
+          "id": "0",
+          "value": null
+        },
+        {
+          "id": "1",
+          "value": null
+        },
+        {
+          "id": "audit-cell",
+          "value": "LOCAL EDIT AFTER EXTERNAL"
+        }
+      ]
+    }
+  ],
+  "externalGraphCellLost": true
+}

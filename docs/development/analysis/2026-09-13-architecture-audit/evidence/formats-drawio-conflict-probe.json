@@ -1,0 +1,225 @@
+{
+  "method": "Real draw.io view, external disk replacement adding an independent shape, then ordinary label editing through DOM/keyboard input and the production autosave bridge. No synthetic drawio:save message or product model mutation.",
+  "steps": [
+    {
+      "stage": "baseline",
+      "at": 1789298254750,
+      "disk": {
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"90\" content=\"&lt;mxfile&gt;&lt;diagram name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;900&quot; dy=&quot;700&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; page=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;audit-cell&quot; value=&quot;AUDIT BASE&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;100&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;\"><rect x=\"1\" y=\"1\" width=\"180\" height=\"70\" fill=\"#dae8fc\"/><text x=\"12\" y=\"40\">AUDIT BASE</text></svg>\n",
+        "sha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433"
+      },
+      "host": {
+        "at": 1789298254749,
+        "hostPid": 85175,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "diagram.drawio.svg",
+            "version": 1,
+            "dirty": false,
+            "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"90\" content=\"&lt;mxfile&gt;&lt;diagram name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;900&quot; dy=&quot;700&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; page=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;audit-cell&quot; value=&quot;AUDIT BASE&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;100&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;\"><rect x=\"1\" y=\"1\" width=\"180\" height=\"70\" fill=\"#dae8fc\"/><text x=\"12\" y=\"40\">AUDIT BASE</text></svg>\n",
+            "length": 851,
+            "sha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "diagram.drawio.svg",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace/diagram.drawio.svg",
+                "viewType": "ritemark.drawioEditor"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "view": {
+        "text": "File\nEdit\nView\nArrange\nExtras\nHelp\nScratchpad\nDrag elements here\nGeneral\nText\nHeading\n\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\nVertical Container\nHorizontal Container\nList\nItem 1\nItem 2\nItem 3\nList Item\nLabel\nLabel\nSource\nLabel\nSource\nTarget\nMisc\nAdvanced\nBasic\nArrows\nFlowchart\nEntity Relation\nUML\n+\nMore Shapes\nDiagram\nStyle\nView\nGrid\nPage View\nBackground\nChange...\nBackground Color\nShadow\nOptions\nConnection Arrows\nConnection Points\nGuides\nPaper Size\nEdit Data...\nClear Default Style\n\nAUDIT BASE\nPage-1",
+        "bridge": {
+          "loaded": true,
+          "events": [
+            "host:drawio:load",
+            "out:load",
+            "drawio:init",
+            "out:load",
+            "out:load",
+            "drawio:load",
+            "drawio:load"
+          ]
+        }
+      }
+    },
+    {
+      "stage": "external-disk-and-host-updated",
+      "at": 1789298255862,
+      "disk": {
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"90\" content=\"&lt;mxfile&gt;&lt;diagram name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;900&quot; dy=&quot;700&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; page=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;audit-cell&quot; value=&quot;AUDIT EXTERNAL&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;100&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;external-cell&quot; value=&quot;EXTERNAL ACTOR BOX&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;240&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;\"><rect x=\"1\" y=\"1\" width=\"180\" height=\"70\" fill=\"#dae8fc\"/><text x=\"12\" y=\"40\">AUDIT EXTERNAL</text></svg>\n",
+        "sha256": "639a360b0e01f35c2a82ba28b033d8e8c9194c70b2fc885e6e7b33189054742f"
+      },
+      "host": {
+        "at": 1789298255860,
+        "hostPid": 85175,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "diagram.drawio.svg",
+            "version": 2,
+            "dirty": false,
+            "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"90\" content=\"&lt;mxfile&gt;&lt;diagram name=&quot;Page-1&quot;&gt;&lt;mxGraphModel dx=&quot;900&quot; dy=&quot;700&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; page=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;audit-cell&quot; value=&quot;AUDIT EXTERNAL&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;100&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;external-cell&quot; value=&quot;EXTERNAL ACTOR BOX&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;100&quot; y=&quot;240&quot; width=&quot;180&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;\"><rect x=\"1\" y=\"1\" width=\"180\" height=\"70\" fill=\"#dae8fc\"/><text x=\"12\" y=\"40\">AUDIT EXTERNAL</text></svg>\n",
+            "length": 1171,
+            "sha256": "639a360b0e01f35c2a82ba28b033d8e8c9194c70b2fc885e6e7b33189054742f"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "diagram.drawio.svg",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace/diagram.drawio.svg",
+                "viewType": "ritemark.drawioEditor"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "view": {
+        "text": "File\nEdit\nView\nArrange\nExtras\nHelp\nScratchpad\nDrag elements here\nGeneral\nText\nHeading\n\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\nVertical Container\nHorizontal Container\nList\nItem 1\nItem 2\nItem 3\nList Item\nLabel\nLabel\nSource\nLabel\nSource\nTarget\nMisc\nAdvanced\nBasic\nArrows\nFlowchart\nEntity Relation\nUML\n+\nMore Shapes\nDiagram\nStyle\nView\nGrid\nPage View\nBackground\nChange...\nBackground Color\nShadow\nOptions\nConnection Arrows\nConnection Points\nGuides\nPaper Size\nEdit Data...\nClear Default Style\n\nAUDIT BASE\nPage-1",
+        "bridge": {
+          "loaded": true,
+          "events": [
+            "host:drawio:load",
+            "out:load",
+            "drawio:init",
+            "out:load",
+            "out:load",
+            "drawio:load",
+            "drawio:load"
+          ]
+        }
+      }
+    },
+    {
+      "stage": "production-autosave",
+      "at": 1789298256850,
+      "disk": {
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" style=\"background: transparent; background-color: transparent; color-scheme: light dark;\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" width=\"181px\" height=\"71px\" viewBox=\"0 0 181 71\" content=\"&lt;mxfile host=&quot;0qr9deb8ud0nc2n5dl30guaijk0cnt0fpd574a9vp1si4fpbhnf3&quot;&gt;&lt;diagram name=&quot;Page-1&quot; id=&quot;0&quot;&gt;jZNdT4MwFIZ/DZcmQCPDy8nYNJmauCV6W9sDbSyUlCLgr7fQMmDGxBva87znoz2HeigpuoPCFXuSFIQX+rTz0M4Lw1uEzHcAvQURCi3IFacWBTM48W9w0He04RTqlaOWUmherSGRZQlErxhWSrZrt0yKddUK566iP4MTwQJ+ub1xqpmlcbiZ+QPwnE2Vg+jOKgWenF3immEq2wVCqYcSJaW2u6JLQAy9m/pi4/Z/qJeDKSj1fwJwQ7m+ISO8jnTJat1P91ayKSkMoYGH7lvGNZwqTAa1NYM2jOlCODnjQiRSSDXGIoohzojhtVbyExZKRGL4yIxi631h0bh6x5dkezQo3T2ezbLdn9PXwXw36/OgjP6gNHSLI7ubHkAWoFVvXNhiGBvX+XYeXBA7NmXxnd1f2dj9N/kl9dxas3Hdncx5iqO2eAoo/QE=&lt;/diagram&gt;&lt;/mxfile&gt;\"><defs/><g><g data-cell-id=\"0\"><g data-cell-id=\"1\"><g data-cell-id=\"audit-cell\"><g transform=\"translate(0.5,0.5)\"><rect x=\"0\" y=\"0\" width=\"180\" height=\"70\" rx=\"10.5\" ry=\"10.5\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" pointer-events=\"all\" style=\"fill: light-dark(rgb(218, 232, 252), rgb(29, 41, 59)); stroke: light-dark(rgb(108, 142, 191), rgb(92, 121, 163));\"/></g><g><g><switch><foreignObject style=\"overflow: visible; text-align: left;\" pointer-events=\"none\" width=\"100%\" height=\"100%\" requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Extensibility\"><div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"display: flex; align-items: unsafe center; justify-content: unsafe center; width: 178px; height: 1px; padding-top: 35px; margin-left: 1px;\"><div style=\"box-sizing: border-box; font-size: 0; text-align: center; color: #000000; \"><div style=\"display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; \">LOCAL EDIT AFTER EXTERNAL</div></div></div></foreignObject><text x=\"90\" y=\"39\" fill=\"light-dark(#000000, #ffffff)\" font-family=\"Helvetica\" font-size=\"12px\" text-anchor=\"middle\">LOCAL EDIT AFTER EXTERNAL</text></switch></g></g></g></g></g></g><switch><g requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Extensibility\"/><a transform=\"translate(0,-5)\" xlink:href=\"https://www.drawio.com/doc/faq/svg-export-text-problems\" target=\"_blank\"><text text-anchor=\"middle\" font-size=\"10px\" x=\"50%\" y=\"100%\">Text is not SVG - cannot display</text></a></switch></svg>",
+        "sha256": "b1a306df418663f545f96a9d221c5495cea637b16883db545b72c5d977ff8913"
+      },
+      "host": {
+        "at": 1789298256849,
+        "hostPid": 85175,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "diagram.drawio.svg",
+            "version": 3,
+            "dirty": false,
+            "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" style=\"background: transparent; background-color: transparent; color-scheme: light dark;\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" width=\"181px\" height=\"71px\" viewBox=\"0 0 181 71\" content=\"&lt;mxfile host=&quot;0qr9deb8ud0nc2n5dl30guaijk0cnt0fpd574a9vp1si4fpbhnf3&quot;&gt;&lt;diagram name=&quot;Page-1&quot; id=&quot;0&quot;&gt;jZNdT4MwFIZ/DZcmQCPDy8nYNJmauCV6W9sDbSyUlCLgr7fQMmDGxBva87znoz2HeigpuoPCFXuSFIQX+rTz0M4Lw1uEzHcAvQURCi3IFacWBTM48W9w0He04RTqlaOWUmherSGRZQlErxhWSrZrt0yKddUK566iP4MTwQJ+ub1xqpmlcbiZ+QPwnE2Vg+jOKgWenF3immEq2wVCqYcSJaW2u6JLQAy9m/pi4/Z/qJeDKSj1fwJwQ7m+ISO8jnTJat1P91ayKSkMoYGH7lvGNZwqTAa1NYM2jOlCODnjQiRSSDXGIoohzojhtVbyExZKRGL4yIxi631h0bh6x5dkezQo3T2ezbLdn9PXwXw36/OgjP6gNHSLI7ubHkAWoFVvXNhiGBvX+XYeXBA7NmXxnd1f2dj9N/kl9dxas3Hdncx5iqO2eAoo/QE=&lt;/diagram&gt;&lt;/mxfile&gt;\"><defs/><g><g data-cell-id=\"0\"><g data-cell-id=\"1\"><g data-cell-id=\"audit-cell\"><g transform=\"translate(0.5,0.5)\"><rect x=\"0\" y=\"0\" width=\"180\" height=\"70\" rx=\"10.5\" ry=\"10.5\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" pointer-events=\"all\" style=\"fill: light-dark(rgb(218, 232, 252), rgb(29, 41, 59)); stroke: light-dark(rgb(108, 142, 191), rgb(92, 121, 163));\"/></g><g><g><switch><foreignObject style=\"overflow: visible; text-align: left;\" pointer-events=\"none\" width=\"100%\" height=\"100%\" requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Extensibility\"><div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"display: flex; align-items: unsafe center; justify-content: unsafe center; width: 178px; height: 1px; padding-top: 35px; margin-left: 1px;\"><div style=\"box-sizing: border-box; font-size: 0; text-align: center; color: #000000; \"><div style=\"display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#000000, #ffffff); line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; \">LOCAL EDIT AFTER EXTERNAL</div></div></div></foreignObject><text x=\"90\" y=\"39\" fill=\"light-dark(#000000, #ffffff)\" font-family=\"Helvetica\" font-size=\"12px\" text-anchor=\"middle\">LOCAL EDIT AFTER EXTERNAL</text></switch></g></g></g></g></g></g><switch><g requiredFeatures=\"http://www.w3.org/TR/SVG11/feature#Extensibility\"/><a transform=\"translate(0,-5)\" xlink:href=\"https://www.drawio.com/doc/faq/svg-export-text-problems\" target=\"_blank\"><text text-anchor=\"middle\" font-size=\"10px\" x=\"50%\" y=\"100%\">Text is not SVG - cannot display</text></a></switch></svg>",
+            "length": 2432,
+            "sha256": "b1a306df418663f545f96a9d221c5495cea637b16883db545b72c5d977ff8913"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "diagram.drawio.svg",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace/diagram.drawio.svg",
+                "viewType": "ritemark.drawioEditor"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "view": {
+        "text": "File\nEdit\nView\nArrange\nExtras\nHelp\nScratchpad\nDrag elements here\nGeneral\nText\nHeading\n\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\nVertical Container\nHorizontal Container\nList\nItem 1\nItem 2\nItem 3\nList Item\nLabel\nLabel\nSource\nLabel\nSource\nTarget\nMisc\nAdvanced\nBasic\nArrows\nFlowchart\nEntity Relation\nUML\n+\nMore Shapes\nStyle\nText\nArrange\n\n\nFill\nFill\nAuto\nHatch\nSolid\nDots\nCross Hatch\nDashed\nZigZag Line\nGradient\nLine\nLine\nPerimeter\nOpacity\nEffects\nEdit\nCopy as Text\nEdit Link\nEdit Data\nCopy Data\nEdit Connection Points\nEdit Geometry\nEdit Tooltip\nEdit Style\n\nCopy Style\nSet as Default Style\n\nProperty\tValue\nLOCAL EDIT AFTER EXTERNAL\nPage-1",
+        "bridge": {
+          "loaded": true,
+          "events": [
+            "host:drawio:load",
+            "out:load",
+            "drawio:init",
+            "out:load",
+            "out:load",
+            "drawio:load",
+            "drawio:load",
+            "drawio:autosave",
+            "out:export",
+            "drawio:export",
+            "host:drawio:saved",
+            "out:status"
+          ]
+        }
+      }
+    }
+  ],
+  "dialogs": {
+    "modal": [],
+    "notifications": [
+      "Source: Ritemark Editor\nOK\nOpt Out\nPrivacy Policy\nTerms of Use\nRitemark collects anonymous usage data to improve the product. No personal information is collected."
+    ]
+  },
+  "externalShapeLost": true,
+  "completed": true
+}

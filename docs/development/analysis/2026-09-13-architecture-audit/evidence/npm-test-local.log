@@ -1,0 +1,783 @@
+
+> ritemark@1.10.1 pretest
+> npm run test:conversations && npm run test:thinking-effort && npm run test:sprint113-language && npm run test:editor-sync && npm run test:claude-auth && npm run test:security-backports
+
+
+> ritemark@1.10.1 test:conversations
+> npx tsx src/runtime/continuation.test.ts && npx tsx src/conversations/contextPack.test.ts && npx tsx src/conversations/identityColor.test.ts && npx tsx src/conversations/runtimeAttachmentPolicy.test.ts && npx tsx src/conversations/types.test.ts && npx tsx src/conversations/projectScope.test.ts && npx tsx src/conversations/ConversationStore.test.ts && npx tsx src/conversations/ConversationController.test.ts && npx tsx src/conversations/conversationDeleteNotification.test.ts && npx tsx src/conversations/ConversationCutoverState.test.ts && npx tsx src/conversations/LegacyConversationMigrator.test.ts && npx tsx src/conversations/ConversationTitlePolicy.test.ts && npx tsx src/conversations/ConversationTitleGenerator.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageReadOnly.test.ts && npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts && npx tsx webview/src/components/ai-sidebar/conversationSelectors.test.ts && npx tsx webview/src/components/ai-sidebar/conversationProjection.test.ts && npx tsx webview/src/components/ai-sidebar/continuationPresentation.test.ts
+
+continuation.test.ts: all tests passed
+contextPack.test.ts: all tests passed
+identityColor.test.ts: all tests passed
+runtimeAttachmentPolicy.test.ts: all tests passed
+types.test.ts: all tests passed
+projectScope.test.ts: all tests passed
+ConversationStore.test.ts: all tests passed
+ConversationController.test.ts: all tests passed
+conversationDeleteNotification.test.ts: all assertions passed
+ConversationCutoverState.test.ts: all tests passed
+LegacyConversationMigrator.test.ts: all tests passed
+ConversationTitlePolicy.test.ts: all tests passed
+ConversationTitleGenerator.test.ts: all tests passed
+chatHistoryStorageReadOnly.test.ts: all tests passed
+[chatHistoryStorage] Skipped malformed legacy record: ritemark-chat-legacy-corrupt SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at Module.discoverLegacyConversationCandidates (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorage.ts:230:31)
+    at main (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts:74:30)
+chatHistoryStorageQuota.test.ts: storage-full bootstrap isolation passed
+conversationSelectors tests passed
+conversationProjection.test.ts: all tests passed
+continuationPresentation.test.ts: all tests passed
+
+> ritemark@1.10.1 test:thinking-effort
+> npx tsx src/runtime/thinkingEffort.test.ts && npx tsx webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts
+
+thinkingEffort.test.ts: all tests passed
+thinkingEffortGeometry tests passed.
+
+> ritemark@1.10.1 test:sprint113-language
+> npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx webview/src/components/transcribe/workbench/InsightsLanguageCombobox.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts
+
+insightsLanguage.test.ts: all tests passed
+workbenchProtocol.test.ts: all tests passed
+insights.test.ts: all tests passed
+insightsMarkdown.test.ts: all tests passed
+InsightsLanguageCombobox.test.ts: all tests passed
+workbenchLayout.test.ts: all tests passed
+
+> ritemark@1.10.1 test:editor-sync
+> npx tsx src/editorSync/state.test.ts && npx tsx src/editorSync/protocol.test.ts && npx tsx src/editorSync/delivery.test.ts && npx tsx src/editorSync/saveReceipt.test.ts && npx tsx webview/src/documentSyncReducer.test.ts && npx tsx webview/src/editorValueReconciliation.test.ts && npm run test:task-list-roundtrip && npx tsx src/editorUndoKeybindings.test.ts
+
+TAP version 13
+# Subtest: three-way classifier keeps ordinary local autosave lag quiet
+ok 1 - three-way classifier keeps ordinary local autosave lag quiet
+  ---
+  duration_ms: 0.577834
+  type: 'test'
+  ...
+# Subtest: three-way classifier distinguishes external-only, converged, and conflict
+ok 2 - three-way classifier distinguishes external-only, converged, and conflict
+  ---
+  duration_ms: 0.051666
+  type: 'test'
+  ...
+# Subtest: a delayed local save remains local-only when the model has advanced
+ok 3 - a delayed local save remains local-only when the model has advanced
+  ---
+  duration_ms: 0.287833
+  type: 'test'
+  ...
+# Subtest: post-participant save content is recognized after format-on-save
+ok 4 - post-participant save content is recognized after format-on-save
+  ---
+  duration_ms: 0.040875
+  type: 'test'
+  ...
+# Subtest: collapsed saves consume through the newest matching local snapshot
+ok 5 - collapsed saves consume through the newest matching local snapshot
+  ---
+  duration_ms: 0.45225
+  type: 'test'
+  ...
+# Subtest: an unconfirmed or canceled save attempt cannot hide a real external conflict
+ok 6 - an unconfirmed or canceled save attempt cannot hide a real external conflict
+  ---
+  duration_ms: 0.060834
+  type: 'test'
+  ...
+# Subtest: an unmatched disk observation retires only receipts it can order after
+ok 7 - an unmatched disk observation retires only receipts it can order after
+  ---
+  duration_ms: 0.051083
+  type: 'test'
+  ...
+# Subtest: logical normalization ignores one BOM and EOL representation
+ok 8 - logical normalization ignores one BOM and EOL representation
+  ---
+  duration_ms: 0.085167
+  type: 'test'
+  ...
+# Subtest: ensureTrailingNewline appends exactly one newline when the body lacks one
+ok 9 - ensureTrailingNewline appends exactly one newline when the body lacks one
+  ---
+  duration_ms: 0.124292
+  type: 'test'
+  ...
+# Subtest: ensureTrailingNewline is a no-op when the body already ends in a newline
+ok 10 - ensureTrailingNewline is a no-op when the body already ends in a newline
+  ---
+  duration_ms: 0.222916
+  type: 'test'
+  ...
+# Subtest: ensureTrailingNewline never turns an empty body into a bare newline
+ok 11 - ensureTrailingNewline never turns an empty body into a bare newline
+  ---
+  duration_ms: 0.034041
+  type: 'test'
+  ...
+# Subtest: canonical JSON sorts nested object keys without reordering arrays
+ok 12 - canonical JSON sorts nested object keys without reordering arrays
+  ---
+  duration_ms: 5.177916
+  type: 'test'
+  ...
+# Subtest: a pre-existing dirty model is local-only against the disk base
+ok 13 - a pre-existing dirty model is local-only against the disk base
+  ---
+  duration_ms: 0.066791
+  type: 'test'
+  ...
+# Subtest: a clean model lagging disk is initialized for external import
+ok 14 - a clean model lagging disk is initialized for external import
+  ---
+  duration_ms: 0.0265
+  type: 'test'
+  ...
+# Subtest: typing during conflict extends the local snapshot instead of dropping the edit
+ok 15 - typing during conflict extends the local snapshot instead of dropping the edit
+  ---
+  duration_ms: 0.03
+  type: 'test'
+  ...
+# Subtest: a stale full-document edit never overwrites a newer dirty model
+ok 16 - a stale full-document edit never overwrites a newer dirty model
+  ---
+  duration_ms: 0.030084
+  type: 'test'
+  ...
+# Subtest: resolution waits for every visible view but not dormant views
+ok 17 - resolution waits for every visible view but not dormant views
+  ---
+  duration_ms: 0.042208
+  type: 'test'
+  ...
+# Subtest: canonicalMarkdownProjection makes the persisted body and the editor projection compare equal
+ok 18 - canonicalMarkdownProjection makes the persisted body and the editor projection compare equal
+  ---
+  duration_ms: 0.151167
+  type: 'test'
+  ...
+# Subtest: canonicalMarkdownProjection is idempotent
+ok 19 - canonicalMarkdownProjection is idempotent
+  ---
+  duration_ms: 0.036542
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20.570209
+TAP version 13
+# Subtest: accepts an exact ready message
+ok 1 - accepts an exact ready message
+  ---
+  duration_ms: 0.455541
+  type: 'test'
+  ...
+# Subtest: rejects unknown fields and malformed hashes
+ok 2 - rejects unknown fields and malformed hashes
+  ---
+  duration_ms: 0.22575
+  type: 'test'
+  ...
+# Subtest: accepts an empty markdown edit body and structured properties
+ok 3 - accepts an empty markdown edit body and structured properties
+  ---
+  duration_ms: 0.067584
+  type: 'test'
+  ...
+# Subtest: retry apply does not pretend to resolve a conflict
+ok 4 - retry apply does not pretend to resolve a conflict
+  ---
+  duration_ms: 0.054584
+  type: 'test'
+  ...
+# Subtest: validates host update payloads at runtime
+ok 5 - validates host update payloads at runtime
+  ---
+  duration_ms: 0.224833
+  type: 'test'
+  ...
+# Subtest: accepts exact CSV edit, applied receipt, and resolution messages
+ok 6 - accepts exact CSV edit, applied receipt, and resolution messages
+  ---
+  duration_ms: 0.055041
+  type: 'test'
+  ...
+# Subtest: validates every host message family
+ok 7 - validates every host message family
+  ---
+  duration_ms: 0.106792
+  type: 'test'
+  ...
+# Subtest: rejects malformed optional feature fields instead of silently dropping them
+ok 8 - rejects malformed optional feature fields instead of silently dropping them
+  ---
+  duration_ms: 0.053667
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5.588792
+TAP version 13
+# Subtest: delivery retries at 750 ms and 2.5 s, then exhausts at 5 s
+ok 1 - delivery retries at 750 ms and 2.5 s, then exhausts at 5 s
+  ---
+  duration_ms: 0.679042
+  type: 'test'
+  ...
+# Subtest: only an exact receipt cancels the delivery budget
+ok 2 - only an exact receipt cancels the delivery budget
+  ---
+  duration_ms: 0.117875
+  type: 'test'
+  ...
+# Subtest: a superseded delivery is inert
+ok 3 - a superseded delivery is inert
+  ---
+  duration_ms: 0.082209
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4.80825
+TAP version 13
+# Subtest: reads the shell-provided exact save receipt
+ok 1 - reads the shell-provided exact save receipt
+  ---
+  duration_ms: 0.310375
+  type: 'test'
+  ...
+# Subtest: missing or malformed receipts stay conservative
+ok 2 - missing or malformed receipts stay conservative
+  ---
+  duration_ms: 0.073875
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3.31075
+TAP version 13
+# Subtest: stale host state cannot replace a newer visible revision
+ok 1 - stale host state cannot replace a newer visible revision
+  ---
+  duration_ms: 0.333
+  type: 'test'
+  ...
+# Subtest: healthy and local-only states never expose a header action
+ok 2 - healthy and local-only states never expose a header action
+  ---
+  duration_ms: 0.053042
+  type: 'test'
+  ...
+# Subtest: only conflict and exhausted application states expose an action
+ok 3 - only conflict and exhausted application states expose an action
+  ---
+  duration_ms: 0.040125
+  type: 'test'
+  ...
+# Subtest: a stale optimistic edit becomes a visible recovery state instead of a silent replay
+ok 4 - a stale optimistic edit becomes a visible recovery state instead of a silent replay
+  ---
+  duration_ms: 0.07925
+  type: 'test'
+  ...
+# Subtest: a successful state clears conflict evidence only after host resolution
+ok 5 - a successful state clears conflict evidence only after host resolution
+  ---
+  duration_ms: 0.053292
+  type: 'test'
+  ...
+# Subtest: an applying retry keeps current conflict evidence when the host still names it
+ok 6 - an applying retry keeps current conflict evidence when the host still names it
+  ---
+  duration_ms: 0.039875
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5.007125
+TAP version 13
+# Subtest: canonical no-op editor transactions are never published
+ok 1 - canonical no-op editor transactions are never published
+  ---
+  duration_ms: 0.382542
+  type: 'test'
+  ...
+# Subtest: a real task-state change is published
+ok 2 - a real task-state change is published
+  ---
+  duration_ms: 0.123875
+  type: 'test'
+  ...
+# Subtest: an empty heading projection is not replaced by the editor's own empty value
+ok 3 - an empty heading projection is not replaced by the editor's own empty value
+  ---
+  duration_ms: 0.117417
+  type: 'test'
+  ...
+# Subtest: initial and genuinely external values still apply
+ok 4 - initial and genuinely external values still apply
+  ---
+  duration_ms: 0.053125
+  type: 'test'
+  ...
+# Subtest: image mapping refresh remains an independent apply reason
+ok 5 - image mapping refresh remains an independent apply reason
+  ---
+  duration_ms: 0.040458
+  type: 'test'
+  ...
+# Subtest: canonicalMarkdownProjection matches the host definition vector for vector
+ok 6 - canonicalMarkdownProjection matches the host definition vector for vector
+  ---
+  duration_ms: 0.061417
+  type: 'test'
+  ...
+# Subtest: the host's echo of an accepted edit differs only by the persisted trailing newline and is not applied
+ok 7 - the host's echo of an accepted edit differs only by the persisted trailing newline and is not applied
+  ---
+  duration_ms: 0.061792
+  type: 'test'
+  ...
+# Subtest: a front-matter body with a leading newline is not applied either
+ok 8 - a front-matter body with a leading newline is not applied either
+  ---
+  duration_ms: 0.081125
+  type: 'test'
+  ...
+# Subtest: a CRLF host value that equals the LF projection is not applied
+ok 9 - a CRLF host value that equals the LF projection is not applied
+  ---
+  duration_ms: 0.14425
+  type: 'test'
+  ...
+# Subtest: a genuinely different host value is still applied
+ok 10 - a genuinely different host value is still applied
+  ---
+  duration_ms: 0.211041
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6.496541
+
+> ritemark@1.10.1 test:task-list-roundtrip
+> npx tsx webview/src/utils/taskListRoundTrip.test.ts
+
+taskListRoundTrip.test.ts — all assertions passed
+TAP version 13
+# Subtest: the Ritemark editor shadows built-in undo/redo while a document editor is active
+ok 1 - the Ritemark editor shadows built-in undo/redo while a document editor is active
+  ---
+  duration_ms: 0.543417
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3.190291
+
+> ritemark@1.10.1 test:claude-auth
+> npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts
+
+claudeLogin tests passed.
+Versioned webview asset URI tests passed.
+Agent sidebar bootstrap tests passed.
+[vscode] acquireVsCodeApi not available
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-1-1789290438657' }
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-2-1789290438658' }
+Agent sidebar bootstrap store tests passed.
+bootstrapStorageIsolation.test.ts: storage-full Agent Chat bootstrap passed
+modelPresentation.test.ts: consistent model naming passed
+[vscode] acquireVsCodeApi not available
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-1-1789290439600' }
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-2-1789290439600' }
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-3-1789290439600' }
+Claude auth recovery state tests passed.
+runtimeAvailability tests passed.
+sidebarGate tests passed.
+[vscode] acquireVsCodeApi not available
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-1-1789290440521' }
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-2-1789290440522' }
+runtimeHydrationRefresh tests passed.
+
+> ritemark@1.10.1 test:security-backports
+> npx tsx webview/src/utils/securityBackports.test.ts
+
+securityBackports.test.ts — TipTap __proto__ backport passed
+
+> ritemark@1.10.1 test
+> npx tsx src/features/featureGate.test.ts && npx tsx src/utils/bundledAgentRuntime.test.ts && npx tsx src/utils/imageWriter.test.ts && npx tsx src/agent/AgentRunner.test.ts && npx tsx src/codex/codexApproval.test.ts && npx tsx src/acp/acpClient.test.ts && npx tsx src/acp/acpManager.test.ts && npx tsx src/browser/browserActionTools.test.ts && npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts && npx tsx webview/src/components/ai-sidebar/conversationReset.test.ts && npx tsx webview/src/components/ai-sidebar/planText.test.ts && npx tsx webview/src/components/ai-sidebar/composerQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueue.test.ts && npx tsx webview/src/components/ai-sidebar/promptQueueStore.test.ts && npx tsx webview/src/components/ai-sidebar/aiDisclosure.test.ts && npx tsx webview/src/components/flows/codexModelSelect.test.ts && npx tsx webview/src/components/flows/ExecutionPanel.test.ts && npx tsx src/flows/flowTypes.test.ts && npx tsx src/flows/flowSchedule.test.ts && npx tsx src/flows/FlowScheduleState.test.ts && npx tsx src/flows/FlowScheduler.test.ts && npx tsx src/flows/FlowExecutor.test.ts && npx tsx src/flows/flowRuntimeCoverage.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts && npx tsx src/update/versionComparison.test.ts && npx tsx src/flows/FlowIntegration.test.ts && npx tsx src/speech/transcriptionFlag.test.ts && npx tsx src/speech/durationProbe.test.ts && npx tsx src/speech/segmentFolding.test.ts && npx tsx src/speech/engineParsing.test.ts && npx tsx src/speech/audioPrep.test.ts && npx tsx src/speech/transcriptMarkdown.test.ts && npx tsx src/speech/SessionStore.test.ts && npx tsx src/speech/engineRegistry.test.ts && npx tsx src/speech/JobManager.test.ts && npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/speakerNames.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx src/speech/exportTranscript.test.ts && npx tsx webview/src/components/transcribe/workbench/playback.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts && npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts && npx tsx src/analytics/analytics.test.ts && npx tsx webview/src/components/agent/agentSchema.test.ts && npx tsx webview/src/components/agent/cronSchedule.test.ts && npx tsx src/daemon/workspaceConsent.test.ts && npx tsx src/utils/stickyTabHealer.test.ts && npx tsx src/daemon/scheduleParser.test.ts && npx tsx src/daemon/cron.test.ts && npx tsx src/daemon/DaemonResultStore.test.ts && npx tsx src/agent/frontmatterRoundtrip.test.ts && npx tsx src/export/v2/imageSource.test.ts && npx tsx src/export/saveAsMarkdown.test.ts && npx tsx webview/src/lib/svgRasterExport.test.ts && npx tsx src/ai/modelCatalog/modelCatalog.test.ts && npx tsx src/ai/capabilityContext.test.ts && npx tsx src/ai/connectivityPolicy.test.ts && npx tsx webview/src/extensions/comment/commentRoundTrip.test.ts && npx tsx webview/src/extensions/comment/commentIndex.test.ts && npx tsx src/runtime/runtimeErrorPresentation.test.ts && npx tsx src/agent/ClaudeCodeRuntime.test.ts && npx tsx src/codex/CodexRuntime.test.ts && npx tsx src/acp/AcpRuntime.test.ts && npx tsx webview/src/components/ai-sidebar/conversationRouting.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeSwitching.test.ts && npx tsx webview/src/components/ai-sidebar/conversationModel.test.ts && npx tsx webview/src/components/ai-sidebar/threadStatus.test.ts && npx tsx webview/src/components/ai-sidebar/threadRail.test.ts && npx tsx webview/src/components/ai-sidebar/activityState.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts && npx tsx webview/src/components/ai-sidebar/chatLinks.test.ts && npx tsx src/browser/browserActionSerialization.test.ts && npx tsx src/views/HomeViewProvider.test.ts
+
+All feature gate tests passed.
+bundledAgentRuntime.test.ts passed
+imageWriter.test.ts: PASS
+AgentRunner lifecycle tests passed.
+✓ Test 1: Command approval with real Codex method name
+✓ Test 2: File change approval with real Codex method name
+✓ Test 3: Old method name "execCommandApproval" correctly denied
+✓ Test 4: Unknown method denied
+✓ Test 5: Command as string (not array) handled
+✓ Test 6: Legacy "changes" key handled for file approval
+✓ Test 7: Method name constants match Codex protocol spec
+✓ Test 8: ReviewDecision values match Codex protocol (accept/decline, not approved/denied)
+✓ Test 9: Default approval policy is "untrusted" (always ask)
+✓ Test 10: threadId propagated out of ApprovalRouteResult (Sprint 99 B3)
+
+All 10 tests passed!
+acpClient.test.ts: all tests passed
+✓ sole-session cancel settles as cancelled with no user-facing error
+acpManager.test.ts: all tests passed
+All browser action tool tests passed.
+Webview lifecycle tests passed.
+[vscode] acquireVsCodeApi not available
+[vscode] postMessage: { type: 'conversation:reset', conversationId: 'conv-1' }
+Conversation reset tests passed.
+planText tests passed.
+composerQueue tests passed.
+promptQueue tests passed.
+[vscode] acquireVsCodeApi not available
+promptQueueStore tests passed.
+AI disclosure tests passed.
+All codex model select tests passed.
+Testing flow execution validation...
+  ✓ Empty flow is rejected
+  ✓ Trigger-only flow is rejected
+  ✓ Trigger + Codex flow is allowed
+
+✅ All execution validation tests passed!
+Testing flow type mappings...
+  ✓ All backend types have React Flow mappings
+  ✓ All React Flow types have backend mappings
+  ✓ Mappings are symmetric (roundtrip works)
+  ✓ Claude Code mappings are correct
+  ✓ Save File mappings are correct
+  ✓ Codex mappings are correct
+  ✓ Schedule types are correct
+  ✓ ISO weekday numbering contract is correct
+
+✅ All flow type mapping tests passed!
+Testing flow schedule utilities...
+  ✓ Schedule time parsing is correct
+  ✓ ISO weekday mapping is correct
+  ✓ Weekly schedule validation is correct
+  ✓ Daily next-run calculation works
+  ✓ Weekdays schedule skips weekend
+  ✓ Weekly schedule uses configured ISO weekday
+  ✓ Hourly schedule uses minute past hour
+  ✓ Interval schedule uses wall-clock minute slots
+  ✓ Due run fires within grace window
+  ✓ Stale slot is skipped outside grace window
+  ✓ Duplicate scheduled slot is suppressed
+  ✓ Weekday schedule does not fire on weekend
+  ✓ Hourly due run uses current hour slot
+  ✓ Interval due run uses current interval slot
+
+✅ All flow schedule tests passed!
+Testing flow schedule state...
+  ✓ Default runtime state is returned when nothing is stored
+  ✓ Runtime state updates are persisted
+  ✓ Runtime state is cleared back to defaults
+  ✓ Runtime state migrates when the flow file path changes
+
+✅ All flow schedule state tests passed!
+Testing flow scheduler...
+  ✓ Scheduled eligibility rejects missing required defaults
+  ✓ Scheduled defaults are passed into execution
+  ✓ Duplicate slot is not executed twice
+  ✓ Disabled feature prevents execution
+  ✓ Ineligible flow is marked skipped
+  ✓ Long-running scheduled flow does not block other due flows
+
+✅ All flow scheduler tests passed!
+Testing FlowExecutor node type handling...
+  ✓ trigger → handleTrigger
+  ✓ llm-prompt → executeLLMNode
+  ✓ image-prompt → executeImageNode
+  ✓ save-file → executeSaveFileNode
+  ✓ claude-code → executeClaudeCodeNode
+
+✅ All FlowExecutor tests passed!
+Flow runtime coverage test passed.
+Testing interpolateVariables...
+All interpolateVariables tests passed.
+Testing node type definitions...
+Node type definition tests passed.
+
+✅ All Claude Code node tests passed!
+PASS prefers full update when app version is behind latest full release
+PASS offers extension update when app base is current
+PASS prefers full update over older-track extension patch
+PASS returns blocked when only incompatible extension exists and no full installer matches platform
+PASS returns none when already at latest app and extension versions
+
+All update resolver tests passed.
+✓ Test 1: mode=auto silent-success stages update, no notification
+Ritemark: silent extension update failed: Checksum mismatch for out/extension.js
+✓ Test 2: mode=auto checksum-failure leaves state untouched
+✓ Test 3: mode=prompt preserves the existing notification flow
+✓ Test 4: action='full' unaffected by mode='auto'
+✓ Test 5: reconcilePendingRestartVersion clears after a simulated restart onto the staged version
+
+All 5 tests passed!
+Cleaning up old extension version: ritemark-1.0.0
+✓ Test 1: cleanupOldVersions keeps exactly the N versions passed
+Cleaning up old extension version: ritemark-1.8.1
+Preserving staged newer extension version: ritemark-1.8.2-ext.1
+✓ Test 1b: cleanupOldVersions preserves a staged version newer than all keeps (#142 bug B)
+Quarantining extension version: ritemark-2.0.0-ext.1
+✓ Test 2: removeInstalledVersion quarantines only the named version
+✓ Test 3: fresh ActivationIntegrityTracker reports no failure
+✓ Test 4: dangling attempt (no confirmation) for the same version is detected
+✓ Test 5: a confirmed version never reports a failure
+✓ Test 6: a dangling attempt for a different version does not false-positive
+
+All 7 tests passed!
+✓ Test 1: delta-only manifest still produces a complete extension dir (#142 incident)
+✓ Test 2: a broken install is replaced, not skipped as "Already installed"
+✓ Test 3: a healthy install of the same version stays a no-op
+✓ Test 4: minimumAppVersion is refused before anything is written
+✓ Test 5: op:delete removes an inherited bundled file
+✓ Test 6: a path escaping the extension directory is refused
+✓ Test 7: install fails closed when the bundled copy is missing
+✓ Test 8: checksum mismatch installs nothing and cleans staging
+
+All 8 tests passed!
+✓ Test 1: floor -0 < ext.N < release ordering (the #142 root-cause guarantee)
+✓ Test 2: bundled floor 1.8.2-0 correctly yields to OTA patch 1.8.2-ext.1
+✓ Test 3: getBaseVersion strips every suffix form to the clean base
+✓ Test 4: cross-base ordering and update-type classification
+✓ Test 5: update notifications gate correctly around the floor
+
+All 5 tests passed!
+=== Flow Integration Tests ===
+⚠ Flows directory not found, skipping integration tests
+  Expected: /Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/.ritemark/flows
+
+✅ All flow integration tests passed!
+transcriptionFlag.test.ts: all tests passed
+durationProbe.test.ts: all tests passed
+segmentFolding.test.ts: all tests passed
+engineParsing.test.ts: all tests passed
+audioPrep.test.ts: all tests passed
+transcriptMarkdown.test.ts: all tests passed
+SessionStore.test.ts: all tests passed
+engineRegistry.test.ts: all tests passed
+JobManager.test.ts: all tests passed
+insightsLanguage.test.ts: all tests passed
+speakerNames.test.ts: all tests passed
+workbenchProtocol.test.ts: all tests passed
+insights.test.ts: all tests passed
+insightsMarkdown.test.ts: all tests passed
+exportTranscript.test.ts: all tests passed
+playback.test.ts: all tests passed
+workbenchLayout.test.ts: all tests passed
+
+=== SaveFileNode Integration Tests ===
+
+  ✓ should create file with text content
+  ✓ should create file in subfolder
+  ✓ should handle JSON object upstream output
+  ✓ should handle image with localPath
+  ✓ should overwrite existing file
+  ✓ should handle empty string content
+  ✓ should handle special characters in filename
+  ✓ should return correct result structure
+
+────────────────────────────────────────
+
+Results: 8 passed, 0 failed
+
+✅ All SaveFileNode integration tests passed!
+
+
+=== ClaudeCodeNode Integration Tests (Real SDK) ===
+
+Note: These tests require Claude Code authentication.
+
+  ⏭ should execute simple prompt and return result (skipped - SKIP_API_TESTS=true)
+  ⏭ should create a file when asked (skipped - SKIP_API_TESTS=true)
+  ⏭ should handle variable interpolation (skipped - SKIP_API_TESTS=true)
+  ⏭ should respect timeout (skipped - SKIP_API_TESTS=true)
+  ⏭ should report progress via callback (skipped - SKIP_API_TESTS=true)
+  ⏭ should handle errors gracefully (skipped - SKIP_API_TESTS=true)
+
+────────────────────────────────────────
+
+Results: 0 passed, 0 failed, 6 skipped
+
+⚠️  All tests skipped
+
+✓ All analytics tests passed
+agentSchema tests passed ✅
+cronSchedule tests passed ✅
+workspaceConsent tests passed.
+stickyTabHealer tests passed.
+✅ All scheduleParser tests passed!
+✅ All cron tests passed!
+✅ All DaemonResultStore tests passed!
+✅ All frontmatter round-trip tests passed!
+saveAsMarkdown.test.ts: all assertions passed
+Failed to rasterize SVG image for export: Error: tainted canvas
+    at Object.rasterize (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/webview/src/lib/svgRasterExport.test.ts:63:15)
+    at inlineSvgImagesForExport (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/webview/src/lib/svgRasterExport.ts:108:37)
+    at async run (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/webview/src/lib/svgRasterExport.test.ts:67:17)
+svgRasterExport.test.ts: all assertions passed
+  ok   validateCatalog accepts the bundled baseline (round-trip)
+  ok   validateCatalog throws on wrong schemaVersion
+  ok   validateCatalog throws on malformed model entry (missing id)
+  ok   validateCatalog throws on bad tier
+  ok   validateCatalog accepts canonical effort metadata and rejects invented levels
+  ok   validateCatalog drops unknown provider keys (forward-compat)
+  ok   bundled-only resolves every provider from the bundled floor
+  ok   live probe wins and is enriched with curated metadata
+  ok   live aliases with one resolved identity collapse to one explicit default-marked row
+  ok   matching labels without resolved identity are never merged
+  ok   live effort metadata overrides a stale curated capability
+  ok   live explicit Auto-only capability overrides the bundled effort floor
+  ok   live model keeps bundled effort when a newer remote catalog omits the field
+  ok   remote is used when no live probe, in preference to bundled
+  ok   remote model keeps the exact-pin bundled effort floor when the remote schema predates it
+  ok   cache is used when no live and no remote
+  ok   empty remote/cache providers cannot erase the bundled selectable floor
+  ok   a source containing only future-gated models falls back to this build bundled floor
+  ok   minAppVersion filters entries above the running app version
+  ok   deprecated catalog model absent from a live probe is preserved + flagged (R2)
+  ok   versionLt compares dotted-numeric versions correctly
+
+modelCatalog: all tests passed
+capabilityContext
+  ✓ every runtime carries the markdown-editor apply-directly framing
+  ✓ names the on-disk comment carriers
+  ✓ rules out footnotes and /// as comment carriers
+  ✓ states the comment-preservation rule
+  ✓ states the selection-window rule with sentinels
+  ✓ covers internal links with the workspace-containment rule
+  ✓ labels the user-only features and existing diagrams
+  ✓ covers file-op safety bounds
+  ✓ instructs honest fallback
+  ✓ browser guidance is present for Claude and Codex, absent for ACP
+  ✓ a descriptor with hasBrowserTools:false omits the browser section
+  ✓ edit-tool naming is bound per runtime
+  ✓ runtime files do not duplicate capability prose (single source)
+  ✓ Claude and Codex share every capability section (edit-tool aside)
+
+capabilityContext: 14 passed
+connectivityPolicy.test.ts: all tests passed
+commentRoundTrip.test.ts — all assertions passed
+commentIndex tests passed.
+runtimeErrorPresentation tests passed.
+✓ Test 1: id is "claude-code"
+✓ Test 2: cancel() interrupts the underlying AgentSession
+✓ Test 3: dispose() closes the session and clears pending questions
+✓ Test 4: respondToApproval() routes plan approval correctly
+✓ Test 5: conversations hold independent sessions
+✓ Test 6: SDK result errors remain failed turns
+✓ Test 7: every advertised Claude effort reaches the SDK without inventing an applied value
+✓ Test 8: OAuth failures carry the authentication recovery category
+✓ Test 9: API-key failures use the AI Settings recovery category
+
+All 9 ClaudeCodeRuntime tests passed!
+✓ Test 1: id is "codex"
+✓ Test 2: session.cancel() calls turnInterrupt() for its own thread
+✓ Test 3: dispose() tears down the app server and all sessions
+✓ Test 4: respondToApproval() maps to sendApprovalResponse()
+✓ Test 5: respondToApproval() approved=false maps to "decline"
+✓ Test 6: B3 — streamed deltas route by threadId, orphans dropped
+✓ Test 7: B2 — turn/completed clears only the completing thread
+✓ Test 8: B1 — a conversation switching approval/browser mode cannot reset a sibling
+✓ Test 9: B4 — exit fans out to all conversations
+✓ Test 10: cancel declines outstanding approvals
+✓ Test 11: compatible native thread resume checkpoints and accepts exactly once
+✓ Test 10: buildCodexBaseInstructions — context is the base, no silent replace
+✓ Test 13: Codex 0.149 request_user_input tolerates isBlocking
+✓ Test 14: Codex effort is isolated, plan-safe, and Auto-restorable
+✓ Test 15: every advertised Codex effort reaches turn/start unchanged
+
+All 15 CodexRuntime tests passed!
+✓ Test 1: id is "opencode"
+✓ Test 2: session.cancel() cancels and drops that session only
+✓ Test 3: runtime.dispose() disposes the shared manager
+✓ Test 4: respondToApproval() resolves pending approval
+✓ Test 5: disposing one session rejects only its own approvals
+✓ Test 6: prompt() calls setModel and manager.prompt()
+✓ Test 6b: ACP effort applies before prompt and Auto restores the live default
+✓ Test 6c: rejected ACP effort falls back to Auto and still prompts
+✓ Test 6d: every live-advertised ACP effort is forwarded unchanged
+✓ Test 7: C1 — write-approval state is per session, no cross-chat bypass
+✓ Test 8: unroutable write is denied
+✓ Test 9: dispose() cancels the upstream turn before forgetting the session
+✓ Test 10: "No provider available" becomes an actionable message
+✓ Test 11: a hung OpenCode turn times out and cancels the session
+✓ Test 12: ACP session/resume is used without session/load
+✓ Test 9: buildAcpPromptText — context prefix, order, image count
+✓ Test 10: capability context is once-per-session
+✓ Test 13: ACP provider evidence accepts dispatch once
+
+All 15 AcpRuntime tests passed!
+[vscode] acquireVsCodeApi not available
+Conversation routing tests passed.
+[vscode] acquireVsCodeApi not available
+Runtime switching tests passed.
+conversationModel tests passed.
+threadStatus.test.ts: all assertions passed
+[vscode] acquireVsCodeApi not available
+threadRail.test.ts: all assertions passed
+activityState + policyOf tests passed.
+sidebarGate tests passed.
+[vscode] acquireVsCodeApi not available
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-1-1789290469363' }
+[Bridge] Would send conversation request: { type: 'conversation/initialize', requestId: 'msg-2-1789290469363' }
+runtimeHydrationRefresh tests passed.
+chatLinks tests passed.
+✓ Test 1: concurrent browser actions run one at a time
+✓ Test 2: a failed action does not wedge the queue
+
+All 2 browser serialization tests passed!
+HomeViewProvider
+  ✓ the true newest file (beyond the old 200 cap) is in the top 5
+  ✓ results are sorted newest first
+  ✓ requests far more than the old 200-file cap (runaway guard only)
+
+3 passed

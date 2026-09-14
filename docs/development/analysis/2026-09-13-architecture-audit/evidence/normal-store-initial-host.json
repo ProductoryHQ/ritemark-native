@@ -1,0 +1,19 @@
+{
+  "hostPid": 16170,
+  "productModuleCached": true,
+  "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/out/extension.js",
+  "providerClass": "_UnifiedViewProvider",
+  "controllerClass": "ConversationController",
+  "storeClass": "ConversationStore",
+  "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage/ritemark.ritemark/conversations/v1",
+  "scope": {
+    "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+    "descriptor": {
+      "kind": "no-folder",
+      "workspaceFileUri": null,
+      "folderUris": []
+    }
+  },
+  "runtimeSessionCount": 0,
+  "interception": null
+}

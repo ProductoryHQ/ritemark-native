@@ -1,0 +1,75 @@
+{
+  "method": "Actual existing transcript provider/job/store in disposable normal-mode hosts. Existing lexical provider reference observed with local inspector; bounded synthetic transcription boundary and optional fixture save hold. No native whisper/model/cloud call.",
+  "runDir": "/private/tmp/ritemark-audit-normal-bg5jgmun",
+  "profile": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile",
+  "workspace": "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace",
+  "extensionsDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions",
+  "extensionPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+  "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+  "files": {
+    "package.json": {
+      "bytes": 34089,
+      "sha256": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605"
+    },
+    "out/extension.js": {
+      "bytes": 4915383,
+      "sha256": "d8a4f5a0403f70aaf4941df2d84e57931a970b3e000af7e487c4d0a9736e15ff"
+    },
+    "media/webview.js": {
+      "bytes": 8844955,
+      "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+    },
+    "binaries/agents/manifest.json": {
+      "bytes": 13989,
+      "sha256": "1d4e9bed86b76e09586f3c8d7a81f4f5b8513d1500d1ec6c3745f1765ac143ee"
+    }
+  },
+  "settings": {
+    "ritemark.analytics.enabled": false,
+    "ritemark.features.analytics": false,
+    "ritemark.updates.enabled": false,
+    "ritemark.features.scheduled-flow-runs": false,
+    "telemetry.telemetryLevel": "off",
+    "update.mode": "none",
+    "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
+    "workbench.startupEditor": "none",
+    "files.autoSave": "off",
+    "terminal.integrated.profiles.osx": {
+      "Audit Bash": {
+        "path": "/bin/bash",
+        "args": [
+          "--noprofile",
+          "--norc"
+        ]
+      }
+    },
+    "terminal.integrated.defaultProfile.osx": "Audit Bash"
+  },
+  "preparedOnly": false,
+  "args": [
+    "/Applications/Ritemark.app/Contents/MacOS/Ritemark",
+    "--new-window",
+    "--user-data-dir=/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile",
+    "--extensions-dir=/private/tmp/ritemark-audit-normal-bg5jgmun/extensions",
+    "--remote-debugging-port=9242",
+    "--disable-telemetry",
+    "--disable-workspace-trust",
+    "--skip-welcome",
+    "--skip-release-notes",
+    "/private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+  ],
+  "fixtureHashes": {
+    "control.wav": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+    "shared.wav": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+    "pending.wav": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc"
+  },
+  "launches": [
+    {
+      "pid": 60627,
+      "at": 1789309393101
+    }
+  ],
+  "pid": 60627,
+  "launchedAt": 1789309393101
+}

@@ -1,0 +1,103 @@
+vite v5.4.21 building for production...
+transforming...
+✓ 7732 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../../../../../../../../private/tmp/ritemark-architecture-audit-build/webview/webview.js  8,833.74 kB │ gzip: 2,558.82 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 15.20s
+{
+  "chunks": [
+    {
+      "name": "webview.js",
+      "bytes": 8844955,
+      "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2",
+      "isEntry": true,
+      "imports": [],
+      "dynamicImports": []
+    }
+  ],
+  "packageRenderedLengths": [
+    {
+      "name": "mermaid",
+      "renderedLength": 2784972
+    },
+    {
+      "name": "elkjs",
+      "renderedLength": 1605985
+    },
+    {
+      "name": "@mermaid-js/parser",
+      "renderedLength": 1351035
+    },
+    {
+      "name": "<first-party-or-virtual>",
+      "renderedLength": 1258672
+    },
+    {
+      "name": "cytoscape",
+      "renderedLength": 1109461
+    },
+    {
+      "name": "xlsx",
+      "renderedLength": 985683
+    },
+    {
+      "name": "pdfjs-dist",
+      "renderedLength": 774235
+    },
+    {
+      "name": "katex",
+      "renderedLength": 599588
+    },
+    {
+      "name": "highlight.js",
+      "renderedLength": 384935
+    },
+    {
+      "name": "cytoscape-fcose",
+      "renderedLength": 337866
+    },
+    {
+      "name": "@phosphor-icons/react",
+      "renderedLength": 332178
+    },
+    {
+      "name": "prosemirror-view",
+      "renderedLength": 244741
+    },
+    {
+      "name": "@tiptap/core",
+      "renderedLength": 185735
+    },
+    {
+      "name": "bluebird",
+      "renderedLength": 180026
+    },
+    {
+      "name": "@xmldom/xmldom",
+      "renderedLength": 164640
+    },
+    {
+      "name": "lodash-es",
+      "renderedLength": 155615
+    },
+    {
+      "name": "docx-preview",
+      "renderedLength": 150311
+    },
+    {
+      "name": "@xyflow/react",
+      "renderedLength": 147748
+    }
+  ],
+  "checkedInArtifact": {
+    "bytes": 8844955,
+    "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2",
+    "preserved": true
+  }
+}

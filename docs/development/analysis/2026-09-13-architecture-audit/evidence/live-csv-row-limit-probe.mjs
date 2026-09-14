@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {driver,findWebview,waitFor,session,writeEvidence,targets,connectCdp,evidence} from './live-tools.mjs';
+const papa=createRequire(import.meta.url)('../../../../../extensions/ritemark/webview/node_modules/papaparse');
+const file=path.join(session.workspace,'table.csv');
+const rows=Array.from({length:10005},(_,i)=>({item:'row-'+String(i).padStart(5,'0'),value:i===0?'ROW LIMIT BASELINE':'value-'+i}));
+const initial=papa.unparse(rows);fs.writeFileSync(file,initial);
+const read=()=>papa.parse(fs.readFileSync(file,'utf8'),{header:true,skipEmptyLines:true}).data;
+const report={method:'Synthetic CSV with 10,005 data rows (under the size-warning threshold), opened in the actual audit editor. Edit one visible cell through the React table and save through ordinary VS Code Save; compare full disk row count and tail sentinel. No external actor writes after opening.',fixture:{rows:rows.length,bytes:Buffer.byteLength(initial),lastRow:rows.at(-1)},steps:[]};
+const record=(stage,data)=>{report.steps.push({stage,at:Date.now(),...data});writeEvidence('live-csv-row-limit-probe.json',report);};
+let v,c;
+try{
+ const started=Date.now();await driver('/open',{file:'table.csv'});
+ v=await findWebview("!!document.querySelector('td[title=\"ROW LIMIT BASELINE\"]')",30000);
+ record('opened',{observedWithinMs:Date.now()-started,host:await driver(),diskRows:read().length,view:await v.evaluate("({dataCells:document.querySelectorAll('td[title]').length,footer:document.body.innerText.slice(-500),editable:!!document.querySelector('td[title=\"ROW LIMIT BASELINE\"]')})")});
+ await v.evaluate("document.querySelector('td[title=\"ROW LIMIT BASELINE\"]').dispatchEvent(new MouseEvent('mousedown',{bubbles:true,detail:2}))");
+ await waitFor(()=>v.evaluate("!!document.querySelector('td textarea')"));
+ await v.evaluate("(()=>{const t=document.querySelector('td textarea');t.focus();t.select();})()");
+ await v.cdp.send('Input.insertText',{text:'ROW LIMIT HUMAN EDIT'});
+ for(const type of ['keyDown','keyUp'])await v.cdp.send('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+ await waitFor(async()=>(await driver()).documents.find(d=>d.file==='table.csv')?.dirty);
+ assert.equal(read().length,10005);
+ record('one-cell-edit',{host:await driver(),diskRows:read().length});
+ const saved=await driver('/command',{command:'workbench.action.files.save'});
+ const disk=read();
+ record('saved',{host:saved,diskRows:disk.length,firstRow:disk[0],lastRow:disk.at(-1),tailSentinelPresent:disk.some(r=>r.item==='row-10004')});
+ c=await connectCdp((await targets()).find(t=>t.type==='page'&&t.url.includes('workbench')).webSocketDebuggerUrl);
+ const shot=await c.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,'live-csv-row-limit.png'),Buffer.from(shot.data,'base64'));
+ report.lostRows=rows.length-disk.length;report.completed=true;writeEvidence('live-csv-row-limit-probe.json',report);console.log(JSON.stringify({completed:true,lostRows:report.lostRows,firstRow:disk[0],lastRow:disk.at(-1)}));
+}catch(e){record('error',{error:String(e.stack??e)});throw e;}finally{v?.close();c?.close();}

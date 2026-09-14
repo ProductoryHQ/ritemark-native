@@ -1,0 +1,103 @@
+{
+  "method": "Compare captured first-page and returned-to-first snapshots for the same PID and command. RSS is not unique physical memory; short observation is not a distribution or leak test.",
+  "fixtureBytes": 13755,
+  "initialCanvasCount": 1,
+  "retainedCanvasCount": 20,
+  "rgbaSurfaceBytesCalculated": 160221600,
+  "initialJsHeapUsed": 21933196,
+  "returnedJsHeapUsed": 19134268,
+  "sameProcessRssDeltas": [
+    {
+      "pid": 84957,
+      "deltaRssKiB": 1552,
+      "beforeRssKiB": 81072,
+      "afterRssKiB": 82624,
+      "kind": "GPU"
+    },
+    {
+      "pid": 85313,
+      "deltaRssKiB": 80,
+      "beforeRssKiB": 20800,
+      "afterRssKiB": 20880,
+      "kind": "other"
+    },
+    {
+      "pid": 84958,
+      "deltaRssKiB": 0,
+      "beforeRssKiB": 37968,
+      "afterRssKiB": 37968,
+      "kind": "other"
+    },
+    {
+      "pid": 85249,
+      "deltaRssKiB": 0,
+      "beforeRssKiB": 1120,
+      "afterRssKiB": 1120,
+      "kind": "other"
+    },
+    {
+      "pid": 85173,
+      "deltaRssKiB": -16,
+      "beforeRssKiB": 59552,
+      "afterRssKiB": 59536,
+      "kind": "other"
+    },
+    {
+      "pid": 85243,
+      "deltaRssKiB": -16,
+      "beforeRssKiB": 56640,
+      "afterRssKiB": 56624,
+      "kind": "other"
+    },
+    {
+      "pid": 85240,
+      "deltaRssKiB": -48,
+      "beforeRssKiB": 103776,
+      "afterRssKiB": 103728,
+      "kind": "renderer"
+    },
+    {
+      "pid": 84955,
+      "deltaRssKiB": -160,
+      "beforeRssKiB": 141888,
+      "afterRssKiB": 141728,
+      "kind": "other"
+    },
+    {
+      "pid": 85174,
+      "deltaRssKiB": -176,
+      "beforeRssKiB": 58624,
+      "afterRssKiB": 58448,
+      "kind": "other"
+    },
+    {
+      "pid": 85193,
+      "deltaRssKiB": -176,
+      "beforeRssKiB": 51936,
+      "afterRssKiB": 51760,
+      "kind": "other"
+    },
+    {
+      "pid": 84964,
+      "deltaRssKiB": -944,
+      "beforeRssKiB": 167008,
+      "afterRssKiB": 166064,
+      "kind": "renderer"
+    },
+    {
+      "pid": 85175,
+      "deltaRssKiB": -10384,
+      "beforeRssKiB": 99152,
+      "afterRssKiB": 88768,
+      "kind": "other"
+    },
+    {
+      "pid": 90967,
+      "deltaRssKiB": -16512,
+      "beforeRssKiB": 255872,
+      "afterRssKiB": 239360,
+      "kind": "renderer"
+    }
+  ],
+  "interpretation": "Twenty canvases remain after all pages are visited. The sample does not demonstrate a matching RSS or JS-heap increase; the calculated RGBA surface size must not be reported as measured memory allocation. Profile browser/GPU accounting and target hardware before selecting a cache budget."
+}

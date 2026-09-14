@@ -1,0 +1,120 @@
+{
+  "method": "Independent APFS clone of unchanged audit extension, synthetic normal-mode profile, format-specific observer and deterministic local fixtures. No release rebuild.",
+  "runDir": "/private/tmp/ritemark-audit-formats-ksmj6md7",
+  "profile": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile",
+  "workspace": "/private/tmp/ritemark-audit-formats-ksmj6md7/workspace",
+  "extensionsDir": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions",
+  "extensionPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+  "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+  "files": {
+    "package.json": {
+      "bytes": 34089,
+      "sha256": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605"
+    },
+    "out/extension.js": {
+      "bytes": 4915383,
+      "sha256": "d8a4f5a0403f70aaf4941df2d84e57931a970b3e000af7e487c4d0a9736e15ff"
+    },
+    "media/webview.js": {
+      "bytes": 8844955,
+      "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+    },
+    "media/pdf.worker.min.mjs": {
+      "bytes": 1046214,
+      "sha256": "dbcae78a691b3c501508f74b774c6066a57a14a76cefdc9e25ad86b651bb75d5"
+    },
+    "media/drawio/index.html": {
+      "bytes": 2759,
+      "sha256": "e1d2cc03e8f21296e14869e302c84781e8b4768615d6ef4260caa50e7fa26d59"
+    },
+    "binaries/agents/manifest.json": {
+      "bytes": 13989,
+      "sha256": "1d4e9bed86b76e09586f3c8d7a81f4f5b8513d1500d1ec6c3745f1765ac143ee"
+    }
+  },
+  "settings": {
+    "ritemark.analytics.enabled": false,
+    "ritemark.features.analytics": false,
+    "ritemark.updates.enabled": false,
+    "ritemark.features.scheduled-flow-runs": false,
+    "telemetry.telemetryLevel": "off",
+    "update.mode": "none",
+    "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
+    "workbench.startupEditor": "none",
+    "files.autoSave": "off",
+    "terminal.integrated.profiles.osx": {
+      "Audit Bash": {
+        "path": "/bin/bash",
+        "args": [
+          "--noprofile",
+          "--norc"
+        ]
+      }
+    },
+    "terminal.integrated.defaultProfile.osx": "Audit Bash"
+  },
+  "fixtureFiles": {
+    "workspace/diagram.drawio.svg": {
+      "bytes": 851,
+      "sha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433"
+    },
+    "workspace/note.md": {
+      "bytes": 42,
+      "sha256": "26d872b4447b8a4d88039aa9e08268aa0158688fc76c55f18354c8dd7c566e07"
+    },
+    "workspace/sample.pdf": {
+      "bytes": 2343,
+      "sha256": "9667f0deff2f5a339335e48de2e6099f81c56f4311d3ae4e5780e145e195134a"
+    },
+    "workspace/sample.docx": {
+      "bytes": 7767,
+      "sha256": "4622d2ca6792b88e67e3e1fa2befdf8a656ca8dffc3151a65d0e11e91c707f35"
+    },
+    "variants/external.pdf": {
+      "bytes": 2346,
+      "sha256": "ac8b339b4025a59d0b4204037d19d90322d43e1f955fa2538323a91d24b4b3de"
+    },
+    "variants/external.drawio.svg": {
+      "bytes": 859,
+      "sha256": "2717e53aef26d6edfb9036ab389e5622363919bc803aac5d15c4a28d36b348e4"
+    },
+    "variants/base.drawio.svg": {
+      "bytes": 851,
+      "sha256": "8e18fe0630b9ba2b7184180f1e978a8b8500b1a9d7f3857a02326b821124b433"
+    },
+    "variants/external.docx": {
+      "bytes": 7772,
+      "sha256": "3328b9fc9dc528df599a757507e8992dd7701e118e1885486fb7303120c7793f"
+    },
+    "variants/base.pdf": {
+      "bytes": 2343,
+      "sha256": "9667f0deff2f5a339335e48de2e6099f81c56f4311d3ae4e5780e145e195134a"
+    },
+    "variants/base.docx": {
+      "bytes": 7767,
+      "sha256": "4622d2ca6792b88e67e3e1fa2befdf8a656ca8dffc3151a65d0e11e91c707f35"
+    }
+  },
+  "preparedOnly": false,
+  "args": [
+    "/Applications/Ritemark.app/Contents/MacOS/Ritemark",
+    "--new-window",
+    "--user-data-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/profile",
+    "--extensions-dir=/private/tmp/ritemark-audit-formats-ksmj6md7/extensions",
+    "--remote-debugging-port=9239",
+    "--disable-telemetry",
+    "--disable-workspace-trust",
+    "--skip-welcome",
+    "--skip-release-notes",
+    "/private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+  ],
+  "launches": [
+    {
+      "pid": 84955,
+      "at": 1789298074689
+    }
+  ],
+  "pid": 84955,
+  "launchedAt": 1789298074689
+}

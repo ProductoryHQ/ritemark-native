@@ -1,0 +1,6 @@
+✓ Test 1: getAcpMcpServers(false, ...) returns []
+✓ Test 2: getAcpMcpServers(true, "") returns []
+✓ Test 3: getAcpMcpServers(true, path) returns correct descriptor
+✓ Test 4: adapter path is absolute
+
+All 4 tests passed!

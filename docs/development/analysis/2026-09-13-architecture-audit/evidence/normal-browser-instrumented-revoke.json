@@ -1,0 +1,7 @@
+{
+  "before": {
+    "label": "Share with Agent",
+    "visible": false
+  },
+  "action": "Invoked existing hidden toggle handler, not an available ordinary UI click"
+}

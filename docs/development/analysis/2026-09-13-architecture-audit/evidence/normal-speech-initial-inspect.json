@@ -1,0 +1,20 @@
+{
+  "hostPid": 60859,
+  "providerClass": "TranscriptWorkbenchProvider",
+  "jobsClass": "JobManager",
+  "storeClass": "SessionStore",
+  "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark/transcripts",
+  "globalStorage": "/private/tmp/ritemark-audit-normal-bg5jgmun/speech-profile/User/globalStorage/ritemark.ritemark",
+  "workspaceFolders": [
+    "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+  ],
+  "workspaceFile": null,
+  "runtimeSessionCount": 0,
+  "jobs": [],
+  "inflight": [],
+  "heldEngines": [],
+  "engineBoundaryStubbed": false,
+  "storeGate": null,
+  "operations": [],
+  "panels": []
+}

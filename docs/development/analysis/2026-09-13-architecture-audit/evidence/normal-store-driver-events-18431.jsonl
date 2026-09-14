@@ -1,0 +1,10 @@
+{"at":1789300563200,"hostPid":18431,"event":"driver-ready","driverMode":1,"driverPath":"/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1","globalStorageRoot":"/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage","workspaceFile":null,"workspaceFolders":[],"hotExit":"onExit","autoSave":"off","ritemark":{"active":true,"path":"/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1","version":"1.10.1"},"documents":[],"tabs":[{"active":true,"viewColumn":1,"tabs":[]}],"terminals":[]}
+{"at":1789300563318,"hostPid":18431,"event":"store-audit-preference-return","conversationId":"00000000-0000-4000-8000-a00600000001","ok":true,"revision":3}
+{"at":1789300563665,"hostPid":18431,"event":"store-audit-rename-held","conversationId":"00000000-0000-4000-8000-a00600000003","revision":2,"eventKinds":["user-message"]}
+{"at":1789300563780,"hostPid":18431,"event":"store-audit-rename-released","conversationId":"00000000-0000-4000-8000-a00600000003","reason":"explicit-release"}
+{"at":1789300563782,"hostPid":18431,"event":"store-audit-preference-return","conversationId":"00000000-0000-4000-8000-a00600000003","ok":true,"revision":2}
+{"at":1789300563796,"hostPid":18431,"event":"store-audit-rename-held","conversationId":"00000000-0000-4000-8000-a00600000004","revision":2,"eventKinds":["user-message"]}
+{"at":1789300564750,"hostPid":18431,"event":"store-audit-rename-released","conversationId":"00000000-0000-4000-8000-a00600000004","reason":"explicit-release"}
+{"at":1789300564752,"hostPid":18431,"event":"store-audit-preference-return","conversationId":"00000000-0000-4000-8000-a00600000004","ok":true,"revision":2}
+{"at":1789300564789,"hostPid":18431,"event":"driver-request","route":"/command","input":{"command":"ritemark.unifiedView.focus"}}
+{"at":1789300703512,"hostPid":18431,"event":"driver-request","route":"/command","input":{"command":"ritemark.unifiedView.focus"}}

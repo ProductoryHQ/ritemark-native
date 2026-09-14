@@ -1,0 +1,38 @@
+{
+  "dialogs": [
+    {
+      "text": "Deny\nAllow Control\nAllow AI to control this browser tab?\nThe AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions.",
+      "html": "<div class=\"monaco-dialog-box\" role=\"dialog\" tabindex=\"-1\" aria-modal=\"true\" aria-labelledby=\"monaco-dialog-icon monaco-dialog-message-text\" aria-describedby=\"monaco-dialog-icon monaco-dialog-message-text monaco-dialog-message-detail monaco-dialog-message-body monaco-dialog-footer\" style=\"color: var(--vscode-editorWidget-foreground); background-color: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border);\"><div class=\"dialog-buttons-row\"><div class=\"dialog-buttons\"><a class=\"monaco-button secondary monaco-text-button\" tabindex=\"0\" role=\"button\" aria-disabled=\"false\" style=\"color: var(--vscode-button-secondaryForeground); background-color: var(--vscode-button-secondaryBackground); border: 1px solid var(--vscode-button-border);\">Deny</a><a class=\"monaco-button monaco-text-button\" tabindex=\"0\" role=\"button\" aria-disabled=\"false\" style=\"color: var(--vscode-button-foreground); background-color: var(--vscode-button-background); border: 1px solid var(--vscode-button-border);\">Allow Control</a></div></div><div class=\"dialog-message-row\"><div id=\"monaco-dialog-icon\" class=\"dialog-icon codicon codicon-dialog-warning\" aria-label=\"Warning\" style=\"color: var(--vscode-problemsWarningIcon-foreground);\"></div><div class=\"dialog-message-container\"><div class=\"dialog-message\"><div id=\"monaco-dialog-message-text\" class=\"dialog-message-text\">Allow AI to control this browser tab?</div></div><div id=\"monaco-dialog-message-detail\" class=\"dialog-message-detail\">The AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.<br><br>Grant control only for tabs where you trust the AI's actions.</div></div></div><div class=\"dialog-toolbar-row\"><div class=\"dialog-toolbar\"><div class=\"monaco-action-bar\"><ul class=\"actions-container\" role=\"toolbar\"><li class=\"action-item\" role=\"presentation\" custom-hover=\"true\"><a class=\"action-label codicon codicon-dialog-close\" role=\"button\" aria-label=\"Close Dialog\" tabindex=\"0\"></a></li></ul></div></div></div></div>"
+    }
+  ],
+  "buttons": [
+    {
+      "text": "Deny",
+      "label": null,
+      "r": {
+        "x": 816.8046875,
+        "y": 512,
+        "width": 44.5,
+        "height": 26,
+        "top": 512,
+        "right": 861.3046875,
+        "bottom": 538,
+        "left": 816.8046875
+      }
+    },
+    {
+      "text": "Allow Control",
+      "label": null,
+      "r": {
+        "x": 869.3046875,
+        "y": 512,
+        "width": 86.6953125,
+        "height": 26,
+        "top": 512,
+        "right": 956,
+        "bottom": 538,
+        "left": 869.3046875
+      }
+    }
+  ]
+}

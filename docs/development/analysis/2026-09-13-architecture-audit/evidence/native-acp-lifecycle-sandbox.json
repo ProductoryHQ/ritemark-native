@@ -1,0 +1,90 @@
+{
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "method": "Actual AcpManager/AcpClient and locked ACP SDK, bundled native OpenCode. Isolated child XDG directories/environment, synthetic workspace and deny-only filesystem/permission callbacks. Concurrent cold session opens, warm control, owned-process crash, restart and dispose. No prompt/model turn or file-tool invocation.",
+  "fixture": "/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-audit-acp-RFTRk4",
+  "platform": "darwin",
+  "node": "v22.22.1",
+  "events": [
+    {
+      "atMs": 244,
+      "kind": "trace:client",
+      "message": "spawn"
+    },
+    {
+      "atMs": 758,
+      "kind": "trace:stdio:stderr",
+      "message": "message"
+    },
+    {
+      "atMs": 758,
+      "kind": "trace:manager",
+      "message": "stderr",
+      "detail": "\u001b[91m\u001b[1mError: \u001b[0mUnexpected error"
+    },
+    {
+      "atMs": 758,
+      "kind": "trace:stdio:stderr",
+      "message": "message"
+    },
+    {
+      "atMs": 758,
+      "kind": "trace:manager",
+      "message": "stderr",
+      "detail": "ServeError"
+    },
+    {
+      "atMs": 767,
+      "kind": "child-exit",
+      "pid": 75227,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "atMs": 767,
+      "kind": "trace:client",
+      "message": "exit"
+    },
+    {
+      "atMs": 767,
+      "kind": "trace:manager",
+      "message": "agent-exit"
+    }
+  ],
+  "children": [
+    {
+      "pid": 75227,
+      "command": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/opencode",
+      "args": [
+        "acp"
+      ],
+      "exited": true,
+      "code": 1,
+      "signal": null
+    }
+  ],
+  "cases": [
+    {
+      "name": "concurrent cold session opens",
+      "results": [
+        {
+          "ok": false,
+          "error": "ACP connection closed"
+        },
+        {
+          "ok": false,
+          "error": "ACP client is not initialized"
+        }
+      ],
+      "childCount": 1,
+      "liveSessionCount": 0
+    }
+  ],
+  "completed": false,
+  "binary": {
+    "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/opencode",
+    "bytes": 143108224,
+    "sha256": "6326ccd2a62d2a423de865ba5a69e105c48d3d363d88195faab939cd7fa3c186"
+  },
+  "error": "AssertionError [ERR_ASSERTION]: [{\"ok\":false,\"error\":\"ACP connection closed\"},{\"ok\":false,\"error\":\"ACP client is not initialized\"}]\n\nfalse !== true\n\n    at main (/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/native-acp-lifecycle-probe.cjs:82:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+  "allOwnedChildrenExited": true
+}

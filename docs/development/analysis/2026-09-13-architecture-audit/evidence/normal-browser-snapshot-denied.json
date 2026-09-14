@@ -1,0 +1,10 @@
+{
+  "id": "audit-browser-2",
+  "actor": "A",
+  "tool": "browser_snapshot",
+  "params": {},
+  "startedAt": 1789308350763,
+  "status": "completed",
+  "finishedAt": 1789308350767,
+  "result": "Error: Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first."
+}

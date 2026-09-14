@@ -1,0 +1,52 @@
+{
+  "runDir": "/private/tmp/ritemark-audit-live-7jr9i09j",
+  "workspace": "/private/tmp/ritemark-audit-live-7jr9i09j/workspace",
+  "profile": "/private/tmp/ritemark-audit-live-7jr9i09j/profile",
+  "args": [
+    "/Applications/Ritemark.app/Contents/MacOS/Ritemark",
+    "--new-window",
+    "--user-data-dir=/private/tmp/ritemark-audit-live-7jr9i09j/profile",
+    "--extensions-dir=/private/tmp/ritemark-audit-live-7jr9i09j/extensions",
+    "--extensionDevelopmentPath=/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+    "--extensionDevelopmentPath=/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/live-driver",
+    "--remote-debugging-port=9237",
+    "--disable-telemetry",
+    "--disable-workspace-trust",
+    "--skip-welcome",
+    "--skip-release-notes",
+    "/private/tmp/ritemark-audit-live-7jr9i09j/workspace"
+  ],
+  "preparedOnly": false,
+  "settings": {
+    "ritemark.analytics.enabled": false,
+    "ritemark.features.analytics": false,
+    "ritemark.updates.enabled": false,
+    "ritemark.features.scheduled-flow-runs": false,
+    "telemetry.telemetryLevel": "off",
+    "update.mode": "none",
+    "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
+    "workbench.startupEditor": "none",
+    "files.autoSave": "off",
+    "terminal.integrated.profiles.osx": {
+      "Audit Bash": {
+        "path": "/bin/bash",
+        "args": [
+          "--noprofile",
+          "--norc"
+        ]
+      }
+    },
+    "terminal.integrated.defaultProfile.osx": "Audit Bash"
+  },
+  "fixtureSha256": {
+    "table.csv": "4b71658e1ed5b867a4b4aef88a5bea064c2fae15fbaafe97a601657e34da2994",
+    "note.md": "df9cbd661dead293a415006d13ce3c8898404548abcbdf6fa052fa8676705507",
+    "book.xlsx": "fb85d8a791d04b1918f44a2a780524c00b36ce939f7ad16211158fef9ac71484",
+    "second.md": "aa6bf467c4b90e968051e6b9a3ed78eb2e278a44c5ba2f3cf49d3eb81f247952"
+  },
+  "pid": 37003,
+  "launchedAt": 1789294552278,
+  "sharedExtensionRemovalCandidatesAtLaunch": [],
+  "previousPid": 584
+}

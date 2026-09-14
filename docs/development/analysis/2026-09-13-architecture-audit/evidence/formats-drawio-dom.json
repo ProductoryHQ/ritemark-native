@@ -1,0 +1,51 @@
+{
+  "rects": [
+    {
+      "tag": "DIV",
+      "cls": "",
+      "rect": {
+        "x": 310,
+        "y": -600,
+        "width": 178,
+        "height": 768,
+        "top": -600,
+        "right": 488,
+        "bottom": 168,
+        "left": 310
+      }
+    },
+    {
+      "tag": "DIV",
+      "cls": "",
+      "rect": {
+        "x": 363.4296875,
+        "y": 160.3046875,
+        "width": 71.140625,
+        "height": 14.3984375,
+        "top": 160.3046875,
+        "right": 434.5703125,
+        "bottom": 174.703125,
+        "left": 363.4296875
+      }
+    },
+    {
+      "tag": "DIV",
+      "cls": "",
+      "rect": {
+        "x": 363.4296875,
+        "y": 160.3046875,
+        "width": 71.140625,
+        "height": 14.3984375,
+        "top": 160.3046875,
+        "right": 434.5703125,
+        "bottom": 174.703125,
+        "left": 363.4296875
+      }
+    }
+  ],
+  "active": "<body class=\"geEditor geClassic vscode-light geEmbed geCompactMode\" role=\"document\" data-vscode-theme-kind=\"vscode-light\" data-vscode-theme-name=\"Ritemark Light\" data-vscode-theme-id=\"ritemark-light\" style=\"color-scheme: light;\">\n\n<script src=\"js/mai",
+  "size": [
+    800,
+    766
+  ]
+}

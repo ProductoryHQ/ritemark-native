@@ -1,0 +1,236 @@
+{
+  "method": "Functional macOS startup with isolated profile, synthetic workspace, actual audit extension and observational driver; DOM sampled about every 100 ms. Launch wall clock includes automation and driver overhead. RSS is per-process resident set, not unique physical memory or Windows baseline.",
+  "runDir": "/private/tmp/ritemark-audit-live-7jr9i09j",
+  "appPid": 584,
+  "workbench": {
+    "id": "5967210D62D193A111B95EF07629008B",
+    "url": "vscode-file://vscode-app/Applications/Ritemark.app/Contents/Resources/app/out/vs/code/electron-browser/workbench/workbench.html"
+  },
+  "samples": [
+    {
+      "at": 1789292739006,
+      "sinceLaunchMs": 682,
+      "state": {
+        "ready": "loading",
+        "title": "",
+        "active": {
+          "classes": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": null,
+        "auxiliaryVisible": false,
+        "editorVisible": false,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292739111,
+      "sinceLaunchMs": 787,
+      "state": {
+        "ready": "complete",
+        "title": "",
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "classes": "",
+          "label": ""
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": null,
+        "auxiliaryVisible": false,
+        "editorVisible": false,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292739748,
+      "sinceLaunchMs": 1424,
+      "state": {
+        "ready": "complete",
+        "title": "",
+        "active": {
+          "tag": "DIV",
+          "id": "",
+          "classes": "editor-group-container empty active",
+          "label": "Editor Group 1 (empty)"
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292739851,
+      "sinceLaunchMs": 1527,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] workspace",
+        "active": {
+          "tag": "DIV",
+          "id": "",
+          "classes": "editor-group-container empty active",
+          "label": "Editor Group 1 (empty)"
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "",
+        "auxiliaryVisible": false,
+        "editorVisible": true,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292742852,
+      "sinceLaunchMs": 4528,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] workspace",
+        "active": {
+          "tag": "TEXTAREA",
+          "id": "",
+          "classes": "xterm-helper-textarea",
+          "label": "Terminal 1\nRun the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience\nUse ⌥F1 for terminal accessibility help"
+        },
+        "terminalVisible": true,
+        "auxiliaryTitle": "Terminal",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292743058,
+      "sinceLaunchMs": 4734,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] workspace",
+        "active": {
+          "tag": "TEXTAREA",
+          "id": "",
+          "classes": "xterm-helper-textarea",
+          "label": "Terminal 1, bash\nRun the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience\nUse ⌥F1 for terminal accessibility help"
+        },
+        "terminalVisible": true,
+        "auxiliaryTitle": "Terminal",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": []
+      }
+    },
+    {
+      "at": 1789292747876,
+      "sinceLaunchMs": 9552,
+      "state": {
+        "ready": "complete",
+        "title": "[Extension Development Host] workspace",
+        "active": {
+          "tag": "IFRAME",
+          "id": "",
+          "classes": "webview ready",
+          "label": null
+        },
+        "terminalVisible": false,
+        "auxiliaryTitle": "Ritemark AI",
+        "auxiliaryVisible": true,
+        "editorVisible": true,
+        "tabs": []
+      }
+    }
+  ],
+  "driver": {
+    "at": 1789292763415,
+    "hostPid": 879,
+    "ritemark": {
+      "active": true,
+      "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+      "version": "1.10.1"
+    },
+    "documents": [],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": []
+      }
+    ],
+    "activeTerminal": "bash",
+    "terminals": [
+      "bash"
+    ]
+  },
+  "processes": [
+    {
+      "pid": 584,
+      "ppid": 299,
+      "rssKiB": 162096,
+      "command": "/Applications/Ritemark.app/Contents/MacOS/Ritemark"
+    },
+    {
+      "pid": 586,
+      "ppid": 584,
+      "rssKiB": 77312,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (GPU).app/Contents/MacOS/Ritemark Helper (GPU)"
+    },
+    {
+      "pid": 588,
+      "ppid": 584,
+      "rssKiB": 46016,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper"
+    },
+    {
+      "pid": 607,
+      "ppid": 584,
+      "rssKiB": 167248,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Renderer).app/Contents/MacOS/Ritemark Helper (Renderer)"
+    },
+    {
+      "pid": 877,
+      "ppid": 584,
+      "rssKiB": 70432,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper"
+    },
+    {
+      "pid": 878,
+      "ppid": 584,
+      "rssKiB": 61408,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper"
+    },
+    {
+      "pid": 879,
+      "ppid": 584,
+      "rssKiB": 106384,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Plugin).app/Contents/MacOS/Ritemark Helper (Plugin)"
+    },
+    {
+      "pid": 883,
+      "ppid": 879,
+      "rssKiB": 62016,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Plugin).app/Contents/MacOS/Ritemark Helper (Plugin)"
+    },
+    {
+      "pid": 909,
+      "ppid": 584,
+      "rssKiB": 172960,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper (Renderer).app/Contents/MacOS/Ritemark Helper (Renderer)"
+    },
+    {
+      "pid": 926,
+      "ppid": 584,
+      "rssKiB": 82208,
+      "command": "/Applications/Ritemark.app/Contents/Frameworks/Ritemark Helper.app/Contents/MacOS/Ritemark Helper"
+    },
+    {
+      "pid": 1021,
+      "ppid": 879,
+      "rssKiB": 89264,
+      "command": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server"
+    },
+    {
+      "pid": 927,
+      "ppid": 926,
+      "rssKiB": 1680,
+      "command": "/bin/bash"
+    }
+  ]
+}

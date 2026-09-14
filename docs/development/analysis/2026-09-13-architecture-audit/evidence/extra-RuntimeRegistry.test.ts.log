@@ -1,0 +1,6 @@
+✓ Test 1: get() returns correct runtime
+✓ Test 2: get() throws on unknown id
+✓ Test 3: dispose() calls dispose() on all runtimes
+✓ Test 4: getAll() returns all runtimes
+
+All 4 tests passed!

@@ -1,0 +1,470 @@
+Running Codex QA validation...
+Agent runtime manifest validation passed
+TAP version 13
+# Extension copied for darwin-arm64: /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/source -> /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/copy-darwin-arm64
+# Extension copied for darwin-x64: /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/source -> /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/copy-darwin-x64
+# Extension copied for win32-x64: /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/source -> /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-extension-copy-vyjciV/copy-win32-x64
+# Subtest: target copy is immutable and filters foreign native payloads
+ok 1 - target copy is immutable and filters foreign native payloads
+  ---
+  duration_ms: 35.444166
+  type: 'test'
+  ...
+# Subtest: copy refuses overlapping source and destination paths
+ok 2 - copy refuses overlapping source and destination paths
+  ---
+  duration_ms: 2.547083
+  type: 'test'
+  ...
+# Subtest: command-line entrypoint performs a target copy
+ok 3 - command-line entrypoint performs a target copy
+  ---
+  duration_ms: 36.429083
+  type: 'test'
+  ...
+# Subtest: release callers use the immutable target copier
+ok 4 - release callers use the immutable target copier
+  ---
+  duration_ms: 2.134167
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 117.216209
+TAP version 13
+# Subtest: checked-in manifest and dependency pins are internally consistent
+ok 1 - checked-in manifest and dependency pins are internally consistent
+  ---
+  duration_ms: 1.334041
+  type: 'test'
+  ...
+# Subtest: rejects Claude binary and SDK drift
+ok 2 - rejects Claude binary and SDK drift
+  ---
+  duration_ms: 0.838833
+  type: 'test'
+  ...
+# Subtest: rejects an unapproved runtime snapshot even when all platform rows agree
+ok 3 - rejects an unapproved runtime snapshot even when all platform rows agree
+  ---
+  duration_ms: 0.423958
+  type: 'test'
+  ...
+# Subtest: rejects a missing Claude platform package from the lockfile
+ok 4 - rejects a missing Claude platform package from the lockfile
+  ---
+  duration_ms: 0.364541
+  type: 'test'
+  ...
+# Subtest: rejects a missing Codex code-mode host component
+ok 5 - rejects a missing Codex code-mode host component
+  ---
+  duration_ms: 0.4505
+  type: 'test'
+  ...
+# Subtest: uses a supported smoke argument for each Codex component
+ok 6 - uses a supported smoke argument for each Codex component
+  ---
+  duration_ms: 0.329834
+  type: 'test'
+  ...
+# Subtest: rejects component install-name collisions on one target
+ok 7 - rejects component install-name collisions on one target
+  ---
+  duration_ms: 0.268417
+  type: 'test'
+  ...
+# Subtest: rejects a unique but undiscoverable Codex sidecar install name
+ok 8 - rejects a unique but undiscoverable Codex sidecar install name
+  ---
+  duration_ms: 0.292333
+  type: 'test'
+  ...
+# Subtest: requires the Windows-only Codex sandbox helpers
+ok 9 - requires the Windows-only Codex sandbox helpers
+  ---
+  duration_ms: 0.429959
+  type: 'test'
+  ...
+# Subtest: rejects a darwin row for a Windows-only Codex component
+ok 10 - rejects a darwin row for a Windows-only Codex component
+  ---
+  duration_ms: 0.476208
+  type: 'test'
+  ...
+# Subtest: rejects validationArgs on a Codex IPC helper that cannot be smoke-tested
+ok 11 - rejects validationArgs on a Codex IPC helper that cannot be smoke-tested
+  ---
+  duration_ms: 0.381375
+  type: 'test'
+  ...
+# Subtest: rejects stale OpenCode vendor identity
+ok 12 - rejects stale OpenCode vendor identity
+  ---
+  duration_ms: 0.256375
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 41.477625
+TAP version 13
+# Subtest: Windows release workflow separates immutable product source from workflow revision
+ok 1 - Windows release workflow separates immutable product source from workflow revision
+  ---
+  duration_ms: 2.172417
+  type: 'test'
+  ...
+# Subtest: Windows shell build stages Ritemark outside the eager VS Code packager
+ok 2 - Windows shell build stages Ritemark outside the eager VS Code packager
+  ---
+  duration_ms: 0.841125
+  type: 'test'
+  ...
+# Subtest: Windows standard-user test uses one observable, replayable roundtrip harness
+ok 3 - Windows standard-user test uses one observable, replayable roundtrip harness
+  ---
+  duration_ms: 1.15075
+  type: 'test'
+  ...
+# Subtest: free Windows canary exercises the shared current-user registry verifier
+ok 4 - free Windows canary exercises the shared current-user registry verifier
+  ---
+  duration_ms: 0.5965
+  type: 'test'
+  ...
+# Subtest: free Windows workflow can replay an immutable preserved installer without rebuilding
+ok 5 - free Windows workflow can replay an immutable preserved installer without rebuilding
+  ---
+  duration_ms: 0.331542
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 37.347875
+TAP version 13
+# Subtest: Authenticode-normalized digest tolerates signing but binds PE code and non-PE files
+ok 1 - Authenticode-normalized digest tolerates signing but binds PE code and non-PE files
+  ---
+  duration_ms: 3.134083
+  type: 'test'
+  ...
+# Subtest: PE normalization rejects a Certificate Table that overlaps executable content
+ok 2 - PE normalization rejects a Certificate Table that overlaps executable content
+  ---
+  duration_ms: 0.1675
+  type: 'test'
+  ...
+# Subtest: PE normalization preserves overlay payloads and removes only the Certificate Table
+ok 3 - PE normalization preserves overlay payloads and removes only the Certificate Table
+  ---
+  duration_ms: 0.47
+  type: 'test'
+  ...
+# Subtest: tree digest binds executable permission bits
+ok 4 - tree digest binds executable permission bits
+  ---
+  duration_ms: 1.363167
+  type: 'test'
+  ...
+# Subtest: tree digest length-prefixes records to prevent file-boundary collisions
+ok 5 - tree digest length-prefixes records to prevent file-boundary collisions
+  ---
+  duration_ms: 2.198708
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 44.8145
+TAP version 13
+# Subtest: Claude canon and extension preflight use the same shell-tier path list
+ok 1 - Claude canon and extension preflight use the same shell-tier path list
+  ---
+  duration_ms: 1.2965
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 33.734167
+TAP version 13
+# Subtest: both macOS build paths record and verify the exact pre-sign extension payload
+ok 1 - both macOS build paths record and verify the exact pre-sign extension payload
+  ---
+  duration_ms: 0.828084
+  type: 'test'
+  ...
+# Subtest: macOS signing verifies exact extension provenance after preparation and before codesign
+ok 2 - macOS signing verifies exact extension provenance after preparation and before codesign
+  ---
+  duration_ms: 0.210542
+  type: 'test'
+  ...
+# Subtest: DMG packaging relies on the post-sign deep app signature
+ok 3 - DMG packaging relies on the post-sign deep app signature
+  ---
+  duration_ms: 0.108125
+  type: 'test'
+  ...
+# Subtest: x64 workflow uploads a symlink- and mode-preserving archive
+ok 4 - x64 workflow uploads a symlink- and mode-preserving archive
+  ---
+  duration_ms: 0.3615
+  type: 'test'
+  ...
+# Subtest: canonical release playbook extracts the verified x64 archive before signing
+ok 5 - canonical release playbook extracts the verified x64 archive before signing
+  ---
+  duration_ms: 0.694709
+  type: 'test'
+  ...
+# Subtest: tar transport preserves extension symlinks, modes, and tree identity
+ok 6 - tar transport preserves extension symlinks, modes, and tree identity
+  ---
+  duration_ms: 89.726084
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132.229041
+TAP version 13
+# Subtest: same-machine verification still requires the exact working tree
+ok 1 - same-machine verification still requires the exact working tree
+  ---
+  duration_ms: 1377.19975
+  type: 'test'
+  ...
+# Subtest: release-commit anchoring verifies a CI artifact from any working tree
+ok 2 - release-commit anchoring verifies a CI artifact from any working tree
+  ---
+  duration_ms: 2401.90725
+  type: 'test'
+  ...
+# Subtest: release-commit anchoring rejects the wrong commit, a tampered manifest, and off-main commits
+ok 3 - release-commit anchoring rejects the wrong commit, a tampered manifest, and off-main commits
+  ---
+  duration_ms: 1936.377
+  type: 'test'
+  ...
+# Subtest: a build always records its own checkout; --release-commit is verification-only
+ok 4 - a build always records its own checkout; --release-commit is verification-only
+  ---
+  duration_ms: 422.956875
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6174.025709
+Staged compiled extension outside the VS Code shell build tree: /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T//ritemark-stage-extension.nDyTnY/staging with spaces/ritemark
+Extension shell-build staging tests passed
+Created extension symlink: /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-dev-extension-link.XXXXXX.ItMPFbVtsB/vscode/extensions/ritemark -> ../../extensions/ritemark
+Extension symlink already correct: /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-dev-extension-link.XXXXXX.ItMPFbVtsB/vscode/extensions/ritemark -> ../../extensions/ritemark
+Created extension symlink: /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-dev-extension-link.XXXXXX.ItMPFbVtsB/vscode/extensions/ritemark -> ../../extensions/ritemark
+Development extension link tests passed
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint: 
+hint: 	git config --global init.defaultBranch <name>
+hint: 
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint: 
+hint: 	git branch -m <name>
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/vscode.git
+ * [new branch]      main -> main
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/ritemark/vscode'...
+done.
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint: 
+hint: 	git config --global init.defaultBranch <name>
+hint: 
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint: 
+hint: 	git branch -m <name>
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/ritemark.git
+ * [new branch]      main -> main
+PASS: dry-run validates dependent patches sequentially without changing the worktree
+PASS: accepted clean exact main source
+PASS: rejected extension must already be staged outside VS Code
+PASS: patch applicator records only an already-staged absent-extension layout
+PASS: rejected differs from its recorded canonical derived state
+PASS: rejected differs from its recorded canonical derived state
+PASS: derived VS Code marker detects later manual edits
+PASS: rejected canonical patch set or patched vscode differs from the state recorded
+PASS: rejected canonical patch set or patched vscode differs from the state recorded
+PASS: rejected patched vscode still contains the extension during the staged shell build
+PASS: patched release gate binds the exact extension layout and rejects unrelated edits
+From /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/ritemark
+ * branch            main       -> FETCH_HEAD
+Preparing worktree (detached HEAD 453ff8f)
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/created-release/vscode'...
+done.
+PASS: release creator produced a new detached physical checkout
+PASS: rejected dependency directory is shared through a symlink
+PASS: rejected old build output exists
+Switched to a new branch 'feature-test'
+PASS: rejected release builds may only use main
+Switched to branch 'main'
+PASS: rejected release sources contain tracked or untracked changes
+PASS: rejected vscode is a symlink
+Submodule 'vscode' (/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-release-source-test.XXXXXX.I9Rfff06j0/vscode.git) registered for path 'vscode'
+PASS: rejected embedded macOS build provenance is missing a valid pre-sign extension payload attestation
+PASS: macOS provenance requires a pre-sign extension payload attestation
+PASS: build provenance round-trip
+PASS: rejected staged extension changed after its release digest was recorded
+PASS: build provenance rejects staged extension drift after digest recording
+PASS: rejected built extension does not match staged release payload
+PASS: build provenance binds the final extension payload
+PASS: rejected signed build Authenticode-normalized extension payload changed after attestation
+PASS: post-sign provenance rejects Authenticode-covered extension drift
+PASS: rejected embedded staged extension digest does not match the original pre-build digest
+PASS: post-sign provenance rejects attestation-field drift
+PASS: rejected embedded Authenticode-normalized extension digest does not match the original pre-build digest
+PASS: post-sign provenance rejects Authenticode attestation-field drift
+PASS: rejected embedded build provenance does not match
+PASS: build provenance binds the actual derived VS Code state
+PASS: rejected embedded build provenance does not match
+PASS: DMG packaging requires a valid deep app signature
+Release source integrity tests passed
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint: 
+hint: 	git config --global init.defaultBranch <name>
+hint: 
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint: 
+hint: 	git branch -m <name>
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/vscode.git
+ * [new branch]      main -> main
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo/vscode'...
+done.
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint: 
+hint: 	git config --global init.defaultBranch <name>
+hint: 
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint: 
+hint: 	git branch -m <name>
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      main -> main
+Switched to a new branch 'merged-clean'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-clean -> merged-clean
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   5747b2e..d525a1a  main -> main
+Preparing worktree (checking out 'merged-clean')
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/wt-merged-clean/vscode'...
+done.
+Switched to a new branch 'merged-dirty'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-dirty -> merged-dirty
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   d525a1a..f2bff3c  main -> main
+Preparing worktree (checking out 'merged-dirty')
+Switched to a new branch 'active-unmerged'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      active-unmerged -> active-unmerged
+Switched to branch 'main'
+Preparing worktree (checking out 'active-unmerged')
+Switched to a new branch 'merged-remote-gone'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-remote-gone -> merged-remote-gone
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   f2bff3c..0bc60ff  main -> main
+Preparing worktree (checking out 'merged-remote-gone')
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ - [deleted]         merged-remote-gone
+Switched to a new branch 'merged-with-output'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-with-output -> merged-with-output
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   0bc60ff..439090d  main -> main
+Preparing worktree (checking out 'merged-with-output')
+Switched to a new branch 'merged-handedited'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-handedited -> merged-handedited
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   439090d..e6e64fe  main -> main
+Preparing worktree (checking out 'merged-handedited')
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/wt-handedited/vscode'...
+done.
+Switched to a new branch 'merged-derived'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+ * [new branch]      merged-derived -> merged-derived
+Switched to branch 'main'
+To /private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/repo.git
+   e6e64fe..0009a4a  main -> main
+Preparing worktree (checking out 'merged-derived')
+Cloning into '/private/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-worktree-hygiene-test.XXXXXX.o78wfPm34N/wt-derived/vscode'...
+done.
+PASS: audit classified clean, dirty, and active worktrees correctly
+PASS: build output blocks an otherwise-clean merged worktree
+PASS: a merged branch with no upstream is still reclaimable
+PASS: a patched vscode submodule no longer blocks a merged worktree
+PASS: an unexpected vscode path blocks the worktree
+PASS: report mode renders an email-ready summary
+PASS: cleanup preserved build output and hand-edited state
+PASS: cleanup removed only the proven-safe worktree
+Worktree hygiene tests passed
+Running pre-commit validation...
+Pre-commit validation passed
+Running fast chrome validation...
+Checking patch state...
+Checking product icon theme JSON...
+No chrome-sensitive TS changes detected; skipping VS Code TypeScript check.
+Fast chrome validation passed
+Codex QA validation passed

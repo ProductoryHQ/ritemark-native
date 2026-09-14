@@ -1,0 +1,38 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {driver,findWebview,waitFor,session,writeEvidence,targets,connectCdp,evidence} from './formats-tools.mjs';
+const file=path.join(session.workspace,'diagram.drawio.svg');
+const report={method:'Real draw.io view, external disk replacement adding an independent shape, then ordinary label editing through DOM/keyboard input and the production autosave bridge. No synthetic drawio:save message or product model mutation.',steps:[]};
+const snap=()=>{const text=fs.readFileSync(file,'utf8');return {text,sha256:crypto.createHash('sha256').update(text).digest('hex')};};
+const record=(stage,data)=>{report.steps.push({stage,at:Date.now(),...data});writeEvidence('formats-drawio-conflict-probe.json',report);};
+let v,c;
+try{
+ await driver('/open',{file:'diagram.drawio.svg'});
+ v=await findWebview('!!window.__rmBridge && document.body.innerText.includes("AUDIT BASE")');
+ record('baseline',{disk:snap(),host:await driver(),view:await v.evaluate('({text:document.body.innerText,bridge:window.__rmBridge})')});
+ const source=fs.readFileSync(path.join(session.runDir,'variants/external.drawio.svg'),'utf8');
+ const extra='<mxCell id="external-cell" value="EXTERNAL ACTOR BOX" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="100" y="240" width="180" height="70" as="geometry"/></mxCell>';
+ const escaped=extra.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+ const external=source.replace('&lt;/root&gt;',escaped+'&lt;/root&gt;');
+ assert.ok(external.includes('EXTERNAL ACTOR BOX'));
+ fs.writeFileSync(file,external);
+ await waitFor(async()=>{const s=await driver();return s.documents.some(d=>d.file==='diagram.drawio.svg'&&d.text.includes('EXTERNAL ACTOR BOX')&&!d.dirty);});
+ await new Promise(r=>setTimeout(r,900));
+ record('external-disk-and-host-updated',{disk:snap(),host:await driver(),view:await v.evaluate('({text:document.body.innerText,bridge:window.__rmBridge})')});
+ assert.ok(await v.evaluate('document.body.innerText.includes("AUDIT BASE") && !document.body.innerText.includes("EXTERNAL ACTOR BOX")'));
+ await v.evaluate(`(()=>{const el=[...document.querySelectorAll('.geDiagramContainer div')].filter(e=>e.textContent==='AUDIT BASE').at(-1);if(!el)throw new Error('Label missing');const r=el.getBoundingClientRect();for(const type of ['mousedown','mouseup','mousedown','mouseup','dblclick'])el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,buttons:type==='mousedown'?1:0,detail:type==='dblclick'?2:1,clientX:r.x+r.width/2,clientY:r.y+r.height/2}));})()`);
+ await waitFor(()=>v.evaluate("[...document.querySelectorAll('[contenteditable=true]')].some(e=>e.getBoundingClientRect().width>0&&e.textContent.includes('AUDIT BASE'))"),6000);
+ await v.evaluate("(()=>{const e=[...document.querySelectorAll('[contenteditable=true]')].find(e=>e.getBoundingClientRect().width>0&&e.textContent.includes('AUDIT BASE'));e.focus();const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r);})()");
+ await v.cdp.send('Input.insertText',{text:'LOCAL EDIT AFTER EXTERNAL'});
+ for(const type of ['keyDown','keyUp'])await v.cdp.send('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13,modifiers:2});
+ await waitFor(()=>fs.readFileSync(file,'utf8').includes('LOCAL EDIT AFTER EXTERNAL'),10000);
+ record('production-autosave',{disk:snap(),host:await driver(),view:await v.evaluate('({text:document.body.innerText,bridge:window.__rmBridge})')});
+ assert.ok(!fs.readFileSync(file,'utf8').includes('EXTERNAL ACTOR BOX'));
+ assert.ok((await driver()).documents.some(d=>d.file==='diagram.drawio.svg'&&!d.dirty));
+ c=await connectCdp((await targets()).find(t=>t.type==='page'&&t.url.includes('workbench')).webSocketDebuggerUrl);
+ report.dialogs=(await c.send('Runtime.evaluate',{expression:"({modal:[...document.querySelectorAll('.monaco-dialog-box,[aria-modal=true]')].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.innerText),notifications:[...document.querySelectorAll('.notification-list-item')].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.innerText)})",returnByValue:true})).result.value;
+ fs.writeFileSync(path.join(evidence,'formats-drawio-after-autosave.png'),Buffer.from((await c.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ report.externalShapeLost=true;report.completed=true;writeEvidence('formats-drawio-conflict-probe.json',report);console.log(JSON.stringify({completed:true,externalShapeLost:true,dialogs:report.dialogs}));
+}catch(e){record('error',{error:String(e.stack??e)});throw e;}finally{v?.close();c?.close();}

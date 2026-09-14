@@ -1,0 +1,10 @@
+{
+  "profile": "/private/tmp/ritemark-audit-normal-bg5jgmun/browser-profile/User/settings.json",
+  "changed": {
+    "window.dialogStyle": {
+      "before": null,
+      "after": "custom"
+    }
+  },
+  "reason": "Observe real consent dialog in isolated audit workbench. No consent service is stubbed. Initial read/control grants were not observed; do not infer automatic approval."
+}

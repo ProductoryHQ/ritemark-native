@@ -1,0 +1,13 @@
+{
+  "id": "audit-browser-3",
+  "actor": "A",
+  "tool": "browser_fill",
+  "params": {
+    "selector": "#entry",
+    "value": "AUDIT MUST STAY DENIED"
+  },
+  "startedAt": 1789308350767,
+  "status": "completed",
+  "finishedAt": 1789308415167,
+  "result": "URL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nTitle: AUDIT PAGE A\nPage summary after action:\nPage Title: AUDIT PAGE A\nURL: file:///private/tmp/ritemark-audit-normal-bg5jgmun/browser-fixtures/page-a.html\nSnapshot: \n- generic [ref=e1]:\n  - heading \"AUDIT PAGE A\" [level=1] [ref=e2]\n  - paragraph [ref=e3]: Local synthetic browser target A. No external requests or form submission.\n  - text: Audit field A\n  - textbox \"Audit field A\" [active] [ref=e4]: AUDIT MUST STAY DENIED\n  - button \"Mark A\" [ref=e5]\n  - button \"Arm delayed action\" [ref=e6]\n  - status [ref=e7]: \"Clicks: 0\"\n  - status [ref=e8]: \"Delayed clicks: 0\"\n  - status [ref=e9]: not armed"
+}

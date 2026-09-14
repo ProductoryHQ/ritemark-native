@@ -1,0 +1,244 @@
+{
+  "method": "Normal-mode actual Markdown webview loading. Instrumented renderer CPU/profile and coverage, fresh view per trial, warm app/OS cache. CPU throttling is a sensitivity experiment, not Windows emulation.",
+  "at": 1789310902245,
+  "pid": 98767,
+  "fixture": {
+    "name": "note.md",
+    "bytes": 79,
+    "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+  },
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.5.0",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 14,
+    "totalMemory": 25769803776
+  },
+  "instrumentation": "Auto-attach without pausing new iframe, CPU throttle, Performance metrics, 1 ms CPU sampling and precise block coverage before the bundle request (checked against navigation/resource timestamps). Main-thread long tasks collected by buffered observer. All trials instrumented; timings are not uninstrumented production benchmarks.",
+  "trials": [
+    {
+      "index": 1,
+      "rate": 1,
+      "attached": [
+        {
+          "sessionId": "A857993CB14F9071BEC8FAE9F4B75330",
+          "targetId": "A44FF28373AD78AB60A03C7A9EF37F4B",
+          "type": "iframe",
+          "url": "",
+          "waitingForDebugger": false,
+          "trial": 1,
+          "setupAt": 1789310903072,
+          "before": [
+            {
+              "name": "Timestamp",
+              "value": 1363369.773301
+            },
+            {
+              "name": "AudioHandlers",
+              "value": 0
+            },
+            {
+              "name": "AudioWorkletProcessors",
+              "value": 0
+            },
+            {
+              "name": "Documents",
+              "value": 3
+            },
+            {
+              "name": "Frames",
+              "value": 9
+            },
+            {
+              "name": "JSEventListeners",
+              "value": 18
+            },
+            {
+              "name": "LayoutObjects",
+              "value": 7
+            },
+            {
+              "name": "MediaKeySessions",
+              "value": 0
+            },
+            {
+              "name": "MediaKeys",
+              "value": 0
+            },
+            {
+              "name": "Nodes",
+              "value": 48
+            },
+            {
+              "name": "Resources",
+              "value": 0
+            },
+            {
+              "name": "ContextLifecycleStateObservers",
+              "value": 3
+            },
+            {
+              "name": "V8PerContextDatas",
+              "value": 2
+            },
+            {
+              "name": "WorkerGlobalScopes",
+              "value": 1
+            },
+            {
+              "name": "UACSSResources",
+              "value": 0
+            },
+            {
+              "name": "RTCPeerConnections",
+              "value": 0
+            },
+            {
+              "name": "ResourceFetchers",
+              "value": 3
+            },
+            {
+              "name": "AdSubframes",
+              "value": 0
+            },
+            {
+              "name": "DetachedScriptStates",
+              "value": 1
+            },
+            {
+              "name": "ArrayBufferContents",
+              "value": 2
+            },
+            {
+              "name": "LayoutCount",
+              "value": 0
+            },
+            {
+              "name": "RecalcStyleCount",
+              "value": 0
+            },
+            {
+              "name": "LayoutDuration",
+              "value": 0
+            },
+            {
+              "name": "RecalcStyleDuration",
+              "value": 0
+            },
+            {
+              "name": "DevToolsCommandDuration",
+              "value": 0.000004
+            },
+            {
+              "name": "ScriptDuration",
+              "value": 0
+            },
+            {
+              "name": "V8CompileDuration",
+              "value": 0
+            },
+            {
+              "name": "TaskDuration",
+              "value": 0.000005
+            },
+            {
+              "name": "TaskOtherDuration",
+              "value": 0.000001
+            },
+            {
+              "name": "ThreadTime",
+              "value": 0.000025
+            },
+            {
+              "name": "ProcessTime",
+              "value": 0.931952
+            },
+            {
+              "name": "JSHeapUsedSize",
+              "value": 1014472
+            },
+            {
+              "name": "JSHeapTotalSize",
+              "value": 1572864
+            },
+            {
+              "name": "FirstMeaningfulPaint",
+              "value": 0
+            },
+            {
+              "name": "DomContentLoaded",
+              "value": 1363369.771658
+            },
+            {
+              "name": "NavigationStart",
+              "value": 1363369.761524
+            }
+          ],
+          "profileStartedAt": 1789310903085,
+          "instrumented": true,
+          "resumedAt": 1789310903085
+        }
+      ],
+      "startedAt": 1789310903035,
+      "openCommandReturnedAt": 1789310903069
+    }
+  ],
+  "errors": [],
+  "hosts": [
+    {
+      "at": 1789310902248,
+      "hostPid": 98994,
+      "driverMode": 1,
+      "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+      "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/performance-profile/User/globalStorage",
+      "workspaceFile": null,
+      "workspaceFolders": [
+        "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+      ],
+      "hotExit": "onExit",
+      "autoSave": "off",
+      "ritemark": {
+        "active": true,
+        "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+        "version": "1.10.1"
+      },
+      "documents": [
+        {
+          "file": "note.md",
+          "version": 1,
+          "dirty": false,
+          "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+          "length": 79,
+          "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+        }
+      ],
+      "tabs": [
+        {
+          "active": true,
+          "viewColumn": 1,
+          "tabs": [
+            {
+              "label": "note.md",
+              "active": true,
+              "dirty": false,
+              "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+              "viewType": "ritemark.editor"
+            }
+          ]
+        }
+      ],
+      "terminals": [
+        "bash"
+      ]
+    }
+  ],
+  "browser": {
+    "Browser": "Chrome/142.0.7444.265",
+    "Protocol-Version": "1.3",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Ritemark/1.117.0 Chrome/142.0.7444.265 Electron/39.8.7 Safari/537.36",
+    "V8-Version": "14.2.231.22",
+    "WebKit-Version": "537.36 (@d338888ca0a7c26fddcfb09a503db016a13a972b)"
+  },
+  "error": "AssertionError [ERR_ASSERTION]: Actual Markdown editor not observed; this is an observation failure, not an app crash\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-performance-observed-load-probe.mjs?run=1789310902243:83:10"
+}

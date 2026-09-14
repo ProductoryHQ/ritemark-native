@@ -1,0 +1,436 @@
+{
+  "method": "Correlate actual cached dispatcher jobs with host log, browser DOM, shell metadata, observed dialogs and verified cleanup. No new application test is run by this script.",
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "syntheticCallerLimit": "A/B labels are observer-only. Runtime session count zero; ACP manager never started. Not a native model turn or natural frequency measurement.",
+  "initialProbePartialFailure": "Error: Condition not reached within 8000 ms; last false\n    at waitFor (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-browser-tools.mjs:23:202)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-browser-ownership-probe.mjs?run=1789308449543:26:30",
+  "initialConsentLimit": "Job 1 and 3 consent grants were not observed; their DENIED payload names do not describe UI choices. Their actual successful outcomes are preserved.",
+  "completedProbe": true,
+  "readSnapshotDeniedWithoutMetadata": true,
+  "observedControlDenyPreservedField": true,
+  "observedControlAndReadGrantWorked": true,
+  "sameTabTargetPreconditionMissing": true,
+  "actionQueueControlPassed": true,
+  "revocationCancelledPendingLocator": true,
+  "deniedFillReturnedUrlAndTitleWhileReadShareFalse": true,
+  "revocationUiLimit": "Existing hidden toggle handler was invoked through CDP; ordinary visible user revocation was not demonstrated.",
+  "visualChecks": {
+    "normal-browser-deny-visible.png": "inspected, actual Control/Deny dialog",
+    "normal-browser-read-consent.png": "inspected, actual Share/Allow dialog",
+    "normal-browser-wrong-target.png": "inspected and excluded as page-state proof: workbench URL B but BrowserView surface still previous A; direct page DOM and ARIA are authoritative here"
+  },
+  "jobsCorrelated": 15,
+  "eventRecords": 59,
+  "capturedOwnedProcessesStopped": 13,
+  "portClosed": true,
+  "originalObserverRestored": {
+    "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1/index.cjs",
+    "sha256": "05ace3994832ea9bff8527bd0cb428411efec394a31212ba7aa36a892e66d099",
+    "temporaryHelperRemoved": true
+  },
+  "productArtifactsUnchanged": 4,
+  "sourceContext": {
+    "extensions/ritemark/src/browser/BrowserActionTools.ts": {
+      "sha256": "db56725d642dd6c497a89c62195bd828a48074421f0b420b3627662550913cf8",
+      "excerpts": [
+        {
+          "start": 33,
+          "end": 62,
+          "lines": [
+            "",
+            "export interface BrowserNavigateArgs {",
+            "  url?: string;",
+            "  type?: 'url' | 'back' | 'forward' | 'reload';",
+            "}",
+            "",
+            "export interface BrowserClickArgs {",
+            "  ref?: string;",
+            "  selector?: string;",
+            "  button?: 'left' | 'right' | 'middle';",
+            "  dblClick?: boolean;",
+            "}",
+            "",
+            "export interface BrowserFillArgs {",
+            "  ref?: string;",
+            "  selector?: string;",
+            "  value: string;",
+            "}",
+            "",
+            "export interface BrowserTypeArgs {",
+            "  text?: string;",
+            "  key?: string;",
+            "}",
+            "",
+            "export interface BrowserScrollArgs {",
+            "  direction?: 'up' | 'down' | 'top' | 'bottom' | 'into-view';",
+            "  amount?: number;",
+            "  ref?: string;",
+            "  selector?: string;",
+            "}"
+          ]
+        },
+        {
+          "start": 69,
+          "end": 96,
+          "lines": [
+            " * Serializes browser tool calls across ALL conversations (Sprint 99, decision D2).",
+            " *",
+            " * There is one integrated browser and one active tab, so every browser tool is a",
+            " * command against shared state. With parallel chats, chat A's navigate could land",
+            " * between chat B's navigate and its snapshot, and B would then reason about A's",
+            " * page \u2014 silently, and non-deterministically. Serializing here, at the single",
+            " * chokepoint every action funnels through, makes each action atomic with respect",
+            " * to the others.",
+            " *",
+            " * This does NOT give each chat its own browser: B may still snapshot a page A",
+            " * navigated to, it just cannot happen mid-action. Per-chat browsers would need",
+            " * per-chat tab ownership in the workbench, which is shell-tier and out of scope",
+            " * \u2014 recorded as a known limitation in the sprint's scenarios.",
+            " */",
+            "let browserActionChain: Promise<unknown> = Promise.resolve();",
+            "",
+            "async function callBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {",
+            "  // Queue behind whatever is in flight. The chain is kept un-rejectable so one",
+            "  // failed action cannot wedge every later one.",
+            "  const run = browserActionChain.then(",
+            "    () => runBrowserAction(command, args),",
+            "    () => runBrowserAction(command, args),",
+            "  );",
+            "  browserActionChain = run.then(() => undefined, () => undefined);",
+            "  return run;",
+            "}",
+            "",
+            "async function runBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {"
+          ]
+        },
+        {
+          "start": 146,
+          "end": 164,
+          "lines": [
+            "    lines.push(`Error: ${result.error}`);",
+            "  }",
+            "  if (result.url) {",
+            "    lines.push(`URL: ${result.url}`);",
+            "  }",
+            "  if (result.title) {",
+            "    lines.push(`Title: ${result.title}`);",
+            "  }",
+            "  if (result.summary) {",
+            "    lines.push('Page summary after action:');",
+            "    lines.push(result.summary);",
+            "  } else if (!result.error) {",
+            "    lines.push('Action completed. (No updated summary returned.)');",
+            "  }",
+            "  return lines.join('\\n');",
+            "}"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/browser/BrowserContextStore.ts": {
+      "sha256": "5c82dc32b8af0f6b341e4c31e2b305f5046939f5dd20075046e12bfc63f4b7bd",
+      "excerpts": [
+        {
+          "start": 108,
+          "end": 130,
+          "lines": [
+            "   * Trigger the workbench \"Share with Agent?\" consent for the active browser tab",
+            "   * the first time it becomes the active context in this session. Subsequent",
+            "   * activations for the same pageId are ignored. The workbench-level",
+            "   * `setSharedWithAgent` honors the \"Don't ask again\" preference, so once the",
+            "   * user consents once, future tabs auto-share silently.",
+            "   */",
+            "  public async ensureSharedForActiveTab(): Promise<void> {",
+            "    const snapshot = this.lastSnapshot;",
+            "    if (!snapshot?.pageId || !snapshot.url || snapshot.sharedWithAgent) return;",
+            "    if (this.autoSharedPageIds.has(snapshot.pageId)) return;",
+            "",
+            "    this.autoSharedPageIds.add(snapshot.pageId);",
+            "    try {",
+            "      const result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND);",
+            "      if (isUsableSnapshot(result)) {",
+            "        this.lastSnapshot = { ...snapshot, ...result };",
+            "      }",
+            "    } catch {",
+            "      // Workbench may have rejected (consent declined). Keep the pageId",
+            "      // marked so we don't re-prompt for this tab in this session.",
+            "    }",
+            "  }",
+            ""
+          ]
+        },
+        {
+          "start": 164,
+          "end": 180,
+          "lines": [
+            "  public async buildTurnContext(options: { includeScreenshot?: boolean } = {}): Promise<BrowserTurnContext | null> {",
+            "    const metadata = await this.refreshMetadata();",
+            "    if (!metadata?.url) return null;",
+            "",
+            "    // Consent boundary (Sprint 67 D5): no browser context \u2014 not even URL/title",
+            "    // \u2014 flows to the AI runtimes unless the user has accepted the workbench",
+            "    // share-with-agent prompt. Auto-share fires the prompt on first activation;",
+            "    // if the user declined, this guard keeps URL identity off the wire.",
+            "    if (!metadata.sharedWithAgent) return null;",
+            "",
+            "    let snapshot: BrowserContextSnapshot = metadata;",
+            "",
+            "    if (metadata.sharedWithAgent) {",
+            "      try {",
+            "        const summaryResult = await vscode.commands.executeCommand<unknown>(GET_ACTIVE_SUMMARY_COMMAND);",
+            "        if (isUsableSnapshot(summaryResult)) {",
+            "          snapshot = { ...snapshot, ...summaryResult };"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/src/acp/AcpRuntime.ts": {
+      "sha256": "b5613b096c4eb1b76a1af3c5d17216356c940235b79a41d83f228bd0e1884c70",
+      "excerpts": [
+        {
+          "start": 524,
+          "end": 545,
+          "lines": [
+            "  private async _handleBrowserIpcRequest(req: BrowserIpcRequest): Promise<string> {",
+            "    // Cast through `unknown` so TypeScript accepts the generic params object.",
+            "    const p = req.params as unknown;",
+            "    switch (req.tool) {",
+            "      case 'browser_navigate':",
+            "        return formatActionResultForAgent(await browserNavigate(p as Parameters<typeof browserNavigate>[0]));",
+            "      case 'browser_click':",
+            "        return formatActionResultForAgent(await browserClick(p as Parameters<typeof browserClick>[0]));",
+            "      case 'browser_fill':",
+            "        return formatActionResultForAgent(await browserFill(p as Parameters<typeof browserFill>[0]));",
+            "      case 'browser_type':",
+            "        return formatActionResultForAgent(await browserType(p as Parameters<typeof browserType>[0]));",
+            "      case 'browser_scroll':",
+            "        return formatActionResultForAgent(await browserScroll(p as Parameters<typeof browserScroll>[0]));",
+            "      case 'browser_snapshot':",
+            "        return formatActionResultForAgent(await browserSnapshot());",
+            "      default: {",
+            "        const exhaustive: never = req.tool;",
+            "        return `Error: Unknown browser tool: ${exhaustive as string}`;",
+            "      }",
+            "    }",
+            "  }"
+          ]
+        }
+      ]
+    },
+    "extensions/ritemark/webview/src/components/ai-sidebar/ChatInput.tsx": {
+      "sha256": "e2810e668ddc78cd646d43f0388b26911dbbfb781984bc10e40ca04099ca7ff8",
+      "excerpts": [
+        {
+          "start": 1099,
+          "end": 1112,
+          "lines": [
+            "                  /* Normal mode or no screenshot yet \u2014 URL globe chip */",
+            "                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]'}`}>",
+            "                    <Icon name=\"globe\" size={12} className=\"shrink-0\" />",
+            "                    <span className=\"truncate max-w-[180px]\" title={currentBrowserContext?.url}>",
+            "                      Browser: {currentBrowserContext?.title || currentBrowserContext?.url}",
+            "                      {currentBrowserContext?.annotationMode ? ' \u00b7 Annotation' : ''}",
+            "                    </span>",
+            "                    <button",
+            "                      onClick={() => setHideBrowserContext(true)}",
+            "                      className=\"shrink-0 rounded hover:text-[var(--r-error)]\"",
+            "                      title=\"Remove browser context from this turn\"",
+            "                    >",
+            "                      <Icon name=\"x\" size={12} />",
+            "                    </button>"
+          ]
+        }
+      ]
+    },
+    "patches/vscode/010-ritemark-browser-action-bridge.patch": {
+      "sha256": "9c7e75ea7be7757d06bd211f6225c629c293ef7f50a8cf1adda8a90ff661d46a",
+      "excerpts": [
+        {
+          "start": 239,
+          "end": 254,
+          "lines": [
+            "+async function ensureControlConsent(model: IBrowserViewModel, dialogService: IDialogService): Promise<boolean> {",
+            "+\tif (model.sharedWithAgentForControl) {",
+            "+\t\treturn true;",
+            "+\t}",
+            "+\tconst result = await dialogService.confirm({",
+            "+\t\ttype: 'warning',",
+            "+\t\tmessage: localize('ritemark.browser.controlConsent.message', \"Allow AI to control this browser tab?\"),",
+            "+\t\tdetail: localize('ritemark.browser.controlConsent.detail', \"The AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\\n\\nGrant control only for tabs where you trust the AI's actions.\"),",
+            "+\t\tprimaryButton: localize('ritemark.browser.controlConsent.allow', \"Allow Control\"),",
+            "+\t\tcancelButton: localize('ritemark.browser.controlConsent.deny', \"Deny\"),",
+            "+\t});",
+            "+\tif (result.confirmed) {",
+            "+\t\tawait model.setSharedWithAgentForControl(true);",
+            "+\t}",
+            "+\treturn model.sharedWithAgentForControl;",
+            "+}"
+          ]
+        },
+        {
+          "start": 278,
+          "end": 290,
+          "lines": [
+            "+\t\tconst model = activeBrowserModelFromEditorService(editorService);",
+            "+\t\tif (!model) {",
+            "+\t\t\treturn { error: 'No active integrated browser tab.' };",
+            "+\t\t}",
+            "+\t\ttry {",
+            "+\t\t\tconst granted = await ensureControlConsent(model, dialogService);",
+            "+\t\t\tif (!granted) {",
+            "+\t\t\t\treturn { ...modelMeta(model), error: 'Browser control consent was not granted.' };",
+            "+\t\t\t}",
+            "+\t\t\treturn { ...modelMeta(model) };",
+            "+\t\t} catch (err) {",
+            "+\t\t\treturn { ...modelMeta(model), error: err instanceof Error ? err.message : String(err) };",
+            "+\t\t}"
+          ]
+        },
+        {
+          "start": 337,
+          "end": 347,
+          "lines": [
+            "+\t\tconst granted = await ensureControlConsent(model, dialogService);",
+            "+\t\tif (!granted) {",
+            "+\t\t\treturn { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };",
+            "+\t\t}",
+            "+\t\ttry {",
+            "+\t\t\tif (type === 'url') {",
+            "+\t\t\t\tif (!args.url) {",
+            "+\t\t\t\t\treturn { ...modelMeta(model), error: 'navigate: url is required when type is \"url\".' };",
+            "+\t\t\t\t}",
+            "+\t\t\t\tif (model.url !== args.url) {",
+            "+\t\t\t\t\tawait model.loadURL(args.url);"
+          ]
+        },
+        {
+          "start": 429,
+          "end": 449,
+          "lines": [
+            "+\tconst { editorService, dialogService, playwrightService, validate, functionBody, invokeArgs } = ctx;",
+            "+\ttry {",
+            "+\t\tconst model = activeBrowserModelFromEditorService(editorService);",
+            "+\t\tif (!model) {",
+            "+\t\t\treturn { error: 'No active integrated browser tab.' };",
+            "+\t\t}",
+            "+\t\tconst granted = await ensureControlConsent(model, dialogService);",
+            "+\t\tif (!granted) {",
+            "+\t\t\treturn { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };",
+            "+\t\t}",
+            "+\t\tconst validationError = validate();",
+            "+\t\tif (validationError) {",
+            "+\t\t\treturn { ...modelMeta(model), error: validationError };",
+            "+\t\t}",
+            "+\t\tconst result = await playwrightService.invokeFunction(model.id, functionBody, invokeArgs);",
+            "+\t\tif (result.error) {",
+            "+\t\t\treturn { ...modelMeta(model), summary: result.summary, error: result.error };",
+            "+\t\t}",
+            "+\t\treturn { ...modelMeta(model), summary: result.summary };",
+            "+\t} catch (err) {",
+            "+\t\treturn { error: err instanceof Error ? err.message : String(err) };"
+          ]
+        },
+        {
+          "start": 670,
+          "end": 681,
+          "lines": [
+            "+\t\t\tif (!model) {",
+            "+\t\t\t\treturn { error: 'No active integrated browser tab.' };",
+            "+\t\t\t}",
+            "+\t\t\t// Snapshot is read-only \u2014 no control consent needed, but it must respect",
+            "+\t\t\t// the same read-consent gate as the GetActiveSummary bridge: never expose",
+            "+\t\t\t// URL, title, or page content for a tab the user has not shared with AI.",
+            "+\t\t\tif (!model.sharedWithAgent) {",
+            "+\t\t\t\treturn { error: 'Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first.' };",
+            "+\t\t\t}",
+            "+\t\t\ttry {",
+            "+\t\t\t\tconst summary = await playwrightService.getSummary(model.id);",
+            "+\t\t\t\treturn { ...modelMeta(model), summary };"
+          ]
+        }
+      ]
+    }
+  },
+  "upstreamUiContext": {
+    "gitlink": "10c8e557c8b9f9ed0a87f61f1c9a44bde731c409",
+    "path": "src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts",
+    "excerpts": [
+      {
+        "start": 162,
+        "end": 166,
+        "lines": [
+          "const canShareBrowserWithAgentContext = ContextKeyExpr.and(",
+          "\tChatContextKeys.enabled,",
+          "\tContextKeyExpr.has(`config.${ChatConfiguration.AgentEnabled}`),",
+          "\tContextKeyExpr.has(`config.workbench.browser.enableChatTools`),",
+          ")!;"
+        ]
+      },
+      {
+        "start": 218,
+        "end": 225,
+        "lines": [
+          "\t\t// Show share button only when chat is enabled and browser tools are enabled",
+          "\t\tconst updateShareButtonVisibility = () => {",
+          "\t\t\tthis._shareButtonContainer.style.display = contextKeyService.contextMatchesRules(canShareBrowserWithAgentContext) ? '' : 'none';",
+          "\t\t};",
+          "\t\tupdateShareButtonVisibility();",
+          "\t\tconst agentSharingKeys = new Set(canShareBrowserWithAgentContext.keys());",
+          "\t\tthis._register(Event.filter(contextKeyService.onDidChangeContext, e => e.affectsSome(agentSharingKeys))(() => {",
+          "\t\t\tupdateShareButtonVisibility();"
+        ]
+      },
+      {
+        "start": 254,
+        "end": 259,
+        "lines": [
+          "\tprivate _toggleShareWithAgent(): void {",
+          "\t\tconst model = this.editor.model;",
+          "\t\tif (!model) {",
+          "\t\t\treturn;",
+          "\t\t}",
+          "\t\tmodel.setSharedWithAgent(!model.sharedWithAgent);"
+        ]
+      }
+    ]
+  },
+  "queueHistory": [
+    "401c6da862b7657dcfbb0525c5f3cc75a0e61022 2026-07-22T12:31:03+02:00 feat(sprint-99): serialize browser tools across chats; architecture gate",
+    "e4186ffcc65d515db81880104f009e1094c9564a 2026-06-02T14:50:21+00:00 feat(browser): add browser_snapshot MCP tool + annotation screenshot chip (#88, #73)",
+    "aa8d58a3d5e8c25a0edf1a0dcd10c9a79eb3987e 2026-05-14T19:25:33+03:00 feat: add AI browser control"
+  ],
+  "syntaxChecks": [
+    {
+      "file": "normal-browser-cleanup-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-client.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-ownership-finish-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-ownership-probe.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-tools.mjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "browser-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-driver/index.cjs",
+      "nodeCheckExitCode": 0
+    },
+    {
+      "file": "normal-browser-driver/browser-audit-api.cjs",
+      "nodeCheckExitCode": 0
+    }
+  ],
+  "pythonAstChecks": 2
+}

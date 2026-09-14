@@ -1,0 +1,10 @@
+{
+  "scripts": [
+    {
+      "type": "module",
+      "src": ""
+    }
+  ],
+  "postMessage": "function",
+  "url": "vscode-webview://062d1r7tpejedhhsl2jl4vhkgl5ungc0qle6ad6j0k9lhajlkbi5/index.html?id=23373b15-5103-4393-92f3-b3f803f7aee3&parentId=1&origin=2ca6077b-69b9-438f-a2b2-6b7f2b5edb50&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app"
+}

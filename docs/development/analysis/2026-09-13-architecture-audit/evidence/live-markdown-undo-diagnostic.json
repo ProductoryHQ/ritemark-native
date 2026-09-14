@@ -1,0 +1,94 @@
+{
+  "keys": [
+    {
+      "key": "z",
+      "code": "KeyZ",
+      "meta": true,
+      "ctrl": false
+    }
+  ],
+  "text": "Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.",
+  "messages": [
+    {
+      "type": "document:sync-state",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "state": "conflict",
+      "revision": 3,
+      "acknowledgedRevision": 3,
+      "conflictRevision": 1,
+      "diskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d"
+    },
+    {
+      "type": "document:sync-state",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "state": "applying",
+      "revision": 4,
+      "acknowledgedRevision": 3,
+      "attempt": 1,
+      "conflictRevision": 1,
+      "diskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d"
+    },
+    {
+      "type": "document:update",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "revision": 4,
+      "baseDiskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+      "modelHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+      "payloadHash": "1be4fd46b75d8770b895d8967a66742c196976d18a458859a7e5174a519dbc83",
+      "reason": "resolution",
+      "attempt": 1,
+      "payload": {
+        "fileType": "markdown",
+        "filename": "second.md",
+        "content": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.",
+        "properties": {},
+        "hasProperties": false,
+        "imageMappings": {},
+        "features": {
+          "voiceDictation": true,
+          "markdownExport": true,
+          "saveAsMarkdownFromPreview": true,
+          "commentCallouts": true
+        }
+      }
+    },
+    {
+      "type": "document:sync-state",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "state": "applying",
+      "revision": 4,
+      "acknowledgedRevision": 3,
+      "attempt": 1,
+      "conflictRevision": 1,
+      "diskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d"
+    },
+    {
+      "type": "document:sync-state",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "state": "conflict",
+      "revision": 4,
+      "acknowledgedRevision": 3,
+      "conflictRevision": 1,
+      "diskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d"
+    },
+    {
+      "type": "document:sync-state",
+      "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+      "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+      "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+      "state": "synced",
+      "revision": 4,
+      "acknowledgedRevision": 4
+    }
+  ]
+}

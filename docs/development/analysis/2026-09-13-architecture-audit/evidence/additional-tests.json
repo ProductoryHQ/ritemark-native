@@ -1,0 +1,81 @@
+{
+  "node": "22.22.1",
+  "method": "Actual tracked tests outside standard npm test, using the tsx require hook to avoid the CLI IPC listener. No global vscode stub is injected: tests must declare their own mock. ESM webview entries were rerun with the tsx ESM loader after the CommonJS hook could not resolve their imports.",
+  "results": [
+    {
+      "file": "extensions/ritemark/src/acp/acpKeyEnv.test.ts",
+      "exitCode": 0,
+      "log": "extra-acpKeyEnv.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/agent/installer.test.ts",
+      "exitCode": 0,
+      "log": "extra-installer.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/agent/setup.test.ts",
+      "exitCode": 0,
+      "log": "extra-setup.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/agent/windows-bootstrap.test.ts",
+      "status": "not-run",
+      "reason": "Requires actual Windows host"
+    },
+    {
+      "file": "extensions/ritemark/src/codex/codexManager.test.ts",
+      "exitCode": 0,
+      "log": "extra-codexManager.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/features/opencodeFlag.test.ts",
+      "exitCode": 0,
+      "log": "extra-opencodeFlag.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/flows/nodes/LLMNodeExecutor.integration.test.ts",
+      "status": "not-run",
+      "reason": "Live API integration intentionally not called; no new model request authorization needed for source audit"
+    },
+    {
+      "file": "extensions/ritemark/src/internalLinkResolver.test.ts",
+      "exitCode": 0,
+      "log": "extra-internalLinkResolver.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/runtime/BrowserToolsInjector.test.ts",
+      "exitCode": 0,
+      "log": "extra-BrowserToolsInjector.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/runtime/RuntimeRegistry.test.ts",
+      "exitCode": 0,
+      "log": "extra-RuntimeRegistry.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/src/workspaceFileLinks.test.ts",
+      "exitCode": 0,
+      "log": "extra-workspaceFileLinks.test.ts.log"
+    },
+    {
+      "file": "extensions/ritemark/webview/src/lib/linkTargets.test.ts",
+      "exitCode": 0,
+      "log": "esm-linkTargets.test.ts.log",
+      "firstAttempt": {
+        "exitCode": 1,
+        "reason": "CommonJS require hook does not resolve ESM entry imports",
+        "log": "extra-linkTargets.test.ts.log"
+      }
+    },
+    {
+      "file": "extensions/ritemark/webview/src/lib/mermaidExport.test.ts",
+      "exitCode": 0,
+      "log": "esm-mermaidExport.test.ts.log",
+      "firstAttempt": {
+        "exitCode": 1,
+        "reason": "CommonJS require hook does not resolve ESM entry imports",
+        "log": "extra-mermaidExport.test.ts.log"
+      }
+    }
+  ]
+}

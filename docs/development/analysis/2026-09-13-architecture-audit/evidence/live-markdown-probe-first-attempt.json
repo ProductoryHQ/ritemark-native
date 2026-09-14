@@ -1,0 +1,98 @@
+{
+  "method": "Actual audit extension in installed compatible macOS shell. Synthetic file; CDP Input.insertText simulates editor typing, Node fs writes simulate another actor. Driver reads actual VS Code document state.",
+  "steps": [
+    {
+      "stage": "initial",
+      "at": 1789293053749,
+      "host": {
+        "at": 1789293053748,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 1,
+            "dirty": false,
+            "length": 58,
+            "sha256": "df9cbd661dead293a415006d13ce3c8898404548abcbdf6fa052fa8676705507",
+            "text": "# Audit note\n\nBaseline paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nBaseline paragraph.\n\nStable selection area.",
+      "disk": "# Audit note\n\nBaseline paragraph.\n\nStable selection area.\n"
+    },
+    {
+      "stage": "clean-external-update",
+      "at": 1789293053955,
+      "visibleAfterMs": 205,
+      "host": {
+        "at": 1789293053954,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 2,
+            "dirty": false,
+            "length": 64,
+            "sha256": "f356d3e025fc23059a82cc39f63f9648fd4b18af77168c2dcffd5de973d992ca",
+            "text": "# Audit note\n\nEXTERNAL_CLEAN paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nEXTERNAL_CLEAN paragraph.\n\nStable selection area."
+    },
+    {
+      "stage": "error",
+      "at": 1789293061985,
+      "error": "Error: Condition not reached within 8000 ms; last value false\n    at waitFor (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/live-tools.mjs:40:9)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/live-markdown-probe.mjs:20:15"
+    }
+  ]
+}

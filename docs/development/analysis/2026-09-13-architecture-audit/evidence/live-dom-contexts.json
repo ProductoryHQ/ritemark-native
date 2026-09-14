@@ -1,0 +1,80 @@
+[
+  {
+    "targetId": "79980B67246496B9A09C3724E6A79CBA",
+    "contexts": [
+      {
+        "contextId": 2,
+        "name": "",
+        "origin": "vscode-webview://1btsld157idiue7an0raviml5niu5e5h6u38h762o24a2jehh4ls",
+        "result": {
+          "url": "vscode-webview://1btsld157idiue7an0raviml5niu5e5h6u38h762o24a2jehh4ls/index.html?id=f2928aab-c0e8-4fb9-be18-99d5f9afa6cb&parentId=1&origin=6c4a5390-a947-4b9c-8045-30233d419d74&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView",
+          "title": "Ritemark AI",
+          "prose": false,
+          "inputs": [
+            {
+              "tag": "TEXTAREA",
+              "role": null,
+              "placeholder": "Ask Claude... (type @ to mention an agent, / for commands)",
+              "classes": "block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            },
+            {
+              "tag": "INPUT",
+              "role": null,
+              "placeholder": null,
+              "classes": "hidden"
+            }
+          ],
+          "body": "Claude can work with your files\n\n\"Reorganize my research notes\"\n\"Create an outline from these files\"\n\"Find all mentions of X and summarize\"\nYou are interacting with AI\nClaude Code "
+        }
+      },
+      {
+        "contextId": 1,
+        "name": "",
+        "origin": "vscode-webview://1btsld157idiue7an0raviml5niu5e5h6u38h762o24a2jehh4ls",
+        "result": {
+          "url": "vscode-webview://1btsld157idiue7an0raviml5niu5e5h6u38h762o24a2jehh4ls/index.html?id=f2928aab-c0e8-4fb9-be18-99d5f9afa6cb&parentId=1&origin=6c4a5390-a947-4b9c-8045-30233d419d74&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView",
+          "title": "",
+          "prose": false,
+          "inputs": [],
+          "body": ""
+        }
+      }
+    ]
+  },
+  {
+    "targetId": "43ACCD1149B3AA125BDC4F55B6DBCB25",
+    "contexts": [
+      {
+        "contextId": 2,
+        "name": "",
+        "origin": "vscode-webview://0vc1ja2bum3bihabdjegjk7uql1o5dnh4gptju8d8vp06rnu1mf4",
+        "result": {
+          "url": "vscode-webview://0vc1ja2bum3bihabdjegjk7uql1o5dnh4gptju8d8vp06rnu1mf4/index.html?id=b31b3f87-be4f-44f3-9680-b06119ab7337&parentId=1&origin=e735f1e5-009e-48fa-8af3-418ff1627da2&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app",
+          "title": "Ritemark",
+          "prose": true,
+          "inputs": [
+            {
+              "tag": "DIV",
+              "role": null,
+              "placeholder": null,
+              "classes": "tiptap ProseMirror prose prose-lg max-w-none focus:outline-none"
+            }
+          ],
+          "body": "ET\nAudit note\n\nBaseline paragraph.\n\nStable selection area."
+        }
+      },
+      {
+        "contextId": 1,
+        "name": "",
+        "origin": "vscode-webview://0vc1ja2bum3bihabdjegjk7uql1o5dnh4gptju8d8vp06rnu1mf4",
+        "result": {
+          "url": "vscode-webview://0vc1ja2bum3bihabdjegjk7uql1o5dnh4gptju8d8vp06rnu1mf4/index.html?id=b31b3f87-be4f-44f3-9680-b06119ab7337&parentId=1&origin=e735f1e5-009e-48fa-8af3-418ff1627da2&swVersion=4&extensionId=ritemark.ritemark&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app",
+          "title": "",
+          "prose": false,
+          "inputs": [],
+          "body": ""
+        }
+      }
+    ]
+  }
+]

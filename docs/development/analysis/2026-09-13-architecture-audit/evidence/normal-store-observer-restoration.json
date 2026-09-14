@@ -1,0 +1,7 @@
+{
+  "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+  "originalDriverRestored": true,
+  "driverSha256": "05ace3994832ea9bff8527bd0cb428411efec394a31212ba7aa36a892e66d099",
+  "helperRemoved": true,
+  "afterVerifiedMainPidStopped": 21662
+}

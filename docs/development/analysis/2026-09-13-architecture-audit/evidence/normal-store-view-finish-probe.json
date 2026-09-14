@@ -1,0 +1,263 @@
+{
+  "method": "Complete only the UI observation after the storage experiment. The first attempt sent the projection during initial AI-view hydration and did not observe it; re-reading the same unchanged stored transcript after the view is ready succeeds. No storage race or seed is rerun.",
+  "at": 1789300703505,
+  "hostPids": [
+    16170,
+    18431
+  ],
+  "views": [
+    {
+      "hostPid": 16170,
+      "targetId": "E2DBBF716C297877EAE96D51CEA2F2B5",
+      "receivedRequestId": "audit-get-16170-1789300703519",
+      "record": {
+        "schemaVersion": 1,
+        "conversationId": "00000000-0000-4000-8000-a00600000004",
+        "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+        "scope": {
+          "kind": "no-folder",
+          "workspaceFileUri": null,
+          "folderUris": []
+        },
+        "title": "AUDIT shared-store fixture 4",
+        "identityColorSlot": 3,
+        "createdAt": "2026-09-13T11:56:03.787Z",
+        "lastActivityAt": "2026-09-13T11:56:03.787Z",
+        "revision": 3,
+        "bindingGeneration": 0,
+        "lifecycle": {
+          "state": "working",
+          "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000004"
+        },
+        "runtimeSummary": [
+          "codex"
+        ],
+        "events": [
+          {
+            "eventId": "audit-user-00000000-0000-4000-8000-a00600000004",
+            "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+            "sequence": 0,
+            "occurredAt": "2026-09-13T11:56:03.787Z",
+            "runtimeId": "codex",
+            "kind": "user-message",
+            "text": "Synthetic shared-store audit request; no native dispatch.",
+            "mode": "agent",
+            "attachments": [],
+            "thinkingEffort": "auto"
+          }
+        ],
+        "composerPreferences": {
+          "thinkingEffortByRuntime": {
+            "codex": "auto"
+          }
+        }
+      },
+      "userPromptVisible": true,
+      "assistantResultVisible": false,
+      "markdownContents": [],
+      "activityTexts": [
+        "You are interacting with AICodex · OpenAI · GPT-6-Astra. AI can be wrong—review its output and changes.What may be shared?Don’t show again"
+      ],
+      "composerExists": true
+    },
+    {
+      "hostPid": 18431,
+      "targetId": "C20EA5F564A5E28C18C9CD0E72EBF8B1",
+      "receivedRequestId": "audit-get-18431-1789300703531",
+      "record": {
+        "schemaVersion": 1,
+        "conversationId": "00000000-0000-4000-8000-a00600000004",
+        "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+        "scope": {
+          "kind": "no-folder",
+          "workspaceFileUri": null,
+          "folderUris": []
+        },
+        "title": "AUDIT shared-store fixture 4",
+        "identityColorSlot": 3,
+        "createdAt": "2026-09-13T11:56:03.787Z",
+        "lastActivityAt": "2026-09-13T11:56:03.787Z",
+        "revision": 3,
+        "bindingGeneration": 0,
+        "lifecycle": {
+          "state": "working",
+          "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000004"
+        },
+        "runtimeSummary": [
+          "codex"
+        ],
+        "events": [
+          {
+            "eventId": "audit-user-00000000-0000-4000-8000-a00600000004",
+            "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+            "sequence": 0,
+            "occurredAt": "2026-09-13T11:56:03.787Z",
+            "runtimeId": "codex",
+            "kind": "user-message",
+            "text": "Synthetic shared-store audit request; no native dispatch.",
+            "mode": "agent",
+            "attachments": [],
+            "thinkingEffort": "auto"
+          }
+        ],
+        "composerPreferences": {
+          "thinkingEffortByRuntime": {
+            "codex": "auto"
+          }
+        }
+      },
+      "userPromptVisible": true,
+      "assistantResultVisible": false,
+      "markdownContents": [],
+      "activityTexts": [
+        "You are interacting with AICodex · OpenAI · GPT-6-Astra. AI can be wrong—review its output and changes.What may be shared?Don’t show again"
+      ],
+      "composerExists": true
+    }
+  ],
+  "endInspectors": [
+    {
+      "hostPid": 16170,
+      "productModuleCached": true,
+      "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/out/extension.js",
+      "providerClass": "_UnifiedViewProvider",
+      "controllerClass": "ConversationController",
+      "storeClass": "ConversationStore",
+      "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage/ritemark.ritemark/conversations/v1",
+      "scope": {
+        "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+        "descriptor": {
+          "kind": "no-folder",
+          "workspaceFileUri": null,
+          "folderUris": []
+        }
+      },
+      "runtimeSessionCount": 0,
+      "interception": {
+        "stage": "released",
+        "conversationId": "00000000-0000-4000-8000-a00600000004",
+        "heldAt": 1789300563798,
+        "releasedAt": 1789300564748,
+        "releaseReason": "explicit-release",
+        "candidate": {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000004",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 4",
+          "identityColorSlot": 3,
+          "createdAt": "2026-09-13T11:56:03.787Z",
+          "lastActivityAt": "2026-09-13T11:56:03.798Z",
+          "revision": 2,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "idle"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000004",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.787Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            },
+            {
+              "eventId": "4d64a001-7330-4744-9134-d6550e686854",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+              "sequence": 1,
+              "occurredAt": "2026-09-13T11:56:03.796Z",
+              "runtimeId": "codex",
+              "kind": "assistant-message",
+              "content": "AUDIT SAVED ASSISTANT RESULT 4",
+              "terminalStatus": "completed",
+              "appliedThinkingEffort": null
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {}
+          }
+        }
+      }
+    },
+    {
+      "hostPid": 18431,
+      "productModuleCached": true,
+      "entry": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1/out/extension.js",
+      "providerClass": "_UnifiedViewProvider",
+      "controllerClass": "ConversationController",
+      "storeClass": "ConversationStore",
+      "baseDir": "/private/tmp/ritemark-audit-normal-bg5jgmun/store-profile/User/globalStorage/ritemark.ritemark/conversations/v1",
+      "scope": {
+        "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+        "descriptor": {
+          "kind": "no-folder",
+          "workspaceFileUri": null,
+          "folderUris": []
+        }
+      },
+      "runtimeSessionCount": 0,
+      "interception": {
+        "stage": "released",
+        "conversationId": "00000000-0000-4000-8000-a00600000004",
+        "heldAt": 1789300563796,
+        "releasedAt": 1789300564750,
+        "releaseReason": "explicit-release",
+        "candidate": {
+          "schemaVersion": 1,
+          "conversationId": "00000000-0000-4000-8000-a00600000004",
+          "scopeId": "ps1-21468c0b2df83829d3a250bd312e63d9e98a7cef",
+          "scope": {
+            "kind": "no-folder",
+            "workspaceFileUri": null,
+            "folderUris": []
+          },
+          "title": "AUDIT shared-store fixture 4",
+          "identityColorSlot": 3,
+          "createdAt": "2026-09-13T11:56:03.787Z",
+          "lastActivityAt": "2026-09-13T11:56:03.787Z",
+          "revision": 2,
+          "bindingGeneration": 0,
+          "lifecycle": {
+            "state": "working",
+            "activeTurnId": "audit-turn-00000000-0000-4000-8000-a00600000004"
+          },
+          "runtimeSummary": [
+            "codex"
+          ],
+          "events": [
+            {
+              "eventId": "audit-user-00000000-0000-4000-8000-a00600000004",
+              "turnId": "audit-turn-00000000-0000-4000-8000-a00600000004",
+              "sequence": 0,
+              "occurredAt": "2026-09-13T11:56:03.787Z",
+              "runtimeId": "codex",
+              "kind": "user-message",
+              "text": "Synthetic shared-store audit request; no native dispatch.",
+              "mode": "agent",
+              "attachments": [],
+              "thinkingEffort": "auto"
+            }
+          ],
+          "composerPreferences": {
+            "thinkingEffortByRuntime": {
+              "codex": "high"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "completed": true
+}

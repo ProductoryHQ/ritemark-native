@@ -1,0 +1,203 @@
+{
+  "method": "Ordinary workbench Command Palette > Undo, distinct from the editor-focused Cmd-Z. Continues after the first recorded palette Undo restored the independent control insertion.",
+  "steps": [
+    {
+      "stage": "before",
+      "at": 1789294135234,
+      "host": {
+        "at": 1789294135233,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 7,
+            "dirty": true,
+            "length": 108,
+            "sha256": "c322f85cca569904ca6c035fb5a5a47c0f30124620a94bc252fe5e1c973fa488",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area. UNDO CONTROL 1789294027889\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      }
+    },
+    {
+      "stage": "host-undo-1",
+      "at": 1789294135668,
+      "host": {
+        "at": 1789294135664,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 8,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.",
+      "disk": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+    },
+    {
+      "stage": "host-undo-2",
+      "at": 1789294136029,
+      "host": {
+        "at": 1789294136028,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 9,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED",
+      "disk": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+    }
+  ],
+  "priorLocalRecoveredThroughHostUndo": true,
+  "completed": true
+}

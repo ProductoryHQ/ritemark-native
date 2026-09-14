@@ -1,0 +1,273 @@
+{
+  "at": 1789299730710,
+  "method": "Actual production AI webview and CSP. CDP delivers synthetic conversation/get and approval messages through the existing MessageEvent listener. No model turn, native tool request or approval click. HTTPS audit.invalid images are intercepted and fulfilled with local PNG bytes before network; no external endpoint is contacted.",
+  "steps": [
+    {
+      "name": "baseline",
+      "at": 1789299730966,
+      "view": {
+        "csp": "default-src 'none'; style-src 'self' https://*.vscode-cdn.net 'unsafe-inline'; script-src 'nonce-kcz5VG9SeIGGXAKMZG0vHobqYFMsWrlr'; img-src 'self' https://*.vscode-cdn.net https: data:; font-src 'self' https://*.vscode-cdn.net data:;",
+        "stylesInContent": false,
+        "userStyleElementExists": false,
+        "userMarkupDisplayedAsText": true,
+        "richMarkdown": {
+          "heading": true,
+          "table": true,
+          "code": true
+        },
+        "composer": {
+          "tag": "TEXTAREA",
+          "text": "",
+          "background": "rgba(0, 0, 0, 0)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "block",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "approve": {
+          "tag": "BUTTON",
+          "text": "Approve",
+          "background": "rgb(67, 56, 202)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "reject": {
+          "tag": "BUTTON",
+          "text": "Reject",
+          "background": "rgb(255, 255, 255)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "httpsImage": null,
+        "inlineHandlerRan": false,
+        "inlineErrorRan": false,
+        "violations": []
+      },
+      "shell": {
+        "bodyBackground": "rgba(0, 0, 0, 0)",
+        "bodyOutline": "rgb(0, 0, 0) none 0px",
+        "auditStyleElement": false,
+        "visibleButtons": []
+      },
+      "screenshot": "formats-security-baseline.png"
+    },
+    {
+      "name": "assistant-html",
+      "at": 1789299731184,
+      "view": {
+        "csp": "default-src 'none'; style-src 'self' https://*.vscode-cdn.net 'unsafe-inline'; script-src 'nonce-kcz5VG9SeIGGXAKMZG0vHobqYFMsWrlr'; img-src 'self' https://*.vscode-cdn.net https: data:; font-src 'self' https://*.vscode-cdn.net data:;",
+        "stylesInContent": true,
+        "userStyleElementExists": false,
+        "userMarkupDisplayedAsText": true,
+        "richMarkdown": {
+          "heading": true,
+          "table": false,
+          "code": false
+        },
+        "composer": {
+          "tag": "TEXTAREA",
+          "text": "",
+          "background": "rgb(255, 235, 160)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "block",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "approve": {
+          "tag": "BUTTON",
+          "text": "Approve",
+          "background": "rgb(67, 56, 202)",
+          "outline": "rgb(235, 0, 200) solid 4px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "reject": {
+          "tag": "BUTTON",
+          "text": "Reject",
+          "background": "rgb(255, 255, 255)",
+          "outline": "rgb(235, 0, 200) solid 4px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "httpsImage": {
+          "complete": true,
+          "naturalWidth": 1,
+          "naturalHeight": 1,
+          "src": "https://audit.invalid/pixel.png?fixture=A08",
+          "onloadAttributePresent": true
+        },
+        "inlineHandlerRan": false,
+        "inlineErrorRan": false,
+        "violations": [
+          {
+            "effectiveDirective": "script-src-attr",
+            "violatedDirective": "script-src-attr",
+            "blockedURI": "inline",
+            "disposition": "enforce"
+          },
+          {
+            "effectiveDirective": "script-src-attr",
+            "violatedDirective": "script-src-attr",
+            "blockedURI": "inline",
+            "disposition": "enforce"
+          }
+        ]
+      },
+      "shell": {
+        "bodyBackground": "rgba(0, 0, 0, 0)",
+        "bodyOutline": "rgb(0, 0, 0) none 0px",
+        "auditStyleElement": false,
+        "visibleButtons": []
+      },
+      "screenshot": "formats-security-styled-controls.png"
+    },
+    {
+      "name": "restored-content",
+      "at": 1789299731192,
+      "view": {
+        "csp": "default-src 'none'; style-src 'self' https://*.vscode-cdn.net 'unsafe-inline'; script-src 'nonce-kcz5VG9SeIGGXAKMZG0vHobqYFMsWrlr'; img-src 'self' https://*.vscode-cdn.net https: data:; font-src 'self' https://*.vscode-cdn.net data:;",
+        "stylesInContent": false,
+        "userStyleElementExists": false,
+        "userMarkupDisplayedAsText": true,
+        "richMarkdown": {
+          "heading": true,
+          "table": true,
+          "code": true
+        },
+        "composer": {
+          "tag": "TEXTAREA",
+          "text": "",
+          "background": "rgba(0, 0, 0, 0)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "block",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "approve": {
+          "tag": "BUTTON",
+          "text": "Approve",
+          "background": "rgb(67, 56, 202)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "reject": {
+          "tag": "BUTTON",
+          "text": "Reject",
+          "background": "rgb(255, 255, 255)",
+          "outline": "rgba(0, 0, 0, 0) solid 2px",
+          "display": "flex",
+          "visible": true,
+          "insideRenderedMarkdown": false
+        },
+        "httpsImage": null,
+        "inlineHandlerRan": false,
+        "inlineErrorRan": false,
+        "violations": [
+          {
+            "effectiveDirective": "script-src-attr",
+            "violatedDirective": "script-src-attr",
+            "blockedURI": "inline",
+            "disposition": "enforce"
+          },
+          {
+            "effectiveDirective": "script-src-attr",
+            "violatedDirective": "script-src-attr",
+            "blockedURI": "inline",
+            "disposition": "enforce"
+          }
+        ]
+      },
+      "shell": {
+        "bodyBackground": "rgba(0, 0, 0, 0)",
+        "bodyOutline": "rgb(0, 0, 0) none 0px",
+        "auditStyleElement": false,
+        "visibleButtons": []
+      }
+    }
+  ],
+  "interceptions": [
+    {
+      "url": "https://audit.invalid/pixel.png?fixture=A08",
+      "resourceType": "Image",
+      "response": "local PNG; Fetch request-stage fulfillment"
+    }
+  ],
+  "network": [
+    {
+      "event": "requestWillBeSent",
+      "url": "https://audit.invalid/pixel.png?fixture=A08",
+      "type": "Image",
+      "initiatorType": "other"
+    }
+  ],
+  "host": {
+    "at": 1789299730713,
+    "hostPid": 4637,
+    "driverMode": 1,
+    "driverPath": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark-audit.ritemark-architecture-formats-driver-0.0.1",
+    "globalStorageRoot": "/private/tmp/ritemark-audit-formats-ksmj6md7/profile/User/globalStorage",
+    "workspaceFile": null,
+    "workspaceFolders": [
+      "file:///private/tmp/ritemark-audit-formats-ksmj6md7/workspace"
+    ],
+    "hotExit": "onExit",
+    "autoSave": "off",
+    "ritemark": {
+      "active": true,
+      "path": "/private/tmp/ritemark-audit-formats-ksmj6md7/extensions/ritemark.ritemark-1.10.1",
+      "version": "1.10.1"
+    },
+    "documents": [],
+    "tabs": [
+      {
+        "active": true,
+        "viewColumn": 1,
+        "tabs": []
+      }
+    ],
+    "terminals": [
+      "bash"
+    ]
+  },
+  "artifacts": {
+    "out/extension.js": {
+      "bytes": 4915383,
+      "sha256": "d8a4f5a0403f70aaf4941df2d84e57931a970b3e000af7e487c4d0a9736e15ff"
+    },
+    "media/webview.js": {
+      "bytes": 8844955,
+      "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+    },
+    "package.json": {
+      "bytes": 34089,
+      "sha256": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605"
+    }
+  },
+  "target": {
+    "id": "879A5924FFFC169323CE17C776DBCB67",
+    "contextId": 3
+  },
+  "fixture": {
+    "conversationId": "00000000-0000-4000-8000-00000000a008",
+    "userMarkup": "<style id=\"audit-user-only-style\">textarea { background-color: rgb(0,255,0) !important; }</style>",
+    "baselineContent": "### Synthetic renderer audit\n\n**Rich Markdown control** with `inline code`.\n\n| Column | Value |\n| --- | --- |\n| Local | 42 |",
+    "payload": "### Synthetic renderer audit\n\n<div id=\"audit-html-marker\">AUDIT HTML STYLE PROBE</div>\n<style id=\"audit-style\">button { outline: 4px solid rgb(235,0,200) !important; outline-offset: -4px !important; } textarea[aria-label=\"Message\"] { background-color: rgb(255,235,160) !important; }</style>\n<img id=\"audit-https-image\" src=\"https://audit.invalid/pixel.png?fixture=A08\" onload=\"window.__auditInlineHandlerRan=true\" alt=\"locally intercepted audit pixel\">\n<img id=\"audit-broken-image\" src=\"data:image/png;base64,broken\" onerror=\"window.__auditInlineErrorRan=true\" alt=\"deliberately invalid audit image\">",
+    "transport": "MessageEvent fixture at renderer listener; not real native-agent/host delivery"
+  },
+  "completed": true,
+  "limits": [
+    "Synthetic host-shaped MessageEvent fixture is not proof of host-message forgery or a native model turn.",
+    "Style effects proved within the AI webview, not across other webviews or the native workbench.",
+    "Remote image policy acceptance proved with local Fetch fulfillment, not DNS/TLS or a real remote transfer.",
+    "Inline event handlers were blocked; no script, privileged host API or OS-code execution demonstrated.",
+    "Approval component was synthetic and never clicked; backend authorization bypass was not tested or established."
+  ]
+}

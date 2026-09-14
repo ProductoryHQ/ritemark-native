@@ -1,0 +1,227 @@
+{
+  "method": "Normal-mode audit extension loaded from isolated extensions-dir. Real unsaved Markdown and XLSX UI edits, observed durable backup, CDP Browser.close, verified old PID termination, then same-profile launch. Reopen both documents, verify restored dirty views against unchanged disk, then ordinary Save. Shutdown is CDP-triggered, not a power-loss or native Quit test.",
+  "marker": "PERSISTENT HUMAN 1789295746665",
+  "excelMarker": "RECOVERED XLSX 1789295746665",
+  "steps": [
+    {
+      "stage": "markdown-unsaved",
+      "at": 1789295747547,
+      "host": {
+        "at": 1789295747546,
+        "hostPid": 52261,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 2,
+            "dirty": true,
+            "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+            "length": 79,
+            "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Normal mode audit\n\nUnsaved recovery baseline.\n"
+    },
+    {
+      "stage": "durable-backups-before-close",
+      "at": 1789295750352,
+      "host": {
+        "at": 1789295750345,
+        "hostPid": 52261,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 2,
+            "dirty": true,
+            "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+            "length": 79,
+            "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "terminals": [
+          "bash"
+        ]
+      },
+      "diskCell": "baseline",
+      "backups": [
+        {
+          "file": "Backups/2aa87b52af531e40f3b6bcfefd386a46/file/73d9caa9",
+          "bytes": 254,
+          "sha256": "d1604424567842a71fc94eb9bc81a441f1ea5fab45691bcaa33f2723f8a6574f",
+          "containsMarkdownMarker": true,
+          "header": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md {\"mtime\":1789295429445,\"ctime\":1789295429445,\"size\":48,\"etag\":\"3gl37g66j1h\",\"orphaned\":false,\"typeId\":\"\"}"
+        },
+        {
+          "file": "Backups/2aa87b52af531e40f3b6bcfefd386a46/vscode-custom-editor/46e3897",
+          "bytes": 1448,
+          "sha256": "a03b431a668ff17f55aa983db653502ba0c79fb0eb4b7f2fba47602bb991443a",
+          "containsMarkdownMarker": false,
+          "header": "vscode-custom-editor://ritemark-excelviewer/ZgBpAGwAZQA6AC8ALwAvAHAAcgBpAHYAYQB0AGUALwB0AG0AcAAvAHIAaQB0AGUAbQBhAHIAawAtAGEAdQBkAGkAdAAtAG4AbwByAG0AYQBsAC0AYgBnADUAagBnAG0AdQBuAC8AdwBvAHIAawBzAHAAYQBjAGUALwBiAG8AbwBrAC4AeABsAHMAeAA%3D?%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22external%22%3A%22file%3A%2F%2F%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22path%22%3A%22%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22scheme%22%3A%22file%22%7D {\"viewType\":\"ritemark.excelViewer\",\"editorResource\":{\"$mid\":1,\"fsPath\":\"/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx\",\"external\":\"file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/"
+        }
+      ]
+    },
+    {
+      "stage": "close-request",
+      "at": 1789295757401,
+      "responseError": "Error: CDP timeout: Browser.close"
+    },
+    {
+      "stage": "terminated",
+      "at": 1789295757450,
+      "oldPid": 52041,
+      "backups": [
+        {
+          "file": "Backups/2aa87b52af531e40f3b6bcfefd386a46/file/73d9caa9",
+          "bytes": 254,
+          "sha256": "d1604424567842a71fc94eb9bc81a441f1ea5fab45691bcaa33f2723f8a6574f",
+          "containsMarkdownMarker": true,
+          "header": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md {\"mtime\":1789295429445,\"ctime\":1789295429445,\"size\":48,\"etag\":\"3gl37g66j1h\",\"orphaned\":false,\"typeId\":\"\"}"
+        },
+        {
+          "file": "Backups/2aa87b52af531e40f3b6bcfefd386a46/vscode-custom-editor/46e3897",
+          "bytes": 1448,
+          "sha256": "a03b431a668ff17f55aa983db653502ba0c79fb0eb4b7f2fba47602bb991443a",
+          "containsMarkdownMarker": false,
+          "header": "vscode-custom-editor://ritemark-excelviewer/ZgBpAGwAZQA6AC8ALwAvAHAAcgBpAHYAYQB0AGUALwB0AG0AcAAvAHIAaQB0AGUAbQBhAHIAawAtAGEAdQBkAGkAdAAtAG4AbwByAG0AYQBsAC0AYgBnADUAagBnAG0AdQBuAC8AdwBvAHIAawBzAHAAYQBjAGUALwBiAG8AbwBrAC4AeABsAHMAeAA%3D?%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22external%22%3A%22file%3A%2F%2F%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22path%22%3A%22%2Fprivate%2Ftmp%2Fritemark-audit-normal-bg5jgmun%2Fworkspace%2Fbook.xlsx%22%2C%22scheme%22%3A%22file%22%7D {\"viewType\":\"ritemark.excelViewer\",\"editorResource\":{\"$mid\":1,\"fsPath\":\"/private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx\",\"external\":\"file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/"
+        }
+      ]
+    },
+    {
+      "stage": "relaunched",
+      "at": 1789295757483,
+      "pid": 54023,
+      "launchedAt": 1789295757483,
+      "runDir": "/private/tmp/ritemark-audit-normal-bg5jgmun"
+    },
+    {
+      "stage": "markdown-restored",
+      "at": 1789295760229,
+      "host": {
+        "at": 1789295760228,
+        "hostPid": 54235,
+        "driverMode": 1,
+        "driverPath": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark-audit.ritemark-architecture-normal-driver-0.0.1",
+        "globalStorageRoot": "/private/tmp/ritemark-audit-normal-bg5jgmun/profile/User/globalStorage",
+        "workspaceFile": null,
+        "workspaceFolders": [
+          "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace"
+        ],
+        "hotExit": "onExit",
+        "autoSave": "off",
+        "ritemark": {
+          "active": true,
+          "path": "/private/tmp/ritemark-audit-normal-bg5jgmun/extensions/ritemark.ritemark-1.10.1",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 1,
+            "dirty": true,
+            "text": "# Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665\n",
+            "length": 79,
+            "sha256": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-normal-bg5jgmun/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          }
+        ],
+        "terminals": []
+      },
+      "visible": "Normal mode audit\n\nUnsaved recovery baseline. PERSISTENT HUMAN 1789295746665",
+      "disk": "# Normal mode audit\n\nUnsaved recovery baseline.\n"
+    },
+    {
+      "stage": "error",
+      "at": 1789295775300,
+      "error": "Error: Matching normal-mode webview not found: !!document.querySelector(\"td[title=\"RECOVERED XLSX 1789295746665\"]\")\n    at findWebview (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-tools.mjs:33:8)\n    at runNextTicks (node:internal/process/task_queues:64:5)\n    at process.processTimers (node:internal/timers:518:9)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/normal-recovery-probe.mjs?run=1789295746607:51:4"
+    }
+  ]
+}

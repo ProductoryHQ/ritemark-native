@@ -1,0 +1,968 @@
+{
+  "method": "Actual two split custom-editor views of the same synthetic Markdown document in one extension host. View-two input, peer delivery, external conflict to both views, Keep my version, and one-view disposal. This is not a two-window or cross-process test.",
+  "steps": [
+    {
+      "stage": "split-open",
+      "at": 1789294223389,
+      "host": {
+        "at": 1789294223388,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 9,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": false,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": true,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "targets": [
+        "691DC18C4D05471E39F548C6360F9BEB",
+        "C190B4B4C195B255A62DD310E3D852D1"
+      ],
+      "views": [
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED",
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED"
+      ]
+    },
+    {
+      "stage": "peer-edit",
+      "at": 1789294223502,
+      "observedWithinMs": 111,
+      "host": {
+        "at": 1789294223501,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": true,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": false,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": true,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "views": [
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832"
+      ]
+    },
+    {
+      "stage": "two-view-conflict",
+      "at": 1789294223716,
+      "host": {
+        "at": 1789294223714,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": true,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": false,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": true,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# EXTERNAL SPLIT 1789294223502\n\nSeparate actor version.\n",
+      "views": [
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832"
+      ]
+    },
+    {
+      "stage": "keep-local-clean",
+      "at": 1789294223845,
+      "host": {
+        "at": 1789294223842,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": false,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": false,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n",
+      "views": [
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+        "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832"
+      ],
+      "messages": [
+        [
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9,
+            "attempt": 1
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "revision": 10,
+            "baseDiskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "peer-edit",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9,
+            "attempt": 1
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "local-only",
+            "revision": 10,
+            "acknowledgedRevision": 10
+          },
+          {
+            "type": "document:conflict",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "conflictRevision": 2,
+            "revision": 10,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6",
+            "filename": "second.md"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "conflict",
+            "revision": 10,
+            "acknowledgedRevision": 10,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "revision": 11,
+            "baseDiskHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "resolution",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "revision": 11,
+            "baseDiskHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "open",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:conflict",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "conflictRevision": 2,
+            "revision": 11,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6",
+            "filename": "second.md"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "conflict",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "conflict",
+            "revision": 11,
+            "acknowledgedRevision": 11,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "5aca9a0b-39a6-4cd6-b760-8cd2b240cf1b",
+            "state": "synced",
+            "revision": 11,
+            "acknowledgedRevision": 11
+          }
+        ],
+        [
+          {
+            "type": "document:edit-result",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "clientSequence": 1,
+            "status": "accepted",
+            "revision": 10,
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9,
+            "attempt": 1
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "revision": 10,
+            "baseDiskHash": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "peer-edit",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9,
+            "attempt": 1
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 10,
+            "acknowledgedRevision": 9
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "local-only",
+            "revision": 10,
+            "acknowledgedRevision": 10
+          },
+          {
+            "type": "document:conflict",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "conflictRevision": 2,
+            "revision": 10,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6",
+            "filename": "second.md"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "conflict",
+            "revision": 10,
+            "acknowledgedRevision": 10,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "revision": 11,
+            "baseDiskHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "resolution",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:update",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "revision": 11,
+            "baseDiskHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "modelHash": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "payloadHash": "7973084cc351d4c6fadf6d06c6321c30a0deeaf56d518192d4b74a430e54d7e0",
+            "reason": "open",
+            "attempt": 1,
+            "payload": {
+              "fileType": "markdown",
+              "filename": "second.md",
+              "content": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832",
+              "properties": {},
+              "hasProperties": false,
+              "imageMappings": {},
+              "features": {
+                "voiceDictation": true,
+                "markdownExport": true,
+                "saveAsMarkdownFromPreview": true,
+                "commentCallouts": true
+              }
+            }
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "applying",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "attempt": 1,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:conflict",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "conflictRevision": 2,
+            "revision": 11,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6",
+            "filename": "second.md"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "conflict",
+            "revision": 11,
+            "acknowledgedRevision": 10,
+            "conflictRevision": 2,
+            "diskHash": "f1a2b507f77a52ef205b0155b2dcc66aa0a332a5404fdd7bea260d34a176bbe6"
+          },
+          {
+            "type": "document:sync-state",
+            "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+            "documentSessionId": "fe0f0654-9990-4cb8-9f5d-0820d6508f42",
+            "viewEpoch": "029521b0-3ca8-44d7-93e3-6e8d5db323a6",
+            "state": "synced",
+            "revision": 11,
+            "acknowledgedRevision": 11
+          }
+        ]
+      ]
+    },
+    {
+      "stage": "one-view-close",
+      "at": 1789294223924,
+      "before": {
+        "at": 1789294223917,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": false,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": false,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": false,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "after": {
+        "at": 1789294223923,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 10,
+            "dirty": false,
+            "length": 116,
+            "sha256": "66e747c7d031542df9529ae5e816290ff288aa13832ba3d7fa3bdc01ea5da685",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "book.xlsx",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/book.xlsx",
+                "viewType": "ritemark.excelViewer"
+              }
+            ]
+          },
+          {
+            "active": false,
+            "viewColumn": 2,
+            "tabs": [
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "targets": [
+        {
+          "id": "5967210D62D193A111B95EF07629008B",
+          "type": "page"
+        },
+        {
+          "id": "79980B67246496B9A09C3724E6A79CBA",
+          "type": "iframe"
+        },
+        {
+          "id": "43ACCD1149B3AA125BDC4F55B6DBCB25",
+          "type": "iframe"
+        },
+        {
+          "id": "05950EFB07667CA26151294DA1B3B3C9",
+          "type": "iframe"
+        },
+        {
+          "id": "C190B4B4C195B255A62DD310E3D852D1",
+          "type": "iframe"
+        },
+        {
+          "id": "09C8E3FC52740A374829D1E051B105C0",
+          "type": "service_worker"
+        },
+        {
+          "id": "9CE2183E6E823694A808CAC8D0B61D4D",
+          "type": "worker"
+        }
+      ],
+      "disk": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED PEER EDIT 1789294222832\n"
+    }
+  ],
+  "completed": true
+}

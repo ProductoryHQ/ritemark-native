@@ -1,0 +1,194 @@
+{
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "method": "Actual source client/manager and bundled darwin-arm64 binary. Explicit discovery root, fake VS Code configuration, isolated child profile/environment. Real 300 ms RPC deadline and owned-child SIGSTOP/SIGCONT/SIGKILL. No login, model turn, user file tool or network-dependent RPC.",
+  "fixture": "/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/ritemark-audit-native-AqlzXZ",
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v22.22.1",
+  "events": [
+    {
+      "atMs": 273,
+      "kind": "child-spawn",
+      "pid": 72045,
+      "args": []
+    },
+    {
+      "atMs": 376,
+      "kind": "rpc:request",
+      "message": "initialize",
+      "id": 1
+    },
+    {
+      "atMs": 378,
+      "kind": "app-server",
+      "message": "initialized"
+    },
+    {
+      "atMs": 378,
+      "kind": "rpc:request",
+      "message": "thread/list",
+      "id": 2
+    },
+    {
+      "atMs": 431,
+      "kind": "rpc:request",
+      "message": "thread/list",
+      "id": 3
+    },
+    {
+      "atMs": 734,
+      "kind": "rpc:request",
+      "message": "thread/list",
+      "id": 4
+    },
+    {
+      "atMs": 785,
+      "kind": "rpc:request",
+      "message": "thread/list",
+      "id": 5
+    },
+    {
+      "atMs": 789,
+      "kind": "child-exit",
+      "pid": 72045,
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    {
+      "atMs": 789,
+      "kind": "app-server",
+      "message": "exit"
+    },
+    {
+      "atMs": 789,
+      "kind": "rpc:error",
+      "message": "thread/list"
+    },
+    {
+      "atMs": 789,
+      "kind": "client-exit",
+      "code": null
+    },
+    {
+      "atMs": 804,
+      "kind": "child-spawn",
+      "pid": 72053,
+      "args": []
+    },
+    {
+      "atMs": 906,
+      "kind": "rpc:request",
+      "message": "initialize",
+      "id": 6
+    },
+    {
+      "atMs": 906,
+      "kind": "app-server",
+      "message": "initialized"
+    },
+    {
+      "atMs": 906,
+      "kind": "rpc:request",
+      "message": "thread/list",
+      "id": 7
+    },
+    {
+      "atMs": 909,
+      "kind": "child-exit",
+      "pid": 72053,
+      "code": null,
+      "signal": "SIGTERM"
+    },
+    {
+      "atMs": 909,
+      "kind": "app-server",
+      "message": "exit"
+    }
+  ],
+  "children": [
+    {
+      "pid": 72045,
+      "binaryPath": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server",
+      "args": [],
+      "exited": true,
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    {
+      "pid": 72053,
+      "binaryPath": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server",
+      "args": [],
+      "exited": true,
+      "code": null,
+      "signal": "SIGTERM"
+    }
+  ],
+  "cases": [
+    {
+      "name": "concurrent initialization",
+      "passed": true,
+      "callers": 3,
+      "childCount": 1,
+      "initializeRequests": 1
+    },
+    {
+      "name": "isolated native JSON-RPC read",
+      "passed": true,
+      "persistedThreads": 0
+    },
+    {
+      "name": "paused native child RPC timeout and resumed read",
+      "passed": true,
+      "deadlineElapsedMs": 302,
+      "timeoutResult": {
+        "ok": false,
+        "error": "RPC call 'thread/list' timed out after 300ms"
+      },
+      "pendingRequestsAfterTimeout": 0,
+      "lateReplyDoesNotCorruptNextRead": true
+    },
+    {
+      "name": "native crash with outstanding RPC, then reinitialize",
+      "passed": true,
+      "killedPid": 72045,
+      "replacementPid": 72053,
+      "pendingResult": {
+        "ok": false,
+        "error": "Codex app-server exited unexpectedly"
+      },
+      "pendingRequestsAfterExit": 0
+    },
+    {
+      "name": "normal native dispose",
+      "passed": true,
+      "logicalStoppedImmediately": true,
+      "observedExitWithinMs": 22,
+      "code": null,
+      "signal": "SIGTERM"
+    }
+  ],
+  "completed": true,
+  "binary": {
+    "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark/binaries/agents/darwin-arm64/codex-app-server",
+    "bytes": 171629600,
+    "sha256": "2c965118276888af7b3ca525ad41d800d24ca3d00ffcdb6874cc948100718570",
+    "status": {
+      "available": true,
+      "runnable": true,
+      "version": "0.153.0",
+      "runtimeSource": "bundled",
+      "launchMode": "codex-app-server",
+      "compatibility": {
+        "state": "compatible",
+        "summary": "Codex lifecycle capabilities detected.",
+        "capabilities": {
+          "approvals": true,
+          "requestUserInput": true,
+          "planUpdates": true
+        },
+        "limitations": []
+      }
+    }
+  },
+  "allOwnedChildrenExited": true
+}

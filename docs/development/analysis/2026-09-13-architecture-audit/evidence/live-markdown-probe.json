@@ -1,0 +1,310 @@
+{
+  "method": "Actual audit extension in installed compatible macOS shell. Synthetic file; CDP Input.insertText simulates editor typing, Node fs writes simulate another actor. Driver reads actual VS Code document state.",
+  "steps": [
+    {
+      "stage": "initial",
+      "at": 1789293525491,
+      "host": {
+        "at": 1789293525490,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 1,
+            "dirty": false,
+            "length": 47,
+            "sha256": "aa6bf467c4b90e968051e6b9a3ed78eb2e278a44c5ba2f3cf49d3eb81f247952",
+            "text": "# Second audit document\n\nIndependent document.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Second audit document\n\nIndependent document.",
+      "disk": "# Second audit document\n\nIndependent document.\n"
+    },
+    {
+      "stage": "clean-external-update",
+      "at": 1789293525701,
+      "visibleAfterMs": 208,
+      "host": {
+        "at": 1789293525700,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 2,
+            "dirty": false,
+            "length": 78,
+            "sha256": "7bc4920806720a675562fb4e73c2bfaa4fa74343dbda04f8531958432786f81f",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": false,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area."
+    },
+    {
+      "stage": "human-unsaved",
+      "at": 1789293525711,
+      "host": {
+        "at": 1789293525709,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 3,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "visible": "Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED",
+      "disk": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area.\n"
+    },
+    {
+      "stage": "conflict-preserves-both",
+      "at": 1789293525818,
+      "host": {
+        "at": 1789293525817,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 3,
+            "dirty": true,
+            "length": 92,
+            "sha256": "07ff582c22313e26571ab55f4762834c974e5b8e3c9c91ce99bc64db235de359",
+            "text": "# Audit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n",
+      "visible": "ET\nReview changes\nReview changes\nAudit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED"
+    },
+    {
+      "stage": "conflict-dialog",
+      "at": 1789293525831,
+      "visible": "ET\nReview changes\nReview changes\nAudit note\n\nEXTERNAL CLEAN 1789293524852 paragraph.\n\nStable selection area. HUMAN UNSAVED\n\nDocument changed in two places\n\nYour edits and the disk version of second.md both changed.\n\nRitemark has preserved both versions. Compare them first, keep your version, or replace it with the disk version.\n\nCompare changes\nUse disk version\nKeep my version"
+    },
+    {
+      "stage": "use-disk",
+      "at": 1789293526049,
+      "host": {
+        "at": 1789293526048,
+        "hostPid": 879,
+        "ritemark": {
+          "active": true,
+          "path": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/extensions/ritemark",
+          "version": "1.10.1"
+        },
+        "documents": [
+          {
+            "file": "note.md",
+            "version": 6,
+            "dirty": true,
+            "length": 67,
+            "sha256": "3f5580c388d4701ea4941087d4a9f080b8e7198c487fa400ca0273885f9ea87a",
+            "text": "# Audit note\n\nEXTERNAL_CONFLICT paragraph.\n\nStable selection area.\n"
+          },
+          {
+            "file": "second.md",
+            "version": 4,
+            "dirty": true,
+            "length": 81,
+            "sha256": "ea71fb7cb5f94453562048908ff3fa81aed4dc6b373b5bf2f0858c7afd48926d",
+            "text": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n"
+          }
+        ],
+        "tabs": [
+          {
+            "active": true,
+            "viewColumn": 1,
+            "tabs": [
+              {
+                "label": "note.md",
+                "active": false,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/note.md",
+                "viewType": "ritemark.editor"
+              },
+              {
+                "label": "second.md",
+                "active": true,
+                "dirty": true,
+                "uri": "file:///private/tmp/ritemark-audit-live-7jr9i09j/workspace/second.md",
+                "viewType": "ritemark.editor"
+              }
+            ]
+          }
+        ],
+        "activeTerminal": "bash",
+        "terminals": [
+          "bash"
+        ]
+      },
+      "disk": "# Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area.\n",
+      "visible": "Audit note\n\nEXTERNAL CONFLICT 1789293524852 paragraph.\n\nStable selection area."
+    },
+    {
+      "stage": "error",
+      "at": 1789293534151,
+      "error": "Error: Condition not reached within 8000 ms; last value false\n    at waitFor (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/live-tools.mjs:40:9)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/architecture-audit/docs/development/analysis/2026-09-13-architecture-audit/evidence/live-markdown-probe.mjs?run=1789293524848:47:3"
+    }
+  ]
+}

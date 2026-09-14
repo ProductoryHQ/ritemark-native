@@ -1,0 +1,9 @@
+
+> ritemark-webview@0.1.0 postinstall
+> patch-package
+
+patch-package 8.0.1
+Applying patches...
+@tiptap/core@2.27.2 ✔
+
+added 514 packages in 19s

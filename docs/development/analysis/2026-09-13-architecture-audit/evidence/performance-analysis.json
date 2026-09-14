@@ -1,0 +1,384 @@
+{
+  "method": "Final timing sample is a fresh app process with no Profiler/precise coverage enabled. Profile/coverage captures are a separate previous process and are not timing controls. Rechecks visible actual inner frames, pre-fetch metrics, exact code/fixture hashes, CDP target lifecycle, raw profile/coverage and verified shutdown.",
+  "baseline": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.5.0",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 14,
+    "totalMemory": 25769803776
+  },
+  "browser": {
+    "Browser": "Chrome/142.0.7444.265",
+    "Protocol-Version": "1.3",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Ritemark/1.117.0 Chrome/142.0.7444.265 Electron/39.8.7 Safari/537.36",
+    "V8-Version": "14.2.231.22",
+    "WebKit-Version": "537.36 (@d338888ca0a7c26fddcfb09a503db016a13a972b)"
+  },
+  "measurementPid": 30867,
+  "profilePid": 98767,
+  "rates": {
+    "1": {
+      "trials": [
+        1,
+        4,
+        5
+      ],
+      "openToReadyMs": {
+        "min": 465,
+        "median": 469,
+        "max": 648
+      },
+      "scriptMs": {
+        "min": 297.442,
+        "median": 301.24399999999997,
+        "max": 326.93
+      },
+      "mainTaskMs": {
+        "min": 307.278,
+        "median": 311.77099999999996,
+        "max": 357.024
+      },
+      "compileMetricMs": {
+        "min": 0.136,
+        "median": 0.15,
+        "max": 0.159
+      },
+      "resourceMs": {
+        "min": 86.79999995231628,
+        "median": 87.70000004768372,
+        "max": 96.29999995231628
+      },
+      "longestTaskMs": {
+        "min": 267,
+        "median": 273,
+        "max": 287
+      },
+      "scriptShareOfTask": {
+        "min": 0.9157087478712915,
+        "median": 0.9662348326175302,
+        "max": 0.9679898983981932
+      }
+    },
+    "4": {
+      "trials": [
+        2,
+        3,
+        6
+      ],
+      "openToReadyMs": {
+        "min": 1513,
+        "median": 1523,
+        "max": 1535
+      },
+      "scriptMs": {
+        "min": 1335.5,
+        "median": 1346.2040000000002,
+        "max": 1359.6779999999999
+      },
+      "mainTaskMs": {
+        "min": 1386.4930000000002,
+        "median": 1387.663,
+        "max": 1392.701
+      },
+      "compileMetricMs": {
+        "min": 0.116,
+        "median": 0.8220000000000001,
+        "max": 1.239
+      },
+      "resourceMs": {
+        "min": 90.5,
+        "median": 91.5,
+        "max": 92.70000004768372
+      },
+      "longestTaskMs": {
+        "min": 1192,
+        "median": 1207,
+        "max": 1230
+      },
+      "scriptShareOfTask": {
+        "min": 0.9632215957815868,
+        "median": 0.9701231494966718,
+        "max": 0.9762885213696263
+      }
+    }
+  },
+  "profiles": [
+    {
+      "rate": 1,
+      "metricsBeforeBundleRequest": true,
+      "profilerBeforeBundleRequest": true,
+      "profileFile": "normal-performance-profile-trial-1.cpuprofile",
+      "coverageFile": "normal-performance-profile-trial-1-coverage.json",
+      "sampleCount": 335,
+      "rootExecutionCount": 1,
+      "functionCount": 33194,
+      "calledFunctionCount": 4415,
+      "executedUtf16Units": 2484607,
+      "executedFraction": 0.2812633154247238,
+      "leafSampleMs": {
+        "bundle": 182.57,
+        "idle": 161.853,
+        "program": 30.086,
+        "gc": 15.143,
+        "other": 11.122
+      },
+      "topBundleFrames": [
+        {
+          "functionName": "l",
+          "line": 2901,
+          "column": 2587,
+          "selfSampleMs": 12.148,
+          "sourceSnippet": "(f,g){if(!a[f]){if(!r[f]){var m=typeof nP==\"function\"&&nP;if(!g&&m)return m(f,!0);if(u)return u(f,!0);var y=new Error(\"Cannot find module '\"+f+\"'\");throw y.code=\"MODULE_NOT_FOUND\",y}var b=a[f]={exports:{}};r[f][0].call(b.exports,function(w)"
+        },
+        {
+          "functionName": "",
+          "line": 1,
+          "column": 731,
+          "selfSampleMs": 10.755,
+          "sourceSnippet": "(){\"use strict\";var eG,ZUt,Ejr,aN,YYe,QUt,Bye,VF,WF,Y5,Z5,$ye,GF,vre,yre,jye,_Fe,Cjr,hy,Sjr,Ajr,ofe,IEe,Uye,nG,oN,lN,_jr,Djr,JUt,DFe,bre,zye,$b,xre,ZYe,q1,qF,Hye,yp,MFe,Mjr,wre,d8,kre,o1,Fm,Ere,Q5,Tre,J5,jb,KF,XF,Cre,YF,N7,eE,rG,Vye,Wye,Sre"
+        },
+        {
+          "functionName": "updateStateInner",
+          "line": 49,
+          "column": 44785,
+          "selfSampleMs": 7.694,
+          "sourceSnippet": "(e,n){var r;let a=this.state,o=!1,l=!1;e.storedMarks&&this.composing&&(EKt(this),l=!0),this.state=e;let u=a.plugins!=e.plugins||this._props.plugins!=n.plugins;if(u||this._props.plugins!=n.plugins||this._props.nodeViews!=n.nodeViews){let b=$"
+        },
+        {
+          "functionName": "N",
+          "line": 158,
+          "column": 3046,
+          "selfSampleMs": 5.022,
+          "sourceSnippet": "(Z,Y){let K=null;try{K=Y(t)}catch(J){if(Cz(\"Language definition for '{}' could not be registered.\".replace(\"{}\",Z)),a)Cz(J);else throw J;K=l}K.name||(K.name=Z),e[Z]=K,K.rawDefinition=Y.bind(null,t),K.aliases&&U(K.aliases,{languageName:Z})}f"
+        },
+        {
+          "functionName": "C0t",
+          "line": 3130,
+          "column": 33751,
+          "selfSampleMs": 4.862,
+          "sourceSnippet": "(t,e){try{const n=Intl.DisplayNames;return n?new n(e,{type:\"language\",fallback:\"none\"}).of(t):void 0}catch{return}}function Lsa(t){const e=C0t(t,\"en\")??t.toUpperCase(),n=Isa[t]??C0t(t,t);return{id:t,code:t,label:e,...n&&rte(n)!==rte(e)?{nat"
+        },
+        {
+          "functionName": "updateStateInner",
+          "line": 49,
+          "column": 44785,
+          "selfSampleMs": 3.805,
+          "sourceSnippet": "(e,n){var r;let a=this.state,o=!1,l=!1;e.storedMarks&&this.composing&&(EKt(this),l=!0),this.state=e;let u=a.plugins!=e.plugins||this._props.plugins!=n.plugins;if(u||this._props.plugins!=n.plugins||this._props.nodeViews!=n.nodeViews){let b=$"
+        },
+        {
+          "functionName": "TRACE_INIT",
+          "line": 4182,
+          "column": 407,
+          "selfSampleMs": 3.788,
+          "sourceSnippet": "(e,n){if(this.traceInitPerf===!0){this.traceInitIndent++;const r=new Array(this.traceInitIndent+1).join(\"\t\");this.traceInitIndent<this.traceInitMaxIdent&&console.log(`${r}--> <${e}>`);const{time:a,value:o}=ubt(n),l=a>10?console.warn:console"
+        },
+        {
+          "functionName": "",
+          "line": 1,
+          "column": 1,
+          "selfSampleMs": 3.763,
+          "sourceSnippet": "var ams=Object.defineProperty;var yjr=ad=>{throw TypeError(ad)};var sms=(ad,sd,N1)=>sd in ad?ams(ad,sd,{enumerable:!0,configurable:!0,writable:!0,value:N1}):ad[sd]=N1;var mr=(ad,sd,N1)=>sms(ad,typeof sd!=\"symbol\"?sd+\"\":sd,N1),HUt=(ad,sd,N1)"
+        },
+        {
+          "functionName": "ne",
+          "line": 2905,
+          "column": 108973,
+          "selfSampleMs": 2.525,
+          "sourceSnippet": "(i,s,h){var p=rke,v,x=p[i],A=x instanceof Array?x[0]:null;x&&!A?S=x:(S=(v=s&&s.prototype,!v&&(v=rke[s]),BGa(v)),S.Sm=h,!s&&(S.Tm=X),p[i]=S);for(var M=3;M<arguments.length;++M)arguments[M].prototype=S;A&&(S.Rm=A)}function oi(i){for(var s;!E("
+        },
+        {
+          "functionName": "",
+          "line": 4177,
+          "column": 1443,
+          "selfSampleMs": 2.51,
+          "sourceSnippet": "()=>{const e=this;for(let n=0;n<10;n++){const r=n>0?n:\"\";delete e[`CONSUME${r}`],delete e[`SUBRULE${r}`],delete e[`OPTION${r}`],delete e[`OR${r}`],delete e[`MANY${r}`],delete e[`MANY_SEP${r}`],delete e[`AT_LEAST_ONE${r}`],delete e[`AT_LEAST"
+        },
+        {
+          "functionName": "A8n",
+          "line": 2926,
+          "column": 481,
+          "selfSampleMs": 2.505,
+          "sourceSnippet": "t=>{let e;const n=new Set,r=(f,g)=>{const m=typeof f==\"function\"?f(e):f;if(!Object.is(m,e)){const y=e;e=g??(typeof m!=\"object\"||m===null)?m:Object.assign({},e,m),n.forEach(b=>b(e,y))}},a=()=>e,u={setState:r,getState:a,getInitialState:()=>d,"
+        },
+        {
+          "functionName": "a",
+          "line": 4087,
+          "column": 440,
+          "selfSampleMs": 2.485,
+          "sourceSnippet": "(){let o=\"\",l;function u(f){o+=n.substr(r,f),r+=f}le(u,\"appendRaw\");function d(f){o+=\"(?:\"+n.substr(r,f)+\"|$)\",r+=f}for(le(d,\"appendOptional\");r<n.length;)switch(n[r]){case\"\\\\\":switch(n[r+1]){case\"c\":d(3);break;case\"x\":d(4);break;case\"u\":e."
+        }
+      ]
+    },
+    {
+      "rate": 4,
+      "metricsBeforeBundleRequest": false,
+      "profilerBeforeBundleRequest": false,
+      "profileFile": "normal-performance-profile-trial-2.cpuprofile",
+      "coverageFile": "normal-performance-profile-trial-2-coverage.json",
+      "sampleCount": 1684,
+      "rootExecutionCount": 1,
+      "functionCount": 33194,
+      "calledFunctionCount": 4415,
+      "executedUtf16Units": 2484617,
+      "executedFraction": 0.28126444744807977,
+      "leafSampleMs": {
+        "bundle": 735.854,
+        "idle": 44.386,
+        "program": 1364.185,
+        "gc": 36.578,
+        "other": 29.846999999999994
+      },
+      "topBundleFrames": [
+        {
+          "functionName": "",
+          "line": 1,
+          "column": 731,
+          "selfSampleMs": 74.326,
+          "sourceSnippet": "(){\"use strict\";var eG,ZUt,Ejr,aN,YYe,QUt,Bye,VF,WF,Y5,Z5,$ye,GF,vre,yre,jye,_Fe,Cjr,hy,Sjr,Ajr,ofe,IEe,Uye,nG,oN,lN,_jr,Djr,JUt,DFe,bre,zye,$b,xre,ZYe,q1,qF,Hye,yp,MFe,Mjr,wre,d8,kre,o1,Fm,Ere,Q5,Tre,J5,jb,KF,XF,Cre,YF,N7,eE,rG,Vye,Wye,Sre"
+        },
+        {
+          "functionName": "l",
+          "line": 2901,
+          "column": 2587,
+          "selfSampleMs": 59.26,
+          "sourceSnippet": "(f,g){if(!a[f]){if(!r[f]){var m=typeof nP==\"function\"&&nP;if(!g&&m)return m(f,!0);if(u)return u(f,!0);var y=new Error(\"Cannot find module '\"+f+\"'\");throw y.code=\"MODULE_NOT_FOUND\",y}var b=a[f]={exports:{}};r[f][0].call(b.exports,function(w)"
+        },
+        {
+          "functionName": "",
+          "line": 4177,
+          "column": 1443,
+          "selfSampleMs": 14.915,
+          "sourceSnippet": "()=>{const e=this;for(let n=0;n<10;n++){const r=n>0?n:\"\";delete e[`CONSUME${r}`],delete e[`SUBRULE${r}`],delete e[`OPTION${r}`],delete e[`OR${r}`],delete e[`MANY${r}`],delete e[`MANY_SEP${r}`],delete e[`AT_LEAST_ONE${r}`],delete e[`AT_LEAST"
+        },
+        {
+          "functionName": "",
+          "line": 2901,
+          "column": 5979,
+          "selfSampleMs": 14.007,
+          "sourceSnippet": "(){var l;typeof window<\"u\"?l=window:typeof o<\"u\"?l=o:typeof self<\"u\"&&(l=self);var u;function d(){}function f(){}function g(){}function m(){}function y(){}function b(){}function w(){}function k(){}function T(){}function C(){}function D(){}f"
+        },
+        {
+          "functionName": "N",
+          "line": 158,
+          "column": 3046,
+          "selfSampleMs": 10.126,
+          "sourceSnippet": "(Z,Y){let K=null;try{K=Y(t)}catch(J){if(Cz(\"Language definition for '{}' could not be registered.\".replace(\"{}\",Z)),a)Cz(J);else throw J;K=l}K.name||(K.name=Z),e[Z]=K,K.rawDefinition=Y.bind(null,t),K.aliases&&U(K.aliases,{languageName:Z})}f"
+        },
+        {
+          "functionName": "updateStateInner",
+          "line": 49,
+          "column": 44785,
+          "selfSampleMs": 9.715,
+          "sourceSnippet": "(e,n){var r;let a=this.state,o=!1,l=!1;e.storedMarks&&this.composing&&(EKt(this),l=!0),this.state=e;let u=a.plugins!=e.plugins||this._props.plugins!=n.plugins;if(u||this._props.plugins!=n.plugins||this._props.nodeViews!=n.nodeViews){let b=$"
+        },
+        {
+          "functionName": "iJe",
+          "line": 39,
+          "column": 17077,
+          "selfSampleMs": 7.744,
+          "sourceSnippet": "(t,e,n,r,a,o){if(YU=o,sp=e,e.memoizedState=null,e.updateQueue=null,e.lanes=0,UTe.current=t===null||t.memoizedState===null?nVr:rVr,t=n(r,a),qfe){o=0;do{if(qfe=!1,Kfe=0,25<=o)throw Error(Ki(301));o+=1,x2=gm=null,e.updateQueue=null,UTe.current"
+        },
+        {
+          "functionName": "xyt",
+          "line": 4087,
+          "column": 359,
+          "selfSampleMs": 6.845,
+          "sourceSnippet": "(t){typeof t==\"string\"&&(t=new RegExp(t));const e=t,n=t.source;let r=0;function a(){let o=\"\",l;function u(f){o+=n.substr(r,f),r+=f}le(u,\"appendRaw\");function d(f){o+=\"(?:\"+n.substr(r,f)+\"|$)\",r+=f}for(le(d,\"appendOptional\");r<n.length;)swit"
+        },
+        {
+          "functionName": "",
+          "line": 1,
+          "column": 1,
+          "selfSampleMs": 6.357,
+          "sourceSnippet": "var ams=Object.defineProperty;var yjr=ad=>{throw TypeError(ad)};var sms=(ad,sd,N1)=>sd in ad?ams(ad,sd,{enumerable:!0,configurable:!0,writable:!0,value:N1}):ad[sd]=N1;var mr=(ad,sd,N1)=>sms(ad,typeof sd!=\"symbol\"?sd+\"\":sd,N1),HUt=(ad,sd,N1)"
+        },
+        {
+          "functionName": "A8n",
+          "line": 2926,
+          "column": 481,
+          "selfSampleMs": 5.276,
+          "sourceSnippet": "t=>{let e;const n=new Set,r=(f,g)=>{const m=typeof f==\"function\"?f(e):f;if(!Object.is(m,e)){const y=e;e=g??(typeof m!=\"object\"||m===null)?m:Object.assign({},e,m),n.forEach(b=>b(e,y))}},a=()=>e,u={setState:r,getState:a,getInitialState:()=>d,"
+        },
+        {
+          "functionName": "cVr",
+          "line": 41,
+          "column": 14800,
+          "selfSampleMs": 4.765,
+          "sourceSnippet": "(t,e,n){var r=e.pendingProps;switch(zQe(e),e.tag){case 2:case 16:case 15:case 0:case 11:case 7:case 8:case 12:case 9:case 14:return Ky(e),null;case 1:return v4(e.type)&&DTe(),Ky(e),null;case 3:return r=e.stateNode,WZ(),Yf(m4),Yf(Gy),tJe(),r"
+        },
+        {
+          "functionName": "",
+          "line": 34,
+          "column": 4211,
+          "selfSampleMs": 4.259,
+          "sourceSnippet": "(t){var e=t.replace(PZe,FZe);Lv[e]=new Sx(e,1,!1,t,null,!1,!1)}),\"xlink:actuate xlink:arcrole xlink:role xlink:show xlink:title xlink:type\".split(\" \").forEach(function(t){var e=t.replace(PZe,FZe);Lv[e]=new Sx(e,1,!1,t,\"http://www.w3.org/199"
+        }
+      ]
+    }
+  ],
+  "medianRatios": {
+    "ready4to1": 3.2473347547974414,
+    "script4to1": 4.468815976417789
+  },
+  "bundle": {
+    "bytes": 8844955,
+    "utf16Units": 8833740,
+    "sha256": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2"
+  },
+  "sourceAttribution": {
+    "method": "Narrow source anchors around sampled generated-bundle frames, matched to installed locked dependency source. No sourcemap or package-wide CPU percentage is claimed.",
+    "elk": {
+      "packageVersion": "0.9.3",
+      "bundleLine": 2901,
+      "loaderColumn": 2587,
+      "packageFile": "elkjs/lib/elk.bundled.js",
+      "anchor": "convertGwtStyleError"
+    },
+    "highlight": {
+      "packageVersion": "11.11.1",
+      "bundleLine": 158,
+      "column": 3046,
+      "packageFile": "highlight.js/lib/core.js",
+      "anchor": "could not be registered"
+    },
+    "parser": {
+      "packageVersion": "1.2.1",
+      "bundleLines": [
+        4177,
+        4182
+      ],
+      "packageFile": "@mermaid-js/parser/dist/chunks/mermaid-parser.core/chunk-FOHPRMQF.mjs",
+      "anchors": [
+        "Deleting Recording methods",
+        "TRACE_INIT"
+      ]
+    }
+  },
+  "limits": [
+    "Warm app, local filesystem and initialized webview service worker; not cold launch or Windows hardware.",
+    "Focus emulation prevents macOS occlusion throttling. Only webview renderer CPU is throttled; shell, disk, GPU and native agents are not emulated.",
+    "Three samples per rate are sensitivity evidence, not population percentiles or a promised speedup.",
+    "Performance main-thread metrics are not whole-process CPU or background compiler totals; low V8CompileDuration on warm load does not prove cold parse is free.",
+    "Precise coverage/profile changes compilation/optimization and is used only for executed-code attribution; second profile capture starts after bundle request.",
+    "Executed UTF-16 range fraction describes this opening only; unexecuted code is not all removable, and byte contribution is not CPU contribution.",
+    "No keystroke responsiveness, Windows cost split, heap leak, native agent or cloud filesystem claim."
+  ],
+  "shutdown": {
+    "calibrationProcesses": 13,
+    "measurementProcesses": 13,
+    "portsClosed": true,
+    "productHashes": {
+      "package.json": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605",
+      "out/extension.js": "d8a4f5a0403f70aaf4941df2d84e57931a970b3e000af7e487c4d0a9736e15ff",
+      "media/webview.js": "6ebdda861a047184f6af36aedb84277ea2cb42ebb61abf2a940940ae415f53a2",
+      "binaries/agents/manifest.json": "1d4e9bed86b76e09586f3c8d7a81f4f5b8513d1500d1ec6c3745f1765ac143ee"
+    },
+    "fixtureHash": "7769d8cd6ce9a65ad6ee714f1d65ac5af20bc9a1ff8e97f01637be07a1b0811b"
+  },
+  "hostEvents": {
+    "count": 44,
+    "fixtureOpenRequests": 6
+  }
+}
