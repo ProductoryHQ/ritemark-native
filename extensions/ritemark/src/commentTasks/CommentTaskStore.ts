@@ -189,16 +189,51 @@ export class CommentTaskStore {
    * The task owning one conversation turn, if any. This is the lookup that
    * replaces `finalizeCommentTasks`: a terminal event resolves to exactly one
    * task instead of every running task in the conversation (audit F22).
+   *
+   * The turn id alone decides the match. It is a UUID minted by the host for
+   * exactly one task, so it cannot collide — while the CONVERSATION id can
+   * legitimately change underneath a task: the sidebar reports the client-side
+   * id of a conversation it has just created, and the conversation store mints
+   * the canonical one when it accepts the first turn. Requiring both to match
+   * left every task from a fresh conversation stuck on "Queued" forever, with
+   * the work visibly running beside it (found on the first live smoke test,
+   * 2026-09-14). `conversationId` is still returned so the caller can repair
+   * the binding.
    */
-  findByTurn(conversationId: string, conversationTurnId: string): Promise<CommentTaskRecordV1 | null> {
+  findByTurn(conversationTurnId: string): Promise<CommentTaskRecordV1 | null> {
     return this.serialized(async () => {
       await this.ensureInitialized();
       const { index } = await this.reconcile();
-      const entry = index.entries.find(
-        (candidate) =>
-          candidate.conversationId === conversationId && candidate.conversationTurnId === conversationTurnId,
-      );
+      const entry = index.entries.find((candidate) => candidate.conversationTurnId === conversationTurnId);
       return entry ? this.readRecord(entry.taskId) : null;
+    });
+  }
+
+  /**
+   * Point a task at the conversation its turn actually runs in, and refresh the
+   * title the comment shows. Identity of the TASK never changes; only the
+   * destination it names, and only towards the truth.
+   */
+  rebindDestination(
+    taskId: string,
+    destination: { conversationId: string; bindingGeneration: number; title?: string },
+  ): Promise<CommentTaskRecordV1> {
+    return this.serialized(async () => {
+      await this.ensureInitialized();
+      const current = await this.requireRecord(taskId);
+      const next = this.validate({
+        ...current,
+        updatedAt: this.timestamp(),
+        destination: {
+          ...current.destination,
+          conversationId: destination.conversationId,
+          bindingGeneration: destination.bindingGeneration,
+          titleSnapshot: destination.title ?? current.destination.titleSnapshot,
+        },
+      });
+      await this.writeRecord(next);
+      await this.updateIndexBestEffort();
+      return next;
     });
   }
 

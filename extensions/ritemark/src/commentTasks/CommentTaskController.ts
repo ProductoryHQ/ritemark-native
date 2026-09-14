@@ -108,6 +108,9 @@ export interface CommentTaskControllerDependencies {
   revealConversation(conversationId: string): Promise<void>;
   /** Ask the runtime to stop a turn this task owns. */
   cancelTurn?(conversationId: string, conversationTurnId: string): Promise<void>;
+  /** Current title of a conversation, used to refresh what a comment shows
+   *  after the conversation store renames or titles it. */
+  conversationTitle?(conversationId: string): Promise<string | null>;
   /** Push a document's task snapshot to its editor webviews. */
   publishProjection(documentUri: string, tasks: CommentTaskProjectionV1[]): void;
   now?(): Date;
@@ -192,6 +195,13 @@ export class CommentTaskController {
           return await this.accept(request, document);
         case 'comment-task/destination-preview':
           return await this.previewDestination(request.requestId);
+        case 'comment-task/refresh': {
+          // The webview asking for what it may have missed. Answering with the
+          // projection rather than data in the result keeps ONE shape for task
+          // state, so a pull and a push cannot disagree.
+          if (document) await this.publish(document.uri);
+          return commentTaskSuccess(request.requestId, request.type, { taskId: '' });
+        }
         case 'comment-task/open-conversation':
           return await this.openConversation(request.requestId, request.taskId);
         case 'comment-task/retry':
@@ -430,21 +440,45 @@ export class CommentTaskController {
       );
     }
 
-    const retried = await this.dependencies.store.retry(taskId, this.randomId());
-    const settings = this.dependencies.runtimeSettings(retried.destination.conversationId, retried.assignment.runtimeId);
-    const outcome = await this.dependencies.enqueue({
-      type: 'comment-task/enqueue',
-      taskId: retried.taskId,
-      conversationId: retried.destination.conversationId,
-      conversationTurnId: retried.turn.conversationTurnId,
-      runtimeId: retried.assignment.runtimeId as CommentTaskEnqueueMessage['runtimeId'],
-      prompt: retried.prompt.text,
-      displayText: retried.comments.map((comment) => comment.instruction).join('\n'),
-      modelId: settings.modelId,
-      autonomy: settings.approvalMode,
-      thinkingEffort: settings.thinkingEffort,
-      sourceDisplayPath: document?.displayPath ?? retried.source.displayPath,
-    });
+    let retried = await this.dependencies.store.retry(taskId, this.randomId());
+
+    const dispatch = async (record: CommentTaskRecordV1): Promise<CommentTaskEnqueueOutcome> => {
+      const settings = this.dependencies.runtimeSettings(record.destination.conversationId, record.assignment.runtimeId);
+      return this.dependencies.enqueue({
+        type: 'comment-task/enqueue',
+        taskId: record.taskId,
+        conversationId: record.destination.conversationId,
+        conversationTurnId: record.turn.conversationTurnId,
+        runtimeId: record.assignment.runtimeId as CommentTaskEnqueueMessage['runtimeId'],
+        prompt: record.prompt.text,
+        displayText: record.comments.map((comment) => comment.instruction).join('\n'),
+        modelId: settings.modelId,
+        autonomy: settings.approvalMode,
+        thinkingEffort: settings.thinkingEffort,
+        sourceDisplayPath: document?.displayPath ?? record.source.displayPath,
+      });
+    };
+
+    let outcome = await dispatch(retried);
+
+    // The conversation a task was bound to can be gone by the time the user
+    // retries: Ritemark restarted, or they deleted it. Failing forever with
+    // "that conversation is no longer available" leaves a comment that can
+    // never be run again. A retry is an explicit user action, so it follows the
+    // same rule as a fresh send and goes to the conversation open in the
+    // sidebar. A task that is merely RUNNING still never retargets (R3) — only
+    // this deliberate second attempt does.
+    if (outcome === 'no-conversation') {
+      const fallback = await this.dependencies.resolveOpenConversation(retried.assignment.runtimeId);
+      if (fallback) {
+        retried = await this.dependencies.store.rebindDestination(retried.taskId, {
+          conversationId: fallback.conversationId,
+          bindingGeneration: fallback.bindingGeneration,
+          title: fallback.title,
+        });
+        outcome = await dispatch(retried);
+      }
+    }
 
     if (outcome !== 'queued') {
       const error =
@@ -608,10 +642,26 @@ export class CommentTaskController {
     conversationTurnId: string,
     lifecycle: () => CommentTaskLifecycleV1,
   ): Promise<void> {
-    const record = await this.dependencies.store.findByTurn(conversationId, conversationTurnId);
+    const record = await this.dependencies.store.findByTurn(conversationTurnId);
     // No task owns this turn: it is an ordinary Composer turn. Doing nothing is
     // the whole fix for the bulk finalization bug (audit F22).
     if (!record) return;
+
+    // The conversation a task was accepted into can be renamed by the store:
+    // the sidebar hands us the client-side id of a conversation it just made,
+    // and the conversation store mints the canonical one on the first accepted
+    // turn. The turn id proves this is the same work, so follow it.
+    if (record.destination.conversationId !== conversationId) {
+      const title = await this.dependencies.conversationTitle?.(conversationId);
+      await this.dependencies.store
+        .rebindDestination(record.taskId, {
+          conversationId,
+          bindingGeneration: record.destination.bindingGeneration,
+          ...(title ? { title } : {}),
+        })
+        .catch(() => undefined);
+    }
+
     await this.transitionQuietly(record.taskId, record.bindingGeneration, lifecycle());
     await this.publish(record.source.documentUri);
   }

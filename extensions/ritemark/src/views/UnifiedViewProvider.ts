@@ -1389,6 +1389,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     | 'enqueue'
     | 'revealConversation'
     | 'cancelTurn'
+    | 'conversationTitle'
   > {
     return {
       areDurableConversationsEnabled: async () => (
@@ -1402,6 +1403,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       enqueue: (enqueueMessage) => this._enqueueCommentTask(enqueueMessage),
       revealConversation: (conversationId) => this._revealConversation(conversationId),
       cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),
+      // A conversation created for a comment task starts untitled and is named
+      // by the store once the agent answers. Reading it back keeps the comment
+      // from saying "New conversation" forever.
+      conversationTitle: async (conversationId) => {
+        try {
+          const record = await this._conversationController.runtimeConversation(conversationId);
+          return record.title || null;
+        } catch {
+          return null;
+        }
+      },
     };
   }
 

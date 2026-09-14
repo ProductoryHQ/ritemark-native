@@ -201,9 +201,22 @@ async function main(): Promise<void> {
 
     // Two tasks in ONE conversation: a terminal event must resolve to exactly
     // one of them, which is what replaces finalizeCommentTasks (F22).
-    const found = await store.findByTurn(uuid(700), 'turn-8');
+    const found = await store.findByTurn('turn-8');
     assert.equal(found?.taskId, uuid(8), 'a turn resolves to its own task');
-    assert.equal(await store.findByTurn(uuid(700), 'turn-unknown'), null, 'an unknown turn resolves to nothing');
+    assert.equal(await store.findByTurn('turn-unknown'), null, 'an unknown turn resolves to nothing');
+
+    // The conversation a task was accepted into can be renamed by the store
+    // (client id -> canonical id on the first accepted turn). The turn id still
+    // finds the task, and rebinding points the comment at the real conversation.
+    const rebound = await store.rebindDestination(uuid(8), {
+      conversationId: uuid(701),
+      bindingGeneration: 2,
+      title: 'Strengthen policy argument',
+    });
+    assert.equal(rebound.destination.conversationId, uuid(701));
+    assert.equal(rebound.destination.titleSnapshot, 'Strengthen policy argument');
+    assert.equal(rebound.taskId, uuid(8), 'rebinding never changes task identity');
+    assert.equal((await store.findByTurn('turn-8'))?.destination.conversationId, uuid(701));
 
     const byRequest = await store.findByRequestId('request-7');
     assert.equal(byRequest?.taskId, uuid(7), 'a repeated request resolves to the task it already created');

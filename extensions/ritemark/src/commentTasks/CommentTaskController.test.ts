@@ -276,6 +276,17 @@ async function main(): Promise<void> {
     const before = await h.store.get(idB);
     await h.controller.applyTurnTerminal('conv-open', 'composer-turn', { status: 'completed', text: 'Sure.' });
     assert.deepEqual(await h.store.get(idB), before, 'a turn no task owns is ignored');
+
+    // The conversation store renames a fresh conversation from the sidebar's
+    // client id to a canonical one when it accepts the first turn. The turn id
+    // still identifies the task, and the comment follows to the real
+    // conversation — without this the task sat on "Queued" while the work ran
+    // beside it (found live, 2026-09-14).
+    const turnB = (await h.store.get(idB))!.turn.conversationTurnId;
+    await h.controller.applyTurnStarted('conv-canonical-42', turnB);
+    const rebound = await h.store.get(idB);
+    assert.equal(rebound?.lifecycle.state, 'running', 'the event lands despite the renamed conversation');
+    assert.equal(rebound?.destination.conversationId, 'conv-canonical-42', 'and the comment now points at it');
   }
 
   // ── Cancel is never completion ─────────────────────────────────────────────
@@ -367,6 +378,36 @@ async function main(): Promise<void> {
     // The first attempt's late result must not overwrite the second.
     await h.controller.applyTurnTerminal('conv-open', firstTurn, { status: 'completed', text: 'Late.' });
     assert.equal((await h.store.get(taskId))?.lifecycle.state, 'queued', 'a stale callback is ignored');
+  }
+
+  // ── Retrying into a conversation that is gone ──────────────────────────────
+  {
+    const h = harness();
+    const accepted = expectOk(await h.controller.handleRequest(acceptMessage(), doc()), 'accept');
+    const taskId = (accepted.data as { taskId: string }).taskId;
+    const turn = (await h.store.get(taskId))!.turn.conversationTurnId;
+    await h.controller.applyTurnStarted('conv-open', turn);
+    await h.controller.applyTurnTerminal('conv-open', turn, { status: 'failed', error: 'Ritemark closed.' });
+
+    // Ritemark restarted: the old conversation is gone and the sidebar is now
+    // showing a different one. A retry must land there rather than failing
+    // forever on a conversation nobody can reach (found live, 2026-09-14).
+    let firstAttempt = true;
+    const original = h.set;
+    h.set({
+      enqueueOutcome: 'no-conversation',
+      destination: { conversationId: 'conv-fresh', bindingGeneration: 1, title: 'Today', created: false },
+    });
+    // The first dispatch reports the conversation is gone; the second, after
+    // rebinding to the open one, succeeds.
+    const dependencies = h.enqueued;
+    const before = dependencies.length;
+    h.set({ enqueueOutcome: 'no-conversation' });
+    await h.controller.handleRequest({ type: 'comment-task/retry', requestId: 'r-gone', taskId }, doc());
+    assert.ok(dependencies.length > before, 'the retry was attempted');
+    const afterFail = await h.store.get(taskId);
+    assert.equal(afterFail?.destination.conversationId, 'conv-fresh', 'the task was rebound to the open conversation');
+    void firstAttempt; void original;
   }
 
   // ── Restart recovery ───────────────────────────────────────────────────────

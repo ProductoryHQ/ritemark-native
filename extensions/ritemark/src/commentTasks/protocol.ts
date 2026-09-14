@@ -89,6 +89,14 @@ export type CommentTaskRequest =
       comments: CommentTaskCommentV1[];
     })
   | (RequestBase & { type: 'comment-task/destination-preview' })
+  /**
+   * "Send me this document's tasks again." The host also pushes a projection
+   * when an editor reports ready, but that push races the webview's own
+   * subscription: after a window reload the comments came back with no status
+   * at all while the ledger held them (found live, 2026-09-14). A pull the
+   * webview makes when it starts listening cannot lose that race.
+   */
+  | (RequestBase & { type: 'comment-task/refresh' })
   | (RequestBase & { type: 'comment-task/open-conversation'; taskId: string })
   | (RequestBase & { type: 'comment-task/retry'; taskId: string })
   | (RequestBase & { type: 'comment-task/cancel'; taskId: string });
@@ -200,6 +208,7 @@ function integerField(input: Record<string, unknown>, key: string): number {
 const REQUEST_TYPES = new Set<CommentTaskRequestType>([
   'comment-task/accept',
   'comment-task/destination-preview',
+  'comment-task/refresh',
   'comment-task/open-conversation',
   'comment-task/retry',
   'comment-task/cancel',
@@ -302,6 +311,9 @@ export function decodeCommentTaskRequest(value: unknown): CommentTaskRequest {
 
     case 'comment-task/destination-preview':
       return { type: 'comment-task/destination-preview', requestId };
+
+    case 'comment-task/refresh':
+      return { type: 'comment-task/refresh', requestId };
 
     default:
       return {

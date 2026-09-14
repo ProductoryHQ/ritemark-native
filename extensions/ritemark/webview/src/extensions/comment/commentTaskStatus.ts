@@ -96,6 +96,14 @@ const pending = new Map<string, PendingRequest>()
 function ensureSubscribed(): void {
   if (subscribed) return
   subscribed = true
+  // Pull once, now that we are listening. The host also pushes a projection
+  // when the editor reports ready, but that push can arrive before this
+  // subscription exists — after a window reload every comment came back blank
+  // while the ledger still held its tasks (found live, 2026-09-14). The pull
+  // runs after the listener is wired, so it cannot lose the same race.
+  queueMicrotask(() => {
+    void requestCommentTask('comment-task/refresh')
+  })
   onMessage((message: { type?: string } & Record<string, unknown>) => {
     if (message.type === 'comment-task/projection') {
       applyCommentTaskProjection(message as { documentUri?: unknown; tasks?: unknown })
