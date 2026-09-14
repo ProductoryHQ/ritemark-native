@@ -1,0 +1,18 @@
+{
+  "type": "comment-task/accept",
+  "requestId": "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a",
+  "batchId": null,
+  "surface": "rail",
+  "alias": "claude",
+  "destination": { "conversationId": "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b" },
+  "documentVersion": 12,
+  "comments": [
+    {
+      "commentId": "11111111-1111-4111-8111-111111111111",
+      "kind": "mark",
+      "note": "@claude Strengthen this argument with one more source",
+      "instruction": "Strengthen this argument with one more source",
+      "anchoredText": "a single survey from 2024"
+    }
+  ]
+}

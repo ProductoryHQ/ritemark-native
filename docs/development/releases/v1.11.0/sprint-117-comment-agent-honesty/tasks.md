@@ -6,8 +6,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 0: Audit, design, and freeze (W0 — R1–R10)
 
-- [ ] Map all 23 findings to requirement/scenario/workstream/disposition in `research/protocol-and-storage-decisions.md`.
-- [ ] Create synthetic comment/document/task fixtures; never use real user documents or transcripts.
+- [x] Map all 23 findings to requirement/scenario/workstream/disposition in `research/protocol-and-storage-decisions.md` — done 2026-09-14, plus two Phase 0 findings (F24 cancel mapped to completed/failed, F25 sidebar dispatch timer).
+- [x] Create synthetic comment/document/task fixtures; never use real user documents or transcripts — `research/fixtures/`, 2026-09-14.
 - [ ] Freeze stable-ID upgrade and duplicate-ID behavior for marks and standalone nodes.
 - [ ] Freeze `CommentTaskRecordV1`, typed protocol, payload bounds, atomic acceptance, queue reservation, and transition table.
 - [ ] Freeze canonical URI/project scope, rename/move/Save As, deleted-source, retention, cleanup, and retry-generation rules.

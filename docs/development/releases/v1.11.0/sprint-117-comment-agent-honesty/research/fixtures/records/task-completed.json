@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "taskId": "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+  "bindingGeneration": 1,
+  "requestId": "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a",
+  "createdAt": "2026-09-14T10:00:00.000Z",
+  "updatedAt": "2026-09-14T10:03:12.000Z",
+  "source": {
+    "documentUri": "file:///fixtures/project/docs/policy-brief.md",
+    "scopeId": "ps1-0000000000000000000000000000000000000000",
+    "displayPath": "docs/policy-brief.md",
+    "documentVersion": 12,
+    "contentSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "comments": [
+    {
+      "commentId": "11111111-1111-4111-8111-111111111111",
+      "kind": "mark",
+      "note": "@claude Strengthen this argument with one more source",
+      "instruction": "Strengthen this argument with one more source",
+      "anchoredText": "a single survey from 2024"
+    }
+  ],
+  "assignment": { "alias": "claude", "runtimeId": "claude-code", "surface": "rail" },
+  "runtime": { "modelId": "claude-example-model", "approvalMode": "auto", "planFirst": false, "thinkingEffort": "auto" },
+  "destination": {
+    "conversationId": "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b",
+    "bindingGeneration": 3,
+    "titleSnapshot": "Strengthen policy argument",
+    "created": false
+  },
+  "turn": { "conversationTurnId": "3c3c3c3c-3c3c-4c3c-8c3c-3c3c3c3c3c3c" },
+  "prompt": {
+    "text": "The user assigned you this comment in docs/policy-brief.md. Work through it.\nDo NOT remove or rewrite the comment markers themselves (the <mark data-comment> wrappers / <!-- --> notes) unless a comment explicitly asks for that — the user clears their own comments.\n\n1. Strengthen this argument with one more source\n   Comment id: 11111111-1111-4111-8111-111111111111\n   Anchored to: \"a single survey from 2024\"",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+  },
+  "lifecycle": {
+    "state": "completed",
+    "since": "2026-09-14T10:03:12.000Z",
+    "terminalEventId": "4d4d4d4d-4d4d-4d4d-8d4d-4d4d4d4d4d4d",
+    "summary": "Added a second source from the 2025 panel study and rewrote the sentence so both surveys support the claim."
+  },
+  "history": [
+    { "state": "accepting", "at": "2026-09-14T10:00:00.000Z", "generation": 1 },
+    { "state": "queued", "at": "2026-09-14T10:00:00.400Z", "generation": 1 },
+    { "state": "running", "at": "2026-09-14T10:00:01.000Z", "generation": 1 },
+    { "state": "completed", "at": "2026-09-14T10:03:12.000Z", "generation": 1 }
+  ]
+}

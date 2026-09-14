@@ -1,0 +1,11 @@
+{
+  "type": "comment-task/result",
+  "requestId": "9c9c9c9c-9c9c-4c9c-8c9c-9c9c9c9c9c9c",
+  "ok": false,
+  "error": {
+    "code": "queue-full",
+    "message": "This conversation already has 10 queued prompts. Wait for one to finish or pick another conversation.",
+    "retryable": true,
+    "recovery": "retry"
+  }
+}
