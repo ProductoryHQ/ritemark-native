@@ -444,10 +444,10 @@ async function main(): Promise<void> {
   {
     // The exact body Codex handed a comment on 2026-09-14, printed verbatim in
     // the bubble until this existed.
-    const codex = '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-5.6-sol\' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again."}}';
+    const codex = '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'example-model-id\' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again."}}';
     assert.equal(
       safeFailureMessage(codex),
-      "The 'gpt-5.6-sol' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.",
+      "The 'example-model-id' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.",
       'the useful sentence is lifted out of the provider envelope',
     );
     assert.ok(!safeFailureMessage(codex).includes('{'), 'and no JSON survives');

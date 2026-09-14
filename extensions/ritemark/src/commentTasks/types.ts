@@ -225,7 +225,7 @@ export interface CommentTaskProjectionV1 {
  * Runtimes report failures in their own shapes, and a provider's raw body is
  * often a JSON envelope: Codex handed the comment
  * `{"type":"error","status":400,"error":{"type":"invalid_request_error",
- * "message":"The 'gpt-5.6-sol' model requires a newer version of Codex..."}}`,
+ * "message":"The '<model>' model requires a newer version of Codex..."}}`,
  * and the bubble printed it verbatim (found live, 2026-09-14) — against
  * design.md's rule that raw provider diagnostics never reach a comment. The
  * useful sentence is in there; this digs it out and drops the envelope.
