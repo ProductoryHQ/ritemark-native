@@ -1,6 +1,6 @@
 # Release Plan — v1.11.0 Publish to Google Docs + Agent Task Honesty
 
-**Status:** Sprint 116 implementation and local QA complete; issue publication, PR CI, and native Intel/Windows evidence remain. Sprints 117–119 remain proposed and require their own scope decisions.<br>
+**Status:** Sprint 116 implementation and local QA complete; [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287) is collecting native CI evidence. Sprints 117–119 remain proposed and require their own scope decisions.<br>
 **Milestone:** [v1.11.0](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
 **Target:** v1.11.0<br>
 **Release type:** Full app distribution (shell-tier — bundles refreshed agent runtime binaries under `extensions/ritemark/binaries/agents/`)<br>
@@ -25,7 +25,7 @@ Around that headline, v1.11.0 pays down three honesty/hygiene debts: comment-to-
 
 | Sprint | Working name | Scope summary | Track | Preparation |
 |---|---|---|---|---|
-| [Sprint 116](./sprint-116-runtime-model-baseline/sprint-plan.md) | Runtime & model baseline refresh | Complete runtime package snapshot, lockstep SDKs, model catalog refresh, and measured protocol fixes | Audit-first SDD (Sprint 111 precedent) | Implementation and local QA pass; issue/PR publication and native Intel/Windows CI pending |
+| [Sprint 116](./sprint-116-runtime-model-baseline/sprint-plan.md) | Runtime & model baseline refresh | Complete runtime package snapshot, lockstep SDKs, model catalog refresh, and measured protocol fixes | Audit-first SDD (Sprint 111 precedent) | Branch `codex/sprint-116-runtime-model-baseline`; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286); [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native CI in progress |
 | [Sprint 117](./sprint-117-comment-agent-honesty/sprint-plan.md) | Comment→agent pipeline honesty | Unify dispatch paths A/B; IDs for all comment forms; correct per-document status; reply-to-comment on completion (#156); carry `documentPath` to the runtime; availability gating; visible target conversation | Full SDD — crosses webview, host, sidebar store, and all three runtimes | Full draft package ready; product-depth decision open |
 | [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record entry in the Transcribe panel; webview mic capture → host-side accumulation into a real audio file on disk → existing path-driven `JobManager` pipeline unchanged | Full SDD — new typed capture/write boundary | Full draft package ready; capture/storage freeze open |
 | [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Google account connect in Settings; template selection; toolbar **Create Google Docs** + **Sync**; Doc identity remembered per markdown file | Full SDD — new external integration, OAuth, conversion fidelity | Full draft package ready; integration Phase 0 and external OAuth blockers open |
@@ -42,7 +42,7 @@ Proposed order: 116 first so 117–119 validate against the final runtime/model 
 - [ ] Jarmo approves the release scope, Sprint 117 depth, and sprint order.
 - [x] Release mapped for the approved Sprint 116 slice; remaining sprint scope is still proposed.
 - [x] GitHub milestone `v1.11.0` created (milestone 11).
-- [ ] Sprint issues created: Sprint 116 draft exists locally; automatic approval review rejected publication. Other issues await their scope decisions.
+- [x] Sprint 116 issue [#286](https://github.com/ProductoryHQ/ritemark-native/issues/286) created under milestone `v1.11.0`; other sprint issues await their scope decisions.
 - [x] Sprint 116 scope/kickoff and exact Phase 0 package approved; implementation runs on `codex/sprint-116-runtime-model-baseline` in its dedicated worktree.
 
 ## SDD Package Index
@@ -139,8 +139,8 @@ Phase 0 must decide (research, not guessed here):
 
 ## Current next steps
 
-1. Publish the prepared Sprint 116 issue, push the branch, and open its PR after explicit publication authorization.
-2. Collect the native darwin-x64 and win32-x64 runtime evidence from PR CI and resolve any failures before readiness.
+1. Review [Sprint 116 PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287), collect its native darwin-x64 and win32-x64 evidence, and resolve any failures before merge.
+2. Close Sprint 116 issue [#286](https://github.com/ProductoryHQ/ritemark-native/issues/286) after the PR is merged and the sprint tracker is current.
 3. Review the Sprint 117–119 SDD drafts and record a separate scope decision before each implementation starts.
 
 ## Decisions Log
@@ -152,3 +152,4 @@ Phase 0 must decide (research, not guessed here):
 | 2026-09-13 | Raise preparation to Sprint 109-level SDD packages | Added traceable requirements, BDD scenarios, architecture/workstreams, phased tasks, audits, UX states, and Google API/OAuth evidence before scope approval |
 | 2026-09-13 | Start the approved Sprint 116 slice | Jarmo approved its scope and kickoff. Milestone 11 exists; work runs on `codex/sprint-116-runtime-model-baseline`. Other sprint decisions remain open. |
 | 2026-09-13 | Approve and implement the Sprint 116 Phase 0 package | Exact runtime/SDK pins, measured adapter fixes, canonical catalog changes, complete package dependency trees, and rollback policy approved. Local repository QA and Apple Silicon evidence pass; PR-native Intel/Windows evidence remains. |
+| 2026-09-14 | Publish Sprint 116 for review and merge after green checks | Jarmo explicitly authorized issue publication, branch push, PR creation, and merge; issue #286 and PR #287 now track the sprint under milestone `v1.11.0`. |

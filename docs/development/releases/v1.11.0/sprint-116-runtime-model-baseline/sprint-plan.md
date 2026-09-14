@@ -59,7 +59,7 @@ After Sprint 116, every bundled runtime component and every curated model shown 
 - [x] Catalog aliases resolve to one canonical identity and the dated bundled floor remains usable offline.
 - [ ] Continuation, effort, approval, cancellation, provider-isolation, and browser-tool matrices pass on final pins.
 - [x] Extension target-copy, runtime-tree expansion, archive/hash/architecture, and local Apple Silicon packaging checks pass; native Intel/Windows execution remains CI evidence.
-- [ ] Architecture, changelog/release-note disposition, sprint tracker, issue, and PR evidence are current.
+- [x] Architecture, changelog/release-note disposition, sprint tracker, issue, and PR evidence are current.
 - [x] Repository QA passes before readiness handoff; see [qa-validation.md](./research/qa-validation.md).
 
 ## Dependencies and Gates
