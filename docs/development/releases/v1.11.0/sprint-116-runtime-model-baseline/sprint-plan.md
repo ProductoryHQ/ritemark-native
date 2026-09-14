@@ -1,10 +1,11 @@
 # Sprint 116 — Runtime and Model Baseline
 
 **Track:** Audit-first SDD<br>
-**Status:** Implementation, clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA complete; issue #286 is published — full behavior matrices, PR CI, and native Intel/Windows evidence pending<br>
+**Status:** Implementation, clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA complete; PR #287 is open — full behavior matrices, PR CI, and native Intel/Windows evidence pending<br>
 **Branch:** `codex/sprint-116-runtime-model-baseline`<br>
 **Worktree:** `.worktrees/sprint-116-runtime-model-baseline`<br>
 **Issue:** [#286 — Sprint 116: Runtime and model baseline](https://github.com/ProductoryHQ/ritemark-native/issues/286)<br>
+**PR:** [#287 — Runtime: refresh v1.11 agent and model baseline](https://github.com/ProductoryHQ/ritemark-native/pull/287)<br>
 **Milestone:** [v1.11.0](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
 **Release:** [v1.11.0](../release-plan.md)
 
@@ -98,7 +99,7 @@ No new flag is planned. This sprint refreshes existing runtime and catalog behav
 | 2026-09-13 | Final Apple Silicon runtime and Codex cancellation checks passed | All target archives and installed hashes passed cross-inspection; native arm64 startup passed, and immediate Stop + resend passed on the final Codex adapter. |
 | 2026-09-13 | Local repository QA passed | The full QA gate, VS Code native TypeScript, extension compile, runtime/lifecycle/Flow/security tests, and schema-v3 packaging fixtures pass after installing worktree-local dependencies. |
 | 2026-09-14 | Clean Ritemark RUNDEV and all three document turns passed | A clean compile produced the Ritemark shell. Claude completed a question/file-edit turn; Codex passed exact response, file-tool, Stop, and resend canaries; OpenCode/Gemini completed a file edit after its ACP `end_turn` status was normalized from a false visible `Failed` to `Done`. |
-| 2026-09-14 | Jarmo authorized Sprint 116 publication and merge after green checks | GitHub issue #286 was created under milestone `v1.11.0`; branch publication, PR review, and CI follow. |
+| 2026-09-14 | Jarmo authorized Sprint 116 publication and merge after green checks | GitHub issue #286 was created under milestone `v1.11.0`, and PR #287 was opened for review and native CI. |
 
 ## Risks
 
