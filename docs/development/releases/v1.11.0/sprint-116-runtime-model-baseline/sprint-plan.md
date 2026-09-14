@@ -1,7 +1,7 @@
 # Sprint 116 — Runtime and Model Baseline
 
 **Track:** Audit-first SDD<br>
-**Status:** Implementation, clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA complete; PR #287 is open — full behavior matrices, PR CI, and native Intel/Windows evidence pending<br>
+**Status:** Implementation, clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA complete; PR #287 is ready to merge. Full behavior matrices and native Intel/Windows evidence are deferred to v1.11 release gates by the release owner.<br>
 **Branch:** `codex/sprint-116-runtime-model-baseline`<br>
 **Worktree:** `.worktrees/sprint-116-runtime-model-baseline`<br>
 **Issue:** [#286 — Sprint 116: Runtime and model baseline](https://github.com/ProductoryHQ/ritemark-native/issues/286)<br>
@@ -58,7 +58,7 @@ After Sprint 116, every bundled runtime component and every curated model shown 
 - [x] All model IDs remain centralized in `src/ai/modelConfig.ts`; static validation rejects production duplicates elsewhere.
 - [x] Catalog aliases resolve to one canonical identity and the dated bundled floor remains usable offline.
 - [ ] Continuation, effort, approval, cancellation, provider-isolation, and browser-tool matrices pass on final pins.
-- [x] Extension target-copy, runtime-tree expansion, archive/hash/architecture, and local Apple Silicon packaging checks pass; native Intel/Windows execution remains CI evidence.
+- [x] Extension target-copy, runtime-tree expansion, archive/hash/architecture, and local Apple Silicon packaging checks pass; native Intel/Windows execution is explicitly deferred to the v1.11 release gates.
 - [x] Architecture, changelog/release-note disposition, sprint tracker, issue, and PR evidence are current.
 - [x] Repository QA passes before readiness handoff; see [qa-validation.md](./research/qa-validation.md).
 
@@ -100,6 +100,7 @@ No new flag is planned. This sprint refreshes existing runtime and catalog behav
 | 2026-09-13 | Local repository QA passed | The full QA gate, VS Code native TypeScript, extension compile, runtime/lifecycle/Flow/security tests, and schema-v3 packaging fixtures pass after installing worktree-local dependencies. |
 | 2026-09-14 | Clean Ritemark RUNDEV and all three document turns passed | A clean compile produced the Ritemark shell. Claude completed a question/file-edit turn; Codex passed exact response, file-tool, Stop, and resend canaries; OpenCode/Gemini completed a file edit after its ACP `end_turn` status was normalized from a false visible `Failed` to `Done`. |
 | 2026-09-14 | Jarmo authorized Sprint 116 publication and merge after green checks | GitHub issue #286 was created under milestone `v1.11.0`, and PR #287 was opened for review and native CI. |
+| 2026-09-14 | Native Intel/Windows CI does not block today's implementation merge | Jarmo confirmed that no installer build is being produced now. Local repository QA, archive cross-inspection, Apple Silicon startup, and authenticated three-runtime RUNDEV are the merge evidence; native execution remains a v1.11 release gate. |
 
 ## Risks
 

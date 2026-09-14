@@ -56,8 +56,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 5: Native and package evidence (W5 — R2, R6, R7)
 
 - [x] Record darwin-arm64 fetch, architecture, startup, and authenticated Codex cancellation/resend evidence.
-- [ ] Record native darwin-x64 matrix evidence with exact commit/manifest/artifact digests.
-- [ ] Record native win32-x64 matrix evidence including platform helper completeness.
+- [ ] Record native darwin-x64 matrix evidence with exact commit/manifest/artifact digests (deferred to the v1.11 release gates by the release owner on 2026-09-14).
+- [ ] Record native win32-x64 matrix evidence including platform helper completeness (deferred to the v1.11 release gates by the release owner on 2026-09-14).
 - [x] Verify staged target copies and installed runtime trees contain only the approved platform component set; signed application validation remains a release gate.
 - [x] Record full signed artifact verification as a remaining release gate, not a sprint claim.
 
