@@ -74,7 +74,12 @@ Use this for VS Code core changes, `patches/vscode`, branding, app bundle change
 11. Gate 2: Jarmo tests the signed, unnotarized x64 DMG and Windows installer. Complete any release-bound Store/external matrix against the exact Windows hash. Do not notarize x64 until Jarmo approves and at least 60 minutes have elapsed since the x64 DMG build with no new bug.
 12. After Gate 2 plus the full hardening window, notarize/staple and verify the x64 DMG.
 13. Tag the already-pushed source commit, create the GitHub release, and publish the canonical update feed together only after every release gate is closed.
-14. Recommend product-marketer handoff unless the user says to skip.
+14. Recommend product-marketer handoff unless the user says to skip. Then run the post-release issue sweep: map open issues against the shipped scope, close what the release resolved citing the version, and surface partial/reputation-dependent issues (Windows Smart App Control) to Jarmo instead of closing them.
+15. Release closeout — reclaim the release worktree. The worktree still holds every built byte, and worktree-hygiene BLOCKS it for build output; that block lifts only here.
+    - Verify every published asset against local `dist/`: GitHub's per-asset SHA-256 digest and the canonical per-version update feed must match the recomputed local hashes. These are the blocking checks. The build-time `.dmg.sha256` sidecars are a pre-staple cross-check only — create-dmg.sh writes them before notarize-dmg.sh staples, so they legitimately differ from the published DMGs and never block.
+    - Archive the local-only evidence (sidecars, `update-feed.json`, Windows roundtrip `.result.json`, and the authoritative published-hash list) to `docs/releases/vX.Y.Z/evidence/`, committed and pushed from the main checkout.
+    - Only after verification passes and the evidence is pushed, delete `dist/` and `VSCode-<target>/` inside the worktree, then rerun `node ./scripts/worktree-hygiene.mjs --check` and expect `REVIEW -- verified disposable release worktree`.
+    - `--clean` is human-authorized (Jarmo says go) and removes every `REVIEW` entry. Never run it mid-release, never override `BLOCKED`, never hand-delete a worktree.
 
 ## DMG Rules
 
@@ -88,8 +93,9 @@ Use this for VS Code core changes, `patches/vscode`, branding, app bundle change
 ## Worktree Hygiene
 
 - Run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before each RC, and weekly.
-- Review before using `--clean`. Only `REMOVE` entries are eligible; never bypass a `BLOCKED` classification with manual recursive deletion.
-- Release artifacts belong in the release system. Locally retain only the currently tested candidate; remove an invalidated or shipped release worktree after the gate evidence is stored.
+- `--clean` is human-authorized: Jarmo reads the report and says go. Nothing scheduled ever deletes — the weekly report task and the `worktree-janitor` agent run `--report` only. Removable worktrees classify `REVIEW`; never bypass a `BLOCKED` classification with manual recursive deletion.
+- A worktree with a non-empty `dist/` or `VSCode-<target>/` is `BLOCKED` for build output. That block lifts only through release closeout (Full Release Workflow step 15): verify published assets, archive evidence, then clear the output, after which it classifies `REVIEW`. A published release worktree left `BLOCKED` means its closeout never ran.
+- Release artifacts belong in the release system. Locally retain only the currently tested candidate; a shipped release worktree is reclaimed through closeout, never by hand-deleting it.
 
 ## DMG Hard Checks
 

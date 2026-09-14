@@ -322,7 +322,7 @@ refusal lifts only through the closeout; it is never bypassed.
 
 | Sub-step | Pass condition | Owner |
 | --- | --- | --- |
-| 1 Verify | `diff` of GitHub asset digests + sizes against recomputed local `dist/` hashes is empty; the canonical feed's entry for this version matches; build-time sidecars match | Agent |
+| 1 Verify | `diff` of GitHub asset digests + sizes against recomputed local `dist/` hashes is empty, and the canonical feed's entry for this version matches (these are the blocking checks). Build-time sidecars are a cross-check only — they are written pre-staple and legitimately differ from the published DMGs | Agent |
 | 2 Archive | `docs/releases/vX.Y.Z/evidence/` (sidecars, `update-feed.json`, Windows roundtrip `.result.json`, `published-assets.txt`, `closeout.md`) committed from the main checkout and pushed | Agent |
 | 3 Clear | `dist/` and `VSCode-<target>/` deleted inside the release worktree; `--check` prints `REVIEW … verified disposable release worktree` | Agent — **only after 1 and 2** |
 | 4 Remove | `node ./scripts/worktree-hygiene.mjs --clean` | **Jarmo** — after reading the audit; it removes every `REVIEW` entry |
