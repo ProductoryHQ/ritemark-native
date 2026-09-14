@@ -447,6 +447,9 @@ body {
 .rm-grow { flex: 1; }
 .rm-bubble-del { background: transparent; border: none; color: var(--ritemark-ink-faint, #94a3b8); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
 .rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
+/* Mark as done: the same action as Delete, but on a finished task it is a
+   completion, not a discard — so it hovers green rather than red. */
+.rm-bubble-done:hover { color: #15803d; background: rgba(21,128,61,0.10); }
 .rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
 
 /* compose bubble (create flow)
