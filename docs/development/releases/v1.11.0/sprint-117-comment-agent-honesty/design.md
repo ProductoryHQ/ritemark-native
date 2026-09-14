@@ -2,7 +2,7 @@
 
 **Status:** Draft for Phase 0 approval<br>
 **System:** Ritemark Indigo-Editorial<br>
-**Scope:** Assignment destination, lifecycle, attention, completion reply, and recovery; not v1.12 comment composer/layout polish
+**Scope:** Assignment destination, lifecycle, attention, completion reply, recovery, and the comment composer, agent picker, and collapsed-marker layout absorbed from v1.12.0 Sprint 121; not the agent conversation header, agent composer, or chat links (Sprint 122)
 
 ## User Model
 
@@ -42,7 +42,7 @@ after completion
 └────────────────────────────────────────┘
 ```
 
-Destination may be confirmed in the same surface before durable acceptance or returned immediately with the accepted state. Phase 0 chooses the atomic interaction, but the user must never receive a generic success without a canonical destination.
+Decided 2026-09-14: the confirmation surface above is the pre-dispatch destination display — the user sees the agent and the destination conversation before anything is queued, from the margin rail and from the Comments menu alike. Phase 0 freezes how the confirmation and durable acceptance interlock, but the user must never receive a generic success without a canonical destination.
 
 ## Bulk Flow
 
@@ -66,6 +66,47 @@ After the host responds, results are per group:
 ```
 
 Never show “Queued 2 tasks” when only one was accepted.
+
+## Composer
+
+```text
+┌────────────────────────────────────────┐
+│ @cla|                                  │
+│ ┌──────────────┐                       │
+│ │ ● Claude     │  ← picker, filtered   │
+│ │   Codex      │                       │
+│ │   OpenCode   │                       │
+│ └──────────────┘                       │
+│                                        │
+│                          ═══ (resize)  │
+│ Claude              [Cancel] [Save]    │
+└────────────────────────────────────────┘
+```
+
+- Bounded vertical resize from the bottom edge: minimum two rows, maximum frozen in Phase 0 (proposal: eight rows or 40% of the editor viewport, whichever is smaller). Height is remembered for the session, not persisted.
+- Save, Cancel, and Send never scroll away; they sit outside the scrolling text area.
+- The selected agent shows as a pill in the footer while composing and in the bubble head after save.
+- One reusable primitive; v1.12.0 Sprint 122 applies it to the agent composer.
+
+## Agent picker
+
+- Opens the moment `@` is typed at a word boundary; filters on every keystroke; closes when the filter matches nothing.
+- Arrow Up/Down move, Enter or Tab insert `@alias ` at the caret, Escape closes without inserting; pointer click inserts and keeps composer focus.
+- Lists only `COMMENT_AGENT_ALIASES`, with the runtime's display name and, when known, its availability hint (for example "Sign in required"); the inserted text is exactly what the collector's `detectAgentAlias` recognises.
+- Screen readers get a listbox with the active option announced; the picker never covers the composer's controls.
+
+## Collapsed marker
+
+```text
+   text column                          │ gutter
+   The evidence in this section is …    │ ◌  @claude Strengthen…
+   which the reviewers questioned.      │ ●  @codex Check the…
+                                        │ ◌  Rephrase for…
+```
+
+- A collapsed comment is a compact marker in the margin gutter (icon, optional status dot, a short preview only when the gutter is wide enough); it never overlaps document text.
+- Expanding opens the bubble beside the text column at normal widths; at narrow widths the bubble opens below the marker within the gutter and the preview is dropped rather than letting the bubble cover the text. Phase 0 validates the narrow-width rule on RunDev at the minimum supported width.
+- Status, completion reply, and actions stack below the note inside the bubble; nothing inside the bubble is positioned over the text column.
 
 ## State Vocabulary
 
@@ -113,3 +154,4 @@ Status is text plus icon; never color-only. `needs-user` uses the established am
 - [ ] Approve state vocabulary and per-group bulk results.
 - [ ] Approve host-local completion projection that leaves Markdown unchanged.
 - [ ] Approve summary bounds/fallback and source/destination deletion behavior.
+- [ ] Approve the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow widths (R10).

@@ -1,17 +1,17 @@
 # Sprint 117 Spec — Comment-to-Agent Honesty
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.11.0](../release-plan.md) · **Issue:** pending / [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.11.0](../release-plan.md) · **Issue:** pending / [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) / [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) (absorbed from v1.12.0 Sprint 121) · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
 
 ## Purpose
 
-Replace the editor→AI-sidebar relay and webview-memory status map with one canonical comment-task contract. A task must retain its source document, exact comments, runtime, destination conversation, and lifecycle independently of which editor or conversation is visible.
+Replace the editor→AI-sidebar relay and webview-memory status map with one canonical comment-task contract. A task must retain its source document, exact comments, runtime, destination conversation, and lifecycle independently of which editor or conversation is visible. The comment surface itself must be comfortable: the composer resizes, `@` opens the agent picker at once, and a collapsed comment never covers the text it annotates.
 
 ## Principles
 
 - **One action, one task record.** UI surfaces capture intent; the host owns accepted task identity and state.
 - **Freeze context at acceptance.** Later tab, selection, model, or conversation changes cannot retarget queued work.
 - **No success before acceptance.** The editor reports queued only after a durable host acknowledgment.
-- **Destination is part of consent.** The user can see where work will happen before or as it is accepted.
+- **Destination is part of consent.** The user sees the agent and the destination conversation before dispatch, on every entry point.
 - **Status follows task/turn facts.** A conversation terminal event cannot finish unrelated tasks.
 - **Reply without corrupting authorship.** Agent completion is visible on the source comment without silently rewriting the user's comment note.
 
@@ -73,7 +73,7 @@ As a user, I want to know which conversation receives the work and be able to op
 
 Acceptance criteria:
 - Destination resolution is deterministic and produces a canonical `conversationId` before task acceptance.
-- The assignment confirmation names the runtime and destination conversation; if a new background conversation will be created, it says so.
+- Before dispatch, on both the margin rail and the Comments menu, the confirmation names the runtime and the exact destination conversation; if a new background conversation will be created, it says so.
 - The source comment shows **Open conversation** for queued/running/needs-user/completed/failed states.
 - Selecting the action opens the exact conversation without changing task identity or status.
 - The task never silently retargets if another conversation becomes active or the chosen conversation is deleted; deletion produces an explicit recovery/failure path.
@@ -137,20 +137,33 @@ Acceptance criteria:
 - Comment add/edit/delete/undo, multi-block marks, standalone notes, Markdown round-trip, document sync, export stripping, conversation durability, and prompt queue regressions pass.
 - Architecture, user docs, changelog, v1.11 release notes, release tracker, issue, and QA evidence are current.
 
+### R10: Comment ergonomics (absorbed from v1.12.0 Sprint 121)
+
+As a user, I want comments to be comfortable to write, assign, and read alongside the text.
+
+Acceptance criteria:
+- The comment composer has a bounded vertical resize (a minimum of the current two rows and a Phase 0-frozen maximum); Save, Cancel, and Send stay visible and reachable at the minimum supported editor width, at 200% zoom, and with a long note.
+- Typing `@` opens the supported-agent list immediately; continued typing filters it; Arrow keys move, Enter or Tab inserts, Escape closes without inserting; pointer selection works; only aliases in `COMMENT_AGENT_ALIASES` are offered, and the inserted mention is exactly what `detectAgentAlias` recognises, so picker and collector share one vocabulary.
+- The selected agent stays visually explicit in the composer and in the bubble before save and before send.
+- A collapsed comment is a compact margin marker that never covers document text at narrow or normal widths, with a long note, with a status dot, and with three adjacent markers; expanding uses the existing rail interaction, and the expanded bubble sits beside the text column.
+- Status, completion reply, and actions stack below the note inside the bubble and never cover document text (R9 carries the accessibility matrix).
+- The resizable composer is one reusable primitive so v1.12.0 Sprint 122 can apply it to the agent composer without a second implementation.
+
 ## Non-Requirements
 
 - Multi-turn collaborative comment threads.
 - Editing the agent response inside the comment.
 - Automatically deleting/resolving a source comment after task completion.
-- v1.12 Sprint 121 resizing, collapsed-callout layout, or richer `@` suggestion UX.
+- Agent conversation header, agent composer resize, and destination-aware chat links (v1.12.0 Sprint 122).
 - New runtime kinds, runtime-specific approvals, or a second conversation transcript store.
 - Portable/cloud-synced task metadata unless separately approved.
 
 ## Phase 0 Decisions
 
-1. Approve full 23-finding scope versus a named surgical deferral list.
+1. ~~Approve full 23-finding scope versus a named surgical deferral list.~~ Resolved 2026-09-14: full scope; v1.12.0 Sprint 121 absorbed.
 2. Freeze `CommentTaskRecordV1`, retention, cleanup, file-move/Save As, retry, and comment-deletion behavior.
 3. Approve host-local completion projection versus a new persisted Markdown reply encoding; recommendation is host-local projection.
-4. Freeze destination resolution and whether the confirmation occurs before or as part of atomic task acceptance.
+4. Freeze destination resolution and the exact pre-dispatch confirmation interaction. Decided 2026-09-14: the agent and destination are shown before dispatch on both entry points; Phase 0 still freezes the surface and its atomicity with acceptance.
 5. Freeze the exact typed request/result/event union and integration seam with ConversationController/sidebar queue.
 6. Approve the visual states in [design.md](./design.md).
+7. Approve the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow widths (R10).
