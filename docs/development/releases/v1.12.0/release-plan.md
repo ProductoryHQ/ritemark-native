@@ -53,7 +53,7 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 ### Out of scope / explicitly deferred
 
 - Google Docs publishing, direct Transcribe recording, runtime/model refreshes, and the underlying comment-task completion reply; those remain in the v1.11.0 plan.
-- Comment composer resize, `@` agent picker, collapsed-comment layout, and pre-dispatch destination visibility — delivered by v1.11.0 Sprint 117 (#281).
+- Comment composer resize, `@` agent picker, collapsed-comment layout, and the open-conversation handoff (the task goes to the conversation open in the AI sidebar, named on the Send surface, no confirmation step) — delivered by v1.11.0 Sprint 117 (#281).
 - Multi-turn comment threads, comment collaboration, or a new persisted comment schema.
 - Workspace-wide or cross-recording transcript search.
 - A complete workbench tab-system redesign, tab groups, browser Favorites/Recents, or per-conversation browser instances.
