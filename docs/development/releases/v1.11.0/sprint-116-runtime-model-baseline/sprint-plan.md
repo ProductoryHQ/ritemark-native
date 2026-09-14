@@ -1,7 +1,7 @@
 # Sprint 116 — Runtime and Model Baseline
 
 **Track:** Audit-first SDD<br>
-**Status:** Implementation, clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA complete; PR #287 is ready to merge. Full behavior matrices and native Intel/Windows evidence are deferred to v1.11 release gates by the release owner.<br>
+**Status:** Implementation complete; issue #286 and PR #287 are the lifecycle records. Clean Ritemark RUNDEV, authenticated three-runtime document smoke, and local QA pass. Full behavior matrices and native Intel/Windows evidence are deferred to v1.11 release gates by the release owner.<br>
 **Branch:** `codex/sprint-116-runtime-model-baseline`<br>
 **Worktree:** `.worktrees/sprint-116-runtime-model-baseline`<br>
 **Issue:** [#286 — Sprint 116: Runtime and model baseline](https://github.com/ProductoryHQ/ritemark-native/issues/286)<br>

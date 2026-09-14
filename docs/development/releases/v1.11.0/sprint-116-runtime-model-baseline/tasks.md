@@ -67,4 +67,4 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Walk every ★ scenario and link its pass, partial, or pending evidence in [research/rundev-smoke.md](./research/rundev-smoke.md).
 - [x] Run `./scripts/validate-qa.sh` through the repository QA gate; see [qa-validation.md](./research/qa-validation.md).
 - [x] Update architecture, runtime notices, user-visible docs, changelog, v1.11 release notes, and parent tracker.
-- [ ] Update milestone issue and PR; verify every checked task against the diff/evidence before readiness handoff.
+- [x] Update milestone issue and PR; verify every checked task against the diff/evidence before readiness handoff.
