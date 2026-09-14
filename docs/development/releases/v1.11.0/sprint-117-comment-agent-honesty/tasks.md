@@ -20,11 +20,12 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 1: Task store and protocol foundation (W1, W3 — R1, R3, R6)
 
-- [ ] Add `src/commentTasks/types.ts` with versioned codecs, task/generation/status/source/destination projections.
-- [ ] Add atomic `CommentTaskStore` with index rebuild, quarantine, document query, transitions, retry/cancel, and diagnostics.
-- [ ] Add exact-field `commentTasks/protocol.ts` request/result/event validation and payload bounds.
-- [ ] Add `CommentTaskController`; compose it into providers/controllers without growing runtime-specific logic in view providers.
-- [ ] Test duplicate requests, wrong scope, unknown/stale IDs, failed writes, restart, and transition monotonicity.
+- [x] Add `src/commentTasks/types.ts` with versioned codecs, task/generation/status/source/destination projections.
+- [x] Add atomic `CommentTaskStore` with index rebuild, quarantine, document query, transitions, retry/cancel, and diagnostics.
+- [x] Add exact-field `commentTasks/protocol.ts` request/result/event validation and payload bounds.
+- [x] Add `CommentTaskController` behind injected dependencies (no `vscode` import), so acceptance and lifecycle run in Node tests.
+- [ ] Compose the controller into `RitemarkEditorProvider` and `UnifiedViewProvider` — Phase 3.
+- [x] Test duplicate requests, wrong scope, unknown/stale IDs, failed writes, restart, and transition monotonicity.
 
 ## Phase 2: Comment capture and stable IDs (W2 — R2, R3)
 
