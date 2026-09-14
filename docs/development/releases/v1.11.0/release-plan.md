@@ -1,6 +1,6 @@
 # Release Plan — v1.11.0 Publish to Google Docs + Agent Task Honesty
 
-**Status:** Sprint 116 implementation is complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286) and [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287) are its lifecycle records. Native Intel/Windows execution remains a v1.11 release gate. Sprints 117–119 remain proposed and require their own scope decisions.<br>
+**Status:** Sprint 116 implementation is complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286) and [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287) are its lifecycle records. Native Intel/Windows execution remains a v1.11 release gate. Sprints 118–119 remain proposed and require their own scope decisions. Sprint 117 approved 2026-09-14 (full scope; absorbs v1.12.0 Sprint 121 / #281); Phase 0 runs on `sprint-117-comment-agent-honesty`.<br>
 **Milestone:** [v1.11.0](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
 **Target:** v1.11.0<br>
 **Release type:** Full app distribution (shell-tier — bundles refreshed agent runtime binaries under `extensions/ritemark/binaries/agents/`)<br>
@@ -26,11 +26,11 @@ Around that headline, v1.11.0 pays down three honesty/hygiene debts: comment-to-
 | Sprint | Working name | Scope summary | Track | Preparation |
 |---|---|---|---|---|
 | [Sprint 116](./sprint-116-runtime-model-baseline/sprint-plan.md) | Runtime & model baseline refresh | Complete runtime package snapshot, lockstep SDKs, model catalog refresh, and measured protocol fixes | Audit-first SDD (Sprint 111 precedent) | Implementation complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286); [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native execution deferred to release gates |
-| [Sprint 117](./sprint-117-comment-agent-honesty/sprint-plan.md) | Comment→agent pipeline honesty | Unify dispatch paths A/B; IDs for all comment forms; correct per-document status; reply-to-comment on completion (#156); carry `documentPath` to the runtime; availability gating; visible target conversation | Full SDD — crosses webview, host, sidebar store, and all three runtimes | Full draft package ready; product-depth decision open |
+| [Sprint 117](./sprint-117-comment-agent-honesty/sprint-plan.md) | Comment→agent pipeline honesty | Unify dispatch paths A/B; IDs for all comment forms; correct per-document status; reply-to-comment on completion (#156); carry `documentPath` to the runtime; availability gating; visible target conversation; absorbs v1.12.0 Sprint 121 (#281): destination shown before dispatch on both surfaces, bounded composer resize, immediate filterable `@` agent picker, collapsed comments that never cover text | Full SDD — crosses webview, host, sidebar store, and all three runtimes | Approved 2026-09-14 (full scope); Phase 0 in progress on `sprint-117-comment-agent-honesty` |
 | [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record entry in the Transcribe panel; webview mic capture → host-side accumulation into a real audio file on disk → existing path-driven `JobManager` pipeline unchanged | Full SDD — new typed capture/write boundary | Full draft package ready; capture/storage freeze open |
 | [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Google account connect in Settings; template selection; toolbar **Create Google Docs** + **Sync**; Doc identity remembered per markdown file | Full SDD — new external integration, OAuth, conversion fidelity | Full draft package ready; integration Phase 0 and external OAuth blockers open |
 
-Proposed order: 116 first so 117–119 validate against the final runtime/model baseline (same reasoning as v1.10.0's Sprint 111-before-112). 117/118/119 have no hard interdependencies; order between them is Jarmo's call.
+Proposed order: 116 first so 117–119 validate against the final runtime/model baseline (same reasoning as v1.10.0's Sprint 111-before-112). 117/118/119 have no hard interdependencies; order between them is Jarmo's call. Sprint 117 goes first among 117–119 (kicked off 2026-09-14).
 
 ## Sprint Preparation Status
 
@@ -39,11 +39,12 @@ Proposed order: 116 first so 117–119 validate against the final runtime/model 
 - [x] Each sprint has a behavioral spec, BDD scenarios, technical workstreams, phased tasks, requirement traceability, Definition of Done, risks, dependencies, and explicit non-goals.
 - [x] Current-state audits completed for all four sprints; UX-heavy Sprints 117–119 include design-state documents.
 - [x] Sprint 119 includes an official-source Google API/OAuth contract audit and explicit external release blockers.
-- [ ] Jarmo approves the release scope, Sprint 117 depth, and sprint order.
+- [x] Jarmo approved Sprint 117 depth (full) and its absorption of v1.12.0 Sprint 121 on 2026-09-14; Sprint 118/119 scope decisions remain open.
 - [x] Release mapped for the approved Sprint 116 slice; remaining sprint scope is still proposed.
 - [x] GitHub milestone `v1.11.0` created (milestone 11).
 - [x] Sprint 116 issue [#286](https://github.com/ProductoryHQ/ritemark-native/issues/286) created under milestone `v1.11.0`; other sprint issues await their scope decisions.
 - [x] Sprint 116 scope/kickoff and exact Phase 0 package approved; implementation runs on `codex/sprint-116-runtime-model-baseline` in its dedicated worktree.
+- [ ] Sprint 117 issue published under milestone `v1.11.0` (draft in the sprint package); #156 and #281 re-homed to it.
 
 ## SDD Package Index
 
@@ -108,7 +109,7 @@ Phase 0 must decide (research, not guessed here):
 ### In scope
 
 - Everything in the Sprint Map above.
-- GitHub milestone v1.11.0; issues per sprint (including absorbing existing #156 into Sprint 117).
+- GitHub milestone v1.11.0; issues per sprint (including absorbing existing #156 and #281 into Sprint 117).
 - Release notes, user docs (`docs/user/`), architecture.md updates per sprint, and the standard full-release gate sequence (Gate 1 arm64 → Gate 2 x64/Windows, notarization, hardening windows, D1 source-freeze discipline).
 
 ### Explicitly out of scope
@@ -133,14 +134,15 @@ Phase 0 must decide (research, not guessed here):
 
 ## Decisions needed from Jarmo before the remaining sprints start
 
-1. Approve the remaining Sprint 117–119 release scope and their order.
-2. Sprint 117 depth: approve the proposed full correctness contract, or reduce it to the surgical core (dispatch unification + IDs + #156 reply + correct status) and explicitly defer the remaining findings.
-3. Confirm the proposed order among Sprints 117, 118, and 119; they have no hard interdependency.
+1. Approve the remaining Sprint 118–119 release scope and their order.
+2. Resolved 2026-09-14: Sprint 117 runs the full correctness contract and absorbs Sprint 121.
+3. Confirm the order between Sprints 118 and 119; they have no hard interdependency.
 
 ## Current next steps
 
 1. Run native darwin-x64 and win32-x64 execution plus signed artifact verification before the v1.11 release candidate.
 2. Review the Sprint 117–119 SDD drafts and record a separate scope decision before each implementation starts.
+3. Sprint 117 Phase 0 freeze (23-finding traceability plus the absorbed Sprint 121 ergonomics, protocol/storage decisions) → Jarmo gate → implementation.
 
 ## Decisions Log
 
@@ -153,3 +155,6 @@ Phase 0 must decide (research, not guessed here):
 | 2026-09-13 | Approve and implement the Sprint 116 Phase 0 package | Exact runtime/SDK pins, measured adapter fixes, canonical catalog changes, complete package dependency trees, and rollback policy approved. Local repository QA and Apple Silicon evidence pass; PR-native Intel/Windows evidence remains. |
 | 2026-09-14 | Publish Sprint 116 for review and merge after green checks | Jarmo explicitly authorized issue publication, branch push, PR creation, and merge; issue #286 and PR #287 now track the sprint under milestone `v1.11.0`. |
 | 2026-09-14 | Defer native Intel/Windows CI to release validation | Jarmo confirmed that today's merge does not produce installers. Local QA and Apple Silicon RUNDEV gate the implementation merge; cross-platform native execution remains mandatory before the v1.11 release. |
+| 2026-09-14 | Approve Sprint 117 at full scope | The 23 findings share one message path and state model; the surgical subset would leave the two worst symptoms — wrong document context and the invisible landing — in place. |
+| 2026-09-14 | Absorb v1.12.0 Sprint 121 (#281) into Sprint 117 | Two of Sprint 121's six outcomes were already Sprint 117 R4/R6/R7; the remaining three ergonomic outcomes (composer resize, `@` picker with explicit agent selection, collapsed-comment layout) change the same component Sprint 117 W6 rewrites (`MarginCommentRail` and the Comments menu) and share the `@` alias vocabulary. One sprint avoids rebuilding the rail in two releases; the resizable composer becomes a primitive Sprint 122 reuses. |
+| 2026-09-14 | Start Sprint 117 on `sprint-117-comment-agent-honesty` from main `d0328249` | Jarmo: "täismaht ja 121 sulata 117 sisse". |

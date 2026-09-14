@@ -1,0 +1,277 @@
+# Release Plan — v1.12.0 Everyday UX
+
+**Status:** Mapped — six-sprint sequence approved by Jarmo (2026-09-12/13). Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14; five sprints remain (120, 122–125). Individual sprints have not started.<br>
+**Target:** v1.12.0<br>
+**GitHub milestone:** [v1.12.0](https://github.com/ProductoryHQ/ritemark-native/milestone/10)<br>
+**Release type:** Full app distribution, provisionally shell-tier because Sprint 123 is expected to change integrated-browser/editor tab labels. Downgrade to extension-only only if Phase 0 proves no VS Code patch or shell source changes are required.<br>
+**Platforms:** darwin-arm64, darwin-x64, win32-x64<br>
+**Release owner:** Jarmo<br>
+**Created:** 2026-09-12<br>
+**Source:** Jarmo's hands-on UX friction log collected while editing, transcribing, and working with agent conversations on 2026-09-12, expanded with Office-preview requirements on 2026-09-13.
+
+## Release Thesis
+
+Ritemark should stay out of the user's way during ordinary long-form work. v1.12.0 removes a focused set of recurring paper cuts: prose no longer turns into a list against the author's intent, comments are comfortable to write and hand to an agent, the active agent conversation and its links are predictable, long transcripts are searchable, crowded tabs remain distinguishable, Word documents are substantially easier to inspect, and modern PowerPoint files open in a useful local preview.
+
+This is a workflow-coherence release, not a collection of unrelated cosmetic tweaks. Every included item must reduce uncertainty or friction in one of five repeated actions: write, comment, work with an agent, find the active material again, or inspect the documents that arrive in everyday work.
+
+## User-Facing Headlines
+
+1. **The editor respects what you type** — a year such as `2026. a` stays prose while deliberate numbered-list input continues to work.
+2. **Comments are comfortable and accountable** — delivered ahead of this release by v1.11.0 Sprint 117; v1.12.0 builds on that vocabulary.
+3. **Agent conversations are easier to understand and operate** — the active conversation has a title and actions, long prompts get more room, and project/file/web links behave according to their destination.
+4. **Long work stays findable** — search inside a transcription and distinguish open documents and web pages in a crowded tab row.
+5. **Office documents become first-class reading material** — Word gains a PDF-like page-viewing experience and modern PowerPoint files gain a secure local preview.
+
+## Product Contract
+
+1. **Never reinterpret obvious prose silently.** Editor shortcuts may accelerate explicit structure, but plausible prose such as a year followed by an abbreviation must remain prose.
+2. **Never hide an AI destination.** Before a comment task is sent, the assigned runtime and destination conversation are visible; completion remains connected to that same conversation (implemented by v1.11.0 Sprint 117).
+3. **Never let controls cover the user's content.** Comment callouts and resizable composers preserve readable text and reachable actions at supported widths.
+4. **Never let a supported link fail silently.** Project files, other local paths, and web URLs have distinct, safe actions and clear failure feedback.
+5. **Never overstate document fidelity or move local files silently.** Office previews remain local by default, expose unsupported content honestly, and always offer a safe external-open fallback.
+
+## Release Sequencing and Cross-Release Dependency
+
+Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carries no in-flight cross-release dependency. Sprint 122 depends on the merged Sprint 117: the comment/agent interaction vocabulary, the visible-destination contract, and the resizable composer primitive. Sprint 122 must not add a second dispatch path or weaken the invariant that every conversation-scoped message carries a canonical `conversationId`.
+
+## Scope Envelope
+
+### In scope
+
+- Ordered-list input intent: prevent plausible year prefixes from triggering a numbered list while preserving deliberate list creation and Markdown round trips.
+- Active agent conversation header with a clear title and actions consistent with History.
+- Agent composer vertical resize without hiding Send, attachment, runtime, model, autonomy, or effort controls.
+- Destination-aware agent-chat links for project files, other local filesystem targets, and web URLs, including appropriate reveal/open/copy actions and clear error states.
+- In-transcript text search with match count, previous/next navigation, active result highlighting, and keyboard access.
+- Compact, distinguishable file and browser tab labels; browser labels do not append a redundant full URL to the primary title.
+- Page-oriented Word preview with improved measured fidelity and PDF-like navigation, zoom, fit, search, loading, refresh, and fallback behavior.
+- Secure local read-only preview for modern `.pptx` files with thumbnails, navigation, zoom, fit, search where supported, and external-open fallback.
+- An Office-preview-specific webview asset boundary so ordinary editor views do not load large document renderers.
+- Automated regression coverage, focused dev-mode/manual scenarios, release notes, and architecture documentation where the architecture gate applies.
+
+### Out of scope / explicitly deferred
+
+- Google Docs publishing, direct Transcribe recording, runtime/model refreshes, and the underlying comment-task completion reply; those remain in the v1.11.0 plan.
+- Comment composer resize, `@` agent picker, collapsed-comment layout, and pre-dispatch destination visibility — delivered by v1.11.0 Sprint 117 (#281).
+- Multi-turn comment threads, comment collaboration, or a new persisted comment schema.
+- Workspace-wide or cross-recording transcript search.
+- A complete workbench tab-system redesign, tab groups, browser Favorites/Recents, or per-conversation browser instances.
+- Executable `command:`, `vscode:`, `javascript:`, or other privileged link schemes from agent output.
+- TipTap 2→3 migration and broad Markdown list serialization cleanup beyond the year/input-intent defect.
+- New agent runtimes, model IDs, approval message types, or runtime-specific browser/link implementations.
+- DOCX/PPTX editing, legacy `.doc`/`.ppt`, complete Office animation or macro support, or a promise of universal pixel-identical Microsoft Office rendering.
+- Uploading Office files to a cloud conversion service by default, or bundling/requiring Microsoft Office or LibreOffice.
+
+## Sprint Map
+
+| Sprint | Working name | User outcome | GitHub issue | Dependency | Status |
+|---|---|---|---|---|---|
+| Sprint 120 | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Planned |
+| Sprint 121 | Comment ergonomics and visible handoff | Comments are easy to compose and review, and AI assignment has a visible destination | [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | — | Absorbed into v1.11.0 Sprint 117 (2026-09-14) |
+| Sprint 122 | Agent conversation clarity | Active conversation, long-prompt composer, and destination-aware links behave predictably | [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | v1.11.0 Sprint 117 merged (interaction vocabulary, composer primitive); existing durable conversation APIs | Planned |
+| Sprint 123 | Findability across long work | Users can search transcripts and distinguish crowded tabs | [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283) | none; can run after Sprint 120 while 121/122 follow their dependency | Planned |
+| Sprint 124 | Word preview fidelity | Word documents get PDF-like page viewing and measured fidelity improvements | [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284) | none; establishes the Office-preview asset boundary | Planned |
+| Sprint 125 | PowerPoint preview | Modern `.pptx` files open locally in a secure read-only slide preview | [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) | Sprint 124 viewer shell and asset boundary | Planned |
+
+Mainline UX order: 120 → 122, with Sprint 123 as an independent findability track after Sprint 120. Office-preview order: 124 → 125. The Office track may proceed independently once release foundations are stable, but Sprint 125 does not start before Sprint 124 has established and validated the preview asset boundary. The release remains feature-incomplete until all six sprints are merged or explicitly deferred.
+
+## Sprint Outcomes and Boundaries
+
+### Sprint 120 — Editor input intent
+
+**Goal:** remove the false numbered-list conversion without weakening real list authoring.
+
+**Required outcomes:**
+
+- Typing `2026. a` at the start of a paragraph does not transform the paragraph into an ordered list.
+- Typing an intentional short marker such as `1. Item` still creates an ordered list.
+- Pasted and reopened Markdown lists keep their original semantics.
+- Undo/redo and save/reopen behavior are covered, not only the first keystroke.
+
+**Boundary:** Phase 0 must identify whether the behavior comes from TipTap's ordered-list input rule, an editor wrapper, or Markdown rehydration. The fix belongs at the narrowest correct layer and must not special-case one literal year.
+
+### Sprint 121 — Comment ergonomics and visible handoff
+
+Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1.11.0/sprint-117-comment-agent-honesty/spec.md`](../v1.11.0/sprint-117-comment-agent-honesty/spec.md) (R4, R6, R7, and the R10 ergonomics requirement Sprint 117 Phase 0 adds) and close with issue #281 under milestone v1.11.0.
+
+### Sprint 122 — Agent conversation clarity
+
+**Goal:** make the current conversation and the objects referenced inside it unambiguous.
+
+**Required outcomes:**
+
+- A persistent header shows the active conversation title and status without competing with the transcript.
+- Header actions reuse the same rename, pin/unpin, and safe delete/archive behavior and terminology as History.
+- Long titles truncate visually while their full accessible name remains available.
+- The prompt composer supports bounded vertical resizing and preserves reachable controls at minimum supported sidebar width.
+- Chat links are classified through one policy as project file, other local file/folder, web URL, or unsupported.
+- Ordinary click performs the safest likely action; a context menu offers destination-specific secondary actions such as Reveal in project, Locate in Finder, Open externally, and Copy.
+- Missing/inaccessible targets and unsupported schemes produce explicit feedback; no supported link appears inert.
+
+**Boundary:** extend the existing `chatLinks`/host bridge policy and durable conversation actions. Do not enable privileged URL schemes or duplicate filesystem access in the sandboxed webview. Reuse the resizable composer primitive from Sprint 117.
+
+### Sprint 123 — Findability across long work
+
+**Goal:** keep content and open surfaces identifiable when the work becomes large.
+
+**Required outcomes:**
+
+- Transcript search supports case-insensitive text matching, a result count, previous/next navigation, active-match highlighting, Enter/Shift+Enter navigation, Escape/clear, and no-result feedback.
+- Search remains local to the loaded transcript and does not mutate transcript/session data.
+- Choosing a result scrolls it into view and deliberately pauses automatic playback-follow until the user resumes it.
+- Browser tab primary labels use the page title without appending the full URL.
+- Long file/page titles use middle- or end-truncation appropriate to the content; full title/URL remains available through hover or the open-tabs list.
+- Active-tab identity, close affordances, and keyboard navigation remain intact across supported platforms.
+
+**Boundary:** Phase 0 must identify whether compact tab labeling can be implemented in the integrated-browser editor input or requires a VS Code patch. Any patch makes the planned full-app release tier final.
+
+### Sprint 124 — Word preview fidelity
+
+**Goal:** make Word documents feel like deliberate page-based reading surfaces rather than best-effort HTML output.
+
+**Required outcomes:**
+
+- A representative DOCX corpus has Word- or LibreOffice-rendered PDF/image ground truth before renderer changes are accepted.
+- The current `docx-preview` 0.3.7 implementation is measured against a 0.4.0 spike; upgrade only if the visual and regression evidence supports it.
+- Common pagination, fonts, headers/footers, lists, tables, images, footnotes, and section behavior improve measurably.
+- The viewer gains page position, zoom, fit-width/fit-page, text search, loading, refresh, actionable errors, and Open externally.
+- DOCX renderer code leaves the shared editor bundle for an Office-preview-specific entry or equivalent lazy asset boundary.
+- Expected fidelity limits are documented; no unsupported document silently appears complete.
+
+**Boundary:** “PDF-like” describes the viewer experience and measured representative fidelity, not universal pixel parity with Microsoft Word. DOCX editing, legacy `.doc`, default cloud conversion, and bundling or requiring LibreOffice are excluded. See [Office preview analysis](research/office-preview-analysis.md).
+
+### Sprint 125 — PowerPoint preview
+
+**Goal:** let users inspect modern PowerPoint presentations locally without leaving Ritemark.
+
+**Required outcomes:**
+
+- Phase 0 audits and visually tests the exact candidate `@aiden0z/pptx-renderer@1.2.4` before dependency approval.
+- A custom read-only `.pptx` document/provider pipeline uses a dedicated PPTX asset rather than the shared editor bundle.
+- The viewer provides thumbnails, current/total slide position, previous/next and keyboard navigation, zoom, fit, search where supported, loading, refresh, actionable errors, and Open externally.
+- Common text, images, tables, shapes, charts, groups, and theme behavior are measured against PowerPoint- or LibreOffice-exported ground truth.
+- Malformed/oversized ZIPs, unsafe links/media, object URLs, large buffers, and renderer disposal are handled explicitly.
+- A default-on experimental `powerpoint-preview` feature flag provides a real kill switch with a truthful fallback.
+
+**Boundary:** modern `.pptx` read-only preview only. Legacy `.ppt`, editing, macros, full animation/transition playback, slideshow parity, and default cloud conversion are excluded. See [Office preview analysis](research/office-preview-analysis.md).
+
+## GitHub Issue Intake
+
+| Observation | Decision | Sprint / issue | Notes |
+|---|---|---|---|
+| A year such as `2026. a` becomes a numbered list | Include | Sprint 120 / [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | Correctness defect, not cosmetic polish |
+| Send-to-AI destination is unclear | Moved to v1.11.0 | v1.11.0 Sprint 117 / [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | Absorbed 2026-09-14 |
+| Search inside a transcription | Include | Sprint 123 / [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283) | Local loaded-transcript search only |
+| Agent prompt composer should resize | Include | Sprint 122 / [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | Bounded height; controls remain visible |
+| Agent-chat links need destination-aware behavior | Include | Sprint 122 / [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | Project/local/web taxonomy; safe schemes only |
+| Open-tab names do not fit | Include | Sprint 123 / [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283) | Remove redundant browser URL from primary label |
+| Comment composer should resize and `@` should open agent choices | Moved to v1.11.0 | v1.11.0 Sprint 117 / [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | Absorbed 2026-09-14 |
+| Collapsed comments cover document text | Moved to v1.11.0 | v1.11.0 Sprint 117 / [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | Absorbed 2026-09-14 |
+| Active agent conversation needs a title header and actions | Include | Sprint 122 / [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | Reuse History actions and host-owned title |
+| Word preview should approach the PDF reading experience | Include as separate sprint | Sprint 124 / [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284) | Improve measured fidelity and viewer UX; do not promise universal Word parity |
+| PowerPoint is not currently supported | Include as separate sprint | Sprint 125 / [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) | Local `.pptx` preview; renderer accepted only after spike |
+
+## Feature-Complete Definition
+
+- [ ] Sprint 120 merged; #280 closed or explicitly deferred with evidence.
+- [ ] Sprint 121 absorbed into v1.11.0 Sprint 117; #281 closes with that sprint.
+- [ ] Sprint 122 merged; #282 closed or explicitly deferred with evidence.
+- [ ] Sprint 123 merged; #283 closed or explicitly deferred with evidence.
+- [ ] Sprint 124 merged; #284 closed or explicitly deferred with evidence.
+- [ ] Sprint 125 merged; #285 closed or explicitly deferred with evidence.
+- [ ] v1.11.0 Sprint 117 is merged before Sprint 122 starts.
+- [ ] Every new or changed webview↔host message is typed/validated at its boundary.
+- [ ] `docs/development/architecture.md` is updated for any structural message, subsystem, feature-flag, or shell-patch change; its date is not older than the relevant sprint branch.
+- [ ] Cross-platform tab-label behavior is verified in dev/RC evidence where the shell is involved.
+- [ ] Office preview renderers are isolated from the ordinary editor bundle and the resulting packaged assets are verified.
+- [ ] Word and PowerPoint visual fixture corpora pass their accepted baselines on macOS arm64/x64 and Windows.
+- [ ] Automated editor, comment, conversation, link, transcript-search, tab-label, and Office-preview regressions pass.
+- [ ] `./scripts/validate-qa.sh` passes at each readiness handoff.
+- [ ] `docs/CHANGELOG.md` and `docs/releases/v1.12.0/release-notes.md` cover every shipped user-facing behavior.
+- [ ] `docs/releases/v1.12.0/TEST-CHECKLIST.md` includes the release canary matrix.
+- [ ] The release tracker records sprint branches, PRs, issue outcomes, QA state, and release-note state.
+
+## Sprint / Issue / PR Tracker
+
+| Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
+|---|---|---|---|---|---|---|
+| Sprint 120 | `sprint-120-editor-input-intent` | TBD | #280 | not started | not run | not drafted |
+| Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
+| Sprint 122 | `sprint-122-conversation-clarity` | TBD | #282 | not started | not run | not drafted |
+| Sprint 123 | `sprint-123-findability` | TBD | #283 | not started | not run | not drafted |
+| Sprint 124 | `sprint-124-word-preview-fidelity` | TBD | #284 | not started | not run | not drafted |
+| Sprint 125 | `sprint-125-powerpoint-preview` | TBD | #285 | blocked on Sprint 124 asset boundary | not run | not drafted |
+
+## Risk Register
+
+| Risk | Severity | Retirement plan | Status |
+|---|---|---|---|
+| Ordered-list suppression breaks legitimate high-number list starts or imported CommonMark | High | Phase 0 input-rule audit; explicit boundary tests for intentional lists, paste, save, reopen, undo/redo | Open |
+| Sprint 121 duplicates or races the v1.11.0 comment dispatch refactor | High | Treat Sprint 117 as a hard dependency; one canonical conversation ID and one queue/dispatch path | Closed 2026-09-14 (absorbed) |
+| Comment resize/rail changes create overlap or unreachable controls at narrow widths | Medium | Responsive layout matrix plus keyboard, zoom, long-text, and multi-comment scenarios | Open |
+| New chat link actions expose unsafe paths or schemes | High | Central classifier; host-side path/scheme validation; deny unsupported schemes; clear failures | Open |
+| Conversation header actions diverge from History and create two lifecycle semantics | Medium | Reuse the existing store/actions and shared labels rather than implementing new mutations | Open |
+| Transcript search over long sessions harms render/playback performance | Medium | Keep a derived local index; test large-session navigation and playback-follow interaction | Open |
+| Tab-label change requires fragile upstream VS Code patch work | High | Phase 0 locates the label authority; prefer existing browser editor-input APIs; patch only if necessary and add patch-application coverage | Open |
+| Full-app release cost is incurred for one shell-facing polish item | Medium | Confirm release tier at Sprint 123 Phase 0 before source changes; retain full release if shell code changes | Open |
+| “PDF-like Word” is interpreted as universal pixel parity that browser HTML cannot guarantee | High | Define representative corpus and accepted differences before implementation; label unsupported content and retain external-open fallback | Open |
+| A new PPTX renderer adds immature behavior, dependency, or bundle risk | High | Exact-version Phase 0 spike; dependency/license/security audit; dedicated lazy asset; accept only with visual evidence | Open |
+| Office ZIP parsing permits decompression bombs, unsafe URLs, or leaked large buffers | High | Enforce ZIP limits and host/webview validation; CSP/link filtering; disposal and large-file tests | Open |
+| Missing or platform-different fonts produce misleading Office layouts | Medium | Cross-platform corpus, font fallback policy, expected-difference documentation, and external-open action | Open |
+
+## Release QA Strategy
+
+### Automated
+
+- Editor input-rule and Markdown round-trip tests for prose-year and deliberate-list cases.
+- Comment model, mention suggestion, resize-boundary, rail-placement, and task-correlation tests.
+- Durable conversation header action and chat-link classification/validation tests.
+- Transcript search reducer/index and keyboard-navigation tests against large synthetic sessions.
+- Browser/file tab label unit or integration coverage at the actual label authority.
+- DOCX/PPTX provider, message-boundary, feature-flag, ZIP-limit, unsafe-link, loading/error, search/navigation, and disposal tests.
+- Visual baselines for representative Word pages and PowerPoint slides, plus bundle-size and large-document performance checks.
+- Full repository QA at every sprint close and release feature-complete review.
+
+### Manual canaries
+
+1. Type Estonian and English prose beginning with several plausible years; save, close, reopen, undo, and redo.
+2. Create short and long anchored/standalone comments at the top, middle, and bottom of a document; resize, collapse, zoom, and narrow the editor.
+3. Assign single and bulk comments with keyboard-only `@` selection; verify the shown destination conversation is the actual running/result conversation.
+4. Rename, pin/unpin, and safely delete/archive the active conversation from both Header and History; confirm identical outcomes.
+5. Compose a long prompt at minimum/typical/wide sidebar widths and verify all controls remain reachable.
+6. Open project-relative, absolute local, missing, external HTTPS, and blocked-scheme links from Claude, Codex, and OpenCode output.
+7. Search a long transcript while stopped and while playing; navigate matches and confirm speaker rename/seek still work.
+8. Open enough long-named documents and web pages to overflow the tab row; verify compact labels, full-name discovery, active identity, close, and keyboard navigation on macOS and Windows.
+9. Open the Word corpus; compare pagination and common content to the accepted PDF/image ground truth, then exercise zoom, fit, search, refresh, failure, and external-open paths.
+10. Open the PowerPoint corpus; navigate via thumbnails and keyboard, inspect common and unsupported content, test search/zoom/fit, then try malformed, oversized, missing-media, and unsafe-link fixtures.
+
+### Release gates
+
+Because the planned tier is full app, release execution follows the standard clean-room worktree, preflight, signed-unnotarized Gate 1 arm64 candidate, Gate 2 x64/Windows candidates, hardening windows, notarization, GitHub release, and canonical update-feed sequence. Planning approval does not clear either release gate.
+
+## Documentation and Release Assets
+
+- Add concise user documentation for transcript search and destination-aware links if the final interaction is not self-explanatory.
+- Update comment and agent conversation documentation with the visible-destination contract.
+- Capture one release-note image showing the improved active conversation/comment workflow and one showing transcript search if visual clarity benefits.
+- Release-note angle: fewer interruptions and less uncertainty in everyday document work; do not market this as a redesign.
+- Record any platform-specific tab-label limitation explicitly rather than silently reducing scope.
+- Add Office preview support/limitations documentation, including the local-first contract and external-open fallback.
+- Capture release-note evidence for improved Word viewing and the new PowerPoint preview if both ship.
+
+## Decisions Log
+
+| Date | Decision | Source |
+|---|---|---|
+| 2026-09-12 | Collect UX friction first; do not create a sprint plan until Jarmo asks | Jarmo, UX collection task |
+| 2026-09-12 | Start release planning from the nine collected observations | Jarmo |
+| 2026-09-12 | Keep the existing v1.11.0 draft untouched and map the UX work as a separate v1.12.0 release | Jarmo confirmation |
+| 2026-09-12 | Use four sprints, numbered 120–123 after the proposed v1.11.0 sprints 116–119 | Jarmo confirmation of the proposed release map |
+| 2026-09-12 | Keep Send-to-AI destination truth dependent on the v1.11.0 Sprint 117 dispatch contract instead of building a duplicate path | Release planning decision |
+| 2026-09-12 | Treat the release as full app unless Sprint 123 proves tab labels can be fixed without shell changes | Release planning decision |
+| 2026-09-13 | Add Word preview fidelity and PowerPoint preview as two separate sprints, 124 and 125 | Jarmo |
+| 2026-09-13 | Keep Office previews browser-native and local by default; cloud or LibreOffice conversion remains a separately approved future option | Office preview feasibility analysis |
+| 2026-09-13 | Isolate Office renderers from the shared editor bundle; Sprint 125 depends on the boundary established in Sprint 124 | Office preview feasibility analysis |
+| 2026-09-13 | Treat `@aiden0z/pptx-renderer@1.2.4` as a spike candidate, not an approved dependency, and put PPTX preview behind a default-on experimental kill switch | Office preview feasibility analysis |
+| 2026-09-14 | Absorb Sprint 121 into v1.11.0 Sprint 117; keep 121 as a numbering gap rather than renumbering 122–125 | Jarmo |
