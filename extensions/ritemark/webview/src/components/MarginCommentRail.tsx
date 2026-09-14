@@ -586,7 +586,9 @@ function RailItem({
           )}
 
           {!projection && !sending && alias && destination && (
-            <div className="rm-task-dest">{destinationCaption(destination.title)}</div>
+            <div className="rm-task-dest">
+              {destinationCaption(destination.title, { alias, conversationRuntimeId: destination.runtimeId })}
+            </div>
           )}
 
           {(presentation || alias) && (

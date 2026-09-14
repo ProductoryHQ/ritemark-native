@@ -131,6 +131,10 @@ export interface CommentTaskDestinationPreview {
    *  surface then says "a new conversation" rather than inventing a title. */
   conversationId: string | null;
   title: string | null;
+  /** The agent that conversation is currently running, or null if it has not
+   *  run a turn yet. The Send surface compares it with the comment's own agent
+   *  so a takeover is announced rather than discovered. */
+  runtimeId?: string | null;
 }
 
 /**

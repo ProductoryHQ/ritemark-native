@@ -13,7 +13,7 @@ import {
 import { CommentTaskStore, commentTaskStoreDir } from './CommentTaskStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome, CommentTaskResultMessage } from './protocol';
-import type { CommentTaskProjectionV1 } from './types';
+import { safeFailureMessage, type CommentTaskProjectionV1 } from './types';
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 const COMMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -436,6 +436,47 @@ async function main(): Promise<void> {
       await h.controller.handleRequest(acceptMessage({ comments: [] }), doc()),
       'invalid-request',
       'no comments',
+    );
+  }
+
+  // ── Summary flattening ─────────────────────────────────────────────────────
+  // ── Failure text never reaches a comment as a payload ──────────────────────
+  {
+    // The exact body Codex handed a comment on 2026-09-14, printed verbatim in
+    // the bubble until this existed.
+    const codex = '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-5.6-sol\' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again."}}';
+    assert.equal(
+      safeFailureMessage(codex),
+      "The 'gpt-5.6-sol' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.",
+      'the useful sentence is lifted out of the provider envelope',
+    );
+    assert.ok(!safeFailureMessage(codex).includes('{'), 'and no JSON survives');
+
+    assert.equal(
+      safeFailureMessage('{"type":"error","status":500}'),
+      'The task failed. Open the conversation for details.',
+      'an envelope with nothing to say falls back rather than printing braces',
+    );
+    assert.equal(
+      safeFailureMessage('Claude needs you to sign in.'),
+      'Claude needs you to sign in.',
+      'plain prose passes through untouched',
+    );
+    assert.equal(
+      safeFailureMessage('Error: boom\n    at Object.<anonymous> (/x.js:1:1)'),
+      'Error: boom',
+      'a stack trace keeps only its first line',
+    );
+    assert.equal(safeFailureMessage(''), 'The task failed. Open the conversation for details.');
+    assert.equal(safeFailureMessage(undefined), 'The task failed. Open the conversation for details.');
+    assert.equal(
+      safeFailureMessage('not json but {"very": "long"} ' + 'x'.repeat(200)),
+      'The task failed. Open the conversation for details.',
+      'brace soup that is not parseable is not shown either',
+    );
+    assert.ok(
+      safeFailureMessage('A sentence. ' + 'word '.repeat(400)).length <= 1024,
+      'a very long message is bounded',
     );
   }
 

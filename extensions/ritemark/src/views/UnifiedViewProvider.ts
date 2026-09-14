@@ -1467,9 +1467,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         bindingGeneration: record.bindingGeneration,
         title: record.title,
         created: false,
+        // The agent that answered last. A comment assigned to another one still
+        // lands here; the Send surface just says so first.
+        runtimeId: [...record.events].reverse().find((event) => event.kind === 'assistant-message')?.runtimeId
+          ?? [...record.events].reverse().find((event) => event.kind === 'user-message')?.runtimeId
+          ?? null,
       };
     } catch {
-      return { conversationId, bindingGeneration: 0, title: '', created: true };
+      return { conversationId, bindingGeneration: 0, title: '', created: true, runtimeId: null };
     }
   }
 

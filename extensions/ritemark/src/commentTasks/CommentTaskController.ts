@@ -30,6 +30,7 @@ import {
   type CommentTaskLifecycleV1,
   type CommentTaskProjectionV1,
   type CommentTaskRecordV1,
+  safeFailureMessage,
   MAX_SAFE_MESSAGE_CHARS,
   MAX_SUMMARY_CHARS,
 } from './types';
@@ -69,6 +70,15 @@ export interface CommentTaskDestination {
   title: string;
   /** True when this task started the conversation. */
   created: boolean;
+  /**
+   * The agent this conversation is currently running, when it has one. A
+   * comment assigned to a DIFFERENT agent still goes here — the same
+   * runtime-switch the Composer already allows, recorded as a boundary in the
+   * transcript — but the Send surface says so first, because a thread quietly
+   * changing agent is exactly the kind of surprise this sprint exists to
+   * remove. Null for a conversation that has not run a turn yet.
+   */
+  runtimeId?: string | null;
 }
 
 export interface CommentTaskAvailability {
@@ -399,6 +409,7 @@ export class CommentTaskController {
   private async previewDestination(requestId: string): Promise<CommentTaskResultMessage> {
     const destination = await this.dependencies.resolveOpenConversation('claude-code').catch(() => null);
     return commentTaskSuccess(requestId, 'comment-task/destination-preview', {
+      runtimeId: destination?.runtimeId ?? null,
       conversationId: destination?.conversationId ?? null,
       title: destination?.title ?? null,
     });
@@ -604,7 +615,7 @@ export class CommentTaskController {
           return {
             state: 'failed',
             since,
-            safeMessage: (outcome.error || 'The task failed.').slice(0, MAX_SAFE_MESSAGE_CHARS),
+            safeMessage: safeFailureMessage(outcome.error),
           };
       }
     });

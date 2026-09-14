@@ -219,6 +219,64 @@ export interface CommentTaskProjectionV1 {
   destination: { conversationId: string; title: string };
 }
 
+/**
+ * Turn whatever a runtime failed with into one sentence a person can act on.
+ *
+ * Runtimes report failures in their own shapes, and a provider's raw body is
+ * often a JSON envelope: Codex handed the comment
+ * `{"type":"error","status":400,"error":{"type":"invalid_request_error",
+ * "message":"The 'gpt-5.6-sol' model requires a newer version of Codex..."}}`,
+ * and the bubble printed it verbatim (found live, 2026-09-14) — against
+ * design.md's rule that raw provider diagnostics never reach a comment. The
+ * useful sentence is in there; this digs it out and drops the envelope.
+ *
+ * Anything still unreadable becomes the honest fallback rather than a wall of
+ * punctuation: the conversation has the detail, and the comment says so.
+ */
+export function safeFailureMessage(raw: string | undefined): string {
+  const fallback = 'The task failed. Open the conversation for details.';
+  const text = (raw ?? '').trim();
+  if (!text) return fallback;
+
+  // A JSON envelope: take the innermost human `message`, whatever nests it.
+  if (text.startsWith('{') || text.startsWith('[')) {
+    let deepest: string | null = null;
+    const walk = (value: unknown, depth: number): void => {
+      if (depth > 6 || value === null || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        if ((key === 'message' || key === 'detail') && typeof child === 'string' && child.trim()) {
+          deepest = child.trim();
+        } else {
+          walk(child, depth + 1);
+        }
+      }
+    };
+    try {
+      walk(JSON.parse(text), 0);
+    } catch {
+      // Not valid JSON after all; fall through to the plain-text path.
+    }
+    if (deepest) return clampSentence(deepest);
+    // It was JSON but carried no message worth showing.
+    return fallback;
+  }
+
+  // A stack trace helps nobody in a margin; keep the first line only.
+  const firstLine = text.split('\n')[0].trim();
+  if (!firstLine || /^\s*at\s/.test(firstLine)) return fallback;
+  // Braces and quote soup mean we are still looking at a payload, not prose.
+  if (/[{}]/.test(firstLine) && firstLine.length > 120) return fallback;
+  return clampSentence(firstLine);
+}
+
+function clampSentence(text: string): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= MAX_SAFE_MESSAGE_CHARS) return clean;
+  const window = clean.slice(0, MAX_SAFE_MESSAGE_CHARS);
+  const stop = Math.max(window.lastIndexOf('. '), window.lastIndexOf(' '));
+  return `${(stop > 40 ? window.slice(0, stop) : window).trimEnd()}…`;
+}
+
 export function projectCommentTask(record: CommentTaskRecordV1): CommentTaskProjectionV1 {
   const { lifecycle } = record;
   return {
@@ -230,7 +288,10 @@ export function projectCommentTask(record: CommentTaskRecordV1): CommentTaskProj
     since: lifecycle.since,
     ...(lifecycle.state === 'needs-user' ? { attentionKind: lifecycle.attentionKind } : {}),
     ...(lifecycle.state === 'completed' ? { summary: lifecycle.summary } : {}),
-    ...(lifecycle.state === 'failed' ? { safeMessage: lifecycle.safeMessage } : {}),
+    // Normalised HERE, not only where a failure is recorded, so a record
+    // written before this existed — or by any future path that forgets — still
+    // cannot show a provider payload in a margin.
+    ...(lifecycle.state === 'failed' ? { safeMessage: safeFailureMessage(lifecycle.safeMessage) } : {}),
     ...(lifecycle.state === 'interrupted' ? { interruptReason: lifecycle.reason } : {}),
     destination: {
       conversationId: record.destination.conversationId,

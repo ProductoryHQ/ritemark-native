@@ -13,7 +13,7 @@
  *   sprint-117-comment-agent-honesty/design.md ## State Vocabulary
  */
 
-import { ALIAS_LABEL } from '../../extensions/comment/commentModel'
+import { ALIAS_LABEL, ALIAS_TO_AGENT_ID } from '../../extensions/comment/commentModel'
 import type { CommentTaskProjectionV1, CommentTaskState } from '../../../../src/commentTasks/types'
 import type { CommentTaskError, CommentTaskRecovery } from '../../../../src/commentTasks/protocol'
 
@@ -102,9 +102,23 @@ export function destinationLine(title: string | null | undefined): string {
 
 /** The caption above a Send control: the conversation the task will go to
  *  (D5 — the open one, never a picker). A null conversation is a fresh one. */
-export function destinationCaption(title: string | null | undefined): string {
+export function destinationCaption(
+  title: string | null | undefined,
+  options: { alias?: CommentTaskProjectionV1['alias']; conversationRuntimeId?: string | null } = {},
+): string {
   const trimmed = (title ?? '').trim()
-  return trimmed ? `→ ${trimmed}` : '→ New conversation'
+  const base = trimmed ? `→ ${trimmed}` : '→ New conversation'
+
+  // A comment assigned to one agent, sent into a conversation another agent is
+  // running, is allowed — it is the same runtime switch the Composer offers,
+  // and the transcript records a boundary. But the user should read it before
+  // it happens, not discover it afterwards. Jarmo asked what this case does,
+  // 2026-09-14, which is the proof it was not visible enough.
+  const { alias, conversationRuntimeId } = options
+  if (!alias || !conversationRuntimeId || !trimmed) return base
+  const assigned = ALIAS_TO_AGENT_ID[alias]
+  if (assigned === conversationRuntimeId) return base
+  return `${base} · ${runtimeLabel(alias)} takes over`
 }
 
 /**

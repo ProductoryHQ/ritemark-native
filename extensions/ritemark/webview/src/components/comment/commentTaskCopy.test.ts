@@ -178,6 +178,29 @@ const ALL_STATES: CommentTaskState[] = [
 {
   assert.equal(destinationCaption('Release note review'), '→ Release note review')
   assert.equal(destinationCaption(null), '→ New conversation')
+
+  // A comment assigned to one agent, sent into a conversation another agent is
+  // running, is allowed — it is the runtime switch the Composer already offers.
+  // The caption says so before the click rather than leaving it to be noticed.
+  assert.equal(
+    destinationCaption('Release note review', { alias: 'codex', conversationRuntimeId: 'claude-code' }),
+    '→ Release note review · Codex takes over',
+  )
+  assert.equal(
+    destinationCaption('Release note review', { alias: 'claude', conversationRuntimeId: 'claude-code' }),
+    '→ Release note review',
+    'the same agent is not announced as a takeover',
+  )
+  assert.equal(
+    destinationCaption('Release note review', { alias: 'codex', conversationRuntimeId: null }),
+    '→ Release note review',
+    'a conversation that has not run a turn has no agent to take over from',
+  )
+  assert.equal(
+    destinationCaption(null, { alias: 'codex', conversationRuntimeId: 'claude-code' }),
+    '→ New conversation',
+    'a new conversation is never a takeover',
+  )
   assert.equal(destinationCaption(''), '→ New conversation')
 }
 
