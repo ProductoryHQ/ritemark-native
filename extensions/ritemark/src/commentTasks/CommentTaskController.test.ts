@@ -195,6 +195,11 @@ async function main(): Promise<void> {
       'comment-not-found',
       'the comment is no longer in the document',
     );
+    expectError(
+      await h.controller.handleRequest(acceptMessage(), doc({ text: documentText(SECOND_ID), isDirty: true })),
+      'document-not-synced',
+      'a comment missing from a dirty document is still on its way, not gone',
+    );
     assert.equal((await h.store.listForDocument(doc().uri)).length, 0, 'no rejected request left a record behind');
   }
 

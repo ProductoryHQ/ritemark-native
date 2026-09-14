@@ -57,6 +57,10 @@ export interface CommentTaskDocument {
   version: number;
   /** Current text, used to confirm the requested comment ids really exist. */
   text: string;
+  /** Unsaved changes pending. A comment the host cannot find in a dirty
+   *  document is probably still on its way, so the user is told to try again
+   *  rather than that their comment vanished. */
+  isDirty?: boolean;
 }
 
 export interface CommentTaskDestination {
@@ -265,7 +269,9 @@ export class CommentTaskController {
     const missing = request.comments.find((comment) => !this.documentContainsComment(document.text, comment.commentId));
     if (missing) {
       return reject(
-        commentTaskError('comment-not-found', 'That comment is no longer in the document.'),
+        document.isDirty
+          ? commentTaskError('document-not-synced', 'The document is still saving. Try again in a moment.')
+          : commentTaskError('comment-not-found', 'That comment is no longer in the document.'),
       );
     }
 
