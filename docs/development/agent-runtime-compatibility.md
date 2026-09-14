@@ -1,5 +1,32 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.11.0 Sprint 116 candidate — 2026-09-13
+
+**Candidate baseline:** Claude Code `2.1.270` with Claude Agent SDK `0.3.270`,
+Codex `0.154.0`, OpenCode `1.18.30` with its packaged ripgrep `15.1.0`, and
+ACP SDK `1.4.0`.
+
+Manifest schema 3 models complete install trees rather than one archive per
+executable. Twelve exact source rows expand to 25 installed files across
+darwin-arm64, darwin-x64, and win32-x64. Every archive, member, installed hash,
+license, target architecture, executable mode, and sidecar is validated. Codex
+preserves the official package tree, including code-mode-host, ripgrep, zsh on
+macOS, and both Windows sandbox helpers. OpenCode owns its first-use ripgrep
+dependency under `opencode-path` so startup does not depend on the user's PATH.
+
+| Runtime | Adapter result on final pin | Continuation/cancel | Model and effort result | Remaining native evidence |
+|---|---|---|---|---|
+| **Codex 0.154.0** | pass — current and legacy effort-cache schemas decode; explicit unknown thread events are dropped | pass — final adapter handles immediate Stop, exact completion, and immediate resend | pass — Astra and 5.6 family use canonical IDs with measured effort ranges; stale static sources cannot replace the newer bundled floor | darwin-x64 and win32-x64 execution in PR CI |
+| **Claude 2.1.270 / SDK 0.3.270** | pass — exact binary/SDK and all eight optional packages are enforced in lockstep | pass — persistent-session cancellation and immediate follow-up | pass — curated identities are centralized; no adapter change was required | darwin-x64 and win32-x64 execution in PR CI |
+| **OpenCode 1.18.30 / ACP 1.4.0** | pass — packaged dependency PATH is scoped to the ACP subprocess | pass within the retained ACP contract tests and canaries | pass — provider routes derive from canonical IDs; account-specific BYOK availability remains release evidence | darwin-x64 and win32-x64 execution in PR CI |
+
+All source archives and installed files passed cross-platform fetch verification.
+Native Apple Silicon startup/version probes and the authenticated Codex
+file-tool plus immediate Stop/resend canary passed. Direct API/BYOK account
+availability, native Intel/Windows execution, and signed-application validation
+remain explicit CI/release gates. Detailed evidence is in the
+[Sprint 116 audit](./releases/v1.11.0/sprint-116-runtime-model-baseline/research/runtime-model-audit.md).
+
 ## v1.10.1 Windows sandbox helpers — 2026-09-08
 
 Measured on Windows 11 x64 (Smart App Control in enforcement) against the

@@ -1,0 +1,22 @@
+{
+  "key": "opencode/runtime/win32-x64",
+  "capturedAt": "2026-09-13T09:03:46.497Z",
+  "version": "1.18.30",
+  "sourceUrl": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.18.30.tgz",
+  "archiveFilename": "opencode-windows-x64-1.18.30.tgz",
+  "sha256": "1a5cc50f529cf359fbb6d1a1750c6ae521799f463d00a0215e6eff579a08b036",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 2,
+    "member": "package/bin/opencode.exe",
+    "size": 179793448,
+    "licenseFiles": []
+  },
+  "binarySha256": "c1bdbb18767048e1853af4238311b3f7e16ff2f91b68fb4c7ced3c5175347eea",
+  "file": "PE32+ executable (console) x86-64, for MS Windows",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

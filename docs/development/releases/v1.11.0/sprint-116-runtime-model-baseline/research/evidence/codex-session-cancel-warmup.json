@@ -1,0 +1,52 @@
+{
+  "capturedAt": "2026-09-13T09:47:13.285Z",
+  "adapter": "unchanged CodexSession + CodexAppServer",
+  "binary": "0.154.0",
+  "variant": "warmup",
+  "auditTransportAdjustment": "Read account and models before first thread/start",
+  "protocol": [
+    {
+      "scope": "rpc:request",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:notification",
+      "method": "initialized"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "account/read"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "account/read"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "model/list"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "model/list"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:progress",
+      "method": "thread/start"
+    }
+  ],
+  "checks": [
+    {
+      "name": "session audit",
+      "status": "FAIL",
+      "error": "RPC call 'thread/start' timed out after 30000ms"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/2.1.270",
+  "capturedAt": "2026-09-13T08:59:17.913Z",
+  "sha256": "85a4403058bb014aca62b92b52af8a4e3b69f880cd406c8cd27ababfaec3da4e",
+  "data": {
+    "os": [
+      "darwin"
+    ],
+    "cpu": [
+      "x64"
+    ],
+    "dist": {
+      "shasum": "a18999e73ea38f0845232015db4d7729c343b079",
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.270.tgz",
+      "fileCount": 4,
+      "integrity": "sha512-Dotq2NtywNxhkqdSVZoCRIAabrZRL9HE31hUjvMDWafR4N3JroQYyywHyjMk/8WI2GIM8M90ef/d4xIXTJ+Uyw==",
+      "signatures": [
+        {
+          "sig": "MEYCIQCNT8J5w5t/McMKfd168xQknvp1gVmSZjvw/6ot6u657wIhAMoOUFiZQhFV214JNafSfoylOXdzYQd1q7LJWEZ+Tf9v",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEQCIBr4sFw9CNz6MxRTEW99rOTf4mq1TWteh5rNpUjWaulqAiBUzcjY0ZbZjAMf2prChu47PDfbmwW1gnQeLxsMSVJn8Q==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 216317497
+    },
+    "name": "@anthropic-ai/claude-code-darwin-x64",
+    "_from": "file:staged-npm/anthropic-ai-claude-code-darwin-x64-2.1.270.tgz",
+    "license": "SEE LICENSE IN LICENSE.md",
+    "_npmUser": {
+      "name": "wolffiex",
+      "email": "wolffiex@anthropic.com"
+    },
+    "_resolved": "/home/runner/work/claude-cli-internal/claude-cli-internal/staged-npm/anthropic-ai-claude-code-darwin-x64-2.1.270.tgz",
+    "_integrity": "sha512-Dotq2NtywNxhkqdSVZoCRIAabrZRL9HE31hUjvMDWafR4N3JroQYyywHyjMk/8WI2GIM8M90ef/d4xIXTJ+Uyw==",
+    "_npmVersion": "11.19.0",
+    "description": "Native binary for Claude Code on darwin-x64",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "zak-anthropic",
+        "email": "zak@anthropic.com"
+      },
+      {
+        "name": "dylanc-anthropic",
+        "email": "dylanc@anthropic.com"
+      },
+      {
+        "name": "benjmann",
+        "email": "ben@anthropic.com"
+      },
+      {
+        "name": "nikhil-anthropic",
+        "email": "nikhil@anthropic.com"
+      },
+      {
+        "name": "ejlangev-ant",
+        "email": "ethan.langevin@anthropic.com"
+      },
+      {
+        "name": "jv-anthropic",
+        "email": "jv@anthropic.com"
+      },
+      {
+        "name": "ollie-ant-2025",
+        "email": "ollie@anthropic.com"
+      },
+      {
+        "name": "packy-anthropic",
+        "email": "packy@anthropic.com"
+      },
+      {
+        "name": "noahz-anthropic",
+        "email": "noahz@anthropic.com"
+      },
+      {
+        "name": "sbidasaria",
+        "email": "sbidasaria@anthropic.com"
+      },
+      {
+        "name": "wolffiex",
+        "email": "wolffiex@anthropic.com"
+      },
+      {
+        "name": "felixrieseberg-anthropic",
+        "email": "f@anthropic.com"
+      },
+      {
+        "name": "joan-anthropic",
+        "email": "joan@anthropic.com"
+      }
+    ],
+    "_nodeVersion": "24.20.0",
+    "_hasShrinkwrap": false,
+    "readmeFilename": "README.md",
+    "_npmOperationalInternal": {
+      "tmp": "tmp/claude-code-darwin-x64_2.1.270_1789239065318_0.45323160878789603",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "@anthropic-ai/claude-code-darwin-x64@2.1.270",
+    "version": "2.1.270"
+  }
+}

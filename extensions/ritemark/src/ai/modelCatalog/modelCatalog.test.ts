@@ -9,12 +9,14 @@ import { BUNDLED_CATALOG } from './bundledCatalog';
 import {
   canonicalizeModelAliases,
   findModelEntry,
+  isCatalogAtLeastAsFresh,
   resolveAll,
   versionLt,
   type DiscoveryResults,
 } from './resolver';
 
 let failures = 0;
+const TEST_CATALOG_DATE = '2026-09-14T00:00:00Z';
 function test(name: string, fn: () => void): void {
   try {
     fn();
@@ -35,14 +37,18 @@ test('validateCatalog accepts the bundled baseline (round-trip)', () => {
 });
 
 test('validateCatalog throws on wrong schemaVersion', () => {
-  assert.throws(() => validateCatalog({ schemaVersion: 2, updatedAt: 'x', providers: {} }));
+  assert.throws(() => validateCatalog({ schemaVersion: 2, updatedAt: TEST_CATALOG_DATE, providers: {} }));
+});
+
+test('validateCatalog rejects an unparseable catalog date', () => {
+  assert.throws(() => validateCatalog({ schemaVersion: 1, updatedAt: 'unknown', providers: {} }));
 });
 
 test('validateCatalog throws on malformed model entry (missing id)', () => {
   assert.throws(() =>
     validateCatalog({
       schemaVersion: 1,
-      updatedAt: 'x',
+      updatedAt: TEST_CATALOG_DATE,
       providers: { anthropic: { models: [{ label: 'X', description: '', tier: 'high', deprecated: false, order: 0 }], defaults: {} } },
     }),
   );
@@ -52,7 +58,7 @@ test('validateCatalog throws on bad tier', () => {
   assert.throws(() =>
     validateCatalog({
       schemaVersion: 1,
-      updatedAt: 'x',
+      updatedAt: TEST_CATALOG_DATE,
       providers: { openai: { models: [{ id: 'a', label: 'A', description: '', tier: 'ultra', deprecated: false, order: 0 }], defaults: {} } },
     }),
   );
@@ -61,7 +67,7 @@ test('validateCatalog throws on bad tier', () => {
 test('validateCatalog accepts canonical effort metadata and rejects invented levels', () => {
   const valid = validateCatalog({
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       codex: {
         models: [{
@@ -75,7 +81,7 @@ test('validateCatalog accepts canonical effort metadata and rejects invented lev
   assert.deepStrictEqual(valid.providers.codex?.models[0].thinkingEffort?.levels, ['low', 'xhigh', 'ultra']);
   assert.throws(() => validateCatalog({
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       codex: {
         models: [{
@@ -91,7 +97,7 @@ test('validateCatalog accepts canonical effort metadata and rejects invented lev
 test('validateCatalog drops unknown provider keys (forward-compat)', () => {
   const v = validateCatalog({
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       anthropic: { models: [], defaults: {} },
       // a provider a future build added that this one does not know:
@@ -196,7 +202,7 @@ test('live model keeps bundled effort when a newer remote catalog omits the fiel
   };
   const remote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       codex: {
         models: [{
@@ -217,7 +223,7 @@ test('live model keeps bundled effort when a newer remote catalog omits the fiel
 test('remote is used when no live probe, in preference to bundled', () => {
   const remote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: { anthropic: { models: [{ id: 'remote-only', label: 'R', description: '', tier: 'high', deprecated: false, order: 0 }], defaults: { 'claude-code': 'remote-only' } } },
   };
   const r = resolveAll({}, remote, null, BUNDLED_CATALOG, APP);
@@ -228,7 +234,7 @@ test('remote is used when no live probe, in preference to bundled', () => {
 test('remote model keeps the exact-pin bundled effort floor when the remote schema predates it', () => {
   const remote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       anthropic: {
         models: [{
@@ -251,7 +257,7 @@ test('remote model keeps the exact-pin bundled effort floor when the remote sche
 test('cache is used when no live and no remote', () => {
   const cache: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: { anthropic: { models: [{ id: 'cache-only', label: 'C', description: '', tier: 'high', deprecated: false, order: 0 }], defaults: {} } },
   };
   const r = resolveAll({}, null, cache, BUNDLED_CATALOG, APP);
@@ -262,12 +268,12 @@ test('cache is used when no live and no remote', () => {
 test('empty remote/cache providers cannot erase the bundled selectable floor', () => {
   const emptyRemote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: { anthropic: { models: [], defaults: {} } },
   };
   const emptyCache: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: { anthropic: { models: [], defaults: {} } },
   };
   const r = resolveAll({}, emptyRemote, emptyCache, BUNDLED_CATALOG, APP);
@@ -279,7 +285,7 @@ test('empty remote/cache providers cannot erase the bundled selectable floor', (
 test('a source containing only future-gated models falls back to this build bundled floor', () => {
   const remote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       anthropic: {
         models: [{
@@ -298,7 +304,7 @@ test('a source containing only future-gated models falls back to this build bund
 test('minAppVersion filters entries above the running app version', () => {
   const bundled: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       anthropic: {
         defaults: {},
@@ -323,7 +329,7 @@ test('minAppVersion filters entries above the running app version', () => {
 test('deprecated catalog model absent from a live probe is preserved + flagged (R2)', () => {
   const remote: ModelCatalog = {
     schemaVersion: 1,
-    updatedAt: 'x',
+    updatedAt: TEST_CATALOG_DATE,
     providers: {
       anthropic: {
         defaults: {},
@@ -340,6 +346,27 @@ test('deprecated catalog model absent from a live probe is preserved + flagged (
   assert.ok(legacy, 'deprecated catalog model preserved despite live absence');
   assert.strictEqual(legacy!.deprecated, true);
   assert.ok(r.anthropic.models.some((m) => m.id === 'claude-sonnet-5'), 'live model still present');
+});
+
+test('remote/cache older than the bundled audit date cannot hide the bundled floor', () => {
+  const stale: ModelCatalog = {
+    schemaVersion: 1,
+    updatedAt: '2026-07-25T00:00:00Z',
+    providers: {
+      codex: {
+        models: [{ id: 'old-only', label: 'Old', description: '', tier: 'medium', deprecated: false, order: 0 }],
+        defaults: { codex: 'old-only' },
+      },
+    },
+  };
+  const bundled: ModelCatalog = {
+    ...BUNDLED_CATALOG,
+    updatedAt: '2026-09-13T00:00:00Z',
+  };
+
+  assert.strictEqual(isCatalogAtLeastAsFresh(stale, bundled), false);
+  assert.strictEqual(resolveAll({}, stale, stale, bundled, APP).codex.source, 'bundled');
+  assert.ok(resolveAll({}, stale, stale, bundled, APP).codex.models.some((model) => model.id === 'gpt-5.6-sol'));
 });
 
 test('versionLt compares dotted-numeric versions correctly', () => {

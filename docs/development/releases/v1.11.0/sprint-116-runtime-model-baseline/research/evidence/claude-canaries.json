@@ -1,0 +1,40 @@
+{
+  "provider": "claude",
+  "capturedAt": "2026-09-13T09:12:58.415Z",
+  "checks": [
+    {
+      "name": "approved fixture edit",
+      "status": "PASS",
+      "selectedModel": "claude-opus-5[1m]",
+      "requestedEffort": "low",
+      "approvals": [
+        {
+          "name": "Edit",
+          "allowed": true
+        }
+      ],
+      "fixtureChanged": true,
+      "terminal": {
+        "subtype": "success",
+        "isError": false
+      }
+    },
+    {
+      "name": "denied fixture edit",
+      "status": "PASS",
+      "selectedModel": "claude-opus-5[1m]",
+      "requestedEffort": "low",
+      "approvals": [
+        {
+          "name": "Edit",
+          "allowed": false
+        }
+      ],
+      "fixtureChanged": false,
+      "terminal": {
+        "subtype": "success",
+        "isError": false
+      }
+    }
+  ]
+}

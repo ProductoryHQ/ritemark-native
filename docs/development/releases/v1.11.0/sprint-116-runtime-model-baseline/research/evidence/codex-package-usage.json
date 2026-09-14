@@ -1,0 +1,12 @@
+{
+  "capturedAt": "2026-09-13T15:00:19.957Z",
+  "status": "PASS",
+  "packageRoot": "/private/tmp/ritemark-s116-audit-YfLYRv/instrumented-codex-package-audit",
+  "path": "/usr/bin:/bin:/usr/sbin:/sbin",
+  "codexHome": "isolated temporary home",
+  "threadSearchReturned": true,
+  "resourceSelections": [
+    "rg"
+  ],
+  "zshSelection": "Static upstream InstallContext path verified; shell execution remains part of the authenticated behavior matrix."
+}

@@ -1,12 +1,12 @@
 /**
  * Image Node Executor
  *
- * Executes image generation nodes using OpenAI GPT Image 1.5 API.
+ * Executes image generation nodes using the configured OpenAI or Gemini image API.
  * Images are auto-downloaded to .flows/images/ per Jarmo's decision.
  *
  * Supports providers:
- * - openai: GPT Image 1.5 (default, uses existing API key)
- * - gemini: Nano Banana Pro (requires Google AI API key) - future
+ * - openai: canonical GPT Image choice (uses existing API key)
+ * - gemini: canonical native Gemini image choice (requires Google AI API key)
  */
 
 import * as vscode from 'vscode';
@@ -14,7 +14,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
-import { DEFAULT_MODELS } from '../../ai/modelConfig';
+import { DEFAULT_MODELS, OPENAI_IMAGE_MODEL_IDS } from '../../ai/modelConfig';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -227,12 +227,12 @@ async function generateWithOpenAI(
 
   const openai = new OpenAI({ apiKey });
 
-  const model = options.model || 'gpt-image-1.5';
+  const model = options.model || DEFAULT_MODELS.flowImage;
   const hasInputImages = options.inputImages.length > 0;
 
   // Check if using GPT Image models vs DALL-E
   const isGptImageModel = model.includes('gpt-image');
-  const isDallE3 = model.includes('dall-e-3');
+  const isDallE3 = model === OPENAI_IMAGE_MODEL_IDS.DALL_E_3;
 
   // Map quality values: UI uses standard/hd, GPT Image uses low/medium/high/auto
   let quality: string;
@@ -493,7 +493,7 @@ export async function executeImageNode(
       return await generateWithOpenAI(
         prompt,
         {
-          model: data.model || 'gpt-image-1.5',
+          model: data.model || DEFAULT_MODELS.flowImage,
           inputImages,
           action: data.action || 'auto',
           inputFidelity: data.inputFidelity || 'low',

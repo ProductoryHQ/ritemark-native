@@ -227,7 +227,7 @@ export function AgentConfiguratorPanel({
             <Input
               value={isAlias ? '' : model}
               onChange={e => set('model', e.target.value)}
-              placeholder="e.g. claude-opus-4-8"
+              placeholder="Provider model ID"
               className="text-[12px] h-7"
             />
           )}

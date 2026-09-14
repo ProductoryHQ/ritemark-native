@@ -24,7 +24,6 @@ import type { ToolRequestUserInputAnswer } from './codexProtocol';
 import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
 import { emitCodexStatusInvalidated } from './codexStatusEvents';
-import { buildCodexBrowserDynamicTools } from '../browser/codexBrowserTools';
 import { CODEX_MODEL_IDS } from '../ai/modelConfig';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
@@ -44,6 +43,7 @@ import {
 } from '../runtime/continuation';
 import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
+import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -101,6 +101,8 @@ const CODEX_PLAN_TURN_REMINDER = [
   '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
 ].join('\n');
 
+const _browserToolsInjector = new BrowserToolsInjector();
+
 // Sprint 103 R1: prompt-text sniffing removed (decision D4) — plan-first is an
 // explicit UI choice carried on `turn.mode`; words like "plan mode" in a prompt
 // must never silently retarget permissions.
@@ -149,6 +151,9 @@ export class CodexSession implements RuntimeSession {
   private _config: RuntimeSessionConfig;
   private _threadId: string | null = null;
   private _turnId: string | null = null;
+  private _lastStartedTurnId: string | null = null;
+  private _lastCompletedTurnId: string | null = null;
+  private readonly _turnStateWaiters = new Set<(turnId: string, state: 'started' | 'completed') => void>();
 
   /**
    * Whether browser tools were wired into THIS conversation's thread, so a
@@ -253,7 +258,7 @@ export class CodexSession implements RuntimeSession {
     // native id falls through to a new thread; transcript fallback framing is
     // injected by the host coordinator, never by provider history replay.
     if (!this._threadId) {
-      const dynamicTools = browserToolsNeeded ? buildCodexBrowserDynamicTools() : undefined;
+      const dynamicTools = _browserToolsInjector.getCodexDynamicTools(browserToolsNeeded);
       const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
       let result: { thread: { id: string }; reasoningEffort?: string | null } | null = null;
       if (continuation.kind === 'native') {
@@ -393,7 +398,28 @@ export class CodexSession implements RuntimeSession {
   async cancel(): Promise<void> {
     const appServer = this._runtime.getAppServer();
     if (appServer && this._threadId && this._turnId) {
-      await appServer.turnInterrupt(this._threadId, this._turnId).catch(() => {});
+      const threadId = this._threadId;
+      const turnId = this._turnId;
+      try {
+        await appServer.turnInterrupt(threadId, turnId);
+      } catch (error) {
+        if (/no active turn to interrupt/i.test(error instanceof Error ? error.message : String(error))) {
+          const state = await this._waitForTurnState(turnId, 10_000);
+          if (state === 'started' && this._threadId === threadId && this._turnId === turnId) {
+            await appServer.turnInterrupt(threadId, turnId).catch((retryError) => {
+              traceCodex('execution', 'turn interrupt retry failed', {
+                conversationId: this.conversationId, threadId, turnId,
+                error: retryError instanceof Error ? retryError.message : String(retryError),
+              });
+            });
+          }
+        } else {
+          traceCodex('execution', 'turn interrupt failed', {
+            conversationId: this.conversationId, threadId, turnId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
     }
     // Decline anything this conversation had outstanding. Interrupting the turn
     // does not answer an approval the app-server is already blocked on, so
@@ -432,7 +458,16 @@ export class CodexSession implements RuntimeSession {
   // ── Internal (adapter-facing) ──────────────────────────────────────────────
 
   /** @internal — event listeners on the shared app-server call these. */
-  _onTurnCompleted(): void { this._turnId = null; }
+  _onTurnStarted(turnId: string): void {
+    this._lastStartedTurnId = turnId;
+    for (const waiter of this._turnStateWaiters) waiter(turnId, 'started');
+  }
+  /** @internal */
+  _onTurnCompleted(turnId: string): void {
+    this._lastCompletedTurnId = turnId;
+    if (this._turnId === turnId) this._turnId = null;
+    for (const waiter of this._turnStateWaiters) waiter(turnId, 'completed');
+  }
   /** @internal */
   _trackRequest(requestId: string): void { this._openRequestIds.add(requestId); }
   /** @internal — the app-server died; drop this conversation's thread state. */
@@ -446,8 +481,28 @@ export class CodexSession implements RuntimeSession {
     if (this._threadId) this._runtime._unbindThread(this._threadId);
     this._threadId = null;
     this._turnId = null;
+    this._lastStartedTurnId = null;
+    this._lastCompletedTurnId = null;
     this._defaultThinkingEffort = null;
     this._manualThinkingEffortApplied = false;
+  }
+
+  private _waitForTurnState(turnId: string, timeoutMs: number): Promise<'started' | 'completed' | 'timeout'> {
+    if (this._lastCompletedTurnId === turnId) return Promise.resolve('completed');
+    if (this._lastStartedTurnId === turnId) return Promise.resolve('started');
+    return new Promise((resolve) => {
+      const waiter = (observedId: string, state: 'started' | 'completed') => {
+        if (observedId !== turnId) return;
+        clearTimeout(timer);
+        this._turnStateWaiters.delete(waiter);
+        resolve(state);
+      };
+      const timer = setTimeout(() => {
+        this._turnStateWaiters.delete(waiter);
+        resolve('timeout');
+      }, timeoutMs);
+      this._turnStateWaiters.add(waiter);
+    });
   }
 }
 
@@ -700,6 +755,8 @@ export class CodexRuntime implements AgentRuntime {
     if (threadId) {
       const hit = this._sessionsByThread.get(threadId);
       if (hit) return hit;
+      traceCodex('event', 'dropped event for unknown thread', { event: what, threadId, liveSessions: this._sessions.size });
+      return undefined;
     }
     if (this._sessions.size === 1) {
       return this._sessions.values().next().value;
@@ -732,6 +789,13 @@ export class CodexRuntime implements AgentRuntime {
    */
   private _setupEventListeners(): void {
     if (!this._appServer) return;
+
+    this._appServer.on(
+      'turn/started',
+      (params: { threadId: string; turn: { id: string } }) => {
+        this._sessionForThread(params.threadId, 'turn/started')?._onTurnStarted(params.turn.id);
+      },
+    );
 
     this._appServer.on(
       'item/started',
@@ -785,7 +849,7 @@ export class CodexRuntime implements AgentRuntime {
         // later cancel() a silent no-op.
         const session = this._sessionForThread(params.threadId, 'turn/completed');
         if (!session) return;
-        session._onTurnCompleted();
+        session._onTurnCompleted(params.turn.id);
         const config = session.config;
         const errorMsg = formatCodexTurnError(params.turn.error);
         config.onCodexComplete?.({ status: params.turn.status, error: errorMsg });

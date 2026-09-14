@@ -1,0 +1,8 @@
+{
+  "capturedAt": "2026-09-13T09:27:56.889Z",
+  "source": "extensions/ritemark/src/codex/CodexRuntime.ts:_sessionForThread",
+  "knownThreadRoutesToSession": true,
+  "unknownExplicitThreadRoutesToSession": true,
+  "missingThreadRoutesToSession": true,
+  "verdict": "REPRODUCED: an explicit unknown thread ID is attributed to the sole live session"
+}

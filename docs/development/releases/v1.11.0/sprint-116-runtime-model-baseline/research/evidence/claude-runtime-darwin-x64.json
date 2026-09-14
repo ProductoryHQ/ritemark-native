@@ -1,0 +1,24 @@
+{
+  "key": "claude/runtime/darwin-x64",
+  "capturedAt": "2026-09-13T09:03:08.182Z",
+  "version": "2.1.270",
+  "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.270.tgz",
+  "archiveFilename": "claude-code-darwin-x64-2.1.270.tgz",
+  "sha256": "aea6314b241d64d5590e56877ff5e4ed9f28bb9bc871e9b1d0e27d4fe3492584",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 4,
+    "member": "package/claude",
+    "size": 216316928,
+    "licenseFiles": [
+      "package/LICENSE.md"
+    ]
+  },
+  "binarySha256": "b3ee3237a019b8a5abb3008f1c7ddd46295a0e6e65ab94545a79c9b997dc8928",
+  "file": "Mach-O 64-bit executable x86_64",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

@@ -137,6 +137,13 @@ async function run() {
   {
     assert.strictEqual(OPENCODE_PERMISSION, '{"edit":"ask","bash":"ask","webfetch":"ask"}',
       'OPENCODE_PERMISSION must be the exact audit-mandated value');
+    const events: AgentProgress[] = [];
+    const mgr = makeManager(events);
+    const config = (mgr as unknown as { config: { pathEntries?: string[]; byokEnv?: Record<string, string> }; buildSpawnEnv(): NodeJS.ProcessEnv });
+    config.config.pathEntries = ['/managed/opencode-path'];
+    config.config.byokEnv = { PATH: '/user/path' };
+    assert.strictEqual(config.buildSpawnEnv().PATH, ['/managed/opencode-path', '/user/path'].join(path.delimiter));
+    mgr.dispose();
   }
 
   // ── session/update → AgentProgress mapping (R5) ──

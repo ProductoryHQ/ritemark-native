@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-09-13T09:21:44.702Z",
+  "baselineTag": "rust-v0.153.0",
+  "candidateTag": "rust-v0.154.0",
+  "addedAssets": [],
+  "removedAssets": [],
+  "candidateSdkLockSha256": "e9b4df8e32f03dd1d82850f503af9708e79d3369d8ad4f843b79d6c897b1f060",
+  "claudeSdkPackages": {
+    "node_modules/@anthropic-ai/claude-agent-sdk": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-darwin-x64": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-linux-arm64": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-linux-x64": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-win32-arm64": "0.3.270",
+    "node_modules/@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.270"
+  }
+}

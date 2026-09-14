@@ -1,0 +1,34 @@
+{
+  "fixture": "sprint-110-runtime-continuation-v1",
+  "provider": "codex",
+  "startedAt": "2026-09-13T09:07:20.035Z",
+  "finishedAt": "2026-09-13T09:08:18.672Z",
+  "platform": "darwin-arm64",
+  "status": "PASS",
+  "nativeApi": "thread/read + thread/resume",
+  "processBoundary": "app-server process restart",
+  "threadIdCaptured": true,
+  "threadReadFound": true,
+  "resumeReturnedSameId": true,
+  "recallMatched": true,
+  "firstTurn": {
+    "turnIdPresent": true,
+    "status": "completed",
+    "emittedText": true,
+    "tokenPresent": false,
+    "account": {
+      "authenticated": true,
+      "requiresOpenaiAuth": true
+    }
+  },
+  "resumedTurn": {
+    "turnIdPresent": true,
+    "status": "completed",
+    "emittedText": true,
+    "tokenPresent": true
+  },
+  "invalidDescriptor": {
+    "rejected": true,
+    "errorClass": "not-found-or-invalid"
+  }
+}

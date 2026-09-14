@@ -1,0 +1,12 @@
+{
+  "provider": "codex",
+  "capturedAt": "2026-09-13T09:49:20.171Z",
+  "checks": [
+    {
+      "name": "file tools through code-mode host",
+      "status": "FAIL",
+      "error": "thread/start: timeout"
+    }
+  ],
+  "model": "gpt-6-astra"
+}

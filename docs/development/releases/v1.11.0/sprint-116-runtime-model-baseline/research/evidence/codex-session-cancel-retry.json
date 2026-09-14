@@ -1,0 +1,34 @@
+{
+  "capturedAt": "2026-09-13T09:46:02.777Z",
+  "adapter": "unchanged CodexSession + CodexAppServer",
+  "binary": "0.154.0",
+  "protocol": [
+    {
+      "scope": "rpc:request",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:notification",
+      "method": "initialized"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:progress",
+      "method": "thread/start"
+    }
+  ],
+  "checks": [
+    {
+      "name": "session audit",
+      "status": "FAIL",
+      "error": "RPC call 'thread/start' timed out after 30000ms"
+    }
+  ]
+}

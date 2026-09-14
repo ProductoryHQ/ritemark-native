@@ -1,0 +1,166 @@
+{
+  "url": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk/latest",
+  "capturedAt": "2026-09-13T08:59:16.110Z",
+  "sha256": "4b63b3f94ee9a012fd5df5886d17156ee23c39c9fd01fb420e595b834d26113d",
+  "data": {
+    "bugs": {
+      "url": "https://github.com/anthropics/claude-agent-sdk-typescript/issues"
+    },
+    "dist": {
+      "shasum": "2a1d5fd4e265320a64e62607ae87567bd7b955d8",
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.3.270.tgz",
+      "fileCount": 15,
+      "integrity": "sha512-sSfcm5Nhb+WHeBCxqeHRRQMUKPmFTL+zgv5xcRUVaFMLttfNEbn3IZJE+fLJJmy4h3J8zdc5sXdSa1JxyB8ppQ==",
+      "signatures": [
+        {
+          "sig": "MEUCIQDO98kB9Ny2OgcKB6i9I3lC9IanXntEdWJrOGyIX71CzAIgYvADMbvipyLV2Ck2wklS+uO8JWEOhrb79BuYO//Pm0o=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEYCIQDe/H6bH1LlQqiXIubsCX6InkNkxYkpsoF6xjKK5mYeTAIhANf73P2QdiEdSU0+9H6h/PNy255VcWFze1hCBlsT7FcL",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 5114331
+    },
+    "main": "sdk.mjs",
+    "name": "@anthropic-ai/claude-agent-sdk",
+    "type": "module",
+    "_from": "file:staged-npm/anthropic-ai-claude-agent-sdk-0.3.270.tgz",
+    "types": "sdk.d.ts",
+    "author": {
+      "name": "Anthropic",
+      "email": "support@anthropic.com"
+    },
+    "engines": {
+      "node": ">=18.0.0"
+    },
+    "exports": {
+      ".": {
+        "types": "./sdk.d.ts",
+        "default": "./sdk.mjs"
+      },
+      "./bridge": {
+        "types": "./bridge.d.ts",
+        "default": "./bridge.mjs"
+      },
+      "./browser": {
+        "types": "./browser-sdk.d.ts",
+        "default": "./browser-sdk.js"
+      },
+      "./extract": {
+        "types": "./extractFromBunfs.d.ts",
+        "default": "./extractFromBunfs.js"
+      },
+      "./sdk-tools": {
+        "types": "./sdk-tools.d.ts"
+      },
+      "./sdk-tools.js": {
+        "types": "./sdk-tools.d.ts"
+      }
+    },
+    "license": "SEE LICENSE IN README.md",
+    "_npmUser": {
+      "name": "wolffiex",
+      "email": "wolffiex@anthropic.com"
+    },
+    "homepage": "https://github.com/anthropics/claude-agent-sdk-typescript",
+    "keywords": [
+      "ai",
+      "agent",
+      "sdk",
+      "claude",
+      "anthropic",
+      "automation",
+      "code-generation"
+    ],
+    "_resolved": "/home/runner/work/claude-cli-internal/claude-cli-internal/staged-npm/anthropic-ai-claude-agent-sdk-0.3.270.tgz",
+    "_integrity": "sha512-sSfcm5Nhb+WHeBCxqeHRRQMUKPmFTL+zgv5xcRUVaFMLttfNEbn3IZJE+fLJJmy4h3J8zdc5sXdSa1JxyB8ppQ==",
+    "repository": {
+      "url": "git+https://github.com/anthropics/claude-agent-sdk-typescript.git",
+      "type": "git"
+    },
+    "_npmVersion": "11.19.0",
+    "description": "SDK for building AI agents with Claude Code's capabilities. Programmatically interact with Claude to build autonomous agents that can understand codebases, edit files, and execute workflows.",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "zak-anthropic",
+        "email": "zak@anthropic.com"
+      },
+      {
+        "name": "dylanc-anthropic",
+        "email": "dylanc@anthropic.com"
+      },
+      {
+        "name": "benjmann",
+        "email": "ben@anthropic.com"
+      },
+      {
+        "name": "nikhil-anthropic",
+        "email": "nikhil@anthropic.com"
+      },
+      {
+        "name": "ejlangev-ant",
+        "email": "ethan.langevin@anthropic.com"
+      },
+      {
+        "name": "jv-anthropic",
+        "email": "jv@anthropic.com"
+      },
+      {
+        "name": "ollie-ant-2025",
+        "email": "ollie@anthropic.com"
+      },
+      {
+        "name": "packy-anthropic",
+        "email": "packy@anthropic.com"
+      },
+      {
+        "name": "noahz-anthropic",
+        "email": "noahz@anthropic.com"
+      },
+      {
+        "name": "sbidasaria",
+        "email": "sbidasaria@anthropic.com"
+      },
+      {
+        "name": "wolffiex",
+        "email": "wolffiex@anthropic.com"
+      },
+      {
+        "name": "felixrieseberg-anthropic",
+        "email": "f@anthropic.com"
+      },
+      {
+        "name": "joan-anthropic",
+        "email": "joan@anthropic.com"
+      }
+    ],
+    "_nodeVersion": "24.20.0",
+    "_hasShrinkwrap": false,
+    "readmeFilename": "README.md",
+    "peerDependencies": {
+      "zod": "^4.0.0",
+      "@anthropic-ai/sdk": ">=0.93.0",
+      "@modelcontextprotocol/sdk": "^1.29.0"
+    },
+    "claudeCodeVersion": "2.1.270",
+    "optionalDependencies": {
+      "@anthropic-ai/claude-agent-sdk-linux-x64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-darwin-x64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-linux-arm64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-win32-arm64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "0.3.270",
+      "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "0.3.270"
+    },
+    "_npmOperationalInternal": {
+      "tmp": "tmp/claude-agent-sdk_0.3.270_1789239192870_0.6657749156323982",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "@anthropic-ai/claude-agent-sdk@0.3.270",
+    "version": "0.3.270"
+  }
+}

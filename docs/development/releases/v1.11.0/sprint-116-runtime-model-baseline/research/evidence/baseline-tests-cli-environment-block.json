@@ -1,0 +1,282 @@
+{
+  "capturedAt": "2026-09-13T09:06:29.024Z",
+  "node": "v22.22.1",
+  "extension": "/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark",
+  "results": [
+    {
+      "name": "TypeScript compile (no emit)",
+      "capturedAt": "2026-09-13T09:06:27.577Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "."
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "src/runtime/continuation.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.295Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/runtime/continuation.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35375.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35375.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/runtime/thinkingEffort.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.347Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/runtime/thinkingEffort.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35383.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35383.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/runtime/runtimeErrorPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.386Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/runtime/runtimeErrorPresentation.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35384.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35384.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/agent/AgentRunner.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.423Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/agent/AgentRunner.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35385.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35385.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/agent/ClaudeCodeRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.458Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/agent/ClaudeCodeRuntime.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35388.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35388.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/codex/codexApproval.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.512Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/codex/codexApproval.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35396.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35396.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/codex/CodexRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.547Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/codex/CodexRuntime.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35397.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35397.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/acp/acpClient.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.582Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/acp/acpClient.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35398.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35398.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/acp/acpManager.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.618Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/acp/acpManager.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35399.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35399.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/acp/AcpRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.656Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/acp/AcpRuntime.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35400.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35400.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/ai/modelCatalog/modelCatalog.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.692Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/ai/modelCatalog/modelCatalog.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35401.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35401.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/utils/bundledAgentRuntime.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.728Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/utils/bundledAgentRuntime.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35402.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35402.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "src/views/agentSidebarBootstrap.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.764Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "src/views/agentSidebarBootstrap.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35403.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35403.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/modelPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.799Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/modelPresentation.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35404.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35404.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/runtimeAvailability.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.835Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/runtimeAvailability.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35405.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35405.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/bootstrapState.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.874Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/bootstrapState.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35406.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35406.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/conversationRouting.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.912Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/conversationRouting.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35407.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35407.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/runtimeSwitching.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.951Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/runtimeSwitching.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35408.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35408.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/continuationPresentation.test.ts",
+      "capturedAt": "2026-09-13T09:06:28.988Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/continuationPresentation.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35409.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35409.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    },
+    {
+      "name": "webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts",
+      "capturedAt": "2026-09-13T09:06:29.024Z",
+      "command": [
+        "/Users/jarmotuisk/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/tsx/dist/cli.mjs",
+        "webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "node:net:1918\n      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);\n                    ^\n\nError: listen EPERM: operation not permitted /var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35410.pipe\n    at Server.setupListenHandle [as _listen2] (node:net:1918:21)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2119:5)\n    at file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31537\n    at new Promise (<anonymous>)\n    at createIpcServer (file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:53:31515)\n    at async file:///Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.worktrees/sprint-116-runtime-model-baseline/extensions/ritemark/node_modules/tsx/dist/cli.mjs:55:459 {\n  code: 'EPERM',\n  errno: -1,\n  syscall: 'listen',\n  address: '/var/folders/yb/4jdxnp1159zd8jh7b2gx4lmm0000gn/T/tsx-501/35410.pipe',\n  port: -1\n}\n\nNode.js v22.22.1\n"
+    }
+  ]
+}

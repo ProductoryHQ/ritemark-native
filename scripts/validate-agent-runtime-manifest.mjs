@@ -6,62 +6,41 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.dirname(SCRIPT_DIR);
+const TARGETS = ['darwin-arm64', 'darwin-x64', 'win32-x64'];
 
-const EXPECTED_TARGETS = [
-  'darwin-arm64',
-  'darwin-x64',
-  'win32-x64',
-];
-
-const EXPECTED_COMPONENTS = {
-  codex: ['app-server', 'code-mode-host', 'windows-sandbox-setup', 'command-runner'],
-  claude: ['runtime'],
-  opencode: ['runtime'],
+const APPROVED_COMPONENTS = {
+  'codex/package': { vendor: 'openai', version: '0.154.0', targets: TARGETS, license: 'Apache-2.0', notice: '/openai/codex/' },
+  'claude/runtime': { vendor: 'anthropic', version: '2.1.270', targets: TARGETS, license: 'LicenseRef-Anthropic-Proprietary', notice: 'code.claude.com/' },
+  'opencode/runtime': { vendor: 'anomalyco', version: '1.18.30', targets: TARGETS, license: 'MIT', notice: '/anomalyco/opencode/' },
+  'opencode/ripgrep': { vendor: 'BurntSushi', version: '15.1.0', targets: TARGETS, license: 'MIT OR Unlicense', notice: '/BurntSushi/ripgrep/' },
 };
 
-// Components that exist for only a subset of targets. Codex's sandbox helpers are
-// Windows-only by construction: the vendor publishes no darwin build, because on macOS
-// the sandbox is the OS seatbelt rather than a spawned helper process.
-const COMPONENT_TARGETS = {
-  'codex/windows-sandbox-setup': ['win32-x64'],
-  'codex/command-runner': ['win32-x64'],
-};
-
-const targetsFor = (agent, component) => COMPONENT_TARGETS[`${agent}/${component}`] ?? EXPECTED_TARGETS;
-
-// Helpers that cannot be smoke-tested: they are IPC endpoints, not CLIs.
-// codex-command-runner expects a pipe handle and codex-windows-sandbox-setup expects a
-// base64 payload, so both exit non-zero on --version and --help. Their manifest rows
-// carry no validationArgs, and fetch-agent-runtimes.sh skips the smoke test when
-// validationArgs is empty.
-const NON_INVOCABLE_COMPONENTS = new Set(['codex/windows-sandbox-setup', 'codex/command-runner']);
-
-const EXPECTED_INSTALL_STEMS = {
-  codex: {
-    'app-server': 'codex-app-server',
-    'code-mode-host': 'codex-code-mode-host',
-    'windows-sandbox-setup': 'codex-windows-sandbox-setup',
-    'command-runner': 'codex-command-runner',
+const CODEX_MEMBERS = {
+  'darwin-arm64': {
+    'app-server': ['bin/codex-app-server', '0.154.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host', '0.154.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.154.0', null],
+    ripgrep: ['codex-path/rg', '15.2.0', '--version'],
+    zsh: ['codex-resources/zsh/bin/zsh', '5.9.0.3-test', '--version'],
   },
-  claude: { runtime: 'claude' },
-  opencode: { runtime: 'opencode' },
+  'darwin-x64': {
+    'app-server': ['bin/codex-app-server', '0.154.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host', '0.154.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.154.0', null],
+    ripgrep: ['codex-path/rg', '15.2.0', '--version'],
+    zsh: ['codex-resources/zsh/bin/zsh', '5.9.0.3-test', '--version'],
+  },
+  'win32-x64': {
+    'app-server': ['bin/codex-app-server.exe', '0.154.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host.exe', '0.154.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.154.0', null],
+    ripgrep: ['codex-path/rg.exe', '15.2.0', '--version'],
+    'command-runner': ['codex-resources/codex-command-runner.exe', '0.154.0', null],
+    'windows-sandbox-setup': ['codex-resources/codex-windows-sandbox-setup.exe', '0.154.0', null],
+  },
 };
 
-const EXPECTED_RUNTIME_ROWS = Object.entries(EXPECTED_COMPONENTS)
-  .reduce((total, [agent, components]) =>
-    total + components.reduce((sum, component) => sum + targetsFor(agent, component).length, 0), 0);
-
-const APPROVED_RUNTIMES = {
-  codex: { vendor: 'openai', version: '0.153.0' },
-  claude: { vendor: 'anthropic', version: '2.1.239' },
-  opencode: { vendor: 'anomalyco', version: '1.18.21' },
-};
-
-const APPROVED_SDKS = {
-  claude: '0.3.239',
-  acp: '1.4.0',
-};
-
+const APPROVED_SDKS = { claude: '0.3.270', acp: '1.4.0' };
 const CLAUDE_OPTIONAL_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk-darwin-arm64',
   '@anthropic-ai/claude-agent-sdk-darwin-x64',
@@ -73,123 +52,119 @@ const CLAUDE_OPTIONAL_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk-win32-x64',
 ];
 
-const isExactVersion = (value) => /^\d+\.\d+\.\d+$/.test(value ?? '');
-const patchVersion = (value) => String(value).split('.').at(-1);
+const isExactVersion = value => /^\d+\.\d+\.\d+$/.test(value ?? '');
+const validSha = value => /^[a-f0-9]{64}$/.test(value ?? '');
+const targetOf = row => `${row.platform}-${row.arch}`;
+const safeRelativePath = value => typeof value === 'string'
+  && value.length > 0
+  && !path.posix.isAbsolute(value)
+  && !/^[A-Za-z]:/.test(value)
+  && !value.includes('\\')
+  && value !== '.'
+  && value.split('/').every(segment => segment && segment !== '.' && segment !== '..')
+  && path.posix.normalize(value) === value;
+const architectureToken = target => target === 'darwin-arm64' ? 'arm64' : target === 'darwin-x64' ? 'x86_64' : 'x86-64';
 
 export function validateAgentRuntimeManifest(manifest, packageJson, packageLock) {
   const errors = [];
-  const runtimes = Array.isArray(manifest?.runtimes) ? manifest.runtimes : [];
-  const byAgent = new Map();
-  const runtimeKeys = new Set();
-  const installKeys = new Set();
+  const rows = Array.isArray(manifest?.runtimes) ? manifest.runtimes : [];
+  if (manifest?.schemaVersion !== '3') errors.push(`manifest schemaVersion must be 3; found ${manifest?.schemaVersion ?? '<missing>'}`);
+  if (rows.length !== 12) errors.push(`manifest must contain 12 source rows; found ${rows.length}`);
 
-  if (manifest?.schemaVersion !== '2') errors.push(`manifest schemaVersion must be 2; found ${manifest?.schemaVersion ?? '<missing>'}`);
-  if (runtimes.length !== EXPECTED_RUNTIME_ROWS) {
-    errors.push(`manifest must contain ${EXPECTED_RUNTIME_ROWS} runtime component rows; found ${runtimes.length}`);
-  }
+  const keys = new Set();
+  const installPaths = new Set();
+  for (const row of rows) {
+    const target = targetOf(row);
+    const key = `${row.agent}/${row.component}`;
+    const rowKey = `${key}/${target}`;
+    if (keys.has(rowKey)) errors.push(`${rowKey} is duplicated`);
+    keys.add(rowKey);
 
-  for (const runtime of runtimes) {
-    const target = `${runtime.platform}-${runtime.arch}`;
-    const runtimeKey = `${runtime.agent}/${runtime.component}/${target}`;
-    const installKey = `${target}/${runtime.installName}`;
-    if (!byAgent.has(runtime.agent)) byAgent.set(runtime.agent, []);
-    byAgent.get(runtime.agent).push(runtime);
-
-    if (runtimeKeys.has(runtimeKey)) errors.push(`${runtimeKey} is duplicated`);
-    runtimeKeys.add(runtimeKey);
-    if (installKeys.has(installKey)) errors.push(`${installKey} installName is duplicated`);
-    installKeys.add(installKey);
-
-    if (!isExactVersion(runtime.version)) errors.push(`${runtimeKey} version is not exact: ${runtime.version}`);
-    if (!/^[a-f0-9]{64}$/.test(runtime.sha256 ?? '')) errors.push(`${runtimeKey} has an invalid SHA-256`);
-    if (!runtime.sourceUrl?.includes(runtime.version)) errors.push(`${runtimeKey} sourceUrl does not contain ${runtime.version}`);
-    const installStem = EXPECTED_INSTALL_STEMS[runtime.agent]?.[runtime.component];
-    const expectedInstallName = installStem ? `${installStem}${runtime.platform === 'win32' ? '.exe' : ''}` : null;
-    if (expectedInstallName && runtime.installName !== expectedInstallName) {
-      errors.push(`${runtimeKey} installName must be ${expectedInstallName}; found ${runtime.installName ?? '<missing>'}`);
+    const approved = APPROVED_COMPONENTS[key];
+    if (!approved) errors.push(`${rowKey} is not an approved source component`);
+    else {
+      if (row.vendor !== approved.vendor) errors.push(`${rowKey} vendor must be ${approved.vendor}; found ${row.vendor}`);
+      if (row.version !== approved.version) errors.push(`${rowKey} version must be approved snapshot ${approved.version}; found ${row.version}`);
+      if (row.license?.spdx !== approved.license) errors.push(`${rowKey} license must be ${approved.license}; found ${row.license?.spdx ?? '<missing>'}`);
+      if (row.license?.redistribution !== (key === 'claude/runtime' ? 'permitted-by-vendor-confirmation' : 'permitted')) errors.push(`${rowKey} redistribution evidence is missing or invalid`);
+      if (!row.license?.noticeUrl?.includes(approved.notice)) errors.push(`${rowKey} license notice URL must identify ${approved.notice}`);
     }
-    if (NON_INVOCABLE_COMPONENTS.has(`${runtime.agent}/${runtime.component}`)) {
-      if (runtime.validationArgs?.length) {
-        errors.push(`${runtimeKey} must not declare validationArgs; it is an IPC helper and cannot be smoke-tested`);
+    if (!isExactVersion(row.version)) errors.push(`${rowKey} version is not exact: ${row.version}`);
+    if (!validSha(row.sha256)) errors.push(`${rowKey} has an invalid archive SHA-256`);
+    if (!row.sourceUrl?.includes(row.version)) errors.push(`${rowKey} sourceUrl does not contain ${row.version}`);
+    if (!safeRelativePath(row.archiveFilename)) errors.push(`${rowKey} archiveFilename is unsafe`);
+    const expectedFormat = row.agent === 'opencode' && row.component === 'ripgrep' && row.platform === 'win32' ? 'zip' : 'tar.gz';
+    if (row.archiveFormat !== expectedFormat) errors.push(`${rowKey} archiveFormat must be ${expectedFormat}`);
+
+    if (row.agent === 'codex') {
+      if (row.installRoot !== 'codex') errors.push(`${rowKey} installRoot must be codex`);
+      if (row.packageMetadataPath !== 'codex-package.json') errors.push(`${rowKey} must identify codex-package.json`);
+      if (row.exactArchiveMembers !== true) errors.push(`${rowKey} must require the exact official package member set`);
+      const expected = CODEX_MEMBERS[target] ?? {};
+      const members = Array.isArray(row.members) ? row.members : [];
+      if (members.length !== Object.keys(expected).length) errors.push(`${rowKey} member count must be ${Object.keys(expected).length}; found ${members.length}`);
+      const seen = new Set();
+      for (const member of members) {
+        const memberKey = `${rowKey}/${member.component}`;
+        if (seen.has(member.component)) errors.push(`${memberKey} is duplicated`);
+        seen.add(member.component);
+        const contract = expected[member.component];
+        if (!contract) { errors.push(`${memberKey} is not expected`); continue; }
+        const [expectedPath, expectedVersion, validationArg] = contract;
+        if (member.archivePath !== expectedPath || member.installPath !== expectedPath) errors.push(`${memberKey} must preserve ${expectedPath}`);
+        if (member.version !== expectedVersion) errors.push(`${memberKey} version must be ${expectedVersion}; found ${member.version}`);
+        const expectedExecutable = member.component !== 'package-metadata';
+        if (member.executable !== expectedExecutable) errors.push(`${memberKey} executable must be ${expectedExecutable}`);
+        if (expectedExecutable && !member.expectedFileArchPattern?.includes(architectureToken(target))) errors.push(`${memberKey} must declare the ${architectureToken(target)} architecture`);
+        if (!validSha(member.sha256)) errors.push(`${memberKey} has an invalid installed SHA-256`);
+        if (!safeRelativePath(member.archivePath) || !safeRelativePath(member.installPath)) errors.push(`${memberKey} path is unsafe`);
+        if (validationArg && !member.validationArgs?.includes(validationArg)) errors.push(`${memberKey} must validate with ${validationArg}`);
+        if (!validationArg && member.validationArgs?.length) errors.push(`${memberKey} must not declare validationArgs`);
+        const installKey = `${target}/${row.installRoot}/${member.installPath}`;
+        if (installPaths.has(installKey)) errors.push(`${installKey} is duplicated`);
+        installPaths.add(installKey);
       }
+      for (const component of Object.keys(expected)) if (!seen.has(component)) errors.push(`${rowKey} is missing ${component}`);
     } else {
-      const validationArg = runtime.component === 'code-mode-host' ? '--help' : '--version';
-      if (!runtime.validationArgs?.includes(validationArg)) errors.push(`${runtimeKey} must validate with ${validationArg}`);
+      if (!safeRelativePath(row.archivePath) || !safeRelativePath(row.installPath)) errors.push(`${rowKey} archive/install path is unsafe`);
+      if (!validSha(row.installedSha256)) errors.push(`${rowKey} has an invalid installed SHA-256`);
+      if (!row.expectedFileArchPattern?.includes(architectureToken(target))) errors.push(`${rowKey} must declare the ${architectureToken(target)} architecture`);
+      const expectedName = row.agent === 'claude'
+        ? `claude${row.platform === 'win32' ? '.exe' : ''}`
+        : row.component === 'runtime'
+          ? `opencode${row.platform === 'win32' ? '.exe' : ''}`
+          : `rg${row.platform === 'win32' ? '.exe' : ''}`;
+      if (row.installName !== expectedName) errors.push(`${rowKey} installName must be ${expectedName}; found ${row.installName}`);
+      if (!row.validationArgs?.includes('--version')) errors.push(`${rowKey} must validate with --version`);
+      const installKey = `${target}/${row.installPath}`;
+      if (installPaths.has(installKey)) errors.push(`${installKey} is duplicated`);
+      installPaths.add(installKey);
     }
   }
 
-  for (const agent of Object.keys(APPROVED_RUNTIMES)) {
-    const rows = byAgent.get(agent) ?? [];
-    const versions = [...new Set(rows.map((row) => row.version))];
-    const expectedComponents = EXPECTED_COMPONENTS[agent];
-    const components = [...new Set(rows.map((row) => row.component))];
-    for (const component of components) {
-      if (!expectedComponents.includes(component)) errors.push(`${agent} has an unknown component: ${component}`);
-    }
-    for (const component of expectedComponents) {
-      const componentRows = rows.filter((row) => row.component === component);
-      const targets = componentRows.map((row) => `${row.platform}-${row.arch}`).sort();
-      const expectedTargets = [...targetsFor(agent, component)].sort();
-      if (JSON.stringify(targets) !== JSON.stringify(expectedTargets)) {
-        errors.push(`${agent}/${component} targets must be ${expectedTargets.join(', ')}; found ${targets.join(', ') || '<none>'}`);
-      }
-    }
-    if (versions.length !== 1) errors.push(`${agent} component rows must share one version; found ${versions.join(', ')}`);
-    for (const row of rows) {
-      const approved = APPROVED_RUNTIMES[agent];
-      if (row.version !== approved.version) {
-        errors.push(`${agent}/${row.component}/${row.platform}-${row.arch} version must be approved snapshot ${approved.version}; found ${row.version}`);
-      }
-      if (row.vendor !== approved.vendor) {
-        errors.push(`${agent}/${row.component}/${row.platform}-${row.arch} vendor must be ${approved.vendor}; found ${row.vendor}`);
-      }
+  for (const [key, approved] of Object.entries(APPROVED_COMPONENTS)) {
+    const actualTargets = rows.filter(row => `${row.agent}/${row.component}` === key).map(targetOf).sort();
+    if (JSON.stringify(actualTargets) !== JSON.stringify([...approved.targets].sort())) {
+      errors.push(`${key} targets must be ${approved.targets.join(', ')}; found ${actualTargets.join(', ') || '<none>'}`);
     }
   }
 
-  for (const agent of byAgent.keys()) {
-    if (!(agent in APPROVED_RUNTIMES)) errors.push(`manifest contains an unapproved agent: ${agent}`);
-  }
-
-  const claudeRows = byAgent.get('claude') ?? [];
-  const claudeBinaryVersion = claudeRows[0]?.version;
-  const claudeSdkVersion = packageJson?.dependencies?.['@anthropic-ai/claude-agent-sdk'];
-  const lockedClaudeSdk = packageLock?.packages?.['node_modules/@anthropic-ai/claude-agent-sdk'];
-  if (!isExactVersion(claudeSdkVersion)) errors.push(`Claude Agent SDK dependency must be exact; found ${claudeSdkVersion}`);
-  if (claudeSdkVersion !== APPROVED_SDKS.claude) {
-    errors.push(`Claude Agent SDK must be approved snapshot ${APPROVED_SDKS.claude}; found ${claudeSdkVersion}`);
-  }
-  if (patchVersion(claudeBinaryVersion) !== patchVersion(claudeSdkVersion)) {
-    errors.push(`Claude binary/SDK patch mismatch: ${claudeBinaryVersion} vs ${claudeSdkVersion}`);
-  }
-  if (packageLock?.packages?.['']?.dependencies?.['@anthropic-ai/claude-agent-sdk'] !== claudeSdkVersion) {
-    errors.push('package-lock root Claude SDK pin does not match package.json');
-  }
-  if (lockedClaudeSdk?.version !== claudeSdkVersion) {
-    errors.push(`package-lock resolved Claude SDK ${lockedClaudeSdk?.version ?? '<missing>'}, expected ${claudeSdkVersion}`);
-  }
+  const claudeVersion = rows.find(row => row.agent === 'claude')?.version;
+  const claudeSdk = packageJson?.dependencies?.['@anthropic-ai/claude-agent-sdk'];
+  const lockedClaude = packageLock?.packages?.['node_modules/@anthropic-ai/claude-agent-sdk'];
+  if (claudeSdk !== APPROVED_SDKS.claude) errors.push(`Claude Agent SDK must be approved snapshot ${APPROVED_SDKS.claude}; found ${claudeSdk}`);
+  if (String(claudeVersion).split('.').at(-1) !== String(claudeSdk).split('.').at(-1)) errors.push(`Claude binary/SDK patch mismatch: ${claudeVersion} vs ${claudeSdk}`);
+  if (packageLock?.packages?.['']?.dependencies?.['@anthropic-ai/claude-agent-sdk'] !== claudeSdk || lockedClaude?.version !== claudeSdk) errors.push('package-lock Claude SDK pin does not match package.json');
   for (const name of CLAUDE_OPTIONAL_PACKAGES) {
-    const declaredVersion = lockedClaudeSdk?.optionalDependencies?.[name];
-    const lockedVersion = packageLock?.packages?.[`node_modules/${name}`]?.version;
-    if (declaredVersion !== claudeSdkVersion || lockedVersion !== claudeSdkVersion) {
-      errors.push(`${name} must be present and locked to Claude SDK ${claudeSdkVersion}; found ${declaredVersion ?? '<missing>'}/${lockedVersion ?? '<missing>'}`);
-    }
+    const declared = lockedClaude?.optionalDependencies?.[name];
+    const locked = packageLock?.packages?.[`node_modules/${name}`]?.version;
+    if (declared !== claudeSdk || locked !== claudeSdk) errors.push(`${name} must be present and locked to Claude SDK ${claudeSdk}; found ${declared ?? '<missing>'}/${locked ?? '<missing>'}`);
   }
 
-  const acpVersion = packageJson?.dependencies?.['@agentclientprotocol/sdk'];
+  const acp = packageJson?.dependencies?.['@agentclientprotocol/sdk'];
   const lockedAcp = packageLock?.packages?.['node_modules/@agentclientprotocol/sdk']?.version;
-  if (!isExactVersion(acpVersion)) errors.push(`ACP SDK dependency must be exact; found ${acpVersion}`);
-  if (acpVersion !== APPROVED_SDKS.acp) {
-    errors.push(`ACP SDK must be approved snapshot ${APPROVED_SDKS.acp}; found ${acpVersion}`);
-  }
-  if (packageLock?.packages?.['']?.dependencies?.['@agentclientprotocol/sdk'] !== acpVersion || lockedAcp !== acpVersion) {
-    errors.push(`package-lock ACP SDK pin does not match package.json (${acpVersion} vs ${lockedAcp ?? '<missing>'})`);
-  }
-
-  for (const runtime of byAgent.get('opencode') ?? []) {
-    if (!runtime.license?.noticeUrl?.includes('/anomalyco/opencode/')) {
-      errors.push(`opencode/${runtime.platform}-${runtime.arch} license URL must use anomalyco/opencode`);
-    }
-  }
+  if (acp !== APPROVED_SDKS.acp) errors.push(`ACP SDK must be approved snapshot ${APPROVED_SDKS.acp}; found ${acp}`);
+  if (packageLock?.packages?.['']?.dependencies?.['@agentclientprotocol/sdk'] !== acp || lockedAcp !== acp) errors.push(`package-lock ACP SDK pin does not match package.json (${acp} vs ${lockedAcp ?? '<missing>'})`);
 
   return errors;
 }
@@ -203,7 +178,7 @@ export function validateFiles(repoRoot = REPO_ROOT) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const errors = validateFiles();
-  if (errors.length > 0) {
+  if (errors.length) {
     console.error('Agent runtime manifest validation failed:');
     for (const error of errors) console.error(`  - ${error}`);
     process.exit(1);

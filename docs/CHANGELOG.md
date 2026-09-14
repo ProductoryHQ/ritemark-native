@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — v1.11.0
+
+### Added
+- **Current agent and model baseline (Sprint 116).** Ritemark now bundles Claude Code 2.1.270, Codex 0.154.0, and OpenCode 1.18.30 with exact matching SDKs and runtime-owned dependencies. The model catalog adds GPT-6 Astra, the current GPT-5.6 family, Claude Fable 5.1, Gemini 3.1 Pro, Gemini 3.8 Flash, and Gemini 3.5 Flash Lite.
+
+### Changed
+- **Image Flows start with supported current models.** New OpenAI image nodes default to GPT Image 2 and new Gemini image nodes default to Gemini 3.1 Flash Image. Older saved model IDs remain identifiable as deprecated and are not silently rewritten.
+- **Runtime packages are complete and reproducible.** Codex ships its official package tree with code-mode-host, ripgrep, shell resources, and Windows sandbox helpers. OpenCode ships its own ripgrep, avoiding a first-use download.
+
+### Fixed
+- Codex Stop now handles the brief race where `turn/start` returns before the turn becomes interruptible, and a new message can be sent immediately after cancellation.
+- Successful OpenCode turns no longer show a red **Failed** marker after already editing the document and returning an answer; ACP's successful `end_turn` now maps to Ritemark's completed state.
+- Late Codex events carrying an explicit unknown thread ID no longer fall into another open conversation.
+- Current Codex cache effort metadata is parsed correctly, and an older remote/cached catalog can no longer hide a newer bundled model floor.
+
 ## [1.10.1] — 2026-09-10
 
 Maintenance release for all platforms: macOS (Apple Silicon and Intel) and Windows.

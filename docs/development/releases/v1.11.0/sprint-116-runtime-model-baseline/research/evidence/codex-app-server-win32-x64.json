@@ -1,0 +1,22 @@
+{
+  "key": "codex/app-server/win32-x64",
+  "capturedAt": "2026-09-13T09:02:29.743Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+  "archiveFilename": "codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+  "sha256": "7801a4595d80a4427dfc53600bd5070d55fe3c44c51438c3e1d10f40f7f0e225",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-app-server-x86_64-pc-windows-msvc.exe",
+    "size": 230817072,
+    "licenseFiles": []
+  },
+  "binarySha256": "6fe58c486f793629317d73e66f804dcfad6561aa8ed9b2c9ff647f7843b4b350",
+  "file": "PE32+ executable (console) x86-64, for MS Windows",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

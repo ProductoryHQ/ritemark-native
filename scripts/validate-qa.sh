@@ -9,7 +9,9 @@ cd "$PROJECT_ROOT"
 
 echo "Running Codex QA validation..."
 node "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.mjs"
+node --test "$PROJECT_ROOT/scripts/list-agent-runtime-files.test.mjs"
 node --test "$PROJECT_ROOT/scripts/copy-extension-for-target.test.mjs"
+node --test "$PROJECT_ROOT/scripts/extract-runtime-artifact.test.mjs"
 node --test "$PROJECT_ROOT/scripts/validate-agent-runtime-manifest.test.mjs"
 node --test "$PROJECT_ROOT/scripts/windows-extension-staging.test.mjs"
 node --test "$PROJECT_ROOT/scripts/tree-sha256.test.mjs"
@@ -41,13 +43,18 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/flows/|e
   )
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|extensions/ritemark/src/codex/|extensions/ritemark/src/views/UnifiedViewProvider\.ts|extensions/ritemark/webview/src/components/ai-sidebar/)'; then
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/(agent/|codex/|acp/|runtime/BrowserToolsInjector)|extensions/ritemark/src/views/UnifiedViewProvider\.ts|extensions/ritemark/webview/src/components/ai-sidebar/)'; then
   echo "Agent lifecycle changes detected; running targeted lifecycle tests..."
   (
     cd "$PROJECT_ROOT/extensions/ritemark"
     npx tsx src/runtime/runtimeErrorPresentation.test.ts
     npx tsx src/agent/AgentRunner.test.ts
     npx tsx src/agent/ClaudeCodeRuntime.test.ts
+    npx tsx src/codex/CodexRuntime.test.ts
+    npx tsx src/acp/acpManager.test.ts
+    npx tsx src/acp/AcpRuntime.test.ts
+    npx tsx src/runtime/BrowserToolsInjector.test.ts
+    npx tsx src/browser/browserActionTools.test.ts
     npx tsx src/conversations/types.test.ts
     npx tsx src/codex/codexApproval.test.ts
     npx tsx webview/src/components/ai-sidebar/lifecycle.test.ts
@@ -58,6 +65,17 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/agent/|e
     npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts
     npx tsx webview/src/components/ai-sidebar/chatHistoryStorageQuota.test.ts
     npx tsx webview/src/components/ai-sidebar/conversationProjection.test.ts
+  )
+fi
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^extensions/ritemark/src/ai/(modelConfig|modelCatalog/)'; then
+  echo "Model catalog changes detected; running targeted model tests..."
+  (
+    cd "$PROJECT_ROOT/extensions/ritemark"
+    npx tsx src/ai/modelConfig.test.ts
+    npx tsx src/ai/modelCatalog/providerDiscovery.test.ts
+    npx tsx src/ai/modelCatalog/modelCatalog.test.ts
+    npx tsx webview/src/config/modelConfig.test.ts
   )
 fi
 

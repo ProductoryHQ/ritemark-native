@@ -1,0 +1,95 @@
+{
+  "capturedAt": "2026-09-13T14:38:41.116Z",
+  "adapter": "isolated Sprint 116 prototype CodexSession + CodexAppServer",
+  "binary": "0.154.0",
+  "variant": "prototype",
+  "auditTransportAdjustment": null,
+  "protocol": [
+    {
+      "scope": "rpc:request",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "initialize"
+    },
+    {
+      "scope": "rpc:notification",
+      "method": "initialized"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "thread/start"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:error",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "turn/interrupt"
+    },
+    {
+      "scope": "rpc:request",
+      "method": "turn/start"
+    },
+    {
+      "scope": "rpc:result",
+      "method": "turn/start"
+    }
+  ],
+  "checks": [
+    {
+      "name": "cancel immediately after turn/start",
+      "status": "PASS",
+      "interrupts": [
+        {
+          "accepted": false,
+          "error": "no active turn to interrupt"
+        },
+        {
+          "accepted": true
+        }
+      ],
+      "terminalStatus": "interrupted"
+    },
+    {
+      "name": "immediate resend",
+      "status": "PASS",
+      "terminalStatus": "completed",
+      "outputMatched": true
+    }
+  ],
+  "processDiagnostics": {
+    "stderrTail": [
+      "{\"timestamp\":\"2026-09-13T14:38:42.479107Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_small: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:42.484541Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_large: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:43.349376Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare\",\"error\":\"OAuth refresh credentials for server cloudflare are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:43.349395Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-observability\",\"error\":\"OAuth refresh credentials for server cloudflare-observability are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:43.380021Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-builds\",\"error\":\"OAuth refresh credentials for server cloudflare-builds are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:43.381159Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"cloudflare-bindings\",\"error\":\"OAuth refresh credentials for server cloudflare-bindings are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}",
+      "{\"timestamp\":\"2026-09-13T14:38:44.800698Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"MCP server startup failed\",\"server_name\":\"figma\",\"error\":\"OAuth refresh credentials for server figma are missing an authorization <redacted> issuer; authorization <redacted> OAuth authorization <redacted>\"},\"target\":\"codex_mcp::rmcp_client\"}"
+    ],
+    "exit": null
+  }
+}

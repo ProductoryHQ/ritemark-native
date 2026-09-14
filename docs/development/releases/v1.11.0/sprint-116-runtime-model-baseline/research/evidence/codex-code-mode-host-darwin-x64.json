@@ -1,0 +1,22 @@
+{
+  "key": "codex/code-mode-host/darwin-x64",
+  "capturedAt": "2026-09-13T09:02:56.225Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+  "archiveFilename": "codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+  "sha256": "a0fa6141e591f44dc2d86a589cfe797212317bfb9fa3a6c73131e4dbb93387fe",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-code-mode-host-x86_64-apple-darwin",
+    "size": 65865664,
+    "licenseFiles": []
+  },
+  "binarySha256": "c558d3ebbd3b810e6e30ef5bb90c50db4807f566073dbdd04f015659ec9dddf9",
+  "file": "Mach-O 64-bit executable x86_64",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

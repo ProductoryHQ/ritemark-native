@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'fs';
-import { basename, join, resolve, dirname } from 'path';
+import { basename, join, resolve, dirname, relative } from 'path';
 
 // Sprint 76 R2: 'opencode' — bundled ACP agent runtime
 export type AgentRuntimeKind = 'claude' | 'codex-cli' | 'codex-app-server' | 'opencode';
@@ -25,7 +25,7 @@ function platformArchTag(platform: NodeJS.Platform, arch: NodeJS.Architecture): 
   return `${platform}-${arch}`;
 }
 
-function executableNames(kind: AgentRuntimeKind, platform: NodeJS.Platform): string[] {
+function executablePaths(kind: AgentRuntimeKind, platform: NodeJS.Platform): string[] {
   const extension = platform === 'win32' ? '.exe' : '';
 
   if (kind === 'claude') {
@@ -33,7 +33,7 @@ function executableNames(kind: AgentRuntimeKind, platform: NodeJS.Platform): str
   }
 
   if (kind === 'codex-app-server') {
-    return [`codex-app-server${extension}`];
+    return [join('codex', 'bin', `codex-app-server${extension}`), `codex-app-server${extension}`];
   }
 
   // Sprint 76 R2: OpenCode ACP agent binary
@@ -58,7 +58,7 @@ function candidateRuntimePaths(
   const arch = options?.arch ?? process.arch;
   const extensionRoot = options?.extensionRoot ?? extensionRootFrom(__dirname);
   const tag = platformArchTag(platform, arch);
-  const names = executableNames(kind, platform);
+  const names = executablePaths(kind, platform);
   const directories = [
     join(extensionRoot, 'binaries', 'agents', tag),
     join(extensionRoot, 'binaries', 'agents', platform),
@@ -104,6 +104,14 @@ export function isBundledAgentRuntimePath(binaryPath: string): boolean {
     || normalized.includes('/resources/claude/');
 }
 
+/** PATH entries shipped specifically for OpenCode's own subprocess lookups. */
+export function findBundledOpenCodePathEntries(binaryPath: string): string[] {
+  if (!isBundledAgentRuntimePath(binaryPath)) return [];
+  const dependencyDir = join(dirname(binaryPath), 'opencode-path');
+  const executable = join(dependencyDir, basename(binaryPath).toLowerCase().endsWith('.exe') ? 'rg.exe' : 'rg');
+  return existsSync(executable) ? [dependencyDir] : [];
+}
+
 export function inferCodexRuntimeLaunchMode(binaryPath: string): 'codex-cli' | 'codex-app-server' {
   const name = basename(binaryPath).toLowerCase();
   return name.startsWith('codex-app-server') ? 'codex-app-server' : 'codex-cli';
@@ -128,11 +136,19 @@ export function readAgentRuntimePreference(): AgentRuntimePreference {
   }
 }
 
+interface BundledManifestMember {
+  installPath: string;
+  version: string;
+}
+
 interface BundledManifestEntry {
-  installName: string;
+  installName?: string;
+  installPath?: string;
+  installRoot?: string;
   platform: string;
   arch: string;
   version: string;
+  members?: BundledManifestMember[];
 }
 
 interface BundledManifest {
@@ -149,15 +165,26 @@ interface BundledManifest {
  */
 export function readBundledRuntimeVersion(binaryPath: string): string | null {
   if (!isBundledAgentRuntimePath(binaryPath)) return null;
-  // <ext>/binaries/agents/<plat>-<arch>/<name> → <ext>/binaries/agents/manifest.json
-  const agentDir = dirname(binaryPath);
-  const manifestPath = join(dirname(agentDir), 'manifest.json');
+  const normalized = resolve(binaryPath).replace(/\\/g, '/');
+  const marker = '/binaries/agents/';
+  const markerIndex = normalized.indexOf(marker);
+  if (markerIndex < 0) return null;
+  const agentsRoot = normalized.slice(0, markerIndex + marker.length - 1);
+  const manifestPath = join(agentsRoot, 'manifest.json');
   if (!existsSync(manifestPath)) return null;
   try {
     const manifest: BundledManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-    const installName = basename(binaryPath);
-    const entry = manifest.runtimes.find((r) => r.installName === installName);
-    return entry?.version ?? null;
+    const target = normalized.slice(markerIndex + marker.length).split('/')[0];
+    const targetRoot = join(agentsRoot, target);
+    const installedPath = relative(targetRoot, binaryPath).replace(/\\/g, '/');
+    for (const entry of manifest.runtimes.filter(r => `${r.platform}-${r.arch}` === target)) {
+      if (entry.installPath === installedPath || entry.installName === basename(binaryPath)) return entry.version;
+      const member = entry.members?.find(candidate => (
+        `${entry.installRoot}/${candidate.installPath}` === installedPath
+      ));
+      if (member) return member.version;
+    }
+    return null;
   } catch {
     return null;
   }

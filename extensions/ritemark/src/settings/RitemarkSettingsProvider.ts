@@ -27,6 +27,7 @@ import {
   type SetupStatus,
 } from '../agent';
 import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
+import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -1075,7 +1076,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: CLAUDE_MODEL_IDS.HAIKU_4_5,
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Hi' }],
         }),

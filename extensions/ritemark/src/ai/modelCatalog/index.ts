@@ -118,7 +118,7 @@ export function onUpdate(cb: (resolved: Resolved) => void): vscode.Disposable {
  * Reshape the flat `opencode` list (composite `<vendor>/<model>` ids) into the
  * `Record<vendor, {id,label,description}[]>` shape the BYOK model picker expects.
  * The vendor is the first path segment; the remainder is the bare model id
- * (so `openrouter/anthropic/claude-sonnet-5` → vendor `openrouter`, id `anthropic/claude-sonnet-5`).
+ * (so the first segment is the vendor and the remainder is its provider model id).
  */
 export function getByokProviderModels(): Record<string, { id: string; label: string; description: string }[]> {
   const grouped: Record<string, { id: string; label: string; description: string }[]> = {};

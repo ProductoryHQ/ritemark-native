@@ -63,14 +63,7 @@ if [ ! -f "$WIN_AGENT_MANIFEST" ]; then
 fi
 
 MISSING_WIN_AGENTS=()
-if ! REQUIRED_WIN_AGENTS=$(node -e "
-    const manifest = require(process.argv[1]);
-    const names = manifest.runtimes
-        .filter((runtime) => runtime.platform === 'win32' && runtime.arch === 'x64')
-        .map((runtime) => runtime.installName);
-    if (names.length === 0) process.exit(2);
-    process.stdout.write(names.join('\\n'));
-" "$WIN_AGENT_MANIFEST"); then
+if ! REQUIRED_WIN_AGENTS=$(node "$SCRIPT_DIR/list-agent-runtime-files.mjs" "$WIN_AGENT_MANIFEST" win32 x64 --paths); then
     echo -e "${RED}ERROR: bundled agent runtime manifest has no valid win32-x64 component list${NC}"
     exit 1
 fi

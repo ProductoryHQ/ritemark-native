@@ -1,0 +1,22 @@
+{
+  "key": "codex/app-server/darwin-x64",
+  "capturedAt": "2026-09-13T09:02:29.743Z",
+  "version": "0.154.0",
+  "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-x86_64-apple-darwin.tar.gz",
+  "archiveFilename": "codex-app-server-x86_64-apple-darwin.tar.gz",
+  "sha256": "43ea79c9679c97ede45128749619a7576ad775eea61153afb0f18260e5160690",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 1,
+    "member": "codex-app-server-x86_64-apple-darwin",
+    "size": 183817328,
+    "licenseFiles": []
+  },
+  "binarySha256": "41bb0e094ec7b21758dffe08681a00d43334bb33e81a32eacdfce9d9db9861e6",
+  "file": "Mach-O 64-bit executable x86_64",
+  "startup": {
+    "status": "NOT_RUN",
+    "reason": "Requires native target runner"
+  },
+  "status": "PASS_ARTIFACT"
+}

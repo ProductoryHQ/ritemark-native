@@ -1,0 +1,93 @@
+{
+  "capturedAt": "2026-09-13T09:28:09.913Z",
+  "archives": [
+    {
+      "agent": "claude",
+      "target": "darwin-arm64",
+      "version": "2.1.270",
+      "npmLicense": "SEE LICENSE IN LICENSE.md",
+      "licenses": [
+        {
+          "member": "package/LICENSE.md",
+          "sha256": "8ce94b9478bb9868f9641f818e06cd722fbe55d4c22e2d2ed11971b20146173a",
+          "bytes": 147,
+          "proprietaryNotice": true,
+          "mitNotice": false,
+          "apacheNotice": false
+        }
+      ]
+    },
+    {
+      "agent": "claude",
+      "target": "darwin-x64",
+      "version": "2.1.270",
+      "npmLicense": "SEE LICENSE IN LICENSE.md",
+      "licenses": [
+        {
+          "member": "package/LICENSE.md",
+          "sha256": "8ce94b9478bb9868f9641f818e06cd722fbe55d4c22e2d2ed11971b20146173a",
+          "bytes": 147,
+          "proprietaryNotice": true,
+          "mitNotice": false,
+          "apacheNotice": false
+        }
+      ]
+    },
+    {
+      "agent": "claude",
+      "target": "win32-x64",
+      "version": "2.1.270",
+      "npmLicense": "SEE LICENSE IN LICENSE.md",
+      "licenses": [
+        {
+          "member": "package/LICENSE.md",
+          "sha256": "fe8260e23b045e5d1ce9c31d2dfe06a39ec9227a12b1bde4c8c6bcb50e9310c8",
+          "bytes": 148,
+          "proprietaryNotice": true,
+          "mitNotice": false,
+          "apacheNotice": false
+        }
+      ]
+    },
+    {
+      "agent": "opencode",
+      "target": "darwin-arm64",
+      "version": "1.18.30",
+      "npmLicense": null,
+      "licenses": []
+    },
+    {
+      "agent": "opencode",
+      "target": "darwin-x64",
+      "version": "1.18.30",
+      "npmLicense": null,
+      "licenses": []
+    },
+    {
+      "agent": "opencode",
+      "target": "win32-x64",
+      "version": "1.18.30",
+      "npmLicense": null,
+      "licenses": []
+    }
+  ],
+  "upstream": [
+    {
+      "agent": "codex",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/LICENSE",
+      "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+      "bytes": 10926,
+      "apacheNotice": true,
+      "mitNotice": false
+    },
+    {
+      "agent": "opencode",
+      "url": "https://raw.githubusercontent.com/anomalyco/opencode/v1.18.30/LICENSE",
+      "sha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b",
+      "bytes": 1065,
+      "apacheNotice": false,
+      "mitNotice": true
+    }
+  ],
+  "claudeRedistributionBasis": "Existing product-owner decision dated 2026-05-06, recorded in binaries/agents/README.md; not a new vendor license grant."
+}

@@ -1,0 +1,80 @@
+{
+  "capturedAt": "2026-09-13T14:40:26.273Z",
+  "stage": "/private/tmp/ritemark-s116-audit-YfLYRv/binaries/darwin-arm64",
+  "environment": {
+    "home": "new empty directory under audit root",
+    "path": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "developerCachesAvailable": false
+  },
+  "componentSet": {
+    "expected": [
+      "claude",
+      "codex-app-server",
+      "codex-code-mode-host",
+      "opencode"
+    ],
+    "staged": [
+      "claude",
+      "codex-app-server",
+      "codex-code-mode-host",
+      "opencode"
+    ],
+    "exact": true
+  },
+  "checks": [
+    {
+      "component": "codex/app-server",
+      "version": "0.154.0",
+      "installName": "codex-app-server",
+      "validationArgs": [
+        "--version"
+      ],
+      "status": "PASS",
+      "code": 0,
+      "signal": null,
+      "stdout": "codex-app-server 0.154.0",
+      "stderr": ""
+    },
+    {
+      "component": "codex/code-mode-host",
+      "version": "0.154.0",
+      "installName": "codex-code-mode-host",
+      "validationArgs": [
+        "--help"
+      ],
+      "status": "PASS",
+      "code": 0,
+      "signal": null,
+      "stdout": "Usage: codex-code-mode-host [OPTIONS]\n\nOptions:\n      --listen <URL>               Transport endpoint: `stdio`, `stdio://`, or `grpc://IP:PORT`\n                                   [default: stdio]\n      --otel-trace-listen <URL>    Optional WebSocket endpoint that streams only raw OTLP trace\n                                   batches\n      --otel-trace-exporter <URL>  Optional OTLP/HTTP JSON trace exporter endpoint, analogous to\n                                   `otel.trace_exporter` in app-server configuration\n  -h, --help                       Print help",
+      "stderr": ""
+    },
+    {
+      "component": "claude/runtime",
+      "version": "2.1.270",
+      "installName": "claude",
+      "validationArgs": [
+        "--version"
+      ],
+      "status": "PASS",
+      "code": 0,
+      "signal": null,
+      "stdout": "2.1.270 (Claude Code)",
+      "stderr": ""
+    },
+    {
+      "component": "opencode/runtime",
+      "version": "1.18.30",
+      "installName": "opencode",
+      "validationArgs": [
+        "--version"
+      ],
+      "status": "PASS",
+      "code": 0,
+      "signal": null,
+      "stdout": "1.18.30",
+      "stderr": ""
+    }
+  ],
+  "status": "PASS",
+  "limitation": "Authenticated behavior necessarily uses existing provider sign-in state and is recorded separately; native Intel/Windows behavior remains a CI matrix item."
+}

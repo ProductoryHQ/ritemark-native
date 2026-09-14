@@ -9,6 +9,10 @@ on:
       - 'extensions/ritemark/package.json'
       - 'extensions/ritemark/package-lock.json'
       - 'scripts/fetch-agent-runtimes.sh'
+      - 'scripts/fetch-agent-runtimes.mjs'
+      - 'scripts/extract-runtime-artifact.py'
+      - 'scripts/list-agent-runtime-files.mjs'
+      - 'scripts/list-agent-runtime-files.test.mjs'
       - 'scripts/verify-agent-runtimes.sh'
       - 'scripts/lib/verify-opencode.mjs'
       - 'scripts/validate-agent-runtime-manifest.mjs'
@@ -45,6 +49,7 @@ jobs:
         shell: bash
         run: |
           node scripts/validate-agent-runtime-manifest.mjs
+          node --test scripts/list-agent-runtime-files.test.mjs
           node --test scripts/validate-agent-runtime-manifest.test.mjs
 
       - name: Install exact extension dependencies

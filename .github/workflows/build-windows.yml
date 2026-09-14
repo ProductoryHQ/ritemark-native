@@ -558,6 +558,11 @@ jobs:
           fi
           "$RCEDIT" "VSCode-win32-x64/Ritemark.exe" --set-icon "branding/icons/icon.ico"
 
+      - name: Validate unsigned runtime payload
+        shell: bash
+        working-directory: r
+        run: ./scripts/validate-build-output.sh win32-x64
+
       - name: Resolve Windows signing tools
         id: signing-tools
         shell: pwsh
@@ -676,7 +681,10 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          if ! ./scripts/validate-build-output.sh win32-x64; then
+          if ! RITEMARK_RUNTIME_FILES_SIGNED=1 \
+              RITEMARK_SKIP_SIGNING_CHECK=0 \
+              SIGNTOOL_PATH='${{ steps.signing-tools.outputs.signtool }}' \
+              ./scripts/validate-build-output.sh win32-x64; then
             ERRORS=$((ERRORS + 1))
           fi
 

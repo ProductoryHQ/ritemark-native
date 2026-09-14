@@ -94,12 +94,10 @@ fi
 
 # Bundled agent binaries
 if [ -d "$AGENTS_DIR" ]; then
-    for exe in "$AGENTS_DIR"/*.exe; do
-        if [ -f "$exe" ]; then
-            TARGETS+=("$exe")
-            echo "  → agents/$(basename "$exe")"
-        fi
-    done
+    while IFS= read -r -d '' exe; do
+        TARGETS+=("$exe")
+        echo "  → agents/${exe#"$AGENTS_DIR/"}"
+    done < <(find "$AGENTS_DIR" -type f -name '*.exe' -print0)
 fi
 
 if [ ${#TARGETS[@]} -eq 0 ]; then

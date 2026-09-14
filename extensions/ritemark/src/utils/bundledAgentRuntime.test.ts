@@ -9,8 +9,10 @@ import { tmpdir } from 'os';
 import {
   extensionRootFrom,
   findBundledAgentRuntime,
+  findBundledOpenCodePathEntries,
   inferCodexRuntimeLaunchMode,
   isBundledAgentRuntimePath,
+  readBundledRuntimeVersion,
 } from './bundledAgentRuntime';
 
 const tempRoot = join(tmpdir(), `ritemark-bundled-runtime-test-${process.pid}`);
@@ -19,7 +21,18 @@ try {
   const windowsRuntimeDir = join(tempRoot, 'binaries', 'agents', 'win32-x64');
   mkdirSync(windowsRuntimeDir, { recursive: true });
   writeFileSync(join(windowsRuntimeDir, 'claude.exe'), '');
-  writeFileSync(join(windowsRuntimeDir, 'codex-app-server.exe'), '');
+  const codexBinDir = join(windowsRuntimeDir, 'codex', 'bin');
+  mkdirSync(codexBinDir, { recursive: true });
+  writeFileSync(join(codexBinDir, 'codex-app-server.exe'), '');
+  writeFileSync(join(windowsRuntimeDir, 'opencode.exe'), '');
+  mkdirSync(join(windowsRuntimeDir, 'opencode-path'), { recursive: true });
+  writeFileSync(join(windowsRuntimeDir, 'opencode-path', 'rg.exe'), '');
+  writeFileSync(join(tempRoot, 'binaries', 'agents', 'manifest.json'), JSON.stringify({
+    runtimes: [{
+      agent: 'codex', component: 'package', platform: 'win32', arch: 'x64', version: '0.154.0', installRoot: 'codex',
+      members: [{ installPath: 'bin/codex-app-server.exe', version: '0.154.0' }],
+    }],
+  }));
 
   const claude = findBundledAgentRuntime('claude', {
     extensionRoot: tempRoot,
@@ -39,8 +52,13 @@ try {
   });
 
   assert.ok(codexAppServer);
-  assert.strictEqual(codexAppServer.path, join(windowsRuntimeDir, 'codex-app-server.exe'));
+  assert.strictEqual(codexAppServer.path, join(codexBinDir, 'codex-app-server.exe'));
   assert.strictEqual(inferCodexRuntimeLaunchMode(codexAppServer.path), 'codex-app-server');
+  assert.strictEqual(readBundledRuntimeVersion(codexAppServer.path), '0.154.0');
+  assert.deepStrictEqual(
+    findBundledOpenCodePathEntries(join(windowsRuntimeDir, 'opencode.exe')),
+    [join(windowsRuntimeDir, 'opencode-path')],
+  );
 
   const missingCodexCli = findBundledAgentRuntime('codex-cli', {
     extensionRoot: tempRoot,

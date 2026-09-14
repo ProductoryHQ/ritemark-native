@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-09-13T08:59:16.007Z",
+  "commit": "30ea2ab32d15be161991d1bb8924a4c4ca331f8c",
+  "branch": "codex/sprint-116-runtime-model-baseline",
+  "files": {
+    "extensions/ritemark/binaries/agents/manifest.json": "1d4e9bed86b76e09586f3c8d7a81f4f5b8513d1500d1ec6c3745f1765ac143ee",
+    "extensions/ritemark/package.json": "5bd585d0ecf83661921dfd550cae02991c9644843a3f045ebb8ce6f002697605",
+    "extensions/ritemark/package-lock.json": "e464854c4f18b0f875b84394bfa5548a8378e70ba43358d4599dc0bf6806e006",
+    "extensions/ritemark/src/ai/modelConfig.ts": "52676c6e0788202426837f698530a37edb8986724dca0b0b5c1de8a1f403813b",
+    "extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts": "a0f31136f77cfdfb4a8fd7db27baa694b05be2d807a4c2188af9d17a562d0093",
+    "scripts/validate-agent-runtime-manifest.mjs": "4a3c24dc2952a73abea5498d97721d289eb9653081e38a50abb7275de845dac9",
+    "extensions/ritemark/src/agent/ClaudeCodeRuntime.ts": "af803a34c7e471f95738308cdffe6f78844bb081d37bf04e0aa304ddd0e27a95",
+    "extensions/ritemark/src/codex/CodexRuntime.ts": "6a464adab5d0855ee52a21b4b3dd651595471b2c7fc7194f3f2c9fd2e134d5e0",
+    "extensions/ritemark/src/acp/AcpRuntime.ts": "b5613b096c4eb1b76a1af3c5d17216356c940235b79a41d83f228bd0e1884c70"
+  }
+}

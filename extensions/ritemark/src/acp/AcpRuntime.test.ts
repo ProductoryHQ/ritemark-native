@@ -252,11 +252,45 @@ async function run() {
   {
     const runtime = new AcpRuntime();
     calls.length = 0;
-    const session = addSession(runtime, 'conv-a', { ...dummyConfig, model: 'openai/gpt-4o' });
+    let completionStatus: string | undefined;
+    const session = addSession(runtime, 'conv-a', {
+      ...dummyConfig,
+      model: 'openai/gpt-4o',
+      onCodexComplete: (result) => { completionStatus = result.status; },
+    });
     await session.prompt({ prompt: 'Hello' });
     assert.ok(calls.includes('setModel'), 'prompt() must call setModel when config.model is set');
     assert.ok(calls.includes('prompt'), 'prompt() must call manager.prompt()');
-    console.log('✓ Test 6: prompt() calls setModel and manager.prompt()');
+    assert.strictEqual(
+      completionStatus,
+      'completed',
+      'ACP end_turn must be normalized to the shared completed status',
+    );
+    console.log('✓ Test 6: prompt() calls setModel and normalizes end_turn to completed');
+  }
+
+  // The shared result contract calls a user cancellation `interrupted`.
+  {
+    const runtime = new AcpRuntime();
+    let completionStatus: string | undefined;
+    const session = addSession(runtime, 'conv-cancelled-result', {
+      ...dummyConfig,
+      onCodexComplete: (result) => { completionStatus = result.status; },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = {
+      ...mockManager,
+      prompt: async () => ({ stopReason: 'cancelled' }),
+    };
+
+    await session.prompt({ prompt: 'Hello' });
+
+    assert.strictEqual(
+      completionStatus,
+      'interrupted',
+      'ACP cancelled must be normalized to the shared interrupted status',
+    );
+    console.log('✓ Test 6a: ACP cancelled normalizes to interrupted');
   }
 
   // Thinking effort is applied before the prompt, and Auto restores the live default.

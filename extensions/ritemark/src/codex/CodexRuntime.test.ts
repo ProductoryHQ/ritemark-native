@@ -189,6 +189,28 @@ async function run() {
     console.log('✓ Test 3: dispose() tears down the app server and all sessions');
   }
 
+  // Codex may acknowledge turn/start before the turn is interruptible. Stop
+  // waits for turn/started and retries the measured transient failure once.
+  {
+    const { runtime, mock } = makeRuntime(['thread-cancel-race']);
+    const session = await openTurn(runtime, 'conv-cancel-race', dummyConfig);
+    let attempts = 0;
+    mock.turnInterrupt = async (threadId: string, turnId: string) => {
+      calls.push(`turnInterrupt:${threadId}:${turnId}`);
+      attempts += 1;
+      if (attempts === 1) throw new Error('no active turn to interrupt');
+    };
+    const cancelling = session.cancel();
+    await Promise.resolve();
+    mock.emit('turn/started', {
+      threadId: 'thread-cancel-race',
+      turn: { id: 'turn-thread-cancel-race', status: 'inProgress', error: null },
+    });
+    await cancelling;
+    assert.strictEqual(attempts, 2, 'Stop retries only after turn/started makes the turn active');
+    console.log('✓ Test 3b: immediate Stop waits for turn/started and retries once');
+  }
+
   // Test 4: respondToApproval() calls sendApprovalResponse() with correct decision
   {
     const { runtime } = makeRuntime();
@@ -246,6 +268,16 @@ async function run() {
     // An unattributable delta with several sessions live is DROPPED, not misrouted.
     mock.emit('item/agentMessage/delta', { delta: 'orphan' });
     assert.ok(!textA.includes('orphan') && !textB.includes('orphan'), 'unroutable delta is dropped, never misrouted');
+
+    // An explicit stale/foreign thread id is never eligible for fallback, even
+    // after only one live conversation remains.
+    const { runtime: single, mock: singleMock } = makeRuntime(['thread-only']);
+    const singleText: string[] = [];
+    await openTurn(single, 'conv-only', cfg(singleText));
+    singleMock.emit('item/agentMessage/delta', { threadId: 'retired-thread', delta: 'stale' });
+    assert.deepStrictEqual(singleText, [], 'explicit unknown thread is dropped with one live session');
+    singleMock.emit('item/agentMessage/delta', { delta: 'unambiguous legacy event' });
+    assert.deepStrictEqual(singleText, ['unambiguous legacy event'], 'missing thread id keeps singleton compatibility');
     console.log('✓ Test 6: B3 — streamed deltas route by threadId, orphans dropped');
   }
 

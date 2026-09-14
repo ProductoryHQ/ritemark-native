@@ -1,0 +1,21 @@
+{
+  "capturedAt": "2026-09-13T09:51:44.503Z",
+  "dir": "/private/tmp/ritemark-s116-audit-YfLYRv/baseline-codex-0.153.0",
+  "version": "codex-app-server 0.153.0",
+  "results": [
+    {
+      "component": "app-server",
+      "version": "0.153.0",
+      "sha256": "4293c483605cae9e3fa413add08ec394bb5f8e52c1762567444551f7c763e143",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-app-server-aarch64-apple-darwin.tar.gz",
+      "file": "Mach-O 64-bit executable arm64"
+    },
+    {
+      "component": "code-mode-host",
+      "version": "0.153.0",
+      "sha256": "85fdb0461636e9d5806fa200b4f000a5cd287456f366f6af4797a4c32d5d50e9",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.153.0/codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+      "file": "Mach-O 64-bit executable arm64"
+    }
+  ]
+}

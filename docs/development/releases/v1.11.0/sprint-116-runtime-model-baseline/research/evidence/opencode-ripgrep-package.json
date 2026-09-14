@@ -1,0 +1,59 @@
+{
+  "capturedAt": "2026-09-13T15:04:54.531Z",
+  "opencodeVersion": "1.18.30",
+  "sourcePin": "packages/core/src/ripgrep/binary.ts VERSION = 15.1.0",
+  "releaseMetadataSha256": "4bc26d96d46cd73cf940fc440a734c2e43a82f32bedaccd324cb1225a175c2b6",
+  "status": "PASS",
+  "artifacts": [
+    {
+      "target": "darwin-arm64",
+      "archive": "ripgrep-15.1.0-aarch64-apple-darwin.tar.gz",
+      "format": "tar.gz",
+      "sha256": "378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715",
+      "binary": "ripgrep-15.1.0-aarch64-apple-darwin/rg",
+      "sourceUrl": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz",
+      "archiveSha256": "378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "binarySha256": "4fdf1d8365af224bc70e3c1490d8461d859c37cc70e739a11e987af0215f3e94",
+      "file": "Mach-O 64-bit executable arm64"
+    },
+    {
+      "target": "darwin-x64",
+      "archive": "ripgrep-15.1.0-x86_64-apple-darwin.tar.gz",
+      "format": "tar.gz",
+      "sha256": "64811cb24e77cac3057d6c40b63ac9becf9082eedd54ca411b475b755d334882",
+      "binary": "ripgrep-15.1.0-x86_64-apple-darwin/rg",
+      "sourceUrl": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-apple-darwin.tar.gz",
+      "archiveSha256": "64811cb24e77cac3057d6c40b63ac9becf9082eedd54ca411b475b755d334882",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "binarySha256": "3bafa7e6ee51ba3ac4ed065883484a309be09b26ea6dad561ae4049bfe049c50",
+      "file": "Mach-O 64-bit executable x86_64"
+    },
+    {
+      "target": "win32-x64",
+      "archive": "ripgrep-15.1.0-x86_64-pc-windows-msvc.zip",
+      "format": "zip",
+      "sha256": "124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a",
+      "binary": "ripgrep-15.1.0-x86_64-pc-windows-msvc/rg.exe",
+      "sourceUrl": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip",
+      "archiveSha256": "124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a",
+      "archiveVerified": true,
+      "archiveEntrySafety": "PASS",
+      "unsafeEntries": [],
+      "binarySha256": "decdd4992f3f1b9a5ef9898f1b40ab16886d579d6516b4efd3d5eaa19364e408",
+      "file": "PE32+ executable (console) x86-64, for MS Windows"
+    }
+  ],
+  "cleanPathProbe": {
+    "stdout": "[]",
+    "resourceSelections": [
+      "rg"
+    ],
+    "downloadedFallback": false,
+    "path": "<managed-opencode-tool-dir>:/usr/bin:/bin:/usr/sbin:/sbin"
+  }
+}

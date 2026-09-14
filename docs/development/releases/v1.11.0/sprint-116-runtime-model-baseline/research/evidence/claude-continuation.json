@@ -1,0 +1,28 @@
+{
+  "fixture": "sprint-110-runtime-continuation-v1",
+  "provider": "claude",
+  "startedAt": "2026-09-13T09:07:36.606Z",
+  "finishedAt": "2026-09-13T09:07:49.071Z",
+  "platform": "darwin-arm64",
+  "status": "PASS",
+  "nativeApi": "query.options.resume",
+  "processBoundary": "new SDK query / new Claude subprocess",
+  "sessionIdCaptured": true,
+  "recallMatched": true,
+  "first": {
+    "sessionIdPresent": true,
+    "resultSubtype": "success",
+    "emittedText": true,
+    "tokenPresent": false
+  },
+  "resumed": {
+    "sessionIdPresent": true,
+    "resultSubtype": "success",
+    "emittedText": true,
+    "tokenPresent": true
+  },
+  "invalidDescriptor": {
+    "rejected": true,
+    "errorClass": "protocol-error"
+  }
+}

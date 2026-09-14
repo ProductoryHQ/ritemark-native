@@ -1,5 +1,7 @@
 import * as path from 'path';
 import { createBrowserMcpServer, BROWSER_MCP_SERVER_NAME } from '../browser/browserMcpServer';
+import { buildCodexBrowserDynamicTools } from '../browser/codexBrowserTools';
+import type { DynamicToolDefinition } from '../codex/codexProtocol';
 
 export class BrowserToolsInjector {
   private cachedServer: unknown | null = null;
@@ -40,7 +42,7 @@ export class BrowserToolsInjector {
     ];
   }
 
-  getCodexDynamicTools(_enabled: boolean): unknown[] | undefined {
-    return undefined;
+  getCodexDynamicTools(enabled: boolean): DynamicToolDefinition[] | undefined {
+    return enabled ? buildCodexBrowserDynamicTools() : undefined;
   }
 }

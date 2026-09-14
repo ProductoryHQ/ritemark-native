@@ -27,18 +27,19 @@ export interface ModelConfig {
   };
 }
 
-// Minimal fallback if extension hasn't sent config yet
+// Non-selectable bootstrap state until the extension sends the authoritative
+// catalog. Model identifiers live only in the extension's modelConfig.ts.
 const FALLBACK_CONFIG: ModelConfig = {
-  openaiLLM: [{ id: 'gpt-4o', name: 'GPT-4o' }],
-  openaiImage: [{ id: 'gpt-image-1.5', name: 'GPT Image 1.5' }],
-  geminiLLM: [{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' }],
-  geminiImage: [{ id: 'imagen-4.0-fast-generate-001', name: 'Imagen 4 Fast' }],
+  openaiLLM: [],
+  openaiImage: [],
+  geminiLLM: [],
+  geminiImage: [],
   defaults: {
-    assistant: 'gpt-4o-mini',
-    flowLLM: 'gpt-5.2',
-    flowLLMGemini: 'gemini-2.5-flash',
-    flowImage: 'gpt-image-1.5',
-    flowImageGemini: 'imagen-4.0-fast-generate-001',
+    assistant: '',
+    flowLLM: '',
+    flowLLMGemini: '',
+    flowImage: '',
+    flowImageGemini: '',
   },
 };
 
@@ -93,6 +94,20 @@ export function getDefaultImageModel(provider: 'openai' | 'gemini'): string {
   return provider === 'openai'
     ? currentConfig.defaults.flowImage
     : currentConfig.defaults.flowImageGemini;
+}
+
+/** Keep a saved model visible without adding unavailable models to new-choice lists. */
+export function modelOptionsWithPersistedSelection(
+  models: ModelInfo[],
+  selectedId: string | undefined,
+): { models: ModelInfo[]; unavailable: boolean } {
+  if (!selectedId || models.some(model => model.id === selectedId)) {
+    return { models, unavailable: false };
+  }
+  return {
+    models: [{ id: selectedId, name: `Unavailable: ${selectedId}` }, ...models],
+    unavailable: true,
+  };
 }
 
 /**

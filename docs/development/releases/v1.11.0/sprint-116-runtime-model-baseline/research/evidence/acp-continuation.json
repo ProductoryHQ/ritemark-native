@@ -1,0 +1,39 @@
+{
+  "fixture": "sprint-110-runtime-continuation-v1",
+  "provider": "acp",
+  "startedAt": "2026-09-13T09:17:15.862Z",
+  "finishedAt": "2026-09-13T09:17:24.577Z",
+  "platform": "darwin-arm64",
+  "status": "PASS",
+  "nativeApi": "session/resume; session/load measured separately",
+  "processBoundary": "OpenCode ACP process restart",
+  "capabilities": {
+    "loadSession": true,
+    "resume": true,
+    "list": true,
+    "fork": true,
+    "close": true
+  },
+  "sessionIdCaptured": true,
+  "selectedModel": "opencode/big-pickle",
+  "recallMatched": true,
+  "firstTurn": {
+    "stopReason": "end_turn",
+    "emittedText": true,
+    "tokenPresent": false
+  },
+  "resumedTurn": {
+    "stopReason": "end_turn",
+    "emittedText": true,
+    "tokenPresent": true
+  },
+  "loadSession": {
+    "replayedUpdateCount": 4,
+    "replayedAgentText": true
+  },
+  "invalidDescriptor": {
+    "rejected": true,
+    "errorClass": "protocol-error"
+  },
+  "resumeMetadataReturned": true
+}

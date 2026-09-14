@@ -1,0 +1,27 @@
+{
+  "key": "claude/runtime/darwin-arm64",
+  "capturedAt": "2026-09-13T09:03:07.595Z",
+  "version": "2.1.270",
+  "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.270.tgz",
+  "archiveFilename": "claude-code-darwin-arm64-2.1.270.tgz",
+  "sha256": "1233c82cf589f08ca89906a6ec5c074423d8e329fdf3a1f5eb9331da2a67d461",
+  "publisherIntegrityVerified": true,
+  "archive": {
+    "memberCount": 4,
+    "member": "package/claude",
+    "size": 207500480,
+    "licenseFiles": [
+      "package/LICENSE.md"
+    ]
+  },
+  "binarySha256": "a506b6d970a4cf44f6abdb53a81ddcd5d3b0ce042a95c502fe9d1f946bdb8807",
+  "file": "Mach-O 64-bit executable arm64",
+  "startup": {
+    "status": "PASS",
+    "args": [
+      "--version"
+    ],
+    "output": "2.1.270 (Claude Code)\n"
+  },
+  "status": "PASS_ARTIFACT"
+}
