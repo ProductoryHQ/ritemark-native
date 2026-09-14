@@ -11,7 +11,7 @@ Replace the editor→AI-sidebar relay and webview-memory status map with one can
 - **One action, one task record.** UI surfaces capture intent; the host owns accepted task identity and state.
 - **Freeze context at acceptance.** Later tab, selection, model, or conversation changes cannot retarget queued work.
 - **No success before acceptance.** The editor reports queued only after a durable host acknowledgment.
-- **Destination is part of consent.** The user sees the agent and the destination conversation before dispatch, on every entry point.
+- **Destination is visible, never asked.** A comment task goes to the conversation open in the AI sidebar; the Send surface says which one, and there is no confirmation step.
 - **Status follows task/turn facts.** A conversation terminal event cannot finish unrelated tasks.
 - **Reply without corrupting authorship.** Agent completion is visible on the source comment without silently rewriting the user's comment note.
 
@@ -73,7 +73,7 @@ As a user, I want to know which conversation receives the work and be able to op
 
 Acceptance criteria:
 - Destination resolution is deterministic and produces a canonical `conversationId` before task acceptance.
-- Before dispatch, on both the margin rail and the Comments menu, the confirmation names the runtime and the exact destination conversation; if a new background conversation will be created, it says so.
+- The destination is the conversation open in the AI sidebar at the moment of sending, a fresh empty conversation included; both the margin rail and the Comments menu show its title on the Send surface, and no confirmation dialog or picker is added.
 - The source comment shows **Open conversation** for queued/running/needs-user/completed/failed states.
 - Selecting the action opens the exact conversation without changing task identity or status.
 - The task never silently retargets if another conversation becomes active or the chosen conversation is deleted; deletion produces an explicit recovery/failure path.
@@ -163,7 +163,7 @@ Acceptance criteria:
 1. ~~Approve full 23-finding scope versus a named surgical deferral list.~~ Resolved 2026-09-14: full scope; v1.12.0 Sprint 121 absorbed.
 2. Freeze `CommentTaskRecordV1`, retention, cleanup, file-move/Save As, retry, and comment-deletion behavior.
 3. Approve host-local completion projection versus a new persisted Markdown reply encoding; recommendation is host-local projection.
-4. Freeze destination resolution and the exact pre-dispatch confirmation interaction. Decided 2026-09-14: the agent and destination are shown before dispatch on both entry points; Phase 0 still freezes the surface and its atomicity with acceptance.
+4. ~~Freeze destination resolution and the exact pre-dispatch confirmation interaction.~~ Decided by Jarmo 2026-09-14: the destination is the conversation open in the AI sidebar; no confirmation, no picker; the Send surface shows its title.
 5. Freeze the exact typed request/result/event union and integration seam with ConversationController/sidebar queue.
 6. Approve the visual states in [design.md](./design.md).
 7. Approve the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow widths (R10).

@@ -86,7 +86,7 @@ The two `components/comment/` files are proposals: Phase 0 may rename them or fo
 
 - Define editor request/result/events in `commentTasks/protocol.ts`; runtime-validate exact fields at the webview boundary.
 - `RitemarkEditorProvider` stamps canonical document URI/project scope and validates that requested IDs exist in the current document snapshot.
-- Resolve a canonical destination conversation through host conversation APIs, preferring a ready compatible conversation only under a frozen deterministic rule; otherwise create one accepted background conversation.
+- The destination is the conversation open in the AI sidebar: the sidebar reports its active conversation to the host (`conversation/active`), the host binds the task to that canonical id at acceptance, and a fresh empty conversation is used as-is. No candidate query, no confirmation.
 - Query normalized runtime availability and queue reservation before final acceptance.
 - Persist task before returning accepted; if queue handoff fails after persistence, record actionable interrupted/failed state rather than losing it.
 - Return per-group results for bulk requests and idempotently correlate retries.
@@ -110,7 +110,7 @@ The two `components/comment/` files are proposals: Phase 0 may rename them or fo
 
 ## Workstream 6: UX, accessibility, migration, and flag behavior (R4–R10)
 
-- Implement [design.md](./design.md) confirmation and task states for single and bulk entry points; the confirmation shows the agent and destination before dispatch.
+- Implement [design.md](./design.md) task states for single and bulk entry points; the Send surface shows the open conversation's title, with no confirmation step.
 - Show runtime, destination title, current state, timestamp, concise reply/error, and Open conversation/Retry/Sign in as applicable.
 - Replace global broadcast with document-scoped host projection; clear old webview module state on transition.
 - Give the compose bubble a bounded vertical resize as one reusable primitive (Sprint 122 applies it to the agent composer); keep Save, Cancel, and Send outside the scrolling area.

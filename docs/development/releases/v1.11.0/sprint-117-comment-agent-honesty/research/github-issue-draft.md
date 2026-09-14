@@ -18,7 +18,7 @@ Every comment-to-agent assignment is truthful from click to completion — one d
 - Runtime availability is checked before acceptance; queue-full and per-runtime failures are reported per group, never as a blanket "Queued N tasks".
 - Host-owned task ledger: status survives editor and sidebar reloads; one terminal turn finishes only its own task; cancelled turns never report done.
 - Completion posts one concise reply on the source comment with an Open conversation link (#156); needs-input, failed, cancelled, and interrupted states are distinct.
-- The agent and destination conversation are shown before dispatch on both surfaces (#281).
+- A comment task goes to the conversation open in the AI sidebar; both surfaces show its title, with no confirmation step (#281).
 - Comment composer with bounded vertical resize; `@` opens the agent picker immediately with keyboard and pointer selection; collapsed comments never cover document text (#281).
 - The existing `comment-callouts` flag stays the only flag and stays default-on.
 
@@ -29,7 +29,7 @@ Every comment-to-agent assignment is truthful from click to completion — one d
 - Unavailable runtimes fail before queue acceptance with actionable recovery.
 - Working, needs-input, completed, failed, and cancelled states are truthful and isolated to the source document and comments.
 - Completion writes one concise reply to the source comment and links to the canonical conversation.
-- Both surfaces show the agent and destination before dispatch; `@` picker works by keyboard and pointer; collapsed comments never overlap text; the composer resizes within bounds with controls reachable.
+- The task lands in the open conversation and both surfaces name it; `@` picker works by keyboard and pointer; collapsed comments never overlap text; the composer resizes within bounds with controls reachable.
 - Comment Markdown round-trip and export stripping are unchanged; three-runtime matrix, webview and extension builds, architecture gate, and repository QA pass.
 
 ## Relationships

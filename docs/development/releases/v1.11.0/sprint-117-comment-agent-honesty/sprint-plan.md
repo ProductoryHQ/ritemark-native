@@ -8,11 +8,11 @@
 
 ## Goal
 
-Make every comment-to-agent assignment truthful from click to completion: one dispatch contract, the correct document and conversation, reliable status, and a visible reply on the source comment. Make the comment itself comfortable to write and hand over: a composer that resizes, an agent picker that opens on `@`, collapsed comments that never cover the text, and the agent and destination conversation shown before dispatch.
+Make every comment-to-agent assignment truthful from click to completion: one dispatch contract, the correct document and conversation, reliable status, and a visible reply on the source comment. Make the comment itself comfortable to write and hand over: a composer that resizes, an agent picker that opens on `@`, collapsed comments that never cover the text, and a task that goes to the conversation you have open, no questions asked.
 
 ## Release Outcome
 
-After Sprint 117, assigning from an individual margin comment or the document-wide Comments menu creates the same host-owned task record. The source document can be closed or another tab selected without retargeting work; the original comment shows durable task status, the destination conversation, requests for attention, and one concise completion reply. The comment composer resizes within bounds, typing `@` opens the agent picker immediately, a collapsed comment is a compact margin marker that never covers document text, and both the margin rail and the Comments menu name the agent and destination conversation before anything is queued.
+After Sprint 117, assigning from an individual margin comment or the document-wide Comments menu creates the same host-owned task record. The source document can be closed or another tab selected without retargeting work; the original comment shows durable task status, the destination conversation, requests for attention, and one concise completion reply. The comment composer resizes within bounds, typing `@` opens the agent picker immediately, a collapsed comment is a compact margin marker that never covers document text, and a comment task goes to the conversation open in the AI sidebar, which the Send surface names, with no confirmation step.
 
 ## SDD Artifacts
 
@@ -37,7 +37,7 @@ Jarmo approved the full correctness contract on 2026-09-14 because the known fin
 - Normalize completion, failure, cancellation, approval, and question states across Claude, Codex, and OpenCode.
 - Post a short completion reply back to the source comment for #156 without creating a general multi-turn comment schema.
 - Show and navigate to the exact destination conversation where the task is working or needs input.
-- Name the agent and the exact destination conversation before dispatch, on both the margin rail and the Comments menu (absorbed from Sprint 121; already R4).
+- Route every comment task to the conversation open in the AI sidebar and show its title on the Send surface of both the margin rail and the Comments menu; no confirmation dialog or picker (Jarmo, 2026-09-14; R4).
 - Give the comment composer a bounded vertical resize that keeps Save, Cancel, and Send reachable at the minimum supported editor width (absorbed from Sprint 121).
 - Open the supported-agent picker immediately on `@`, filter as the user types, support keyboard and pointer selection, keep the selected agent visually explicit, and insert mentions from the same alias vocabulary the collector parses (absorbed from Sprint 121).
 - Render a collapsed comment as a compact margin marker that never covers document text, and stack status, reply, and actions below the note inside the bubble (absorbed from Sprint 121).
@@ -62,7 +62,7 @@ Jarmo approved the full correctness contract on 2026-09-14 because the known fin
 - [ ] Unavailable runtimes fail before queue acceptance with actionable recovery.
 - [ ] Working, needs-input, completed, failed, and cancelled states are truthful and isolated to the source document/comments.
 - [ ] Completion writes one concise reply to the source comment and links to the canonical conversation.
-- [ ] Both the margin rail and the Comments menu show the agent and destination conversation before dispatch.
+- [ ] A comment task lands in the conversation open in the AI sidebar; both surfaces show that conversation's title without a confirmation step.
 - [ ] `@` opens the agent picker immediately; keyboard-only and pointer selection both work; only supported aliases are offered.
 - [ ] Collapsed comments never overlap document text at narrow or normal widths, including with status dots and adjacent markers.
 - [ ] The comment composer resizes within bounds and keeps Save, Cancel, and Send reachable at the minimum supported width.
@@ -122,7 +122,7 @@ Resolved 2026-09-14: full correctness contract, plus v1.12.0 Sprint 121 absorbed
 | 2026-09-13 | Keep completion reply outside the Markdown comment body by default | The user's note and export/round-trip contract stay untouched; Phase 0 must approve exact local metadata ownership. |
 | 2026-09-14 | Approve the full 23-finding scope | The surgical subset would have left the two worst symptoms, wrong document context and the invisible landing; every finding gets a disposition in Phase 0. |
 | 2026-09-14 | Absorb v1.12.0 Sprint 121 (#281) into Sprint 117 | Two of Sprint 121's six outcomes were already R4/R6/R7; the other three change the same component W6 rewrites (`MarginCommentRail.tsx`, `CommentsMenuButton.tsx`) and share the `@` alias vocabulary with W2. One sprint avoids rebuilding the rail in two releases; R10 added; the resizable composer becomes a primitive Sprint 122 reuses. |
-| 2026-09-14 | Show the agent and destination conversation before dispatch, on both entry points | Decided by the absorption; Phase 0 freezes only the exact confirmation surface and its atomicity with acceptance. |
+| 2026-09-14 | Destination is the conversation open in the AI sidebar; no confirmation dialog, no picker | Jarmo: "läheb automaatselt sinna, milline on hetkel visuaalselt avatud". A fresh empty conversation counts; the Send surface shows the title so nothing is hidden. |
 
 ## Planning Approval
 

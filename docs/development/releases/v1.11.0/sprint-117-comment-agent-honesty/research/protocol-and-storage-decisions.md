@@ -14,7 +14,7 @@ Every decision below names the evidence it rests on (file and line on `main`) an
 | D2 | `CommentTaskRecordV1` | Shape, bounds, and transition table in §3 | Jarmo |
 | D3 | Stable IDs for every comment kind | Standalone carrier `<!-- {id:<uuid>} body -->`; legacy IDs minted in one undoable transaction at dispatch; duplicate IDs re-minted | Jarmo |
 | D4 | Source binding, rename, deletion, retention | Canonical `file:` URI + project `scopeId`; in-app renames follow; no relink flow; 30-day terminal retention, 500-record cap | Jarmo |
-| D5 | Destination resolution and confirmation | Host resolves a deterministic default; the confirmation shows it and lets the user pick another ready conversation or "New conversation" | Jarmo |
+| D5 | Destination | The conversation open in the AI sidebar, a fresh empty one included; no confirmation, no picker; the Send surface names it | decided by Jarmo 2026-09-14 |
 | D6 | Acceptance protocol and atomicity | Persist `accepting` → sidebar enqueue ack → `queued` → editor result; bounded waits; per-group bulk results | engineering |
 | D7 | Lifecycle derivation | Derived from the host conversation record by exact `(conversationId, conversationTurnId)`; cancel normalised above adapters | engineering |
 | D8 | Capture and prompt | One collector (`commentIndex.ts`), one host prompt builder, `stripAssignmentMention` everywhere, runtime context from the record, never from the active tab | engineering |
@@ -46,7 +46,7 @@ Every decision below names the evidence it rests on (file and line on `main`) an
 | F17 `enqueuePrompt` returned `full` is ignored | R5 | Queue is full | W3 | Required — enqueue ack precedes `queued` (D6) |
 | F18 bulk and rail show success before any acknowledgment | R5 | Bulk has mixed acceptance results | W3, W6 | Required — per-request results; the rail's `sentKey` flash goes too |
 | F19 no availability gate before enqueue | R5 | Runtime is signed out; Runtime status is refreshing | W3 | Required — host gate using the shared policy (D12) |
-| F20 destination chosen silently in the sidebar | R4 | Destination is visible before dispatch | W3, W6 | Required — host resolver + confirmation (D5) |
+| F20 destination chosen silently in the sidebar | R4 | Destination is the open conversation | W3, W6 | Required — the host binds the sidebar's open conversation at acceptance and the Send surface names it (D5) |
 | F21 approval/question only in the destination conversation | R6 | Approval or question needs the user | W4, W5 | Required — `needs-user` projection with Open conversation |
 | F22 terminal handlers finalise every running task in a conversation | R6, R8 | Two tasks share one conversation | W4 | Required — derivation by exact turn (D7) |
 | F23 no reply on the source comment (#156) | R7 | Successful result replies to the source comment | W5 | Required (D9) |
@@ -142,16 +142,17 @@ Rejected requests never create a record. Sample records: [fixtures/records/](./f
 - **Retention:** terminal records are removed 30 days after `lifecycle.since`; at most 500 records per store (oldest terminal first). Non-terminal records found at activation move to `interrupted(restart)` unless the destination conversation still shows that exact turn active. Cleanup runs at activation and every 24 h.
 - **Source comment deleted while a task runs:** the record keeps the comment snapshot; the projection simply has no target; nothing is reinserted.
 
-## 6. D5 — Destination resolution and confirmation
+## 6. D5 — Destination
 
-**Observed.** The sidebar picks a destination with no user visibility (`webview/src/components/ai-sidebar/store.ts:802-818`): first ready conversation of the runtime, else the newest, else a new one. The margin rail flashes "Sent" immediately (`MarginCommentRail.tsx:397-399`); the menu shows "Queued N tasks" right after posting (`CommentsMenuButton.tsx:90-93`).
+**Observed.** The sidebar picks a destination with no user visibility (`webview/src/components/ai-sidebar/store.ts:802-818`): first ready conversation of the runtime, else the newest, else a new background one. The margin rail flashes "Sent" immediately (`MarginCommentRail.tsx:397-399`); the menu shows "Queued N tasks" right after posting (`CommentsMenuButton.tsx:90-93`).
 
-**Decision.**
-- The host resolves the default deterministically: the most recently active conversation in this `scopeId` whose last runtime is the assigned runtime and whose lifecycle is `idle`; otherwise a new background conversation titled from the first instruction (`Comment: <first 40 chars>`), created through `ConversationStore.create`. The visible conversation is never preferred merely for being visible.
-- The confirmation is shown before dispatch on both surfaces. On Send, the webview asks `comment-task/destinations` and renders: runtime name, the default destination, and a select listing every other idle conversation of that runtime in this project plus "New conversation". The rail replaces its immediate send with `Send to <Runtime> → <destination> [Cancel] [Send]`; the menu adds the select to each group in its existing confirming step.
-- After acceptance the bubble shows `Queued for <Runtime>` and `In "<title>"` with Open conversation, from the projection, never from local state.
+**Decided by Jarmo, 2026-09-14.** The task goes to the conversation that is open in the AI sidebar at the moment of sending. A fresh empty conversation counts and simply starts with the task. No confirmation dialog, no picker, no "prefer a ready conversation" logic.
 
-**Jarmo:** read-only display would satisfy #281 literally; the select costs one extra host query and prevents "it went to the wrong chat". Recommendation: the select.
+- The sidebar reports its active conversation to the host (`conversation/active { conversationId }`) whenever it changes, so the host can bind without a round trip. The host binds that canonical id at acceptance; later switching the visible conversation does not retarget the task (R3, R4).
+- If the open conversation is currently running a turn, the task enters that conversation's queue behind it (Sprint 104 semantics, unchanged).
+- If the open conversation belongs to another runtime, the task still goes there and runs as the assigned runtime, with the usual runtime-switch boundary in the transcript. Bulk send with two agent groups therefore produces two tasks in the same open conversation. *(Assumption stated to Jarmo; revisit only if he objects.)*
+- If the sidebar has never been opened this session, the host focuses it and uses the conversation it restores as active; if that resolves to nothing within 5 s the request fails with `sidebar-unreachable` (D6).
+- Visibility without a step: the rail shows a one-line caption with the conversation title above the Send button, and the menu's existing confirming step names it in its summary line. After acceptance the bubble shows `Queued for <Runtime>` and `In "<title>"` with Open conversation, from the projection.
 
 ## 7. D6 — Acceptance protocol and atomicity
 
@@ -159,8 +160,8 @@ Messages are exact-field validated at the host boundary in `src/commentTasks/pro
 
 **Editor webview → host**
 
-- `comment-task/destinations` `{ requestId, runtimeId }` → `comment-task/destinations-result` `{ requestId, defaultConversationId | null, candidates: [{ conversationId, title, lifecycle }] }`.
-- `comment-task/accept` `{ requestId, batchId?, surface, alias, destination: { conversationId } | { new: true }, documentVersion, comments: [{ commentId, kind, note, instruction, anchoredText? }] }` → `comment-task/result` `{ requestId, ok: true, taskId, state: 'queued', destination: { conversationId, title, created } }` or `{ requestId, ok: false, error: { code, message, retryable, recovery? } }`.
+- `comment-task/accept` `{ requestId, batchId?, surface, alias, documentVersion, comments: [{ commentId, kind, note, instruction, anchoredText? }] }` → `comment-task/result` `{ requestId, ok: true, taskId, state: 'queued', destination: { conversationId, title, created } }` or `{ requestId, ok: false, error: { code, message, retryable, recovery? } }`. The request carries no destination: the host uses the sidebar's open conversation (D5).
+- `comment-task/destination-preview` `{ requestId }` → `{ requestId, conversationId | null, title | null }` — read-only, used only to render the caption on the Send surface.
 - `comment-task/open-conversation` `{ taskId }`, `comment-task/retry` `{ taskId }`, `comment-task/cancel` `{ taskId }` → `comment-task/result`.
 
 Error codes: `invalid-request`, `feature-disabled`, `durable-conversations-disabled`, `document-not-file`, `document-not-synced`, `comment-not-found`, `duplicate-comment-id`, `unsupported-alias`, `empty-instruction`, `payload-too-large`, `runtime-unavailable` (with the normalised state and a `recovery` of `sign-in` | `configure` | `install` | `retry`), `destination-not-found`, `queue-full`, `sidebar-unreachable`, `store-degraded`, `unknown-task`, `stale-generation`.
@@ -171,11 +172,11 @@ Error codes: `invalid-request`, `feature-disabled`, `durable-conversations-disab
 
 **Host ↔ AI sidebar**
 
-- Sidebar posts `sidebar/ready` once its store is hydrated. The host queues `comment-task/enqueue` until then, at most 5 s.
+- Sidebar posts `sidebar/ready` once its store is hydrated, and `conversation/active { conversationId }` on every selection change. The host queues `comment-task/enqueue` until ready, at most 5 s.
 - `comment-task/enqueue` `{ taskId, conversationId, conversationTurnId, runtimeId, prompt, displayText, modelId, autonomy, thinkingEffort, sourceDisplayPath }` → `comment-task/enqueue-result` `{ taskId, outcome: 'queued' | 'full' | 'no-conversation' }`. The sidebar's `QueueItem` gains `taskId`, `conversationTurnId`, and `sourceDisplayPath`; `dispatchQueueItem` uses the host-minted turn id instead of `nextId()` and sends `taskId` in `agent-execute`.
 - A user removing the queued item sends `comment-task/dequeued` `{ taskId }` → the host records `cancelled`.
 
-**Acceptance sequence** (one serialized mutation per request): validate → resolve document, scope, ids (bounded 1 s sync wait) → availability (D12) → destination (D5; may create a conversation) → persist `accepting` → sidebar enqueue → on `queued` persist `queued` and answer the editor; on `full` delete the `accepting` record and answer `queue-full`; on timeout persist `interrupted(sidebar-unreachable)` and answer `sidebar-unreachable` (Retry offered). A restart with `accepting` records yields `interrupted(restart)`.
+**Acceptance sequence** (one serialized mutation per request): validate → resolve document, scope, ids (bounded 1 s sync wait) → availability (D12) → destination = the sidebar's open conversation (D5) → persist `accepting` → sidebar enqueue → on `queued` persist `queued` and answer the editor; on `full` delete the `accepting` record and answer `queue-full`; on timeout persist `interrupted(sidebar-unreachable)` and answer `sidebar-unreachable` (Retry offered). A restart with `accepting` records yields `interrupted(restart)`.
 
 **Idempotency.** `requestId` is unique per (surface, group). A repeated `requestId` returns the original result; a second click while a request is in flight is disabled in the UI and ignored by the host. Bulk sends one `accept` per agent group under one `batchId`; the menu renders each result as it arrives and never a blanket success.
 
@@ -241,7 +242,7 @@ Events for other turns, other generations, or unknown tasks are ignored and logg
 - [ ] D2 record shape, bounds, and transition table.
 - [ ] D3 `{id:…}` carrier for standalone notes; ids minted at dispatch for legacy comments; duplicates re-minted.
 - [ ] D4 canonical URI + scope; in-app renames follow; no relink flow; 30-day / 500-record retention; `untitled:` rejected.
-- [ ] D5 deterministic default destination with a select for another idle conversation or New.
+- [x] D5 the conversation open in the AI sidebar, no confirmation, no picker (Jarmo, 2026-09-14).
 - [ ] D9 host-local plain-text summary ≤ 280 chars; Markdown untouched.
 - [ ] D10 native vertical resize with the stated bounds; `@` listbox without availability hints; gutter-marker rule with thresholds measured before Phase 5.
 - [ ] design.md states as amended 2026-09-14.

@@ -17,10 +17,8 @@
 ```text
 ┌────────────────────────────────────────┐
 │ @claude Strengthen this argument       │
-│                                        │
-│ Send to Claude                         │
-│ Destination: New conversation          │
-│                         [Cancel] [Send] │
+│ → Release note review                  │
+│                        [Send to Claude] │
 └────────────────────────────────────────┘
 
 after acceptance
@@ -42,18 +40,18 @@ after completion
 └────────────────────────────────────────┘
 ```
 
-Decided 2026-09-14: the confirmation surface above is the pre-dispatch destination display — the user sees the agent and the destination conversation before anything is queued, from the margin rail and from the Comments menu alike. Phase 0 freezes how the confirmation and durable acceptance interlock, but the user must never receive a generic success without a canonical destination.
+Decided by Jarmo 2026-09-14: there is no confirmation step. The task goes to the conversation open in the AI sidebar, a fresh empty one included; the caption above the button names it so nothing is hidden, and after acceptance the bubble shows the same title with Open conversation. The user must never receive a generic success without a canonical destination.
 
 ## Bulk Flow
 
 ```text
 COMMENTS · 5 total · 4 assigned
 
-[✓] Claude · 2  → “Release note review”
-[✓] Codex  · 2  → New conversation
+[✓] Claude · 2
+[✓] Codex  · 2
     1 unassigned comment is not sent
 
-Starts 2 tasks containing 4 comments.
+Starts 2 tasks containing 4 comments in “Release note review”.
 Each task keeps the document and comments shown here.
                          [Back] [Start 2 tasks]
 ```
@@ -150,7 +148,7 @@ Status is text plus icon; never color-only. `needs-user` uses the established am
 ## Phase 0 Decisions for Jarmo
 
 - [ ] Approve task/comment/conversation mental model.
-- [ ] Approve destination visibility and exact confirmation timing.
+- [x] Destination: the conversation open in the AI sidebar, no confirmation (Jarmo, 2026-09-14).
 - [ ] Approve state vocabulary and per-group bulk results.
 - [ ] Approve host-local completion projection that leaves Markdown unchanged.
 - [ ] Approve summary bounds/fallback and source/destination deletion behavior.

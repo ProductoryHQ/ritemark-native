@@ -11,7 +11,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Freeze stable-ID upgrade and duplicate-ID behavior for marks and standalone nodes.
 - [ ] Freeze `CommentTaskRecordV1`, typed protocol, payload bounds, atomic acceptance, queue reservation, and transition table.
 - [ ] Freeze canonical URI/project scope, rename/move/Save As, deleted-source, retention, cleanup, and retry-generation rules.
-- [ ] Freeze deterministic destination-conversation selection and visibility/confirmation timing.
+- [x] Destination-conversation selection — decided by Jarmo 2026-09-14: the conversation open in the AI sidebar, no confirmation step.
 - [ ] Approve host-local completion reply projection versus Markdown encoding.
 - [x] Full versus surgical scope — resolved full on 2026-09-14; v1.12.0 Sprint 121 absorbed.
 - [ ] Freeze the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow/normal widths (R10, Sprint 121 absorption).
@@ -38,7 +38,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 - [ ] Stamp canonical URI/project scope and validate source IDs at host acceptance.
 - [ ] Resolve/show exact destination conversation under the approved rule.
-- [ ] Show the agent and destination conversation before dispatch on both the margin rail and the Comments menu (R4, decided 2026-09-14).
+- [ ] Route each comment task to the conversation open in the AI sidebar and show its title on both Send surfaces without a confirmation step (R4, Jarmo 2026-09-14).
 - [ ] Reuse normalized runtime availability/recovery and atomically enforce queue capacity.
 - [ ] Persist before accepted acknowledgment; return per-group bulk results and idempotent retry behavior.
 - [ ] Carry task ID, turn ID, frozen source context, runtime/model/policy/effort through queue and dispatch.

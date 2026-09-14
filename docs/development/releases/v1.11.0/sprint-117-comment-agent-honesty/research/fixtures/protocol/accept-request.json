@@ -4,7 +4,6 @@
   "batchId": null,
   "surface": "rail",
   "alias": "claude",
-  "destination": { "conversationId": "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b" },
   "documentVersion": 12,
   "comments": [
     {

@@ -68,11 +68,23 @@ And Ritemark never guesses across projects
 
 ## Feature: Destination and acceptance honesty (R4, R5)
 
-### ★ Scenario: Destination is visible before dispatch
-Given a comment is assigned to Codex
+### ★ Scenario: Destination is the open conversation
+Given the AI sidebar shows conversation "Release note review"
 When I choose Send to AI from the margin rail or the Comments menu
-Then the confirmation names Codex and the exact existing or new destination conversation before anything is queued
-And after acceptance Open conversation selects that canonical conversation
+Then the task is queued into "Release note review" with no confirmation step
+And the Send surface showed that title, and after acceptance Open conversation selects it
+
+### Scenario: A fresh conversation receives the task
+Given the AI sidebar shows a new, empty conversation
+When I send a comment task
+Then the task starts that conversation
+And its title comes from the first instruction until the runtime names it
+
+### Scenario: The open conversation belongs to another agent
+Given the AI sidebar shows a Codex conversation
+When I send a comment assigned to Claude
+Then the task runs as Claude inside that conversation, marked with the usual runtime-switch boundary
+And no other conversation is created or retargeted
 
 ### Scenario: Runtime is signed out
 Given Claude is unavailable because sign-in is required
