@@ -220,8 +220,9 @@ The composer never locks while an agent is working. Each Enter adds your follow-
 plan review, question, or approval is waiting for you — the next item sends automatically, in order.
 
 - **Edit, reorder, or remove** any queued item before it runs (hover a row for its actions).
-- **Comments queue too:** sending an assigned comment to a busy agent adds it to that agent's own
-  thread queue instead of dropping it.
+- **Comments queue too:** a comment sent from the document goes to the conversation you have open,
+  and waits in its queue if that conversation is busy. Removing it from the queue tells the comment
+  it was cancelled. See [Comments](comments.md#sending-a-comment-to-an-agent).
 - A **failed or stopped** turn pauses the queue; press **Resume** to continue.
 - Background threads drain on their own — a queued follow-up in another thread runs when that
   thread's agent finishes, even if you're looking elsewhere.

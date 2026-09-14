@@ -249,3 +249,83 @@ Events for other turns, other generations, or unknown tasks are ignored and logg
 - [x] design.md states as amended 2026-09-14.
 
 Jarmo: "ülejäänud sprindi otsustes usaldan sind." Anything that later changes user-visible behaviour beyond what is written here goes back to him before it ships.
+
+---
+
+## 15. As built (2026-09-14)
+
+The decisions above stand as written. This section records only where the implementation departed from them, or left one unfinished — nothing here rewrites a decision. Nothing in it changes user-visible behaviour beyond what D1–D12 describe, except where it says so explicitly.
+
+### D1 — Ownership and storage
+
+- `extension.ts` exports **both** `commentTaskController` and `commentTaskStore`. The rename listener in `ritemarkEditor.ts` needs `store.renameSource`, and the controller has no rename entry point.
+- The projection port is composed in `extension.ts` and calls `RitemarkEditorProvider.publishCommentTaskProjection` directly rather than going through a `UnifiedViewProvider` method. Same effect, one fewer cross-module require.
+- The controller is constructed with `randomId: () => randomUUID()`. Its default `randomId` is a sha256 hex string, which the record codec rejects — without the override every acceptance would fail at `store.create`.
+
+### D2 — `CommentTaskRecordV1`
+
+- `applyTurnTerminal` is called without a `terminalEventId`: `completeRuntimeTurn` mints the terminal event id internally and does not return it synchronously, so the controller's documented fallback (`terminalEventId = conversationTurnId`) applies.
+- `runtime.approvalMode` is frozen as `auto` for every comment task. The per-conversation Manual/Auto choice is webview state (`conversationState.ts` `pendingRuntime.mode`) that the host cannot read and nothing persists host-side. `auto` matches the product default, but a user whose composer is set to Manual still gets an auto comment task. **This is a user-visible gap and goes back to Jarmo** — honouring the composer needs the sidebar to report autonomy, which is a contract change.
+- `runtime.thinkingEffort` comes from the destination conversation record's `composerPreferences.thinkingEffortByRuntime` when the composer-thinking-effort flag is on, else `auto`. The record is read during destination resolution and cached for the one synchronous `runtimeSettings` call that follows, because that dependency cannot await.
+- `runtime.modelId`: Claude → the reconciled Claude model; Codex → the catalog default; OpenCode → `null`, which the sidebar turns into `undefined` so the conversation's own BYOK selection applies.
+
+### D3 — Stable IDs
+
+- **The host's bounded 1 s re-check is not implemented.** The frozen `CommentTaskController` performs a single containment check and falls back to `document-not-synced` when the document is dirty. The error is retryable, so the user is told the truth, but a fast Send right after an edit can be refused where D3 promised a short wait.
+- `assignMissingCommentIds` repairs duplicate ids across the **whole** document, not only among the requested keys. The collector groups two comments sharing an id into one entry, so a duplicate can never itself be a requested key; a duplicate-only-if-requested rule would never fire. The repair stays inside the same single transaction / single undo step.
+- A requested key that resolves to no comment in the document (deleted between collection and Send) is **omitted** from the returned map rather than given an invented id. Callers treat a missing entry as `comment-not-found` and do not dispatch that comment.
+- An `m:<from>-<to>` marker key is matched by range **overlap**, not equality: the rail builds it from `getMarkRange` (the whole mark) while the collector builds it from the first fragment, and the two differ for a link- or format-split comment.
+- `collectDocumentComments` keeps the marker key `n:<pos>` for a standalone note even once that note has an id; only the new `commentId` field is populated. Both Send surfaces match collector entries by `commentId`, never by key.
+- The tokenizer consumes only spaces and tabs after the `{id:…}` token, so the token cannot swallow a newline. A body written as `<!-- {id:x}\nbody -->` still normalises to `<!-- {id:x} body -->` on save, as it did before this sprint.
+- Untested edge: the Turndown rule emits `<!-- {id:<id>} -->` for a standalone note that has an id and an empty body. The rail deletes an empty placeholder note on blur, but that state was not proven unreachable from every path.
+- The one-undo claim is asserted as **one dispatched transaction** in a harness built on the real ProseMirror schema; TipTap's history plugin is not in that harness, so one observed Cmd+Z restoring a byte-identical file still needs the RunDev pass.
+
+### D5 — Destination
+
+Implemented as decided. Two additions:
+
+- The host treats the pre-existing sidebar message `conversation:selected` as an active-conversation report alongside the new `conversation/active`. A superset of the contract; it makes destination binding work regardless of which message the sidebar emits.
+- The host reveals a bound conversation by posting `conversation/select { conversationId }` to the sidebar, which opens it through the same path History uses.
+
+### D6 — Acceptance protocol and atomicity
+
+- **No persistent ready-queue.** The handshake waits for the sidebar to report an open conversation and gives up after 10 s (`no-conversation`); D6 specified a 5 s queue of undelivered enqueues. A sidebar that hydrates later than that window fails the task as `destination-not-found` instead of delivering late.
+- Destination resolution reveals the sidebar and waits up to 5 s for its first report, as specified.
+- One message was added to the contract: editor → host `comment:recover { recovery, alias }`, deliberately **outside** the `comment-task/` prefix so the protocol decoder never sees it as an invalid request. The editor webview cannot reach the sidebar's sign-in commands, so `ritemarkEditor.ts` maps it to `ritemark.claudeLogin` / `ritemark.codexLogin` / `ritemark.aiSettings`. `RECOVERY_LABEL` only ever produces a button for `sign-in` / `configure` / `install`, so the mapping is total.
+- The editor webview applies its own 15 s timeout per request and resolves with a synthetic retryable error coded `sidebar-unreachable`, whose message says plainly that Ritemark did not answer. The code is the nearest existing one; it is the webview giving up, not a host verdict.
+- A per-group retry from the Comments menu sends `batchId: null` — it is a single re-send, not a bulk send. A fresh bulk send always mints a shared `batchId`, including when only one group is included.
+- The sidebar acknowledges `comment-task/enqueue` before any dispatch, which is why enqueue and drain are split into `enqueueCaptured` plus an explicit `maybeDrainQueue`.
+- The sidebar posts `conversation/active` only once its store is `ready`; the `sidebar/ready` handshake itself always restates the open conversation, forced past the dedupe. (`UnifiedViewProvider`'s `case 'sidebar/ready'` still reads a `conversationId` the store never sends on that message — harmless dead defensive code.)
+- The sidebar's `ExtensionMessage` union now declares `comment-task/enqueue` and `conversation/select` in place of the deleted `comment:submit`, so the webview and `protocol.ts` agree at compile time rather than through two hand-copied literals.
+
+### D7 — Lifecycle derivation and runtime parity
+
+- Cancel normalisation is implemented (cancel intent recorded per conversation + turn on `agent-cancel`; a terminal callback for that turn, or a literal Codex/OpenCode `cancelled`, writes `cancelled`), but it has **no automated test**: the decision lives inside `UnifiedViewProvider`'s `agent-execute` closure with no pure-function seam. It needs either an extraction or the three-runtime manual matrix.
+- §13's `debugTrace` of what Claude's `session.cancel()` delivers to `onComplete` was **not run**.
+- The `interrupted(conversation-deleted)` reason exists in the record, the projection, and the comment copy, but **nothing detects a deleted conversation** and transitions its tasks. Retry, generation change, and callbacks for a turn no task owns are covered and tested.
+
+### D8 — Capture and prompt
+
+- `agent-execute` carries `taskId` **as well as** `sourceDisplayPath` for comment items, so the host can use the record's document instead of the active tab. Additive; absent on composer turns.
+- The prompt builder stamps the real `displayPath` and always emits the marker-preservation guard, the stable ids, anchored text, and a standalone-note marker, reusing the previous wording verbatim otherwise.
+
+### D10 — R10 ergonomics
+
+- **The narrow-width numbers were never measured.** The breakpoints (1280 / 960 px), gutter widths (210 / 40 / 30 px, 2 px inset when compact) and bubble bound (`min(300px, container − 32px)`, offset 26 px below the marker) are derived arithmetically from the current `.ProseMirror` layout. §13's RunDev measurement is still owed.
+- The marker now stays mounted while its bubble is open (previously they swapped). With the bubble offset below the marker at narrow widths, unmounting left a pointer gap that immediately closed the bubble.
+- The picker shows no availability hint, per D10. `design.md`'s picker bullet mentions one; D10 is the governing text and the editor webview receives no runtime status.
+- No React rendering harness exists in this repo, so the picker's keyboard flow, the composer's resize bounds, the listbox never covering the footer, and the 200 % zoom / high-contrast / screen-reader matrix are covered only by pure-logic tests plus the typecheck.
+- `index.css` changes are scoped to comment-rail selectors; `cursor: pointer` is set within that scope rather than as the project-wide preflight override, which belongs outside this sprint.
+
+### D12 — Shared availability policy
+
+- The shared module is `src/runtime/availability.ts`, exporting `deriveRuntimeAvailabilities`, `listReadyAlternatives`, `RUNTIME_LABELS` and the availability types, plus two host-facing helpers (`recoveryForRuntimeAvailability`, `messageForRuntimeAvailability`). Input types are structural, so the sidebar keeps passing its own concrete status objects.
+- The webview's `runtimeAvailability.ts` keeps its own concrete input interface and delegates, rather than re-exporting the host's structural one, so the object literals in its existing test do not trip excess-property checks. There is still one derivation.
+- `availability.ts` iterates a fixed ACP provider key list (`google`, `openai`, `anthropic`, `openrouter`) instead of the webview's `Object.entries`. Behaviourally identical for those four; required for the shared optional-field input type.
+- The host's `checkAvailability` reports runtime hydration phase `ready` for all three runtimes, because it reads the authoritative status synchronously at that moment. A probe that throws returns `{ usable: false, recovery: 'retry' }` rather than a usable runtime.
+
+### Not exercised
+
+`comment-task/cancel` is decoded and handled by the controller and listed in the contract, but **no webview surface sends it**: `design.md`'s State Vocabulary gives no state a Cancel primary action (`cancelled` is what the sidebar's own Stop produces, and its action is Retry). The branch is deliberately unreached — confirm with Jarmo whether the editor should expose a Cancel.
+
+Nothing in this sprint was run end to end: verification across all four workstreams is compile plus unit tests. The live evidence listed in §13 remains owed.
