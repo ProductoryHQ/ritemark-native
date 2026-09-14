@@ -650,6 +650,64 @@ export function MarginCommentRail({
     }
   }, [editor, container, rescan])
 
+  /**
+   * Hovering the highlighted text opens that comment, the same way hovering its
+   * gutter marker does.
+   *
+   * Jarmo, 2026-09-14, watching the first smoke test: "when I hover the
+   * highlighted text I was expecting that the comment is also popped open."
+   * The highlight and the marker are two halves of one object, and reaching for
+   * the margin to read a note about the sentence under the cursor is a detour.
+   *
+   * Delegated from the container rather than bound per fragment, so a
+   * multi-block or format-split comment needs no extra bookkeeping and the
+   * listeners survive a rescan.
+   */
+  useEffect(() => {
+    if (!container || markers.length === 0) return
+
+    const byElement = new Map<Element, string>()
+    for (const marker of markers) byElement.set(marker.el, marker.key)
+
+    const keyFor = (target: EventTarget | null): string | null => {
+      if (!(target instanceof Element)) return null
+      const anchor = target.closest('mark[data-comment], ritemark-comment')
+      if (!anchor) return null
+      const direct = byElement.get(anchor)
+      if (direct) return direct
+      // Only the first fragment of a multi-block comment is a marker; the rest
+      // resolve through the id they share (#150).
+      const id = anchor.getAttribute('data-comment-id')
+      if (!id) return null
+      return markers.find((marker) => marker.commentId === id)?.key ?? null
+    }
+
+    const onOver = (event: MouseEvent) => {
+      // Never steal focus from a note being written or edited.
+      if (editKey) return
+      const key = keyFor(event.target)
+      if (key) setOpenKey(key)
+    }
+
+    const onOut = (event: MouseEvent) => {
+      if (editKey) return
+      const key = keyFor(event.target)
+      if (!key) return
+      // Moving from the text into the bubble must not close it — otherwise the
+      // Send button is unreachable by mouse.
+      const next = event.relatedTarget
+      if (next instanceof Element && next.closest('.rm-comment-rail')) return
+      setOpenKey((current) => (current === key ? null : current))
+    }
+
+    container.addEventListener('mouseover', onOver)
+    container.addEventListener('mouseout', onOut)
+    return () => {
+      container.removeEventListener('mouseover', onOver)
+      container.removeEventListener('mouseout', onOut)
+    }
+  }, [container, markers, editKey])
+
   const remove = useCallback(
     (m: RailMarker) => {
       if (!editor) return
