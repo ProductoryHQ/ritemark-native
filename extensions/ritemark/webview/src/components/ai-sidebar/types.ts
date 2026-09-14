@@ -407,8 +407,13 @@ export type ExtensionMessage =
   | AgentSidebarProtocolMessage
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
-  // Sprint 94 (#81): a comment assigned to an agent, relayed from the editor.
-  | { type: 'comment:submit'; agentId: string; prompt: string; commentIds?: string[]; documentPath?: string }
+  // Sprint 117 (#292, R4/D5): the host names the destination conversation for
+  // an accepted comment task. This replaced Sprint 94's `comment:submit`, where
+  // the editor relayed a prompt and the sidebar picked a thread of its own
+  // (audit F20). The sidebar answers with `comment-task/enqueue-result`.
+  | { type: 'comment-task/enqueue'; taskId: string; conversationId: string; conversationTurnId: string; runtimeId: 'claude-code' | 'codex' | 'opencode'; prompt: string; displayText: string; modelId: string | null; autonomy: 'auto' | 'ask'; thinkingEffort: string; sourceDisplayPath: string }
+  // Sprint 117: "Open conversation" on a comment reveals the task's own thread.
+  | { type: 'conversation/select'; conversationId: string }
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)

@@ -1,19 +1,22 @@
 /**
  * Sprint 105 (#164) R1 — comment index tests over a fake minimal doc.
+ * Sprint 117 (R2/R3) — standalone notes carry a stable id, and prompt building
+ * has left this module for the host.
  */
 import assert from 'node:assert/strict'
-import { collectDocumentComments, summarizeComments, buildAgentTaskPrompt, type MinimalNode } from './commentIndex'
+import * as commentIndex from './commentIndex'
+import { collectDocumentComments, summarizeComments, type MinimalNode } from './commentIndex'
 
 type FakeSpec =
   | { kind: 'text'; text: string; pos: number; mark?: { id?: string | null; note: string } }
-  | { kind: 'node'; note: string; pos: number }
+  | { kind: 'node'; note: string; pos: number; id?: string | null }
 
 function fakeDoc(specs: FakeSpec[]): MinimalNode {
   const entries = specs.map((s) => {
     if (s.kind === 'node') {
       return {
         node: {
-          isText: false, type: { name: 'commentNode' }, attrs: { note: s.note },
+          isText: false, type: { name: 'commentNode' }, attrs: { note: s.note, id: s.id ?? null },
           marks: [], nodeSize: 1,
         } as unknown as MinimalNode,
         pos: s.pos,
@@ -105,21 +108,47 @@ function fakeDoc(specs: FakeSpec[]): MinimalNode {
   assert.equal(c.alias, null)
 }
 
-// Task prompt: ordered, ids + anchors included, dispatch-only wording.
+// A domain that merely contains an alias never assigns (audit L-A).
 {
   const doc = fakeDoc([
-    { kind: 'text', text: 'pricing table', pos: 10, mark: { id: 'a1', note: '@claude verify the numbers' } },
-    { kind: 'node', note: '@claude add sources at the end', pos: 90 },
+    { kind: 'text', text: 'A domain is not a mention.', pos: 5, mark: { id: 'dom1', note: 'mail me at team@codex.com' } },
   ])
-  const comments = collectDocumentComments(doc)
-  const prompt = buildAgentTaskPrompt('blog/pricing.md', comments)
-  assert.match(prompt, /these 2 comments in blog\/pricing\.md/)
-  assert.match(prompt, /1\. verify the numbers/)
-  assert.match(prompt, /Comment id: a1/)
-  assert.match(prompt, /Anchored to: "pricing table"/)
-  assert.match(prompt, /2\. add sources at the end/)
-  assert.match(prompt, /standalone note/)
-  assert.match(prompt, /Do NOT remove or rewrite the comment markers/)
+  const [c] = collectDocumentComments(doc)
+  assert.equal(c.alias, null, 'team@codex.com is an address, not an assignment')
+  assert.equal(c.instruction, 'mail me at team@codex.com', 'the address survives intact in the instruction')
 }
 
-console.log('commentIndex tests passed.')
+// Sprint 117 (audit F08): a standalone note reports its stable id, so dispatch
+// no longer sends an empty id list for the whole `///` comment kind.
+{
+  const doc = fakeDoc([
+    { kind: 'node', note: '@claude Add a short summary', pos: 12, id: '44444444-4444-4444-8444-444444444444' },
+    { kind: 'node', note: 'Plain legacy note without an id', pos: 40 },
+  ])
+  const comments = collectDocumentComments(doc)
+  assert.equal(comments[0].commentId, '44444444-4444-4444-8444-444444444444', 'identified standalone note reports its id')
+  assert.equal(comments[0].key, 'n:12', 'the rail-facing marker key stays positional')
+  assert.equal(comments[1].commentId, undefined, 'a legacy note has no id until the dispatch-time upgrade')
+}
+
+// Link-split fragments: one comment, one anchored passage (audit H-A).
+{
+  const doc = fakeDoc([
+    { kind: 'text', text: 'the ', pos: 5, mark: { note: 'Check that this link still resolves' } },
+    { kind: 'text', text: 'reference page', pos: 9, mark: { note: 'Check that this link still resolves' } },
+    { kind: 'text', text: ' for details', pos: 23, mark: { note: 'Check that this link still resolves' } },
+  ])
+  const comments = collectDocumentComments(doc)
+  assert.equal(comments.length, 1, 'a link split inside one comment is still one comment')
+  assert.equal(comments[0].key, 'm:5-9', 'identity comes from the first fragment')
+}
+
+// Sprint 117 D8: prompt building moved to the host. Nothing may import it from
+// here — a surface that rebuilds its own prompt is how F04–F06 happened.
+assert.equal(
+  (commentIndex as unknown as Record<string, unknown>).buildAgentTaskPrompt,
+  undefined,
+  'buildAgentTaskPrompt is gone from the webview collector',
+)
+
+console.log('commentIndex.test.ts — all assertions passed')

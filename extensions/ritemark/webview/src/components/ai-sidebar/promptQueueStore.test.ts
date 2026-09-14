@@ -144,10 +144,19 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
   assert.equal(conv.codexConversation.length, 1, 'codex turn shape used');
 }
 
-// ── 5. comment:submit routes to a stable runtime conversation via the queue ──
+// ── 5. a comment task runs in the conversation the HOST named ──
+// Sprint 117 (R4, D5, audit F20) rewrote this block. It used to feed
+// `comment:submit` and assert the store picked a destination itself ("first
+// ready thread of that runtime, else a new background one") — a silent choice
+// the user was never shown. The store no longer picks: the host binds the
+// conversation open in the sidebar at acceptance and names it on
+// `comment-task/enqueue`. The invariants worth keeping are the same two the
+// old block guarded — a busy destination still queues rather than being
+// dropped, and the visible thread is neither used nor retargeted — plus the
+// enqueue verdict, which the old path had no way to report.
 {
   resetAll();
-  // Two threads: active Claude thread; busy Codex thread.
+  // Two threads: the visible Claude thread; a BUSY Codex thread.
   seed('claude-a', {});
   seed('codex-b', {
     codexConversation: [{
@@ -157,15 +166,66 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
     } as never],
   });
   useAISidebarStore.setState({ activeConversationId: 'claude-a' });
-  // Deliver a comment:submit for Codex through the store's message handler.
-  useAISidebarStore.getState().handleExtensionMessage({ type: 'comment:submit', agentId: 'codex', prompt: 'fix the comment' } as never);
+
+  useAISidebarStore.getState().handleExtensionMessage({
+    type: 'comment-task/enqueue',
+    taskId: 'task-5',
+    conversationId: 'codex-b',
+    conversationTurnId: 'turn-host-5',
+    runtimeId: 'codex',
+    prompt: 'fix the comment',
+    displayText: 'fix the comment',
+    modelId: null,
+    autonomy: 'auto',
+    thinkingEffort: 'auto',
+    sourceDisplayPath: 'notes/release.md',
+  } as never);
+
   const q = queueFor(useAISidebarStore.getState().promptQueues, 'codex-b');
-  assert.equal(q.length, 1, 'comment queued in the BUSY Codex thread, not dropped');
+  assert.equal(q.length, 1, 'comment queued in the BUSY named thread, not dropped');
   assert.equal(q[0].source, 'comment');
   assert.equal(q[0].runtimeId, 'codex');
-  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'claude-a').length, 0, 'active thread untouched');
+  assert.equal(q[0].taskId, 'task-5', 'the item carries its task id');
+  assert.equal(q[0].conversationTurnId, 'turn-host-5', 'the host-minted turn id is used verbatim');
+  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'claude-a').length, 0, 'visible thread untouched');
   const active = useAISidebarStore.getState().conversations['claude-a'];
-  assert.equal(active.pendingRuntime.runtimeId, 'claude-code', 'active thread runtime NOT retargeted');
+  assert.equal(active.pendingRuntime.runtimeId, 'claude-code', 'visible thread runtime NOT retargeted');
+  assert.deepEqual(
+    posted.find((m) => m.type === 'comment-task/enqueue-result'),
+    { type: 'comment-task/enqueue-result', taskId: 'task-5', outcome: 'queued' },
+    'the queue verdict is reported back to the host',
+  );
+}
+
+// ── 6. a destination this sidebar does not hold is reported, not redirected ──
+{
+  resetAll();
+  seed('claude-a', {});
+  useAISidebarStore.setState({ activeConversationId: 'claude-a' });
+
+  useAISidebarStore.getState().handleExtensionMessage({
+    type: 'comment-task/enqueue',
+    taskId: 'task-6',
+    conversationId: 'gone-9',
+    conversationTurnId: 'turn-host-6',
+    runtimeId: 'claude-code',
+    prompt: 'p',
+    displayText: 'p',
+    modelId: null,
+    autonomy: 'auto',
+    thinkingEffort: 'auto',
+    sourceDisplayPath: 'notes/release.md',
+  } as never);
+
+  assert.equal(
+    queueFor(useAISidebarStore.getState().promptQueues, 'claude-a').length, 0,
+    'an unknown destination is NEVER redirected into the visible thread',
+  );
+  assert.deepEqual(
+    posted.find((m) => m.type === 'comment-task/enqueue-result'),
+    { type: 'comment-task/enqueue-result', taskId: 'task-6', outcome: 'no-conversation' },
+    'the sidebar says so instead of inventing a destination',
+  );
 }
 
 console.log('promptQueueStore tests passed.');

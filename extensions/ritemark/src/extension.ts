@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { PdfEditorProvider } from './pdfEditorProvider';
@@ -14,6 +15,9 @@ import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
 import { getSetupStatus } from './agent/setup';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
+import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
+import { CommentTaskController } from './commentTasks/CommentTaskController';
+import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
@@ -53,6 +57,14 @@ import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
 
 // Export unified view provider for editor access
 export let unifiedViewProvider: UnifiedViewProvider;
+
+/**
+ * Sprint 117 (#292): the host-owned comment-task ledger and its controller.
+ * Exported the same way as `unifiedViewProvider` so the custom editor provider
+ * can route `comment-task/*` messages without a circular import at load time.
+ */
+export let commentTaskStore: CommentTaskStore | undefined;
+export let commentTaskController: CommentTaskController | undefined;
 
 // Agent Library view provider
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
@@ -352,6 +364,29 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     unifiedViewProvider,
   );
+
+  // ── Comment tasks (Sprint 117, #292) ───────────────────────────────────────
+  // One host-owned ledger for "send this comment to an agent". Composed here,
+  // next to the conversation stack, so the editor provider and the AI sidebar
+  // both talk to the SAME controller instead of relaying prompts to each other.
+  commentTaskStore = new CommentTaskStore(commentTaskStoreDir(context.globalStorageUri.fsPath));
+  commentTaskController = new CommentTaskController({
+    store: commentTaskStore,
+    isFeatureEnabled: () => isEnabled('comment-callouts'),
+    buildPrompt: (document, comments) => buildCommentTaskPrompt(document.displayPath, comments),
+    publishProjection: (documentUri, tasks) => {
+      RitemarkEditorProvider.publishCommentTaskProjection(documentUri, tasks);
+    },
+    // Task and turn ids must be UUIDs — the record codec rejects anything else.
+    randomId: () => randomUUID(),
+    ...unifiedViewProvider.commentTaskHostDependencies(),
+  });
+  unifiedViewProvider.attachCommentTaskController(commentTaskController);
+  // Work a crash or a quit abandoned mid-flight becomes an honest `interrupted`
+  // with a Retry, instead of a comment that says "working" forever.
+  void commentTaskController.recoverUnfinished().catch((error: unknown) => {
+    console.warn('[commentTasks] Could not recover unfinished tasks:', error);
+  });
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
   // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live

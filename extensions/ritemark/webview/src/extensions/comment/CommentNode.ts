@@ -19,6 +19,14 @@ import { hasCommentTerminator, detectAgentAlias } from './commentModel'
 import { newCommentId } from './CommentMark'
 
 export interface CommentNodeAttrs {
+  /**
+   * Stable comment id (Sprint 117 D3), minted by the same `newCommentId()` the
+   * anchored mark uses. Before this, a standalone note had only a positional
+   * identity, so dispatching one sent an empty id list and the user got no
+   * status at all (audit F08). Persisted in Markdown as the leading
+   * `<!-- {id:<id>} body -->` token.
+   */
+  id: string | null
   note: string
   agentAlias: CommentAgentAlias | null
 }
@@ -40,6 +48,14 @@ export const CommentNode = Node.create({
 
   addAttributes() {
     return {
+      // Mirrors CommentMark's `id` attribute exactly — same carrier attribute
+      // name, same "omit when null" render rule, so both comment kinds are
+      // identified the same way on load, save, and dispatch.
+      id: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-comment-id') || null,
+        renderHTML: (attrs) => (attrs.id ? { 'data-comment-id': attrs.id } : {}),
+      },
       note: {
         default: '',
         parseHTML: (el) => el.getAttribute('data-note') || '',
@@ -73,7 +89,9 @@ export const CommentNode = Node.create({
         ({ commands }) =>
           commands.insertContent({
             type: this.name,
-            attrs: { note: '', agentAlias: null },
+            // Mint the id at creation (D3) — a note born without one is a note
+            // whose task status cannot survive the next edit.
+            attrs: { id: newCommentId(), note: '', agentAlias: null },
           }),
     }
   },
@@ -119,7 +137,7 @@ export const CommentNode = Node.create({
         return editor
           .chain()
           .command(({ tr }) => {
-            const created = this.type.create({ note, agentAlias: alias })
+            const created = this.type.create({ id: newCommentId(), note, agentAlias: alias })
             tr.replaceRangeWith(start, end, created)
             // Collapse to a text cursor after the note so the atom doesn't stay
             // node-selected (which would raise the formatting toolbar).

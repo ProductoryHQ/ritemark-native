@@ -75,6 +75,20 @@ import {
 } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
+import {
+  deriveRuntimeAvailabilities,
+  messageForRuntimeAvailability,
+  recoveryForRuntimeAvailability,
+} from '../runtime/availability';
+import type {
+  CommentTaskAvailability,
+  CommentTaskController,
+  CommentTaskControllerDependencies,
+  CommentTaskDestination,
+  CommentTaskRuntimeSettings,
+} from '../commentTasks/CommentTaskController';
+import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
+import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
 import {
@@ -95,6 +109,7 @@ import { ConversationStore, ConversationStoreError, conversationStoreDir } from 
 import { ConversationCutoverState } from '../conversations/ConversationCutoverState';
 import { LegacyConversationMigrator } from '../conversations/LegacyConversationMigrator';
 import { isConversationRequestMessage } from '../conversations/protocol';
+import type { ConversationRecordV1 } from '../conversations/types';
 import { resolveProjectScope } from '../conversations/projectScope';
 import { ConversationTitleGenerator } from '../conversations/ConversationTitleGenerator';
 import { showConversationDeleteNotification } from '../conversations/conversationDeleteNotification';
@@ -152,6 +167,32 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** ACP thought_level is discovered only after the existing lazy session opens. */
   private readonly _liveThinkingEffortCapabilities = new Map<string, Partial<Record<AgentId, ThinkingEffortCapability>>>();
   private _selectedConversationId: string | null = null;
+  /**
+   * The conversation the sidebar says is OPEN right now (D5). This, not the
+   * sidebar's old silent "first ready, else newest, else new" guess (audit F20),
+   * is where a comment task goes. Null until the sidebar reports one.
+   */
+  private _activeConversationId: string | null = null;
+  /** Resolvers waiting for the sidebar's first `conversation/active` report. */
+  private _activeConversationWaiters: Array<(conversationId: string | null) => void> = [];
+  /** Pending `comment-task/enqueue` handshakes, keyed by taskId. */
+  private readonly _commentTaskEnqueueWaiters = new Map<string, (outcome: CommentTaskEnqueueOutcome) => void>();
+  private _commentTaskController: CommentTaskController | null = null;
+  /**
+   * The destination record read during acceptance, kept only long enough for
+   * the synchronous `runtimeSettings()` call that follows it.
+   */
+  private readonly _commentTaskDestinationCache = new Map<string, ConversationRecordV1>();
+  /**
+   * Turns the user asked to stop, as `${conversationId}::${turnId}`. A runtime
+   * that answers a cancel with a clean result is still a cancellation, and
+   * recording it as `completed` is how the conversation record used to lie
+   * about it (audit F24).
+   */
+  private readonly _cancelIntents = new Set<string>();
+  /** The turn currently running in each conversation, so a cancel that carries
+   *  no turn id can still be attributed to the exact turn. */
+  private readonly _activeConversationTurnIds = new Map<string, string>();
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
@@ -383,8 +424,47 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (typeof message.conversationId === 'string') {
             this._selectedConversationId = message.conversationId;
             this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
+            this._noteActiveConversation(message.conversationId);
           }
           break;
+
+        // Sprint 117 (D5/D6): the sidebar's own report of what is open and
+        // whether its store is hydrated. The comment-task destination is bound
+        // from this, so a bounded wait on it replaces the old blind 400 ms
+        // setTimeout dispatch that simply lost the message (audit F25).
+        case 'sidebar/ready':
+          if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          break;
+
+        case 'conversation/active':
+          this._noteActiveConversation(
+            typeof message.conversationId === 'string' ? message.conversationId : null,
+          );
+          break;
+
+        case 'comment-task/enqueue-result':
+        case 'comment-task/dequeued': {
+          let sidebarMessage;
+          try {
+            sidebarMessage = decodeCommentTaskSidebarMessage(message);
+          } catch {
+            break; // A malformed answer is not a reason to disturb the host.
+          }
+          if (sidebarMessage.type === 'comment-task/enqueue-result') {
+            const waiter = this._commentTaskEnqueueWaiters.get(sidebarMessage.taskId);
+            if (waiter) {
+              this._commentTaskEnqueueWaiters.delete(sidebarMessage.taskId);
+              waiter(sidebarMessage.outcome);
+            } else {
+              // No one is waiting: the acceptance already timed out, so the
+              // ledger — not the caller — has to hear the verdict.
+              void this._commentTaskController?.applyEnqueueOutcome(sidebarMessage.taskId, sidebarMessage.outcome);
+            }
+          } else {
+            void this._commentTaskController?.applyDequeued(sidebarMessage.taskId);
+          }
+          break;
+        }
 
         case 'ai-select-model':
           await vscode.workspace.getConfiguration('ritemark.ai').update(
@@ -495,6 +575,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               : undefined;
           const runtimeTurnToken = Symbol(`${agentId}:${conversationTurnId ?? 'legacy'}`);
           this._activeRuntimeTurnTokens.set(conversationId, runtimeTurnToken);
+          // Sprint 117: a cancel arrives without a turn id, so remember which
+          // turn is live in this conversation before anything can be cancelled.
+          if (conversationTurnId) this._activeConversationTurnIds.set(conversationId, conversationTurnId);
+          // A comment task's runtime context is the document it was assigned in,
+          // frozen at acceptance. The sidebar sends that back on the execute
+          // message; using it instead of the active tab is the whole of F11/F12.
+          const commentTaskId = typeof message.taskId === 'string' ? message.taskId : undefined;
+          const commentTaskSourcePath = typeof message.sourceDisplayPath === 'string' && message.sourceDisplayPath
+            ? message.sourceDisplayPath
+            : undefined;
           const isCurrentRuntimeTurn = () => this._activeRuntimeTurnTokens.get(conversationId) === runtimeTurnToken;
           this._disposeOtherRuntimeSessions(conversationId, agentId as AgentId);
           if (acceptedConversation && conversationId !== clientConversationId) {
@@ -555,7 +645,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
 
           // Active file context — works for TextEditor and custom (Ritemark) editors.
-          const activeFile = skipActiveFile ? undefined : this._getActiveFileContext();
+          // A comment turn never consults the active tab: switching tabs while
+          // the task waited in the queue used to tell the agent it was editing
+          // the wrong file (audit F12).
+          const activeFile = skipActiveFile
+            ? undefined
+            : commentTaskId && commentTaskSourcePath
+              ? { path: commentTaskSourcePath }
+              : this._getActiveFileContext();
 
           // Browser MCP server for Claude Code (in-process server)
           let mcpServers: Record<string, unknown> | undefined;
@@ -806,6 +903,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 attentionKind: 'approval',
                 prompt: req.kind === 'shell-command' ? (req.command ?? 'Command approval') : (req.filePath ?? 'Approval required'),
               }), hostConversationEnabled);
+              this._applyCommentTaskAttention(conversationId, conversationTurnId, 'approval');
               return this._approvalGate.request({ ...req, conversationId });
             },
             onComplete: (result) => {
@@ -825,18 +923,30 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
+                // Cancel normalisation (F24). Claude answers `session.cancel()`
+                // with an ordinary error-free result, so "no error" alone is not
+                // evidence of completion — the user's own intent decides.
+                const cancelled = this._consumeCancelIntent(conversationId, conversationTurnId);
+                const status: 'completed' | 'failed' | 'cancelled' = cancelled
+                  ? 'cancelled'
+                  : error ? 'failed' : 'completed';
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
                   runtimeId: agentId as AgentId,
                   turnId: conversationTurnId,
                   text: result.text ?? '',
-                  status: error ? 'failed' : 'completed',
+                  status,
                   error,
                   failureKind,
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
+                this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
+                  status,
+                  text: result.text ?? '',
+                  error,
+                });
               }
               if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
                 // Claude authentication is app-global. OAuth siblings may hold
@@ -858,6 +968,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 attentionKind: 'question',
                 prompt: question.questions.map((item) => item.question).join('\n'),
               }), hostConversationEnabled);
+              this._applyCommentTaskAttention(conversationId, conversationTurnId, 'question');
               this._view?.webview.postMessage({ type: 'agent-question', conversationId, agentId, question });
             },
             onCodexComplete: (result) => {
@@ -872,17 +983,30 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 const runtimeCompleted = !result.error && !/error|failed|cancelled/i.test(result.status);
+                // Cancel normalisation (F24): Codex/OpenCode used to fold a
+                // literal `cancelled` status into `failed`, so a stopped turn
+                // read as a failure the user never caused.
+                const cancelled = /cancell?ed/i.test(result.status)
+                  || this._consumeCancelIntent(conversationId, conversationTurnId);
+                const status: 'completed' | 'failed' | 'cancelled' = cancelled
+                  ? 'cancelled'
+                  : runtimeCompleted ? 'completed' : 'failed';
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
                   runtimeId: agentId as AgentId,
                   turnId: conversationTurnId,
                   text: streamedResponseText,
-                  status: runtimeCompleted ? 'completed' : 'failed',
+                  status,
                   error: result.error,
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
+                this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
+                  status,
+                  text: streamedResponseText,
+                  error: result.error,
+                });
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
               }
             },
@@ -904,9 +1028,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   runtimeId: agentId as AgentId,
                   turnId: conversationTurnId,
                   text: '',
+                  // The conversation keeps calling a runtime exit a failure; the
+                  // task calls it interrupted, because that is the state that
+                  // offers Retry rather than an error the user cannot act on.
                   status: 'failed',
                   error: 'Runtime exited unexpectedly.',
                 }), hostConversationEnabled);
+                this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
+                  status: 'interrupted',
+                  interruptReason: 'runtime-exited',
+                  error: 'Runtime exited unexpectedly.',
+                });
               }
               this._disposeRuntimeSession(conversationId, agentId as AgentId);
             },
@@ -923,6 +1055,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 attentionKind: 'plan-review',
                 prompt: explanation ?? plan.map((step) => step.step).join('\n'),
               }), hostConversationEnabled);
+              this._applyCommentTaskAttention(conversationId, conversationTurnId, 'plan-review');
               this._view?.webview.postMessage({ type: 'codex-plan-update', conversationId, explanation, plan });
             },
             onCodexQuestion: (requestId, questions) => {
@@ -934,6 +1067,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 attentionKind: 'question',
                 prompt: questions.map((item) => item.question).join('\n'),
               }), hostConversationEnabled);
+              this._applyCommentTaskAttention(conversationId, conversationTurnId, 'question');
               this._view?.webview.postMessage({ type: 'codex-question', conversationId, requestId, questions });
             },
             onRpcProgress: (_method, msg) => {
@@ -973,6 +1107,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ));
             }
             if (isCurrentRuntimeTurn()) {
+              // The task is no longer waiting in the queue — it is running.
+              if (commentTaskId && conversationTurnId) {
+                void this._commentTaskController?.applyTurnStarted(conversationId, conversationTurnId);
+              }
               await session.prompt({
                 prompt,
                 attachments: turnAttachments,
@@ -996,20 +1134,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
-        case 'comment:task-status': {
-          // Sprint 105 (#165): the sidebar's queue/turn facts flow back to the
-          // editor webviews so margin markers can show honest task status.
-          const { RitemarkEditorProvider } = require('../ritemarkEditor') as typeof import('../ritemarkEditor');
-          RitemarkEditorProvider.broadcastCommentTaskStatus({
-            documentPath: String(message.documentPath ?? ''),
-            commentIds: Array.isArray(message.commentIds) ? message.commentIds : [],
-            status: message.status,
-          });
-          break;
-        }
-
         case 'agent-cancel': {
           // Cancels ONLY the named conversation; sibling conversations keep running.
+          // Sprint 117 (F24): remember the intent first. Claude answers a cancel
+          // with an ordinary, error-free result, so without this the turn was
+          // recorded as `completed` and a cancelled comment task claimed success.
+          this._noteCancelIntent(
+            message.conversationId,
+            typeof message.conversationTurnId === 'string' ? message.conversationTurnId : undefined,
+          );
           const session = this._findRuntimeSession(message.conversationId, message.agentId as AgentId);
           await session?.cancel();
           break;
@@ -1198,6 +1331,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         this._view = undefined;
         this._hydratedViewGeneration = 0;
         this._legacySidebarViewGeneration = 0;
+        // A disposed sidebar has no open conversation. Remembering the last one
+        // would bind a comment task to a destination nobody is looking at.
+        this._activeConversationId = null;
       }
     });
     this._refreshBrowserContextPolling();
@@ -1231,30 +1367,269 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ── Comment tasks (Sprint 117) ─────────────────────────────────────────────
+  //
+  // The provider owns none of the task logic. It supplies the four facts only
+  // the sidebar side of the host knows — which conversation is open, whether a
+  // runtime can accept a turn, the frozen per-turn settings, and the queue
+  // handshake — and forwards runtime lifecycle facts back. Everything else
+  // lives in `CommentTaskController`.
+
+  public attachCommentTaskController(controller: CommentTaskController): void {
+    this._commentTaskController = controller;
+  }
+
+  /** The dependencies `extension.ts` composes the controller from. */
+  public commentTaskHostDependencies(): Pick<
+    CommentTaskControllerDependencies,
+    | 'areDurableConversationsEnabled'
+    | 'resolveOpenConversation'
+    | 'checkAvailability'
+    | 'runtimeSettings'
+    | 'enqueue'
+    | 'revealConversation'
+    | 'cancelTurn'
+  > {
+    return {
+      areDurableConversationsEnabled: async () => (
+        (await this._conversationController.currentRolloutMode()) !== 'legacy'
+      ),
+      resolveOpenConversation: (runtimeId) => this._resolveOpenConversation(runtimeId),
+      checkAvailability: (runtimeId) => this._checkRuntimeAvailability(runtimeId as AgentId),
+      runtimeSettings: (conversationId, runtimeId) => (
+        this._commentTaskRuntimeSettings(conversationId, runtimeId as AgentId)
+      ),
+      enqueue: (enqueueMessage) => this._enqueueCommentTask(enqueueMessage),
+      revealConversation: (conversationId) => this._revealConversation(conversationId),
+      cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),
+    };
+  }
+
+  private _noteActiveConversation(conversationId: string | null): void {
+    this._activeConversationId = conversationId;
+    if (this._activeConversationWaiters.length === 0) return;
+    const waiters = this._activeConversationWaiters;
+    this._activeConversationWaiters = [];
+    for (const waiter of waiters) waiter(conversationId);
+  }
+
   /**
-   * Sprint 94 (#81): a comment assigned to an AI agent was sent from the editor.
-   * Reveal the sidebar and hand the prompt to the store, which routes it to the
-   * mentioned runtime and submits (→ the normal agent-execute path). If the view
-   * isn't resolved yet, focus the container first so `_view` gets populated.
+   * The conversation open in the AI sidebar (D5). If the sidebar has not
+   * reported one — it was never opened this window — reveal it and wait a
+   * bounded 5 s. Returning null makes the request fail as `sidebar-unreachable`,
+   * which the user can retry; the path this replaces posted into the void on a
+   * 400 ms timer and reported success regardless (audit F25).
    */
-  public submitCommentPrompt(
-    agentId: string,
-    prompt: string,
-    meta?: { commentIds?: string[]; documentPath?: string },
-  ) {
-    const dispatch = () =>
-      this._view?.webview.postMessage({
-        type: 'comment:submit', agentId, prompt,
-        commentIds: meta?.commentIds, documentPath: meta?.documentPath,
-      });
-    if (this._view) {
-      this.show();
-      dispatch();
-    } else {
-      // Not resolved yet — reveal the view, then dispatch once it's ready.
-      vscode.commands.executeCommand('ritemark.unifiedView.focus');
-      setTimeout(dispatch, 400);
+  /**
+   * Reveal the sidebar and wait — bounded — for it to say which conversation is
+   * open. Resolves immediately when it already has.
+   */
+  private async _awaitActiveConversation(timeoutMs = 5000): Promise<string | null> {
+    if (this._activeConversationId) return this._activeConversationId;
+    const reported = new Promise<string | null>((resolve) => {
+      this._activeConversationWaiters.push(resolve);
+    });
+    if (!this._view) await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    else this.show();
+    return Promise.race([
+      reported,
+      new Promise<string | null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+  }
+
+  private async _resolveOpenConversation(_runtimeId: string): Promise<CommentTaskDestination | null> {
+    const conversationId = await this._awaitActiveConversation();
+    if (!conversationId) return null;
+
+    // A conversation the sidebar has opened but never sent a turn to has no
+    // durable record yet. That is a legitimate destination — the task simply
+    // starts it — so it is reported as created rather than refused.
+    try {
+      const record = await this._conversationController.runtimeConversation(conversationId);
+      // One entry only: the cache exists to bridge this call and the
+      // synchronous `runtimeSettings()` that follows it, nothing more.
+      this._commentTaskDestinationCache.clear();
+      this._commentTaskDestinationCache.set(conversationId, record);
+      return {
+        conversationId: record.conversationId,
+        bindingGeneration: record.bindingGeneration,
+        title: record.title,
+        created: false,
+      };
+    } catch {
+      return { conversationId, bindingGeneration: 0, title: '', created: true };
     }
+  }
+
+  /**
+   * The same normalized availability policy the Composer uses (D12). Gating here
+   * means a signed-out runtime is refused where the user clicked, with the
+   * runtime's own recovery action, instead of failing minutes later at the
+   * runtime boundary (audit F19).
+   */
+  private async _checkRuntimeAvailability(runtimeId: AgentId): Promise<CommentTaskAvailability> {
+    const codexEnabled = isEnabled('codex-integration');
+    const opencodeEnabled = isEnabled('opencode-integration');
+    let setupStatus: SetupStatus | null = null;
+    let codexStatus: CodexSidebarStatus | { state: 'disabled'; error: null } = { state: 'disabled', error: null };
+    let acpProviders: ByokProviderFlags = { google: false, openai: false, anthropic: false, openrouter: false };
+
+    try {
+      if (runtimeId === 'claude-code') {
+        setupStatus = await getSetupStatus();
+      } else if (runtimeId === 'codex' && codexEnabled) {
+        codexStatus = await (this._runtimeRegistry.get('codex') as CodexRuntime).getCodexSidebarStatus();
+      } else if (runtimeId === 'opencode' && opencodeEnabled) {
+        acpProviders = byokProviderFlags(await this._readByokKeys());
+      }
+    } catch (error) {
+      // A probe that throws is an unknown state, never a usable one.
+      return {
+        usable: false,
+        message: error instanceof Error ? error.message : String(error),
+        recovery: 'retry',
+      };
+    }
+
+    const availabilities = deriveRuntimeAvailabilities({
+      runtimeHydration: {
+        // The host reads the authoritative status synchronously above, so there
+        // is no in-flight probe to report here.
+        'claude-code': { phase: 'ready', error: null },
+        codex: { phase: 'ready', error: null },
+        opencode: { phase: 'ready', error: null },
+      },
+      setupStatus,
+      codexStatus,
+      opencodeEnabled,
+      acpProviders,
+      byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
+    });
+    const result = availabilities[runtimeId];
+    if (result.usable) return { usable: true };
+    return {
+      usable: false,
+      message: messageForRuntimeAvailability(runtimeId, result),
+      recovery: recoveryForRuntimeAvailability(result.state),
+    };
+  }
+
+  /**
+   * The per-turn settings frozen into the task record. Model and thinking
+   * effort come from the same authorities the Composer reads; autonomy is the
+   * product default, because the sidebar's per-conversation autonomy toggle is
+   * webview state the host cannot see.
+   */
+  private _commentTaskRuntimeSettings(conversationId: string, runtimeId: AgentId): CommentTaskRuntimeSettings {
+    const record = this._commentTaskDestinationCache.get(conversationId);
+    this._commentTaskDestinationCache.delete(conversationId);
+    const modelId = runtimeId === 'claude-code'
+      ? this._reconciledClaudeModel()
+      : runtimeId === 'codex'
+        ? modelCatalog.getDefault('codex', 'codex')
+        : null;
+    const preference = record?.composerPreferences?.thinkingEffortByRuntime?.[runtimeId];
+    return {
+      modelId: modelId ?? null,
+      approvalMode: 'auto',
+      thinkingEffort: isEnabled('composer-thinking-effort') && preference ? preference : 'auto',
+    };
+  }
+
+  /**
+   * Hand an accepted task to the sidebar's queue and wait for its verdict. The
+   * answer — including `full` — IS the acceptance result; the path this
+   * replaces dropped `enqueuePrompt`'s `full` on the floor and told the editor
+   * the work was queued (audit F17).
+   */
+  private _enqueueCommentTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome> {
+    return new Promise<CommentTaskEnqueueOutcome>((resolve) => {
+      let settled = false;
+      const settle = (outcome: CommentTaskEnqueueOutcome): void => {
+        if (settled) return;
+        settled = true;
+        this._commentTaskEnqueueWaiters.delete(enqueueMessage.taskId);
+        clearTimeout(timer);
+        resolve(outcome);
+      };
+      const timer = setTimeout(() => settle('no-conversation'), 10_000);
+      this._commentTaskEnqueueWaiters.set(enqueueMessage.taskId, settle);
+
+      // A webview that has not reported its open conversation yet has not
+      // hydrated its store either, and a message posted into it would simply be
+      // dropped — which is exactly how the old 400 ms dispatch lost work (F25).
+      void this._awaitActiveConversation().then((conversationId) => {
+        const view = this._view;
+        if (!conversationId || !view) {
+          settle('no-conversation');
+          return;
+        }
+        this.show();
+        void view.webview.postMessage(enqueueMessage).then((delivered) => {
+          if (delivered === false) settle('no-conversation');
+        }, () => settle('no-conversation'));
+      }, () => settle('no-conversation'));
+    });
+  }
+
+  /** Open the EXACT conversation a task was bound to, whatever is visible. */
+  private async _revealConversation(conversationId: string): Promise<void> {
+    if (!this._view) await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    else this.show();
+    // Sprint 117 W6 owns the sidebar handler for this message.
+    void this._view?.webview.postMessage({ type: 'conversation/select', conversationId });
+  }
+
+  private async _cancelCommentTaskTurn(conversationId: string, conversationTurnId: string): Promise<void> {
+    this._noteCancelIntent(conversationId, conversationTurnId);
+    const sessions = this._runtimeSessions.get(conversationId);
+    if (!sessions) return;
+    for (const session of sessions.values()) await session.cancel();
+  }
+
+  private _cancelIntentKey(conversationId: string, conversationTurnId: string | undefined): string {
+    return `${conversationId}::${conversationTurnId ?? 'legacy'}`;
+  }
+
+  private _noteCancelIntent(conversationId: string, conversationTurnId?: string): void {
+    const turnId = conversationTurnId ?? this._activeConversationTurnIds.get(conversationId);
+    this._cancelIntents.add(this._cancelIntentKey(conversationId, turnId));
+  }
+
+  /** True once, for the turn the user actually stopped. */
+  private _consumeCancelIntent(conversationId: string, conversationTurnId: string | undefined): boolean {
+    const key = this._cancelIntentKey(conversationId, conversationTurnId);
+    if (!this._cancelIntents.delete(key)) return false;
+    return true;
+  }
+
+  /**
+   * Forward one runtime fact to the task that owns this exact turn. The
+   * controller drops events for turns no task owns, which is the whole cure for
+   * a terminal event finalising every running task in a conversation (F22).
+   */
+  private _applyCommentTaskAttention(
+    conversationId: string,
+    conversationTurnId: string | undefined,
+    attentionKind: 'approval' | 'question' | 'plan-review',
+  ): void {
+    if (!conversationTurnId || !this._commentTaskController) return;
+    void this._commentTaskController.applyTurnAttention(conversationId, conversationTurnId, attentionKind);
+  }
+
+  private _applyCommentTaskTerminal(
+    conversationId: string,
+    conversationTurnId: string | undefined,
+    outcome: {
+      status: 'completed' | 'failed' | 'cancelled' | 'interrupted';
+      text?: string;
+      error?: string;
+      interruptReason?: 'restart' | 'sidebar-unreachable' | 'conversation-deleted' | 'runtime-exited';
+    },
+  ): void {
+    this._activeConversationTurnIds.delete(conversationId);
+    if (!conversationTurnId || !this._commentTaskController) return;
+    void this._commentTaskController.applyTurnTerminal(conversationId, conversationTurnId, outcome);
   }
 
   /**

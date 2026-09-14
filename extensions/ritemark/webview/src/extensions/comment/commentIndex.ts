@@ -9,6 +9,13 @@
  * same-text comments with distinct ranges stay distinct).
  *
  * Pure over a minimal doc interface so it is unit-testable without TipTap.
+ *
+ * Sprint 117 (D8) makes this the ONLY collector: both the margin rail and the
+ * Comments menu take assignment and instruction from here, never from the
+ * rendered `data-agent` attribute (audit F02), and no surface re-derives them
+ * with a different mention rule (F03). Prompt building left this module with
+ * `buildAgentTaskPrompt` — the host owns it now (`src/commentTasks/`), so a
+ * single-comment send and a bulk send cannot produce different prompts (F04–F06).
  */
 
 import { detectAgentAlias, stripAssignmentMention, type CommentAgentAlias } from './commentModel'
@@ -70,6 +77,11 @@ export function collectDocumentComments(doc: MinimalNode): IndexedComment[] {
       const alias = detectAgentAlias(note)
       nodes.push({
         key: `n:${pos}`,
+        // Sprint 117 (D3, audit F08): a standalone note now carries a stable id
+        // too, so dispatching one no longer sends an empty id list. The KEY stays
+        // positional — that is the rail's marker identity — but the id is what
+        // travels to the host and what status comes back on.
+        commentId: (node.attrs.id as string | null) || undefined,
         kind: 'node',
         note,
         alias,
@@ -144,26 +156,4 @@ export function summarizeComments(comments: IndexedComment[]): CommentSummary {
     unassigned,
     byAgent: [...byAgent.entries()].map(([alias, list]) => ({ alias, comments: list })),
   }
-}
-
-/**
- * Sprint 105 R3: ONE ordered task prompt per agent. Comments appear in
- * document order with their stable ids and anchored text so the agent can
- * work through them and reference each precisely. Dispatch-only wording —
- * the agent must not delete or resolve the comment carriers.
- */
-export function buildAgentTaskPrompt(documentPath: string, comments: IndexedComment[]): string {
-  const lines: string[] = [
-    `The user assigned you ${comments.length === 1 ? 'this comment' : `these ${comments.length} comments`} in ${documentPath}. Work through ${comments.length === 1 ? 'it' : 'them in order'}.`,
-    'Do NOT remove or rewrite the comment markers themselves (the <mark data-comment> wrappers / <!-- --> notes) unless a comment explicitly asks for that — the user clears their own comments.',
-    '',
-  ]
-  comments.forEach((c, i) => {
-    lines.push(`${i + 1}. ${c.instruction || c.note}`)
-    if (c.commentId) lines.push(`   Comment id: ${c.commentId}`)
-    if (c.anchoredText) lines.push(`   Anchored to: "${c.anchoredText}"`)
-    if (c.kind === 'node') lines.push('   (standalone note — not anchored to specific text)')
-    lines.push('')
-  })
-  return lines.join('\n').trimEnd()
 }

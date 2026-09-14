@@ -3,8 +3,15 @@
  *
  * Toolbar button with the unique-comment count badge; opens a compact overview
  * (totals + per-agent groups) whose one action — **Send assigned comments to
- * AI** — dispatches ONE ordered task per included agent through the Sprint 104
- * queue. Dispatch-only: no comment is resolved, deleted, or edited here.
+ * AI** — dispatches ONE ordered task per included agent. Dispatch-only: no
+ * comment is resolved, deleted, or edited here.
+ *
+ * Sprint 117 (#292): the dispatch is the typed `comment-task/accept` contract,
+ * the prompt is built by the HOST from the frozen task record (so both surfaces
+ * send the same thing, audit F01–F06), and the old "Queued N tasks" banner is
+ * gone. It was shown the instant the messages were posted — before availability,
+ * destination, or queue capacity had been checked (audit F18). Results now
+ * arrive per agent group and are rendered exactly as they come.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/core'
@@ -14,24 +21,34 @@ import { sendToExtension } from '../../bridge'
 import {
   collectDocumentComments,
   summarizeComments,
-  buildAgentTaskPrompt,
   type CommentSummary,
+  type IndexedComment,
   type MinimalNode,
 } from '../../extensions/comment/commentIndex'
-import { ALIAS_TO_AGENT_ID, type CommentAgentAlias } from '../../extensions/comment/commentModel'
+import { assignMissingCommentIds } from '../../extensions/comment/commentIds'
+import {
+  newCommentTaskRequestId,
+  requestCommentTask,
+  toRequestComment,
+  useCommentTaskDestination,
+} from '../../extensions/comment/commentTaskStatus'
+import {
+  describeGroupResult,
+  destinationCaption,
+  type GroupSendState,
+} from '../comment/commentTaskCopy'
+import { ALIAS_LABEL, type CommentAgentAlias } from '../../extensions/comment/commentModel'
+import type { CommentTaskError } from '../../../../src/commentTasks/protocol'
 
-const AGENT_LABEL: Record<CommentAgentAlias, string> = {
-  claude: 'Claude',
-  codex: 'Codex',
-  opencode: 'OpenCode',
-}
+type GroupStates = Partial<Record<CommentAgentAlias, GroupSendState>>
 
 export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEditor | null }) {
   const [summary, setSummary] = useState<CommentSummary | null>(null)
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [included, setIncluded] = useState<Record<string, boolean>>({})
-  const [dispatched, setDispatched] = useState(false)
+  const [groupStates, setGroupStates] = useState<GroupStates>({})
+  const [sending, setSending] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   const recompute = useCallback(() => {
@@ -65,35 +82,129 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
     if (!open) return
     const onDown = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false); setConfirming(false)
+        // Send results describe one dispatch; reopening the menu should not
+        // replay them. The task's own state lives on the comment from here on.
+        setOpen(false); setConfirming(false); setGroupStates({})
       }
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
+  // The destination caption (D5): the conversation open in the AI sidebar. It
+  // is a caption, not a choice — there is no picker and no confirmation.
+  const destination = useCommentTaskDestination(open && confirming)
+
+  const setGroupState = useCallback((alias: CommentAgentAlias, state: GroupSendState | null) => {
+    setGroupStates((current) => {
+      const next = { ...current }
+      if (state) next[alias] = state
+      else delete next[alias]
+      return next
+    })
+  }, [])
+
+  /**
+   * Mint ids for every comment about to be sent (one undoable transaction for
+   * the whole batch, D3), then re-read the document so the payload carries the
+   * ids that are actually in it, in document order.
+   */
+  const buildGroups = useCallback(
+    (aliases: CommentAgentAlias[]): Map<CommentAgentAlias, IndexedComment[]> => {
+      const editor = getEditor()
+      const groups = new Map<CommentAgentAlias, IndexedComment[]>()
+      if (!editor || aliases.length === 0) return groups
+      const wanted = new Set<CommentAgentAlias>(aliases)
+      const before = collectDocumentComments(editor.state.doc as unknown as MinimalNode)
+      const keys = before.filter((c) => c.alias && wanted.has(c.alias)).map((c) => c.key)
+      if (!keys.length) return groups
+      const minted = new Set(assignMissingCommentIds(editor, keys).values())
+      for (const comment of collectDocumentComments(editor.state.doc as unknown as MinimalNode)) {
+        if (!comment.commentId || !minted.has(comment.commentId)) continue
+        if (!comment.alias || !wanted.has(comment.alias)) continue
+        const list = groups.get(comment.alias) ?? []
+        list.push(comment)
+        groups.set(comment.alias, list)
+      }
+      return groups
+    },
+    [getEditor],
+  )
+
+  const postGroup = useCallback(
+    async (alias: CommentAgentAlias, comments: IndexedComment[], batchId: string | null) => {
+      setGroupState(alias, { status: 'pending' })
+      const outcome = await requestCommentTask('comment-task/accept', {
+        batchId,
+        surface: 'menu',
+        alias,
+        // The host validates against the live document by comment id; the
+        // webview has no view of TextDocument.version.
+        documentVersion: 0,
+        comments: comments.map(toRequestComment),
+      })
+      if (!outcome.ok) {
+        setGroupState(alias, { status: 'rejected', error: outcome.error })
+        return
+      }
+      const data = outcome.data as { destination?: { title?: unknown } }
+      const title = typeof data.destination?.title === 'string' ? data.destination.title : null
+      setGroupState(alias, { status: 'accepted', count: comments.length, destinationTitle: title })
+    },
+    [setGroupState],
+  )
+
+  const dispatchAliases = useCallback(
+    async (aliases: CommentAgentAlias[], batchId: string | null) => {
+      if (!aliases.length) return
+      setSending(true)
+      for (const alias of aliases) setGroupState(alias, { status: 'pending' })
+      let groups: Map<CommentAgentAlias, IndexedComment[]>
+      try {
+        groups = buildGroups(aliases)
+      } catch {
+        const error: CommentTaskError = {
+          code: 'comment-not-found',
+          message: 'These comments could not be prepared for sending. Reopen the document and try again.',
+          retryable: false,
+          recovery: 'none',
+        }
+        for (const alias of aliases) setGroupState(alias, { status: 'rejected', error })
+        setSending(false)
+        return
+      }
+      for (const alias of aliases) {
+        if (!groups.has(alias)) {
+          setGroupState(alias, {
+            status: 'rejected',
+            error: {
+              code: 'comment-not-found',
+              message: 'These comments are no longer in the document.',
+              retryable: false,
+              recovery: 'none',
+            },
+          })
+        }
+      }
+      await Promise.all([...groups.entries()].map(([alias, list]) => postGroup(alias, list, batchId)))
+      setSending(false)
+    },
+    [buildGroups, postGroup, setGroupState],
+  )
+
   if (!summary || summary.total === 0) return null
 
   const includedGroups = summary.byAgent.filter((g) => included[g.alias] !== false)
   const includedTaskCount = includedGroups.length
   const includedCommentCount = includedGroups.reduce((n, g) => n + g.comments.length, 0)
+  const resultAliases = summary.byAgent.map((g) => g.alias).filter((alias) => groupStates[alias])
+  const hasResults = resultAliases.length > 0
+  const settled = hasResults && resultAliases.every((alias) => groupStates[alias]?.status !== 'pending')
 
-  const dispatch = () => {
-    const editor = getEditor()
-    if (!editor) return
-    for (const group of includedGroups) {
-      const agentId = ALIAS_TO_AGENT_ID[group.alias]
-      const prompt = buildAgentTaskPrompt('the active document', group.comments)
-      sendToExtension('comment:send-to-ai', {
-        agentId,
-        prompt,
-        commentIds: group.comments.map((c) => c.commentId).filter((id): id is string => !!id),
-      })
-    }
-    setDispatched(true)
-    window.setTimeout(() => {
-      setDispatched(false); setConfirming(false); setOpen(false)
-    }, 1800)
+  const startDispatch = () => {
+    // One batch id groups this send, so the host can report per agent and the
+    // menu can render each group's answer as it arrives (D6).
+    void dispatchAliases(includedGroups.map((g) => g.alias), newCommentTaskRequestId())
   }
 
   return (
@@ -104,7 +215,7 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
         data-state={open ? 'active' : undefined}
         aria-pressed={open}
         aria-label={`Comments (${summary.total})`}
-        onClick={() => { setOpen((o) => !o); setConfirming(false); recompute() }}
+        onClick={() => { setOpen((o) => !o); setConfirming(false); setGroupStates({}); recompute() }}
         title={`Comments (${summary.total})`}
         className="relative"
       >
@@ -132,18 +243,18 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
               <ul className="mt-2 space-y-1">
                 {summary.byAgent.map((group) => (
                   <li key={group.alias} className="flex items-start gap-1.5">
-                    {confirming && (
+                    {confirming && !hasResults && (
                       <input
                         type="checkbox"
                         checked={included[group.alias] !== false}
                         onChange={(e) => setIncluded((m) => ({ ...m, [group.alias]: e.target.checked }))}
-                        className="mt-0.5 accent-[var(--r-accent)]"
-                        aria-label={`Include ${AGENT_LABEL[group.alias]}`}
+                        className="mt-0.5 accent-[var(--r-accent)] cursor-pointer"
+                        aria-label={`Include ${ALIAS_LABEL[group.alias]}`}
                       />
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-medium text-[var(--r-ink-strong)]">
-                        {AGENT_LABEL[group.alias]} · {group.comments.length}
+                        {ALIAS_LABEL[group.alias]} · {group.comments.length}
                       </div>
                       <div className="truncate text-[11px] text-[var(--r-ink-muted)]">
                         {group.comments.map((c) => c.instruction || c.note).join(' · ')}
@@ -160,41 +271,81 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
               )}
 
               <div className="mt-2 border-t border-[var(--r-hairline)] pt-2">
-                {dispatched ? (
-                  <div className="flex items-center gap-1.5 text-[12px] text-[var(--r-success)]">
-                    <Icon name="check" size={12} />
-                    Queued {includedTaskCount === 1 ? '1 task' : `${includedTaskCount} tasks`} — comments stay in the document
+                {hasResults ? (
+                  <div className="space-y-1.5" role="status">
+                    {/* One line per agent group, rendered as each answer
+                        arrives. A group that failed never hides behind a
+                        group that succeeded (R5). */}
+                    {resultAliases.map((alias) => {
+                      const line = describeGroupResult(ALIAS_LABEL[alias], groupStates[alias] as GroupSendState)
+                      if (!line) return null
+                      const tone =
+                        line.tone === 'success' ? 'var(--r-success)'
+                          : line.tone === 'error' ? 'var(--r-error)'
+                            : 'var(--r-ink-muted)'
+                      return (
+                        <div key={alias} className="flex items-start gap-1.5 text-[12px]" style={{ color: tone }}>
+                          <span aria-hidden="true" className="leading-[18px]">{line.glyph}</span>
+                          <span className="min-w-0 flex-1">{line.text}</span>
+                          {line.action && (
+                            <Button
+                              size="sm"
+                              variant={line.action.kind === 'retry' ? 'default' : 'outline'}
+                              onClick={() => {
+                                if (line.action?.kind === 'retry') void dispatchAliases([alias], null)
+                                else sendToExtension('comment:recover', { recovery: line.action?.recovery, alias })
+                              }}
+                            >
+                              {line.action.label}
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {settled && (
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setGroupStates({}); setConfirming(false); setOpen(false) }}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : confirming ? (
                   <div className="space-y-1.5">
                     <div className="text-[11px] text-[var(--r-ink-muted)]">
                       Starts {includedTaskCount === 1 ? 'one task' : `${includedTaskCount} tasks`} ({includedCommentCount} comment{includedCommentCount === 1 ? '' : 's'}) — one per agent, in document order.
                     </div>
+                    <div className="truncate text-[11px] font-medium text-[var(--r-ink-body)]">
+                      {destinationCaption(destination?.title ?? null)}
+                    </div>
                     <div className="flex gap-1.5">
-                      <button
-                        onClick={dispatch}
-                        disabled={includedTaskCount === 0}
-                        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[12px] font-semibold text-white bg-[var(--r-accent)] hover:bg-[var(--r-accent-deep)] shadow-[0_4px_6px_-1px_rgba(67,56,202,0.25)] disabled:opacity-50"
+                      <Button
+                        className="flex-1"
+                        size="sm"
+                        onClick={startDispatch}
+                        disabled={includedTaskCount === 0 || sending}
                       >
-                        <Icon name="check" size={12} className="text-white" />
-                        Start {includedTaskCount === 1 ? 'task' : `${includedTaskCount} tasks`}
-                      </button>
-                      <button
-                        onClick={() => setConfirming(false)}
-                        className="rounded-md border border-[var(--r-hairline)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--r-ink-body)] hover:bg-[var(--r-surface-soft)]"
-                      >
+                        <Icon name="check" size={12} />
+                        {sending ? 'Sending…' : `Start ${includedTaskCount === 1 ? 'task' : `${includedTaskCount} tasks`}`}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setConfirming(false)}>
                         Back
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => { setIncluded({}); setConfirming(true) }}
-                    className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[12px] font-semibold text-white bg-[var(--r-accent)] hover:bg-[var(--r-accent-deep)] shadow-[0_4px_6px_-1px_rgba(67,56,202,0.25)]"
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    onClick={() => { setIncluded({}); setGroupStates({}); setConfirming(true) }}
                   >
-                    <Icon name="paper-plane-right" size={12} className="text-white" />
+                    <Icon name="paper-plane-right" size={12} />
                     Send assigned comments to AI
-                  </button>
+                  </Button>
                 )}
               </div>
             </>

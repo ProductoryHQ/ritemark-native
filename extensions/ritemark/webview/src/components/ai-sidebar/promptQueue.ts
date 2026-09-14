@@ -37,9 +37,22 @@ export interface QueueItem {
   skipActiveFile?: boolean;
   skipBrowserContext?: boolean;
   mentionedAgentPaths?: string[];
-  /** Comment-originated metadata (Sprint 105 consumes). */
-  commentIds?: string[];
-  documentPath?: string;
+  /**
+   * Sprint 117 (R1/R6): comment-originated identity, all HOST-MINTED.
+   *
+   * The sidebar no longer owns a comment-task ledger (audit F16). It carries
+   * the host's ids through the queue so the turn it dispatches can be matched
+   * back to exactly one task:
+   * - `taskId` — the canonical task this item runs; absent for composer items.
+   * - `conversationTurnId` — the turn id the dispatcher MUST use verbatim
+   *   instead of minting one, because a terminal event is matched by
+   *   (conversationId, conversationTurnId) on the host (audit F22).
+   * - `sourceDisplayPath` — the document frozen at acceptance, so the runtime
+   *   never gets whatever tab happens to be active at drain time (audit F12).
+   */
+  taskId?: string;
+  conversationTurnId?: string;
+  sourceDisplayPath?: string;
   status: 'queued' | 'sending' | 'failed';
   error?: string;
   createdAt: number;

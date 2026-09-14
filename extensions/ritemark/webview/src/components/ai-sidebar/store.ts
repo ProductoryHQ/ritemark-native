@@ -33,6 +33,10 @@ import type {
 } from '../../../../src/conversations/protocol';
 import { sendConversationRequest } from '../../bridge';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
+import type {
+  CommentTaskEnqueueMessage,
+  CommentTaskEnqueueOutcome,
+} from '../../../../src/commentTasks/protocol';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
 import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult } from './lifecycle';
 import {
@@ -43,7 +47,6 @@ import {
   type ConversationState,
   type PendingRuntimeSelection,
 } from './conversationState';
-import { runtimeOfConversation } from './threadStatus';
 import { clearSlot, setSlot, type ComposerSlots } from './composerQueue';
 import {
   enqueueItem,
@@ -54,6 +57,7 @@ import {
   requeueFailed,
   nextDispatchable,
   isReadyToDrain,
+  queueFor,
   type PromptQueues,
   type QueueItem,
 } from './promptQueue';
@@ -322,12 +326,13 @@ interface AISidebarState {
    * Returns 'full' (cap 10) without mutating anything, else 'queued'.
    */
   enqueuePrompt: (item: Omit<QueueItem, 'id' | 'status' | 'createdAt'>) => 'queued' | 'full';
-  /**
-   * Sprint 105 (#165): comment-task status registry keyed by queue item id.
-   * Statuses reflect queue/turn FACTS only; every transition is pushed back to
-   * the editor webviews via comment:task-status.
+  /*
+   * Sprint 117 (R1/R6): there is deliberately NO comment-task ledger here any
+   * more. The Sprint 105 `commentTasks` record lived in webview memory, was
+   * keyed by queue item id, and was finalised per CONVERSATION rather than per
+   * turn — so one terminal event marked every running comment task done (audit
+   * F16, F22). The host owns the ledger; the sidebar only runs the queue.
    */
-  commentTasks: Record<string, { commentIds: string[]; documentPath: string; conversationId: string; status: 'queued' | 'running' | 'done' | 'failed' }>;
   removeQueued: (conversationId: string, itemId: string) => void;
   editQueued: (conversationId: string, itemId: string, displayText: string, prompt: string) => void;
   moveQueued: (conversationId: string, itemId: string, direction: -1 | 1) => void;
@@ -639,44 +644,23 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
    * kept active; it is only replaced when it is an untouched blank and there is
    * real restored work to show instead.
    */
-  // ── Sprint 104 (#162): queue dispatch + comment target resolution ──────
+  // ── Sprint 104 (#162) / Sprint 117: queue dispatch ─────────────────────
 
-  /** Sprint 105 (#165): update the registry + push the fact editor-ward. */
-  function setCommentTaskStatus(
-    itemId: string,
-    task: { commentIds: string[]; documentPath: string; conversationId: string; status: 'queued' | 'running' | 'done' | 'failed' },
-  ): void {
-    set({ commentTasks: { ...get().commentTasks, [itemId]: task } });
-    vscode.postMessage({
-      type: 'comment:task-status',
-      documentPath: task.documentPath,
-      commentIds: task.commentIds,
-      status: task.status,
-    });
-  }
-
-  /** A user-removed queued comment task returns its markers to neutral. */
-  function clearCommentTask(itemId: string): void {
-    const task = get().commentTasks[itemId];
-    if (!task || task.status !== 'queued') return;
-    const next = { ...get().commentTasks };
-    delete next[itemId];
-    set({ commentTasks: next });
-    vscode.postMessage({
-      type: 'comment:task-status',
-      documentPath: task.documentPath,
-      commentIds: task.commentIds,
-      status: 'cleared',
-    });
-  }
-
-  /** Terminal transition for every RUNNING comment task of a conversation. */
-  function finalizeCommentTasks(conversationId: string, status: 'done' | 'failed'): void {
-    for (const [itemId, task] of Object.entries(get().commentTasks)) {
-      if (task.conversationId === conversationId && task.status === 'running') {
-        setCommentTaskStatus(itemId, { ...task, status });
-      }
-    }
+  /**
+   * Sprint 117 (R5): put a captured item into ITS conversation's queue.
+   *
+   * Returns the queue's real answer. Draining is deliberately NOT done here so
+   * the caller can acknowledge before a dispatch goes out — the host's
+   * acceptance sequence wants the enqueue ack before the turn (D6).
+   */
+  function enqueueCaptured(
+    input: Omit<QueueItem, 'id' | 'status' | 'createdAt'>,
+  ): { outcome: 'queued' | 'full'; item: QueueItem } {
+    const item: QueueItem = { ...input, id: nextId(), status: 'queued', createdAt: Date.now() };
+    const result = enqueueItem(get().promptQueues, item);
+    if (result.outcome === 'full') return { outcome: 'full', item };
+    set({ promptQueues: result.queues });
+    return { outcome: 'queued', item };
   }
 
   /**
@@ -694,13 +678,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     }
     try {
       set({ promptQueues: markQueueStatus(get().promptQueues, item.conversationId, item.id, 'sending') });
+      // Sprint 117 (R1/R6): a comment task arrives with the turn id the HOST
+      // already minted. Using it verbatim is what lets a terminal event find
+      // exactly this task instead of every running one (audit F22).
+      const turnId = item.conversationTurnId ?? nextId();
       if (item.runtimeId === 'claude-code') {
         const turn: AgentConversationTurn = {
-          id: nextId(),
+          id: turnId,
           conversationId: item.conversationId,
           userPrompt: item.displayText,
           thinkingEffort: item.thinkingEffort,
-          activeFilePath: item.documentPath,
+          activeFilePath: item.sourceDisplayPath,
           attachments: item.attachments,
           activities: [],
           isRunning: true,
@@ -733,16 +721,21 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           mentionedAgentPaths: item.mentionedAgentPaths,
+          // Sprint 117 (audit F11/F12): a comment turn names its own task and
+          // its own document. Composer items send neither, so the host keeps
+          // resolving the active file for them exactly as before.
+          ...(item.taskId ? { taskId: item.taskId } : {}),
+          ...(item.sourceDisplayPath ? { sourceDisplayPath: item.sourceDisplayPath } : {}),
         });
       } else {
         const turn: CodexConversationTurn = {
-          id: nextId(),
+          id: turnId,
           conversationId: item.conversationId,
           userPrompt: item.displayText,
           thinkingEffort: item.thinkingEffort,
           runtime: item.runtimeId === 'opencode' ? 'opencode' : 'codex',
           requestedPlanMode: item.planFirst,
-          activeFilePath: item.documentPath,
+          activeFilePath: item.sourceDisplayPath,
           attachments: item.attachments,
           streamingText: '',
           activities: [],
@@ -775,11 +768,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
+          ...(item.taskId ? { taskId: item.taskId } : {}),
+          ...(item.sourceDisplayPath ? { sourceDisplayPath: item.sourceDisplayPath } : {}),
         });
       }
       set({ promptQueues: removeQueueItem(get().promptQueues, item.conversationId, item.id) });
-      const task = get().commentTasks[item.id];
-      if (task) setCommentTaskStatus(item.id, { ...task, status: 'running' });
+      // No local status write: `running` is the host's conclusion from the
+      // conversation record for this exact turn (Sprint 117 D7).
     } catch (err) {
       // Keep the item visible with its error — never silently discard (R3).
       set({
@@ -788,33 +783,68 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           err instanceof Error ? err.message : String(err),
         ),
       });
-      const task = get().commentTasks[item.id];
-      if (task) setCommentTaskStatus(item.id, { ...task, status: 'failed' });
     }
   }
 
   /**
-   * Sprint 104 R2: a comment task targets a STABLE conversation for its
-   * assigned agent — an open thread already bound to that runtime (prefer one
-   * that is ready), else a new background thread. The visible thread is never
-   * retargeted.
+   * Sprint 117 (R4, D5): run an accepted comment task in the conversation the
+   * HOST named. The sidebar no longer picks a destination of its own — the old
+   * "first ready thread of that runtime, else a new background thread" rule
+   * (audit F20) chose silently and could never be shown to the user. The host
+   * binds the conversation that is open in this sidebar at acceptance time.
    */
-  function resolveCommentTargetConversation(runtimeId: 'claude-code' | 'codex' | 'opencode'): string {
-    const state = get();
-    const threadRt = runtimeId === 'claude-code' ? 'claude' : runtimeId;
-    const candidates = Object.values(state.conversations)
-      .filter((c) => runtimeOfConversation(c) === threadRt);
-    const ready = candidates.find((c) => isReadyToDrain(deriveActivityState(c)));
-    if (ready) return ready.id;
-    if (candidates.length > 0) {
-      return [...candidates].sort((a, b) => b.createdAt - a.createdAt)[0].id;
+  function handleCommentTaskEnqueue(message: CommentTaskEnqueueMessage): void {
+    const answer = (outcome: CommentTaskEnqueueOutcome): void => {
+      vscode.postMessage({ type: 'comment-task/enqueue-result', taskId: message.taskId, outcome });
+    };
+
+    // The named conversation, never the visible one. An id this sidebar does
+    // not hold is reported honestly rather than redirected (R1).
+    if (!get().conversations[message.conversationId]) {
+      answer('no-conversation');
+      return;
     }
-    const conversation = createConversationState(nextId(), {
-      selectedAgent: runtimeId,
-      pendingRuntime: { runtimeId, modelId: '', mode: 'auto', planFirst: false },
+
+    const { outcome, item } = enqueueCaptured({
+      conversationId: message.conversationId,
+      runtimeId: message.runtimeId,
+      autonomy: message.autonomy,
+      planFirst: false,
+      modelId: message.modelId ?? undefined,
+      thinkingEffort: (message.thinkingEffort as ThinkingEffort) ?? 'auto',
+      prompt: message.prompt,
+      displayText: message.displayText,
+      source: 'comment',
+      taskId: message.taskId,
+      conversationTurnId: message.conversationTurnId,
+      sourceDisplayPath: message.sourceDisplayPath,
     });
-    set({ conversations: { ...state.conversations, [conversation.id]: conversation } });
-    return conversation.id;
+
+    // Audit F17: the queue's `full` answer used to be dropped on the floor and
+    // the user was told the work was queued. It is now the reply.
+    answer(outcome);
+    if (outcome === 'queued') get().maybeDrainQueue(item.conversationId);
+  }
+
+  /**
+   * Sprint 117: host→sidebar control messages handled ahead of the main
+   * `ExtensionMessage` switch, so the comment-task bridge stays in one place.
+   * Both variants are declared in the union, so this narrows properly.
+   * Returns true when the message was consumed.
+   */
+  function handleHostControlMessage(message: ExtensionMessage): boolean {
+    if (message.type === 'comment-task/enqueue') {
+      handleCommentTaskEnqueue(message satisfies CommentTaskEnqueueMessage);
+      return true;
+    }
+
+    // "Open conversation" on a comment: show the task's own destination (R4).
+    if (message.type === 'conversation/select') {
+      if (message.conversationId) get().loadSavedConversation(message.conversationId);
+      return true;
+    }
+
+    return false;
   }
 
   return {
@@ -872,7 +902,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     conversationStoreNotice: null,
 
     promptQueues: {},
-    commentTasks: {},
     composerDrafts: {},
     setupStatus: null,
     environmentStatus: null,
@@ -985,33 +1014,21 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // ── Sprint 104 (#162): bounded per-conversation prompt queue ──────────
 
     enqueuePrompt: (input) => {
-      const item: QueueItem = {
-        ...input,
-        id: nextId(),
-        status: 'queued',
-        createdAt: Date.now(),
-      };
-      const result = enqueueItem(get().promptQueues, item);
-      if (result.outcome === 'full') return 'full';
-      set({ promptQueues: result.queues });
-      // Sprint 105 (#165): a comment-originated item enters the status registry
-      // as 'queued' and the editor's margin marker learns about it immediately.
-      if (item.source === 'comment' && item.commentIds?.length && item.documentPath) {
-        setCommentTaskStatus(item.id, {
-          commentIds: item.commentIds,
-          documentPath: item.documentPath,
-          conversationId: item.conversationId,
-          status: 'queued',
-        });
-      }
+      const { outcome, item } = enqueueCaptured(input);
+      if (outcome === 'full') return 'full';
       // Idle target → the item should not sit in the queue a moment longer.
       get().maybeDrainQueue(item.conversationId);
       return 'queued';
     },
 
     removeQueued: (conversationId, itemId) => {
+      // Sprint 117 (R6): dropping a queued comment item is the user cancelling
+      // that task. The host records it; nothing is decided here.
+      const removed = queueFor(get().promptQueues, conversationId).find((i) => i.id === itemId);
       set({ promptQueues: removeQueueItem(get().promptQueues, conversationId, itemId) });
-      clearCommentTask(itemId);
+      if (removed?.taskId) {
+        vscode.postMessage({ type: 'comment-task/dequeued', taskId: removed.taskId });
+      }
     },
 
     editQueued: (conversationId, itemId, displayText, prompt) => {
@@ -2071,6 +2088,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     handleExtensionMessage: (message) => {
       const state = get();
 
+      // Sprint 117: the host's comment-task and conversation-select messages
+      // are matched before the union switch. The editor no longer relays
+      // `comment:submit` to us at all — the host accepts the task, decides the
+      // destination (D5) and tells us what to run.
+      if (handleHostControlMessage(message)) return;
+
       switch (message.type) {
         case 'conversation/canonical-id': {
           const current = get();
@@ -2312,38 +2335,6 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'connectivity-status':
           set({ isOnline: message.isOnline, isCheckingConnectivity: false });
           break;
-
-        case 'comment:submit': {
-          // Sprint 104 (#162, supersedes the Sprint 94 direct-send): a comment
-          // assigned to an agent routes through the SAME queue as composer
-          // prompts, into a stable conversation for that agent. The old path
-          // retargeted the visible thread's runtime and silently dropped the
-          // prompt when the runtime was busy (audit F-class bug) — both gone.
-          if (!message.prompt) break;
-          const rt: 'claude-code' | 'codex' | 'opencode' =
-            message.agentId === 'codex'
-              ? 'codex'
-              : message.agentId === 'opencode'
-                ? 'opencode'
-                : 'claude-code';
-          const targetId = resolveCommentTargetConversation(rt);
-          const target = get().conversations[targetId];
-          const policy = target ? policyOf(target.pendingRuntime) : { autonomy: 'auto' as const, planFirst: false };
-          get().enqueuePrompt({
-            conversationId: targetId,
-            runtimeId: rt,
-            autonomy: policy.autonomy,
-            planFirst: false,
-            modelId: rt === 'codex' ? target?.codexSelectedModel : rt === 'opencode' ? target?.opencodeSelectedModel : undefined,
-            thinkingEffort: target?.thinkingEffortByRuntime[rt] ?? 'auto',
-            prompt: message.prompt,
-            displayText: message.prompt,
-            source: 'comment',
-            commentIds: Array.isArray(message.commentIds) ? message.commentIds : undefined,
-            documentPath: typeof message.documentPath === 'string' ? message.documentPath : undefined,
-          });
-          break;
-        }
 
         case 'agent:bootstrap-error':
           if (message.generation < get().bootstrapGeneration) break;
@@ -2852,9 +2843,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             patchConversation(targetId, (c) => computeContextState(c.agentConversation));
             // Auto-save the conversation that finished — not "the current" one.
             setTimeout(() => persistConversation(targetId), 100);
-            // Sprint 105 (#165): the running comment task of THIS conversation
-            // reaches its terminal state with the turn.
-            finalizeCommentTasks(targetId, message.error ? 'failed' : 'done');
+            // Sprint 117 (audit F22): NO comment-task finalisation here. This
+            // used to mark every running comment task of the conversation
+            // terminal, finishing tasks that had nothing to do with this turn.
+            // The host derives each task from its own (conversation, turn) id.
             // Sprint 104 R3: the turn ended — drain this conversation's queue
             // (readiness-gated: pending cards / failed turns block inside).
             get().maybeDrainQueue(targetId);
@@ -3000,7 +2992,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           );
           if (landed) {
             setTimeout(() => persistConversation(targetId), 100);
-            finalizeCommentTasks(targetId, message.error ? 'failed' : (message.status === 'interrupted' ? 'failed' : 'done'));
+            // Sprint 117 (audit F22): see the Claude handler — per-task terminal
+            // state is the host's conclusion for this exact turn, not ours.
             // Sprint 104 R3: drain on turn completion (readiness-gated —
             // a requiresPlanReview turn keeps the queue waiting).
             get().maybeDrainQueue(targetId);
@@ -3175,4 +3168,51 @@ export function hydrateConversations(conversations: ConversationState[], activeI
   const active = map[activeId];
   if (!active) throw new Error(`hydrateConversations: active id "${activeId}" is not in the provided set`);
   useAISidebarStore.setState({ conversations: map, activeConversationId: activeId });
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Sprint 117 (R4/R5 — D5, D6): the sidebar reports what it is showing.
+ *
+ * The host needs exactly two facts to accept a comment task without asking the
+ * user anything: that this store is hydrated, and which conversation is open
+ * right now. Reporting them from one subscription means every path that
+ * changes the active thread — switch, New, History, restore, the delete
+ * fallback — is covered without a call site of its own, and none of them can
+ * quietly forget. The host binds the id it was last told at acceptance time;
+ * a later switch never retargets an accepted task.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+let sidebarReadyPosted = false;
+let lastReportedConversationId: string | null = null;
+
+function reportActiveConversation(conversationId: string | null, force = false): void {
+  if (!conversationId) return;
+  if (!force && conversationId === lastReportedConversationId) return;
+  lastReportedConversationId = conversationId;
+  vscode.postMessage({ type: 'conversation/active', conversationId });
+}
+
+useAISidebarStore.subscribe((state, previous) => {
+  if (state.ready && !previous.ready && !sidebarReadyPosted) {
+    sidebarReadyPosted = true;
+    vscode.postMessage({ type: 'sidebar/ready' });
+    // The host holds comment-task enqueues behind this handshake (D6), so the
+    // destination has to be known in the same breath as readiness — restated
+    // even if this store already reported it while the host was still loading.
+    reportActiveConversation(state.activeConversationId, true);
+    return;
+  }
+  // Before hydration there is nothing worth binding: the host holds comment-task
+  // enqueues until the handshake, and the handshake reports the open
+  // conversation itself. Reporting earlier would only be noise.
+  if (!state.ready) return;
+  if (state.activeConversationId !== previous.activeConversationId) {
+    reportActiveConversation(state.activeConversationId);
+  }
+});
+
+/** Test-only: replay the ready handshake inside one process. */
+export function resetSidebarHandshakeForTest(): void {
+  sidebarReadyPosted = false;
+  lastReportedConversationId = null;
 }
