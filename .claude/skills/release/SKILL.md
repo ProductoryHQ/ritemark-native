@@ -1,9 +1,9 @@
 ---
 name: release
-description: Procedural commands and gotchas for Ritemark Native releases — version bump, signing, DMG creation, notarization, GitHub Actions toggling, update feed publication. Use when the release-manager agent needs concrete commands or when the user is performing release steps directly.
+description: Procedural commands and gotchas for Ritemark Native releases — version bump, signing, DMG creation, notarization, GitHub Actions toggling, update feed publication, release closeout (verify published assets, archive evidence, reclaim the release worktree). Use when the release-manager agent needs concrete commands or when the user is performing release steps directly.
 allowed-tools: Read, Bash, Glob, Grep
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Release Skill — Procedural Reference
@@ -16,6 +16,7 @@ Companion skill to `release-manager` agent. The agent owns workflow + gate enfor
 - The user is doing release steps without invoking the agent.
 - Notarization, signing, or GitHub Release commands need to be looked up.
 - GitHub Actions Windows build needs the public/private repo toggle.
+- A published release's worktree is still on disk holding build output (Step 10, closeout).
 
 ## Release Types
 
@@ -256,7 +257,163 @@ If feed/metadata is stale or missing, the release is BLOCKED — even if binarie
 
 ### Step 9 — Post-release
 
-Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy."
+1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy."
+2. **Issue sweep.** `gh issue list --repo ProductoryHQ/ritemark-native --state open`; map every open issue against the shipped scope; verify that each `Fixes #NNN` auto-close actually happened; close what the release genuinely resolved with a comment naming the version. Do not close partial or reputation-dependent issues (Windows Smart App Control, #130, is the standing example) — surface those to Jarmo.
+3. Run the release closeout (Step 10). A release whose worktree is still `BLOCKED` for build output is not finished.
+
+### Step 10 — Release closeout (reclaim the release worktree)
+
+A shell release leaves the release worktree holding everything it built. For
+v1.10.1 that was 15.7 GB four days after publication: `dist/` 3.2 GB,
+`VSCode-darwin-arm64/` 2.0 GB, `VSCode-darwin-x64/` 2.1 GB, and the physical
+`vscode/` submodule 6.6 GB. `worktree-hygiene.mjs` classifies any worktree with
+a non-empty `dist/` or `VSCode-<target>/` as `BLOCKED — build output present …
+publish or move it before removing`, and that verdict never lifts on its own.
+The closeout is the "publish or move" the classifier asks for: prove the
+published copies are the built bytes, keep the evidence that exists only on
+this disk, then delete the output. Removing the worktree itself stays Jarmo's
+call, and `--clean` is not part of this step.
+
+Run it after Step 9 for every full release, on the Mac that built it (the
+commands use BSD `stat -f%z`). It needs `gh` authenticated as
+`jarmo-productory`.
+
+#### 10.1 Verify every published asset against local `dist/`
+
+GitHub computes a SHA-256 digest for every release asset, so nothing has to be
+downloaded again. Recompute the local hashes — never trust the sidecars alone —
+and diff the two lists. An empty diff is the pass condition.
+
+```bash
+cd .worktrees/release-<commit>          # the release worktree, not the main checkout
+V=X.Y.Z; TAG=v$V; REPO=jarmo-productory/ritemark-public
+T=$(mktemp -d)
+
+# Published: GitHub's own digest + size per asset
+gh api repos/$REPO/releases/tags/$TAG \
+  --jq '.assets[] | "\(.digest | ltrimstr("sha256:"))  \(.size)  \(.name)"' | sort -k3 > "$T/published.txt"
+
+# Local: recomputed from the bytes in dist/
+for f in Ritemark-arm64.dmg Ritemark-x64.dmg Ritemark-Setup.exe update-feed.json; do
+  printf '%s  %s  %s\n' "$(shasum -a 256 "dist/$f" | cut -d' ' -f1)" "$(stat -f%z "dist/$f")" "$f"
+done | sort -k3 > "$T/local.txt"
+
+diff "$T/published.txt" "$T/local.txt"        # must print nothing
+
+# Canonical feed: the per-version copy must name exactly these hashes and sizes
+curl -fsSL "https://github.com/$REPO/releases/download/$TAG/update-feed.json" -o "$T/feed-versioned.json"
+node -e 'const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+  const r=f.fullReleases.find(x=>x.version===process.argv[2]);
+  if(!r){console.error("version missing from feed");process.exit(1)}
+  for(const p of r.platforms)console.log(`${p.sha256}  ${p.size}  ${p.assetName}`)' \
+  "$T/feed-versioned.json" "$V" | sort -k3 > "$T/feed.txt"
+diff "$T/feed.txt" <(grep -v ' update-feed.json$' "$T/local.txt")   # must print nothing
+cmp dist/update-feed.json "$T/feed-versioned.json"                    # must print nothing
+gh api repos/$REPO/releases/latest --jq .tag_name                     # this tag, unless a newer release shipped since
+
+# Build-time sidecars must name the same hashes as the recomputed list.
+# The Windows *-setup.sha256.txt is written by PowerShell with CRLF, so strip
+# CR or every hash from it carries a trailing \r and never matches.
+for h in $(cat dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/*-setup.sha256.txt | tr -d '\r'); do
+  grep -q "^$h " "$T/local.txt" && echo "ok       $h" || echo "MISSING  $h"
+done
+```
+
+Any diff line, a `MISSING`, a `cmp` difference, or a version absent from the
+feed means the published release is not the built release. Stop, report, and
+clear nothing — the local copy may be the only correct one. A `null` digest
+means GitHub has not computed one for that asset: download it and hash it
+locally instead of skipping the check. (Validated against v1.10.1 on
+2026-09-14: every diff empty, feed byte-identical, all three sidecars matched.)
+
+`published.txt` is closeout evidence; keep `$T` until 10.2 has copied it.
+
+#### 10.2 Archive the evidence that exists only locally
+
+Durable location: **`docs/releases/vX.Y.Z/evidence/`, tracked in Git.** The
+files are a few dozen kilobytes of hashes, JSON results, and the feed. A
+Git-ignored archive directory was considered and rejected: it would recreate
+the problem being solved (one copy, one disk, invisible to `git status`).
+Nothing in these files is secret, and the repository is periodically public,
+so keep it that way — no logs carrying machine-specific paths, no personal
+data (`docs/microsoft-store-submission/evidence/README.md` has the standing
+rule).
+
+Commit from the **main checkout on a docs branch**, never from the release
+worktree — it is detached at the frozen source commit and is about to be
+deleted.
+
+```bash
+W=<absolute path of the release worktree>
+E=docs/releases/v$V/evidence
+mkdir -p "$E/win32-roundtrip"
+cp "$W/dist/update-feed.json" "$E/"
+cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"
+cp "$W"/dist/win32-roundtrip-evidence/*.result.json "$E/win32-roundtrip/"
+cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
+cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
+cp "$T/published.txt" "$E/published-assets.txt"
+```
+
+What is deliberately left out:
+
+- The DMGs and the installer — the GitHub Release is their archive, and 10.1
+  just proved it holds the same bytes. Partner Center and `getritemark.com`
+  take that same file; neither needs the local copy.
+- `win32-roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
+  uninstall logs, Git-ignored by `*.log`. Their outcomes are in the
+  `.result.json` files, and the `ritemark-windows-installer` CI artifact keeps
+  the full set for 30 days after the run.
+- `x64-ci/` — empty once `extract-macos-x64-artifact.sh` has run.
+
+Add `docs/releases/vX.Y.Z/evidence/closeout.md` recording, in a few lines: the
+worktree path and source commit, the release URL and publish date, the Windows
+CI run id, the 10.1 result (all diffs empty), and — added in 10.3 — the
+post-clear verdict. Open the PR and **push before 10.3**: the evidence must
+exist on `origin` before the local copy is deleted.
+
+#### 10.3 Clear the build output, then re-audit
+
+Only when 10.1 printed nothing and the 10.2 commit is pushed. Delete exactly
+the output directories the `BLOCKED` line named — the two kinds of Git-ignored
+output the classifier looks for — by name, inside the release worktree. This
+deletes output, not the worktree.
+
+```bash
+cd "$W"
+rm -rf dist VSCode-darwin-arm64 VSCode-darwin-x64
+cd <main checkout>
+node ./scripts/worktree-hygiene.mjs --check --no-sizes
+```
+
+Expected line for the release worktree:
+
+```
+REVIEW   …/.worktrees/release-<commit> — verified disposable release worktree ((detached))
+```
+
+That verdict needs the release marker (`ritemark-release-worktree.json` under
+`.git/worktrees/<name>/`, written by `create-release-worktree.sh`) to name the
+worktree's HEAD, the superproject to be clean, and HEAD to be an ancestor of
+`origin/main`. If the line says anything else — still `BLOCKED`, or `KEEP` —
+stop and report the reason verbatim. Do not pass `--force`, do not delete the
+directory, do not argue with the classifier: a wrong verdict is a bug in
+`scripts/worktree-hygiene.mjs`. Record the verdict line in `closeout.md` on
+the open PR and merge it.
+
+#### 10.4 Hand over — removal is Jarmo's
+
+Report to Jarmo: the release worktree now classifies `REVIEW`, how much the
+clear freed, and that `--clean` will also remove every other `REVIEW` entry in
+the same audit (list them). Then wait.
+
+- `node ./scripts/worktree-hygiene.mjs --clean` runs only after Jarmo says
+  go. It calls `git worktree remove` on the exact path (`--force` only because
+  the physical `vscode/` submodule requires it) and reclaims the remaining
+  ~6.6 GB.
+- Never run `--clean` yourself, never run it while another release is
+  mid-flight, never override `BLOCKED`, never `rm -rf` or `git worktree
+  remove` a worktree by hand.
 
 ## Workflow — Extension-only release (Sprint 93)
 
@@ -267,6 +424,7 @@ For changes confined to `extensions/ritemark/` — i.e. extension-tier per `CLAU
 3. Review `release-staging/upload/` — the script prints (does not auto-run) the exact `gh release create` command to publish.
 4. **Light gate, not the full Gate 1/Gate 2 process below:** Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install pointed at the staged files) on the changed surfaces only, then gives the approval phrase. No notarization, no 60-min hardening wait, no Windows CI dispatch, no repo-visibility toggle — none of those apply to an extension-only release.
 5. Only after Jarmo's approval: run the `gh release create` command the script printed, uploading the individual files from `release-staging/upload/` (never a `.vsix`).
+6. No closeout step: an extension release is built in the main checkout and leaves no release worktree or multi-GB output behind.
 
 See `docs/development/RELEASING.md` for the plain-language version Jarmo can follow without engineering background.
 
@@ -307,14 +465,26 @@ cp -R extensions/ritemark/out/* "VSCode-darwin-arm64/Ritemark Native.app/Content
 This is development-only. A hot-copied app has invalid provenance and must
 never be signed, packaged, or described as an RC.
 
-### Release worktree holds the only copy of the artifacts
+### Release worktree holds the only copy of the artifacts — until closeout
 
-`node ./scripts/worktree-hygiene.mjs --check` classifies an active release
-worktree as `REMOVE — verified disposable release worktree` even when its
-`dist/` holds the only copies of the notarized DMGs and the signed Windows
-installer. The scheduled `worktree-janitor` runs `--clean` every Friday 18:00.
-**Never run `--clean` while a release is mid-flight**; get the artifacts onto
-the GitHub Release first.
+Between the DMG build and the GitHub Release, `dist/` in the release worktree
+holds the only copies of the notarized DMGs and the signed Windows installer.
+`worktree-hygiene.mjs` accounts for that: a non-empty `dist/` or
+`VSCode-<target>/` classifies the worktree `BLOCKED — build output present …
+publish or move it before removing`, whatever `git status` says. (During the
+v1.10.0 publish the classifier still reported such a worktree as removable;
+that was fixed, and the removable verdict is now spelled `REVIEW`.) The block
+does not lift by itself — Step 10 is what verifies the published copies,
+archives the evidence, and clears the output, after which the same worktree
+classifies `REVIEW — verified disposable release worktree`.
+
+Nothing scheduled ever runs `--clean`. The weekly `ritemark-worktree-report`
+task and the `worktree-janitor` agent run `--report` and deliver it; removal
+happens only after Jarmo has read a report and said so
+(`docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`). **Never
+run `--clean` while a release is mid-flight** — it removes every `REVIEW`
+worktree in the audit, not only the one you meant — and never get past a
+`BLOCKED` verdict by deleting the directory yourself.
 
 ### Clean build and worktree contract
 
@@ -323,7 +493,10 @@ The authoritative contract is
 
 - Audit after merge/close, at sprint close, before RC creation, and weekly:
   `node ./scripts/worktree-hygiene.mjs --check`.
-- Use `--clean` only after reviewing classifications. Never override `BLOCKED`.
+- `--clean` is human-authorized: Jarmo reads the report and says go. Never
+  override `BLOCKED`, never recurse-delete a worktree by hand.
+- A published release worktree is reclaimed through Step 10 (closeout), never
+  by deleting it directly.
 - Every RC begins with `./scripts/create-release-worktree.sh`.
 - `codesign-app.sh` and `create-dmg.sh` refuse missing or mismatched provenance.
 - Any source change or rebuild creates a new candidate and resets the relevant gate.
@@ -445,3 +618,5 @@ If v1.6.3 had run the pre-edit audit, Commits A→D would have collapsed into a 
 - Build script: `scripts/build-prod.sh`
 - Sign + DMG + notarize: `scripts/codesign-app.sh`, `scripts/create-dmg.sh`, `scripts/notarize-dmg.sh`
 - Validation script: `scripts/validate-build-output.sh` (cross-platform aware: `darwin-arm64` / `darwin-x64` / `win32-x64`)
+- Release closeout evidence: `docs/releases/vX.Y.Z/evidence/` (per-release, written by Step 10)
+- Worktree hygiene contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`

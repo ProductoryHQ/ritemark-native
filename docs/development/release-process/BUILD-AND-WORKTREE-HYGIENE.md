@@ -2,7 +2,7 @@
 
 **Status:** mandatory repository policy
 
-**Validated:** 2026-09-02
+**Validated:** 2026-09-02 · **Updated:** 2026-09-14 (release closeout)
 **Scope:** shell-release builds and local Git worktree storage
 
 ## One rule
@@ -128,6 +128,18 @@ whatever Git says. Those directories are ignored, so `git status` reports a
 release worktree holding signed, notarized DMGs as pristine. That output can
 represent hours of compute and spent Apple notarization submissions, and it
 exists nowhere else until it is published.
+
+The block lifts only through the release closeout (`release` skill, Step 10;
+gate in the `release-manager` agent): verify the published assets against
+`dist/` (size and SHA-256 against GitHub's asset digests and the canonical
+update feed), archive the local-only evidence to
+`docs/releases/vX.Y.Z/evidence/`, and only then delete `dist/` and
+`VSCode-<target>/` inside the worktree. The same worktree then classifies
+`REVIEW — verified disposable release worktree`, and `--clean` — still
+human-authorized — removes it together with its physical `vscode/` submodule.
+Deleting the worktree directory by hand to get past the block is never the
+answer; a worktree that stays `BLOCKED` after a closeout is a classifier bug
+to report.
 
 **Unmerged work.** An unmerged branch needs an upstream and no unpushed
 commits. Once the commit is an ancestor of `origin/main` the work is
