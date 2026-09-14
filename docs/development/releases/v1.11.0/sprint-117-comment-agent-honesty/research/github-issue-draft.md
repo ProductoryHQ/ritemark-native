@@ -1,6 +1,6 @@
 # GitHub issue draft — Sprint 117
 
-**Draft — publish only after Jarmo's go (precedent: Sprint 116 issue #286).** Milestone `v1.11.0`, labels `enhancement`, `sprint`. On publication: move #281 from milestone `v1.12.0` to `v1.11.0`, retitle it to drop "Sprint 121", and comment on #156 and #281 that Sprint 117 absorbs them.
+**Published 2026-09-14 as [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292)** under milestone `v1.11.0`, label `enhancement`. Done at the same time: #281 moved to `v1.11.0` and retitled without "Sprint 121"; #156 moved to `v1.11.0`; both commented with how Sprint 117 absorbs them. This file is kept as the source text.
 
 ---
 

@@ -2,21 +2,21 @@
 
 Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]` only when the artifact/code/evidence exists on the approved sprint branch.
 
-> **Gate:** Phase 0 may create research, fixtures, protocol/schema candidates, and design evidence only. Depth was approved (full) on 2026-09-14; product code starts after Jarmo approves the complete Phase 0 freeze.
+> **Gate:** passed 2026-09-14. Depth approved (full), the destination decided by Jarmo, the remaining Phase 0 decisions delegated to engineering ("ülejäänud sprindi otsustes usaldan sind"). Implementation may start at Phase 1. Any later change to user-visible behaviour goes back to Jarmo.
 
 ## Phase 0: Audit, design, and freeze (W0 — R1–R10)
 
 - [x] Map all 23 findings to requirement/scenario/workstream/disposition in `research/protocol-and-storage-decisions.md` — done 2026-09-14, plus two Phase 0 findings (F24 cancel mapped to completed/failed, F25 sidebar dispatch timer).
 - [x] Create synthetic comment/document/task fixtures; never use real user documents or transcripts — `research/fixtures/`, 2026-09-14.
-- [ ] Freeze stable-ID upgrade and duplicate-ID behavior for marks and standalone nodes.
-- [ ] Freeze `CommentTaskRecordV1`, typed protocol, payload bounds, atomic acceptance, queue reservation, and transition table.
-- [ ] Freeze canonical URI/project scope, rename/move/Save As, deleted-source, retention, cleanup, and retry-generation rules.
+- [x] Freeze stable-ID upgrade and duplicate-ID behavior for marks and standalone nodes — D3.
+- [x] Freeze `CommentTaskRecordV1`, typed protocol, payload bounds, atomic acceptance, queue reservation, and transition table — D2, D6.
+- [x] Freeze canonical URI/project scope, rename/move/Save As, deleted-source, retention, cleanup, and retry-generation rules — D4.
 - [x] Destination-conversation selection — decided by Jarmo 2026-09-14: the conversation open in the AI sidebar, no confirmation step.
-- [ ] Approve host-local completion reply projection versus Markdown encoding.
+- [x] Approve host-local completion reply projection versus Markdown encoding — D9, host-local.
 - [x] Full versus surgical scope — resolved full on 2026-09-14; v1.12.0 Sprint 121 absorbed.
-- [ ] Freeze the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow/normal widths (R10, Sprint 121 absorption).
-- [ ] Approve [design.md](./design.md), including the R10 composer, picker, and collapsed-marker states.
-- [ ] **Jarmo Phase 0 gate:** authorize the frozen contract before implementation.
+- [x] Freeze the composer resize bounds, the `@` picker behaviour, and the collapsed-marker layout at narrow/normal widths (R10, Sprint 121 absorption) — D10; the narrow-width thresholds are measured on RunDev before Phase 5.
+- [x] Approve [design.md](./design.md), including the R10 composer, picker, and collapsed-marker states.
+- [x] **Jarmo Phase 0 gate:** authorized 2026-09-14 — destination decided by him, the rest delegated.
 
 ## Phase 1: Task store and protocol foundation (W1, W3 — R1, R3, R6)
 

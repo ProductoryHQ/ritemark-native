@@ -1,10 +1,10 @@
 # Sprint 117 Phase 0 — Protocol and Storage Decisions
 
-**Status:** Draft for Jarmo's Phase 0 gate (2026-09-14). No product code exists yet.<br>
+**Status:** Approved 2026-09-14. Jarmo decided D5 himself (the destination is the open sidebar conversation, no confirmation) and delegated the rest: "ülejäänud sprindi otsustes usaldan sind". Implementation may start at Phase 1. A later change to user-visible behaviour goes back to him.<br>
 **Inputs:** [current-state-audit.md](./current-state-audit.md) (F01–F23), [spec.md](../spec.md) R1–R10, code on `main` at `d0328249`.<br>
 **Fixtures:** [fixtures/](./fixtures/) — synthetic documents, records, and protocol samples referenced below.
 
-Every decision below names the evidence it rests on (file and line on `main`) and separates what is observed from what is proposed. Decisions marked **Jarmo** need his explicit approval at the gate; the rest are engineering calls he can veto.
+Every decision below names the evidence it rests on (file and line on `main`) and separates what is observed from what is proposed. The "Needs" column records how each decision was settled: **Jarmo** where he decided or would have had to, **engineering** where the call was ours. All of them are approved as written.
 
 ## 0. Decisions at a glance
 
@@ -236,13 +236,16 @@ Events for other turns, other generations, or unknown tasks are ignored and logg
 - Confirm every anchored-mark creation path mints `newCommentId()` (bubble menu "Comment" action, toolbar) — W2.
 - Trace what `session.cancel()` delivers to `onComplete` for Claude (error or clean result) with `debugTrace` — W4, before relying on cancel intent alone.
 
-## 14. Decisions for Jarmo
+## 14. Approval record (2026-09-14)
 
-- [ ] D1 host-owned store under `comment-tasks/v1`, `ConversationStore` pattern.
-- [ ] D2 record shape, bounds, and transition table.
-- [ ] D3 `{id:…}` carrier for standalone notes; ids minted at dispatch for legacy comments; duplicates re-minted.
-- [ ] D4 canonical URI + scope; in-app renames follow; no relink flow; 30-day / 500-record retention; `untitled:` rejected.
-- [x] D5 the conversation open in the AI sidebar, no confirmation, no picker (Jarmo, 2026-09-14).
-- [ ] D9 host-local plain-text summary ≤ 280 chars; Markdown untouched.
-- [ ] D10 native vertical resize with the stated bounds; `@` listbox without availability hints; gutter-marker rule with thresholds measured before Phase 5.
-- [ ] design.md states as amended 2026-09-14.
+- [x] D5 the conversation open in the AI sidebar, no confirmation, no picker — **decided by Jarmo**, overriding the drafted confirmation-and-picker proposal.
+- [x] D1 host-owned store under `comment-tasks/v1`, `ConversationStore` pattern — delegated.
+- [x] D2 record shape, bounds, and transition table — delegated.
+- [x] D3 `{id:…}` carrier for standalone notes; ids minted at dispatch for legacy comments; duplicates re-minted — delegated. This is the one decision that changes what a user sees in raw Markdown; it was put to Jarmo in plain language and he did not object.
+- [x] D4 canonical URI + scope; in-app renames follow; no relink flow; 30-day / 500-record retention; `untitled:` rejected — delegated.
+- [x] D9 host-local plain-text summary ≤ 280 chars; Markdown untouched — delegated.
+- [x] D10 native vertical resize with the stated bounds; `@` listbox without availability hints; gutter-marker rule with thresholds measured before Phase 5 — delegated.
+- [x] D6, D7, D8, D11, D12 — engineering, unchanged.
+- [x] design.md states as amended 2026-09-14.
+
+Jarmo: "ülejäänud sprindi otsustes usaldan sind." Anything that later changes user-visible behaviour beyond what is written here goes back to him before it ships.

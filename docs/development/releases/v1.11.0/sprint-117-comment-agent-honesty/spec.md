@@ -160,6 +160,8 @@ Acceptance criteria:
 
 ## Phase 0 Decisions
 
+All resolved 2026-09-14; the frozen contract is [research/protocol-and-storage-decisions.md](./research/protocol-and-storage-decisions.md).
+
 1. ~~Approve full 23-finding scope versus a named surgical deferral list.~~ Resolved 2026-09-14: full scope; v1.12.0 Sprint 121 absorbed.
 2. Freeze `CommentTaskRecordV1`, retention, cleanup, file-move/Save As, retry, and comment-deletion behavior.
 3. Approve host-local completion projection versus a new persisted Markdown reply encoding; recommendation is host-local projection.

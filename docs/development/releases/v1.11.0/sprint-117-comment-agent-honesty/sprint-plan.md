@@ -1,9 +1,9 @@
 # Sprint 117 — Comment-to-Agent Honesty
 
 **Track:** Full SDD<br>
-**Status:** Approved 2026-09-14 — full scope; absorbs v1.12.0 Sprint 121 ([#281](https://github.com/ProductoryHQ/ritemark-native/issues/281)). Branch `sprint-117-comment-agent-honesty` created from main `d0328249`. Phase 0 in progress; no product code before the Phase 0 freeze is approved.<br>
+**Status:** Phase 0 frozen and approved 2026-09-14 — full scope; absorbs v1.12.0 Sprint 121 ([#281](https://github.com/ProductoryHQ/ritemark-native/issues/281)). Branch `sprint-117-comment-agent-honesty` from main `d0328249`. Implementation authorized: Jarmo approved the destination decision explicitly and delegated the remaining Phase 0 decisions ("ülejäänud sprindi otsustes usaldan sind").<br>
 **Branch:** `sprint-117-comment-agent-honesty` (worktree `.claude/worktrees/sprint-117-comment-agent-honesty`)<br>
-**Issue:** Pending publication (draft: [research/github-issue-draft.md](./research/github-issue-draft.md)); absorbs [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) and [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281)<br>
+**Issue:** [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292), published 2026-09-14 under milestone `v1.11.0`; absorbs [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) and [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281), both moved to that milestone<br>
 **Release:** [v1.11.0](../release-plan.md)
 
 ## Goal
@@ -123,10 +123,11 @@ Resolved 2026-09-14: full correctness contract, plus v1.12.0 Sprint 121 absorbed
 | 2026-09-14 | Approve the full 23-finding scope | The surgical subset would have left the two worst symptoms, wrong document context and the invisible landing; every finding gets a disposition in Phase 0. |
 | 2026-09-14 | Absorb v1.12.0 Sprint 121 (#281) into Sprint 117 | Two of Sprint 121's six outcomes were already R4/R6/R7; the other three change the same component W6 rewrites (`MarginCommentRail.tsx`, `CommentsMenuButton.tsx`) and share the `@` alias vocabulary with W2. One sprint avoids rebuilding the rail in two releases; R10 added; the resizable composer becomes a primitive Sprint 122 reuses. |
 | 2026-09-14 | Destination is the conversation open in the AI sidebar; no confirmation dialog, no picker | Jarmo: "läheb automaatselt sinna, milline on hetkel visuaalselt avatud". A fresh empty conversation counts; the Send surface shows the title so nothing is hidden. |
+| 2026-09-14 | Phase 0 gate passed; the remaining protocol, storage and ergonomics decisions are delegated to engineering | Jarmo: "ülejäänud sprindi otsustes usaldan sind". Decisions D1–D4 and D6–D12 in [research/protocol-and-storage-decisions.md](./research/protocol-and-storage-decisions.md) stand as written; any later change to user-visible behaviour still comes back to him. |
 
 ## Planning Approval
 
 - [x] Jarmo chooses full or surgical depth — full, 2026-09-14.
-- [ ] GitHub issue is created, links #156 and #281, and is assigned to milestone `v1.11.0` — draft ready, publication awaits Jarmo's go.
+- [x] GitHub issue is created, links #156 and #281, and is assigned to milestone `v1.11.0` — [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292), 2026-09-14.
 - [x] SDD artifacts are approved — as amended 2026-09-14 to absorb Sprint 121; the Phase 0 freeze is still gated.
 - [x] Dedicated branch is created after approval — `sprint-117-comment-agent-honesty` from `d0328249`.
