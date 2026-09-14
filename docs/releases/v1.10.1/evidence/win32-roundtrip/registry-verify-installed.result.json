@@ -1,0 +1,17 @@
+{
+  "Mode": "verify-installed",
+  "Identity": "runnervmeef0v\\rmci-34472311244",
+  "Count": 1,
+  "KeyNames": [
+    "{B8F5E4A2-7C3D-4E9F-A1B6-8D2E5F3C9A7B}_is1"
+  ],
+  "DisplayNames": [
+    "Ritemark 1.10.1"
+  ],
+  "Publishers": [
+    "Productory Services OÜ"
+  ],
+  "DisplayVersions": [
+    "1.10.1"
+  ]
+}

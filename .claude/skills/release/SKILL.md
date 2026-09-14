@@ -349,7 +349,7 @@ E=docs/releases/v$V/evidence
 mkdir -p "$E/win32-roundtrip"
 cp "$W/dist/update-feed.json" "$E/"
 cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"
-cp "$W"/dist/win32-roundtrip-evidence/*.result.json "$E/win32-roundtrip/"
+cp "$W"/dist/win32-roundtrip-evidence/*result.json "$E/win32-roundtrip/"
 cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
 cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
 cp "$T/published.txt" "$E/published-assets.txt"
