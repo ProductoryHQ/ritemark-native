@@ -99,4 +99,32 @@ assert.equal(got.runtimeId, 'codex');
 assert.equal(got.autonomy, 'ask');
 assert.equal(got.planFirst, true);
 
+// ── Sprint 117 (R1/R6): host-minted comment identity rides the item ──
+const commentItem = item('E', {
+  source: 'comment',
+  taskId: 'task-77',
+  conversationTurnId: 'host-turn-77',
+  sourceDisplayPath: 'docs/notes.md',
+});
+const qe = enqueueItem({}, commentItem).queues;
+const carried = queueFor(qe, 'E')[0];
+assert.equal(carried.taskId, 'task-77', 'taskId survives enqueue');
+assert.equal(carried.conversationTurnId, 'host-turn-77', 'the host-minted turn id is frozen with the item');
+assert.equal(carried.sourceDisplayPath, 'docs/notes.md', 'the source document is frozen, not re-read at drain');
+
+// Reordering/editing must not disturb the frozen identity (R3 capture rule).
+let qf = enqueueItem(qe, item('E')).queues;
+qf = moveItem(qf, 'E', commentItem.id, 1);
+qf = updateItemPrompt(qf, 'E', commentItem.id, 'edited', 'edited full');
+const afterOps = queueFor(qf, 'E').find((i) => i.id === commentItem.id)!;
+assert.equal(afterOps.taskId, 'task-77');
+assert.equal(afterOps.conversationTurnId, 'host-turn-77');
+assert.equal(afterOps.sourceDisplayPath, 'docs/notes.md');
+
+// A composer item carries none of it — no synthetic task identity is invented.
+const composerItem = queueFor(qd, 'D')[0];
+assert.equal(composerItem.taskId, undefined);
+assert.equal(composerItem.conversationTurnId, undefined);
+assert.equal(composerItem.sourceDisplayPath, undefined);
+
 console.log('promptQueue tests passed.');

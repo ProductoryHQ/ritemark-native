@@ -44,12 +44,17 @@ extensions/ritemark/src/ritemarkEditor.ts
 extensions/ritemark/src/views/UnifiedViewProvider.ts
 extensions/ritemark/src/conversations/ConversationController.ts
 extensions/ritemark/webview/src/extensions/comment/commentIndex.ts
+extensions/ritemark/webview/src/extensions/comment/commentModel.ts
 extensions/ritemark/webview/src/extensions/comment/commentTaskStatus.ts
 extensions/ritemark/webview/src/components/MarginCommentRail.tsx
 extensions/ritemark/webview/src/components/header/CommentsMenuButton.tsx
 extensions/ritemark/webview/src/components/ai-sidebar/promptQueue.ts
 extensions/ritemark/webview/src/components/ai-sidebar/store.ts
+extensions/ritemark/webview/src/components/comment/AgentMentionPicker.tsx   (proposed, R10)
+extensions/ritemark/webview/src/components/comment/ResizableComposer.tsx    (proposed, R10; reused by Sprint 122)
 ```
+
+The two `components/comment/` files are proposals: Phase 0 may rename them or fold them into `MarginCommentRail.tsx` if the existing compose bubble can carry the behaviour without a new file.
 
 ## Workstream 0: Audit and freeze (R1–R9)
 
@@ -57,7 +62,7 @@ extensions/ritemark/webview/src/components/ai-sidebar/store.ts
 - Freeze `CommentTaskRecordV1`, exact typed messages, bounds, retention, file move/Save As behavior, source deletion, retry generations, cleanup, and reply ownership.
 - Decide destination resolution/confirmation timing and the atomicity boundary between durable acceptance and queue capacity reservation.
 - Build synthetic Markdown fixtures: anchored, multi-block, link/format split, standalone, id-less legacy, duplicate IDs, multiple agents, terminator, deleted source, and two documents with identical text.
-- Approve [design.md](./design.md) states and full versus surgical scope.
+- Approve [design.md](./design.md) states, including the R10 composer, picker, and collapsed-marker states; scope resolved full on 2026-09-14.
 - Stop for Jarmo's explicit Phase 0 decision before product code.
 
 ## Workstream 1: Task schema, store, and source identity (R1, R3, R6)
@@ -81,7 +86,7 @@ extensions/ritemark/webview/src/components/ai-sidebar/store.ts
 
 - Define editor request/result/events in `commentTasks/protocol.ts`; runtime-validate exact fields at the webview boundary.
 - `RitemarkEditorProvider` stamps canonical document URI/project scope and validates that requested IDs exist in the current document snapshot.
-- Resolve a canonical destination conversation through host conversation APIs, preferring a ready compatible conversation only under a frozen deterministic rule; otherwise create one accepted background conversation.
+- The destination is the conversation open in the AI sidebar: the sidebar reports its active conversation to the host (`conversation/active`), the host binds the task to that canonical id at acceptance, and a fresh empty conversation is used as-is. No candidate query, no confirmation.
 - Query normalized runtime availability and queue reservation before final acceptance.
 - Persist task before returning accepted; if queue handoff fails after persistence, record actionable interrupted/failed state rather than losing it.
 - Return per-group results for bulk requests and idempotently correlate retries.
@@ -103,13 +108,16 @@ extensions/ritemark/webview/src/components/ai-sidebar/store.ts
 - Render the projection in the comment bubble without modifying the user's note or TipTap document.
 - If a source comment is gone, retain conversation/task evidence under the approved retention rule but never reinsert text.
 
-## Workstream 6: UX, accessibility, migration, and flag behavior (R4–R9)
+## Workstream 6: UX, accessibility, migration, and flag behavior (R4–R10)
 
-- Implement [design.md](./design.md) confirmation and task states for single and bulk entry points.
+- Implement [design.md](./design.md) task states for single and bulk entry points; the Send surface shows the open conversation's title, with no confirmation step.
 - Show runtime, destination title, current state, timestamp, concise reply/error, and Open conversation/Retry/Sign in as applicable.
 - Replace global broadcast with document-scoped host projection; clear old webview module state on transition.
+- Give the compose bubble a bounded vertical resize as one reusable primitive (Sprint 122 applies it to the agent composer); keep Save, Cancel, and Send outside the scrolling area.
+- Add the `@` agent picker driven by `COMMENT_AGENT_ALIASES` and `ALIAS_TO_AGENT_ID` from `commentModel.ts`, so the picker and the W2 collector share one vocabulary; keyboard and pointer selection; explicit selected-agent pill.
+- Render collapsed comments as gutter markers that never overlap the text column; stack status, reply, and actions below the note; validate the narrow-width rule on RunDev.
 - Keep `comment-callouts` as the single default-on flag and gate host/UI paths together.
-- Preserve comment editing/removal, document sync, export stripping, and v1.12 layout boundaries.
+- Preserve comment editing/removal, document sync, export stripping, and the Sprint 122 boundary (conversation header, agent composer, chat links stay out).
 
 ## Workstream 7: Tests, live matrix, and closeout (R9)
 
@@ -120,7 +128,7 @@ extensions/ritemark/webview/src/components/ai-sidebar/store.ts
 
 ## Implementation Order
 
-W0 audit/design → decision gate → W1 task store → W2 capture/IDs/prompt → W3 acceptance/destination → W4 runtime lifecycle → W5 reply projection → W6 UX/migration/flag → W7 QA/docs.
+W0 audit/design → decision gate → W1 task store → W2 capture/IDs/prompt → W3 acceptance/destination → W4 runtime lifecycle → W5 reply projection → W6 UX/ergonomics (R10)/migration/flag → W7 QA/docs.
 
 ## Architecture Gate
 

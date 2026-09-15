@@ -2,7 +2,7 @@
  * Turndown rules — the save half of the comment round-trip. Re-emit the two
  * comment carriers back to their canonical Markdown storage forms:
  *
- *  - `<ritemark-comment>`      → `<!-- body -->`               (standalone note)
+ *  - `<ritemark-comment>`      → `<!-- {id:…} body -->`        (standalone note)
  *  - `<mark data-comment="…">` → `<mark data-comment="…">…</mark>` (anchored)
  *
  * Body text is the element's own text content / attribute (source of truth);
@@ -20,8 +20,15 @@ export function addCommentTurndownRules(service: TurndownService): void {
     replacement: (_content, node) => {
       // The note is the `data-note` attribute (source of truth); it keeps any
       // newlines, so a multi-line body round-trips intact.
-      const body = ((node as HTMLElement).getAttribute('data-note') || '').trim()
-      return `\n\n<!-- ${body} -->\n\n`
+      const el = node as HTMLElement
+      const body = (el.getAttribute('data-note') || '').trim()
+      // Stable id (Sprint 117 D3) rides in front of the body as `{id:<id>}`, the
+      // standalone equivalent of the anchored mark's `data-comment-id`. A note
+      // without an id keeps the bare `<!-- body -->` form, so a legacy document
+      // that is merely opened and saved is unchanged.
+      const id = el.getAttribute('data-comment-id')
+      const inner = id ? (body ? `{id:${id}} ${body}` : `{id:${id}}`) : body
+      return `\n\n<!-- ${inner} -->\n\n`
     },
   })
 

@@ -10,13 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v1.11.0
 
 ### Added
+- **The agent's answer comes back to the comment (Sprint 117).** A finished comment task shows a short plain-language summary under your own note, with **Open conversation** for the full thread. Your note, the highlighted passage, and the Markdown file are never rewritten, and nothing is resolved or deleted for you.
+- **A comment says where its work is going, and what it is doing (Sprint 117).** The line above **Send** names the conversation that will receive the task; afterwards the comment shows that conversation's title and its own state — queued, working, needs your input, completed, failed, cancelled, or interrupted. Each state is a symbol plus a sentence, not a colour, and it survives reload, reopen, and restart.
+- **A comment box that resizes, and an `@` picker (Sprint 117).** Drag a comment taller — Cancel, Save, and Send stay reachable. Typing `@` opens the agent list immediately: keep typing to filter, arrow keys to move, Enter or Tab to insert, Escape to close, or click.
 - **Current agent and model baseline (Sprint 116).** Ritemark now bundles Claude Code 2.1.270, Codex 0.154.0, and OpenCode 1.18.30 with exact matching SDKs and runtime-owned dependencies. The model catalog adds GPT-6 Astra, the current GPT-5.6 family, Claude Fable 5.1, Gemini 3.1 Pro, Gemini 3.8 Flash, and Gemini 3.5 Flash Lite.
 
 ### Changed
+- **A comment task goes to the conversation you have open (Sprint 117).** A brand-new empty one counts, and if it is busy the task waits in its queue. Ritemark used to choose a conversation for you without saying which; now there is one rule, and the Send surface names the destination before you press it. There is still no confirmation step to click through.
+- **Sending several comments at once answers per agent (Sprint 117).** The Comments menu reports each agent group as its answer arrives — "Claude · 2 queued", "Codex · Sign in required" with a **Sign in** button — instead of one blanket success.
+- **A collapsed comment no longer covers the text it annotates (Sprint 117).** The margin marker drops its preview and shrinks as the window narrows, and at narrow widths an opened comment sits below its marker instead of over the line.
 - **Image Flows start with supported current models.** New OpenAI image nodes default to GPT Image 2 and new Gemini image nodes default to Gemini 3.1 Flash Image. Older saved model IDs remain identifiable as deprecated and are not silently rewritten.
 - **Runtime packages are complete and reproducible.** Codex ships its official package tree with code-mode-host, ripgrep, shell resources, and Windows sandbox helpers. OpenCode ships its own ripgrep, avoiding a first-use download.
 
 ### Fixed
+- **A comment no longer says "Sent" before anything was sent (Sprint 117).** The margin flash and the "Queued N tasks" banner appeared the instant you clicked, whatever happened next. A comment now reports queued only once the work is really accepted — and when it is not, it says why: signed-out agent, full queue, unsaved document, each with the matching **Sign in**, **Open settings**, or **Retry** action.
+- **One agent finishing no longer marks unrelated comments as done (Sprint 117).** Two comments sent to the same conversation now each follow their own task.
+- **A stopped run is reported as cancelled (Sprint 117)** — not as completed, and not as a failure, in any of the three agents.
+- **A queued comment keeps working on the document you assigned it (Sprint 117).** Switching tabs, closing the document, or opening another project before the task runs can no longer point the agent at a different file.
+- **A comment task survives a restart honestly (Sprint 117).** Work cut short when Ritemark closed comes back marked interrupted with **Retry**, instead of sitting there looking busy forever, and comment status is no longer lost on reload.
+- **Standalone `///` notes keep a stable identity (Sprint 117),** so a task still finds its note after you keep editing around it. Opening an existing document does not change or dirty the file; an identity is added the first time you send that comment, in one step a single Undo reverses.
+- **Hovering the highlighted text opens its comment (Sprint 117).** You no longer have to find the marker in the margin to read a note about the sentence you are looking at. Any part of a comment that spans several paragraphs opens the same note.
+- **A finished comment offers Mark as done instead of a trash can (Sprint 117).** The action is the same one it always was, clearing your own comment from the document; only once the agent has actually completed the task does it say what you mean by it.
 - Codex Stop now handles the brief race where `turn/start` returns before the turn becomes interruptible, and a new message can be sent immediately after cancellation.
 - Successful OpenCode turns no longer show a red **Failed** marker after already editing the document and returning an answer; ACP's successful `end_turn` now maps to Ritemark's completed state.
 - Late Codex events carrying an explicit unknown thread ID no longer fall into another open conversation.

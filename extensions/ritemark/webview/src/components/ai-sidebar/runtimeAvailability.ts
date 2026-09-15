@@ -1,3 +1,21 @@
+/**
+ * Runtime availability for the AI sidebar.
+ *
+ * Sprint 117 (D12): the derivation itself now lives in `src/runtime/availability.ts`
+ * so the host's comment-task acceptance gate and this sidebar answer "can this
+ * runtime take a turn?" with the same function. Before that the policy existed
+ * only here, the comment dispatch path had no gate at all, and a signed-out
+ * runtime surfaced minutes later at the runtime boundary (audit F19).
+ *
+ * What stays in this module is the webview-shaped surface: the concrete input
+ * type built from the sidebar's own status objects, and `resolveAvailableRuntimeModel`,
+ * which needs the sidebar's model catalogs and has no meaning on the host.
+ */
+
+import {
+  deriveRuntimeAvailabilities as deriveSharedRuntimeAvailabilities,
+  type RuntimeAvailabilities,
+} from '../../../../src/runtime/availability';
 import type {
   AcpProviderFlags,
   AgentId,
@@ -7,28 +25,24 @@ import type {
   SetupStatus,
 } from './types';
 
-export type RuntimeAvailabilityState =
-  | 'checking'
-  | 'ready'
-  | 'needs-auth'
-  | 'auth-in-progress'
-  | 'needs-configuration'
-  | 'not-installed'
-  | 'broken'
-  | 'disabled'
-  | 'error';
+export {
+  listReadyAlternatives,
+  RUNTIME_LABELS,
+} from '../../../../src/runtime/availability';
+export type {
+  RuntimeAvailability,
+  RuntimeAvailabilities,
+  RuntimeAvailabilityState,
+  RuntimeHydration,
+} from '../../../../src/runtime/availability';
 
-export interface RuntimeAvailability {
-  state: RuntimeAvailabilityState;
-  usable: boolean;
-  detail: string | null;
-}
+import type { RuntimeHydration } from '../../../../src/runtime/availability';
 
-export type RuntimeHydration = Record<
-  AgentId,
-  { phase: 'checking' | 'ready' | 'error'; error: string | null; refreshing?: boolean }
->;
-
+/**
+ * The sidebar's own inputs, spelled with its concrete status types. It is
+ * structurally the shared module's input, which is exactly how host and webview
+ * can share one derivation while each keeps its own status objects.
+ */
 export interface RuntimeAvailabilityInput {
   runtimeHydration: RuntimeHydration;
   setupStatus: SetupStatus | null;
@@ -37,8 +51,6 @@ export interface RuntimeAvailabilityInput {
   acpProviders: AcpProviderFlags;
   byokProviderModels?: Record<string, ByokModelOption[]>;
 }
-
-export type RuntimeAvailabilities = Record<AgentId, RuntimeAvailability>;
 
 export interface RuntimeModelSelection {
   claude: string;
@@ -53,85 +65,15 @@ export interface RuntimeModelCatalogs {
   acpProviders: AcpProviderFlags;
 }
 
-const RUNTIME_ORDER: readonly AgentId[] = ['claude-code', 'codex', 'opencode'];
-
-function availability(
-  state: RuntimeAvailabilityState,
-  detail: string | null = null,
-): RuntimeAvailability {
-  return { state, usable: state === 'ready', detail };
-}
-
-function probeOverride(
-  probe: RuntimeHydration[AgentId],
-): RuntimeAvailability | null {
-  if (probe.phase === 'checking') return availability('checking');
-  if (probe.phase === 'error') return availability('error', probe.error);
-  return null;
-}
-
-function deriveClaude(input: RuntimeAvailabilityInput): RuntimeAvailability {
-  const probe = probeOverride(input.runtimeHydration['claude-code']);
-  if (probe) return probe;
-  if (!input.setupStatus) return availability('checking');
-
-  switch (input.setupStatus.state) {
-    case 'ready': return availability('ready');
-    case 'needs-auth': return availability('needs-auth', input.setupStatus.error);
-    case 'auth-in-progress': return availability('auth-in-progress');
-    case 'not-installed': return availability('not-installed', input.setupStatus.error);
-    case 'broken-install': return availability('broken', input.setupStatus.error);
-  }
-}
-
-function deriveCodex(input: RuntimeAvailabilityInput): RuntimeAvailability {
-  const probe = probeOverride(input.runtimeHydration.codex);
-  if (probe) return probe;
-
-  switch (input.codexStatus.state) {
-    case 'ready': return availability('ready');
-    case 'needs-auth': return availability('needs-auth', input.codexStatus.error);
-    case 'auth-in-progress': return availability('auth-in-progress');
-    case 'broken-install': return availability('broken', input.codexStatus.error);
-    case 'disabled': return availability('disabled');
-    case 'checking': return availability('checking');
-  }
-}
-
-function deriveOpenCode(input: RuntimeAvailabilityInput): RuntimeAvailability {
-  if (!input.opencodeEnabled) return availability('disabled');
-  const probe = probeOverride(input.runtimeHydration.opencode);
-  if (probe) return probe;
-  const configured = Object.values(input.acpProviders).some(Boolean);
-  if (!configured) return availability('needs-configuration');
-  const hasConfiguredModel = Object.entries(input.acpProviders).some(([provider, enabled]) => (
-    enabled && (input.byokProviderModels?.[provider]?.length ?? 0) > 0
-  ));
-  return hasConfiguredModel ? availability('ready') : availability('needs-configuration');
-}
-
 /**
  * Normalize provider-specific setup/auth reports into the one definition of
- * whether a runtime can accept a turn. `runtimeHydration` remains probe state;
- * a completed probe is never treated as authenticated by itself.
+ * whether a runtime can accept a turn. Thin wrapper over the shared policy so
+ * the sidebar's call sites and its tests keep their existing shape.
  */
 export function deriveRuntimeAvailabilities(
   input: RuntimeAvailabilityInput,
 ): RuntimeAvailabilities {
-  return {
-    'claude-code': deriveClaude(input),
-    codex: deriveCodex(input),
-    opencode: deriveOpenCode(input),
-  };
-}
-
-export function listReadyAlternatives(
-  availabilities: RuntimeAvailabilities,
-  selected: AgentId,
-): AgentId[] {
-  return RUNTIME_ORDER.filter((runtimeId) => (
-    runtimeId !== selected && availabilities[runtimeId].usable
-  ));
+  return deriveSharedRuntimeAvailabilities(input);
 }
 
 /** Resolve a canonical, currently selectable model for an explicit handoff. */
@@ -169,9 +111,3 @@ export function resolveAvailableRuntimeModel(
   }
   return null;
 }
-
-export const RUNTIME_LABELS: Record<AgentId, string> = {
-  'claude-code': 'Claude',
-  codex: 'Codex',
-  opencode: 'OpenCode',
-};

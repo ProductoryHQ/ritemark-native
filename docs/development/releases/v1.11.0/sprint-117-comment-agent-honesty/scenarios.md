@@ -68,11 +68,23 @@ And Ritemark never guesses across projects
 
 ## Feature: Destination and acceptance honesty (R4, R5)
 
-### ★ Scenario: Destination is visible
-Given a comment is assigned to Codex
-When the send confirmation appears or the task is accepted
-Then it names Codex and the exact existing or new destination conversation
-And Open conversation selects that canonical conversation
+### ★ Scenario: Destination is the open conversation
+Given the AI sidebar shows conversation "Release note review"
+When I choose Send to AI from the margin rail or the Comments menu
+Then the task is queued into "Release note review" with no confirmation step
+And the Send surface showed that title, and after acceptance Open conversation selects it
+
+### Scenario: A fresh conversation receives the task
+Given the AI sidebar shows a new, empty conversation
+When I send a comment task
+Then the task starts that conversation
+And its title comes from the first instruction until the runtime names it
+
+### Scenario: The open conversation belongs to another agent
+Given the AI sidebar shows a Codex conversation
+When I send a comment assigned to Claude
+Then the task runs as Claude inside that conversation, marked with the usual runtime-switch boundary
+And no other conversation is created or retargeted
 
 ### Scenario: Runtime is signed out
 Given Claude is unavailable because sign-in is required
@@ -178,6 +190,44 @@ Given a comment displays task status and a completion projection
 When I export PDF, Word, or Google Docs input HTML
 Then neither the original comment nor task metadata/reply appears in exported content
 
+## Feature: Comment ergonomics (R10)
+
+### ★ Scenario: `@` opens the agent picker and keyboard selects
+Given the comment composer is focused
+When I type `@`, then `co`
+Then the picker opens immediately and filters to Codex
+And Arrow keys move, Enter inserts `@codex `, and the selected agent shows before save
+
+### Scenario: Pointer selects from the picker
+Given the picker is open
+When I click OpenCode
+Then `@opencode ` is inserted at the caret
+And the composer keeps focus
+
+### Scenario: Escape closes the picker without inserting
+Given the picker is open
+When I press Escape
+Then nothing is inserted
+And the note text is unchanged
+
+### Scenario: Only supported aliases are offered
+Given the supported aliases are `claude`, `codex`, and `opencode`
+When I type `@other`
+Then the picker offers nothing and closes
+And the note stays unassigned
+
+### ★ Scenario: Collapsed comments never cover document text
+Given three comments anchored to adjacent lines, one with a long note and one with a status dot
+When the editor is at its narrowest supported width and at its normal width
+Then every collapsed marker sits in the margin gutter and no marker overlaps document text
+And expanding one opens the bubble beside the text column without covering the anchored text
+
+### ★ Scenario: Composer resize keeps controls reachable
+Given the comment composer is open at its minimum height
+When I drag it to its maximum height and back, at the minimum supported width and at 200% zoom
+Then the height stays within the frozen bounds
+And Save, Cancel, and Send remain visible and reachable throughout
+
 ## Feature: Rollout and closeout (R9)
 
 ### ★ Scenario: Flag-off is coherent
@@ -188,13 +238,13 @@ And no hidden task mutation or new relay remains active
 
 ### ★ Scenario: Accessibility matrix passes
 Given narrow and normal sidebar/editor widths, keyboard-only use, 200% zoom, high contrast, and reduced motion
-When I inspect confirmation, queued, running, needs-user, failed, and completed states
+When I inspect the composer resize handle, the `@` picker, confirmation, queued, running, needs-user, failed, and completed states
 Then status is readable, non-color-only, focusable, and does not cover the document text
 
 ### ★ Scenario: Sprint closes without regressions
 Given all requirement-linked tests, manual scenarios, docs, and repository QA pass
 When Sprint 117 closes
-Then #156 is satisfied, the 23 findings are resolved or explicitly deferred, and the parent tracker records evidence
+Then #156 and #281 are satisfied, the 23 findings are resolved or explicitly deferred, and the parent tracker records evidence
 
 ## Negative and Hostile Paths
 

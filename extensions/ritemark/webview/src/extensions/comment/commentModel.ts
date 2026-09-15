@@ -23,6 +23,19 @@ export const ALIAS_TO_AGENT_ID: Record<CommentAgentAlias, string> = {
   opencode: 'opencode',
 }
 
+/**
+ * Human label for an alias — the one place a runtime is spelled for display
+ * (Sprint 117 D10). Previously every surface kept its own copy (the Comments
+ * menu had a private `AGENT_LABEL`), which is how two surfaces start disagreeing
+ * about the same agent. The `@alias` picker, the Send captions, and the menu's
+ * per-agent groups all read this map.
+ */
+export const ALIAS_LABEL: Record<CommentAgentAlias, string> = {
+  claude: 'Claude',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+}
+
 // A note assigned to an agent starts with `@alias`; the colon is optional so
 // both `@claude: fix this` and `@claude fix this` assign (matches the compose
 // placeholder "… or @claude to assign"). Case-insensitive. The `(?=$|[\s:])`

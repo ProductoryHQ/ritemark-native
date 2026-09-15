@@ -42,6 +42,47 @@ assert.equal(
 )
 assert.match(roundTrip('<!--\nfirst line\nsecond line\n-->'), /first line\nsecond line/, 'multi-line keeps its line breaks')
 
+// ---- stable id carrier for standalone notes (Sprint 117 D3) ----
+{
+  const ID = '44444444-4444-4444-8444-444444444444'
+  const md = `<!-- {id:${ID}} @claude Add a short summary at the top of this section -->`
+  const html = mdToHtml(md)
+  assert.ok(html.includes(`data-comment-id="${ID}"`), 'the {id:…} token becomes data-comment-id')
+  assert.ok(
+    html.includes('data-note="@claude Add a short summary at the top of this section"'),
+    'the id token is metadata — it never becomes part of the note the user reads',
+  )
+  assert.ok(html.includes('data-agent="claude"'), 'assignment is still derived from the body, not the token')
+  assert.equal(norm(roundTrip(md)), norm(md), 'an identified standalone note round-trips byte-for-byte')
+}
+{
+  // Multi-line body behind an id token keeps its line breaks and its id.
+  const ID = '55555555-5555-4555-8555-555555555555'
+  const md = `<!-- {id:${ID}} A multi-line note\nthat keeps its line break\nand has no assignment -->`
+  const out = roundTrip(md)
+  assert.match(out, new RegExp(`\\{id:${ID}\\}`), 'the id survives a multi-line body')
+  assert.match(out, /A multi-line note\nthat keeps its line break/, 'line breaks survive the id token')
+  assert.ok(!/data-agent/.test(mdToHtml(md)), 'an unassigned note stays unassigned')
+}
+
+// ---- a legacy document without ids loads and saves unchanged ----
+{
+  const md = 'Intro paragraph.\n\n<!-- @claude Add a short summary at the top of this section -->\n\nBody paragraph that the note refers to loosely.\n\n<!-- Plain note without an assignment -->'
+  assert.ok(!/data-comment-id/.test(mdToHtml(md)), 'opening a legacy document invents no ids')
+  assert.equal(norm(roundTrip(md)), norm(md), 'a legacy document round-trips unchanged (no forced upgrade on open)')
+}
+
+// ---- a body that merely LOOKS like an id token is ordinary text ----
+{
+  const md = '<!-- {id:not-a-uuid} keep these braces -->'
+  assert.ok(!/data-comment-id/.test(mdToHtml(md)), '{id:not-a-uuid} is not an id')
+  assert.ok(
+    mdToHtml(md).includes('data-note="{id:not-a-uuid} keep these braces"'),
+    'the braces stay in the note body',
+  )
+  assert.equal(norm(roundTrip(md)), norm(md), 'and they round-trip untouched')
+}
+
 // ---- code fence must NOT be converted (the Sprint 72 blocker) ----
 {
   const html = mdToHtml('```\n<!-- not a comment -->\n```')
@@ -107,5 +148,13 @@ assert.equal(stripAgentMentions('Väike kommentaar siia! @claude'), 'Väike komm
 // ---- terminator guard ----
 assert.equal(hasCommentTerminator('oops --> broken'), true, 'a `-->` body is flagged')
 assert.equal(hasCommentTerminator('fine note'), false, 'a clean body is not flagged')
+assert.equal(hasCommentTerminator('{id:x} oops --> broken'), true, 'the guard sees through an id token')
+{
+  // The rejection matters because the carrier cannot hold it: the tokenizer
+  // stops at the FIRST `-->`, so the tail would silently leave the comment.
+  const html = mdToHtml('<!-- note --> tail -->')
+  assert.ok(html.includes('data-note="note"'), 'the body ends at the first terminator')
+  assert.ok(!html.includes('data-note="note --> tail"'), 'a `-->` body cannot be stored, hence the input-time guard')
+}
 
 console.log('commentRoundTrip.test.ts — all assertions passed')

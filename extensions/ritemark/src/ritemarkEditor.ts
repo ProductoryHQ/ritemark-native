@@ -25,6 +25,9 @@ import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
 import { canonicalMarkdownProjection, ensureTrailingNewline } from './editorSync/state';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
+import { resolveProjectScope } from './conversations/projectScope';
+import type { CommentTaskProjectionV1 } from './commentTasks/types';
+import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -70,15 +73,26 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private static activeWebviews: Set<vscode.Webview> = new Set();
 
   /**
-   * Sprint 105 (#165): push a comment-task status update to every open editor
-   * webview. Each editor filters by its own documentPath, so broadcasting is
-   * safe and avoids a path→webview registry.
+   * Sprint 117 (#292): editor webviews indexed by the document they render.
+   *
+   * The path this replaces broadcast every comment-task status message to every
+   * open editor and relied on each consumer filtering perfectly by a relative
+   * display path (audit F13) — which meant the same relative path in two windows
+   * could show each other's status. A projection now reaches exactly the
+   * editors showing that canonical URI, and nothing else.
    */
-  public static broadcastCommentTaskStatus(payload: {
-    documentPath: string; commentIds: string[]; status: 'queued' | 'running' | 'done' | 'failed' | 'cleared';
-  }): void {
-    for (const webview of RitemarkEditorProvider.activeWebviews) {
-      webview.postMessage({ type: 'comment:task-status', ...payload }).then(undefined, () => {});
+  private static commentTaskWebviews: Map<string, Set<vscode.Webview>> = new Map();
+
+  /** Push one document's complete task snapshot to its own editors. */
+  public static publishCommentTaskProjection(
+    documentUri: string,
+    tasks: CommentTaskProjectionV1[],
+  ): void {
+    const webviews = RitemarkEditorProvider.commentTaskWebviews.get(documentUri);
+    if (!webviews) { return; }
+    for (const webview of webviews) {
+      webview.postMessage({ type: 'comment-task/projection', documentUri, tasks })
+        .then(undefined, () => {});
     }
   }
 
@@ -107,6 +121,30 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     RitemarkEditorProvider._wordCountStatusBar.text = '0 words';
     RitemarkEditorProvider._wordCountStatusBar.tooltip = 'Word count';
     context.subscriptions.push(RitemarkEditorProvider._wordCountStatusBar);
+
+    // Sprint 117 (D4): a rename inside Ritemark moves a document's tasks with
+    // it. Nothing else follows — an external move or delete leaves the records
+    // bound to the old URI, where they simply stop projecting and expire by
+    // retention rather than being guessed onto some other file.
+    context.subscriptions.push(
+      vscode.workspace.onDidRenameFiles(async (event) => {
+        const ext = require('./extension') as typeof import('./extension');
+        const store = ext.commentTaskStore;
+        if (!store) { return; }
+        for (const { oldUri, newUri } of event.files) {
+          try {
+            const moved = await store.renameSource(
+              oldUri.toString(),
+              newUri.toString(),
+              vscode.workspace.asRelativePath(newUri, false),
+            );
+            if (moved > 0) { await ext.commentTaskController?.publish(newUri.toString()); }
+          } catch (error) {
+            console.warn('[commentTasks] Could not follow a rename:', error);
+          }
+        }
+      }),
+    );
 
     return vscode.window.registerCustomEditorProvider(
       RitemarkEditorProvider.viewType,
@@ -558,6 +596,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Add this webview to active set for AI tool broadcasts
     RitemarkEditorProvider.activeWebviews.add(webview);
+    // …and to the per-document index, so comment-task projections reach only
+    // the editors actually showing this document (Sprint 117, audit F13).
+    const commentTaskKey = document.uri.toString();
+    const documentWebviews = RitemarkEditorProvider.commentTaskWebviews.get(commentTaskKey) ?? new Set<vscode.Webview>();
+    documentWebviews.add(webview);
+    RitemarkEditorProvider.commentTaskWebviews.set(commentTaskKey, documentWebviews);
 
     // Show word count status bar only for markdown files
     const fileType = this.getFileType(document.uri.fsPath);
@@ -597,6 +641,24 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
 
+        // Sprint 117 (#292): every comment-task request goes to the ONE host
+        // controller, which answers this exact webview. The editor holds no task
+        // state of its own any more.
+        if (typeof message.type === 'string' && message.type.startsWith('comment-task/')) {
+          void this.handleCommentTaskRequest(document, webview, message);
+          return;
+        }
+
+        // Sprint 117 (#292): the recovery buttons on a rejected comment task.
+        // The editor webview cannot reach the sidebar's own sign-in surfaces,
+        // so it asks the host to open them. Deliberately NOT under the
+        // `comment-task/` prefix — it is not a task request and must not go
+        // through the controller's decoder.
+        if (message.type === 'comment:recover') {
+          void RitemarkEditorProvider.runCommentRecovery(message.recovery, message.alias);
+          return;
+        }
+
         // Gate all dictation messages with a single check
         if (message.type.startsWith('dictation:') && !isEnabled('voice-dictation')) {
           // Don't respond to stop/cancel with error - prevents infinite loop
@@ -611,6 +673,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'ready':
             // Legacy/non-editable viewers do not participate in document sync.
             webview.postMessage(this.buildLoadMessage(document, webview));
+            // Comment status is reconstructed from the host ledger, not from
+            // webview memory that a reload just threw away (audit F15).
+            void RitemarkEditorProvider.publishCommentTasksFor(document);
             return;
 
           case 'searchWorkspaceFiles':
@@ -728,23 +793,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Open settings to configure API key
             vscode.commands.executeCommand('workbench.action.openSettings', 'ritemark.openaiApiKey');
             return;
-
-          case 'comment:send-to-ai': {
-            // Sprint 94 (#81): relay an agent-assigned comment to the AI sidebar.
-            // Sprint 105 (#164/#165): carry the stable comment ids + document
-            // path so the sidebar can correlate queue/task status back here.
-            // Lazy require avoids a load-time circular import with ./extension.
-            const agentId = message.agentId as string | undefined;
-            const prompt = message.prompt as string | undefined;
-            if (agentId && prompt) {
-              const ext = require('./extension') as typeof import('./extension');
-              ext.unifiedViewProvider?.submitCommentPrompt(agentId, prompt, {
-                commentIds: Array.isArray(message.commentIds) ? message.commentIds as string[] : undefined,
-                documentPath: vscode.workspace.asRelativePath(document.uri, false),
-              });
-            }
-            return;
-          }
 
           case 'wordCountChanged':
             // Update word count in status bar
@@ -885,6 +933,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Remove from active set using stored reference
       RitemarkEditorProvider.activeWebviews.delete(webview);
+      const remaining = RitemarkEditorProvider.commentTaskWebviews.get(commentTaskKey);
+      if (remaining) {
+        remaining.delete(webview);
+        if (remaining.size === 0) { RitemarkEditorProvider.commentTaskWebviews.delete(commentTaskKey); }
+      }
       imageWatcher.dispose();
       this.documentSync.disposeView(document, webview);
 
@@ -893,6 +946,72 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         RitemarkEditorProvider._wordCountStatusBar?.hide();
       }
     });
+  }
+
+  /**
+   * Describe the document for the comment-task controller.
+   *
+   * Identity is the canonical URI plus the project scope id, never the relative
+   * display path the old dispatch stamped — that string can name two different
+   * files in two windows (audit F10). The display path rides along as a label
+   * for the prompt and the runtime's active-file context.
+   */
+  /**
+   * Sprint 117 (#292): open the surface a rejected comment task pointed at.
+   * `sign-in` is runtime-specific; `configure` and `install` both land in AI
+   * settings, which is where every runtime's key and binary live.
+   */
+  private static async runCommentRecovery(recovery: unknown, alias: unknown): Promise<void> {
+    const command =
+      recovery === 'sign-in' && alias === 'claude' ? 'ritemark.claudeLogin' :
+      recovery === 'sign-in' && alias === 'codex' ? 'ritemark.codexLogin' :
+      recovery === 'sign-in' || recovery === 'configure' || recovery === 'install' ? 'ritemark.aiSettings' :
+      null;
+    if (!command) return;
+    try {
+      await vscode.commands.executeCommand(command);
+    } catch (error) {
+      console.warn('[commentTasks] Recovery command failed:', command, error);
+    }
+  }
+
+  private static commentTaskDocumentFor(document: vscode.TextDocument): CommentTaskDocument {
+    const scope = resolveProjectScope({
+      workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,
+      folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),
+      platform: process.platform,
+    });
+    return {
+      uri: document.uri.toString(),
+      scopeId: scope.scopeId,
+      scope: scope.descriptor,
+      displayPath: vscode.workspace.asRelativePath(document.uri, false),
+      version: document.version,
+      text: document.getText(),
+      isDirty: document.isDirty,
+    };
+  }
+
+  /** Send this document's task snapshot to its editors, if the ledger exists. */
+  private static async publishCommentTasksFor(document: vscode.TextDocument): Promise<void> {
+    // Lazy require avoids a load-time circular import with ./extension.
+    const ext = require('./extension') as typeof import('./extension');
+    await ext.commentTaskController?.publish(document.uri.toString());
+  }
+
+  private async handleCommentTaskRequest(
+    document: vscode.TextDocument,
+    webview: vscode.Webview,
+    message: { type: string; requestId?: unknown },
+  ): Promise<void> {
+    const ext = require('./extension') as typeof import('./extension');
+    const controller = ext.commentTaskController;
+    if (!controller) { return; }
+    const result = await controller.handleRequest(
+      message,
+      RitemarkEditorProvider.commentTaskDocumentFor(document),
+    );
+    void webview.postMessage(result);
   }
 
   private updateDocument(document: vscode.TextDocument, content: string): void {

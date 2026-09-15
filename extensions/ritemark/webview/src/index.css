@@ -335,7 +335,13 @@ body {
   overflow: hidden;
 }
 
-/* the right-margin rail */
+/* the right-margin rail
+   Sprint 117 R10: the gutter is width-aware. `width` comes from the component
+   (210 / 40 / 26 px by container width) so a COLLAPSED marker always fits in
+   the free margin beside the 900px text column and never covers text. The
+   expanded bubble is absolutely positioned inside its item, with its own width
+   and a downward offset at the two narrow densities, so it opens BELOW the
+   marker instead of over the line it annotates. Never a negative offset. */
 .rm-comment-rail {
   position: absolute;
   top: 0;
@@ -344,6 +350,7 @@ body {
   z-index: 6;
   pointer-events: none;
 }
+.rm-comment-rail[data-density="compact"] { right: 2px; }
 .rm-rail-item { position: absolute; right: 0; width: 100%; pointer-events: auto; }
 
 .rm-marker {
@@ -356,16 +363,28 @@ body {
   box-shadow: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
 }
 .rm-marker:hover { border-color: var(--ritemark-hairline-strong, #cbd5e1); }
+.rm-marker:focus-visible { outline: 2px solid var(--r-accent, #4338ca); outline-offset: 2px; }
 .rm-marker-ico { color: #f59e0b; flex: none; display: inline-flex; }
 .rm-marker-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* No preview text below the wide breakpoint — the marker shrinks to icon +
+   status dot rather than pushing itself over the text column. */
+.rm-comment-rail[data-density="medium"] .rm-marker,
+.rm-comment-rail[data-density="compact"] .rm-marker {
+  justify-content: center; gap: 3px; padding: 5px 2px;
+}
+.rm-comment-rail[data-density="medium"] .rm-task-dot,
+.rm-comment-rail[data-density="compact"] .rm-task-dot { margin-left: 0; }
 
 .rm-bubble {
+  position: absolute; right: 0; top: 0;
+  box-sizing: border-box;
   background: var(--ritemark-surface, #fff);
   border: 1px solid var(--ritemark-hairline, #e2e8f0);
   border-radius: 10px; padding: 10px 11px;
   box-shadow: 0 8px 24px -6px rgba(30,27,75,0.18);
   transform-origin: top right; animation: rmBubbleIn 150ms cubic-bezier(0.22,0.61,0.36,1);
 }
+.rm-bubble button { cursor: pointer; }
 @keyframes rmBubbleIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .rm-bubble { animation: none; } }
 
@@ -428,32 +447,63 @@ body {
 .rm-grow { flex: 1; }
 .rm-bubble-del { background: transparent; border: none; color: var(--ritemark-ink-faint, #94a3b8); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
 .rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
+/* Mark as done: the same action as Delete, but on a finished task it is a
+   completion, not a discard — so it hovers green rather than red. */
+.rm-bubble-done:hover { color: #15803d; background: rgba(21,128,61,0.10); }
 .rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
 
-/* compose bubble (create flow) */
+/* compose bubble (create flow)
+   Sprint 117 R10: the field resizes vertically between a two-row floor and a
+   min(8 rows, 40vh) ceiling — the bounds arrive as custom properties from
+   ResizableComposer. The footer is a SIBLING of the field, so Cancel / Comment
+   / Send never scroll away however tall the note gets. */
+.rm-composer-field { position: relative; }
 .rm-compose-input {
-  width: 100%; box-sizing: border-box; resize: none;
+  width: 100%; box-sizing: border-box;
+  resize: vertical;
+  min-height: var(--rm-composer-min, calc(2.9em + 16px));
+  max-height: var(--rm-composer-max, min(calc(11.6em + 16px), 40vh));
+  overflow-y: auto;
   border: 1px solid var(--ritemark-hairline-strong, #cbd5e1); border-radius: 6px;
   padding: 7px 9px; font-family: var(--ritemark-editor-font-family); font-size: 13px;
   color: var(--ritemark-ink-strong, #1e1b4b); background: var(--ritemark-surface, #fff); line-height: 1.45;
 }
 .rm-compose-input:focus { outline: none; border-color: var(--ritemark-indigo, #4338ca); box-shadow: 0 0 0 4px rgba(67,56,202,0.10); }
 .rm-compose-err { margin-top: 5px; font-size: 11px; color: #ef4444; }
-.rm-compose-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-.rm-btn-ghost, .rm-btn-primary {
-  font-family: var(--ritemark-ui-font-family); font-size: 11.5px; font-weight: 600;
-  border-radius: 6px; padding: 5px 11px; cursor: pointer; border: 1px solid transparent; line-height: 1;
-}
-.rm-btn-ghost { background: transparent; color: var(--ritemark-ink-muted, #64748b); }
-.rm-btn-ghost:hover { color: var(--ritemark-ink-body, #475569); background: var(--ritemark-surface-soft, #f1f5f9); }
-.rm-btn-primary { background: var(--ritemark-indigo, #4338ca); color: #fff; box-shadow: 0 4px 6px -1px rgba(67,56,202,0.25); }
-.rm-btn-primary:hover { background: var(--ritemark-indigo-deep, #3730a3); }
-.rm-btn-primary:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.rm-compose-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
-/* Send-to-AI action in an assigned comment bubble (Gate B) */
-.rm-bubble-foot { display: flex; justify-content: flex-end; margin-top: 9px; }
-.rm-send { display: inline-flex; align-items: center; gap: 5px; }
-.rm-send:disabled { opacity: 1; background: var(--ritemark-indigo-deep, #3730a3); cursor: default; }
+/* the agent shown explicitly while composing */
+.rm-agent-pill {
+  display: inline-flex; align-items: center; border-radius: 999px;
+  background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
+  padding: 2px 8px; font-size: 11px; font-weight: 600;
+  font-family: var(--ritemark-ui-font-family);
+}
+
+/* `@` agent picker — floats ABOVE the field so it can never cover the footer */
+.rm-mention-pop {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
+  z-index: 40; margin: 0; padding: 4px; list-style: none;
+  max-height: 132px; overflow-y: auto;
+  background: var(--ritemark-surface, #fff);
+  border: 1px solid var(--ritemark-hairline-strong, #cbd5e1); border-radius: 8px;
+  box-shadow: 0 8px 24px -6px rgba(30,27,75,0.22);
+  font-family: var(--ritemark-ui-font-family);
+}
+.rm-mention-opt {
+  display: flex; align-items: baseline; gap: 6px; cursor: pointer;
+  padding: 5px 7px; border-radius: 6px; font-size: 12px;
+  color: var(--ritemark-ink-body, #475569);
+}
+.rm-mention-opt[data-active="true"] {
+  background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
+}
+.rm-mention-opt-alias { font-weight: 600; }
+.rm-mention-opt-label { color: var(--ritemark-ink-muted, #64748b); }
+.rm-mention-opt[data-active="true"] .rm-mention-opt-label { color: inherit; }
+
+/* Send / Open conversation / recovery actions in a comment bubble */
+.rm-bubble-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 9px; }
 
 /* edit-comment button — indigo hover (distinct from the red delete) */
 .rm-bubble-edit:hover { color: var(--ritemark-indigo, #4338ca); background: var(--ritemark-indigo-soft, #e0e7ff); }
@@ -472,7 +522,10 @@ body {
   color: var(--ritemark-dark-indigo, #818cf8);
 }
 
-/* ── Sprint 105 (#165): comment task status — marker dot + bubble line ── */
+/* ── Sprint 117 (#292): comment task projection — marker dot, status line,
+   destination, and the bounded completion reply. Tone is colour ONLY; every
+   state also carries a glyph and a sentence from commentTaskCopy.ts, so none
+   of this is colour-only (R9). ── */
 .rm-task-dot {
   flex: 0 0 auto;
   width: 7px;
@@ -480,18 +533,53 @@ body {
   border-radius: 999px;
   margin-left: 4px;
 }
-.rm-task-dot--queued  { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-warning); }
-.rm-task-dot--running { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
-.rm-task-dot--done    { background: var(--r-success); }
-.rm-task-dot--failed  { background: var(--r-error); }
+.rm-task-dot--idle      { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-ink-faint, #94a3b8); }
+.rm-task-dot--progress  { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
+.rm-task-dot--attention { background: var(--r-warning); }
+.rm-task-dot--success   { background: var(--r-success); }
+.rm-task-dot--error     { background: var(--r-error); }
 @keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .rm-task-dot--progress { animation: none; } }
 
 .rm-task-status {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.3;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 6px;
+  font-family: var(--ritemark-ui-font-family);
+  font-size: 11.5px;
+  line-height: 1.35;
+  word-break: break-word;
 }
-.rm-task-status--queued  { color: var(--r-warning); }
-.rm-task-status--running { color: var(--r-accent); }
-.rm-task-status--done    { color: var(--r-success); }
-.rm-task-status--failed  { color: var(--r-error); }
+.rm-task-glyph { flex: none; font-size: 10px; line-height: inherit; }
+.rm-task-status--idle      { color: var(--r-ink-muted, #64748b); }
+.rm-task-status--progress  { color: var(--r-accent); }
+.rm-task-status--attention { color: var(--r-warning); }
+.rm-task-status--success   { color: var(--r-success); }
+.rm-task-status--error     { color: var(--r-error); }
+
+/* which conversation the task went to / will go to */
+.rm-task-dest {
+  margin-top: 3px;
+  font-family: var(--ritemark-ui-font-family);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--r-ink-muted, #64748b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the completion summary — two visually truncated lines, full text in the DOM */
+.rm-task-reply {
+  margin: 5px 0 0;
+  font-family: var(--ritemark-editor-font-family);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ritemark-ink-body, #475569);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
