@@ -4,7 +4,7 @@
 **Status:** Draft — prepared, not approved, no branch created<br>
 **Branch after approval:** `sprint-118-transcribe-recording`<br>
 **Issue:** Pending release mapping<br>
-**Release:** [v1.11.0](../release-plan.md)
+**Release:** [v1.12.0](../release-plan.md)
 
 ## Goal
 
@@ -42,7 +42,7 @@ After Sprint 118, a user can start and stop a microphone recording from the Tran
 3. Accessible Transcribe recording controls and permission/error guidance.
 4. Normal library/session integration through the existing path-driven pipeline.
 5. Automated lifecycle tests and real-device macOS/Windows capture evidence.
-6. Architecture, Transcribe user guide, changelog, and v1.11.0 release-note updates.
+6. Architecture, Transcribe user guide, changelog, and v1.12.0 release-note updates.
 
 ## Definition of Done
 
@@ -57,7 +57,7 @@ After Sprint 118, a user can start and stop a microphone recording from the Tran
 
 ## Dependencies and Gates
 
-- v1.11.0 must be mapped and the sprint approved before branch creation.
+- v1.12.0 must be mapped and the sprint approved before branch creation.
 - Phase 0 must decide file format, chunk size, duration/storage warnings, pause semantics, destination/fallback path, and interrupted-file policy before implementation.
 - Microphone permission behavior must be verified in dev and packaged app contexts; no shell/patch assumption is accepted without evidence.
 - The existing dictation controller is reference code only. Its transcribe-and-delete/drop-while-busy behavior must not be reused as a recording sink.
@@ -108,6 +108,6 @@ Add an experimental, default-on `transcribe-direct-recording` flag as a code-lev
 ## Planning Approval
 
 - [ ] Jarmo approves scope and Phase 0 questions.
-- [ ] GitHub issue is created and assigned to milestone `v1.11.0`.
+- [ ] GitHub issue is created and assigned to milestone `v1.12.0`.
 - [ ] SDD artifacts and feature-flag decision are approved.
 - [ ] Dedicated branch is created after approval.

@@ -1,6 +1,6 @@
 # Sprint 118 Spec — Direct Transcribe Recording
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.11.0](../release-plan.md) · **Issue:** pending · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** pending · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
 
 ## Purpose
 

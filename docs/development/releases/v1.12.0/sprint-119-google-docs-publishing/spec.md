@@ -1,6 +1,6 @@
 # Sprint 119 Spec — Publish to Google Docs
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.11.0](../release-plan.md) · **Issue:** pending · **Evidence:** [current-state audit](./research/current-state-audit.md), [Google API contract audit](./research/google-api-contract-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** pending · **Evidence:** [current-state audit](./research/current-state-audit.md), [Google API contract audit](./research/google-api-contract-audit.md)
 
 ## Purpose
 
