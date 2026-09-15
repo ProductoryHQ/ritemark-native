@@ -29,9 +29,9 @@ export const REPORT_COPY = {
   contextLabel: 'Included with your report',
 
   /** Actions. Named for what happens, not for a delivery we cannot see. */
-  primaryAction: 'Open email to report',
+  primaryAction: 'Open email',
   cancelAction: 'Cancel',
-  copyAction: 'Copy report',
+  copyAction: 'Copy report',  // lives beside the report text, not in the footer
   copiedAction: 'Copied',
 
   /** After the mail handler was opened. */
@@ -44,12 +44,12 @@ export const REPORT_COPY = {
    * they must still end up with a complete, copyable report.
    */
   fallbackTitle: 'No email app is set up on this computer',
-  fallbackDetail: `Copy the report below and email it to ${REPORT_RECIPIENT} yourself.`,
+  fallbackDetail: `Use Copy report above, then email it to ${REPORT_RECIPIENT} yourself.`,
   fallbackRecipientLabel: 'Send to',
 
   /** Shown when the report is too long for a mail handler to carry safely. */
   tooLongTitle: 'This report is too long to open in an email app',
-  tooLongDetail: `Copy it below and email it to ${REPORT_RECIPIENT} yourself, so nothing is cut off.`,
+  tooLongDetail: `Use Copy report above and email it to ${REPORT_RECIPIENT} yourself, so nothing is cut off.`,
 } as const;
 
 /**

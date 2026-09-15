@@ -153,6 +153,13 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
               rows={7}
               className="w-full resize-y rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)] p-2.5 text-[12px] leading-relaxed text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
             />
+            <button
+              type="button"
+              onClick={copy}
+              className="mt-1.5 bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+            >
+              {copied ? REPORT_COPY.copiedAction : REPORT_COPY.copyAction}
+            </button>
           </section>
 
           {handedOver && (
@@ -182,10 +189,11 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
           )}
         </DialogBody>
 
+        {/* Two buttons, not three. The sidebar is ~300px wide and a third
+            control forced every label to wrap to four lines. Copy belongs
+            beside the report text anyway — it acts on the text, it is not a
+            peer of the primary action. */}
         <DialogFooter>
-          <DialogButton variant="secondary" onClick={copy}>
-            {copied ? REPORT_COPY.copiedAction : REPORT_COPY.copyAction}
-          </DialogButton>
           <DialogButton variant="secondary" onClick={() => onOpenChange(false)}>
             {REPORT_COPY.cancelAction}
           </DialogButton>
