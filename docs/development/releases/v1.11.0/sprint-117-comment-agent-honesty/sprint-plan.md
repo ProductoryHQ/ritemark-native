@@ -1,7 +1,7 @@
 # Sprint 117 — Comment-to-Agent Honesty
 
 **Track:** Full SDD<br>
-**Status:** Phase 0 frozen and approved 2026-09-14 — full scope; absorbs v1.12.0 Sprint 121 ([#281](https://github.com/ProductoryHQ/ritemark-native/issues/281)). Branch `sprint-117-comment-agent-honesty` from main `d0328249`. Implementation authorized: Jarmo approved the destination decision explicitly and delegated the remaining Phase 0 decisions ("ülejäänud sprindi otsustes usaldan sind").<br>
+**Status:** **Closed 2026-09-15.** Merged via [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293); [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292), [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) and [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) closed with it. Full scope, absorbing v1.12.0 Sprint 121. Validated on a running dev instance; the five defects that surfaced there are listed in the PR and fixed on the branch.<br>
 **Branch:** `sprint-117-comment-agent-honesty` (worktree `.claude/worktrees/sprint-117-comment-agent-honesty`)<br>
 **Issue:** [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292), published 2026-09-14 under milestone `v1.11.0`; absorbs [#156](https://github.com/ProductoryHQ/ritemark-native/issues/156) and [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281), both moved to that milestone<br>
 **Release:** [v1.11.0](../release-plan.md)
