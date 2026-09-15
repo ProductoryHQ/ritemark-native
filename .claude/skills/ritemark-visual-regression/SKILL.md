@@ -14,6 +14,17 @@ Run ten completed end-to-end tests in the real desktop UI. Prefer a small finish
 - Use `macos-screenshots` for final evidence and inspect every screenshot before reporting a visual pass.
 - For a release candidate, keep the `release-process` gates authoritative. This skill can block a release but cannot clear a release gate by itself.
 
+## Windows host
+
+`computer-use` and `macos-screenshots` do not exist there. The proven equivalent (v1.10.1 RC, 2026-09-10):
+
+- Launch the installed RC a second time with its own port and profile: `Ritemark.exe --remote-debugging-port=9225 --user-data-dir=<scratch profile> <disposable workspace>`. The user's own window stays untouched, and a fresh profile gives a signed-out Claude state for free. This counts as an app launched with a dedicated debugging port.
+- Drive it with CDP `Input.dispatchMouseEvent`, `Input.dispatchKeyEvent` and per-character typing, never DOM `.click()` or `execCommand`. Only real input proves which user action created a dirty state.
+- Webview elements need page coordinates: add the webview `<iframe>` offset in the workbench, the `#active-frame` offset, and the element rect. Match the iframe by its `vscode-webview://<id>` segment. A title match is not enough, because "Ritemark" (the editor) and "Ritemark AI" share a prefix.
+- In Git Bash, prefix every command whose arguments may start with `/` with `MSYS_NO_PATHCONV=1`. Otherwise a typed `/table` arrives as `C:/Program Files/Git/table`, straight inside the document.
+- Capture evidence with `Page.captureScreenshot` and keep it in the session scratchpad, not `/tmp`.
+- Count line endings at byte level. Git Bash `grep` strips `CR`, so `grep | cat -A` reports LF for a CRLF file.
+
 ## Test identity and isolation
 
 Before editing, record:
@@ -30,14 +41,14 @@ Use a disposable or explicitly approved project. Create all material under one c
 Complete these tests in order, adapting document names and copy to the user's project:
 
 1. Open the intended project and confirm the editor, File Browser, and AI sidebar render.
-2. Create a QA folder and a Markdown document through File Browser.
+2. Create a QA folder and a Markdown document through File Browser. Click into the new editor before typing. After the inline name box closes, focus can stay in the File Browser tree, and keystrokes then go to tree navigation instead of the document.
 3. In the empty file, type `# ` before any body text, finish the H1, and confirm it renders as H1.
 4. Create an H2 and a bulleted or numbered list; confirm keyboard continuation and exit behavior.
 5. Insert a task list through the slash menu, add at least two items, and check one item.
 6. Insert and fill a 3x3 table using Tab navigation.
 7. Save explicitly; confirm no disk-conflict or stale-file warning appears.
 8. Create a second document, use multiple tabs, then close and reopen the first document.
-9. Inspect model, permission, and effort controls; when AI access is available, run one read-only active-document request and confirm completion without file edits.
+9. Inspect model, permission, and effort controls; when AI access is available, run one read-only active-document request and confirm completion without file edits. A disabled effort control carrying the tooltip "This model chooses its own thinking effort." is correct, not a failure. When the release touches agent runtimes or editor sync, add one write task on the open document: the change must appear in that editor without reopening, with no conflict or "changed on disk" warning, and only that file may change.
 10. Execute the round-trip gate below and compare both UI and disk state.
 
 If a product area is unavailable, replace it with a comparable real-user action and record the substitution. Do not count a planned or partially executed case as completed.
@@ -65,6 +76,8 @@ For task lists, assert all of these:
 - an unrelated edit does not normalize task items into ordinary bullets.
 
 Any silent content or structural loss is a release blocker.
+
+`textContent` concatenates across `<br>`, so a hard break reads as merged words. Inspect `innerHTML` or the editor JSON before calling a paragraph merged. A soft line break coming back as a two-space hard break on save is known source rewriting ([#270](https://github.com/ProductoryHQ/ritemark-native/issues/270)). Record it, but do not count it as a new failure.
 
 ## Failure-envelope regression protocol
 
@@ -102,6 +115,8 @@ For each test, keep a concise result: `PASS`, `FAIL`, or `BLOCKED`, the user act
 - final results document.
 
 Visually open every screenshot used as evidence. Do not infer a visual pass from accessibility text alone. Use accessibility state and raw files as additional deterministic evidence.
+
+An agent turn is complete only when a standalone `Done` line is present, no Stop button is shown, and the composer is back at its idle placeholder. Progress labels such as `Done: commandExecution` also contain the word "Done". Run file-hash checks after that terminal state, never while the agent may still be working.
 
 Check the editor tab's dirty marker at three points: it should be present after a user edit, absent after an explicit save, and must not reappear merely because a saved file was closed and reopened. Record an unexpected dirty marker even when document content is preserved.
 
