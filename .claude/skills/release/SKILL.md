@@ -311,22 +311,34 @@ diff "$T/feed.txt" <(grep -v ' update-feed.json$' "$T/local.txt")   # must print
 cmp dist/update-feed.json "$T/feed-versioned.json"                    # must print nothing
 gh api repos/$REPO/releases/latest --jq .tag_name                     # this tag, unless a newer release shipped since
 
-# Build-time sidecars must name the same hashes as the recomputed list.
-# The Windows *-setup.sha256.txt is written by PowerShell with CRLF, so strip
-# CR or every hash from it carries a trailing \r and never matches.
+# Build-time sidecars — CROSS-CHECK ONLY, not a gate. create-dmg.sh writes each
+# .dmg.sha256 BEFORE notarize-dmg.sh staples the ticket into the DMG, and
+# stapling changes the DMG's bytes — so on the standard flow the sidecars are
+# pre-staple and will NOT match the published (stapled) DMG. A "differs" line
+# here is expected, not a block. The Windows *-setup.sha256.txt is PowerShell
+# CRLF, so strip CR before comparing.
 for h in $(cat dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/*-setup.sha256.txt | tr -d '\r'); do
-  grep -q "^$h " "$T/local.txt" && echo "ok       $h" || echo "MISSING  $h"
+  grep -q "^$h " "$T/local.txt" && echo "matches published    $h" || echo "differs (pre-staple?) $h"
 done
 ```
 
-Any diff line, a `MISSING`, a `cmp` difference, or a version absent from the
-feed means the published release is not the built release. Stop, report, and
-clear nothing — the local copy may be the only correct one. A `null` digest
-means GitHub has not computed one for that asset: download it and hash it
-locally instead of skipping the check. (Validated against v1.10.1 on
-2026-09-14: every diff empty, feed byte-identical, all three sidecars matched.)
+The **blocking** checks are the three diffs: local `dist/` vs GitHub's published
+digests, the canonical feed vs local, and `dist/update-feed.json` vs the
+published feed. Any non-empty diff, a `cmp` difference, or a version absent from
+the feed means the published release is not the built release — stop, report,
+and clear nothing; the local copy may be the only correct one. A `null` digest
+means GitHub has not computed one for that asset yet: download it and hash it
+locally instead of skipping the check.
 
-`published.txt` is closeout evidence; keep `$T` until 10.2 has copied it.
+The sidecar loop is only a cross-check. Because create-dmg.sh writes the sidecar
+before notarize-dmg.sh staples, a `differs` line on the standard flow is normal
+and never blocks — the digest and feed diffs above already prove the published
+bytes equal the local bytes. (v1.10.1, built the non-standard `ditto`/`hdiutil`
+way, happened to match on 2026-09-14 with every blocking diff empty and the feed
+byte-identical.)
+
+`published.txt` is the authoritative published-hash record; keep `$T` until 10.2
+has copied it.
 
 #### 10.2 Archive the evidence that exists only locally
 
@@ -348,11 +360,11 @@ W=<absolute path of the release worktree>
 E=docs/releases/v$V/evidence
 mkdir -p "$E/win32-roundtrip"
 cp "$W/dist/update-feed.json" "$E/"
-cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"
+cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"   # build-time (pre-staple) hashes
 cp "$W"/dist/win32-roundtrip-evidence/*result.json "$E/win32-roundtrip/"
 cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
 cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
-cp "$T/published.txt" "$E/published-assets.txt"
+cp "$T/published.txt" "$E/published-assets.txt"   # authoritative post-staple published hashes
 ```
 
 What is deliberately left out:
