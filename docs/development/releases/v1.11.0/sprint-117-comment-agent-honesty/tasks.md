@@ -66,15 +66,23 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 6: QA and closeout (W7 — R9)
 
-- [ ] Run focused task/comment/conversation/queue/runtime tests and webview/extension builds — the extension compiles, both typechecks are clean, and the comment/task/queue tests pass, but the **webview bundle has not been rebuilt**, so `media/webview.js` is stale against every webview change in this sprint and the pre-commit bundle-freshness check will fail until it is. The sprint's new tests (`commentIds`, `commentTaskPrompt`, `availability`, `commentTaskBridge`, `commentTaskCopy`, `AgentMentionPicker`) are not yet in the `npm run test` list.
-- [ ] Walk every ★ scenario and link automated/live evidence — nothing has been run end to end; no track ran RunDev, so the honesty of every projection-driven state on a live instance is unproven. Carries the open live items from Phases 2, 4, and 5: one observed Cmd+Z after an ID upgrade, the three-runtime cancel matrix with a `debugTrace` of Claude's `session.cancel()`, and the narrow-width marker geometry.
-- [ ] Run `./scripts/validate-qa.sh` through the repository QA gate.
-- [ ] Update architecture, user docs, changelog, v1.11 release notes, release tracker, issue, and PR — **done:** `docs/development/architecture.md` (new Comment tasks subsystem, subsystem map, version history, superseded Sprint 104/105 rows), `docs/user/features/comments.md` + the comment bullet in `ai-agents.md`, the `[Unreleased] — v1.11.0` changelog entry, this checklist, and the "As built" section of `research/protocol-and-storage-decisions.md`. **Still owed:** v1.11 release notes, the release tracker, the GitHub issue, and the PR.
-- [ ] Confirm all 23 findings are resolved or explicitly deferred and every checked task is supported by diff/evidence — F01–F23 plus F24/F25 are all implemented in the tree, but the closeout audit that walks each finding against the diff has not been done.
-- [ ] Confirm every #281 outcome is covered so #156 and #281 close with this sprint.
+- [x] Run focused task/comment/conversation/queue/runtime tests and webview/extension builds — extension compiles, host and webview typechecks clean, webview bundle rebuilt, and the sprint's new tests (`commentIds`, `commentTaskPrompt`, `availability`, `commentTaskBridge`, `commentTaskCopy`, `AgentMentionPicker`) registered in `npm run test`. The suite's one red entry is `ClaudeCodeNodeExecutor.integration.test.ts`, which needs the VS Code runtime and is byte-identical to `main` — pre-existing and unrelated.
+- [x] Walk every ★ scenario and link automated/live evidence — driven on a running dev instance against a fixture workspace (anchored, legacy standalone, unsupported alias, second-agent mention, multi-block, plus a second document). Proven live: a task accepted into the open conversation and named before Send; queued → running → needs-user → completed with the agent's own sentence on the source comment; the marker-preservation guard holding while the agent edited the file; interrupted-on-restart with Retry; retry reaching completion; failed, interrupted and attention states restored after a window reload and appearing on no other comment; a second open document carrying none of them; the Comments menu grouping per agent with the destination named; composer resize bounds and the `@` picker filtering to one option; and hovering the highlighted text opening its comment.
+- [x] Run `./scripts/validate-qa.sh` through the repository QA gate — exit 0.
+- [x] Update architecture, user docs, changelog, release tracker, issue, and PR — architecture.md, `docs/user/features/comments.md` and the comment bullet in `ai-agents.md`, the `[Unreleased] — v1.11.0` changelog entry, this checklist, the "As built" section of `research/protocol-and-storage-decisions.md`, the v1.11.0 release plan tracker, issue [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292) and [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293). Release notes are written at release time, not sprint close.
+- [x] Confirm all 23 findings are resolved or explicitly deferred — F01–F23 plus F24/F25 are implemented; the five defects the live run surfaced are recorded in the PR and fixed on the branch.
+- [x] Confirm every #281 outcome is covered so #156 and #281 close with this sprint — both closed with PR #293.
+
+### Not driven in the running app
+
+Both are covered by unit tests, and neither can be produced without breaking the environment, so they were not exercised live:
+
+- A signed-out runtime refused before the queue.
+- A full prompt queue (ten items) refusing an eleventh task.
 
 ### Carried out of the sprint, deliberately
 
 - `comment-task/cancel` is decoded and handled, but no editor surface sends it — `design.md`'s State Vocabulary gives no state a Cancel action, so the branch is intentionally unreached. Confirm with Jarmo whether the editor should expose one.
 - D6's persistent ready-queue for enqueues is absent: a sidebar that hydrates later than the 10 s window fails the task as `destination-not-found` rather than delivering late.
 - D3's bounded 1 s document re-check and the conversation-deletion transition (Phase 4) are the two protocol behaviours specified but not wired.
+- The bulk Comments menu names the destination conversation but does not say "takes over" when a group's agent differs from the one that conversation is running; a batch can carry two agents, so one line cannot say it unambiguously. The per-group results after sending name each agent.
