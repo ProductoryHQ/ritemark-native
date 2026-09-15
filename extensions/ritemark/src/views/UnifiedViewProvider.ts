@@ -5,6 +5,8 @@
 
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
+import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
+import { openReportMail } from '../reporting/reportTransport';
 import {
   getAPIKeyManager,
   apiKeyChanged,
@@ -144,6 +146,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * prevent those results from hydrating the replacement view.
    */
   private _viewGeneration = 0;
+
+  /**
+   * Set when the report window is requested before the webview can hear it —
+   * the status bar item works from launch, while the sidebar may not exist
+   * yet. Sprint 117 lost a message to exactly this race (audit F25), so the
+   * request waits for `sidebar/ready` instead of being fired blindly.
+   */
+  private _pendingOpenReport = false;
   private _hydratedViewGeneration = 0;
   private _legacySidebarViewGeneration = 0;
   private readonly _sidebarStatusRevisions: Record<AgentId | 'discovery', number> = {
@@ -434,6 +444,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
           if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          if (this._pendingOpenReport) {
+            this._pendingOpenReport = false;
+            void this._view?.webview.postMessage({ type: 'report/open' });
+          }
           break;
 
         case 'conversation/active':
@@ -441,6 +455,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             typeof message.conversationId === 'string' ? message.conversationId : null,
           );
           break;
+
+        case 'report/open-mail': {
+          // Sprint 126 (RQ3). The host hands the report to a mail client and
+          // learns nothing more; the outcome it reports back is about the
+          // handoff, never about delivery.
+          const request = decodeReportMailMessage(message);
+          if (!request) {
+            void this._view?.webview.postMessage(reportResult('invalid-request', ''));
+            break;
+          }
+          const outcome = await openReportMail(request, {
+            openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
+          });
+          void this._view?.webview.postMessage(reportResult(outcome, request.body));
+          break;
+        }
 
         case 'comment-task/enqueue-result':
         case 'comment-task/dequeued': {
@@ -1365,6 +1395,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (this._view) {
       this._view.show(true);
     }
+  }
+
+  /**
+   * Reveal the sidebar and open the report window (Sprint 126, RQ1).
+   *
+   * Both entry points land here — the status bar item and the AI Information
+   * dialog — so there is one window with one implementation. If the webview is
+   * not listening yet, the request is held and flushed on `sidebar/ready`.
+   */
+  public async openReportWindow(): Promise<void> {
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    this._view?.show(true);
+    if (this._view) {
+      void this._view.webview.postMessage({ type: 'report/open' });
+      return;
+    }
+    this._pendingOpenReport = true;
   }
 
   // ── Comment tasks (Sprint 117) ─────────────────────────────────────────────
