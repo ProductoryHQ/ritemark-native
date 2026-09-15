@@ -141,11 +141,28 @@ Two consequences that are now requirements, not preferences:
 
 **Triage owner:** the Ritemark team monitors `info@productory.eu` (Jarmo, 2026-09-15). This is the answer to the finding's "owned receiving/triage process"; it should be stated in the reviewer reproduction instructions.
 
+## R2 — surface scope (Jarmo, 2026-09-15)
+
+Two anchor points, not seven:
+
+1. **The conversation turn in the AI sidebar.** One attachment covers Claude Code, Codex and OpenCode, because all three share the turn model (`AgentConversationTurn.id`, `CodexConversationTurn.id`; OpenCode carries provenance as a field on the Codex shape, `store.ts:736`). This is where live generative content actually is, and `turnId` is the only identity that survives a reload, so it is also the only sane granularity without plumbing `eventId` through the projection.
+2. **The AI Information dialog**, already mounted in the composer (`ChatInput.tsx:1459`, `:1507`). Ritemark already talks to the user about AI there; it is the natural place to also say where to report it, and it gives the action a fixed, surface-independent home — which is what "discoverable" asks for.
+
+Out of scope, with reasons: Transcribe insights (no per-item id — `InsightsRail.tsx:28-33`), Flows execution output (ephemeral panel state, reset at `ExecutionPanel.tsx:172`), generated images (provenance lost at the file boundary), AI-generated conversation titles, and comment-task summaries.
+
+### No feature-flag change is needed — and none should be made
+
+The scope above was initially paired with a proposal to promote `comment-callouts` and `durableAgentConversations` to `stable` for the Store build. On checking, that is both unnecessary and not possible as stated:
+
+- **There is no separate Store build.** The submitted package is `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` — the same artifact as the public direct download. "Stable in the Store build" would mean stable for every user, which is a product change, not a packaging switch.
+- **Neither flag gates the chosen surfaces.** `durableAgentConversations` feeds only `conversationCutover.resolve(...)` (`UnifiedViewProvider.ts:258`), which decides *where* conversations are persisted; the transcript renders on either path. `comment-callouts` gates the comment rail, which is out of scope.
+
+So the report action is unconditionally visible wherever the AI sidebar is, with no flag work. The three runtime flags it does depend on — `agentic-assistant`, `codex-integration`, `opencode-integration` — are already `stable`.
+
 ## Decisions this audit cannot make
 
-R4 is decided. R2's recipient, content policy, consent model, transport and triage owner are decided. What remains open is the surface scope below, plus R1 and R3, which need Partner Center.
+R4 and R2 are both fully decided. What remains are R1 and R3, which need Partner Center access.
 
-4. **Is the reporting action required on experimental-flag surfaces?** `comment-callouts` and `durableAgentConversations` are both experimental, i.e. user-disableable. If the submitted build must expose reporting unconditionally, either those surfaces are out of R2 scope or the flags change for the Store build.
 5. **Does transcription count as generative content** for 11.16 — voice dictation and Transcribe segments?
 6. **R1 and R3 need Partner Center.** The live StoreLogo2 asset must be identified before replacement artwork is prepared — the plan's own warning that a repository logo is not evidence of the live asset stands, and the audit could not check it from the repo. Freemium copy likewise needs the saved listing text.
 
