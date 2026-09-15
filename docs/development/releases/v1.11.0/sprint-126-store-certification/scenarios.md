@@ -4,20 +4,22 @@
 
 ## Feature: Report entry points (RQ1)
 
-### ★ Scenario: Reporting is reachable from a completed turn
-Given the AI sidebar has at least one completed assistant turn
-When the user looks at that turn
-Then a report control is present, keyboard reachable, and carries an accessible name stating it reports the output
+### ★ Scenario: Reporting is reachable from the status bar on any screen
+Given Ritemark is open with the AI sidebar closed and no conversation started
+When the user looks at the status bar
+Then a report item is present immediately right of the AI status indicator
+And activating it reveals the AI panel and opens the report window
 
-### ★ Scenario: Reporting is reachable with no turn at all
-Given a fresh conversation with no assistant output yet
-When the user opens AI Information from the composer
-Then a report entry is present there
+### ★ Scenario: Reporting is reachable from AI Information
+Given the composer is visible
+When the user opens AI Information
+Then a report entry is present there, keyboard reachable, with an accessible name stating what it does
+And it opens the same window the status bar item opens
 
-### Scenario: All three runtimes expose the same control
-Given completed turns produced by Claude Code, by Codex and by OpenCode
-When the user inspects each turn
-Then the same report control appears on each, with identical wording and behaviour
+### Scenario: No per-turn control is introduced
+Given the transcript contains completed turns from Claude Code, Codex and OpenCode
+When the user inspects those turns
+Then no per-turn report control is present, because reporting is reached from the status bar and AI Information
 
 ### Scenario: No user setting can remove the entry points
 Given a user who has disabled analytics and every experimental feature available to them
@@ -26,25 +28,25 @@ Then both report entry points are still present and functional
 
 ## Feature: The composition window (RQ2)
 
-### ★ Scenario: The user sees the exact bytes before anything leaves
-Given the user reports a specific assistant turn
+### ★ Scenario: The window opens empty and nothing is harvested
+Given the user has a long conversation open, in a named workspace, with a document open
 When the composition window opens
-Then it shows the reported output and the context lines of RQ5 as editable text
-And no content is carried that the window does not display
+Then the body is empty and only the context lines of RQ5 are present
+And no conversation content, document content, workspace name or file path appears anywhere in it
 
-### ★ Scenario: The user removes something private before reporting
-Given the composition window is open with the model output pre-filled
-When the user deletes a sentence from the field and proceeds
-Then only the remaining text is carried
+### ★ Scenario: The user pastes the output and edits it before reporting
+Given the composition window is open
+When the user pastes model output into the body, removes a sentence from it, and proceeds
+Then exactly the remaining text is carried
 
 ### Scenario: Cancelling leaves nothing behind
 Given the composition window is open
 When the user cancels
 Then nothing is transmitted, no mail client opens, and no draft is retained
 
-### Scenario: Reporting from AI Information opens an empty body
-Given the user opens the report entry from AI Information with no turn in context
-Then the context lines are present and the body is empty for the user to describe the problem
+### Scenario: Both entry points open the same window in the same state
+Given the report window is opened from the status bar, and separately from AI Information
+Then both show the same context lines, the same empty body and the same actions
 
 ## Feature: Transport (RQ3)
 
@@ -85,15 +87,15 @@ Then the primary action is labelled with what will happen — the mail app openi
 ## Feature: Payload bounds (RQ5)
 
 ### ★ Scenario: Only the stated fields are present
-Given a report composed from a turn in a long conversation, in a named workspace, with a document open
 When the composed text is inspected
-Then it contains the reported output, the runtime, the model identifier, a timestamp, the Ritemark version and platform, and the user's own text
-And it contains no other turn from that conversation, no document content, no file path, no workspace name
+Then it contains a timestamp, the Ritemark version and platform, and the user's own text
+And nothing else — no conversation, no turn, no document, no file path, no workspace name, no runtime or model identifier
 
 ### ★ Scenario: Credentials never appear
 Given a signed-in runtime with stored credentials and a configured provider key
 When a report is composed
 Then no API key, token or account identifier appears anywhere in it
+And this holds by construction, because the builder is never given them
 
 ### Scenario: The bound is enforced where the payload is built
 Given a caller that passes extra fields to the payload builder

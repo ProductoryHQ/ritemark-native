@@ -20,21 +20,24 @@ Clear all four findings in Microsoft's 2026-09-15 certification report with evid
 
 ### RQ1: Two report entry points, always present (R2)
 
-A user can raise a report from the conversation turn in the AI sidebar, and from the AI Information dialog already mounted in the composer.
+A user can raise a report from the **status bar**, and from the **AI Information dialog** already mounted in the composer. There is no per-turn control.
 
-- The turn-level control covers Claude Code, Codex and OpenCode through one attachment, because all three share the turn model.
-- The AI Information entry is surface-independent: it is reachable whenever the sidebar is, regardless of what is on screen or whether any turn exists yet.
-- Neither entry point is gated by a feature flag a user can switch off. The three runtime flags they depend on are already `stable`, and no flag promotion is part of this sprint.
-- The turn control is keyboard reachable and carries an accessible name that says what it does; it is not an unlabelled icon.
+- A status bar item sits immediately right of the AI status indicator (right-aligned, priority 99 — 101 is the word count, 100 the AI status, 98 the scheduled-tasks item). It is visible on every screen in the app, whether or not the AI sidebar is open and whether or not a conversation exists.
+- Its command reveals the AI panel and opens the report window, so both entry points land in one dialog rather than two implementations.
+- The AI Information entry sits where Ritemark already explains AI to the user — where a reader looking for "how do I complain about this" would go next.
+- Neither entry point is gated by a feature flag a user can switch off, and no flag promotion is part of this sprint.
+- The status bar item carries a `name` and a `tooltip`; the dialog entry is keyboard reachable with an accessible name saying what it does.
+
+**Why not per-turn.** A turn-level control is not required by the finding, which asks for "a discoverable, working user action" without specifying granularity. It would mean a new per-turn action affordance the transcript has never had, attached separately to `AgentResponse` and `CodexTurn` because there is no shared assistant-output component. The status bar is both cheaper and more discoverable: always on screen, and a single answer to a reviewer asking to be shown the mechanism.
 
 ### RQ2: A composition window showing exactly what will be sent (R2)
 
 Choosing to report opens a window containing the report as text, in an **editable** field, before anything leaves Ritemark.
 
-- The field is pre-filled with the reported model output and the minimal context of RQ5.
+- The window opens with the context lines of RQ5 and an **empty body**. The user pastes the output they object to, or describes it.
+- Nothing is harvested automatically. Because neither entry point has a specific output in hand, the reported content is entirely the user's own composition — the strongest available version of "the user sees what is sent".
 - Nothing is included that the field does not show. What the user reads is what is sent, character for character.
-- The user can edit or delete any part of it, and can cancel outright with nothing transmitted and no trace left.
-- Raised from AI Information with no turn in context, the field opens with the context lines and an empty body for the user to describe the problem.
+- The user can edit or delete any part of it, including the context lines, and can cancel outright with nothing transmitted and no trace left.
 
 ### RQ3: `mailto:` first, copy fallback as a first-class state (R2)
 
@@ -54,11 +57,13 @@ The report reaches `info@productory.eu`, monitored by the Ritemark team.
 
 ### RQ5: A bounded, stated payload (R2)
 
-The report carries only: the reported model output, the runtime that produced it, the model identifier, a timestamp, the Ritemark version and platform, and whatever the user writes or edits.
+The report carries only: a timestamp, the Ritemark version and platform, and whatever the user writes or pastes.
 
-It never carries, automatically: the full conversation, the document, file paths, workspace names, API keys, tokens, or account identifiers. The bound is enforced where the payload is built, not by trusting the caller — and a test asserts each excluded category is absent.
+Nothing else is gathered. No conversation, no turn, no document, no file path, no workspace name, no runtime or model identifier, no credential — not because each is filtered out, but because the builder is never given them. The bound is enforced by what the builder accepts, and a test asserts each category is absent from the output.
 
-This reverses the posture `CommentTaskProjectionV1` takes elsewhere (`src/commentTasks/types.ts:206-207` excludes prompt text and content hashes). That exclusion stays in force for every non-report path; the difference here is that the user sees and approves the content.
+Dropping the per-turn entry point simplified this requirement considerably: with no turn in hand there is nothing to harvest, so the privacy contract stops being a filtering problem and becomes a construction one.
+
+The Phase 0 content policy — that a report may carry the offending output — is satisfied by the user pasting it. `CommentTaskProjectionV1`'s exclusion of prompt text and content hashes (`src/commentTasks/types.ts:206-207`) stays in force everywhere, and this sprint adds no automated content extraction anywhere.
 
 ### RQ6: No external acquisition promotion (R4)
 

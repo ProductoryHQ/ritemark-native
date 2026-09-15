@@ -13,9 +13,9 @@
 
 ## Phase 1 — Report composition (W1 — RQ2, RQ5)
 
-- [ ] `composeReport.ts`: turn + context → report text
+- [ ] `composeReport.ts`: context lines + user text → report text. The signature accepts nothing else.
 - [ ] `reportCopy.ts`: every user-visible string in one module
-- [ ] Unit tests: each excluded category (other turns, document content, file paths, workspace name, credentials) asserted absent
+- [ ] Unit tests: each excluded category (conversation content, document content, file paths, workspace name, runtime/model identifiers, credentials) asserted absent
 - [ ] Unit test: a caller passing extra fields has them dropped, not forwarded
 
 ## Phase 2 — Transport (W2 — RQ3, RQ4)
@@ -29,8 +29,9 @@
 ## Phase 3 — UI (W3 — RQ1, RQ2, RQ4)
 
 - [ ] `ReportDialog.tsx` on `ui/dialog.tsx`, with the editable body and the fallback state
-- [ ] Turn-level control in `AgentResponse.tsx` and `CodexView.tsx`
-- [ ] Entry in `AIInformation.tsx`
+- [ ] `reportStatusBar.ts`: item at right/priority 99, plus the command that reveals the AI panel and opens the window
+- [ ] Entry in `AIInformation.tsx`, opening the same window in the same state
+- [ ] Verify status bar order on a narrow window: word count, AI status, report, scheduled tasks
 - [ ] Accessibility: keyboard reach, accessible names, dialog focus handling, 200% zoom, minimum sidebar width
 - [ ] Styles in `index.css`, brand font, `cursor: pointer` on everything clickable
 
@@ -43,7 +44,7 @@
 
 ## Phase 5 — Evidence and closeout (W5 — RQ7, RQ8)
 
-- [ ] Packaged-app Windows evidence: report raised from each runtime, mail handler present and absent
+- [ ] Packaged-app Windows evidence: report raised from the status bar and from AI Information, mail handler present and absent
 - [ ] Freemium classification and listing text saved in Partner Center — **Jarmo**
 - [ ] Replacement artwork for the identified `StoreLogo2`, and every other image checked — **Jarmo, his own work; the sprint produces no Store imagery**
 - [ ] Reviewer reproduction instructions, naming `info@productory.eu` and its monitoring by the Ritemark team
@@ -56,6 +57,7 @@
 
 - A backend ingestion service, report history, or in-app report status.
 - Reporting on Transcribe insights, Flows output, generated images, conversation titles, comment-task summaries.
+- A per-turn report control, and any change to the transcript components.
 - Any feature-flag promotion, and any Store-specific build variant.
 - Moderation or classification of reported content.
 

@@ -6,11 +6,13 @@
 
 Two independent changes that share nothing but the release.
 
-**Reporting (RQ1–RQ5)** is a webview feature with a thin host edge. The webview composes the report text and owns the window; the host owns the two things a webview cannot do — opening a mail handler and telling the webview whether one exists. One new message pair crosses the boundary; no runtime touches it, because by the time a report is raised the content is already a rendered turn and its runtime is a field on that turn.
+**Reporting (RQ1–RQ5)** is a webview dialog reached two ways, with a thin host edge. The host owns the status bar item, the command behind it, and the two things a webview cannot do — opening a mail handler and reporting whether one exists. The webview owns the window and composes the text. No runtime touches any of it.
 
 **Acquisition promotion (RQ6)** is two text edits inside `patches/vscode/`. No TypeScript in `extensions/ritemark/` changes.
 
-The audit established the constraint that shapes the first: there is **no shared assistant-output component** and **no per-message action row** in the transcript today. `RenderedMarkdown` takes `{ content, className }` and also renders user text, so it cannot be the anchor. The report control therefore attaches at the turn components — `AgentResponse` for Claude, `CodexTurn` for Codex and OpenCode — and this sprint introduces the first per-turn action affordance.
+The transcript is deliberately untouched. Dropping the per-turn control removed the need to introduce a per-turn action affordance — something the transcript has never had — and to attach it separately to `AgentResponse` and `CodexTurn`, since there is no shared assistant-output component to anchor to (`RenderedMarkdown` takes `{ content, className }` and also renders user text). The status bar item is always on screen, which is a better answer to "discoverable" than a control that only exists once a turn does.
+
+It also collapses the payload problem. With no turn in hand, the builder is never given conversation content, so RQ5 is enforced by construction rather than by filtering.
 
 ## Host files
 
@@ -18,7 +20,9 @@ The audit established the constraint that shapes the first: there is **no shared
 |---|---|
 | `src/reporting/reportTransport.ts` | New. Resolves whether a mail handler exists and opens it. Sole owner of the `mailto:` URL construction and its encoding limits. |
 | `src/reporting/protocol.ts` | New. Typed inbound message + result, validated field by field, in the shape `src/commentTasks/protocol.ts` established. |
-| `src/views/UnifiedViewProvider.ts` | Wire the message pair. No other behaviour. |
+| `src/reporting/reportStatusBar.ts` | New. The status bar item at right/priority 99 — between the AI status (100) and the scheduled-tasks item (98) — plus its command, which reveals the AI panel and asks the webview to open the report window. |
+| `src/views/UnifiedViewProvider.ts` | Wire the message pair and the open-report request. No other behaviour. |
+| `package.json` | Contribute the command. |
 
 `mailto:` length is the one real hazard: handlers and the OS truncate long URLs, silently. `reportTransport` measures the encoded URL and, above a conservative bound, returns the fallback outcome instead of opening a handler that would drop the body. The fallback is a first-class state (RQ3), so this degrades into a supported path rather than an error.
 
@@ -29,8 +33,7 @@ The audit established the constraint that shapes the first: there is **no shared
 | `webview/src/components/ai-sidebar/reporting/composeReport.ts` | New. Pure builder: turn + context → report text. Where RQ5's bound is enforced; unit-tested against each excluded category. |
 | `webview/src/components/ai-sidebar/reporting/ReportDialog.tsx` | New. The composition window: editable body, primary action, cancel, and the fallback state with the address and Copy. |
 | `webview/src/components/ai-sidebar/reporting/reportCopy.ts` | New. Every user-visible string, so RQ4's language is assertable in one test rather than scattered across JSX. |
-| `AgentResponse.tsx`, `CodexView.tsx` | Add the turn-level control. |
-| `AIInformation.tsx` | Add the surface-independent entry. |
+| `AIInformation.tsx` | Add the report entry. |
 | `index.css` | Styles for the new control and dialog. |
 
 Using `ui/dialog.tsx` (shadcn) is mandatory per CLAUDE.md — no hand-rolled modal. The primary action uses `ui/button.tsx`.
@@ -41,13 +44,13 @@ Using `ui/dialog.tsx` (shadcn) is mandatory per CLAUDE.md — no hand-rolled mod
 Confirm the audit against the current `main`, and confirm in Partner Center which asset `StoreLogo2` actually is before any artwork is prepared. Blocks W4.
 
 ### W1 — Report composition (RQ2, RQ5)
-`composeReport.ts` and `reportCopy.ts`. Payload bound enforced at construction with negative tests per excluded category. No UI yet — the builder is testable alone and is where the privacy contract lives.
+`composeReport.ts` and `reportCopy.ts`. The builder accepts only a timestamp, version and platform, and the user text — so the bound is its signature, not a filter. Negative tests per excluded category still run, to catch a later caller widening it. No UI yet.
 
 ### W2 — Transport (RQ3, RQ4)
 `reportTransport.ts`, `protocol.ts`, the provider wiring, and the URL-length bound that degrades to the fallback. Host tests run without VS Code, in the pattern `CommentTaskController.test.ts` uses.
 
 ### W3 — UI (RQ1, RQ2, RQ4)
-`ReportDialog.tsx`, the turn-level control on both turn components, the AI Information entry, styles, and accessibility: keyboard reach, accessible names, focus handling in the dialog.
+`ReportDialog.tsx`, the status bar item and its command, the AI Information entry, styles, and accessibility: keyboard reach, accessible names, focus handling in the dialog. Both entry points open the same window in the same state; there is one implementation, not two.
 
 ### W4 — Acquisition promotion (RQ6)
 Patch the three `scm.missing.*` strings and the two welcome-page launch checks. Add the applicability check that fails loudly on an upstream drift. Independent of W1–W3 and can run in parallel.
