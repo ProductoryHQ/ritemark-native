@@ -159,6 +159,19 @@ test('runtime files do not duplicate capability prose (single source)', () => {
   }
 });
 
+// The reply on a comment is not something the agent writes into the file — the
+// host lifts the turn's final text, strips it and caps it at MAX_SUMMARY_CHARS
+// (280). An agent that ends with a code block or "Done." therefore produces a
+// useless comment reply through no fault of its own, unless it is told.
+test('tells agents their closing message becomes the comment reply', () => {
+  for (const text of [claude, codex, acp]) {
+    assert.ok(/FINAL message of that turn becomes the reply/.test(text), 'names where the reply comes from');
+    assert.ok(text.includes('280'), 'gives the real character budget');
+    assert.ok(/not a bare `Done`/.test(text), 'rules out the empty closing line');
+    assert.ok(/Clearing a comment is the user's action/.test(text), 'leaves resolution to the user');
+  }
+});
+
 // ── R7: single-source structural property (S7.2) ────────────────────────────
 // Claude and Codex renders differ ONLY in the edit-tool name; every capability
 // section flows to both from one function, so a new section reaches all runtimes.

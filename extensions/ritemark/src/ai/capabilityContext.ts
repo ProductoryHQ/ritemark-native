@@ -81,6 +81,8 @@ const SECTIONS: CapabilitySection[] = [
         '- Do NOT write `///` to make a comment: `///` is a live-editor input shortcut only; written into the file it stays literal text. Use the `<!-- … -->` or `<mark data-comment>` forms above.',
         '- When you rewrite surrounding prose, preserve any existing `<!-- … -->` blocks and `<mark data-comment …>` wrappers verbatim, including their `data-comment-id` and `data-agent` attributes and any leading `{id:…}` token inside a `<!-- … -->` note — dropping a comment loses the user\'s note, and dropping only its identity detaches it from agent work already running on it.',
         '- Never invent an `{id:…}` token or a `data-comment-id`, and never copy one from another comment. Ritemark assigns them; a note you write yourself simply has none.',
+        '- When the user assigns you a comment, your FINAL message of that turn becomes the reply shown on the comment itself, under their note. Ritemark drops fenced code blocks and images from it, flattens links and formatting to plain text, and keeps roughly the first 280 characters — so finish with one or two plain sentences saying what you did and where, not a code block, not a bulleted summary, and not a bare `Done`.',
+        '- Do NOT write that reply into the document, and do NOT delete or resolve the comment when you are finished. Clearing a comment is the user\'s action.',
       ].join('\n'),
   },
   {
