@@ -125,23 +125,26 @@ This reverses the posture `CommentTaskProjectionV1` takes for comment tasks (`sr
 
 **Editable, not just previewable.** The field is an input, so a user who wants to report an output while removing something private from it can. That makes the minimisation requirement the user's own action rather than a heuristic we have to write.
 
-### Still open: transport
+### Transport: `mailto:` with a copy fallback (Jarmo, 2026-09-15)
 
 The recipient is fixed; how bytes reach it is not, and it decides whether the mechanism survives review.
 
 - **`mailto:`** — no backend, works today, recipient is a real monitored mailbox. But Ritemark cannot confirm delivery, so the copy must say "your mail app will open" and never "sent" — the sprint DoD already requires this (`sprint-plan.md`, "the UI never claims delivery when it only opens a compose window"). The risk is a reviewer on a clean Windows 11 VM with no mail account configured: the action would appear to do nothing.
 - **An owned HTTP endpoint** — delivers regardless of the reviewer's machine and can be confirmed in the UI. Costs a small ingestion service; `ritemark-cloud` is the obvious host.
 
-A combination is the cheapest way to be honest and still always work: open `mailto:` when a handler exists, and when it does not, show the address with a Copy button and the report text ready to paste. The action then always does something visible, and Ritemark never claims a delivery it cannot observe.
+**Decision:** `mailto:` as the primary path, with a copy fallback when no mail handler is available — the address shown alongside the report text and a Copy button, ready to paste. No backend service is built.
 
-**Not decided here.** Whoever decides must also name the triage owner and the response expectation — "a discoverable, working user action, with an owned receiving/triage process" is the finding's wording, and an unread mailbox does not satisfy it.
+Two consequences that are now requirements, not preferences:
+
+1. **Ritemark never says "sent".** It can observe that it handed the report to a mail client; it cannot observe delivery. The copy says the mail app will open, and the fallback says plainly that the report must be pasted and sent by the user. This is the sprint DoD's existing rule and the transport makes it binding.
+2. **The fallback is not an error path.** A reviewer on a clean Windows VM with no mail account must still reach a complete, visible, copyable report — that case is the one most likely to be tested, so it is a first-class state with its own test, not a catch block.
+
+**Triage owner:** the Ritemark team monitors `info@productory.eu` (Jarmo, 2026-09-15). This is the answer to the finding's "owned receiving/triage process"; it should be stated in the reviewer reproduction instructions.
 
 ## Decisions this audit cannot make
 
-R4 is decided — see the decision table above. R2's recipient, content policy and consent model are decided above; its transport is open. What follows is the rest.
+R4 is decided. R2's recipient, content policy, consent model, transport and triage owner are decided. What remains open is the surface scope below, plus R1 and R3, which need Partner Center.
 
-1. **Who reads `info@productory.eu` for these, and how fast?** The address is decided; the triage owner and response expectation are not.
-2. **Transport** — see above.
 4. **Is the reporting action required on experimental-flag surfaces?** `comment-callouts` and `durableAgentConversations` are both experimental, i.e. user-disableable. If the submitted build must expose reporting unconditionally, either those surfaces are out of R2 scope or the flags change for the Store build.
 5. **Does transcription count as generative content** for 11.16 — voice dictation and Transcribe segments?
 6. **R1 and R3 need Partner Center.** The live StoreLogo2 asset must be identified before replacement artwork is prepared — the plan's own warning that a repository logo is not evidence of the live asset stands, and the audit could not check it from the repo. Freemium copy likewise needs the saved listing text.
