@@ -113,12 +113,35 @@ The closest structural neighbour is the **AI Information** disclosure already mo
 
 ---
 
+## R2 — decisions taken (Jarmo, 2026-09-15)
+
+| Question | Decision |
+|---|---|
+| Where does a report go? | `info@productory.eu` — the same public contact already approved and saved in the Store listing. |
+| May the report carry the offending output? | Yes. |
+| How is that safe? | The user reviews it before it is sent: a simple window showing the content that will be included, in an editable field. Nothing leaves without being seen. |
+
+This reverses the posture `CommentTaskProjectionV1` takes for comment tasks (`src/commentTasks/types.ts:206-207` deliberately excludes prompt text and content hashes). The difference is consent: a comment task's projection is machine-to-machine and the user never sees it, whereas a report is user-initiated, user-reviewed and user-edited. The exclusion rule stays in force everywhere else.
+
+**Editable, not just previewable.** The field is an input, so a user who wants to report an output while removing something private from it can. That makes the minimisation requirement the user's own action rather than a heuristic we have to write.
+
+### Still open: transport
+
+The recipient is fixed; how bytes reach it is not, and it decides whether the mechanism survives review.
+
+- **`mailto:`** — no backend, works today, recipient is a real monitored mailbox. But Ritemark cannot confirm delivery, so the copy must say "your mail app will open" and never "sent" — the sprint DoD already requires this (`sprint-plan.md`, "the UI never claims delivery when it only opens a compose window"). The risk is a reviewer on a clean Windows 11 VM with no mail account configured: the action would appear to do nothing.
+- **An owned HTTP endpoint** — delivers regardless of the reviewer's machine and can be confirmed in the UI. Costs a small ingestion service; `ritemark-cloud` is the obvious host.
+
+A combination is the cheapest way to be honest and still always work: open `mailto:` when a handler exists, and when it does not, show the address with a Copy button and the report text ready to paste. The action then always does something visible, and Ritemark never claims a delivery it cannot observe.
+
+**Not decided here.** Whoever decides must also name the triage owner and the response expectation — "a discoverable, working user action, with an owned receiving/triage process" is the finding's wording, and an unread mailbox does not satisfy it.
+
 ## Decisions this audit cannot make
 
-R4 is decided — see the decision table above. What follows is R2, R1 and R3.
+R4 is decided — see the decision table above. R2's recipient, content policy and consent model are decided above; its transport is open. What follows is the rest.
 
-1. **Where does a report go, and who reads it?** Not answerable from code. PostHog is the only existing transport and fails all three tests above. Until the recipient and triage owner are fixed, R2's UX cannot be specified. This is the single biggest blocker in Sprint 126.
-2. **May a report carry the offending output?** The codebase currently leans hard the other way: `CommentTaskProjectionV1` deliberately excludes prompt text and content hashes (`src/commentTasks/types.ts:206-207`). Sending content is a new privacy posture and needs an explicit decision plus consent UX.
+1. **Who reads `info@productory.eu` for these, and how fast?** The address is decided; the triage owner and response expectation are not.
+2. **Transport** — see above.
 4. **Is the reporting action required on experimental-flag surfaces?** `comment-callouts` and `durableAgentConversations` are both experimental, i.e. user-disableable. If the submitted build must expose reporting unconditionally, either those surfaces are out of R2 scope or the flags change for the Store build.
 5. **Does transcription count as generative content** for 11.16 — voice dictation and Transcribe segments?
 6. **R1 and R3 need Partner Center.** The live StoreLogo2 asset must be identified before replacement artwork is prepared — the plan's own warning that a repository logo is not evidence of the live asset stands, and the audit could not check it from the repo. Freemium copy likewise needs the saved listing text.
