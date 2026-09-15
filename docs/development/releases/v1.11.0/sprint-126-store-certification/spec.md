@@ -74,6 +74,8 @@ Ritemark tells the user that Git or Node is missing and does not offer to obtain
 - Pricing classification changes from Free to Freemium, and the listing text accurately describes that AI features may require the user's own paid third-party account. No Ritemark subscription or payment feature is invented.
 - The **live** `StoreLogo2` asset is identified in Partner Center before any replacement is prepared. A repository logo is not evidence of what is published. Every other submitted image is checked for the same non-Windows imagery.
 
+**The image track is Jarmo's own work** (2026-09-15): identifying the live asset, producing the replacement artwork, and uploading it. The sprint does not generate Store imagery and does not block on it — the implementation work is RQ1-RQ6, and RQ7's artwork half runs alongside on Jarmo's side. No task here should be read as authorizing anyone else to produce or replace Store art.
+
 ### RQ8: Evidence a reviewer can reproduce (R1–R4)
 
 Each finding has its own evidence, owned separately: packaged-app reproduction for RQ1–RQ6, saved Partner Center state for RQ7. The reviewer instructions name `info@productory.eu` and say the Ritemark team monitors it, because the finding asks for an owned receiving process and an unattended mailbox does not satisfy it.

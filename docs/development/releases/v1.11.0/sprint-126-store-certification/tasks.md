@@ -7,7 +7,7 @@
 - [x] Audit the generative surfaces and the acquisition promotions — [research/phase-0-audit.md](./research/phase-0-audit.md)
 - [x] Decide recipient, content policy, consent model, transport, triage owner, surface scope
 - [x] Establish that no feature-flag change is needed and that there is no separate Store build
-- [ ] Identify the live `StoreLogo2` asset in Partner Center and record it with dimensions — **Jarmo; blocks Phase 4**
+- [ ] Identify the live `StoreLogo2` asset in Partner Center and record it with dimensions — **Jarmo, his own work.** Blocks the resubmission, not Phases 1-4: the code track does not wait on it.
 - [ ] Capture the saved listing text that describes AI usage, for the Freemium rewrite — **Jarmo**
 - [ ] Jarmo approves this specification package
 
@@ -45,7 +45,7 @@
 
 - [ ] Packaged-app Windows evidence: report raised from each runtime, mail handler present and absent
 - [ ] Freemium classification and listing text saved in Partner Center — **Jarmo**
-- [ ] Replacement artwork for the identified `StoreLogo2`, and every other image checked — **Jarmo**
+- [ ] Replacement artwork for the identified `StoreLogo2`, and every other image checked — **Jarmo, his own work; the sprint produces no Store imagery**
 - [ ] Reviewer reproduction instructions, naming `info@productory.eu` and its monitoring by the Ritemark team
 - [ ] `docs/microsoft-store-submission/` updated with final asset mapping and dated evidence
 - [ ] `docs/CHANGELOG.md` and the v1.11.0 release notes
