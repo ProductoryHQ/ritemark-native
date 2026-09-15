@@ -25,21 +25,30 @@ Select text, drop a note in the right margin, and keep your writing clean — th
 3. Ritemark highlights the selected passage and opens a note card in the right margin
 4. Type your note in the card
 
-The highlighted anchor and the margin note stay linked — hover the margin to see the note at any time.
+The highlighted anchor and the margin note stay linked. Hovering either one opens the comment — the highlighted text in the document as well as its marker in the margin.
 
 ### Standalone margin notes
 
 Type `///` anywhere in your document and press Enter (or Space) to insert a standalone margin note. No text selection needed. Good for reminders or questions that aren't tied to one specific phrase.
 
+In the raw Markdown a standalone note looks like this:
+
+```markdown
+<!-- {id:6f1e9f0c-1c2a-4a6b-8f21-9a0f0b7c5d31} Rephrase this -->
+```
+
+The `{id:…}` token is Ritemark's, not part of your note. It never appears in the editor and is not sent to the agent as instruction text — it is how a task that is already running keeps pointing at this exact note while you edit around it. Leave it alone; if you delete it by hand, Ritemark can no longer connect that note to its task.
+
 ### Writing the note
 
-- The note box **resizes**. Drag the bottom-right corner to make it taller — it stops at about eight lines so the buttons never scroll out of reach. **Cancel**, **Save**, and **Send** always stay visible.
+- The note box **resizes**. Drag the bottom-right corner to make it taller — it stops at eight lines, or 40% of the window height if that is smaller, so the buttons never scroll out of reach. **Cancel** and **Comment** sit outside the scrolling area and stay reachable at any height. The height you drag to is kept for the rest of the session; a new window starts at two lines again.
 - Typing **`@`** opens the list of agents straight away. Keep typing to narrow it, use the arrow keys to move, **Enter** or **Tab** to insert, **Escape** to close without inserting — or just click one. The chosen agent is shown in the note while you write and on the comment after you save.
 
 ### Editing and deleting comments
 
 - **Edit** — click the margin marker to open the note; edit the text directly
 - **Delete** — hover the margin marker and click the trash icon; the margin note is removed and the highlighted anchor returns to plain text
+- **Mark as done** — once a comment's task has finished, the trash icon becomes a checkmark labelled **Mark as done**. It is the same action under a truer name: the comment is cleared from the document. Clearing a comment is always your decision — an agent never removes a marker itself
 
 ---
 
@@ -65,7 +74,7 @@ A **Send to Claude** (or Codex, or OpenCode) button appears on the comment. Abov
 
 - The line above the Send button names that conversation, so you always know before you press it. If nothing is open yet, it says **New conversation**.
 - If that conversation is busy, your task waits in its queue and runs next.
-- If it belongs to a different agent, the task still goes there and runs as the agent you mentioned.
+- If that conversation is running a different agent, the task still goes there and runs as the agent you mentioned — the same runtime switch the sidebar composer offers. The line above the Send button says so before you press it, by adding **· Claude takes over** (or Codex, or OpenCode).
 - Once sent, the task stays with that conversation. Switching to another conversation afterwards does not move it.
 
 ### Sending several at once
@@ -76,7 +85,7 @@ Each group answers for itself, as its answer arrives:
 
 ```text
 ✓ Claude · 2 queued → Release note review
-! Codex · Sign in required            [Sign in]
+! Codex · Codex is signed out. Sign in and try again.   [Sign in]
 ```
 
 You never get a blanket "all sent" when only one group was accepted.
@@ -92,11 +101,24 @@ The comment shows its own task's state — never another comment's, and never th
 | **Claude is working** | The agent is on it right now. |
 | **Needs your input** | The agent asked a question, wants a plan reviewed, or needs permission. Open the conversation to answer. |
 | **Claude completed this task** | Finished, with a short summary underneath. |
-| **Task failed · …** | It did not run. The reason is shown in plain words, with **Retry** — and, where it helps, **Sign in** or **Open settings**. |
+| **Task failed · …** | It ran and did not finish. The reason is shown in plain words, with **Retry** and **Open conversation**. |
 | **Task cancelled** | You stopped the run in the AI sidebar. **Retry** sends it again. |
-| **Task interrupted…** | The app closed, or the agent stopped, before the work finished. **Retry** sends it again. |
+| **Task interrupted when Ritemark closed** | The app closed before the work finished. The line names the cause — the other variants are *Task interrupted when the agent stopped* and *Task interrupted before it reached the agent*. **Retry** sends it again. |
+| **Conversation no longer available** | The destination conversation was deleted. Only **Retry** is offered; there is nothing left to open. |
 
 Every state is a symbol plus a sentence, not just a colour, and it survives reloading the document, closing and reopening the tab, and restarting Ritemark. If work was cut short by a restart, the comment says so instead of pretending it is still running.
+
+### When a task is refused
+
+A refusal is not a task that failed — the task is never created. It appears on the comment itself, or on that agent's group in the **Comments** menu, in Ritemark's own words with the action that fixes it:
+
+| What you see | What to do |
+|---|---|
+| **Claude is signed out. Sign in and try again.** | **Sign in** opens that agent's sign-in. The runtime is checked before the task is queued, so a signed-out agent never leaves you with a task that looks accepted. |
+| **That conversation already has ten prompts waiting. Let one finish and try again.** | Let one of the queued prompts finish, then **Try again**. A full queue is a refusal, not a silent success. |
+| **Save this document to disk before sending comments to an agent.** | Save the document. Until you do there is no file for the agent to read, so pressing Send again will not help. |
+| **The document is still saving. Try again in a moment.** | Wait a moment, then **Try again**. |
+| **That comment is no longer in the document.** | The note was deleted or edited away while the request was in flight. |
 
 ### Where the reply appears
 
@@ -111,7 +133,7 @@ Every state is a symbol plus a sentence, not just a colour, and it survives relo
 
 Comments are stored directly in the Markdown file using `<mark data-comment>` attributes (anchored) and HTML comment nodes (standalone). They survive saves, reopens, and round-trips through Ritemark's Markdown converter. No sidecar file is created.
 
-Each comment also carries a short identifier so that a queued task keeps pointing at the right note even while you keep editing around it. Anchored comments have always had one; standalone notes now get one too, which is why a note may look like `<!-- {id:…} Rephrase this -->` in the raw file. Opening an older document does not add identifiers or mark the file as changed — they are added the first time you send that comment to an agent, in one step that a single **Undo** reverses.
+Each comment also carries a short identifier so that a queued task keeps pointing at the right note even while you keep editing around it. Anchored comments have always had one; standalone notes now get one too, which is why a standalone note carries a `{id:…}` token in the raw file (see [Standalone margin notes](#standalone-margin-notes)). Opening an older document does not add identifiers or mark the file as changed — they are added the first time you send that comment to an agent, in one step that a single **Undo** reverses.
 
 > **Note:** Comments are Ritemark-specific HTML embedded in Markdown. They are invisible when the file is opened in a plain-text editor, but do appear in the raw source. They are stripped from exports.
 

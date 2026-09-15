@@ -25,6 +25,7 @@ Write and edit markdown with a visual editor.
 | [Core Editor](editor.md) | WYSIWYG markdown editing with auto-save |
 | [Text Formatting](formatting.md) | Bold, italic, links, and inline styles |
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
+| [Comments](comments.md) | Margin notes on any passage, and handing one to an agent |
 | [AI Agents](ai-agents.md) | Built-in Claude, Codex, and OpenCode agents in the sidebar |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 
