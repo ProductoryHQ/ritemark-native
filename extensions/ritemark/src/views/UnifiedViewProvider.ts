@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
 import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
 import { openReportMail } from '../reporting/reportTransport';
+import { getCurrentAppVersion } from '../update/versionService';
 import {
   getAPIKeyManager,
   apiKeyChanged,
@@ -446,7 +447,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
           if (this._pendingOpenReport) {
             this._pendingOpenReport = false;
-            void this._view?.webview.postMessage({ type: 'report/open' });
+            void this._view?.webview.postMessage(this._reportOpenMessage());
           }
           break;
 
@@ -454,6 +455,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._noteActiveConversation(
             typeof message.conversationId === 'string' ? message.conversationId : null,
           );
+          break;
+
+        case 'report/request-open':
+          // The AI Information entry asks the host to open the window rather
+          // than opening it itself, so both entry points get the same context
+          // (RQ5) from the one place that actually knows the app version.
+          void this.openReportWindow();
           break;
 
         case 'report/open-mail': {
@@ -1408,10 +1416,24 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     await vscode.commands.executeCommand('ritemark.unifiedView.focus');
     this._view?.show(true);
     if (this._view) {
-      void this._view.webview.postMessage({ type: 'report/open' });
+      void this._view.webview.postMessage(this._reportOpenMessage());
       return;
     }
     this._pendingOpenReport = true;
+  }
+
+  /**
+   * The only context a report carries (Sprint 126, RQ5). Built here because
+   * the webview has no other source for the app version or the platform — and
+   * deliberately nothing else, so there is nothing for the builder to strip.
+   */
+  private _reportOpenMessage(): { type: string; appVersion: string; platform: string; occurredAt: string } {
+    return {
+      type: 'report/open',
+      appVersion: getCurrentAppVersion(),
+      platform: process.platform,
+      occurredAt: new Date().toISOString(),
+    };
   }
 
   // ── Comment tasks (Sprint 117) ─────────────────────────────────────────────

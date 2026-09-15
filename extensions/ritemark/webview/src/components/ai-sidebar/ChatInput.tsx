@@ -24,6 +24,7 @@ import {
   AIInformationDialog,
   useAIInformationDisclosure,
 } from './AIInformation';
+import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
 import { resolveAIIdentity } from './aiDisclosure';
 import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
@@ -966,6 +967,7 @@ export function ChatInput() {
     byokProviderModels,
   });
   const aiInformation = useAIInformationDisclosure();
+  const reportDialog = useReportDialog();
 
   const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
@@ -1504,6 +1506,11 @@ export function ChatInput() {
           </div>
         </div>
       </div>
+      <ReportDialog
+        open={reportDialog.open}
+        context={reportDialog.context}
+        onOpenChange={reportDialog.setOpen}
+      />
       <AIInformationDialog
         identity={aiIdentity}
         context={{
@@ -1518,6 +1525,7 @@ export function ChatInput() {
         showFirstUse={aiInformation.showFirstUse}
         onOpenChange={aiInformation.setOpen}
         onAcknowledge={aiInformation.acknowledge}
+        onReport={reportDialog.request}
       />
     </div>
     </>
