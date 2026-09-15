@@ -170,7 +170,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (15)
+### Current patches (16)
 
 | Patch | Purpose |
 | --- | --- |
@@ -189,6 +189,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `013-ritemark-configuration-defaults.patch` | product.json `configurationDefaults` apply on desktop (trust off, `*.md` → Ritemark editor, theme/tree/preview defaults) |
 | `014-ritemark-save-receipts.patch` | Text-file save receipts through the extension-host document protocol, so a save is acknowledged against the exact written snapshot |
 | `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries |
+| `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion — the Git download button in Source Control and the Git/Node "Click here to install" actions on the welcome page (Microsoft Store policy 10.1.5) |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

@@ -1,0 +1,105 @@
+Ritemark Store Compliance: no external software acquisition promotion
+Sprint 126 (R4): Microsoft Store certification finding 10.1.5 — Source Control
+offered "Download Git for Windows" linking to git-scm.com. VS Code renders a
+welcome-view line as a full-width primary Button when the line parses to
+exactly one link and nothing else (viewPane.ts), so the flagged element was a
+large blue call-to-action.
+
+Two surfaces change, and Ritemark now informs without offering:
+
+  1. extensions/git/package.nls.json — the three scm.missing.* strings lose
+     their bare download-link line. No line is left that parses to a single
+     link, so nothing renders as a button. The explanation and the reload /
+     troubleshoot commands stay. All three are gated on `git.missing`, so an
+     installed Git is untouched by construction.
+
+  2. gettingStarted.ts launch checks — "Ritemark needs Git." and "Ritemark
+     needs Node." keep their status lines and lose "Click here to install".
+     The Node one was not flagged; it is the identical construct, and fixing
+     only what was reported would leave the same exposure for the next round.
+
+Applies after 001, which owns the launch-check list itself.
+
+Note: Visual Studio Code ships in the Microsoft Store with the same button,
+so this is not evidence that mentioning Git acquisition is categorically
+forbidden. The resubmission describes what changed, not a policy reading.
+---
+diff --git a/extensions/git/package.nls.json b/extensions/git/package.nls.json
+index 147a75f9b70..ebd86842fa1 100644
+--- a/extensions/git/package.nls.json
++++ b/extensions/git/package.nls.json
+@@ -351,31 +351,28 @@
+ 	"colors.incomingModified": "Color for modified incoming resource.",
+ 	"colors.blameEditorDecoration": "Color for the blame editor decoration.",
+ 	"view.workbench.scm.missing.windows": {
+-		"message": "[Download Git for Windows](https://git-scm.com/download/win)\nAfter installing, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)). Additional source control providers can be installed [from the Marketplace](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22).",
++		"message": "Source control depends on Git being installed.\nAfter installing Git, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)).",
+ 		"comment": [
+ 			"{Locked='](command:workbench.action.reloadWindow'}",
+ 			"{Locked='](command:git.showOutput'}",
+-			"{Locked='](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22'}",
+ 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VS Code",
+ 			"Please make sure there is no space between the right bracket and left parenthesis:  ]( this is an internal syntax for links"
+ 		]
+ 	},
+ 	"view.workbench.scm.missing.mac": {
+-		"message": "[Download Git for macOS](https://git-scm.com/download/mac)\nAfter installing, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)). Additional source control providers can be installed [from the Marketplace](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22).",
++		"message": "Source control depends on Git being installed.\nAfter installing Git, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)).",
+ 		"comment": [
+ 			"{Locked='](command:workbench.action.reloadWindow'}",
+ 			"{Locked='](command:git.showOutput'}",
+-			"{Locked='](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22'}",
+ 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VS Code",
+ 			"Please make sure there is no space between the right bracket and left parenthesis:  ]( this is an internal syntax for links"
+ 		]
+ 	},
+ 	"view.workbench.scm.missing.linux": {
+-		"message": "Source control depends on Git being installed.\n[Download Git for Linux](https://git-scm.com/download/linux)\nAfter installing, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)). Additional source control providers can be installed [from the Marketplace](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22).",
++		"message": "Source control depends on Git being installed.\nAfter installing Git, please [reload](command:workbench.action.reloadWindow) (or [troubleshoot](command:git.showOutput)).",
+ 		"comment": [
+ 			"{Locked='](command:workbench.action.reloadWindow'}",
+ 			"{Locked='](command:git.showOutput'}",
+-			"{Locked='](command:workbench.extensions.search?%22%40category%3A%5C%22scm%20providers%5C%22%22'}",
+ 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VS Code",
+ 			"Please make sure there is no space between the right bracket and left parenthesis:  ]( this is an internal syntax for links"
+ 		]
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -1183,26 +1183,26 @@
+ 				}
+ 			));
+ 
++			// Sprint 126 (R4): the launch check says what is missing and stops
++			// there. It used to offer "Click here to install" straight to
++			// git-scm.com, which Microsoft Store policy 10.1.5 reads as
++			// promoting software acquisition from outside the Store. Informing
++			// the user is not the problem; offering to fetch it is.
+ 			container.appendChild(renderLaunchCheckItem(
+ 				status.gitInstalled
+ 					? localize('ritemark.gitReady', "Ritemark found Git.")
+-					: localize('ritemark.gitMissing', "Ritemark needs Git."),
+-				status.gitInstalled,
+-				status.gitInstalled ? undefined : {
+-					label: localize('ritemark.clickHereToInstall', "Click here to install"),
+-					run: () => { void this.openerService.open(URI.parse('https://git-scm.com/downloads')); }
+-				}
++					: localize('ritemark.gitMissing', "Ritemark needs Git. Install Git to use Source Control."),
++				status.gitInstalled
+ 			));
+ 
++			// Same rule as the Git check above. Not flagged by the report, but
++			// the identical construct — fixing only what was reported would
++			// leave the same exposure for the next certification round.
+ 			container.appendChild(renderLaunchCheckItem(
+ 				status.nodeInstalled
+ 					? localize('ritemark.nodeReady', "Ritemark found Node.")
+ 					: localize('ritemark.nodeMissing', "Ritemark needs Node."),
+-				status.nodeInstalled,
+-				status.nodeInstalled ? undefined : {
+-					label: localize('ritemark.clickHereToInstall', "Click here to install"),
+-					run: () => { void this.openerService.open(URI.parse('https://nodejs.org/en/download')); }
+-				}
++				status.nodeInstalled
+ 			));
+ 		} catch {
+ 			container.textContent = '';
