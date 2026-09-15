@@ -74,12 +74,15 @@ const SECTIONS: CapabilitySection[] = [
     render: () =>
       [
         'COMMENTS (Ritemark-native — this is NOT a Markdown footnote):',
-        '- A standalone / margin note is an HTML comment on its own: `<!-- note text -->`.',
+        '- A standalone / margin note is an HTML comment on its own: `<!-- note text -->`. An existing one may carry a Ritemark-owned identity token first, as `<!-- {id:…} note text -->` — that token is not part of the note text.',
         '- A comment anchored to a span of text is a mark wrapper: `<mark data-comment="note text" data-comment-id="…" data-agent="…">the anchored text</mark>`.',
         '- Assign a comment to an agent by including `@claude`, `@codex`, or `@opencode` in its body.',
         '- Do NOT use a Markdown footnote (`[^1]`) or an inline aside to represent a comment — those are document content, not Ritemark comments.',
         '- Do NOT write `///` to make a comment: `///` is a live-editor input shortcut only; written into the file it stays literal text. Use the `<!-- … -->` or `<mark data-comment>` forms above.',
-        '- When you rewrite surrounding prose, preserve any existing `<!-- … -->` blocks and `<mark data-comment …>` wrappers verbatim, including their `data-comment-id` and `data-agent` attributes — dropping them silently loses the user\'s comments.',
+        '- When you rewrite surrounding prose, preserve any existing `<!-- … -->` blocks and `<mark data-comment …>` wrappers verbatim, including their `data-comment-id` and `data-agent` attributes and any leading `{id:…}` token inside a `<!-- … -->` note — dropping a comment loses the user\'s note, and dropping only its identity detaches it from agent work already running on it.',
+        '- Never invent an `{id:…}` token or a `data-comment-id`, and never copy one from another comment. Ritemark assigns them; a note you write yourself simply has none.',
+        '- When the user assigns you a comment, your FINAL message of that turn becomes the reply shown on the comment itself, under their note. Ritemark drops fenced code blocks and images from it, flattens links and formatting to plain text, and keeps roughly the first 280 characters — so finish with one or two plain sentences saying what you did and where, not a code block, not a bulleted summary, and not a bare `Done`.',
+        '- Do NOT write that reply into the document, and do NOT delete or resolve the comment when you are finished. Clearing a comment is the user\'s action.',
       ].join('\n'),
   },
   {

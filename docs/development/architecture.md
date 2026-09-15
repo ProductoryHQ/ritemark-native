@@ -403,6 +403,11 @@ footnotes, not `///`); internal links are relative Markdown links; slash-menu / 
 / export / voice are USER-ONLY; prefer the integrated browser over `open`/`xdg-open`. Adding a
 Ritemark capability = editing this one module.
 
+Sprint 117 gave standalone notes a durable identity carried in the Markdown as a leading `{id:…}`
+token, so the comments section also names that token in its preservation rule and forbids agents
+from minting or copying one. A capability the agent is told about must be kept true here whenever
+the on-disk form changes — the sprint that changes a carrier owns this text.
+
 Each runtime delivers the same context through its own native mechanism — `UnifiedViewProvider` is
 the single injection point, rendering the per-runtime descriptor into `RuntimeSessionConfig.extraSystemPrompt`:
 
