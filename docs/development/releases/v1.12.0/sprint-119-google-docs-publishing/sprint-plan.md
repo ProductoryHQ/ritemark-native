@@ -4,7 +4,7 @@
 **Status:** Draft — prepared, not approved, no branch created<br>
 **Branch after approval:** `sprint-119-google-docs-publishing`<br>
 **Issue:** Pending release mapping<br>
-**Release:** [v1.11.0](../release-plan.md)
+**Release:** [v1.12.0](../release-plan.md)
 
 ## Release Outcome
 
@@ -91,7 +91,7 @@ Phase 0 produces evidence and a recommendation for Jarmo; it does not implement 
 
 ## Dependencies and Gates
 
-- v1.11.0 must be mapped and the sprint approved before branch creation.
+- v1.12.0 must be mapped and the sprint approved before branch creation.
 - Phase 0 must be approved before OAuth registration, dependencies, settings contracts, message contracts, or product code change.
 - Google Cloud Console configuration and consent-screen publication may require Jarmo-owned external actions; record these as release blockers, not implicit implementation steps.
 - Existing DOCX export is a candidate conversion engine, not a pre-decided solution.
@@ -131,7 +131,7 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 ## Planning Approval
 
 - [ ] Jarmo approves scope and integration-first Phase 0.
-- [ ] GitHub issue is created and assigned to milestone `v1.11.0`.
+- [ ] GitHub issue is created and assigned to milestone `v1.12.0`.
 - [ ] Phase 0 research and all six decisions are approved.
 - [ ] SDD artifacts and feature-flag decision are approved.
 - [ ] Dedicated branch is created after approval.

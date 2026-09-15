@@ -1,51 +1,58 @@
-# Release Plan — v1.11.0 Publish to Google Docs + Agent Task Honesty
+# Release Plan — v1.11.0 Store Compliance + Agent Task Honesty
 
-**Status:** Sprint 116 implementation is complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286) and [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287) are its lifecycle records. Native Intel/Windows execution remains a v1.11 release gate. Sprint 117 is merged — [issue #292](https://github.com/ProductoryHQ/ritemark-native/issues/292) and [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293) are its lifecycle records; it absorbed v1.12.0 Sprint 121, and #156 and #281 closed with it. Sprints 118–119 remain proposed and require their own scope decisions.<br>
+**Status:** Sprints 116 and 117 are merged. Sprint 116 — [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286), [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native Intel/Windows execution remains a v1.11 release gate. Sprint 117 — [issue #292](https://github.com/ProductoryHQ/ritemark-native/issues/292), [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293); it absorbed v1.12.0 Sprint 121, and #156 and #281 closed with it. **Sprint 126 is the only remaining sprint in this release**; Sprints 118 and 119 moved to v1.12.0 on 2026-09-15.<br>
 **Milestone:** [v1.11.0](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
 **Target:** v1.11.0<br>
-**Release type:** Full app distribution (shell-tier — bundles refreshed agent runtime binaries under `extensions/ritemark/binaries/agents/`)<br>
+**Release type:** Full app distribution, **shell-tier** on two independent grounds — refreshed agent runtime binaries under `extensions/ritemark/binaries/agents/` (Sprint 116), and the targeted `patches/vscode/` change Sprint 126 R4 requires. A full rebuild, Gate 1 + Gate 2, notarization, the hardening window and Windows CI all apply; there is no extension-lane shortcut for this release.<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-09-07<br>
-**Source idea:** voice memo transcript, “Ritemark Google Docs Ülesanne” (2026-09-07; retained outside this sprint branch)
+**Source:** Jarmo’s 2026-09-07 scope items for runtimes, models and comment honesty, plus Microsoft’s 2026-09-15 certification report. The release’s original Google Docs headline moved to v1.12.0 with Sprint 119.
+
+**Scope change (2026-09-15).** Microsoft’s certification report came back **Attention needed** with four findings, and Jarmo re-cut the release around clearing them:
+
+- [Sprint 126 — Microsoft Store Certification Gaps](./sprint-126-store-certification/sprint-plan.md) is added and moves to the front of the queue. Phase 0 and implementation approval remain pending.
+- **Sprints 118 (Transcriber recording) and 119 (Publish to Google Docs) move to v1.12.0**, packages and all. Neither has started; no work is lost. Google Docs publishing was this release’s headline, and giving it up is the deliberate cost of shipping a compliant Windows build sooner.
+- Sprints 120 and 122–125 retain their existing v1.12.0 allocations.
+
+The reasoning is sequencing, not priority: the Store submission is already in Microsoft’s hands and blocked on four fixable findings, while 118 and 119 are unstarted work whose value does not decay by one release. v1.11.0 therefore becomes the release that gets Ritemark through certification.
 
 ## Release Thesis
 
-A Ritemark author can finish a markdown document and push it to Google Docs in one action — connect a Google account once in Settings, optionally pick a Docs template, then **Create Google Docs** from the toolbar; the created Doc's identity is remembered so every later **Sync** updates the same Doc instead of creating a new one.
+Ritemark reaches the Microsoft Store. v1.11.0 clears every finding in Microsoft’s 2026-09-15 certification report — correct Freemium pricing classification, a real way for a user to report inappropriate generated output, accurate Store artwork, and no external Git acquisition promotion — and ships the candidate that goes back for resubmission.
 
-Around that headline, v1.11.0 pays down three honesty/hygiene debts: comment-to-agent tasks stop being "puder ja kapsad" (one dispatch contract, correct status, a visible landing for the agent's answer, and a reply back on the source comment — #156); the bundled agent runtimes and the model catalog are refreshed to current; and the Transcriber gains direct in-app audio recording alongside file upload.
+Underneath that, the release carries two honesty/hygiene debts already paid down and merged: comment-to-agent tasks stopped being "puder ja kapsad" (one dispatch contract, correct status, a visible landing for the agent’s answer, and a reply back on the source comment — #156), and the bundled agent runtimes and model catalog are refreshed to current.
 
 ## User-Facing Headlines
 
-1. **Publish markdown to Google Docs** — connect your Google account in Settings, choose an optional Docs template, create the Doc from the toolbar, and keep it updated with one Sync action. One-way push: Ritemark stays the source of truth.
-2. **Record directly in Transcribe** — a Record button next to "Add recording"; the recording becomes a normal library item and goes through the same engine/consent/transcript pipeline as an uploaded file.
+1. **Report inappropriate AI output** — a discoverable action on every generative surface, with a payload you review before it is sent and an owned recipient behind it. Required by Microsoft Store policy 11.16; useful on its own merits.
+2. **Honest Store presentation** — Freemium classification that matches how third-party paid AI is actually used, accurate Windows artwork, and no promotion of an external Git download.
 3. **Agent comments you can trust** — assigning a comment with @claude/@codex/@opencode behaves identically from the margin rail and the toolbar overview; every comment gets tracked status; the agent's completion posts a short reply back to the source comment (#156); the conversation where the work happened is visible.
 4. **Current runtimes and models** — refreshed Claude Code, Codex, and OpenCode pins with the lockstep SDKs, and a re-verified model catalog for every provider surface (Claude, OpenAI, Gemini, Codex IDs, BYOK).
 
-## Sprint Map (proposed — numbering continues from Sprint 115)
+## Sprint Map
 
 | Sprint | Working name | Scope summary | Track | Preparation |
 |---|---|---|---|---|
 | [Sprint 116](./sprint-116-runtime-model-baseline/sprint-plan.md) | Runtime & model baseline refresh | Complete runtime package snapshot, lockstep SDKs, model catalog refresh, and measured protocol fixes | Audit-first SDD (Sprint 111 precedent) | Implementation complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286); [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native execution deferred to release gates |
 | [Sprint 117](./sprint-117-comment-agent-honesty/sprint-plan.md) | Comment→agent pipeline honesty | Unify dispatch paths A/B; IDs for all comment forms; correct per-document status; reply-to-comment on completion (#156); carry `documentPath` to the runtime; availability gating; visible target conversation; absorbs v1.12.0 Sprint 121 (#281): tasks go to the conversation open in the AI sidebar, named on the Send surface, with no confirmation step, bounded composer resize, immediate filterable `@` agent picker, collapsed comments that never cover text | Full SDD — crosses webview, host, sidebar store, and all three runtimes | **Merged 2026-09-15**; [issue #292](https://github.com/ProductoryHQ/ritemark-native/issues/292), [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293); closed #156 and #281 |
-| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record entry in the Transcribe panel; webview mic capture → host-side accumulation into a real audio file on disk → existing path-driven `JobManager` pipeline unchanged | Full SDD — new typed capture/write boundary | Full draft package ready; capture/storage freeze open |
-| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Google account connect in Settings; template selection; toolbar **Create Google Docs** + **Sync**; Doc identity remembered per markdown file | Full SDD — new external integration, OAuth, conversion fidelity | Full draft package ready; integration Phase 0 and external OAuth blockers open |
+| [Sprint 126](./sprint-126-store-certification/sprint-plan.md) | Microsoft Store certification gaps | Freemium classification; inappropriate AI-output reporting; correct StoreLogo2 imagery; remove external Git acquisition promotion while preserving SCM | Audit-first — shared AI reporting, targeted shell patch, Store metadata | Plan and four-finding traceability drafted; audit/specification and implementation approval pending; issue not yet created |
 
-Order as run: 116 first so the rest validate against the final runtime/model baseline (same reasoning as v1.10.0's Sprint 111-before-112), then 117. 118 and 119 have no hard interdependency; the order between them is Jarmo's call.
+Order as run: 116 first so the rest validated against the final runtime/model baseline (same reasoning as v1.10.0’s Sprint 111-before-112), then 117. Both are merged. Sprint 126 runs on that landed baseline and is the only sprint left.
+
+Sprint 126’s certified-candidate handoff depends on the release gates. Microsoft Store resubmission is blocked until all four report findings have verified fixes, and the new candidate needs a new immutable installer URL — the submitted `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` stays byte-for-byte unchanged.
 
 ## Sprint Preparation Status
 
-- [x] Release thesis and four-sprint envelope drafted.
-- [x] Sprint 116–119 full SDD draft packages created under this release folder.
-- [x] Each sprint has a behavioral spec, BDD scenarios, technical workstreams, phased tasks, requirement traceability, Definition of Done, risks, dependencies, and explicit non-goals.
-- [x] Current-state audits completed for all four sprints; UX-heavy Sprints 117–119 include design-state documents.
-- [x] Sprint 119 includes an official-source Google API/OAuth contract audit and explicit external release blockers.
-- [x] Jarmo approved Sprint 117 depth (full) and its absorption of v1.12.0 Sprint 121 on 2026-09-14; Sprint 118/119 scope decisions remain open.
-- [x] Release mapped for the approved Sprint 116 slice; remaining sprint scope is still proposed.
+- [x] Release thesis drafted, then re-cut on 2026-09-15 around Store certification.
+- [x] Sprints 116 and 117 delivered and merged under this release.
+- [x] Jarmo approved Sprint 117 depth (full) and its absorption of v1.12.0 Sprint 121 on 2026-09-14.
+- [x] Sprints 118 and 119 moved to v1.12.0 with their complete SDD packages on 2026-09-15; their scope decisions are now v1.12.0's.
 - [x] GitHub milestone `v1.11.0` created (milestone 11).
 - [x] Sprint 116 issue [#286](https://github.com/ProductoryHQ/ritemark-native/issues/286) created under milestone `v1.11.0`; other sprint issues await their scope decisions.
 - [x] Sprint 116 scope/kickoff and exact Phase 0 package approved; implementation runs on `codex/sprint-116-runtime-model-baseline` in its dedicated worktree.
 - [x] Sprint 117 issue [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292) published under milestone `v1.11.0` 2026-09-14; #156 and #281 re-homed to it and closed with [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293) on 2026-09-15.
-- [ ] Sprint 118 and Sprint 119 receive their own scope decisions and kickoffs.
+- [x] Sprint 126 added with report-to-deliverable traceability, acceptance checks, dependencies and explicit non-goals.
+- [ ] Sprint 126 completes Phase 0, receives implementation approval and a milestone-linked issue, and starts on its own branch.
 
 ## SDD Package Index
 
@@ -53,8 +60,7 @@ Order as run: 116 first so the rest validate against the final runtime/model bas
 |---|---|---|---|
 | [116](./sprint-116-runtime-model-baseline/sprint-plan.md) | plan, spec, scenarios, technical plan, tasks | current runtime/model/manifest audit | exact pins/catalog changes and rollback evidence |
 | [117](./sprint-117-comment-agent-honesty/sprint-plan.md) | plan, spec, scenarios, technical plan, tasks | 23-finding current-state audit + interaction/state design | host-owned task contract and full-vs-surgical scope |
-| [118](./sprint-118-transcribe-recording/sprint-plan.md) | plan, spec, scenarios, technical plan, tasks | capture/storage audit + recording/recovery design | format/backpressure/destination/recovery/native proof |
-| [119](./sprint-119-google-docs-publishing/sprint-plan.md) | plan, spec, 76 scenarios, technical plan, tasks | current-state audit + Settings/editor design + official Google API audit | OAuth/scope/converter/binding/idempotency/external production state |
+| [126](./sprint-126-store-certification/sprint-plan.md) | plan and certification traceability; full specification pending | live report findings captured; reporting/shell/asset audit pending | reporting destination/privacy/coverage, targeted Git fix, artwork and metadata approval |
 
 ## Evidence Base (research through 2026-09-13)
 
@@ -86,13 +92,20 @@ The highest-severity classes:
 4. **Context is wrong for queued tasks.** The runtime receives `[Currently editing: …]` + selection from the active tab *at drain time*, not the comment's `documentPath` — switch tabs while queued and the agent is told it is editing a different file.
 5. **No gating.** Comment dispatch bypasses the runtime-availability gate — a comment can be queued into a signed-out runtime and fail only at the boundary.
 
-### Transcriber recording (feasibility confirmed)
+### Moved to v1.12.0
+
+The Transcriber-recording feasibility work and the Google Docs / OAuth evidence moved with Sprints 118 and 119 to [the v1.12.0 release plan](../v1.12.0/release-plan.md) on 2026-09-15. Nothing was discarded; the full packages, audits and design documents travelled intact.
+
+<details>
+<summary>Retained here for the record — the evidence as it stood when these sprints were part of v1.11.0</summary>
+
+#### Transcriber recording (feasibility confirmed)
 
 - Mic capture already exists in the product — `useVoiceDictation.ts` (getUserMedia → 16 kHz mono WAV chunks → base64 postMessage) — but only in the document-editor webview; the Transcribe panel has never requested the mic. Webview `allow` list already delegates `microphone` to all webviews, and macOS TCC/`NSMicrophoneUsageDescription` is asserted at sign time, so no shell/patch change is expected (to be confirmed at kickoff — this determines whether Sprint 118 alone would force shell-tier anyway; the runtime bump already does).
 - The pipeline is path-driven end-to-end (`JobManager.enqueue({audioPath, …})`; sessions keyed by audio path), so recording needs: accumulate chunks host-side into a real file in the workspace/recordings location, then hand it to the existing enqueue/consent flow. Everything downstream (engine choice, cost consent, transcript markdown, library row, Insights) is unchanged.
 - Constraints found: dictation's host handler transcribes-and-deletes chunks and *drops* chunks while busy (fine for dictation, loses audio for recording — recording needs its own accumulating sink, not the dictation controller); the only local encoder is macOS `afconvert` (WAV output is the cross-platform baseline; optional m4a compression is macOS-only); ElevenLabs uploads the file in a single request, so very long recordings inherit today's upload behavior.
 
-### Publish to Google Docs (from the voice memo)
+#### Publish to Google Docs (from the voice memo)
 
 Committed intent: prepare teaching materials in Ritemark → publish as Google Docs (easiest to share). Settings: connect Google account + choose a default Docs **template**. Toolbar (next to Convert to Word / Download PDF / Copy Markdown): **Create Google Docs** → creates the Doc, remembers its file ID; pressing **Sync** later updates the same Doc. One-way push.
 
@@ -105,6 +118,8 @@ Phase 0 must decide (research, not guessed here):
 - **Template semantics** — what "using a template" means for a markdown push (copy template then replace body vs. style inheritance).
 - **Create idempotency** — Drive pre-generated IDs do not apply to creation through Google Workspace conversion, so response-loss/orphan recovery needs an approved strategy before retries are safe.
 
+</details>
+
 ## Scope Envelope
 
 ### In scope
@@ -112,13 +127,15 @@ Phase 0 must decide (research, not guessed here):
 - Everything in the Sprint Map above.
 - GitHub milestone v1.11.0; issues per sprint (including absorbing existing #156 and #281 into Sprint 117).
 - Release notes, user docs (`docs/user/`), architecture.md updates per sprint, and the standard full-release gate sequence (Gate 1 arm64 → Gate 2 x64/Windows, notarization, hardening windows, D1 source-freeze discipline).
+- A new signed Windows candidate at a new immutable installer URL, and the authorized Partner Center resubmission that follows it.
 
 ### Explicitly out of scope
 
-- Two-way Google Docs sync, Docs-comment import, Drive file browsing, sharing/permissions management from Ritemark, real-time collaboration.
-- Automatic/background sync of Docs (Sync is a user action).
+- Google Docs publishing and Transcriber direct recording — moved to v1.12.0 with Sprints 119 and 118.
+- Rebuilding or replacing the already-submitted v1.10.1 installer under its existing URL.
+- New billing or subscription implementation. Freemium is a *classification* of how third-party paid AI is already used, not a new payment feature in Ritemark.
 - A comment thread schema / multi-turn comment conversations (beyond the single completion reply of #156).
-- Windows/Intel voice dictation (#133, #203) — recording uses the cross-platform capture path but does not promise local Whisper anywhere new.
+- Windows/Intel voice dictation (#133, #203).
 - Runtime marketplace, fourth runtime (#92), floating `latest` runtime dependencies.
 - TipTap 2→3 migration (#243) — stays its own track.
 
@@ -126,29 +143,33 @@ Phase 0 must decide (research, not guessed here):
 
 | Risk | Severity | Note |
 |---|---|---|
-| Google OAuth consent/verification friction (unverified-app warnings, seven-day Testing refresh tokens) | High | Phase 0 decides scope + flow before any UI work; track production consent/publication as an owned external blocker |
-| Markdown→Docs conversion fidelity (tables, images, comments must not leak) | High | Candidate path reuses the shipped DOCX exporter; comments are already stripped at the export chokepoint |
-| Sync overwrites manual edits made in the Doc | Medium | One-way push is the contract; the UI copy must say so plainly |
-| Comment pipeline refactor destabilizes three runtimes at once | High | SDD track, per-runtime matrix reruns; Sprint 116 lands the runtime baseline first |
-| Recording produces large WAV files / long-recording upload limits | Medium | Cross-platform WAV baseline, macOS `afconvert` compression optional; cap/segment decision at kickoff |
-| Runtime bump changes protocol behavior (Codex 0.149.0 precedent) | High | Audit-first Phase 0 with real authenticated canaries before pinning |
+| Store certification remains blocked by four findings | High | Sprint 126 tracks each finding separately; require packaged-app and saved metadata evidence before resubmission |
+| AI-output reports expose private content or have no reliable recipient | High | Sprint 126 Phase 0 freezes user-reviewed minimal payload, transport, retention and triage ownership |
+| The R4 Git fix needs a `patches/vscode/` change, which forces shell-tier and a full rebuild | Medium | Already shell-tier from the Sprint 116 runtime binaries, so the tier costs nothing extra — but the patch must survive an upstream bump, so it needs a persistent applicability check |
+| Metadata-only fixes are mistaken for full compliance | High | R2 and R4 require packaged-app evidence; all four findings are tracked separately to the end |
+| A further certification round returns new findings | Medium | Record as new intake rather than silently widening Sprint 126; acceptance is never promised |
+| Native Intel/Windows execution still unproven for this baseline | High | Remains a hard release gate before any candidate is built |
 
 ## Decisions needed from Jarmo before the remaining sprints start
 
-1. Approve the remaining Sprint 118–119 release scope and their order.
-2. Resolved 2026-09-14: Sprint 117 runs the full correctness contract and absorbs Sprint 121.
-3. Confirm the order between Sprints 118 and 119; they have no hard interdependency.
+1. Approve Sprint 126's implementation scope after its reporting/privacy, Git-promotion and live-artwork audit. Release inclusion and sequencing are decided; implementation is not yet approved.
+2. Decide the reporting destination and its triage owner — R2 cannot be specified without it.
+3. Resolved 2026-09-14: Sprint 117 runs the full correctness contract and absorbs Sprint 121.
+4. Resolved 2026-09-15: Sprints 118 and 119 move to v1.12.0; v1.11.0 ships once Sprint 126 and the release gates are done.
 
 ## Current next steps
 
-1. Run native darwin-x64 and win32-x64 execution plus signed artifact verification before the v1.11 release candidate.
-2. Review the Sprint 117–119 SDD drafts and record a separate scope decision before each implementation starts.
-3. Sprint 117 Phase 0 freeze (23-finding traceability plus the absorbed Sprint 121 ergonomics, protocol/storage decisions) → Jarmo gate → implementation.
+1. Sprint 126 Phase 0: audit reporting surfaces/delivery/privacy, trace the Git acquisition promotion, identify the live StoreLogo2 asset, then freeze the specification for Jarmo's implementation approval.
+2. Create the Sprint 126 issue under milestone `v1.11.0` at scope freeze, and start on its own branch.
+3. Run native darwin-x64 and win32-x64 execution plus signed artifact verification before the v1.11 release candidate.
+4. Build, sign and notarize the candidate, publish it to a new immutable installer URL, then resubmit to Partner Center with per-finding evidence.
 
 ## Decisions Log
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-09-15 | Move Sprints 118 and 119 to v1.12.0 and re-cut v1.11.0 around Store certification | Jarmo: "meil on vaja Microsofti asjad korda teha ja siis teha uus release ja see üles panna." The Store submission is already lodged and blocked on four fixable findings; 118 and 119 are unstarted work whose value does not decay by one release. Google Docs publishing was the release's headline and was given up deliberately. Packages moved intact into the v1.12.0 folder. |
+| 2026-09-15 | Add Sprint 126 to v1.11.0 for all four Microsoft Store certification findings | Jarmo requested a new sprint in the open release. Plan only; implementation, release builds and external submission changes remain gated. Numbers 120–125 are already allocated to v1.12.0. |
 | 2026-09-07 | Draft plan created from Jarmo's five scope items | Voice memo (Google Docs) + runtimes + models + comment landing + transcriber recording |
 | 2026-09-13 | Prepare all four full draft sprint packages without starting implementation | Makes scope, gates, and open decisions reviewable while preserving the release and per-sprint approval gates |
 | 2026-09-13 | Raise preparation to Sprint 109-level SDD packages | Added traceable requirements, BDD scenarios, architecture/workstreams, phased tasks, audits, UX states, and Google API/OAuth evidence before scope approval |

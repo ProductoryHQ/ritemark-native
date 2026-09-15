@@ -1,27 +1,31 @@
-# Release Plan — v1.12.0 Everyday UX
+# Release Plan — v1.12.0 Publish to Google Docs + Everyday UX
 
-**Status:** Mapped — six-sprint sequence approved by Jarmo (2026-09-12/13). Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14; five sprints remain (120, 122–125). Individual sprints have not started.<br>
+**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. None has started.<br>
 **Target:** v1.12.0<br>
 **GitHub milestone:** [v1.12.0](https://github.com/ProductoryHQ/ritemark-native/milestone/10)<br>
 **Release type:** Full app distribution, provisionally shell-tier because Sprint 123 is expected to change integrated-browser/editor tab labels. Downgrade to extension-only only if Phase 0 proves no VS Code patch or shell source changes are required.<br>
 **Platforms:** darwin-arm64, darwin-x64, win32-x64<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-09-12<br>
-**Source:** Jarmo's hands-on UX friction log collected while editing, transcribing, and working with agent conversations on 2026-09-12, expanded with Office-preview requirements on 2026-09-13.
+**Source:** Jarmo's hands-on UX friction log collected while editing, transcribing, and working with agent conversations on 2026-09-12, expanded with Office-preview requirements on 2026-09-13, and joined on 2026-09-15 by Sprints 118 and 119 from the v1.11.0 plan — the latter originating in a 2026-09-07 voice memo about publishing teaching material to Google Docs.
 
 ## Release Thesis
 
-Ritemark should stay out of the user's way during ordinary long-form work. v1.12.0 removes a focused set of recurring paper cuts: prose no longer turns into a list against the author's intent, comments are comfortable to write and hand to an agent, the active agent conversation and its links are predictable, long transcripts are searchable, crowded tabs remain distinguishable, Word documents are substantially easier to inspect, and modern PowerPoint files open in a useful local preview.
+A Ritemark author can finish a markdown document and push it to Google Docs in one action — connect a Google account once in Settings, optionally pick a Docs template, then **Create Google Docs** from the toolbar; the created Doc identity is remembered so every later **Sync** updates the same Doc instead of creating a new one. The Transcriber gains direct in-app recording alongside file upload. Both arrived from v1.11.0 on 2026-09-15 and are this release’s headline work.
+
+Around them, Ritemark should stay out of the user's way during ordinary long-form work. v1.12.0 removes a focused set of recurring paper cuts: prose no longer turns into a list against the author's intent, comments are comfortable to write and hand to an agent, the active agent conversation and its links are predictable, long transcripts are searchable, crowded tabs remain distinguishable, Word documents are substantially easier to inspect, and modern PowerPoint files open in a useful local preview.
 
 This is a workflow-coherence release, not a collection of unrelated cosmetic tweaks. Every included item must reduce uncertainty or friction in one of five repeated actions: write, comment, work with an agent, find the active material again, or inspect the documents that arrive in everyday work.
 
 ## User-Facing Headlines
 
-1. **The editor respects what you type** — a year such as `2026. a` stays prose while deliberate numbered-list input continues to work.
-2. **Comments are comfortable and accountable** — delivered ahead of this release by v1.11.0 Sprint 117; v1.12.0 builds on that vocabulary.
-3. **Agent conversations are easier to understand and operate** — the active conversation has a title and actions, long prompts get more room, and project/file/web links behave according to their destination.
-4. **Long work stays findable** — search inside a transcription and distinguish open documents and web pages in a crowded tab row.
-5. **Office documents become first-class reading material** — Word gains a PDF-like page-viewing experience and modern PowerPoint files gain a secure local preview.
+1. **Publish markdown to Google Docs** — connect your Google account in Settings, choose an optional Docs template, create the Doc from the toolbar, and keep it updated with one Sync action. One-way push: Ritemark stays the source of truth.
+2. **Record directly in Transcribe** — a Record button next to "Add recording"; the recording becomes a normal library item and goes through the same engine/consent/transcript pipeline as an uploaded file.
+3. **The editor respects what you type** — a year such as `2026. a` stays prose while deliberate numbered-list input continues to work.
+4. **Comments are comfortable and accountable** — delivered ahead of this release by v1.11.0 Sprint 117; v1.12.0 builds on that vocabulary.
+5. **Agent conversations are easier to understand and operate** — the active conversation has a title and actions, long prompts get more room, and project/file/web links behave according to their destination.
+6. **Long work stays findable** — search inside a transcription and distinguish open documents and web pages in a crowded tab row.
+7. **Office documents become first-class reading material** — Word gains a PDF-like page-viewing experience and modern PowerPoint files gain a secure local preview.
 
 ## Product Contract
 
@@ -33,12 +37,16 @@ This is a workflow-coherence release, not a collection of unrelated cosmetic twe
 
 ## Release Sequencing and Cross-Release Dependency
 
+Sprints 118 and 119 arrived from v1.11.0 on 2026-09-15. Both have complete SDD packages — spec, scenarios, technical plan, tasks, current-state audits, design documents, and for Sprint 119 an official-source Google API/OAuth contract audit — and both still owe their own scope decisions and kickoffs. Sprint 119 additionally carries external blockers that are not code: Google Cloud project ownership, OAuth consent publication and verification, release client configuration, and dedicated test accounts. Those should start early, because they run on Google’s clock rather than ours.
+
 Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carries no in-flight cross-release dependency. Sprint 122 depends on the merged Sprint 117: the comment/agent interaction vocabulary, the visible-destination contract, and the resizable composer primitive. Sprint 122 must not add a second dispatch path or weaken the invariant that every conversation-scoped message carries a canonical `conversationId`.
 
 ## Scope Envelope
 
 ### In scope
 
+- Publishing a markdown document to Google Docs: account connect in Settings, optional template selection, toolbar **Create Google Docs** and **Sync**, and a remembered Doc identity per markdown file. One-way push.
+- Direct audio recording in the Transcribe panel, feeding the existing path-driven transcription pipeline unchanged.
 - Ordered-list input intent: prevent plausible year prefixes from triggering a numbered list while preserving deliberate list creation and Markdown round trips.
 - Active agent conversation header with a clear title and actions consistent with History.
 - Agent composer vertical resize without hiding Send, attachment, runtime, model, autonomy, or effort controls.
@@ -67,6 +75,8 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 
 | Sprint | Working name | User outcome | GitHub issue | Dependency | Status |
 |---|---|---|---|---|---|
+| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | none yet | none | Moved from v1.11.0 (2026-09-15); full SDD package ready, capture/storage freeze open |
+| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated | none yet | External Google Cloud/OAuth setup | Moved from v1.11.0 (2026-09-15); full SDD package ready, Phase 0 and external OAuth blockers open |
 | Sprint 120 | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Planned |
 | Sprint 121 | Comment ergonomics and visible handoff | Comments are easy to compose and review, and AI assignment has a visible destination | [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | — | Absorbed into v1.11.0 Sprint 117 (2026-09-14) |
 | Sprint 122 | Agent conversation clarity | Active conversation, long-prompt composer, and destination-aware links behave predictably | [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | v1.11.0 Sprint 117 merged (interaction vocabulary, composer primitive); existing durable conversation APIs | Planned |
@@ -74,7 +84,7 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 | Sprint 124 | Word preview fidelity | Word documents get PDF-like page viewing and measured fidelity improvements | [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284) | none; establishes the Office-preview asset boundary | Planned |
 | Sprint 125 | PowerPoint preview | Modern `.pptx` files open locally in a secure read-only slide preview | [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) | Sprint 124 viewer shell and asset boundary | Planned |
 
-Mainline UX order: 120 → 122, with Sprint 123 as an independent findability track after Sprint 120. Office-preview order: 124 → 125. The Office track may proceed independently once release foundations are stable, but Sprint 125 does not start before Sprint 124 has established and validated the preview asset boundary. The release remains feature-incomplete until all six sprints are merged or explicitly deferred.
+Headline order: 119 first, since its external OAuth blockers gate it and nothing else waits on it; 118 has no hard interdependency with 119, and the order between them is Jarmo’s call. Mainline UX order: 120 → 122, with Sprint 123 as an independent findability track after Sprint 120. Office-preview order: 124 → 125. The Office track may proceed independently once release foundations are stable, but Sprint 125 does not start before Sprint 124 has established and validated the preview asset boundary. The release remains feature-incomplete until all seven sprints are merged or explicitly deferred.
 
 ## Sprint Outcomes and Boundaries
 
@@ -196,6 +206,8 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
+| Sprint 118 | `sprint-118-transcribe-recording` | TBD | none yet | not started | not run | not drafted |
+| Sprint 119 | `sprint-119-google-docs-publishing` | TBD | none yet | not started | not run | not drafted |
 | Sprint 120 | `sprint-120-editor-input-intent` | TBD | #280 | not started | not run | not drafted |
 | Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
 | Sprint 122 | `sprint-122-conversation-clarity` | TBD | #282 | not started | not run | not drafted |
@@ -264,6 +276,7 @@ Because the planned tier is full app, release execution follows the standard cle
 
 | Date | Decision | Source |
 |---|---|---|
+| 2026-09-15 | Receive Sprints 118 and 119 from v1.11.0 | Jarmo re-cut v1.11.0 around the four Microsoft Store certification findings and moved the unstarted sprints here: "meil on vaja Microsofti asjad korda teha ja siis teha uus release ja see üles panna." Packages moved intact; Google Docs publishing becomes this release’s headline. |
 | 2026-09-12 | Collect UX friction first; do not create a sprint plan until Jarmo asks | Jarmo, UX collection task |
 | 2026-09-12 | Start release planning from the nine collected observations | Jarmo |
 | 2026-09-12 | Keep the existing v1.11.0 draft untouched and map the UX work as a separate v1.12.0 release | Jarmo confirmation |
