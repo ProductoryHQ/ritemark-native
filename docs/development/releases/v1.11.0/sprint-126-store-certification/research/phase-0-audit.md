@@ -38,14 +38,31 @@ The Node prompt is the same policy class as the Git one. It was not flagged, pre
 
 The certification report cites `git-scm.com/install/windows`. Neither of our surfaces uses that path — the extension uses `/download/win`, our welcome page uses `/downloads`. The reviewer most likely paraphrased or followed a redirect. This does not change the fix, but the packaged app should be checked to confirm which surface they actually reached before the resubmission claims a specific one was corrected.
 
+### Why it renders as a button — and what that makes the fix
+
+`viewPane.ts:249-253` decides how a welcome-view line is drawn: if the line parses to **exactly one link and nothing else**, it becomes a `Button` with `defaultButtonStyles` — a full-width primary button. A line with any surrounding prose renders as text with inline links.
+
+`view.workbench.scm.missing.windows` is precisely the first case. Its first line is the bare link `[Download Git for Windows](https://git-scm.com/download/win)`; its second line ("After installing, please [reload]… or [troubleshoot]…") has prose around the links and stays text. So the flagged element is a large blue call-to-action button, and the reviewer's finding is most plausibly about that prominence rather than the mere existence of the link.
+
+Supporting this reading: **Visual Studio Code itself ships in the Microsoft Store with this same button** (Jarmo, 2026-09-15). The finding therefore cannot mean that mentioning Git acquisition is categorically forbidden. The resubmission should describe what we changed — the prominent acquisition call-to-action is gone — and must not claim a general policy interpretation we cannot support.
+
+### Decision (Jarmo, 2026-09-15): inform, do not offer
+
+Ritemark tells the user that Git or Node is missing and must be obtained. It does not provide the action that obtains it. Scope stays deliberately small:
+
+| Surface | Change |
+|---|---|
+| `view.workbench.scm.missing.windows` / `.mac` / `.linux` | Drop the bare download link line. Keep an informational sentence that Source Control needs Git installed, and keep the `reload` / `troubleshoot` commands. With no single-link line left, nothing renders as a button. |
+| `gettingStarted.ts:1186-1195` (patch 001) | Keep "Ritemark needs Git."; drop the `action` object, so no "Click here to install". |
+| `gettingStarted.ts:1197-1206` (patch 001) | Keep "Ritemark needs Node."; drop the `action` object. |
+
+Node is included because it is the same construct and the same policy class, not because it was flagged. The user still learns exactly what is missing.
+
 ### Fix shape
 
-Both live in `patches/vscode/`, so this is a shell-tier change — which the release already is, from the Sprint 116 runtime binaries. The smallest maintainable change is a text/contribution edit, not code removal:
+Both live in `patches/vscode/`, so this is a shell-tier change — which the release already is, from the Sprint 116 runtime binaries. Both are text/contribution edits, not code removal, so the blast radius is small.
 
-- Extension side: drop the download link from the four `package.nls.json` strings, keeping the explanation and the reload/troubleshoot commands.
-- Ritemark side: keep the "Ritemark needs Git" / "Ritemark needs Node" status lines, drop the "Click here to install" action.
-
-The user still learns what is missing; Ritemark no longer directs them to acquire it externally. A persistent patch-applicability check is needed so an upstream bump cannot silently restore the strings.
+One durability requirement: an upstream VS Code bump can silently restore the `package.nls.json` strings. The patch needs an applicability check that fails loudly rather than a change that quietly reverts.
 
 ---
 
@@ -98,9 +115,10 @@ The closest structural neighbour is the **AI Information** disclosure already mo
 
 ## Decisions this audit cannot make
 
+R4 is decided — see the decision table above. What follows is R2, R1 and R3.
+
 1. **Where does a report go, and who reads it?** Not answerable from code. PostHog is the only existing transport and fails all three tests above. Until the recipient and triage owner are fixed, R2's UX cannot be specified. This is the single biggest blocker in Sprint 126.
 2. **May a report carry the offending output?** The codebase currently leans hard the other way: `CommentTaskProjectionV1` deliberately excludes prompt text and content hashes (`src/commentTasks/types.ts:206-207`). Sending content is a new privacy posture and needs an explicit decision plus consent UX.
-3. **Does the Node prompt go too?** Same policy class as the Git one, not flagged. Fixing only what was reported leaves an identical exposure for the next review round.
 4. **Is the reporting action required on experimental-flag surfaces?** `comment-callouts` and `durableAgentConversations` are both experimental, i.e. user-disableable. If the submitted build must expose reporting unconditionally, either those surfaces are out of R2 scope or the flags change for the Store build.
 5. **Does transcription count as generative content** for 11.16 — voice dictation and Transcribe segments?
 6. **R1 and R3 need Partner Center.** The live StoreLogo2 asset must be identified before replacement artwork is prepared — the plan's own warning that a repository logo is not evidence of the live asset stands, and the audit could not check it from the repo. Freemium copy likewise needs the saved listing text.
