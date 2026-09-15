@@ -1,5 +1,10 @@
 {
+  "scripts": {
+    "store-hosting": "node scripts/publish-store-installer.mjs",
+    "test:store-hosting": "node --test scripts/publish-store-installer.test.mjs"
+  },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
     "lucide-static": "^0.555.0"
   }
 }

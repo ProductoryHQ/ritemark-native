@@ -54,7 +54,7 @@ The document contains business contact information. Keep it as verification evid
 
 Verification and account creation have passed. `Ritemark` was found available and reserved as an EXE/MSI app. Partner Center ID: `3a2a9010-fbe3-47cf-ae87-4d338f587830`.
 
-The application overview currently warns that recently created account verification may take up to 30 minutes to reflect across the system. Continue with [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md) after propagation.
+The temporary account-verification propagation warning disappeared from the Store listing surface on 2026-09-02. Continue with the current live state in [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md).
 
 If Microsoft later changes or rejects the account state:
 

@@ -6,7 +6,7 @@ Release folders may describe why a particular Windows candidate was built, but S
 
 ## Current position
 
-Last reviewed: **2026-09-01**
+Last reviewed: **2026-09-11**
 
 | Area | State | Next action |
 |---|---|---|
@@ -14,9 +14,9 @@ Last reviewed: **2026-09-01**
 | English Store listing | `Ritemark` reserved; EXE/MSI draft active | Complete draft sections after account-state propagation and field decisions |
 | Public product/support pages | Ready | Recheck immediately before submission |
 | Privacy and terms | Ready at Productory URLs | Use the approved Productory pages, not the 404 Ritemark paths |
-| Installer hosting | Ready | `getritemark.com/windows/v{VERSION}/Ritemark-Setup.exe`; upload each candidate to its own versioned path |
-| Signed Windows package | Pending | Build only after the release Gate 1 approval |
-| Store screenshots | Reference set only | Capture the installed Windows build; current images show a development host |
+| Installer hosting | Complete: locked v1.10.1 object, direct HTTPS response, and fresh-download hash pass | Preserve the object unchanged and reuse the guarded procedure for new versioned keys |
+| Signed Windows package | v1.10.1 candidate 3 published and audited | Complete clean-machine test and Store-specific approval |
+| Store screenshots | Four installed-Windows v1.10.1 images selected | Jarmo review and Partner Center preview |
 | Submission | Not authorized | Keep as draft until the final candidate and all checks pass |
 
 The detailed checklist is in [`STATUS.md`](./STATUS.md).
@@ -45,6 +45,8 @@ The detailed checklist is in [`STATUS.md`](./STATUS.md).
 | [`PARTNER-CENTER-RUNBOOK.md`](./PARTNER-CENTER-RUNBOOK.md) | Browser-assisted Partner Center sequence |
 | [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md) | Current live product ID, section state, and pending decisions |
 | [`PACKAGE-AND-CERTIFICATION.md`](./PACKAGE-AND-CERTIFICATION.md) | Installer, signature, URL, hash, and test gates |
+| [`HOSTING-AND-DOWNLOADS.md`](./HOSTING-AND-DOWNLOADS.md) | DNS, R2 architecture, immutable object paths, upload, verification, and rollback |
+| [`WINDOWS-TEST-GUIDE-ET.md`](./WINDOWS-TEST-GUIDE-ET.md) | Estonian clean-Windows test instructions for the exact v1.10.1 candidate |
 | [`LEGAL-AND-URLS.md`](./LEGAL-AND-URLS.md) | Canonical public URLs and live checks |
 | [`ASSETS.md`](./ASSETS.md) | Store logo and screenshot inventory |
 | [`DECISIONS.md`](./DECISIONS.md) | Durable decisions and change log |
