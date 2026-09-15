@@ -43,6 +43,7 @@ test('every runtime carries the markdown-editor apply-directly framing', () => {
 test('names the on-disk comment carriers', () => {
   for (const text of [claude, codex, acp]) {
     assert.ok(text.includes('<!-- note text -->'), 'standalone HTML comment carrier');
+    assert.ok(text.includes('<!-- {id:…} note text -->'), 'the identity-carrying form of the same carrier');
     assert.ok(text.includes('<mark data-comment='), 'anchored mark carrier');
     assert.ok(text.includes('@claude') && text.includes('@codex') && text.includes('@opencode'), 'assignment aliases');
   }
@@ -61,6 +62,19 @@ test('states the comment-preservation rule', () => {
   for (const text of [claude, codex, acp]) {
     assert.ok(/preserve any existing/i.test(text), 'preservation instruction present');
     assert.ok(text.includes('data-comment-id') && text.includes('data-agent'), 'names the attributes to keep');
+    // Sprint 117 gave standalone notes a durable identity carried in the
+    // Markdown as a leading `{id:…}` token. An agent that strips it while
+    // rewriting prose detaches the note from the task already running on it,
+    // so the preservation rule has to name it explicitly.
+    assert.ok(text.includes('{id:…}'), 'names the standalone identity token to keep');
+  }
+});
+
+test('tells agents not to mint or copy a comment identity', () => {
+  for (const text of [claude, codex, acp]) {
+    assert.ok(/Never invent an/i.test(text), 'rules out inventing an identity');
+    assert.ok(/never copy one from another comment/i.test(text), 'rules out copying one');
+    assert.ok(/a note you write yourself simply has none/i.test(text), 'says what to do instead');
   }
 });
 
