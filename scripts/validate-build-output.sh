@@ -429,7 +429,15 @@ if [[ "$TARGET" == "win32-x64" ]]; then
       # and sent the v1.11.0 Windows build round a second diagnosis cycle.
       for stgt in "${SIGN_TARGETS[@]}"; do
         echo -n "  $(basename "$stgt")... "
-        if SIGN_OUTPUT="$("$SIGNTOOL" verify /pa /all "$stgt" 2>&1)"; then
+        # MSYS_NO_PATHCONV is not optional here. Under Git Bash the runner
+        # rewrites any argument that looks like a POSIX path, so `/pa` and
+        # `/all` arrived as C:/Program Files/Git/pa and .../all — signtool then
+        # reported "File not found" for both and, with the policy flag eaten,
+        # fell back to the stricter driver policy and rejected the Azure
+        # Trusted Signing chain. Every executable therefore read as unsigned
+        # while being correctly signed. The release skill's cross-platform
+        # catalogue names this exact hazard; the repo had never applied it.
+        if SIGN_OUTPUT="$(MSYS_NO_PATHCONV=1 "$SIGNTOOL" verify /pa /all "$stgt" 2>&1)"; then
           echo -e "${GREEN}OK${NC} (signed)"
         else
           echo -e "${RED}FAIL${NC} (not signed or invalid signature)"
