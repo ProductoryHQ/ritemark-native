@@ -12,7 +12,15 @@ Shell-tier on two independent grounds: the Sprint 116 runtime binaries, and patc
 | 117 | Comment→agent honesty: host-owned task ledger, real status, reply on the comment | Gate 1 |
 | 126 | Report AI issue (status bar + AI Information → `info@productory.eu`); no Git/Node download offers | Gate 1 for reporting; **Windows for the Git-absent case** |
 
-## arm64 candidate — 2026-09-16
+## Candidate 2 — 2026-09-16 (current)
+
+Candidate 1 was discarded at Gate 1. Jarmo: *"niipea kui liigun hiirega kommentaari poole, siis see on juba mouse-out from komment area ja kaob see kommentaar eest ära."* Hovering a highlight showed **Send to Claude** and then closed as the pointer travelled toward it, so the feature's primary action was unreachable by the gesture that revealed it. Fixed in [PR #309](https://github.com/ProductoryHQ/ritemark-native/pull/309): a click latches the comment open, hover gets a 220 ms grace, and the latched bubble is visibly different.
+
+Source commit `9e963596ba14985471064b24e4c844d3984c3878`. Built in `.worktrees/release-9e963596ba14`, signed **52 components, 0 failures**. DMG `dist/Ritemark-1.11.0-darwin-arm64.dmg`, **623,571,092 bytes**, SHA-256 `35e8f99d8f9d64a40483083a79c42eb69377c043def6c6295eaadaa722682e7b`, built **2026-09-16 16:01:08 EEST** (hardening clock). **Not notarized.**
+
+Mounted-DMG checks: `ritemarkVersion` 1.11.0; provenance `darwin-arm64` / `9e963596` / vscode `10c8e557`; the pin fix present in the shipped bundle; Sprint 126 intact (status bar item present, `git-scm.com/download` 0, `clickHereToInstall` 0); all three runtimes execute — `claude` 2.1.270, `codex-app-server` 0.154.0, `opencode` 1.18.30; `spctl` rejected as expected.
+
+## Candidate 1 — 2026-09-16 (discarded at Gate 1)
 
 Built in `.worktrees/release-a8343678e72a-2` (Node 22.x arm64). DMG `dist/Ritemark-1.11.0-darwin-arm64.dmg`, **623,571,703 bytes**, SHA-256 `9a367b3da2280807a01e7b7a6a6e3b0eb69bf23cb3ca01da508db1489fcf231c`, built **2026-09-16 09:35:56 EEST** (hardening clock). **Not notarized.**
 
