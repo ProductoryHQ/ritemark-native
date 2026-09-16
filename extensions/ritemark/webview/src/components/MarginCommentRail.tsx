@@ -121,6 +121,11 @@ const MARKER_HEIGHT = 30
 // window. Measured against the CSS above; re-check them if the column changes.
 export type RailDensity = 'wide' | 'medium' | 'compact'
 
+/** Grace period before a hover-opened bubble closes (Sprint 126 follow-up).
+ *  Long enough to cross the gap from the highlight to the rail, short enough
+ *  that a bubble never feels stuck to the pointer. */
+const HOVER_CLOSE_GRACE_MS = 220
+
 const RAIL_WIDE_MIN_PX = 1280
 const RAIL_MEDIUM_MIN_PX = 960
 
@@ -420,10 +425,12 @@ function RailItem({
   density,
   geometry,
   open,
+  pinned,
   composing,
   sendState,
   onOpen,
   onClose,
+  onTogglePin,
   onEdit,
   onRemove,
   onSave,
@@ -435,10 +442,13 @@ function RailItem({
   density: RailDensity
   geometry: { railWidth: number; bubbleWidth: number; bubbleOffset: number }
   open: boolean
+  /** Latched open by a click, so the pointer may leave without closing it. */
+  pinned: boolean
   composing: boolean
   sendState: SendState | undefined
   onOpen: () => void
   onClose: () => void
+  onTogglePin: () => void
   onEdit: () => void
   onRemove: () => void
   onSave: (text: string) => void
@@ -470,19 +480,29 @@ function RailItem({
 
   return (
     <div
-      className="rm-rail-item"
+      className={`rm-rail-item${pinned ? ' rm-rail-item-pinned' : ''}`}
       // Open bubble / compose sits ON TOP of neighbouring markers.
       style={{ top: marker.top, zIndex: open || composing ? 30 : 1 }}
+      onClick={() => !composing && onTogglePin()}
       onMouseEnter={() => !composing && onOpen()}
-      onMouseLeave={() => !composing && onClose()}
+      // A pinned bubble stays put; only hover-opened ones close on leave.
+      onMouseLeave={() => !composing && !pinned && onClose()}
       onBlur={(e) => {
         if (composing) return
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onClose()
       }}
       onKeyDown={(e) => {
-        if (!composing && e.key === 'Escape' && open) {
+        if (composing) return
+        if (e.key === 'Escape' && open) {
           e.stopPropagation()
           onClose()
+        }
+        // Keyboard parity with the click: Enter/Space latches the bubble open
+        // so its actions are reachable without a pointer.
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          e.stopPropagation()
+          onTogglePin()
         }
       }}
     >
@@ -638,6 +658,29 @@ export function MarginCommentRail({
   const [markers, setMarkers] = useState<RailMarker[]>([])
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [editKey, setEditKey] = useState<string | null>(null)
+  /**
+   * A comment the user CLICKED, rather than merely hovered (Sprint 126 follow-up).
+   *
+   * Hover alone cannot carry a primary action. The bubble holds "Send to
+   * Claude", and reaching it means crossing the gap between the highlight and
+   * the rail — where `mouseout`'s relatedTarget is the editor background, not
+   * the rail, so the existing guard never fires and the button evaporates as
+   * the pointer approaches it. Jarmo hit this in Gate 1, 2026-09-16.
+   *
+   * Pinning is the reliable path: it survives the pointer leaving entirely, and
+   * clicking a highlight is what people try first anyway. Exactly one comment
+   * is pinned at a time.
+   */
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null)
+  /** Grace period before a hover-opened bubble closes; cancelled on re-entry. */
+  const closeTimer = useRef<number | null>(null)
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }, [])
+  useEffect(() => cancelClose, [cancelClose])
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({})
   const [containerWidth, setContainerWidth] = useState(0)
   const rafRef = useRef<number | null>(null)
@@ -709,27 +752,72 @@ export function MarginCommentRail({
       // Never steal focus from a note being written or edited.
       if (editKey) return
       const key = keyFor(event.target)
-      if (key) setOpenKey(key)
+      if (key) {
+        cancelClose()
+        setOpenKey(key)
+      }
+    }
+
+    // One click on the highlighted text latches the comment open, so the
+    // pointer can travel to the bubble without racing a close.
+    const onClick = (event: MouseEvent) => {
+      if (editKey) return
+      const key = keyFor(event.target)
+      if (!key) return
+      cancelClose()
+      setOpenKey(key)
+      setPinnedKey((current) => (current === key ? null : key))
     }
 
     const onOut = (event: MouseEvent) => {
       if (editKey) return
       const key = keyFor(event.target)
       if (!key) return
-      // Moving from the text into the bubble must not close it — otherwise the
-      // Send button is unreachable by mouse.
+      // A pinned comment ignores the pointer entirely.
+      if (pinnedKey === key) return
+      // Adjacent case: the pointer went straight into the rail.
       const next = event.relatedTarget
       if (next instanceof Element && next.closest('.rm-comment-rail')) return
-      setOpenKey((current) => (current === key ? null : current))
+      // Otherwise the pointer is crossing the gap between the highlight and the
+      // rail, where relatedTarget is the editor background. Closing now is what
+      // made the Send button unreachable, so the close waits out a short grace
+      // period that entering either surface cancels.
+      cancelClose()
+      closeTimer.current = window.setTimeout(() => {
+        closeTimer.current = null
+        setOpenKey((current) => (current === key ? null : current))
+      }, HOVER_CLOSE_GRACE_MS)
     }
 
     container.addEventListener('mouseover', onOver)
     container.addEventListener('mouseout', onOut)
+    container.addEventListener('click', onClick)
     return () => {
       container.removeEventListener('mouseover', onOver)
       container.removeEventListener('mouseout', onOut)
+      container.removeEventListener('click', onClick)
     }
-  }, [container, markers, editKey])
+  }, [container, markers, editKey, pinnedKey, cancelClose])
+
+  /**
+   * A click anywhere that is neither the rail nor a comment highlight releases
+   * the latch. Without this the only way out is hitting the same highlight
+   * again, which is not where anyone looks.
+   */
+  useEffect(() => {
+    if (!pinnedKey) return
+    const onDocClick = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('.rm-comment-rail')) return
+      if (target.closest('mark[data-comment], ritemark-comment')) return
+      setPinnedKey(null)
+      setOpenKey(null)
+    }
+    // Capture so a stopPropagation inside the editor cannot strand the latch.
+    document.addEventListener('click', onDocClick, true)
+    return () => document.removeEventListener('click', onDocClick, true)
+  }, [pinnedKey])
 
   const remove = useCallback(
     (m: RailMarker) => {
@@ -749,6 +837,7 @@ export function MarginCommentRail({
         editor.chain().focus().deleteRange({ from: m.nodePos, to: m.nodePos + (node?.nodeSize ?? 1) }).run()
       }
       setOpenKey(null)
+      setPinnedKey(null)
       rescan()
     },
     [editor, rescan],
@@ -895,11 +984,26 @@ export function MarginCommentRail({
             marker={m}
             density={density}
             geometry={geometry}
-            open={composing || openKey === m.key}
+            open={composing || openKey === m.key || pinnedKey === m.key}
+            pinned={pinnedKey === m.key}
             composing={composing}
             sendState={sendStates[m.key]}
-            onOpen={() => setOpenKey(m.key)}
-            onClose={() => setOpenKey((k) => (k === m.key ? null : k))}
+            onOpen={() => {
+              cancelClose()
+              setOpenKey(m.key)
+            }}
+            onClose={() => {
+              // Escape and blur release the latch too — otherwise a pinned
+              // bubble could only be dismissed by clicking, and a keyboard
+              // user would be stuck with it open.
+              setOpenKey((k) => (k === m.key ? null : k))
+              setPinnedKey((k) => (k === m.key ? null : k))
+            }}
+            onTogglePin={() => {
+              cancelClose()
+              setOpenKey(m.key)
+              setPinnedKey((k) => (k === m.key ? null : m.key))
+            }}
             onEdit={() => {
               setOpenKey(m.key)
               setEditKey(m.key)
