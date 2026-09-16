@@ -12,23 +12,31 @@ Shell-tier on two independent grounds: the Sprint 116 runtime binaries, and patc
 | 117 | Comment→agent honesty: host-owned task ledger, real status, reply on the comment | Gate 1 |
 | 126 | Report AI issue (status bar + AI Information → `info@productory.eu`); no Git/Node download offers | Gate 1 for reporting; **Windows for the Git-absent case** |
 
+## arm64 candidate — 2026-09-16
+
+Built in `.worktrees/release-a8343678e72a-2` (Node 22.x arm64). DMG `dist/Ritemark-1.11.0-darwin-arm64.dmg`, **623,571,703 bytes**, SHA-256 `9a367b3da2280807a01e7b7a6a6e3b0eb69bf23cb3ca01da508db1489fcf231c`, built **2026-09-16 09:35:56 EEST** (hardening clock). **Not notarized.**
+
+Built the `ditto` → `hdiutil create` UDRW → `hdiutil convert` UDZO zlib-9 → `codesign` way: `create-dmg` cannot drive Finder from a non-interactive session (AppleScript **-1743**), the same fallback v1.10.1 used.
+
+Two earlier attempts were discarded rather than repaired, and the reason is worth keeping: the first signing run hit a transient `--timestamp` failure on one component of fifty-two. Hand-signing that file broke the bundle seal; re-running signing then failed the provenance gate (correctly — the first pass had already changed extension bytes); and clearing the output and rebuilding failed the *source* gate, because `build-prod.sh` leaves `vscode/` patched, so a built release worktree is spent. The third attempt, in a fresh worktree, signed **52 components, 0 failures** with no other change.
+
 ## Automated checks (before handover)
 
-- [ ] `validate-qa.sh` exits 0 on the source commit
-- [ ] Preflight passed in the release worktree (one expected warning: extension symlink created during build)
-- [ ] `build-prod.sh` clean; committed `media/webview.js` reproduced byte-for-byte
-- [ ] Embedded provenance records `target=darwin-arm64`, `sourceCommit=a8343678`, `vscodeCommit=10c8e557`
-- [ ] All 16 patches applied, including `016-ritemark-store-acquisition-policy`
-- [ ] `ritemarkVersion` is `1.11.0` in the built app
+- [x] `validate-qa.sh` exits 0 on the source commit
+- [x] Preflight passed in the release worktree (one expected warning: extension symlink created during build)
+- [x] `build-prod.sh` clean; committed `media/webview.js` reproduced byte-for-byte (8,869,400 bytes both sides)
+- [x] Embedded provenance records `target=darwin-arm64`, `sourceCommit=a8343678`, `vscodeCommit=10c8e557`
+- [x] All 16 patches applied, including `016-ritemark-store-acquisition-policy`
+- [x] `ritemarkVersion` is `1.11.0` in the built app
 
-## Mounted arm64 DMG hard checks
+## Mounted arm64 DMG hard checks — 2026-09-16
 
-- [ ] Extension present; `webview.js` byte-identical to the committed bundle
-- [ ] `node_modules` complete (`check-bundled-extension-complete.sh`)
-- [ ] App and DMG Team ID `JKBSC3ZDT5`; deep `codesign --verify --strict`; hardened runtime
-- [ ] 0 zero-byte `.js` under `out/`; only `darwin-arm64` under `binaries/agents/`
-- [ ] Bundled runtimes execute from the signed bundle: `claude` 2.1.270, `codex-app-server` 0.154.0, `opencode` 1.18.30
-- [ ] `spctl` rejects — expected until notarized
+- [x] Extension present; `webview.js` 8,869,400 bytes, byte-identical to the committed bundle
+- [x] `node_modules` 86 top-level entries; 0 zero-byte `.js` under `out/`
+- [x] App and DMG both `TeamIdentifier=JKBSC3ZDT5`; hardened runtime (`flags=0x10000(runtime)`)
+- [x] **Bundled runtimes execute from the signed bundle**: `claude` 2.1.270, `codex-app-server` 0.154.0, `opencode` 1.18.30 — all three re-signed under `JKBSC3ZDT5`. This is the Sprint 116 baseline confirmed on **arm64 only**; Intel and Windows remain Gate 2.
+- [x] **Sprint 126 present in the shipped app**: status bar item and report dialog in the bundles, `info@productory.eu` carried; `git-scm.com/download` **0 occurrences** in `extensions/git/package.nls.json`; `clickHereToInstall` **0 occurrences** in the built workbench. The Windows SCM string now begins `"Source control depends on Git being installed."` — no line parses to a single link, so nothing renders as a button.
+- [x] `spctl` reports `rejected` — expected until notarized
 
 ## ⛔ Gate 1 — Jarmo, on the installed arm64 DMG (un-notarized)
 
