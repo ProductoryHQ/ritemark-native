@@ -39,8 +39,8 @@
 
 - [x] Patch the three `scm.missing.*` strings: drop the bare link line, keep the explanation and the reload/troubleshoot commands
 - [x] Patch the two welcome-page launch checks: keep the status line, drop the install action
-- [ ] Applicability check that fails loudly if an upstream bump restores the strings
-- [ ] Verify on Windows: Git absent → no button; Git installed → Source Control unchanged
+- [ ] Applicability check that fails loudly if an upstream bump restores the strings — **carried out of the sprint**, see below
+- [ ] Verify on Windows: Git absent → no button; Git installed → Source Control unchanged — **not run**, needs a machine without Git
 
 ## Phase 5 — Evidence and closeout (W5 — RQ7, RQ8)
 
@@ -49,8 +49,8 @@
 - [ ] Replacement artwork for the identified `StoreLogo2`, and every other image checked — **Jarmo, his own work; the sprint produces no Store imagery**
 - [ ] Reviewer reproduction instructions, naming `info@productory.eu` and its monitoring by the Ritemark team
 - [ ] `docs/microsoft-store-submission/` updated with final asset mapping and dated evidence
-- [ ] `docs/CHANGELOG.md` and the v1.11.0 release notes
-- [ ] `architecture.md` updated for the new message contract and module
+- [x] `docs/CHANGELOG.md` and the v1.11.0 release notes
+- [x] `architecture.md` updated for the new message contract and module
 - [ ] Repository QA green; release gates; new candidate at a new immutable URL
 
 ## Verified on the running dev instance (2026-09-15)
@@ -78,6 +78,11 @@ Two defects were found this way and fixed: a three-button footer whose labels ea
 - A per-turn report control, and any change to the transcript components.
 - Any feature-flag promotion, and any Store-specific build variant.
 - Moderation or classification of reported content.
+
+## Carried out of the sprint, deliberately
+
+- **A patch-applicability check for the `scm.missing` strings.** An upstream VS Code bump can restore them silently. The check belongs with the patch tooling rather than with this sprint's code, and `apply-patches.sh --dry-run` is already known to misreport (it says "can apply" for patches that are applied), so a check bolted on now would inherit that unreliability. Worth its own issue.
+- **The Windows Git-absent verification.** Needs a machine without Git. The structural guarantee — no action argument in either branch, no single-link line in any `scm.missing` string — is what stands in for it, and the sprint record says so rather than implying a test that did not run.
 
 ## Cannot be claimed as verified until it happens
 

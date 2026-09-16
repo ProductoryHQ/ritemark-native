@@ -27,3 +27,16 @@ A comment task is now a real thing the extension host owns and tracks:
 - If you address a comment to one agent but the open conversation is running a different one, the line above the Send button tells you beforehand that the agent you mentioned takes over.
 
 Hovering the highlighted text opens its comment, and a finished comment offers **Mark as done** instead of a red trash can. This sprint also absorbed the comment ergonomics planned for v1.12.0: the comment composer resizes, the `@` picker opens immediately and uses the same agent-alias vocabulary as the comment collector, and collapsed comments no longer cover the text they annotate.
+
+## Reporting AI output, and a cleaner Store listing
+
+Microsoft's certification review of the Windows submission returned four findings. Two of them change the app.
+
+**You can report AI output you object to.** A **Report AI issue** item sits in the status bar beside the AI indicator, visible whether or not the AI sidebar is open; the AI Information dialog carries the same entry. Both open one window. You paste or describe the output and edit it freely, and the window shows exactly what travels with it: the Ritemark version, the platform, and the time. Nothing is taken from your conversation, your documents, or your account — not filtered out, simply never collected.
+
+It opens your email app addressed to `info@productory.eu`, which the Ritemark team monitors. If no email app is set up, the address and the full report are shown with a copy button, which is a normal outcome rather than an error. Ritemark never tells you the report was sent: it can see that it handed the report to your email app, and it cannot see what happens after that, so it does not pretend otherwise.
+
+**Ritemark no longer offers to download Git or Node.** Source Control and the welcome page still say what is missing on your machine; they no longer link out to fetch it. Source Control itself is untouched when Git is installed.
+
+Alongside those, dialogs opened in the AI sidebar now use its full width instead of clipping their own text inside a centred card, and no longer sit underneath the conversation rail.
+

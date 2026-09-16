@@ -258,6 +258,33 @@ comment-task/accept  ──────────→   validate ids in the Tex
 | Cancel normalisation (F24) has no automated test | The decision lives inside `UnifiedViewProvider`'s `agent-execute` closure with no pure-function seam. Needs the three-runtime manual cancel matrix and a `debugTrace` of what Claude's `session.cancel()` delivers to `onComplete`. |
 | No live end-to-end pass | Verification is compile plus unit tests. The narrow-width marker geometry is arithmetic against the current `.ProseMirror` layout, not measured on RunDev, and no React rendering harness exists for the picker/composer keyboard matrix. |
 
+### AI output reporting (Sprint 126)
+
+Microsoft Store policy 11.16 requires a working way for a user to report inappropriate generated output. Two entry points — a status bar item at right/priority 99 (between the AI status at 100 and scheduled tasks at 98) and an entry in the AI Information dialog — open one webview dialog. Both route through the host: the AI Information entry sends `report/request-open` rather than opening locally, because the host is the only side that knows the app version.
+
+| Module | Role |
+|---|---|
+| `src/reporting/composeReport.ts` | Pure builder. Its **signature is the privacy contract** — see below. |
+| `src/reporting/reportCopy.ts` | Every user-visible string, so the honesty rule is assertable in one test. |
+| `src/reporting/reportTransport.ts` | `mailto:` construction and the encoded-length bound. Imports no `vscode`; takes `openExternal` as a string function, so it runs under `tsx` in a plain Node test. |
+| `src/reporting/protocol.ts` | Typed `report/open-mail` message and result, validated field by field. |
+| `src/reporting/reportStatusBar.ts` | The status bar item and its command. |
+| `webview/.../reporting/ReportDialog.tsx` | The window, reached both ways. |
+
+Two properties are worth keeping when this code is touched.
+
+**The payload bound is a signature, not a filter.** Neither entry point has a model output in hand, so `composeReport` is never *given* a conversation, a document, a path, a workspace name, a runtime or a credential. It carries a timestamp, the app version and platform, and what the user typed. Widening `ReportContextV1` turns a construction guarantee back into a filtering problem; the negative tests exist to make that decision visible rather than silent.
+
+**Ritemark never claims delivery.** It hands the report to a mail client and learns nothing more — `openExternal` resolving true means the OS accepted the URI, not that a compose window appeared. So no string may say sent/delivered/received, the report text and a Copy control stay on screen in *every* outcome, and the support address is permanently visible. The copy fallback is a first-class state with its own test, because a reviewer on a clean Windows machine with no mail account will land there.
+
+Over `MAILTO_MAX_URL_CHARS` (1800 encoded) the transport returns `too-long` **before** opening anything: handlers truncate long URLs silently, which would drop exactly the content being reported.
+
+### Modal layering (Sprint 126)
+
+`DialogContent` and `DialogOverlay` sit at **z-80**. Before this they were z-50, below `ThreadRail` and `DocumentHeader` (z-60) and the Comments menu (z-70), so app chrome painted over modals; `ConversationsPanel` had a private workaround that shifted and shrank its dialog to dodge the 56px rail. z-80 stays *below* the z-90/z-100 popovers, which must remain visible when they open from inside a dialog — that ceiling is deliberate.
+
+Below 640px a dialog goes full bleed: no inset, no rounded corners, no border. The AI sidebar is typically 280–500px, where a centred card spends its width on margins and then clips its own prose.
+
 ---
 
 ## Agent Runtime Architecture
