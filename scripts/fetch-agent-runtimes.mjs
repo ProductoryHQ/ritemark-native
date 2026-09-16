@@ -101,10 +101,65 @@ function listFiles(root) {
   return files.sort();
 }
 
+/**
+ * Significant tokens of an expected `file(1)` description.
+ *
+ * The manifest states patterns as whole sentences ("PE32+ executable (console)
+ * x86-64, for MS Windows"), but libmagic reorders and extends its output across
+ * versions and hosts — a Windows runner now answers "PE32+ executable for MS
+ * Windows 6.00 (console), x86-64, 8 sections". An exact substring match turns
+ * every such drift into a release-blocking build failure, which is what
+ * happened to v1.6.3 (5 commits) and again to v1.11.0.
+ *
+ * Only the tokens that actually identify the format and the architecture are
+ * required, in any order. The rest of the sentence is commentary.
+ */
+export function architectureTokens(pattern) {
+  return pattern
+    .split(/[\s,()]+/)
+    .filter(Boolean)
+    .filter((token) => /^(PE32\+?|Mach-O|x86[-_]64|arm64|i386|64-bit)$/i.test(token));
+}
+
+/** First two bytes, as a hint of last resort when `file` is unavailable. */
+function magicBytes(file) {
+  const handle = fs.openSync(file, 'r');
+  try {
+    const buffer = Buffer.alloc(4);
+    fs.readSync(handle, buffer, 0, 4, 0);
+    return buffer;
+  } finally {
+    fs.closeSync(handle);
+  }
+}
+
 function checkArchitecture(file, pattern) {
   if (!pattern) return;
-  const output = run('file', ['-b', file], { capture: true });
-  if (!output.includes(pattern)) fail(`${file} architecture mismatch: expected "${pattern}", found "${output}"`);
+
+  let output = '';
+  try {
+    output = run('file', ['-b', file], { capture: true });
+  } catch {
+    output = '';
+  }
+
+  const tokens = architectureTokens(pattern);
+  if (output && tokens.length) {
+    const missing = tokens.filter((token) => !new RegExp(token.replace('+', '\\+'), 'i').test(output));
+    if (!missing.length) return;
+    fail(`${file} architecture mismatch: expected ${JSON.stringify(tokens)}, missing ${JSON.stringify(missing)}, found "${output}"`);
+  }
+
+  // `file` gave nothing usable. Magic bytes are the truth the pattern only
+  // describes: MZ for a PE, the Mach-O 64-bit magics otherwise.
+  const magic = magicBytes(file);
+  const wantsPE = /^PE32/i.test(pattern);
+  const looksPE = magic[0] === 0x4d && magic[1] === 0x5a; // "MZ"
+  const machMagics = [0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca];
+  const looksMachO = machMagics.includes(magic.readUInt32BE(0)) || machMagics.includes(magic.readUInt32LE(0));
+  if (wantsPE ? looksPE : looksMachO) return;
+
+  fail(`${file} architecture mismatch: expected "${pattern}", file(1) unavailable and magic bytes ${magic.toString('hex')} do not match`);
 }
 
 function smoke(file, args, row) {
