@@ -1,11 +1,11 @@
 # Sprint 126 — Microsoft Store Certification Gaps
 
 **Release:** [v1.11.0](../release-plan.md) · [milestone 11](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
-**Status:** Planned — release inclusion requested by Jarmo on 2026-09-15, and on the same day moved to the front of v1.11.0: Sprints 118 and 119 were deferred to v1.12.0, leaving this as the release’s only remaining sprint. Phase 0 audit, implementation scope approval, and kickoff remain pending.<br>
+**Status:** **R2 and R4 merged 2026-09-16** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). R1 (Freemium) and R3 (StoreLogo2 artwork) are Jarmo's Partner Center work and remain open; the resubmission depends on them plus a new signed candidate at a new immutable URL.<br>
 **Track:** Audit-first; shared AI UX/host boundary, targeted VS Code distribution patch, and Store metadata operations.<br>
 **Owner:** Jarmo (scope, external account actions, release gates); implementation/QA assignees TBD at kickoff.<br>
-**Issue:** Pending scope freeze; create under the existing v1.11.0 milestone at kickoff.<br>
-**Branch:** Not created. Proposed `codex/sprint-126-store-certification` after scope approval.<br>
+**Issue:** [#305](https://github.com/ProductoryHQ/ritemark-native/issues/305) under milestone `v1.11.0`, closed with the merge.<br>
+**Branch:** `sprint-126-store-certification`, merged and deleted.<br>
 **Created:** 2026-09-15
 
 ## Goal
