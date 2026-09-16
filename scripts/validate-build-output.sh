@@ -418,12 +418,22 @@ if [[ "$TARGET" == "win32-x64" ]]; then
         while IFS= read -r -d '' exe; do SIGN_TARGETS+=("$exe"); done < <(find "$AGENTS_SIGN_DIR" -type f -name '*.exe' -print0)
       fi
 
+      # `/all` matters and its absence cost a release: verify-windows-signatures.ps1
+      # verifies the same files with `verify /pa /all` and passes, while `/pa`
+      # alone reported every executable as unsigned. Two implementations of one
+      # check, drifting apart — the same shape as the v1.6.3 file(1) incident.
+      #
+      # The output is no longer discarded either. Swallowing signtool's stderr
+      # turned a specific, fixable complaint into "not signed or invalid
+      # signature", which is indistinguishable from an actual unsigned binary
+      # and sent the v1.11.0 Windows build round a second diagnosis cycle.
       for stgt in "${SIGN_TARGETS[@]}"; do
         echo -n "  $(basename "$stgt")... "
-        if "$SIGNTOOL" verify /pa "$stgt" > /dev/null 2>&1; then
+        if SIGN_OUTPUT="$("$SIGNTOOL" verify /pa /all "$stgt" 2>&1)"; then
           echo -e "${GREEN}OK${NC} (signed)"
         else
           echo -e "${RED}FAIL${NC} (not signed or invalid signature)"
+          echo "$SIGN_OUTPUT" | sed 's/^/      /'
           ERRORS=$((ERRORS + 1))
         fi
       done
