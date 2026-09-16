@@ -15,6 +15,7 @@ import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
 import { getSetupStatus } from './agent/setup';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
+import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
@@ -364,6 +365,13 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     unifiedViewProvider,
   );
+
+  // ── AI output reporting (Sprint 126, RQ1) ──────────────────────────────────
+  // Microsoft Store policy 11.16 wants a discoverable, working way to report
+  // inappropriate generated output. The status bar item is on screen from
+  // launch, whether or not the sidebar is open, and shares its window with the
+  // entry inside the AI Information dialog.
+  registerReportStatusBar(context, () => unifiedViewProvider.openReportWindow());
 
   // ── Comment tasks (Sprint 117, #292) ───────────────────────────────────────
   // One host-owned ledger for "send this comment to an agent". Composed here,

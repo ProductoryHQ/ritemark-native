@@ -21,6 +21,7 @@ import {
   type AIIdentity,
   type DisclosureContextInput,
 } from './aiDisclosure';
+import { REPORT_COPY } from '../../../../src/reporting/reportCopy';
 
 interface AIInformationDialogProps {
   identity: AIIdentity;
@@ -29,6 +30,8 @@ interface AIInformationDialogProps {
   showFirstUse: boolean;
   onOpenChange: (open: boolean) => void;
   onAcknowledge: () => void;
+  /** Sprint 126 (RQ1): the second way to reach the report window. */
+  onReport: () => void;
 }
 
 interface AIFirstUseDisclosureProps {
@@ -128,12 +131,13 @@ export function AIInformationDialog({
   showFirstUse,
   onOpenChange,
   onAcknowledge,
+  onReport,
 }: AIInformationDialogProps) {
   const contextRows = buildDisclosureContextRows(context);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%_-_32px)] max-w-[500px]">
+      <DialogContent className="max-w-[500px]">
           <DialogHeader icon={<Icon name="shield-check" size={20} tone="active" />} onClose={() => onOpenChange(false)}>
             <DialogTitle>AI information</DialogTitle>
           </DialogHeader>
@@ -205,6 +209,26 @@ export function AIInformationDialog({
               <p className="text-[10px] leading-relaxed text-[var(--r-ink-muted)]">
                 The selected runtime uses the account or API key configured for it and connects directly to its provider; Productory does not proxy AI requests. Separately, when Ritemark analytics is enabled, the app sends anonymous product-usage events to PostHog. Those events do not include prompt or file contents. Written feedback text is sent only when you explicitly submit it.
               </p>
+            </section>
+
+            <section className="rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] p-3" aria-labelledby="ai-report-output">
+              <h3 id="ai-report-output" className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--r-ink-strong)]">
+                <Icon name="warning-circle" size={14} />
+                {REPORT_COPY.informationEntryLabel}
+              </h3>
+              <p className="mt-1 text-[10px] leading-relaxed text-[var(--r-ink-muted)]">
+                {REPORT_COPY.informationEntryDetail}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  onReport();
+                }}
+                className="mt-2 bg-transparent p-0 text-[11px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+              >
+                {REPORT_COPY.dialogTitle}
+              </button>
             </section>
 
             <div className="flex flex-wrap gap-x-3 gap-y-1.5 border-t border-[var(--r-hairline)] pt-3">
