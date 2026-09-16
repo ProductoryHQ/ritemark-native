@@ -28,6 +28,13 @@ export const REPORT_COPY = {
   bodyPlaceholder: 'Paste the AI output you are reporting, and say what is wrong with it.',
   contextLabel: 'Included with your report',
 
+  /**
+   * Always on screen, not only in the fallback. Whatever the buttons do —
+   * and Ritemark cannot see whether a mail client actually appeared — the
+   * user must never be left without a way to reach a person.
+   */
+  directContactLabel: 'Write to us',
+
   /** Actions. Named for what happens, not for a delivery we cannot see. */
   primaryAction: 'Open email',
   cancelAction: 'Cancel',

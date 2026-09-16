@@ -29,7 +29,11 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-[rgba(30,27,75,0.45)] backdrop-blur-[6px]',
+      // z-80 puts a modal above the app chrome that would otherwise paint over
+      // it — ThreadRail and DocumentHeader at z-60, the Comments menu at z-70 —
+      // while staying below the popovers at z-90/z-100, which have to remain
+      // visible when they open from inside a dialog.
+      'fixed inset-0 z-[80] bg-[rgba(30,27,75,0.45)] backdrop-blur-[6px]',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
@@ -48,11 +52,20 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 w-full max-w-[480px] translate-x-[-50%] translate-y-[-50%]',
+        // Wide host (the editor area): a centred card with breathing room.
+        'fixed left-[50%] top-[50%] z-[80] w-[calc(100%-32px)] max-w-[480px] translate-x-[-50%] translate-y-[-50%]',
         'flex flex-col max-h-[80vh]',
         'rounded-lg shadow-ritemark-lg',
         'bg-surface text-ink-strong',
         'border border-hairline',
+        // Narrow host (the AI sidebar, typically 280-500px): full bleed. A
+        // centred card there spends its scarce width on margins and then
+        // clips its own prose. Below 640px the dialog takes the whole
+        // viewport, drops its corners and border, and lets DialogBody scroll.
+        'max-[640px]:inset-0 max-[640px]:left-0 max-[640px]:top-0',
+        'max-[640px]:translate-x-0 max-[640px]:translate-y-0',
+        'max-[640px]:h-full max-[640px]:w-full max-[640px]:max-h-none max-[640px]:max-w-none',
+        'max-[640px]:rounded-none max-[640px]:border-0',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

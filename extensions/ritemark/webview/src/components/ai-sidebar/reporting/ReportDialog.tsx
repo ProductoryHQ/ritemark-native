@@ -116,7 +116,7 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%_-_32px)] max-w-[520px]">
+      <DialogContent className="max-w-[520px]">
         <DialogHeader icon={<Icon name="warning-circle" size={20} tone="active" />} onClose={() => onOpenChange(false)}>
           <DialogTitle>{REPORT_COPY.dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -153,13 +153,22 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
               rows={7}
               className="w-full resize-y rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)] p-2.5 text-[12px] leading-relaxed text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
             />
-            <button
-              type="button"
-              onClick={copy}
-              className="mt-1.5 bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
-            >
-              {copied ? REPORT_COPY.copiedAction : REPORT_COPY.copyAction}
-            </button>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <button
+                type="button"
+                onClick={copy}
+                className="bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+              >
+                {copied ? REPORT_COPY.copiedAction : REPORT_COPY.copyAction}
+              </button>
+              {/* The address is always visible, not only in the fallback.
+                  Ritemark cannot observe whether a mail client appeared, so
+                  the user is never left without a way to reach a person. */}
+              <span className="text-[10px] text-[var(--r-ink-muted)]">
+                {REPORT_COPY.directContactLabel}:{' '}
+                <span className="select-text font-medium text-[var(--r-ink-strong)]">{REPORT_RECIPIENT}</span>
+              </span>
+            </div>
           </section>
 
           {handedOver && (

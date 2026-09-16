@@ -50,7 +50,10 @@ interface DeleteTarget {
 
 // Radix portals into the full webview, which also contains the permanent 56px rail.
 // Offset by half the rail and reserve 16px margins inside the conversation pane.
-const CONVERSATION_DIALOG_LAYOUT = 'left-[calc(50%_-_28px)] w-[calc(100%_-_88px)] max-w-[320px]';
+// The 56px ThreadRail used to paint over dialogs (z-60 vs z-50), so this
+// dialog shifted and shrank to dodge it. The dialog now sits at z-80, so only
+// the max-width remains — and below 640px DialogContent goes full bleed anyway.
+const CONVERSATION_DIALOG_LAYOUT = 'max-w-[320px]';
 const CONVERSATION_DIALOG_FOOTER_LAYOUT = 'flex-col gap-2 px-4 min-[280px]:flex-row min-[280px]:gap-2.5 min-[280px]:px-5';
 const CONVERSATION_DIALOG_ACTION_LAYOUT = 'w-full min-[280px]:w-auto';
 

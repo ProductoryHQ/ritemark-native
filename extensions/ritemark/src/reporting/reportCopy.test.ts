@@ -80,4 +80,12 @@ test('the status bar item is labelled for what it does', () => {
   assert.ok(REPORT_COPY.statusBarTooltip.length > REPORT_COPY.statusBarLabel.length, 'the tooltip explains further')
 })
 
+test('the address is part of the standing vocabulary, not only the fallback', () => {
+  assert.ok(/write to us/i.test(REPORT_COPY.directContactLabel), 'invites the user to write')
+  // The dialog renders this label next to REPORT_RECIPIENT unconditionally.
+  // Ritemark cannot observe whether a mail client appeared, so a user must
+  // never be left with no way to reach a person.
+  assert.ok(REPORT_RECIPIENT.includes('@'), 'a real address backs the label')
+})
+
 console.log(`\nreportCopy: ${passed} passed`)

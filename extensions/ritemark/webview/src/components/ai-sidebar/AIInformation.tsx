@@ -137,7 +137,7 @@ export function AIInformationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%_-_32px)] max-w-[500px]">
+      <DialogContent className="max-w-[500px]">
           <DialogHeader icon={<Icon name="shield-check" size={20} tone="active" />} onClose={() => onOpenChange(false)}>
             <DialogTitle>AI information</DialogTitle>
           </DialogHeader>
