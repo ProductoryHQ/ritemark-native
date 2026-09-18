@@ -297,6 +297,11 @@ Output: `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed, **NOT notarized**). Same r
 
 ```bash
 gh run list --workflow=build-windows.yml --limit 3
+# Download the Windows artifact next to the x64 one, then stage the installer for Step 8
+gh run download <windows-run-id> --name ritemark-windows-installer --dir dist/win-ci
+cp dist/win-ci/Ritemark-Setup.exe dist/Ritemark-Setup.exe
+# dist/win-ci/ also holds Ritemark-Setup.sha256.txt (sha256, source_commit,
+# workflow_commit, store_url) and roundtrip-evidence/ — Step 10 archives both
 # Jarmo downloads Windows artifact + the signed (un-notarized) x64 DMG, tests both
 ```
 
@@ -435,7 +440,8 @@ gh api repos/$REPO/releases/latest --jq .tag_name                     # this tag
 # pre-staple and will NOT match the published (stapled) DMG. A "differs" line
 # here is expected, not a block. The Windows *-setup.sha256.txt is PowerShell
 # CRLF, so strip CR before comparing.
-for h in $(cat dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/*-setup.sha256.txt | tr -d '\r'); do
+cmp dist/win-ci/Ritemark-Setup.exe dist/Ritemark-Setup.exe        # the staged installer is the CI artifact
+for h in $(cut -d' ' -f1 dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/win-ci/Ritemark-Setup.sha256.txt | tr -d '\r'); do
   grep -q "^$h " "$T/local.txt" && echo "matches published    $h" || echo "differs (pre-staple?) $h"
 done
 ```
@@ -478,8 +484,9 @@ W=<absolute path of the release worktree>
 E=docs/releases/v$V/evidence
 mkdir -p "$E/win32-roundtrip"
 cp "$W/dist/update-feed.json" "$E/"
-cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"   # build-time (pre-staple) hashes
-cp "$W"/dist/win32-roundtrip-evidence/*result.json "$E/win32-roundtrip/"
+cp "$W"/dist/*.dmg.sha256 "$E/"                                          # build-time (pre-staple) hashes
+cp "$W/dist/win-ci/Ritemark-Setup.sha256.txt" "$E/Ritemark-$V-win32-x64-setup.sha256.txt"
+cp "$W"/dist/win-ci/roundtrip-evidence/*result.json "$E/win32-roundtrip/"
 cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
 cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
 cp "$T/published.txt" "$E/published-assets.txt"   # authoritative post-staple published hashes
@@ -490,7 +497,7 @@ What is deliberately left out:
 - The DMGs and the installer — the GitHub Release is their archive, and 10.1
   just proved it holds the same bytes. Partner Center and `getritemark.com`
   take that same file; neither needs the local copy.
-- `win32-roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
+- `win-ci/roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
   uninstall logs, Git-ignored by `*.log`. Their outcomes are in the
   `.result.json` files, and the `ritemark-windows-installer` CI artifact keeps
   the full set for 30 days after the run.
