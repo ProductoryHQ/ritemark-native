@@ -1,6 +1,7 @@
 # Evidence
 
 - `reconciliation-2026-09-11.md` records the v1.10.1 reconciliation, HTTP/TLS recheck and passing repository QA.
+- `hosting-verification-2026-09-18.md` records the v1.11.0 immutable object identity and anonymous HTTPS/header/size/hash verification.
 
 This directory stores reusable Microsoft Store preparation evidence that does not belong in a single release folder.
 

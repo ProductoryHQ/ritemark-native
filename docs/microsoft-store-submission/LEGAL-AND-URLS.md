@@ -1,6 +1,6 @@
 # Legal, support, and public URLs
 
-Last installer HTTP/TLS check: **2026-09-11**. Legal/support page checks remain dated 2026-09-01.
+Last installer HTTP/TLS and hash check: **2026-09-18**. Legal/support page checks remain dated 2026-09-01.
 
 ## Canonical submission URLs
 
@@ -11,7 +11,7 @@ Last installer HTTP/TLS check: **2026-09-11**. Legal/support page checks remain 
 | Product support | `https://ritemark.app/en/support/` | HTTP 200 | Yes |
 | Privacy policy | `https://www.productory.ai/en/privacy/` | HTTP 200 | Yes |
 | License / terms | `https://www.productory.ai/en/terms/` | HTTP 200 | Yes |
-| Installer host | `https://getritemark.com` | Public DNS, valid HTTPS, direct v1.10.1 response, and fresh-download hash passed | Yes |
+| Installer host | `https://getritemark.com` | Public DNS, valid HTTPS, direct v1.11.0 response, and fresh-download hash passed | Yes |
 
 Use explicit `/en/` policy URLs so the English Store listing does not depend on location-based redirects.
 
@@ -40,7 +40,7 @@ Ritemark's source repository is MIT-licensed, but the public Store listing shoul
 
 ## Installer hosting
 
-The production host is `getritemark.com`, backed by Cloudflare R2. DNS, HTTPS, and direct object delivery were verified with a safe probe on 2026-09-07. Both v1.10.0 (2026-09-07) and v1.10.1 (2026-09-10) were uploaded to the versioned key under the indefinite `windows/` lock and downloaded again from the final URL with the approved SHA-256.
+The production host is `getritemark.com`, backed by Cloudflare R2. DNS, HTTPS, and direct object delivery were verified with a safe probe on 2026-09-07. v1.10.0, v1.10.1 and v1.11.0 were uploaded to separate versioned keys under the indefinite `windows/` lock and downloaded again from their final URLs with the approved SHA-256. The current Store candidate is v1.11.0, verified 2026-09-18.
 
 Required behavior, checked for every candidate:
 
@@ -60,7 +60,7 @@ The complete architecture and operational procedure are in [`HOSTING-AND-DOWNLOA
 
 ## Public support identity
 
-The support URL is ready. A public support email remains an explicit Jarmo decision. Do not expose the private/account-verification contact merely because it appears in onboarding. If Partner Center requires an email, confirm the customer-facing mailbox and response owner first.
+The support URL and public support email `info@productory.eu` are approved for the Store listing and the AI-reporting workflow. Private/account-verification contacts remain out of scope.
 
 ## Recheck commands
 

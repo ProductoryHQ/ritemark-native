@@ -1,6 +1,6 @@
 # Microsoft Store visual assets
 
-Last inventory: **2026-09-10**
+Last inventory: **2026-09-18**
 
 ## Microsoft requirements used here
 
@@ -80,9 +80,9 @@ Plan item 4 (transcription) is left out, because the Windows on-device engine is
 - [ ] English captions describe only what is visible.
 - [ ] Partner Center preview does not crop important UI.
 
-## Optional artwork
+## 2:3 poster art
 
-A dedicated 2:3 poster-art asset has not been prepared. It is recommended rather than required for this EXE listing. Create it only from approved Ritemark branding and review it separately; do not stretch the square icon.
+The certification report identified the original English (United Kingdom) `StoreLogo2` image as inaccurate because it showed Mac UI. Jarmo replaced that live 2:3 slot in Partner Center with [`posterart_windows.png`](./assets/store-screenshots/1.10.1/posterart_windows.png) on 2026-09-18 and confirmed the saved image is correct. The 720×1080 PNG shows the Windows application and contains no Mac window chrome.
 
 ## Asset replacement rule
 
