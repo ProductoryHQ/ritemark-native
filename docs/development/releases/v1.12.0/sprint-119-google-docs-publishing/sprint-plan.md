@@ -1,14 +1,16 @@
 # Sprint 119 — Publish to Google Docs
 
-**Track:** Full SDD, integration-first Phase 0<br>
-**Status:** Draft — prepared, not approved, no branch created<br>
-**Branch after approval:** `sprint-119-google-docs-publishing`<br>
-**Issue:** Pending release mapping<br>
-**Release:** [v1.12.0](../release-plan.md)
+Track: SDD (integration-first Phase 0)<br>
+Release tier: extension — all product code lands under `extensions/ritemark/`; Google's Desktop-app OAuth client uses a loopback redirect, so no shell, patch or `product.json` change is planned. Phase 0 re-confirms this.<br>
+Status: **Phase 0 — integration research (canon Phase 1 RESEARCH)**. Scope and Phase 0 were approved at kickoff on 2026-09-18. Implementation (canon Phase 2→3) stays gated on Jarmo's approval of `research/integration-decisions.md`.<br>
+Branch: `sprint-119-google-docs-publishing`, created 2026-09-18 from main `c2522479`<br>
+Worktree: `.claude/worktrees/sprint-119-google-docs-publishing`<br>
+Issue: [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) under milestone `v1.12.0`<br>
+Release: [v1.12.0](../release-plan.md)
 
 ## Release Outcome
 
-This sprint owns the v1.11 headline: a Markdown document can be published to one durable Google Doc and later synchronized to that same remote identity. It does not own two-way synchronization or make Google Docs a second source of truth.
+This sprint owns the v1.12.0 headline (it moved here from v1.11.0 on 2026-09-15): a Markdown document can be published to one durable Google Doc and later synchronized to that same remote identity. It does not own two-way synchronization or make Google Docs a second source of truth.
 
 ## SDD Artifacts
 
@@ -34,6 +36,7 @@ This sprint owns the v1.11 headline: a Markdown document can be published to one
 | R8 failure, retry, and recovery | S51–S62 | W1–W6 | fault-injection matrix |
 | R9 concurrency, observability, and privacy | S63–S69 | W1, W2, W5, W7 | race/redaction/telemetry tests |
 | R10 flag, accessibility, docs, and QA | S70–S76 | W6–W8 | accessibility, flag, docs, QA evidence |
+| R11 Ritemark's own legal pages (added 2026-09-18) | S77–S81 | W0, W8, W9 | live-URL evidence, in-app link tests, consent-screen record |
 
 ## Goal
 
@@ -56,6 +59,7 @@ Let a Ritemark author connect Google once, create a Google Doc from the current 
 - Stable local binding between the Markdown document and Google file ID, including rename/move, missing/stale/deleted remote ID, and copy semantics.
 - Explicit progress, success link, re-authentication, permission, quota, offline, conflict/overwrite, and retry feedback.
 - Tests with a fake transport plus an authenticated canary against a dedicated test account before release readiness.
+- **R11 (added 2026-09-18):** Ritemark's own privacy policy and terms on ritemark.app, with Productory Services OÜ as provider. This sprint owns the in-app link switch, the consent-screen URLs, the facts for the Google Docs section, and the evidence. The pages themselves are built in `ritemark-web`, and the Productory pages are updated in `productory-2026`; both are external dependencies (see Dependencies and Gates).
 
 ## Phase 0 Decisions
 
@@ -76,6 +80,7 @@ Phase 0 produces evidence and a recommendation for Jarmo; it does not implement 
 4. Settings integration, toolbar actions, conversion/upload/sync service, and document binding.
 5. Fake-server contract suite, conversion fixtures, and authenticated end-to-end evidence.
 6. Architecture, privacy/user documentation, changelog, release notes, and support/recovery guidance.
+7. In-app legal links on ritemark.app, and the Google Docs section facts for the Ritemark privacy policy (R11).
 
 ## Definition of Done
 
@@ -88,6 +93,7 @@ Phase 0 produces evidence and a recommendation for Jarmo; it does not implement 
 - [ ] Offline, quota, permission, cancellation, partial-upload, and retry paths preserve both the Markdown source and honest local binding state.
 - [ ] Fake transport tests and a real dedicated-account canary pass without production credentials in fixtures or logs.
 - [ ] Webview build, extension tests, feature flag, architecture gate, docs, release notes, and repository QA pass.
+- [ ] The app's privacy and terms links and the Google consent screen point to live ritemark.app pages; the Ritemark privacy policy has an approved Google Docs section; the old productory.ai URLs still resolve (R11).
 
 ## Dependencies and Gates
 
@@ -95,6 +101,8 @@ Phase 0 produces evidence and a recommendation for Jarmo; it does not implement 
 - Phase 0 must be approved before OAuth registration, dependencies, settings contracts, message contracts, or product code change.
 - Google Cloud Console configuration and consent-screen publication may require Jarmo-owned external actions; record these as release blockers, not implicit implementation steps.
 - Existing DOCX export is a candidate conversion engine, not a pre-decided solution.
+- **(revised 2026-09-18)** Phase 0 may create the Google Cloud project in **Testing** mode, with test users only, for disposable canaries; that is not the "OAuth registration" gated above. Publication, verification and the production client configuration wait for the Phase 0 gate.
+- **External dependencies (added 2026-09-18):** Ritemark privacy and terms pages in `ritemark-web` (ritemark.app), and the Productory privacy/terms update in `productory-2026` (productory.ai). They are tracked in the [release plan](../release-plan.md) because sprints are repo-scoped. Both must be live before R11 switches the in-app links and before the consent screen is published.
 
 ## Feature Flag Decision
 
@@ -109,6 +117,13 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 - Do not store a binding until Create has succeeded and the exact returned Google file ID has been verified. Never change a valid binding as an automatic retry strategy.
 - Keep the existing export normalizer as the comment-removal and unsafe-markup chokepoint; Phase 0 selects the downstream Google conversion adapter from measured results.
 
+## Product Decisions
+
+- **2026-09-18:** Kickoff approved: scope and integration-first Phase 0. Implementation is not yet authorized. — Jarmo: "jah" to the kickoff as proposed.
+- **2026-09-18:** Phase 0 may use a Testing-mode Google Cloud project with test users only; publication and verification follow the Phase 0 gate. — The package's own Phase 0 tasks needed a project that its gate text forbade.
+- **2026-09-18:** Ritemark gets its own privacy policy and terms on ritemark.app, and Productory Services OÜ stays the provider. Added as R11; the website work is split out by repository. — Jarmo: "Toode on arenenud ja seega väärt eraldi."
+- **2026-09-18:** ritemark.app is the official product domain for the consent screen's home page, privacy and terms URLs, and the authorized domain. getritemark.com remains only the Windows installer host. — Jarmo.
+
 ## Risks
 
 | Risk | Severity | Mitigation |
@@ -119,6 +134,7 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 | Template access requires broader scope than intended | High | Validate `drive.file` + Picker/copy behavior against a test account before scope approval. |
 | Local binding duplicates or targets the wrong remote file | High | Define copy/rename/Save As semantics; transactional binding updates and identity tests. |
 | Secrets or tokens leak through public code/logs | High | Secure storage, redaction tests, no client secret in repo/webview/document. |
+| Legal pages are not live when the consent screen or the in-app links need them | Medium | Start the `ritemark-web`/`productory-2026` work in parallel with Phase 0; switch links only after dated live-URL evidence; keep the old productory.ai URLs resolving. |
 
 ## Out of Scope
 
@@ -128,10 +144,10 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 - Automatic/background sync or Google Docs as a second source of truth.
 - Google Sheets, Slides, or general cloud storage integration.
 
-## Planning Approval
+## Approval
 
-- [ ] Jarmo approves scope and integration-first Phase 0.
-- [ ] GitHub issue is created and assigned to milestone `v1.12.0`.
-- [ ] Phase 0 research and all six decisions are approved.
-- [ ] SDD artifacts and feature-flag decision are approved.
-- [ ] Dedicated branch is created after approval.
+- [x] Jarmo approved this sprint plan: scope and integration-first Phase 0 (2026-09-18). This does not authorize implementation.
+- [x] GitHub issue [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) is created under milestone `v1.12.0` (2026-09-18).
+- [x] Dedicated branch `sprint-119-google-docs-publishing` is created after approval (2026-09-18, from main `c2522479`).
+- [ ] Phase 0 research and all decisions in `research/integration-decisions.md` are approved (the implementation gate).
+- [ ] SDD artifacts, including R11, and the feature-flag decision are approved.

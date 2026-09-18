@@ -3,11 +3,13 @@
 Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]` only with branch diff/evidence.
 
 > **Gate:** Phase 0 is research, disposable canaries, fixtures, design, and decision documentation only. No OAuth registration/config change, dependency addition, production message contract, or product implementation begins until Jarmo approves `research/integration-decisions.md`.
+>
+> *(revised 2026-09-18)* A Testing-mode Google Cloud project with test users only may be created for the Phase 0 canaries. Publication, verification and the production client configuration wait for the gate.
 
 ## Phase 0: Audit, canaries, and freeze (W0 — R1–R10)
 
 - [ ] Verify every current-state finding and complete `research/integration-decisions.md` with owner/date/evidence.
-- [ ] Establish a dedicated Google Cloud project/test account and record project ownership, consent status, test users, support/privacy URLs, OAuth client types, release configuration path, and external blockers without storing credentials.
+- [ ] Establish a dedicated Google Cloud project/test account in Testing mode and record project ownership, consent status, test users, support/privacy URLs (ritemark.app), OAuth client types, release configuration path, and external blockers without storing credentials.
 - [ ] Prove the exact installed-desktop OAuth flow on macOS and Windows: browser, callback, PKCE/state, timeout/cancel, token exchange/refresh/revoke, and cleanup.
 - [ ] Prove the least-privilege scope set and template grant; document why any scope beyond `drive.file` is unavoidable before requesting approval.
 - [ ] Build disposable direct-Markdown, DOCX-conversion, and native-Docs-API canaries.
@@ -96,6 +98,16 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Run focused webview/extension/export/feature/security tests and builds.
 - [ ] Run `./scripts/validate-qa.sh` through repository QA.
 - [ ] Update `docs/development/architecture.md` for subsystem/protocol/SecretStorage/binding/rename/conversion/flag, with a valid Last updated date.
-- [ ] Update privacy/security docs, Google Docs user/recovery guide, changelog, v1.11 release notes, parent release tracker, issue, and PR evidence.
+- [ ] Update privacy/security docs, Google Docs user/recovery guide, changelog, v1.12.0 release notes, parent release tracker, issue, and PR evidence.
 - [ ] Confirm all Google Cloud external blockers have owners/status and no production/test credentials appear in the repository or artifacts.
 - [ ] Verify every checked requirement/task against branch diff and evidence before readiness handoff.
+
+## Phase 9: Ritemark's own legal pages (W9 — R11) (added 2026-09-18)
+
+- [ ] Record the Google user-data facts and consent-screen fields for the privacy policy in `research/integration-decisions.md` (Phase 0 decision 8).
+- [ ] Hand off the `ritemark-web` privacy/terms pages (EN + ET, provider Productory Services OÜ, Google Docs section from the facts) and the `productory-2026` update (short Ritemark reference, links to ritemark.app, old URLs keep resolving), and record their status.
+- [ ] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78).
+- [ ] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77).
+- [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79).
+- [ ] Configure and verify the consent screen's ritemark.app URLs and authorized domain (S80), and check the policy text against the approved facts (S81).
+- [ ] Update `docs/microsoft-store-submission/LEGAL-AND-URLS.md`, and record Jarmo's Partner Center URL change.

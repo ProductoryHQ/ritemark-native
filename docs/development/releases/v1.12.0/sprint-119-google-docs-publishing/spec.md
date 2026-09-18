@@ -1,6 +1,6 @@
 # Sprint 119 Spec — Publish to Google Docs
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** pending · **Evidence:** [current-state audit](./research/current-state-audit.md), [Google API contract audit](./research/google-api-contract-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) · **Evidence:** [current-state audit](./research/current-state-audit.md), [Google API contract audit](./research/google-api-contract-audit.md)
 
 ## Purpose
 
@@ -193,6 +193,23 @@ Acceptance criteria:
 - Architecture, privacy/security docs, user guide, changelog, v1.11 release notes, issue/tracker, external OAuth blockers, and support/recovery instructions are current.
 - Focused unit/integration/webview tests, authenticated canary, native macOS/Windows matrix, extension/webview builds, and repository QA pass before readiness.
 
+*R10 (revised 2026-09-18):* the release notes this requirement names are v1.12.0's. The sprint moved there with its package unchanged on 2026-09-15; the criterion is otherwise unchanged.
+
+### R11: Ritemark's own legal pages (added 2026-09-18)
+
+As a user, I want Ritemark's privacy policy and terms to be Ritemark's own and to say plainly what happens to my Google data, so I can judge the Google connection before I grant it.
+
+Acceptance criteria:
+
+- The app's privacy and terms links point to ritemark.app: analytics consent (`extensions/ritemark/src/analytics/posthog.ts`) and AI disclosure (`extensions/ritemark/webview/src/components/ai-sidebar/aiDisclosure.ts`). No productory.ai privacy or terms URL remains in shipped extension or webview code.
+- The links switch only after the ritemark.app pages answer HTTP 200 for every URL the app uses, with dated evidence.
+- The Google OAuth consent screen names ritemark.app for the home page, privacy policy and terms URLs. ritemark.app is the authorized domain, and its ownership is verified.
+- The Ritemark privacy policy names Productory Services OÜ as provider and controller, and has a Google Docs publishing section written from the approved Phase 0 facts: the scope requested, what Ritemark reads and writes, where tokens and bindings live (on the user's device), that no document content or Google data passes through Productory servers, how to disconnect and revoke, and any Google API Services User Data Policy / Limited Use statement that publication or verification requires.
+- The pages keep every Ritemark commitment the current Productory text makes (local files, PostHog analytics with its opt-out, direct AI routes). Jarmo approves the final legal text.
+- Productory's privacy policy and terms keep a short Ritemark reference that links to ritemark.app, and their existing URLs keep resolving, so apps up to 1.11 still reach a correct policy.
+- The Microsoft Store listing's privacy and terms URLs move to ritemark.app (Jarmo, Partner Center), recorded in `docs/microsoft-store-submission/`.
+- Boundary: the web pages are built in `ritemark-web` and `productory-2026` under those repositories' own processes. This sprint owns the in-app switch, the consent-screen configuration, the Google-section facts, and the evidence.
+
 ## Non-Requirements
 
 - Two-way synchronization, conflict merge, remote edit import, change tracking, Google Docs comments, suggestions, or collaboration events.
@@ -213,5 +230,8 @@ Phase 0 ends with an approved `research/integration-decisions.md` covering:
 5. Versioned binding schema, workspace identity, rename/copy/Save As/account-switch/missing-target semantics, atomic persistence, and migration.
 6. UI copy/state model in [design.md](./design.md), including overwrite warning frequency and dirty/untitled document behavior.
 7. Feature flag, telemetry allowlist, threat/privacy model, dependency choice, architecture impact, and native/live canary matrix.
+8. *(added 2026-09-18)* The Google user-data facts for the Ritemark privacy policy (R11): scopes, data read and written, storage locations, retention, revocation, and whatever Google's publication or verification requires the policy to state.
 
 No OAuth registration, dependency addition, message-contract change, or product code starts before this gate is approved.
+
+*(revised 2026-09-18)* A Google Cloud project in **Testing** mode, with test users only, may be created during Phase 0 for disposable canaries. The production client configuration, consent-screen publication and verification remain behind this gate.
