@@ -1,6 +1,6 @@
 # Partner Center live draft
 
-Last inspected: **2026-09-02**
+Last inspected: **2026-09-18**
 
 ## Product identity
 
@@ -20,12 +20,12 @@ Onboarding is complete and all three verification checks passed. The stale new-a
 
 | Section | Live state / proposed value | Save state |
 |---|---|---|
-| Availability | 240/240 markets, discoverable, Free, future regions not automatic | Complete; no unsaved changes observed |
-| Properties | Productivity, policy/product URLs, generative-AI declaration persisted | Support-contact URL remains blank |
-| Age ratings | Questionnaire complete; IARC preview generated | Awaiting explicit IARC Terms/adult-status attestation and **Save** |
-| Packages | Final package does not exist | Intentionally blocked |
-| Store listing | Manage listing page renders without the account-verification propagation alert | No language added yet |
-| Package validation | Depends on Packages | Blocked |
+| Availability | 240/240 markets, discoverable, **Freemium**, future regions not automatic | Saved 2026-09-18 |
+| Properties | Productivity, policy/product URLs, generative-AI declaration and v1.11.0 certification notes persisted | Saved 2026-09-18 |
+| Age ratings | Questionnaire and IARC rating completed | Complete |
+| Packages | Package ID `23647104`, x64, immutable v1.11.0 URL; existing install settings preserved | Saved 2026-09-18 |
+| Store listing | English (United Kingdom) listing exists; corrected Windows 2:3 poster art saved | Complete for this remediation |
+| Package validation | Fresh v1.11.0 validation started 2026-09-18 | Running; inspect the report when complete |
 
 ## Availability decisions
 
@@ -34,9 +34,9 @@ Live confirmed values:
 - markets: 240 of 240;
 - discoverability: discoverable in Microsoft Store;
 - automatically include new regions: unchecked;
-- pricing model: `Free: no payment necessary`.
+- pricing model: `Freemium: optional in-app purchases`.
 
-Jarmo confirmed these values on 2026-09-01. Partner Center showed no unsaved Availability changes.
+Microsoft's 2026-09-15 report requires the Freemium classification because optional third-party AI may require paid provider access. Ritemark itself does not sell an in-app subscription.
 
 ## Properties mapping
 
@@ -47,7 +47,7 @@ Jarmo confirmed these values on 2026-09-01. Partner Center showed no unsaved Ava
 | Privacy policy | `https://www.productory.ai/en/privacy/` |
 | Website | `https://ritemark.app/en/` |
 | Support contact info | Intended: `https://ritemark.app/en/support/`; live field currently clears input and remains blank |
-| Public email | Pending explicit confirmation |
+| Public email | `info@productory.eu` |
 | Public phone | Pending explicit confirmation |
 | Public address | Pending explicit confirmation |
 | Non-Microsoft driver / NT service | Unchecked; final candidate audit must confirm |

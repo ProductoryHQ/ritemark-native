@@ -29,16 +29,19 @@ This log captures material Store decisions that must survive individual releases
 | 2026-09-07 | Keep the R2 development URL disabled and require TLS 1.2 or newer on the custom domain. | Only the production hostname is public; the rate-limited development hostname is not a supported download route. |
 | 2026-09-07 | Publish Store installers with the repository's guarded S3-compatible tool, atomic `If-None-Match: *`, and an indefinite R2 lock on `windows/`. | The client refuses existing keys while the service-side retention rule prevents overwrite and deletion; neither mechanism depends on operator memory alone. |
 | 2026-09-07 | Publish the approved v1.10.0 installer at `https://getritemark.com/windows/v1.10.0/Ritemark-Setup.exe`. | A fresh anonymous download matched the approved `430929984`-byte size and SHA-256 `7ada28ad…32f3`; the URL is now immutable and must never receive different bytes. |
+| 2026-09-18 | Use v1.11.0 candidate 1 for the certification-remediation resubmission. | The immutable URL returns the approved 444207592-byte installer with SHA-256 `0ebda501…932b`; v1.10.0 and v1.10.1 remain unchanged. |
+| 2026-09-18 | Classify the Store offer as Freemium while keeping the product copy explicit about third-party AI costs. | Microsoft finding R1 requires Freemium because optional providers may require subscriptions or API credits. Ritemark itself does not sell an in-app subscription. |
+| 2026-09-18 | Treat the English UK `StoreLogo2` finding as the 2:3 poster-art slot and replace it with Windows artwork. | Jarmo uploaded and saved the 720×1080 `posterart_windows.png`; the replacement contains no Mac window chrome. |
 
 ## Open decisions
 
-Reconciliation on 2026-09-11: v1.10.1 candidate 3 supersedes v1.10.0 for Store submission. Both hosted objects stay immutable. PR #275 supplies the Windows audit/screenshots; PR #277 records the later successful publication. The guarded uploader and its operational documentation are retained as release-independent tooling. See [reconciliation evidence](./evidence/reconciliation-2026-09-11.md).
+Reconciliation on 2026-09-18: v1.11.0 candidate 1 supersedes v1.10.1 for the certification-remediation resubmission. All three hosted versions stay immutable. The guarded uploader and its operational documentation remain release-independent tooling.
 
 | Decision | Owner | Needed by |
 |---|---|---|
-| Public support email | Jarmo | Before support information is finalized |
-| Final screenshot set and order | Jarmo | Before final draft review |
-| Exact Store candidate/hash | Jarmo: v1.10.1 candidate 3, `93f9adce…d77250`; direct-release approval is recorded, Store approval pending | Before package section is finalized |
+| Partner Center Freemium save | Jarmo / authorized operator | Before package validation and final draft review |
+| v1.11.0 package URL and certification notes save | Jarmo / authorized operator | Before package validation and final draft review |
+| Exact Store candidate/hash | Jarmo: v1.11.0 candidate 1, `0ebda501…932b`; installer tested and hosted, final Submit approval pending | Before final draft review |
 | Submit authorization | Jarmo | After all validation and clean-Windows evidence |
 
 ## Change procedure

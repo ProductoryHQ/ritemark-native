@@ -7,8 +7,8 @@
 - [x] Audit the generative surfaces and the acquisition promotions — [research/phase-0-audit.md](./research/phase-0-audit.md)
 - [x] Decide recipient, content policy, consent model, transport, triage owner, surface scope
 - [x] Establish that no feature-flag change is needed and that there is no separate Store build
-- [ ] Identify the live `StoreLogo2` asset in Partner Center and record it with dimensions — **Jarmo, his own work.** Blocks the resubmission, not Phases 1-4: the code track does not wait on it.
-- [ ] Capture the saved listing text that describes AI usage, for the Freemium rewrite — **Jarmo**
+- [x] Identify the live `StoreLogo2` asset in Partner Center and record it with dimensions — the reported slot is the 2:3 poster art; Jarmo replaced it with a 720×1080 Windows image on 2026-09-18.
+- [x] Capture the saved listing text that describes AI usage — it already states that optional AI can require a separate account, subscription, or API credits; the remaining action is the Freemium selector.
 - [ ] Jarmo approves this specification package
 
 ## Phase 1 — Report composition (W1 — RQ2, RQ5)
@@ -45,13 +45,13 @@
 ## Phase 5 — Evidence and closeout (W5 — RQ7, RQ8)
 
 - [ ] Packaged-app Windows evidence: report raised from the status bar and from AI Information, mail handler present and absent
-- [ ] Freemium classification and listing text saved in Partner Center — **Jarmo**
-- [ ] Replacement artwork for the identified `StoreLogo2`, and every other image checked — **Jarmo, his own work; the sprint produces no Store imagery**
-- [ ] Reviewer reproduction instructions, naming `info@productory.eu` and its monitoring by the Ritemark team
-- [ ] `docs/microsoft-store-submission/` updated with final asset mapping and dated evidence
+- [x] Freemium classification and matching listing text saved in Partner Center on 2026-09-18.
+- [x] Replacement artwork for the identified `StoreLogo2`, and every other image checked — Jarmo uploaded and saved the corrected Windows poster art.
+- [x] Reviewer reproduction instructions saved, naming `info@productory.eu` and the honest mail-handler/copy fallback.
+- [x] `docs/microsoft-store-submission/` updated with final asset mapping, v1.11.0 candidate identity, and dated hosting evidence.
 - [x] `docs/CHANGELOG.md` and the v1.11.0 release notes
 - [x] `architecture.md` updated for the new message contract and module
-- [ ] Repository QA green; release gates; new candidate at a new immutable URL
+- [ ] Repository QA green and all release gates recorded. The signed Windows candidate is complete at the new immutable URL; the wider release checklist still owns remaining cross-platform gate evidence.
 
 ## Verified on the running dev instance (2026-09-15)
 
