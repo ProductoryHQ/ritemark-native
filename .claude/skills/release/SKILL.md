@@ -37,6 +37,42 @@ gh api repos/ProductoryHQ/ritemark-native/milestones --paginate --jq '.[].title'
 
 Do not start version bumps, tags, packaging, or GitHub release work until the release plan says the release is feature complete or a release candidate.
 
+## Two rules that govern the whole sequence
+
+Both were learned the expensive way in v1.11.0. Neither is obvious from the
+step list, and breaking either invalidates work already done.
+
+### ⛔ Prove CI green BEFORE cutting a candidate
+
+Dispatch `build-windows.yml` and `build-macos-x64.yml` and get them green
+*first*, on throwaway runs if necessary. Only then build the arm64 candidate.
+
+A CI fix is a commit; a commit moves `main`; and a moved `main` invalidates
+every artifact already built (see the next rule). In v1.11.0 three latent CI
+defects surfaced one after another, and each one discarded a completed arm64
+build — one of which had already been notarized, spending an Apple submission
+on bookkeeping.
+
+### ⛔ `main` is FROZEN from the first candidate until publish
+
+`verify-release-source.sh` does not merely check that the build uses an
+approved commit. It checks that the commit **is `origin/main`'s tip right
+now**, and it refuses a named branch outright:
+
+```
+FAIL  HEAD 9e963596… does not match origin/main 897e61f3…
+FAIL  release builds may only use main or a detached origin/main commit
+      (found: release/v1.11.0-candidate)
+```
+
+So merging **anything** — including the release notes, the test checklist, or
+the candidate record — invalidates the candidate. Pushing a branch at the
+frozen commit does not help; that is the case the gate explicitly rejects.
+
+Hold those PRs open and merge them in the closeout (Step 9/10). This does not
+contradict D1: the harness may advance *after* publication, not between a
+candidate and its CI builds.
+
 ## Workflow — Full release (DMG)
 
 ### ⛔⛔ TWO HARD RULES THAT GOVERN NOTARIZATION ORDER ⛔⛔
@@ -49,6 +85,10 @@ These override the convenience of doing sign+DMG+notarize in one shot. Notarizat
 Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening (no new bugs) → notarize → publish.**
 
 ### Step 0 — Pre-flight
+
+> Read **Two rules that govern the whole sequence** above first. Cutting a
+> candidate before CI is green, or merging anything to `main` afterwards,
+> throws away everything built from this point on.
 
 ```bash
 node ./scripts/worktree-hygiene.mjs --check
@@ -65,11 +105,31 @@ worktree and recreate it; do not repair it in place.
 
 ### Step 1 — Version bump (no tag yet)
 
+**Six files carry the version, not two.** Two of them have drifted at every
+recent release — v1.10.1 bumped four of six, and the v1.10.0 bump found
+`BRANDING.json` at 1.5.4 and `VERSION` at 1.6.2. Check all six and bump all six:
+
+| File | Key |
+|---|---|
+| `branding/product.json` | `ritemarkVersion` |
+| `branding/BRANDING.json` | `version` |
+| `branding/VERSION` | the whole file |
+| `extensions/ritemark/package.json` | `version` |
+| `extensions/ritemark/package-lock.json` | `version` **and** `packages[""].version` |
+| `installer/windows/ritemark.iss` | `#define AppVersion` |
+
+The installer default is overridable with `/DAppVersion` and CI passes it, so a
+drifted `.iss` is harmless in CI — but a *local* installer build from a drifted
+tree is mislabelled.
+
 1. Make the version changes on a dedicated release-prep branch.
-2. Edit `branding/product.json` — bump `version`.
-3. Edit `extensions/ritemark/package.json` — bump `version`.
+2. Bump all six entries above. Use targeted replacement, not a JSON round-trip:
+   reformatting a release input is not something to do incidentally.
+3. Verify: the diff should be **7 insertions, 7 deletions across 6 files**.
 4. Commit, push, and merge through the normal protected-main workflow.
 5. Fetch `origin/main`; the previous preflight worktree is now invalid.
+
+This is the **last** merge to `main` until publish — see the freeze rule above.
 
 **Do NOT create the tag yet** — tag push triggers CI; we wait until Gate 1 passes.
 
@@ -89,6 +149,24 @@ requires empty output, and embeds `ritemark-build-provenance.json`. Run as a
 background task with `timeout: 600000` (10 min cap). Never pipe through
 `tail`/`head` — buffering hangs background mode.
 
+⛔ **A release worktree is single-use per build attempt.** `build-prod.sh`
+applies the patches into `vscode/`, so afterwards the submodule is no longer
+pristine and the source gate refuses the next build with *"use a new release
+worktree"*. Clearing `VSCode-*/` and `dist/` does **not** restore it. Every
+retry needs a fresh worktree:
+
+```bash
+./scripts/create-release-worktree.sh --path .worktrees/release-<commit>-2
+```
+
+Budget disk for this: each spent attempt holds ~8 GB (mostly the physical
+`vscode` submodule — clearing build output only recovers ~2.5 GB of it), and
+removal is Jarmo's call, not yours.
+
+⚠️ `.signing-config` is git-ignored, so a fresh worktree does not have it.
+Copy it from the main checkout before Step 3 or `codesign-app.sh` stops with
+`APPLE_TEAM_ID not set`.
+
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
 ### Step 3 — Sign + DMG arm64 (NO notarization yet)
@@ -97,6 +175,36 @@ Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 ./scripts/codesign-app.sh
 ./scripts/create-dmg.sh
 ```
+
+⛔ **If one component fails to sign, rebuild — do not hand-sign it.** A single
+failure among ~52 is almost always a transient `--timestamp` round-trip to
+Apple; re-running the whole script usually comes back 52/0. But signing an
+inner file after the bundle is sealed **breaks the outer seal**, and re-running
+`codesign-app.sh` over an already-signed tree then fails the provenance gate
+(correctly — the first pass changed extension bytes). At that point the only
+way out is a fresh worktree and a fresh build. In v1.11.0 that cost two dead
+builds.
+
+⚠️ **`create-dmg` cannot drive Finder from a non-interactive session** — it
+dies with AppleScript `-1743` (or `-1712`/`-1728`). This is normal here, not a
+broken machine. Fall back to the v1.8.1 path, which v1.10.1 and v1.11.0 both
+used:
+
+```bash
+mkdir -p dist                       # create-dmg.sh would have made this
+STAGE=$(mktemp -d)
+ditto "VSCode-darwin-arm64/Ritemark.app" "$STAGE/Ritemark.app"
+ln -s /Applications "$STAGE/Applications"
+cp branding/icons/icon.icns "$STAGE/.VolumeIcon.icns" && SetFile -a C "$STAGE"
+hdiutil create -srcfolder "$STAGE" -volname "Ritemark" -fs HFS+ -format UDRW -ov dist/rw.dmg
+hdiutil convert dist/rw.dmg -format UDZO -imagekey zlib-level=9 -o dist/Ritemark-X.Y.Z-darwin-arm64.dmg -ov
+rm -f dist/rw.dmg; rm -rf "$STAGE"
+codesign --force --sign "<Developer ID hash>" dist/Ritemark-X.Y.Z-darwin-arm64.dmg
+shasum -a 256 dist/Ritemark-X.Y.Z-darwin-arm64.dmg | awk '{print $1}' > dist/Ritemark-X.Y.Z-darwin-arm64.dmg.sha256
+```
+
+Sign with the identity **hash** from `security find-identity -v -p codesigning`;
+`"Developer ID Application: <TEAM_ID>"` is not a resolvable identity string.
 
 Output: `dist/Ritemark-X.Y.Z-darwin-arm64.dmg` (signed Developer ID, **NOT notarized, NOT stapled**).
 
@@ -134,12 +242,22 @@ This notarizes AND staples. Verify staple + Gatekeeper acceptance before proceed
 gh repo edit ProductoryHQ/ritemark-native --visibility private --accept-visibility-change-consequences
 ```
 
-Dispatch both builds against the release ref (e.g. `main`, or the release branch/commit):
+Dispatch both builds against **`main`** — not a SHA (`--ref` takes a branch or
+tag; a raw commit gives `HTTP 422: No ref found`) and not a release branch (the
+source gate rejects any named branch). `build-windows.yml` additionally
+requires the exact commit as an input:
 
 ```bash
-gh workflow run build-macos-x64.yml --ref <ref>
-gh workflow run build-windows.yml  --ref <ref>
+C=$(git rev-parse origin/main)          # must equal the built candidate
+gh workflow run build-macos-x64.yml --ref main
+gh workflow run build-windows.yml  --ref main -f source_commit="$C"
 ```
+
+Verify `git rev-parse origin/main` equals the commit your arm64 candidate was
+built from, immediately before dispatching. If it does not, `main` moved and
+the freeze rule was broken — every artifact must be rebuilt from one commit,
+because artifacts that disagree about their source commit cannot be signed
+against a single `RITEMARK_RELEASE_COMMIT`.
 
 `<ref>` must resolve to the exact already-approved `origin/main` source commit.
 Both workflows independently initialize the recorded VS Code gitlink, use
@@ -179,6 +297,11 @@ Output: `dist/Ritemark-X.Y.Z-darwin-x64.dmg` (signed, **NOT notarized**). Same r
 
 ```bash
 gh run list --workflow=build-windows.yml --limit 3
+# Download the Windows artifact next to the x64 one, then stage the installer for Step 8
+gh run download <windows-run-id> --name ritemark-windows-installer --dir dist/win-ci
+cp dist/win-ci/Ritemark-Setup.exe dist/Ritemark-Setup.exe
+# dist/win-ci/ also holds Ritemark-Setup.sha256.txt (sha256, source_commit,
+# workflow_commit, store_url) and roundtrip-evidence/ — Step 10 archives both
 # Jarmo downloads Windows artifact + the signed (un-notarized) x64 DMG, tests both
 ```
 
@@ -317,7 +440,8 @@ gh api repos/$REPO/releases/latest --jq .tag_name                     # this tag
 # pre-staple and will NOT match the published (stapled) DMG. A "differs" line
 # here is expected, not a block. The Windows *-setup.sha256.txt is PowerShell
 # CRLF, so strip CR before comparing.
-for h in $(cat dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/*-setup.sha256.txt | tr -d '\r'); do
+cmp dist/win-ci/Ritemark-Setup.exe dist/Ritemark-Setup.exe        # the staged installer is the CI artifact
+for h in $(cut -d' ' -f1 dist/*.dmg.sha256 | tr -d '\r') $(sed -n 's/^sha256=//p' dist/win-ci/Ritemark-Setup.sha256.txt | tr -d '\r'); do
   grep -q "^$h " "$T/local.txt" && echo "matches published    $h" || echo "differs (pre-staple?) $h"
 done
 ```
@@ -360,8 +484,9 @@ W=<absolute path of the release worktree>
 E=docs/releases/v$V/evidence
 mkdir -p "$E/win32-roundtrip"
 cp "$W/dist/update-feed.json" "$E/"
-cp "$W"/dist/*.sha256 "$W"/dist/*-setup.sha256.txt "$E/"   # build-time (pre-staple) hashes
-cp "$W"/dist/win32-roundtrip-evidence/*result.json "$E/win32-roundtrip/"
+cp "$W"/dist/*.dmg.sha256 "$E/"                                          # build-time (pre-staple) hashes
+cp "$W/dist/win-ci/Ritemark-Setup.sha256.txt" "$E/Ritemark-$V-win32-x64-setup.sha256.txt"
+cp "$W"/dist/win-ci/roundtrip-evidence/*result.json "$E/win32-roundtrip/"
 cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
 cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
 cp "$T/published.txt" "$E/published-assets.txt"   # authoritative post-staple published hashes
@@ -372,7 +497,7 @@ What is deliberately left out:
 - The DMGs and the installer — the GitHub Release is their archive, and 10.1
   just proved it holds the same bytes. Partner Center and `getritemark.com`
   take that same file; neither needs the local copy.
-- `win32-roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
+- `win-ci/roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
   uninstall logs, Git-ignored by `*.log`. Their outcomes are in the
   `.result.json` files, and the `ritemark-windows-installer` CI artifact keeps
   the full set for 30 days after the run.
@@ -569,6 +694,33 @@ hdiutil detach /tmp/v100; hdiutil detach /tmp/v101
 5. Test the actual DMG, not just the source app bundle.
 6. After any corruption restore: `rm -rf extensions/ritemark/out && npm run compile` before `build-prod.sh`. Incremental tsc will silently keep 0-byte `.js` artifacts otherwise (v1.7.1).
 
+### v1.11.0 — three latent CI defects, and a self-inflicted fourth (2026-09-16)
+
+None of the three came from the release's own content. All three would have
+hit the next Windows release whatever shipped in it; v1.11.0 was simply the
+first Windows build after the runner image and the signing path had moved.
+
+| # | Defect | Where the lesson already was |
+|---|---|---|
+| 1 | `file(1)` said "8 sections"; the manifest pattern was an exact substring | This skill's catalogue, from v1.6.3 — described, never enforced |
+| 2 | `validate-build-output.sh` used `verify /pa`; the PowerShell verifier used `/pa /all` | Nowhere |
+| 3 | Git Bash rewrote `/pa` and `/all` into file paths | `ritemark-visual-regression` skill — the **wrong skill**, so the release path never saw it |
+
+The fourth was mine: merging the candidate record to `main` between the build
+and the CI dispatch, which invalidated a completed, **already notarized** arm64
+candidate. Hence the freeze rule at the top of this document.
+
+Two things are worth carrying forward beyond the individual fixes.
+
+**A lesson written in the wrong place is not written down.** Defect 3 had been
+documented for months, in a skill about visual-regression testing. Release work
+never loads that skill. It is now in this catalogue *and* enforced in code.
+
+**Describing a pitfall is weaker than enforcing it.** Defects 1 and 3 were both
+described somewhere and both still happened. They are now a test and an
+environment variable respectively; defect 2's root cause was only findable
+because the failure stopped swallowing stderr.
+
 ## CI workflow editing — pre-push audit (HARD RULE)
 
 Before editing ANY GitHub Actions workflow file (`.github/workflows/*.yml`), follow this checklist. Skipping it costs 20–30 min per CI iteration; v1.6.3 burned ~5 hours across 5 commits because the checklist wasn't followed.
@@ -595,10 +747,13 @@ Before editing ANY GitHub Actions workflow file (`.github/workflows/*.yml`), fol
 |---|---|---|
 | **Python `print()` emits CRLF on Windows pipes** | `bash read -r IFS="|"` reads `tar.gz\r` (length 7) → `case` doesn't match | `sys.stdout.reconfigure(newline="\n")` after `import sys`, AND strip `${var%$'\r'}` on bash side (belt-and-braces) |
 | **Git Bash `cp -R` cannot replicate macOS symlinks** | `cp: cannot create symbolic link '...libggml-base.0.dylib'` | Strip `binaries/darwin-*/` BEFORE `cp -R` on Windows runners. NEVER remove that line without solving symlinks first. |
-| **`file(1)` output format drift across MSYS / Git Bash / libmagic versions** | `grep -qF "PE32+ executable (console) x86-64, for MS Windows"` misses runner output `"PE32+ executable for MS Windows 6.00 (console), x86-64, 7 sections"` | Two-token check (`PE32+` AND `x86-64`) + MZ magic-byte fallback (`od -An -N2 -tx1` → `4d5a`). Pattern is a hint, magic bytes are truth. |
+| **`file(1)` output format drift across MSYS / Git Bash / libmagic versions** | `grep -qF "PE32+ …"` misses runner output `"PE32+ executable for MS Windows 6.00 (console), x86-64, 7 sections"` — v1.11.0 saw the same runner say **8 sections** | **ENFORCED (v1.11.0):** `architectureTokens()` in `scripts/fetch-agent-runtimes.mjs` requires only the format and architecture tokens, in any order, with a magic-byte fallback. `scripts/fetch-agent-runtimes.test.mjs` carries the real runner output from both incidents plus negative cases, so the next drift fails a test rather than a release. |
 | **`stat -f%z` (BSD) returns 0 on Git Bash; GNU expects `-c%s`** | size gates fail on valid build outputs | `file_size()` helper trying `-f%z` then `-c%s` then `wc -c`. |
 | **`python3` not always on Windows PATH; only `python`** | `command not found` mid-script | Probe `for py in python3 python; do ...; done` and use the first hit. |
 | **Inline YAML duplicates a script's logic** | Fix to script doesn't reach CI because workflow inlines its own copy | Single source of truth: delete inline, call the script. Two places = drift. |
+| **Two scripts verifying the same thing in different languages** | v1.11.0: `verify-windows-signatures.ps1` passed with `signtool verify /pa /all` while `validate-build-output.sh` called `verify /pa` and reported every executable unsigned | The row above, one layer down. Align the invocations, or have the bash side call the PowerShell one. |
+| **Git Bash rewrites arguments that look like POSIX paths** | v1.11.0: `signtool verify /pa /all` arrived as `… C:/Program Files/Git/pa C:/Program Files/Git/all`; with the policy flag eaten, signtool fell back to the stricter driver policy and rejected the Azure Trusted Signing chain, so correctly-signed binaries all read as unsigned | **ENFORCED (v1.11.0):** `MSYS_NO_PATHCONV=1` on the signtool call in `validate-build-output.sh` — the only bash caller of a Windows tool with slash flags. Prefix any new one. |
+| **Discarding a verification tool's stderr** | `signtool … > /dev/null 2>&1` turned "the flags were eaten and the chain is untrusted" into "not signed or invalid signature" — indistinguishable from a genuinely unsigned binary, costing a full diagnosis cycle | Never swallow a verification tool's output on the failure path. Print it. The fix for the row above was found the moment the real message appeared. |
 | **Tag `--force` retriggers ALL `tag: 'v*'` workflows** | Earlier in-progress runs become wasted artifacts | Plan tag moves: only re-tag once per commit you actually want shipped. |
 | **gh auth account drift** | `HTTP 404 Not Found` on a repo that exists | `gh auth status` to check active account. Switch with `gh auth switch --user <handle>`. ProductoryHQ repos need `jarmo-productory`. |
 
