@@ -8,20 +8,14 @@
 
 ### "Cannot be opened because Apple cannot check it"
 
-Ritemark isn't notarized with Apple yet. To open:
-
-1. **Right-click** on Ritemark in Applications
-2. Select **Open**
-3. Click **Open** in the dialog
-
-You only need to do this once.
+Ritemark for macOS is signed and notarized by Apple, so this warning shouldn't appear for a download from the [official releases page](https://github.com/jarmo-productory/ritemark-public/releases/latest). If it does, the download is probably incomplete or came from somewhere else. Delete it and download the DMG again.
 
 ### App won't open at all
 
-1. Check you're on macOS (Windows not yet supported)
-2. Verify you have an Apple Silicon Mac (Intel not supported)
-3. Try downloading the DMG again
-4. Move to Applications folder before opening
+1. Check you downloaded the build for your machine: **Ritemark-arm64.dmg** for Apple Silicon Macs, **Ritemark-x64.dmg** for Intel Macs, **Ritemark-Setup.exe** for Windows
+2. Try downloading it again
+3. On macOS, move Ritemark to the Applications folder before opening it
+4. On Windows, if Smart App Control blocks the installer, see [Windows Smart App Control](windows-smart-app-control.md)
 
 ---
 
@@ -59,7 +53,7 @@ Ritemark auto-saves after 1 second. If changes aren't saving:
 ## AI Agents and Agent Library
 
 > The earlier built-in "Ritemark Agent" chat assistant was removed in v1.7.2. The AI sidebar now runs
-> **Claude** and **Codex** only. For per-agent setup and troubleshooting (sign-in, "needs repair",
+> **Claude**, **Codex**, and **OpenCode**. For per-agent setup and troubleshooting (sign-in, "needs repair",
 > spawn errors), see [AI Agents](features/ai-agents.md). For OpenAI-key issues in Flows, see
 > [Set Up AI → OpenAI API Key for Flows](setup-ai.md#openai-api-key-for-flows).
 
@@ -83,6 +77,16 @@ If Ritemark can't reach the AI provider, the sidebar shows an **AI Offline** bad
 1. Confirm you are right-clicking an **agent** row, not a skill row
 2. Make sure the helper is recognized as an agent configuration file
 3. If the helper is new, wait for the sidebar to rescan or reload the window
+
+### Report AI issue doesn't open an email
+
+**Report AI issue** in the status bar hands your report to your computer's email app; Ritemark never sends it itself. The report window tells you what happened, and your report always stays in it:
+
+- **Your email app is opening**: find the new message in your email app, check it, and press Send there. The report isn't sent until you do.
+- **No email app is set up on this computer**: click **Copy report** under the text box and email the report to info@productory.eu from the email you normally use. This is expected on a computer without an email app; it isn't an error.
+- **This report is too long to open in an email app**: email links can only carry a limited amount of text. Click **Copy report** and email it to info@productory.eu yourself, so nothing is cut off.
+
+If the window says your email app is opening but nothing appears, use **Copy report** the same way. The address is always shown under the text box as **Write to us: info@productory.eu**, so you can also write to it directly. See [AI Agents → Reporting AI output](features/ai-agents.md#reporting-ai-output).
 
 ---
 
@@ -128,6 +132,27 @@ Files over 5MB or 10,000 rows may:
 - Cause performance issues
 
 For very large data, use a dedicated spreadsheet app.
+
+---
+
+## Source Control
+
+### "Source control depends on Git being installed"
+
+Source Control uses Git, a separate program that doesn't come with Ritemark. When Git isn't installed, the Source Control view says:
+
+> Source control depends on Git being installed.
+> After installing Git, please reload (or troubleshoot).
+
+The welcome page says the same thing: **Ritemark needs Git. Install Git to use Source Control.** Ritemark no longer links to a Git download; it only tells you Git is missing.
+
+1. Install Git yourself, for example from [git-scm.com](https://git-scm.com/downloads)
+2. Back in Ritemark, click **reload** in the Source Control message, or run **Reload Window** (Cmd+Shift+P, or Ctrl+Shift+P on Windows)
+3. If Source Control still says Git is missing, click **troubleshoot** to see Git's log
+
+Once Git is installed, Source Control works as before.
+
+The welcome page reports Node the same way (**Ritemark needs Node.**) and doesn't link to a download either. If you need Node.js, install it from [nodejs.org](https://nodejs.org) and restart Ritemark.
 
 ---
 
@@ -198,3 +223,5 @@ If you've found a bug:
 | Can't open app | Right-click → Open |
 | File won't save | Check folder permissions |
 | Slow performance | Restart Ritemark |
+| Source Control says Git is missing | Install Git, then click **reload** |
+| Report AI issue shows no email | **Copy report**, then email info@productory.eu |

@@ -25,7 +25,9 @@ Select text, drop a note in the right margin, and keep your writing clean — th
 3. Ritemark highlights the selected passage and opens a note card in the right margin
 4. Type your note in the card
 
-The highlighted anchor and the margin note stay linked. Hovering either one opens the comment — the highlighted text in the document as well as its marker in the margin.
+The highlighted anchor and the margin note stay linked. Hovering either one opens the comment — the highlighted text in the document as well as its marker in the margin. Move the pointer away and it closes again. When you leave the highlighted text there is a short pause first, long enough to reach the note in the margin.
+
+To keep a comment open, click it: either the highlighted text or its marker in the margin. A pinned comment gets a coloured border and stays open wherever the pointer goes, so buttons such as **Send to Claude** are easy to reach. Only one comment stays pinned at a time; clicking another comment moves the pin to it. To close a pinned comment, click its highlighted text again or click somewhere in the text that isn't a comment.
 
 ### Standalone margin notes
 
@@ -46,7 +48,7 @@ The `{id:…}` token is Ritemark's, not part of your note. It never appears in t
 
 ### Editing and deleting comments
 
-- **Edit** — click the margin marker to open the note; edit the text directly
+- **Edit** — open the comment and click the pencil icon (**Edit comment**); change the text, then press **Comment** (or Enter) to save, or **Cancel** to leave it as it was
 - **Delete** — hover the margin marker and click the trash icon; the margin note is removed and the highlighted anchor returns to plain text
 - **Mark as done** — once a comment's task has finished, the trash icon becomes a checkmark labelled **Mark as done**. It is the same action under a truer name: the comment is cleared from the document. Clearing a comment is always your decision — an agent never removes a marker itself
 

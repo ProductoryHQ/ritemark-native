@@ -10,9 +10,9 @@ This guide walks you through installing Ritemark and creating your first documen
 
 Get Ritemark from GitHub:
 1. Download the build for your machine:
-   - **macOS (Apple Silicon / M1+):** [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-arm64.dmg)
-   - **macOS (Intel):** [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-x64.dmg)
-   - **Windows (x64):** [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-Setup.exe)
+   - **macOS (Apple Silicon / M1+):** [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-arm64.dmg)
+   - **macOS (Intel):** [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-x64.dmg)
+   - **Windows (x64):** [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/latest/download/Ritemark-Setup.exe)
 2. Open the downloaded file
 
 ---

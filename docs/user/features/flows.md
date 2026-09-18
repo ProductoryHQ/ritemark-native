@@ -44,7 +44,7 @@ Flows are built from four node types, organized in three categories.
 | Node | Purpose |
 |------|---------|
 | **LLM Prompt** | Send a prompt to an LLM (GPT-4o, etc.). Use `{{variableName}}` to inject values from connected nodes. Outputs generated text. |
-| **Image Generation** | Create images with AI (GPT Image 1.5). Input: text description. Output: path to generated image file. |
+| **Image Generation** | Create images with AI (GPT Image 2 by default, or Gemini 3.1 Flash Image with the Google Gemini provider). Input: text description. Output: path to generated image file. |
 
 ### Output
 
@@ -92,6 +92,7 @@ Click a node to open its configuration panel on the right:
 **Image Node:**
 - Configure the prompt (can reference upstream text)
 - Set image dimensions
+- Choose the provider (**OpenAI** or **Google Gemini**) and model. If a saved Flow uses a model Ritemark no longer offers, the Model field shows it as **Unavailable** with *Saved model is no longer available. Choose a replacement.*
 
 **Save File Node:**
 - Choose filename (use variables for dynamic names)
