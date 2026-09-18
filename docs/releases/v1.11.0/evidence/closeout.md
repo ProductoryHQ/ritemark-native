@@ -28,4 +28,12 @@ Left out on purpose:
 
 ## 10.3 Clear the build output and re-audit
 
-Pending.
+The auto-mode classifier refused the deletion from the agent session, as it did for v1.10.1, so Jarmo removed the worktree himself. Clearing only the output and re-auditing to `REVIEW` was skipped. The worktree was removed in the same step, for the reason given in 10.4.
+
+## 10.4 Removal
+
+Jarmo authorized removal on 2026-09-18. `--clean` was deliberately **not** used: it removes every `REVIEW` entry, and at that moment `.claude/worktrees/release-v1.12.0` also classified as `REVIEW` while another session was actively working in it.
+
+The targeted `git worktree remove --force` failed with `validation failed … .git does not exist`. By then the folder had already been partly deleted (15.7 GB down to 3.2 GB, the `.git` link gone), and nothing else was writing to it. Jarmo finished it with `rm -rf` on that one path, and the stale Git entry was pruned. The four other worktrees were checked before and after and are intact.
+
+Free disk after removal: 55 GB (38 GB before). Post-removal audit: no release worktree remains; `release-v1.12.0` and `sprint-119-google-docs-publishing` now classify `BLOCKED` (unpushed active work), so a later `--clean` cannot touch them.
