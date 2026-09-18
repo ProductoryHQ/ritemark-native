@@ -12,11 +12,25 @@ Shell-tier on two independent grounds: the Sprint 116 runtime binaries, and patc
 | 117 | Comment→agent honesty: host-owned task ledger, real status, reply on the comment | Gate 1 |
 | 126 | Report AI issue (status bar + AI Information → `info@productory.eu`); no Git/Node download offers | Gate 1 for reporting; **Windows for the Git-absent case** |
 
-## Candidate 2 — 2026-09-16 (current)
+## Candidate 3 — 2026-09-17 (released)
+
+Candidate 2 passed Gate 1 and was notarized, then became unusable for CI. Docs PR #310 was merged to `main` after the candidate was built, so `origin/main` moved past `9e963596`. Both CI dispatches then failed the source gate: `HEAD` has to equal live `origin/main`, and a named branch at the old commit is refused. Windows CI also needed three harness fixes before it could pass: [#311](https://github.com/ProductoryHQ/ritemark-native/pull/311), [#312](https://github.com/ProductoryHQ/ritemark-native/pull/312) and [#313](https://github.com/ProductoryHQ/ritemark-native/pull/313). So candidate 3 was rebuilt from the new tip, and every platform shares that one source commit. The product code is the same as candidate 2; the only differences are docs and CI scripts.
+
+Source commit `bb823de525bc6e96cd34b6513be8405ebe9bd1a7` (tag `v1.11.0`). Built in `.worktrees/release-bb823de525bc`.
+
+| Platform | Built | Signed | Notarization | Published asset |
+| --- | --- | --- | --- | --- |
+| macOS arm64 | locally, 2026-09-17 | 52 components, 0 failures | `9a95a684-3bb0-4f72-bc0d-f72fbde7b0a6`, Accepted, stapled | `Ritemark-arm64.dmg`, 623,574,471 bytes, SHA-256 `505d987ea9f35be436cb4109b5caac0c59c0847d65e9a8c834a092c5c896e64f` |
+| macOS x64 | CI run `35181424280` | 50 components, 0 failures | `ba635e6f-e339-420e-9214-0414cf123b9a`, Accepted, stapled | `Ritemark-x64.dmg`, 664,007,658 bytes, SHA-256 `dfb913f47bc63c07829e341eafba95c139bd91e7a30939a1cf700113fa9d2947` |
+| Windows x64 | CI run `35125844155` | Productory Services OÜ; standard-user roundtrip `passed` | not applicable | `Ritemark-Setup.exe`, 444,207,592 bytes, SHA-256 `0ebda5016e432b2f039613f74665343220006e39e7749ddb76d285d0a87b932b` |
+
+Published 2026-09-18T11:56:21Z as Latest on `jarmo-productory/ritemark-public`, with `update-feed.json` (21 releases, v1.10.1 retained). Closeout evidence is in [`evidence/`](evidence/closeout.md).
+
+## Candidate 2 — 2026-09-16 (superseded)
 
 Candidate 1 was discarded at Gate 1. Jarmo: *"niipea kui liigun hiirega kommentaari poole, siis see on juba mouse-out from komment area ja kaob see kommentaar eest ära."* Hovering a highlight showed **Send to Claude** and then closed as the pointer travelled toward it, so the feature's primary action was unreachable by the gesture that revealed it. Fixed in [PR #309](https://github.com/ProductoryHQ/ritemark-native/pull/309): a click latches the comment open, hover gets a 220 ms grace, and the latched bubble is visibly different.
 
-Source commit `9e963596ba14985471064b24e4c844d3984c3878`. Built in `.worktrees/release-9e963596ba14`, signed **52 components, 0 failures**. DMG `dist/Ritemark-1.11.0-darwin-arm64.dmg`, **623,571,092 bytes**, SHA-256 `35e8f99d8f9d64a40483083a79c42eb69377c043def6c6295eaadaa722682e7b`, built **2026-09-16 16:01:08 EEST** (hardening clock). **Not notarized.**
+Source commit `9e963596ba14985471064b24e4c844d3984c3878`. Built in `.worktrees/release-9e963596ba14`, signed **52 components, 0 failures**. DMG `dist/Ritemark-1.11.0-darwin-arm64.dmg`, **623,571,092 bytes**, SHA-256 `35e8f99d8f9d64a40483083a79c42eb69377c043def6c6295eaadaa722682e7b`, built **2026-09-16 16:01:08 EEST** (hardening clock). Notarized after Gate 1, then superseded by candidate 3 (see above).
 
 Mounted-DMG checks: `ritemarkVersion` 1.11.0; provenance `darwin-arm64` / `9e963596` / vscode `10c8e557`; the pin fix present in the shipped bundle; Sprint 126 intact (status bar item present, `git-scm.com/download` 0, `clickHereToInstall` 0); all three runtimes execute — `claude` 2.1.270, `codex-app-server` 0.154.0, `opencode` 1.18.30; `spctl` rejected as expected.
 
@@ -81,7 +95,7 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 
 - [ ] Nothing from v1.10.1 broke: typing at speed, task lists, undo/redo, save without conflict warnings
 
-**Gate 1 verdict:**
+**Gate 1 verdict:** passed. Candidate 2: Jarmo, 2026-09-16, *"ma olen RC ise läbi testinud - see on täiesti OK, et edasi minna ehk GATE 1 Approved"*. Candidate 3: Jarmo, 2026-09-17, *"GATE 1 approved - jätka x64-ga"*. The verdict was given for the gate as a whole; individual items above were not reported separately.
 
 ## ⛔ Gate 2 — Jarmo, on the x64 DMG (un-notarized) + Windows installer
 
@@ -100,7 +114,7 @@ This gate carries the **open Sprint 116 native-execution requirement**. It is no
 - [ ] **On a machine with no mail app configured:** the fallback shows the address and the full report with Copy, and reads as a normal outcome rather than an error
 - [ ] **On a machine with no Git installed:** Source Control explains Git is needed and shows **no download button**. *This is the exact surface Microsoft flagged (10.1.5) and the one case that could not be exercised on the development machine.*
 
-**Gate 2 verdict:**
+**Gate 2 verdict:** passed. Jarmo, 2026-09-18, *"pane edasi! Win ja x64 on testitud"*. The verdict was given for the gate as a whole; individual items above were not reported separately, so the Git-absent Windows case is not confirmed as seen on screen.
 
 ## Not verifiable before the gates
 

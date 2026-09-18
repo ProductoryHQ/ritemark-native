@@ -1,0 +1,632 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-18T11:45:51.942Z",
+  "channel": "stable",
+  "fullReleases": [
+    {
+      "version": "1.11.0",
+      "tagName": "v1.11.0",
+      "releaseDate": "2026-09-18T11:45:51.941Z",
+      "notesSummary": "Sprint 116 refreshes the foundation used by Agent Chat and Flows:",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.11.0/Ritemark-arm64.dmg",
+          "size": 623574471,
+          "sha256": "505d987ea9f35be436cb4109b5caac0c59c0847d65e9a8c834a092c5c896e64f"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.11.0/Ritemark-x64.dmg",
+          "size": 664007658,
+          "sha256": "dfb913f47bc63c07829e341eafba95c139bd91e7a30939a1cf700113fa9d2947"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.11.0/Ritemark-Setup.exe",
+          "size": 444207592,
+          "sha256": "0ebda5016e432b2f039613f74665343220006e39e7749ddb76d285d0a87b932b"
+        }
+      ]
+    },
+    {
+      "version": "1.10.1",
+      "tagName": "v1.10.1",
+      "releaseDate": "2026-09-10",
+      "notesSummary": "Codex Reliability: the Codex setup pane no longer loops, Codex file tools work again on Windows, and typing, undo and checklists are reliable again.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-arm64.dmg",
+          "size": 625110002,
+          "sha256": "0dc7d8e72dfa15a6d0412f8b3653980473123e8fb57d57049de1220bf065c17a"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-x64.dmg",
+          "size": 666304301,
+          "sha256": "826c44b0222234dd6eb6ad1d840d52802af84cd891824b2137d599750d298bf7"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.1/Ritemark-Setup.exe",
+          "size": 436614200,
+          "sha256": "93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250"
+        }
+      ]
+    },
+    {
+      "version": "1.10.0",
+      "tagName": "v1.10.0",
+      "releaseDate": "2026-09-05T18:19:54.915Z",
+      "notesSummary": "Ritemark 1.10.0 turns Agent Chat from a row of temporary sidebar tabs into a",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-arm64.dmg",
+          "size": 625185175,
+          "sha256": "5258848c5cab5ddb32beac8844b4a3ab7cb15ee09d93b50f586af49a1b26a1d2"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-x64.dmg",
+          "size": 666500783,
+          "sha256": "4b587025a6962eaf6e5f3bdc1faccfa40df9f46783b226fe4a5ea332564a0f82"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.10.0/Ritemark-Setup.exe",
+          "size": 430929984,
+          "sha256": "7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3"
+        }
+      ]
+    },
+    {
+      "version": "1.9.0",
+      "tagName": "v1.9.0",
+      "releaseDate": "2026-08-20T12:42:35.920Z",
+      "notesSummary": "Ritemark 1.9.0",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.9.0/Ritemark-arm64.dmg",
+          "size": 583392434,
+          "sha256": "dfda96c95de4e08e2ce4684b9e01e7dba90e5f5879ecd704cea83ecb70e4dab4"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.9.0/Ritemark-x64.dmg",
+          "size": 626896407,
+          "sha256": "d9948d37e984b47f0dab852e866ec8e6d767108a34fa96753ada1c6bcb382367"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.9.0/Ritemark-Setup.exe",
+          "size": 396621848,
+          "sha256": "9b248918c860e93a53e327b19f3359cce7296f8a7761a3d1f69ff9f4d474e8d4"
+        }
+      ]
+    },
+    {
+      "version": "1.8.6",
+      "tagName": "v1.8.6",
+      "releaseDate": "2026-08-09T09:26:29.070Z",
+      "notesSummary": "Ritemark v1.8.6 — Clean Start: a trustworthy first open, a Home launcher, truthful agent plans, and a calmer shell.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.6/Ritemark-arm64.dmg",
+          "size": 583191983,
+          "sha256": "d6865058e766aedac1dfa2663cd5b60f2cfd09be18b0df479d8dbc60a1797847"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.6/Ritemark-x64.dmg",
+          "size": 627820601,
+          "sha256": "f252ce881dd57a3a4b77afdc153bd64748ad6ff5eff49a7cd9e05e0a6beb397c"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.6/Ritemark-Setup.exe",
+          "size": 396606616,
+          "sha256": "6ad1ad65d6e73c35a2230516204c891b28276db8408e117a34a30e0cfd872f9a"
+        }
+      ]
+    },
+    {
+      "version": "1.8.5",
+      "tagName": "v1.8.5",
+      "releaseDate": "2026-07-29T10:38:26.421Z",
+      "notesSummary": "Ritemark v1.8.5 — parallel agent chats, updated AI runtimes, and a safer update system.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.5/Ritemark-arm64.dmg",
+          "size": 583499159,
+          "sha256": "21379aacfe0b1f36d7c1060d6104c5993083ac09399d2951158f081145d0b3de"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.5/Ritemark-x64.dmg",
+          "size": 629040327,
+          "sha256": "0077675db7ed577b140a116a8522c335046decc94fc123d87a221bd5c1556743"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.5/Ritemark-Setup.exe",
+          "size": 396262008,
+          "sha256": "79cfbd8df77cb4989aadabfec1ed6939bdc89bbc37d1428b7ca5f7b828c2e1d2"
+        }
+      ]
+    },
+    {
+      "version": "1.8.4",
+      "tagName": "v1.8.4",
+      "releaseDate": "2026-07-20T12:08:52.343Z",
+      "notesSummary": "Ritemark 1.8.4",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.4/Ritemark-arm64.dmg",
+          "size": 551864253,
+          "sha256": "313302a1db797f452d6668ca311784ca2620e02d49d5a412a04dde7ecd96812e"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.4/Ritemark-x64.dmg",
+          "size": 589818658,
+          "sha256": "4844293497e4719e741c5c0684e8ed2f59f79b27b50f4497f39de8fec33586a6"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.4/Ritemark-Setup.exe",
+          "size": 372701176,
+          "sha256": "a6e5a605e0ee273aa95cd4bb17e843107790aeafd2ffff34a84c73a9079ed3ec"
+        }
+      ]
+    },
+    {
+      "version": "1.8.3",
+      "tagName": "v1.8.3",
+      "releaseDate": "2026-07-15T18:37:51.572Z",
+      "notesSummary": "Ritemark 1.8.3",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-arm64.dmg",
+          "size": 551864773,
+          "sha256": "1b47a92cb628fb1bbeef2e0c7f142e18ceed903b618238efab504ad7b7adbddc"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-x64.dmg",
+          "size": 589817721,
+          "sha256": "a5270542b0604e3759bd89e348f3d78dbccef4cb92ffd6a7af41cefed6251f0f"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.3/Ritemark-Setup.exe",
+          "size": 372668888,
+          "sha256": "2af9c2786be7e156a2b610a122f30807c1c80dc8bc44533efcd02009f09247ac"
+        }
+      ]
+    },
+    {
+      "version": "1.8.2",
+      "tagName": "v1.8.2",
+      "releaseDate": "2026-07-13T13:51:11.593Z",
+      "notesSummary": "Ritemark v1.8.2 — sturdier, faster, and now installable on Windows.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.2/Ritemark-arm64.dmg",
+          "size": 614119514,
+          "sha256": "1c1f75f7fe1728bf93d8d7283516a1213beabb32fd791aa62c9cd7469ccb5067"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.2/Ritemark-x64.dmg",
+          "size": 693919922,
+          "sha256": "e98f7b2d1c4f506a556b04a01537e9856d046eca660fae87d63b29715615de32"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.2/Ritemark-Setup.exe",
+          "size": 354392256,
+          "sha256": "64958072372f70717adc39c6d5a3bcdd67ca0217418d66f527b50b6557844af1"
+        }
+      ]
+    },
+    {
+      "version": "1.8.1",
+      "tagName": "v1.8.1",
+      "releaseDate": "2026-07-08T00:00:00.000Z",
+      "notesSummary": "Export integrity: SVG and draw.io diagrams now render in PDF/Word exports, and a single bad image can no longer crash an export; saveAsMarkdown is atomic; /image SVG insert fixed (Sprint 90). Model Gateway: the AI model list and defaults resolve from a live provider probe and remote catalog, default moves to claude-sonnet-5 (Sprint 89).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.1/Ritemark-arm64.dmg",
+          "size": 529230321,
+          "sha256": "0bda661ff7653c2e66446258d3f5d18d081f7e731eecfb43602f7ff6eaf46af7"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.1/Ritemark-x64.dmg",
+          "size": 570369684,
+          "sha256": "cc18c152471249b9e3ca134cf071ca99a89c8d1b11735745350ae80e4a020a2e"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.1/Ritemark-Setup.exe",
+          "size": 352921166,
+          "sha256": "16010b23087b3a46b935eb215bb7eb57c07bd60bd9a38bfae99bbbdc74af5b62"
+        }
+      ]
+    },
+    {
+      "version": "1.8.0",
+      "tagName": "v1.8.0",
+      "releaseDate": "2026-06-13T11:57:40.786Z",
+      "notesSummary": "Draw.io diagrams embedded and edited directly in markdown with a fully offline vendored editor (Sprint 82); scheduled AI agents with a no-cron Schedule picker and safe-by-default approval (Sprint 80); editable .xlsx spreadsheets and multi-sheet fix (Sprint 81); unified Auto/Ask/Plan approval and file attachments across Claude Code, Codex and OpenCode (Sprint 79); voice dictation microphone fix on macOS Tahoe (Sprint 83).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-arm64.dmg",
+          "size": 529174394,
+          "sha256": "bb310e81933a5bfa1624b8c45acc84675dabe7576995ad40b54f852b11b6fdf2"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-x64.dmg",
+          "size": 565341519,
+          "sha256": "17785bbe870b9854658e519cde634af18c3006b22971c39a0e1b01ba45e15ef0"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.8.0/Ritemark-Setup.exe",
+          "size": 352889533,
+          "sha256": "165081d05f0527b0981a0fe3df40b1a22aeaf502e5b5b2383079c753c67a78c4"
+        }
+      ]
+    },
+    {
+      "version": "1.7.3",
+      "tagName": "v1.7.3",
+      "releaseDate": "2026-06-06",
+      "notesSummary": "Agent Library + visual Agent Configurator (Sprint 77); OpenCode bring-your-own-key runtime over ACP (Sprint 76); browser_snapshot tool + live screenshot chip in the composer (Sprint 78); composer queue, redesigned plan-approval, and editor polish (Sprint 74).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-arm64.dmg",
+          "size": 510383569,
+          "sha256": "290fd1678729978d144b9c253f27d8bb79b599cb23cab444d2ad5c405ac861b4"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-x64.dmg",
+          "size": 546509760,
+          "sha256": "4c29cfb0102a172eaf03ce48c38fd7511337fabe7ebdabf12b11a9c9e505c7bc"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.3/Ritemark-Setup.exe",
+          "size": 336114443,
+          "sha256": "e43e5c26e72d3d084a0a645b38e92dc1c303c9932ad6c3b594b082e388439110"
+        }
+      ]
+    },
+    {
+      "version": "1.7.2",
+      "tagName": "v1.7.2",
+      "releaseDate": "2026-06-01",
+      "notesSummary": "Markdown @-mention file links + Cmd-click navigation + TOC heading-level shortcuts (Sprint 72); clearer AI runtime/model info (Sprint 73); removed the legacy chat runtime and document-search/RAG subsystem — the AI sidebar is now Claude Code + Codex (Sprint 74).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.2/Ritemark-arm64.dmg",
+          "size": 475340371,
+          "sha256": "3c07d914b581b9d550ec828386e91673e3f1c1c5e5be8e034eecfe67956750bf"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.2/Ritemark-x64.dmg",
+          "size": 506991759,
+          "sha256": "b1c51e3a996ae69b823fc6a8c2082d94f984f66d9a35f460e2ea271e87da2346"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.2/Ritemark-Setup.exe",
+          "size": 301293766,
+          "sha256": "88cfec9db03ba51f1a2709869182258a7b9ec10bf43784c8d53fd8988a337196"
+        }
+      ]
+    },
+    {
+      "version": "1.7.1",
+      "tagName": "v1.7.1",
+      "releaseDate": "2026-05-25",
+      "notesSummary": "GitHub Copilot Chat support (Auxiliary Bar + Activity Bar launcher) and Copilot-aware Markdown editing. Unnotarized macOS build — see release notes for one-time Gatekeeper step (Apple notarization service held by Apple).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.1/Ritemark-arm64.dmg",
+          "size": 444989574,
+          "sha256": "b6c202e92db018fd277ba927693eb6bf974c3be8a29b9cb7ec31f846ee1bc800"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.1/Ritemark-x64.dmg",
+          "size": 457956748,
+          "sha256": "41cb3ce4fd3441f04fdd9150c0843a9f5976aa3432b040d2eb16635ae1c0a658"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.1/Ritemark-Setup.exe",
+          "size": 267416357,
+          "sha256": "e78a503059c00fc523d2283e307b3499df6f0a1bf8451676a11eb176d9584f54"
+        }
+      ]
+    },
+    {
+      "version": "1.7.0",
+      "tagName": "v1.7.0",
+      "releaseDate": "2026-05-12",
+      "notesSummary": "In-app browser with HTML artifact support, browser-aware AI chat (Claude + Codex read the page you're viewing), and Codex runtime hardening with system-runtime preference.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.0/Ritemark-arm64.dmg",
+          "size": 444737311,
+          "sha256": "5abe7e27c7aceb8763fd40ca990839b3b0a9f30f1d5aed41c1b90638913ce978"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.0/Ritemark-x64.dmg",
+          "size": 457839677,
+          "sha256": "e182ae062ac8c2609a75eee11066d5400e234706ee2ba9dfcfd4979fde2b745c"
+        },
+        {
+          "platform": "win32",
+          "arch": "x64",
+          "assetName": "Ritemark-Setup.exe",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.7.0/Ritemark-Setup.exe",
+          "size": 267327986,
+          "sha256": "14a8143fc324fd148ff159a376f1a3211296d182be4ae5042a79a987b4bdf15c"
+        }
+      ]
+    },
+    {
+      "version": "1.6.3",
+      "tagName": "v1.6.3",
+      "releaseDate": "2026-05-09",
+      "notesSummary": "Per-turn Claude/Codex runtime switching, Agent Library authoring + Launch Chat, AGENTS.md/.agents discovery, bundled runtimes, and the selected-text docked context tab.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.3/Ritemark-arm64.dmg",
+          "size": 442981330,
+          "sha256": "6d960984e7f2b6a2ed8b2ca335049f2dce47c1caa52a72ed58174cfc66085f69"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.3/Ritemark-x64.dmg",
+          "size": 455863333,
+          "sha256": "e041a5cede727ff24da264ba2be104a0169e23122bcec27539d267825e71f3cb"
+        }
+      ]
+    },
+    {
+      "version": "1.6.2",
+      "tagName": "v1.6.2",
+      "releaseDate": "2026-05-03",
+      "notesSummary": "Two regressions from v1.6.1 fixed: .md files reliably open in Ritemark, and external/agent edits show up live in the open editor (silent swap when clean, Refresh banner with 10s auto-reload when dirty).",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.2/Ritemark-arm64.dmg",
+          "size": 321752335,
+          "sha256": "2a96e4576e043a0fc99cfce5aea6b9b7599c61e556c42bafee388f9f3f9c3bb4"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.2/Ritemark-x64.dmg",
+          "size": 324153853,
+          "sha256": "cfcff19fddda96de7c9da33fc597e12b00d0c037fb7c64d3dac5d062505696eb"
+        }
+      ]
+    },
+    {
+      "version": "1.6.1",
+      "tagName": "v1.6.1",
+      "releaseDate": "2026-05-03T00:00:00.000Z",
+      "notesSummary": "VS Code 1.117.0 upgrade, Mermaid diagram polish (full-width, Copy/Download/Expand+zoom), terminal-free Claude/Codex sign-in, bundled agent runtime, gitignored Explorer readability, text selection + AI file-write fixes.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.1/Ritemark-arm64.dmg",
+          "size": 321702505,
+          "sha256": "8bba403437106da990ab49c9e994960d3079da3f1a2ee25dda8b6777cf6cf483"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.1/Ritemark-x64.dmg",
+          "size": 324148872,
+          "sha256": "7a86c1693e64d6c2880fe437c29bae657333f4c9d7d2a2bc77e62d12d7890a43"
+        }
+      ]
+    },
+    {
+      "version": "1.6.0",
+      "tagName": "v1.6.0",
+      "releaseDate": "2026-04-28T00:00:00.000Z",
+      "notesSummary": "Agent Library — your .claude/ agents and skills get a first-class activity-bar entry. Plus design refresh, inline Table of Contents, dark mode, and CSV→Excel encoding fix on Mac.",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.0/Ritemark-arm64.dmg",
+          "size": 262032084,
+          "sha256": "cf0c5d192d1545ef2a63227bfeff452ea0c5c4fe6f1892455f58b8f3d4a48620"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.6.0/Ritemark-x64.dmg",
+          "size": 241692423,
+          "sha256": "c45b21144c042430f99d579ffbf65fa15e1e789a1d6b23690fa397ae20f0d58f"
+        }
+      ]
+    },
+    {
+      "version": "1.5.3",
+      "tagName": "v1.5.3",
+      "releaseDate": "2026-04-14T13:22:27.636Z",
+      "notesSummary": "Text Editor Quality of Life — in-document CMD+F search and table of contents",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.5.3/Ritemark-arm64.dmg",
+          "size": 252930897,
+          "sha256": "d6c9280f55f349110bd28a87f1427bf9e21b6b6bb31b414ff762eb6b1a6a9542"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.5.3/Ritemark-x64.dmg",
+          "size": 232562906,
+          "sha256": "18e97c8a8018b00e7d5e15e9d228907995474e9704edfff0f7e03c163ff7382a"
+        }
+      ]
+    },
+    {
+      "version": "1.5.2",
+      "tagName": "v1.5.2",
+      "releaseDate": "2026-04-06T17:49:03.840Z",
+      "notesSummary": "Unified Onboarding, Codex Flow Node, Scheduled Flows, Reactions, Offline Guard",
+      "platforms": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "assetName": "Ritemark-arm64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.5.2/Ritemark-arm64.dmg",
+          "size": 252942775,
+          "sha256": "f51ab8688026703f429ca505b753a2e7e3ea27ae3a3b25bf680b4a0abcb5a406"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "assetName": "Ritemark-x64.dmg",
+          "downloadUrl": "https://github.com/jarmo-productory/ritemark-public/releases/download/v1.5.2/Ritemark-x64.dmg",
+          "size": 232560533,
+          "sha256": "0e4ada590606b76b5a99b43929bf617313c8225490245284ab10d2cc947c48f2"
+        }
+      ]
+    }
+  ],
+  "extensionReleases": []
+}

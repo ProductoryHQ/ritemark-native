@@ -60,6 +60,7 @@ Build and run AI workflows.
 | [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
 | [Browser](browser.md) | In-app browser with AI context — open `.html` files and localhost next to your markdown |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
+| [Reporting AI output](ai-agents.md#reporting-ai-output) | Report inappropriate or harmful AI output from **Report AI issue** in the status bar |
 
 
 ---

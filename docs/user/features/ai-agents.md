@@ -6,6 +6,8 @@ Ritemark includes three AI agents in the sidebar, each with different capabiliti
 
 If you want to manage custom helpers, see [Agent Library](agent-library.md) for creating, launching, and organizing your own agents and skills.
 
+> **New in v1.11.0:** A **Report AI issue** item in the status bar lets you report AI output you object to — see [Reporting AI output](#reporting-ai-output). The built-in model list now includes **Claude Fable 5.1** and **GPT-6 Astra**.
+
 > **New in v1.8.6:** Ritemark now identifies AI before the first sidebar interaction and keeps an **[AI information](#ai-information-and-context-sharing)** button beside the composer. It shows the selected runtime, provider/service, and model; explains what context may leave the device; and reminds you to review AI output.
 
 > **New in v1.10.0:** Agent conversations are saved locally per project in one durable **Conversations** list. A permanent right rail keeps Pinned, working, needs-you, recent, and otherwise-absent current conversations close without making the rail the owner of history.
@@ -61,10 +63,11 @@ Anthropic's autonomous coding and writing agent. Claude can read, write, and org
 | Model | Description |
 |-------|-------------|
 | Claude Sonnet 5 | Fast and capable (default) |
-| Claude Opus 5 | Newest and most powerful (added in v1.8.5) |
+| Claude Opus 5 | Most powerful Opus model (added in v1.8.5) |
+| Claude Fable 5.1 | Current long-horizon model |
 | Claude Opus 4.8 | Previous flagship |
 | Claude Haiku 4.5 | Quick and light |
-| Claude Fable 5 | Lightweight tier |
+| Claude Fable 5 | Previous Fable generation |
 
 The model list is served from a live catalog feed, so newly released Claude models appear automatically without a reinstall.
 
@@ -329,6 +332,37 @@ The active-file chip can be removed before sending. Browser context is shown and
 AI output can be inaccurate or incomplete. Review facts, sources, calculations, commands, and file changes before relying on, publishing, or acting on the result. Approval controls reduce unintended actions; they do not verify correctness.
 
 For the longer data-flow explanation and current provider links, open **AI information** in the app or visit [Ritemark AI Information](https://ritemark.app/en/support/guides/ai-information).
+
+---
+
+## Reporting AI output
+
+> New in v1.11.0.
+
+If an agent gives you output that is inappropriate or harmful, you can report it to the Ritemark team.
+
+There are two ways in, and both open the same window:
+
+- **Report AI issue** in the status bar at the bottom of the window, beside the **AI Ready** indicator. It is always there, whether or not the AI sidebar is open. Clicking it opens the AI sidebar with the report window.
+- **AI information** (the ⓘ button beside the composer) has a **Report AI output** section with a link of the same name.
+
+The **Report AI output** window shows exactly what the report will contain:
+
+- **Included with your report**: two lines Ritemark adds. One is the Ritemark version and your platform (for example `Ritemark 1.11.0 (darwin)` on a Mac, or `(win32)` on Windows). The other is the time you opened the window, in UTC.
+- **What went wrong?**: an empty box for you to paste the AI output and say what is wrong with it. It holds up to 8,000 characters.
+
+Nothing else goes into the report. Ritemark takes nothing from your conversations, your documents or your account. Nothing is filtered out; the report window never has access to them in the first place. The window starts empty every time you open it.
+
+Click **Open email** to hand the report to your email app as a new message to **info@productory.eu**, the address the Ritemark team monitors. You can read and change the whole message there, including the two lines Ritemark added, and nothing is sent until you press Send in your email app. Ritemark never tells you the report was sent, because it only knows that it passed the report to your email app, not what happened next. The window says **Your email app is opening** and reminds you that the report hasn't been sent yet.
+
+Your report stays in the window whatever happens, and **Copy report** (under the text box) copies all of it:
+
+- **No email app is set up on this computer**: copy the report and email it to info@productory.eu yourself. This is a normal outcome, not an error.
+- **This report is too long to open in an email app**: email links can only carry a limited amount of text, so Ritemark won't open your email app and risk cutting the report short. Copy it and email it yourself.
+
+The address is always on screen under the text box as **Write to us: info@productory.eu**.
+
+If no email appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue-doesnt-open-an-email).
 
 ---
 

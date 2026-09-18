@@ -26,7 +26,7 @@ A comment task is now a real thing the extension host owns and tracks:
 - When it finishes, the agent's own sentence appears under your note with a link to the thread. Your note, the highlighted passage, and the Markdown file itself are never rewritten.
 - If you address a comment to one agent but the open conversation is running a different one, the line above the Send button tells you beforehand that the agent you mentioned takes over.
 
-Hovering the highlighted text opens its comment, and a finished comment offers **Mark as done** instead of a red trash can. This sprint also absorbed the comment ergonomics planned for v1.12.0: the comment composer resizes, the `@` picker opens immediately and uses the same agent-alias vocabulary as the comment collector, and collapsed comments no longer cover the text they annotate.
+Hovering the highlighted text opens its comment, and clicking it keeps the comment open while you move to its buttons — so **Send to Claude** is always within reach. A finished comment offers **Mark as done** instead of a red trash can. This sprint also absorbed the comment ergonomics planned for v1.12.0: the comment composer resizes, the `@` picker opens immediately and uses the same agent-alias vocabulary as the comment collector, and collapsed comments no longer cover the text they annotate.
 
 ## Reporting AI output, and a cleaner Store listing
 
