@@ -24,7 +24,6 @@ import {
   AIInformationDialog,
   useAIInformationDisclosure,
 } from './AIInformation';
-import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
 import { resolveAIIdentity } from './aiDisclosure';
 import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
@@ -129,7 +128,16 @@ function getDisplayPath(fullPath: string): string {
   return fullPath;
 }
 
-export function ChatInput() {
+interface ChatInputProps {
+  /**
+   * Requests the host to open the report window (#317). Owned by AISidebar,
+   * which mounts the one ReportDialog instance outside the view switch so it
+   * survives onboarding/setup states where ChatInput itself isn't rendered.
+   */
+  onReport: () => void;
+}
+
+export function ChatInput({ onReport }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
@@ -967,7 +975,6 @@ export function ChatInput() {
     byokProviderModels,
   });
   const aiInformation = useAIInformationDisclosure();
-  const reportDialog = useReportDialog();
 
   const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
@@ -1506,11 +1513,6 @@ export function ChatInput() {
           </div>
         </div>
       </div>
-      <ReportDialog
-        open={reportDialog.open}
-        context={reportDialog.context}
-        onOpenChange={reportDialog.setOpen}
-      />
       <AIInformationDialog
         identity={aiIdentity}
         context={{
@@ -1525,7 +1527,7 @@ export function ChatInput() {
         showFirstUse={aiInformation.showFirstUse}
         onOpenChange={aiInformation.setOpen}
         onAcknowledge={aiInformation.acknowledge}
-        onReport={reportDialog.request}
+        onReport={onReport}
       />
     </div>
     </>

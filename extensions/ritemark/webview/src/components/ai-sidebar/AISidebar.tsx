@@ -19,6 +19,7 @@ import { LegacyConversationView } from './LegacyConversationView';
 import { CodexSetupView } from './CodexSetupView';
 import { OpenCodeSetupView } from './OpenCodeSetupView';
 import { ChatInput } from './ChatInput';
+import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ConversationsPanel } from './ConversationsPanel';
 import { ThreadRail } from './ThreadRail';
@@ -43,6 +44,11 @@ export function AISidebar() {
     codexConversation,
     legacyConversation,
   } = useActiveConversation();
+
+  // Mounted here, not inside ChatInput, so the status bar's "Report AI issue"
+  // reaches a live dialog in EVERY sidebar state — onboarding, agent setup,
+  // bootstrapping — not only once a chat composer exists (#317).
+  const reportDialog = useReportDialog();
 
   // Set up message listener + handshake
   useEffect(() => {
@@ -236,6 +242,14 @@ export function AISidebar() {
       {/* Inject markdown styles once at root level */}
       <style dangerouslySetInnerHTML={{ __html: markdownStyles }} />
 
+      {/* Mounted unconditionally (#317): every sidebarView value — including
+          onboarding and agent setup, which render no ChatInput — must be able
+          to receive the host's `report/open` message. */}
+      <ReportDialog
+        open={reportDialog.open}
+        context={reportDialog.context}
+        onOpenChange={reportDialog.setOpen}
+      />
 
       {/* Conversations panel overlay; the rail remains visible. */}
       {showHistoryPanel && <ConversationsPanel />}
@@ -358,7 +372,7 @@ export function AISidebar() {
                   alternativeRuntime={readyAlternatives[0] ?? null}
                 />
               )}
-              <ChatInput />
+              <ChatInput onReport={reportDialog.request} />
             </div>
             <ThreadRail />
           </div>
