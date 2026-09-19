@@ -460,6 +460,7 @@ function RailItem({
   const alias = detectAgentAlias(marker.note)
   const presentation = projection ? presentCommentTask(projection) : null
   const sending = sendState?.status === 'pending'
+  const markerRef = useRef<HTMLButtonElement>(null)
   // The destination caption is only worth asking for while a Send control is
   // actually on screen and no task exists yet.
   const destination = useCommentTaskDestination(open && !!alias && !projection && !composing)
@@ -478,12 +479,25 @@ function RailItem({
   const rejection = sendState?.status === 'rejected' ? sendState.error : null
   const recovery = rejection ? recoveryAction(rejection) : null
 
+  // The wrapper toggles pin for clicks/keypresses on itself or the marker
+  // button, but a bubble action (Send, Edit, Delete, Retry, Open conversation)
+  // must reach its own handler instead of being swallowed into a pin toggle
+  // (#318).
+  const isBubbleAction = (target: EventTarget | null) => {
+    const el = target instanceof HTMLElement ? target : null
+    const interactive = el?.closest('button, a, input, textarea, [role="button"]') ?? null
+    return interactive !== null && interactive !== markerRef.current
+  }
+
   return (
     <div
       className={`rm-rail-item${pinned ? ' rm-rail-item-pinned' : ''}`}
       // Open bubble / compose sits ON TOP of neighbouring markers.
       style={{ top: marker.top, zIndex: open || composing ? 30 : 1 }}
-      onClick={() => !composing && onTogglePin()}
+      onClick={(e) => {
+        if (composing || isBubbleAction(e.target)) return
+        onTogglePin()
+      }}
       onMouseEnter={() => !composing && onOpen()}
       // A pinned bubble stays put; only hover-opened ones close on leave.
       onMouseLeave={() => !composing && !pinned && onClose()}
@@ -498,8 +512,10 @@ function RailItem({
           onClose()
         }
         // Keyboard parity with the click: Enter/Space latches the bubble open
-        // so its actions are reachable without a pointer.
-        if (e.key === 'Enter' || e.key === ' ') {
+        // so its actions are reachable without a pointer. A bubble action
+        // button handles its own Enter/Space via the browser's native button
+        // activation, so it must not be preempted here.
+        if ((e.key === 'Enter' || e.key === ' ') && !isBubbleAction(e.target)) {
           e.preventDefault()
           e.stopPropagation()
           onTogglePin()
@@ -521,6 +537,7 @@ function RailItem({
             would leave a gap the pointer falls into, closing what it just
             opened. At `wide` the bubble simply covers it. */}
         <button
+          ref={markerRef}
           className="rm-marker"
           aria-label={markerLabel}
           aria-expanded={open}
