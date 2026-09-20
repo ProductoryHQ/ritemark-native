@@ -8,10 +8,10 @@
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | OAuth desktop flow, redirect/PKCE/state, scope set, consent publication, test accounts, release credential injection | Partly recorded (credentials below); flow not yet canaried |
-| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | Open |
-| 3 | Template selection/grant/copy semantics | Open |
-| 4 | Create and same-ID Sync sequence, idempotency, verification, retry/cancel | Open |
+| 1 | OAuth desktop flow, redirect/PKCE/state, scope set, consent publication, test accounts, release credential injection | Flow canaried end to end 2026-09-20; recommendation below, publication still open |
+| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | Two of three canaried 2026-09-20 (Markdown import, native Docs API); DOCX not yet; recommendation below |
+| 3 | Template selection/grant/copy semantics | Copy-and-replace measured 2026-09-20; result rules out one candidate |
+| 4 | Create and same-ID Sync sequence, idempotency, verification, retry/cancel | Same-ID update, version signals and atomicity measured 2026-09-20 |
 | 5 | Binding schema, workspace identity, rename/copy/Save As/account switch | Open |
 | 6 | Credentials and operations | Recorded 2026-09-20; publication and verification open |
 | 7 | Feature flag, telemetry allowlist, threat model, dependency choice, architecture impact, canary matrix | Open |
@@ -118,3 +118,94 @@ The client secret Google issued with it is held by Jarmo in his password manager
 - **Project ownership.** The project has no organization. Whether it should move under a Productory organization resource, and who the second owner is, is Jarmo's decision and is not yet made.
 - **The legacy web client** shares this project's consent screen. Publishing and verifying the project therefore also affects that client. Jarmo has not yet confirmed whether that web application is still in use.
 - **Release credential injection.** Which client the shipped app uses, and how its ID reaches the build, is undecided and belongs with decision 1.
+
+
+## Decision 1 — the installed-app OAuth flow, canaried
+
+Run on 2026-09-20 against the real Google endpoints with a disposable canary client and Jarmo's own account as the single test user. Scripts live outside the repository, in the session scratch directory, and are not product code.
+
+**The loopback flow works exactly as Google's installed-app guide describes.** A listener on `127.0.0.1` with an OS-assigned port, an `S256` PKCE challenge and a random `state` produced a callback carrying a 73-character authorization code, the `state` matched, and the listener closed itself on success.
+
+**A desktop client must send a client secret.** The token exchange with PKCE but no `client_secret` is refused:
+
+```
+400 invalid_request — "client_secret is missing."
+```
+
+With the secret the same exchange returns `200`: an access token valid for 3599 seconds, a refresh token, `token_type: Bearer`, and exactly the `drive.file` scope that was requested. So the shipped app has to carry a client secret that Google's own installed-app documentation says cannot be kept secret. That is public build configuration, not a security boundary, and R2's rule stands: the tokens and the per-attempt PKCE verifier are the real secrets.
+
+**What a test user sees.** Because the app is in Testing, the account chooser is followed by a full-page **"Google hasn't verified this app"** interstitial with `Continue` and `Back to safety`. Only then comes the consent screen, which shows the app name **Ritemark**, the account, the single permission "See, edit, create, and delete only the specific Google Drive files you use with this app", and links to Ritemark's privacy policy and terms on ritemark.app. The interstitial is what publication and verification remove; the consent screen itself is already correct.
+
+**Recommendation for decision 1:** keep the loopback + PKCE + state design as specified; treat the client ID *and* secret as build configuration with no security claim attached; keep tokens in SecretStorage only. Nothing here blocks implementation.
+
+## Decision 2 and 4 — conversion and same-ID sync, measured
+
+Two of the three candidates were exercised against a fixture corpus covering headings 1–6, inline styles, links, fenced and indented code, ordered/unordered/nested/mixed lists, blockquotes, a table with alignment, a horizontal rule, task lists, escapes, Unicode and emoji, a remote image, a missing local image, raw HTML, and a Ritemark comment.
+
+**Markdown import is officially supported and was confirmed at runtime.** `about.importFormats` maps `text/markdown` and `text/x-markdown` to a Google Doc, and `exportFormats` offers Markdown back, so a round trip is measurable rather than a matter of opinion.
+
+What survived the round trip: all six heading levels, bold/italic/bold-italic, inline code, links, ordered, unordered, nested and mixed lists, the table including its alignment row, the horizontal rule, task list checkboxes, hard breaks, escapes, and every Unicode and emoji character.
+
+What did not:
+
+- **Fenced and indented code blocks lose their block identity.** They come back as ordinary paragraphs, one per line, with the angle brackets escaped. Only 15 characters in the whole document kept a monospace font, which is the inline `code` spans. For a Markdown editor this is the most serious loss in the corpus.
+- **Blockquotes are flattened.** Two quoted lines merged into one and empty quote markers appeared around them; the nested quote survived.
+- Heading 6 came back wrapped in italics, because Google's Heading 6 style is italic.
+
+Content-safety probes on the created document, read back through the Docs API rather than through the export:
+
+| Probe | Result |
+|---|---|
+| Ritemark comment id and body (`<!-- {id:…} -->`) | absent |
+| Any HTML comment marker | absent |
+| `<script>` tag, `alert(1)` payload, `onerror` attribute | absent |
+| Raw `<img src=x onerror=…>` | **became an inline image object** with source `x` and no content |
+| Remote image `https://ritemark.app/favicon.ico` | fetched and re-hosted by Google |
+| Missing local image `./does-not-exist.png` | **became an inline image object** with the relative path as its source and no content |
+
+So Google's importer strips scripts and comments by itself, but it turns image-shaped markup into real inline objects, including references it cannot resolve. A naive upload therefore produces documents with silently broken images. R4's demand to resolve or reject images before upload is justified by measurement, not by caution.
+
+**Same-ID sync works.** `files.update` with `uploadType=media` and a Markdown body against an existing document returned the same file id, replaced the entire contents, bumped Drive's `version` from 6 to 7, moved `modifiedTime`, and left `appProperties` intact.
+
+**`appProperties` survive creation through conversion.** The tag set at create time came back on the created file and again after the update. That makes it a usable marker for the orphan/duplicate problem that pre-generated ids cannot solve for converted Workspace files: tag the create, and on an indeterminate response search for the tag instead of blindly retrying.
+
+**Version signals do not agree.** A Docs API edit — which is what a person typing in Google Docs produces — changed the Docs `revisionId` but left Drive's `version` and `modifiedTime` unchanged. Drive's `version` is stable when nothing writes, but it moved on its own between create and the first update, while Google finished converting. `headRevisionId` is not populated for Google Docs at all.
+
+The consequence is sharp: **the only trustworthy "has someone edited this since our last Sync" signal is the Docs `revisionId`**, captured after our own write completes. Drive's `version` is good for "our write landed", not for detecting remote edits.
+
+**Atomicity is real, and index arithmetic is the cost.** A four-request `batchUpdate` with one bad index was rejected whole, with the document left exactly as it was, which is the documented all-or-nothing behaviour observed. The rejection itself came from a miscalculated bullet range — a fair sample of the work a native mapper carries.
+
+**Optimistic concurrency exists only on the native path.** A `batchUpdate` carrying `writeControl.requiredRevisionId` from a stale read was refused with `400 INVALID_ARGUMENT`. The Drive import path has no equivalent: it overwrites whatever is there, silently.
+
+## Decision 3 — templates, measured
+
+The copy-then-replace idea was tested directly. A template document was given a distinctive font and a page header, then copied, which is the "Create from template" path. The copy kept both. Replacing the copy's contents through the Markdown import path then **erased both**: the font was gone and the header count dropped from one to zero.
+
+Writing into the same copy through the Docs API instead kept the page header and the document's named styles; only direct character formatting applied to the replaced text did not transfer to the new text, which is correct behaviour rather than a defect.
+
+**So a template is incompatible with the Markdown-import path.** If R3 stays in scope, the conversion adapter has to be the native Docs API, or templates have to be reduced to what a converted upload can carry, which today is nothing.
+
+## Where this leaves the adapter choice
+
+Nothing is decided here; this is the evidence for Jarmo's call.
+
+- **Direct Markdown import** is by far the cheapest to build and is faithful for ordinary prose, lists, tables and links. It cannot keep code blocks, it flattens blockquotes, it wipes templates, it has no concurrency control, and it needs image pre-processing to avoid broken inline objects.
+- **Native Docs API** keeps templates and headers, offers `requiredRevisionId` as a real guard against overwriting someone's edits, and applies atomically. It costs a mapper with careful index arithmetic, and images become their own upload problem.
+- **DOCX through the existing Word exporter** has not been canaried yet. It is the remaining candidate and the one that would reuse the most existing code.
+
+A defensible middle path, if the release cannot afford the full mapper: ship Create and Sync on the import path without template support and with code blocks documented as unsupported, and treat the native mapper as the follow-up that unlocks R3. That is a scope decision, not a technical one.
+
+## Canary artifacts
+
+Created in Jarmo's Drive, all tagged `appProperties.ritemarkCanary = sprint-119-phase-0`, all disposable:
+
+| Document | Purpose |
+|---|---|
+| [Markdown import corpus](https://docs.google.com/document/d/1R77_vWek-zPlBrNFIQ5x4jarZgqrsr4CVs5dQGxxCeE/edit) | the fidelity corpus, later overwritten by the same-ID sync test |
+| [TEMPLATE](https://docs.google.com/document/d/1LrlWqmoQKK4fffkpXUnpB2yKNfOoHJ39QBwZf0FlBDg/edit) | template with a distinctive font and a page header |
+| [FROM TEMPLATE](https://docs.google.com/document/d/1R8NfKVjBksQm8oX3HQuQeqfdfKBtdJjCAyB9FP2wZ5o/edit) | copy whose styling the Markdown update erased |
+| [NATIVE into template](https://docs.google.com/document/d/1aC4lmNI2yRoF04w34PBCETKvaxo2Y5Zb7TyufmAqyzU/edit) | copy written through the Docs API, header preserved |
+
+A second OAuth client, **Ritemark canary (Phase 0, disposable)**, was created because Google never shows an existing client's secret again and the Phase 0 client's secret is in Jarmo's password manager. Its secret lives only in the session scratch directory with mode 0600 and is not in this repository. Both the canary client and these documents should be deleted when Phase 0 closes.
+
+The legacy **Ritemark** web-application OAuth client, created 2025-09-12, was deleted on 2026-09-20 at Jarmo's instruction, so the project's consent screen now covers only the desktop clients. Google keeps deleted credentials restorable for 30 days. The new Auth Platform UI failed to delete it silently; the older Credentials page did it.
