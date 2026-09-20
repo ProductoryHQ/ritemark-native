@@ -52,13 +52,32 @@ An existing project was reused rather than creating a new one.
 | User support email | jarmo@productory.eu |
 | Developer contact | jarmo@productory.eu |
 | Application home page | `https://ritemark.app/en/` |
-| Privacy policy link | Empty — blocked on the `ritemark-web` pages (R11) |
-| Terms of service link | Empty — blocked on the `ritemark-web` pages (R11) |
+| Privacy policy link | `https://ritemark.app/en/privacy/`, added 2026-09-20 once the page was live |
+| Terms of service link | `https://ritemark.app/en/terms/`, added 2026-09-20 |
 | Authorized domains | `ritemark.app` |
 | Logo | None uploaded |
 | Test users | jarmo@productory.eu (1 of the 100 pre-verification cap) |
 
-Google states on the Audience page that the app cannot be published until the Branding configuration is complete, which currently means the missing privacy and terms links.
+Until 2026-09-20 the Audience page refused publication because Branding was incomplete. With the two links saved, that block is gone and a **Publish app** action is now offered. It has deliberately not been used: publication waits for the Phase 0 gate and for the open items below.
+
+### Legal pages (R11 evidence)
+
+`ritemark-web` shipped its Sprint 26, "Ritemark's own privacy policy and terms of use", merged as PR #119 and deployed. Checked live on 2026-09-20:
+
+| URL | Status |
+|---|---|
+| `https://ritemark.app/en/privacy/` | 200 |
+| `https://ritemark.app/en/terms/` | 200 |
+| `https://ritemark.app/et/privacy/` | 200 |
+| `https://ritemark.app/et/terms/` | 200 |
+| `https://www.productory.ai/en/privacy/` | 200, still the pre-split text |
+
+The English privacy policy names Productory Services OÜ as provider with info@productory.eu, is dated 18 September 2026, and carries over the Ritemark commitments: local files, PostHog EU analytics with its opt-out, and the direct AI provider routes. It has **no Google Docs section yet** — that text is decision 8 and is written from the Phase 0 facts.
+
+Two follow-ups outside this repository:
+
+- `productory-2026` PR #21, "Move Ritemark legal details to ritemark.app" (+52/−158), is still open. Until it merges, the Productory pages carry the old Ritemark text. Scenario S79 closes only when those pages point at ritemark.app and still resolve for 1.11-era in-app links.
+- The Estonian pages live at `/et/privacy/` and `/et/terms/`, English slugs, while other Estonian routes use Estonian ones such as `/et/tugi`. That is `ritemark-web`'s call, but the app should link whatever slug is final.
 
 ### Scopes
 
@@ -81,7 +100,7 @@ The client secret Google issued with it is held by Jarmo in his password manager
 
 ### Open items for this decision
 
-- **Publication and verification.** The app stays in Testing, where refresh tokens expire after seven days for non-profile scopes such as `drive.file`. Publishing needs the privacy and terms URLs, so it is blocked on the `ritemark-web` pages. Verification lead time is unknown and runs on Google's clock.
+- **Publication and verification.** The app stays in Testing, where refresh tokens expire after seven days for non-profile scopes such as `drive.file`. Since 2026-09-20 nothing in the console blocks publication, so this is now a decision rather than a missing prerequisite: publish only after the Phase 0 gate fixes the scope set, and after the privacy policy states the Google facts (decision 8). Verification lead time is unknown and runs on Google's clock.
 - **Dedicated test account.** Only jarmo@productory.eu is a test user. A separate test account is still needed so canary evidence does not depend on the owner's own Drive.
 - **Project ownership.** The project has no organization. Whether it should move under a Productory organization resource, and who the second owner is, is Jarmo's decision and is not yet made.
 - **The legacy web client** shares this project's consent screen. Publishing and verifying the project therefore also affects that client. Jarmo has not yet confirmed whether that web application is still in use.
