@@ -48,4 +48,6 @@ The stub lives in that throwaway `node_modules` on purpose and is deleted afterw
 
 ## Known gaps in what was measured
 
-Windows, the cancel/timeout/port-collision matrix, the Picker template grant, Mermaid diagrams, per-image size limits, and the native mapper beyond a small sample. The DOCX run fed the exporter `marked`'s HTML rather than TipTap's, so its structural results need one re-run before the fidelity matrix is frozen.
+Windows, the cancel/timeout/port-collision matrix, the Picker template grant, Mermaid diagrams, per-image size limits, and a Sync that rewrites an existing document through the mapper rather than creating a new one.
+
+Every run here fed the pipeline `marked`'s HTML, not TipTap's. That difference already showed its teeth once: `marked` wraps an image in a `<p>`, and the Word exporter drops an image in that position while keeping one at block level. Before the fidelity matrix is frozen, the corpus needs one pass through real editor HTML.
