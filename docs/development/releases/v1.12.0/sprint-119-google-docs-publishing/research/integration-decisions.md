@@ -9,7 +9,7 @@
 | # | Decision | Status |
 |---|---|---|
 | 1 | OAuth desktop flow, redirect/PKCE/state, scope set, consent publication, test accounts, release credential injection | Flow canaried end to end 2026-09-20; recommendation below, publication still open |
-| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | Two of three canaried 2026-09-20 (Markdown import, native Docs API); DOCX not yet; recommendation below |
+| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | All three canaried 2026-09-20; comparison below, choice is Jarmo's |
 | 3 | Template selection/grant/copy semantics | Copy-and-replace measured 2026-09-20; result rules out one candidate |
 | 4 | Create and same-ID Sync sequence, idempotency, verification, retry/cancel | Same-ID update, version signals and atomicity measured 2026-09-20 |
 | 5 | Binding schema, workspace identity, rename/copy/Save As/account switch | Open |
@@ -185,13 +185,36 @@ Writing into the same copy through the Docs API instead kept the page header and
 
 **So a template is incompatible with the Markdown-import path.** If R3 stays in scope, the conversion adapter has to be the native Docs API, or templates have to be reduced to what a converted upload can carry, which today is nothing.
 
+## The DOCX path, measured
+
+The third candidate was run through Ritemark's own Word exporter rather than a synthetic document, so the result describes the code we would actually reuse. `exportToWordV2` was called outside the extension host with a stub `vscode` module, the same fixture corpus was converted to HTML with `marked`, and the resulting 9 KB `.docx` was uploaded to Drive with conversion and exported back to Markdown.
+
+**Caveat on this canary.** The real app feeds the exporter TipTap's `editor.getHTML()`; this run used `marked`'s HTML. The two differ in detail, so treat the structural results as indicative and re-run them against real editor HTML before freezing the fidelity matrix.
+
+What the DOCX path did better than Markdown import:
+
+- Code blocks kept a code appearance instead of becoming plain prose.
+- Heading 6 was not silently italicised.
+- Nothing unsafe arrived at all: `<script>`, the `onerror` image and the Ritemark comment were already gone, because `buildNormalizedExportHtml` strips them before the exporter runs. The importer never had to be trusted.
+- No broken images appeared, because the Word exporter drops images it cannot decode.
+
+What it did worse:
+
+- **List structure is lost.** Ordered items came back as literal text — `1\. First` — and every nested level flattened to a single bullet level. Task list checkboxes became plain bullets.
+- **Blockquotes collapsed** into one italic run with the nested quote merged in.
+- The horizontal rule vanished, and the table lost its column alignment.
+- The document title and byline were emitted in addition to the corpus H1, so the published document opened with a duplicated heading.
+- Images vanished silently, which is the honest-failure problem from the other direction: the user is told nothing.
+
+**A real defect surfaced, outside this sprint's scope.** Both exporters read `node.rawText`, which is HTML text with entities still encoded. A document containing `Tom & Jerry` reaches the exporter as `Tom &amp; Jerry` and is written to Word as the literal text `&amp;`. This was reproduced directly: exporting `<p>Ampersand &amp; less-than &lt;tag&gt; …</p>` produced `Ampersand &amp;amp; less-than &amp;lt;tag&amp;gt;` inside `word/document.xml`. `wordHtmlExporter.ts:78` and `pdfHtmlExporter.ts:19` share the accessor, so PDF is very likely affected too, though that half was not run. It is filed as its own task; Sprint 119 should not absorb it.
+
 ## Where this leaves the adapter choice
 
 Nothing is decided here; this is the evidence for Jarmo's call.
 
 - **Direct Markdown import** is by far the cheapest to build and is faithful for ordinary prose, lists, tables and links. It cannot keep code blocks, it flattens blockquotes, it wipes templates, it has no concurrency control, and it needs image pre-processing to avoid broken inline objects.
 - **Native Docs API** keeps templates and headers, offers `requiredRevisionId` as a real guard against overwriting someone's edits, and applies atomically. It costs a mapper with careful index arithmetic, and images become their own upload problem.
-- **DOCX through the existing Word exporter** has not been canaried yet. It is the remaining candidate and the one that would reuse the most existing code.
+- **DOCX through the existing Word exporter** inherits the normalizer's safety for free and handles code and images predictably, but it loses list structure, blockquotes, rules and table alignment, and it carries an entity-decoding defect that has to be fixed first. It reuses the most code and produces the least faithful structure of the three.
 
 A defensible middle path, if the release cannot afford the full mapper: ship Create and Sync on the import path without template support and with code blocks documented as unsupported, and treat the native mapper as the follow-up that unlocks R3. That is a scope decision, not a technical one.
 
@@ -205,6 +228,7 @@ Created in Jarmo's Drive, all tagged `appProperties.ritemarkCanary = sprint-119-
 | [TEMPLATE](https://docs.google.com/document/d/1LrlWqmoQKK4fffkpXUnpB2yKNfOoHJ39QBwZf0FlBDg/edit) | template with a distinctive font and a page header |
 | [FROM TEMPLATE](https://docs.google.com/document/d/1R8NfKVjBksQm8oX3HQuQeqfdfKBtdJjCAyB9FP2wZ5o/edit) | copy whose styling the Markdown update erased |
 | [NATIVE into template](https://docs.google.com/document/d/1aC4lmNI2yRoF04w34PBCETKvaxo2Y5Zb7TyufmAqyzU/edit) | copy written through the Docs API, header preserved |
+| [DOCX import](https://docs.google.com/document/d/1j3SeyY7K4SqjiluT3Ai3vt-3iuoVqgSa2nq_Ip821cw/edit) | the same corpus through Ritemark's Word exporter, then Drive conversion |
 
 A second OAuth client, **Ritemark canary (Phase 0, disposable)**, was created because Google never shows an existing client's secret again and the Phase 0 client's secret is in Jarmo's password manager. Its secret lives only in the session scratch directory with mode 0600 and is not in this repository. Both the canary client and these documents should be deleted when Phase 0 closes.
 
