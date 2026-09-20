@@ -70,14 +70,27 @@ Until 2026-09-20 the Audience page refused publication because Branding was inco
 | `https://ritemark.app/en/terms/` | 200 |
 | `https://ritemark.app/et/privacy/` | 200 |
 | `https://ritemark.app/et/terms/` | 200 |
-| `https://www.productory.ai/en/privacy/` | 200, still the pre-split text |
+| `https://www.productory.ai/en/privacy/` | 200, and since 2026-09-20 it points at the Ritemark policy |
 
 The English privacy policy names Productory Services OÜ as provider with info@productory.eu, is dated 18 September 2026, and carries over the Ritemark commitments: local files, PostHog EU analytics with its opt-out, and the direct AI provider routes. It has **no Google Docs section yet** — that text is decision 8 and is written from the Phase 0 facts.
 
-Two follow-ups outside this repository:
+`productory-2026` PR #21, "Move Ritemark legal details to ritemark.app", was reviewed and merged on 2026-09-20 as `815bf85c`, and the deploy is live. Each Productory legal page now carries a short Ritemark section linking to the matching ritemark.app page in the same language, verified after the deploy:
 
-- `productory-2026` PR #21, "Move Ritemark legal details to ritemark.app" (+52/−158), is still open. Until it merges, the Productory pages carry the old Ritemark text. Scenario S79 closes only when those pages point at ritemark.app and still resolve for 1.11-era in-app links.
-- The Estonian pages live at `/et/privacy/` and `/et/terms/`, English slugs, while other Estonian routes use Estonian ones such as `/et/tugi`. That is `ritemark-web`'s call, but the app should link whatever slug is final.
+| Productory page | Links to |
+|---|---|
+| `/en/privacy/` | `ritemark.app/en/privacy/` |
+| `/en/terms/` | `ritemark.app/en/terms/` |
+| `/et/privacy/` | `ritemark.app/et/privacy/` |
+| `/et/terms/` | `ritemark.app/et/terms/` |
+
+The review checked that nothing was lost between the two documents. Every Ritemark commitment removed from Productory's terms — MIT License, "AS IS", the liability limitation, the AI provider policy links, user responsibilities, best-effort support, and the AI-output review duty — is present on ritemark.app, as are the privacy items: the PostHog policy link, analytics on by default with its opt-out, the direct AI routes, feedback transmission, and that Productory receives no copy of the workspace. The Productory URLs did not move, so 1.11-era in-app links still land on a correct page.
+
+S79 is therefore satisfied on the web side. It closes for this sprint when the in-app links also point at ritemark.app, which is product code behind the Phase 0 gate.
+
+Two open points:
+
+- The Estonian pages live at `/et/privacy/` and `/et/terms/`, English slugs, while other Estonian routes use Estonian ones such as `/et/tugi`. Both `productory-2026` (`src/config/legal.ts`) and this sprint's in-app links hardcode the current slugs, so a later rename in `ritemark-web` must update both.
+- `productory-2026` still contains `src/app/ritemark/components/RitemarkFooter.tsx`, whose legal links point at the Productory pages. That section 301s to ritemark.app and is not served, and a separate task already covers removing the dead Ritemark code there.
 
 ### Scopes
 
