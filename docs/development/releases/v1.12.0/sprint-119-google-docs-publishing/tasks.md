@@ -17,7 +17,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Build disposable direct-Markdown, DOCX-conversion, and native-Docs-API canaries.
 - [ ] Run the same versioned fidelity corpus through all candidates: metadata, headings, inline styles, code, lists, blockquotes, tables, links, comments, unsafe markup, images/Mermaid, Unicode, and empty documents. *(corpus run through Markdown import and DOCX; the native path covered only a small mapper sample; Mermaid and empty documents not covered)*
 - [x] Measure template survival, same-file-ID update, remote version evidence, payload/size limits, latency, API count, mutation atomicity, retry/cancel, and unknown-outcome recovery for each candidate. *(template survival, same-ID update, version signals and atomicity measured; payload limits, latency at size, retry/cancel and unknown-outcome recovery still open)*
-- [ ] Select one conversion adapter and record scored rationale plus unsupported-format contract.
+- [x] Select one conversion adapter and record scored rationale plus unsupported-format contract. *(native Docs API, decided 2026-09-20 under Jarmo's delegation, on measured results; unsupported-format contract recorded: local images, checked checkboxes, mixed-list glyphs)*
 - [ ] Freeze exact Create/Sync API sequence, same-ID proof, idempotency/orphan strategy, preflight/verification, error mapping, retry budget, and cancellation semantics.
 - [ ] Freeze binding schema, workspace/document identity, Save As/copy/rename/collision/account mismatch/corruption/migration behavior, and atomic persistence.
 - [ ] Freeze dirty/untitled snapshot rule, concurrency, overwrite warning frequency, remote-edit version response, telemetry/log allowlist, and support error codes.

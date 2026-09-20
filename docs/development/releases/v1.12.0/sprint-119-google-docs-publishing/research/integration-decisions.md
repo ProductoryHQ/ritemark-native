@@ -9,8 +9,8 @@
 | # | Decision | Status |
 |---|---|---|
 | 1 | OAuth desktop flow, redirect/PKCE/state, scope set, consent publication, test accounts, release credential injection | Flow canaried end to end 2026-09-20; recommendation below, publication still open |
-| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | All three canaried 2026-09-20; comparison below, choice is Jarmo's |
-| 3 | Template selection/grant/copy semantics | Copy-and-replace measured 2026-09-20; result rules out one candidate |
+| 2 | Direct Markdown import vs DOCX conversion vs native Docs API | **Decided 2026-09-20: native Docs API.** Built, run and measured; see the decision below |
+| 3 | Template selection/grant/copy semantics | Copy-and-replace proven on the chosen adapter 2026-09-20; the Picker grant is still untested |
 | 4 | Create and same-ID Sync sequence, idempotency, verification, retry/cancel | Same-ID update, version signals and atomicity measured 2026-09-20 |
 | 5 | Binding schema, workspace identity, rename/copy/Save As/account switch | Open |
 | 6 | Credentials and operations | Recorded 2026-09-20; publication and verification open |
@@ -208,15 +208,75 @@ What it did worse:
 
 **A real defect surfaced, outside this sprint's scope.** Both exporters read `node.rawText`, which is HTML text with entities still encoded. A document containing `Tom & Jerry` reaches the exporter as `Tom &amp; Jerry` and is written to Word as the literal text `&amp;`. This was reproduced directly: exporting `<p>Ampersand &amp; less-than &lt;tag&gt; …</p>` produced `Ampersand &amp;amp; less-than &amp;lt;tag&amp;gt;` inside `word/document.xml`. `wordHtmlExporter.ts:78` and `pdfHtmlExporter.ts:19` share the accessor, so PDF is very likely affected too, though that half was not run. It is filed as its own task; Sprint 119 should not absorb it.
 
-## Where this leaves the adapter choice
+## Decision 2 — the adapter is the native Docs API
 
-Nothing is decided here; this is the evidence for Jarmo's call.
+**Decided 2026-09-20 by Claude under Jarmo's explicit delegation** — "tee ise ja vasta ise oma küsimustele … hommikul tahan näha parimat lahendust mida oskad teha". It is recorded here as a decision rather than a recommendation, and Jarmo can overturn it; the evidence for doing so is below in the same place as the evidence for it.
+
+The decision was not taken on paper. A mapper was written, run against the full corpus, and the resulting documents were read back.
+
+### What the mapper does, and the index discipline that makes it safe
+
+The thing that makes this path look expensive is index arithmetic, and the first attempt duly broke: a table landed in the middle of a sentence, because `createParagraphBullets` consumes the leading tabs that express list nesting and shifts every index after it. The working discipline is four passes:
+
+1. **One `insertText`** carrying the entire body, with a placeholder line where each table or image belongs.
+2. **Styling only** — paragraph styles, text styles, bullets. None of these changes the document's length, so every offset computed in pass 1 stays valid. Bullets go last, later lists first, because they are the one request that does change length.
+3. **Tables and images**, located by finding their placeholders in a fresh read and applied last-first.
+4. **Table cells**, filled last cell first.
+
+Each pass is one atomic `batchUpdate`. The whole corpus — 50 blocks — is 35 + 4 + 15 requests and takes about 2.6 seconds.
+
+### What it produces
+
+Measured on the same corpus and the same round trip as the other two candidates:
+
+| Construct | Markdown import | DOCX via our exporter | **Native mapper** |
+|---|---|---|---|
+| Headings 1–6 | kept, H6 italicised | kept | kept, H6 italicised (Google's own style) |
+| Bold, italic, inline code, links | kept | kept | kept |
+| Nested unordered lists | kept | **flattened** | kept, correct glyph per level |
+| Ordered lists and numbering | kept | **lost, numbers became text** | kept, continuous numbering, nested a/b |
+| Fenced code blocks | **lost, became prose** | code-styled text | kept: monospace, shaded block |
+| Blockquotes | flattened into one | **collapsed** | kept, indented with a left rule |
+| Horizontal rule | kept | **lost** | kept |
+| Table | kept | kept, **alignment lost** | kept, bold header row |
+| Task lists | checkboxes kept | **became plain bullets** | checkboxes kept, unchecked only |
+| Unicode, emoji, escapes | kept | **entities mangled** | kept |
+| Ritemark comments, scripts | dropped by Google | dropped by our normalizer | dropped by our normalizer |
+| Unsafe `<img onerror>` | **became an inline object** | dropped | dropped |
+| Template | **erased** | erased | **kept, including the page header** |
+| Overwrite protection | none | none | `requiredRevisionId` refuses stale writes |
+
+Two defects in the mapper's own first run were found and fixed rather than documented away: `<pre>` is a raw-text element in `node-html-parser`, so the `<code class="language-ts">` tag itself was published — the same trap the product's Word exporter has a comment about — and `ParagraphBorder.color` is an `OptionalColor`, one level deeper than `TextStyle`'s, which failed an entire batch.
+
+### Why this one
+
+- It is the only candidate that keeps a template, which is the release's own headline promise (R3).
+- It is the only candidate with overwrite protection. On the import paths a Sync silently overwrites whatever a colleague typed; here a stale revision is refused (R7).
+- It has the best structural fidelity of the three, and the two constructs a Markdown editor cares most about — code blocks and nested lists — survive only here.
+- Safety is the product's, not the provider's: the normalizer strips comments and unsafe markup before anything is sent, so nothing depends on Google's importer being well-behaved.
+
+### What it costs, stated plainly
+
+- **Local images cannot be published.** Docs fetches images itself, anonymously, so it accepts only a public `https` PNG, JPEG or GIF. Uploading the image to the user's own Drive and referencing it does not work: both `drive.google.com/uc` and the thumbnail URL were refused, because the fetcher cannot see a private file. A `.ico` was refused too. The DOCX path is the only one that embeds local images, and only when the HTML puts `<img>` at block level; wrapped in a `<p>` the Word exporter drops it silently, which is worth its own look in the product.
+- **A checkbox cannot be published as checked.** The API creates checkbox bullets but exposes no way to tick one.
+- **Mixed lists are approximate.** A Docs list has one preset, so unordered children under an ordered parent come out as `a.`, `b.`.
+- **The mapper is ours to maintain.** Every construct is code, and index arithmetic is where its bugs will live. The four-pass discipline and the fixture corpus exist so that those bugs are caught by a round trip rather than by a user.
+
+### The image policy this forces, and the one question left
+
+For v1: remote `https` PNG/JPEG/GIF images are inlined; every other image is **not published and named to the user** — which document, which image, and why — rather than silently dropped or published broken. That is the honest-failure rule R4 and R8 already ask for.
+
+The alternative is uploading local images to the user's Drive and making them link-visible so Google's fetcher can read them. That publishes a private screenshot to anyone holding the link, so it is a privacy decision, not a technical one. It is **not** in v1 and belongs to Jarmo.
+
+## The evidence that was weighed
+
+(kept for the record; the decision above is what it produced)
 
 - **Direct Markdown import** is by far the cheapest to build and is faithful for ordinary prose, lists, tables and links. It cannot keep code blocks, it flattens blockquotes, it wipes templates, it has no concurrency control, and it needs image pre-processing to avoid broken inline objects.
 - **Native Docs API** keeps templates and headers, offers `requiredRevisionId` as a real guard against overwriting someone's edits, and applies atomically. It costs a mapper with careful index arithmetic, and images become their own upload problem.
 - **DOCX through the existing Word exporter** inherits the normalizer's safety for free and handles code and images predictably, but it loses list structure, blockquotes, rules and table alignment, and it carries an entity-decoding defect that has to be fixed first. It reuses the most code and produces the least faithful structure of the three.
 
-A defensible middle path, if the release cannot afford the full mapper: ship Create and Sync on the import path without template support and with code blocks documented as unsupported, and treat the native mapper as the follow-up that unlocks R3. That is a scope decision, not a technical one.
+That middle path — shipping on the import path without templates — was the obvious cheap answer before the mapper existed. Having built the mapper and measured it, it is no longer the better trade: the expensive path took four passes and about 2.6 seconds per document, and it is the only one that can keep a promise the release already made.
 
 ## Recovery, scope and limits, measured
 
@@ -251,6 +311,8 @@ Created in Jarmo's Drive, all tagged `appProperties.ritemarkCanary = sprint-119-
 | [FROM TEMPLATE](https://docs.google.com/document/d/1R8NfKVjBksQm8oX3HQuQeqfdfKBtdJjCAyB9FP2wZ5o/edit) | copy whose styling the Markdown update erased |
 | [NATIVE into template](https://docs.google.com/document/d/1aC4lmNI2yRoF04w34PBCETKvaxo2Y5Zb7TyufmAqyzU/edit) | copy written through the Docs API, header preserved |
 | [DOCX import](https://docs.google.com/document/d/1j3SeyY7K4SqjiluT3Ai3vt-3iuoVqgSa2nq_Ip821cw/edit) | the same corpus through Ritemark's Word exporter, then Drive conversion |
+| [NATIVE MAPPER](https://docs.google.com/document/d/18lad5r7kgQ4pSzoEUAKT9vmgCCGY5MvWrHYhmAl2-gk/edit) | the same corpus through the chosen adapter |
+| [NATIVE MAPPER into a template](https://docs.google.com/document/d/1POkVUPI4bsfccCYKiaoy-lRgX3J5eY7v54zE3cvc67g/edit) | the same, published into a template copy, page header intact |
 
 The grant these canaries used was revoked at the end of the session, and the local token file was deleted, so nothing on this machine holds access to Jarmo's Drive overnight. Continuing the canaries needs one new consent round.
 

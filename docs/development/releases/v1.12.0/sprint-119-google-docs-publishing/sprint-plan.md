@@ -126,6 +126,7 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 - **2026-09-20:** No separate Google test account for now; Phase 0 canaries run on Jarmo's own account, and the created documents are tagged and disposable. — Jarmo: "dont worry about it".
 - **2026-09-20:** The project stays outside a Productory organisation and keeps a single owner for now; revisit before publication. — Jarmo: "leave as is atm".
 - **2026-09-20:** The legacy Ritemark web OAuth client was deleted, so the consent screen covers only the desktop client. — Jarmo: "kustuta vana klient".
+- **2026-09-20:** The conversion adapter is the **native Docs API**, decided by Claude under Jarmo's delegation ("tee ise ja vasta ise oma küsimustele"). It is the only candidate that keeps a template and refuses a stale write, and it has the best measured structural fidelity. Cost accepted: local images cannot be published in v1, and the user is told which images were left out. See [integration-decisions.md](./research/integration-decisions.md) § Decision 2.
 
 ## Risks
 
