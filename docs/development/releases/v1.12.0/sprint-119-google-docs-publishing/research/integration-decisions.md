@@ -218,6 +218,28 @@ Nothing is decided here; this is the evidence for Jarmo's call.
 
 A defensible middle path, if the release cannot afford the full mapper: ship Create and Sync on the import path without template support and with code blocks documented as unsupported, and treat the native mapper as the follow-up that unlocks R3. That is a scope decision, not a technical one.
 
+## Recovery, scope and limits, measured
+
+Run at the end of the same session, on the same grant.
+
+**`drive.file` really is a per-file window.** Listing files with no query at all returned exactly the five documents the canary had created and nothing else from Jarmo's Drive. That is the concrete claim the privacy policy's Google section can make (decision 8): Ritemark cannot see documents it did not create or that the user did not hand it.
+
+**The orphan query works.** `files.list` with `appProperties has { key='ritemarkCanary' and value='…' }` returned every canary document with its creation time. Combined with tagging each create, that is the recovery path for an indeterminate create response: search for the tag rather than retry blindly and risk a duplicate.
+
+**Refresh works** and returns a fresh hour-long access token.
+
+**Revocation produces three distinct, recognisable states**, which is what R8's error classification needs:
+
+| Step | Result |
+|---|---|
+| `POST /revoke` with the refresh token | `200` |
+| Any Drive call with the old access token | `401`, "Request had invalid authentication credentials" |
+| Refresh with the revoked refresh token | `400 invalid_grant`, "Token has been expired or revoked" |
+
+**Writing into a trashed document silently succeeds.** A document that the user moved to the bin still accepted a `files.update` and returned `200`. Only a permanently deleted file gives `404 File not found`. So Sync must check `trashed` explicitly: without that check Ritemark would report a successful publish into a document the user believes they threw away. This is a product requirement the spec does not currently state.
+
+**Size and time.** An empty document converted fine. A 281 KB Markdown document — roughly 4000 paragraphs — created in 7.4 seconds, against 2.6 seconds for an empty one. Publishing is therefore a multi-second operation on ordinary documents and needs the staged progress R5 already asks for; it is not a spinner-free instant action.
+
 ## Canary artifacts
 
 Created in Jarmo's Drive, all tagged `appProperties.ritemarkCanary = sprint-119-phase-0`, all disposable:
@@ -229,6 +251,8 @@ Created in Jarmo's Drive, all tagged `appProperties.ritemarkCanary = sprint-119-
 | [FROM TEMPLATE](https://docs.google.com/document/d/1R8NfKVjBksQm8oX3HQuQeqfdfKBtdJjCAyB9FP2wZ5o/edit) | copy whose styling the Markdown update erased |
 | [NATIVE into template](https://docs.google.com/document/d/1aC4lmNI2yRoF04w34PBCETKvaxo2Y5Zb7TyufmAqyzU/edit) | copy written through the Docs API, header preserved |
 | [DOCX import](https://docs.google.com/document/d/1j3SeyY7K4SqjiluT3Ai3vt-3iuoVqgSa2nq_Ip821cw/edit) | the same corpus through Ritemark's Word exporter, then Drive conversion |
+
+The grant these canaries used was revoked at the end of the session, and the local token file was deleted, so nothing on this machine holds access to Jarmo's Drive overnight. Continuing the canaries needs one new consent round.
 
 A second OAuth client, **Ritemark canary (Phase 0, disposable)**, was created because Google never shows an existing client's secret again and the Phase 0 client's secret is in Jarmo's password manager. Its secret lives only in the session scratch directory with mode 0600 and is not in this repository. Both the canary client and these documents should be deleted when Phase 0 closes.
 
