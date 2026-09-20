@@ -2,7 +2,7 @@
 
 Track: SDD (integration-first Phase 0)<br>
 Release tier: extension — all product code lands under `extensions/ritemark/`; Google's Desktop-app OAuth client uses a loopback redirect, so no shell, patch or `product.json` change is planned. Phase 0 re-confirms this.<br>
-Status: **Phase 0 — integration research (canon Phase 1 RESEARCH)**. Scope and Phase 0 were approved at kickoff on 2026-09-18. Implementation (canon Phase 2→3) stays gated on Jarmo's approval of `research/integration-decisions.md`.<br>
+Status: **Phase 0 — integration research (canon Phase 1 RESEARCH), first canary session run 2026-09-20**. Scope and Phase 0 were approved at kickoff on 2026-09-18. Implementation (canon Phase 2→3) stays gated on Jarmo's approval of `research/integration-decisions.md`.<br>
 Branch: `sprint-119-google-docs-publishing`, created 2026-09-18 from main `c2522479`<br>
 Worktree: `.claude/worktrees/sprint-119-google-docs-publishing`<br>
 Issue: [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) under milestone `v1.12.0`<br>
@@ -123,6 +123,9 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 - **2026-09-18:** Phase 0 may use a Testing-mode Google Cloud project with test users only; publication and verification follow the Phase 0 gate. — The package's own Phase 0 tasks needed a project that its gate text forbade.
 - **2026-09-18:** Ritemark gets its own privacy policy and terms on ritemark.app, and Productory Services OÜ stays the provider. Added as R11; the website work is split out by repository. — Jarmo: "Toode on arenenud ja seega väärt eraldi."
 - **2026-09-18:** ritemark.app is the official product domain for the consent screen's home page, privacy and terms URLs, and the authorized domain. getritemark.com remains only the Windows installer host. — Jarmo.
+- **2026-09-20:** No separate Google test account for now; Phase 0 canaries run on Jarmo's own account, and the created documents are tagged and disposable. — Jarmo: "dont worry about it".
+- **2026-09-20:** The project stays outside a Productory organisation and keeps a single owner for now; revisit before publication. — Jarmo: "leave as is atm".
+- **2026-09-20:** The legacy Ritemark web OAuth client was deleted, so the consent screen covers only the desktop client. — Jarmo: "kustuta vana klient".
 
 ## Risks
 

@@ -8,13 +8,15 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 0: Audit, canaries, and freeze (W0 — R1–R10)
 
-- [ ] Verify every current-state finding and complete `research/integration-decisions.md` with owner/date/evidence.
-- [ ] Establish a dedicated Google Cloud project/test account in Testing mode and record project ownership, consent status, test users, support/privacy URLs (ritemark.app), OAuth client types, release configuration path, and external blockers without storing credentials.
-- [ ] Prove the exact installed-desktop OAuth flow on macOS and Windows: browser, callback, PKCE/state, timeout/cancel, token exchange/refresh/revoke, and cleanup.
-- [ ] Prove the least-privilege scope set and template grant; document why any scope beyond `drive.file` is unavoidable before requesting approval.
-- [ ] Build disposable direct-Markdown, DOCX-conversion, and native-Docs-API canaries.
-- [ ] Run the same versioned fidelity corpus through all candidates: metadata, headings, inline styles, code, lists, blockquotes, tables, links, comments, unsafe markup, images/Mermaid, Unicode, and empty documents.
-- [ ] Measure template survival, same-file-ID update, remote version evidence, payload/size limits, latency, API count, mutation atomicity, retry/cancel, and unknown-outcome recovery for each candidate.
+> **Progress 2026-09-20.** First canary session done; see [integration-decisions.md](./research/integration-decisions.md). The OAuth flow, the Markdown-import path, the DOCX path and a native Docs write were exercised against the real endpoints. Still open: the Picker/template grant, Windows, Mermaid and large-payload limits, the cancel/timeout matrix, and every freeze below.
+
+- [x] Verify every current-state finding and complete `research/integration-decisions.md` with owner/date/evidence. *(audit re-verified with a dated addendum; the decision record is open and filling)*
+- [x] Establish a dedicated Google Cloud project/test account in Testing mode and record project ownership, consent status, test users, support/privacy URLs (ritemark.app), OAuth client types, release configuration path, and external blockers without storing credentials. *(project reused, APIs enabled, consent screen and scope set; Jarmo deferred the separate test account, so canaries run on his own account)*
+- [ ] Prove the exact installed-desktop OAuth flow on macOS and Windows: browser, callback, PKCE/state, timeout/cancel, token exchange/refresh/revoke, and cleanup. *(macOS proven end to end, including the missing-secret refusal; Windows, the cancel/timeout/port-collision matrix and revoke still to run)*
+- [ ] Prove the least-privilege scope set and template grant; document why any scope beyond `drive.file` is unavoidable before requesting approval. *(`drive.file` proven sufficient for create, update, copy and Docs writes; the Picker grant is untested)*
+- [x] Build disposable direct-Markdown, DOCX-conversion, and native-Docs-API canaries.
+- [ ] Run the same versioned fidelity corpus through all candidates: metadata, headings, inline styles, code, lists, blockquotes, tables, links, comments, unsafe markup, images/Mermaid, Unicode, and empty documents. *(corpus run through Markdown import and DOCX; the native path covered only a small mapper sample; Mermaid and empty documents not covered)*
+- [x] Measure template survival, same-file-ID update, remote version evidence, payload/size limits, latency, API count, mutation atomicity, retry/cancel, and unknown-outcome recovery for each candidate. *(template survival, same-ID update, version signals and atomicity measured; payload limits, latency at size, retry/cancel and unknown-outcome recovery still open)*
 - [ ] Select one conversion adapter and record scored rationale plus unsupported-format contract.
 - [ ] Freeze exact Create/Sync API sequence, same-ID proof, idempotency/orphan strategy, preflight/verification, error mapping, retry budget, and cancellation semantics.
 - [ ] Freeze binding schema, workspace/document identity, Save As/copy/rename/collision/account mismatch/corruption/migration behavior, and atomic persistence.
