@@ -1,10 +1,10 @@
 # Microsoft Store status
 
-Last updated: **2026-09-18**
+Last updated: **2026-09-20**
 
 ## High-level status
 
-**Certification failed; v1.11.0 resubmission draft is updated and package validation is running.** Microsoft completed the v1.10.1 review on 2026-09-15 with four findings: Freemium classification, inappropriate-AI-output reporting, inaccurate `StoreLogo2` imagery, and an external Git download promotion. Sprint 126 fixed the two product findings in v1.11.0. Jarmo replaced the English (United Kingdom) 2:3 poster art with Windows artwork. On 2026-09-18 the Partner Center draft was changed to Freemium, package ID `23647104` was changed to the v1.11.0 URL, and revised certification notes were saved. A fresh package validation is running.
+**The v1.11.0 resubmission is in Microsoft review.** Microsoft completed the v1.10.1 review on 2026-09-15 with four findings: Freemium classification, inappropriate-AI-output reporting, inaccurate `StoreLogo2` imagery, and an external Git download promotion. Sprint 126 fixed the two product findings in v1.11.0. Jarmo replaced the English (United Kingdom) 2:3 poster art with Windows artwork. Partner Center was updated to Freemium, package ID `23647104` was changed to the immutable v1.11.0 URL, revised certification notes were saved, and the validation report completed. Jarmo explicitly approved **Submit anyway** on 2026-09-20; Partner Center then confirmed **In review**, “Your app submission is complete,” and review **in process**.
 
 The immutable v1.11.0 installer is hosted at `https://getritemark.com/windows/v1.11.0/Ritemark-Setup.exe`: 444207592 bytes, SHA-256 `0ebda5016e432b2f039613f74665343220006e39e7749ddb76d285d0a87b932b`. Anonymous HTTPS verification completed on 2026-09-18. This is **not** certification approval and **not** Store publication. **Partner Center remains the live source of submission status** — this file is a snapshot.
 
@@ -74,20 +74,20 @@ The immutable v1.11.0 installer is hosted at `https://getritemark.com/windows/v1
 ## Store certification (separate from completed direct-release gates)
 
 - [x] Certification notes updated and saved with the four-finding remediation summary, reviewer steps, and v1.11.0 package identity.
-- [x] Partner Center package validation status **Completed** — malware scan clean, code signing valid. Silent install, Apps & Features identity and bundleware checks came back **automatic identification inconclusive** with a link to manual verification; they were not reported as passed automated checks. Manual evidence for the same hash is in [`release-candidates/v1.10.1-candidate-3.md`](./release-candidates/v1.10.1-candidate-3.md).
+- [x] v1.11.0 Partner Center package validation status **Completed** — malware scan clean and code signing valid. Silent install, Apps & Features identity and bundleware checks came back **automatic identification inconclusive**; they were not reported as passed automated checks. Manual install/uninstall evidence for the exact v1.11.0 candidate is recorded in [`release-candidates/v1.11.0-candidate-1.md`](./release-candidates/v1.11.0-candidate-1.md).
 - [ ] Clean Windows 11 / Smart App Control On test passes.
-- [x] Developer-machine install, launch, edit/save, and uninstall evidence refers to the exact hosted v1.10.1 SHA-256. Clean-machine evidence remains pending.
+- [x] Jarmo's install/use confirmation and candidate install/uninstall evidence refer to the exact hosted v1.11.0 SHA-256. Clean-machine evidence remains pending.
 - [x] Final Partner Center review completed without placeholders (2026-09-12).
 - [x] Jarmo explicitly approved the original v1.10.1 **Submit to the Store** action (2026-09-12).
 - [x] Microsoft returned the v1.10.1 certification report on 2026-09-15 — **Attention needed**, four findings recorded in Sprint 126.
-- [ ] Jarmo explicitly approves the v1.11.0 resubmission after all saved draft sections and validation results are reviewed.
+- [x] Jarmo explicitly approved **Submit anyway** for the v1.11.0 resubmission on 2026-09-20 after the completed validation report and pricing warning were reviewed.
+- [x] Partner Center accepted the resubmission and displayed **In review**, submission complete, and review **in process** on 2026-09-20; see [`SUBMISSION-2026-09-20.md`](./SUBMISSION-2026-09-20.md).
 - [ ] Microsoft certifies the v1.11.0 resubmission.
 - [ ] Store-origin install passes.
 - [ ] Gate 2 records the Store and direct-download evidence.
 
 ## Immediate next actions
 
-1. Wait for the v1.11.0 Partner Center package validation to complete and inspect its report. Do not submit while validation is pending or failed.
-2. Review every draft section and obtain Jarmo's explicit approval for the final **Submit to the Store** action.
-3. **Never replace either v1.10.1 or v1.11.0 bytes.** Any changed binary needs a new immutable URL and candidate record.
-4. After publication, verify Store-origin install, launch, edit/save and uninstall, then record it in Gate 2.
+1. Await Microsoft's certification decision and inspect any new actionable report. Microsoft displayed an SLA of 3 business days.
+2. **Never replace either v1.10.1 or v1.11.0 bytes.** Any changed binary needs a new immutable URL and candidate record.
+3. After publication, verify Store-origin install, launch, edit/save and uninstall, then record it in Gate 2.

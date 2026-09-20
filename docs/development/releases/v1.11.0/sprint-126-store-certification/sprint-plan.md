@@ -1,7 +1,7 @@
 # Sprint 126 — Microsoft Store Certification Gaps
 
 **Release:** [v1.11.0](../release-plan.md) · [milestone 11](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
-**Status:** **R1–R4 remediation and the immutable v1.11.0 package are complete; fresh Partner Center validation is running 2026-09-18** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). Final draft review and authorized resubmission follow a completed validation report.<br>
+**Status:** **R1–R4 remediation is submitted; Microsoft review is in process from 2026-09-20** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). The immutable v1.11.0 package passed Partner Center malware and signing validation; Jarmo authorized the final resubmission.<br>
 **Track:** Audit-first; shared AI UX/host boundary, targeted VS Code distribution patch, and Store metadata operations.<br>
 **Owner:** Jarmo (scope, external account actions, release gates); implementation/QA assignees TBD at kickoff.<br>
 **Issue:** [#305](https://github.com/ProductoryHQ/ritemark-native/issues/305) under milestone `v1.11.0`, closed with the merge.<br>
@@ -60,7 +60,7 @@ Steps 2–3 follow approved Phase 0. Metadata preparation can proceed independen
 - [ ] User-facing changes are recorded in `docs/CHANGELOG.md` and v1.11.0 release notes; central Store documentation links the final evidence.
 - [ ] Release handoff explicitly separates completed sprint work from remaining candidate, release-gate and submission actions.
 
-Microsoft certification acceptance is an external follow-up, not a guaranteed sprint outcome. Until candidate/download tests and authorized resubmission are complete, do not label the Store submission ready or accepted.
+Microsoft certification acceptance is an external follow-up, not a guaranteed sprint outcome. The candidate/download tests and authorized resubmission are complete, but do not label the app certified or published until Partner Center reports that result.
 
 ## Dependencies
 

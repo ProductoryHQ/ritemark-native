@@ -1,6 +1,6 @@
 # Partner Center live draft
 
-Last inspected: **2026-09-18**
+Last inspected: **2026-09-20**
 
 ## Product identity
 
@@ -9,7 +9,7 @@ Last inspected: **2026-09-18**
 | Product name | `Ritemark` |
 | Product type | EXE or MSI app |
 | Partner Center ID | `3a2a9010-fbe3-47cf-ae87-4d338f587830` |
-| Submission state | In draft |
+| Submission state | **In review** — submission complete; review in process |
 | Store ID | Available after the app is live |
 | Store deep link | Available after the app is live |
 | Web Store URL | Available after the app is live |
@@ -25,7 +25,7 @@ Onboarding is complete and all three verification checks passed. The stale new-a
 | Age ratings | Questionnaire and IARC rating completed | Complete |
 | Packages | Package ID `23647104`, x64, immutable v1.11.0 URL; existing install settings preserved | Saved 2026-09-18 |
 | Store listing | English (United Kingdom) listing exists; corrected Windows 2:3 poster art saved | Complete for this remediation |
-| Package validation | Fresh v1.11.0 validation started 2026-09-18 | Running; inspect the report when complete |
+| Package validation | v1.11.0 validation completed | Malware clean; code sign valid; three automatic-identification checks inconclusive, not failed |
 
 ## Availability decisions
 
@@ -106,8 +106,8 @@ Generated preview highlights:
 - Russia PCBP: `18+`;
 - PEGI: `Parental Guidance Recommended`.
 
-The preview now requires a checkbox attesting agreement to the IARC Terms of Use and that the publisher representative is of the age of majority in their jurisdiction. **Save** remains disabled until that legal attestation is checked. Obtain Jarmo's explicit confirmation before checking it or saving the ratings.
+Jarmo explicitly approved the IARC Terms of Use/adult-status attestation; the ratings were saved and remained complete for the v1.11.0 resubmission.
 
 ## Hard boundary
 
-Do not add a package placeholder and do not select Submit. The exact signed EXE, immutable HTTPS URL, SHA-256, Windows evidence, and final approval remain mandatory.
+The v1.11.0 package was submitted on 2026-09-20 after validation and Jarmo's explicit approval. Do not replace the bytes at the submitted URL. Any changed binary requires a new versioned URL, candidate record, validation cycle, and explicit submission approval.
