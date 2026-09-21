@@ -414,6 +414,18 @@ export function locatePlaceholders(doc: DocsDocument, placeholders: Placeholder[
   return found;
 }
 
+/**
+ * How an image is named to the user when it could not be published: its file
+ * path when there is one (TipTap keeps it in `title`), never a multi-megabyte
+ * `data:` URI, and the alt text only as a last resort.
+ */
+export function imageLabel(block: Block): string {
+  if (block.title) return block.title;
+  if (block.src && !block.src.startsWith('data:') && !/vscode-resource|vscode-cdn\.net/.test(block.src)) return block.src;
+  if (block.src?.startsWith('data:')) return block.alt ? `${block.alt} (diagram)` : 'a diagram';
+  return block.alt || 'an image';
+}
+
 export interface PlaceholderBatch {
   requests: unknown[];
   /** Images that could not be placed, named for the user (never silently lost). */
@@ -436,7 +448,7 @@ export function placeholderRequests(located: LocatedPlaceholder[], imageUris: Ma
     } else if (block.kind === 'image') {
       const uri = imageUris.get(block);
       if (uri) requests.push({ insertInlineImage: { uri, location: { index: at } } });
-      else skipped.push({ source: block.title || block.alt || block.src || 'image', reason: reasons.get(block) ?? 'could not be read' });
+      else skipped.push({ source: imageLabel(block), reason: reasons.get(block) ?? 'could not be read' });
     }
   }
   return { requests, skipped };
