@@ -89,6 +89,6 @@ Image, remote:
 
 Image, local and missing:
 
-![Missing local image](./does-not-exist.png)
+![Local red square](./red.png)
 
 Final paragraph.

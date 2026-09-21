@@ -164,6 +164,41 @@ async function api(url: string, init: any = {}) {
   return { ok: res.ok, status: res.status, json, body }
 }
 
+// An image only reaches a Doc through a URL that Google itself can fetch, and
+// the Docs API caps that URL at 2 KB, so a data: URI is only good for a
+// thumbnail. A local image is therefore staged: uploaded to the user's own
+// Drive, made link-readable for the few seconds the insert needs, then
+// unshared and deleted. Google copies the bytes into the document, so the
+// picture survives that cleanup.
+const MIME_BY_EXT: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif' }
+
+async function stageImage(absPath: string) {
+  const mime = MIME_BY_EXT[path.extname(absPath).toLowerCase()]
+  if (!mime || !fs.existsSync(absPath)) return null
+  const bytes = fs.readFileSync(absPath)
+  const b = 'b' + Math.random().toString(36).slice(2)
+  const meta = { name: `ritemark-publish-${path.basename(absPath)}`, appProperties: { ritemarkCanary: 'sprint-119-phase-0', ritemarkTemp: 'image-staging' } }
+  const body = Buffer.concat([
+    Buffer.from(`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`),
+    bytes, Buffer.from(`\r\n--${b}--\r\n`),
+  ])
+  const up = await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST', headers: { 'content-type': `multipart/related; boundary=${b}` }, body,
+  })
+  if (!up.ok) return null
+  const perm = await api(`https://www.googleapis.com/drive/v3/files/${up.json.id}/permissions?fields=id`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  })
+  return { fileId: up.json.id as string, permId: perm.ok ? (perm.json.id as string) : null, uri: `https://drive.google.com/uc?export=view&id=${up.json.id}`, bytes: bytes.length }
+}
+
+async function unstage(staged: { fileId: string; permId: string | null }[]) {
+  await Promise.all(staged.map(async (s) => {
+    if (s.permId) await api(`https://www.googleapis.com/drive/v3/files/${s.fileId}/permissions/${s.permId}`, { method: 'DELETE' })
+    await api(`https://www.googleapis.com/drive/v3/files/${s.fileId}`, { method: 'DELETE' })
+  }))
+}
+
 const mdPath = process.argv[2]
 const templateId = process.argv[3]
 const md = fs.readFileSync(mdPath, 'utf8')
@@ -321,6 +356,26 @@ console.log('BATCH 1 (text + styles + bullets)', main.status, `${styleRequests.l
 if (!main.ok) { console.log(String(main.json?.error?.message).slice(0, 300)); console.log('doc', docId); process.exit(1) }
 
 // ---- pass 3: tables and images, located by their placeholders
+const staged: { fileId: string; permId: string | null }[] = []
+const stagedUri = new Map<string, string>()
+const imageBlocks = placed.filter((p) => p.block.kind === 'image')
+if (imageBlocks.length) {
+  const t0 = Date.now()
+  const results = await Promise.all(imageBlocks.map(async (p) => {
+    const src = p.block.src || ''
+    if (/^https:\/\//.test(src) && /\.(png|jpe?g|gif)(\?|$)/i.test(src)) return { src, uri: src, staged: null }
+    if (/^https?:\/\//.test(src)) return { src, uri: null, staged: null }   // Docs cannot fetch it; report instead
+    const abs = path.resolve(path.dirname(mdPath), src)
+    const st = await stageImage(abs)
+    return { src, uri: st?.uri ?? null, staged: st }
+  }))
+  for (const r of results) {
+    if (r.uri) stagedUri.set(r.src, r.uri)
+    if (r.staged) staged.push(r.staged)
+  }
+  console.log(`IMAGES staged ${staged.length} local, ${results.filter((r) => r.uri && !r.staged).length} remote, ${results.filter((r) => !r.uri).length} not publishable, in ${Date.now() - t0}ms`)
+}
+
 const tokens = placed.filter((p) => p.token)
 if (tokens.length) {
   const doc = await api(`https://docs.googleapis.com/v1/documents/${docId}`)
@@ -342,11 +397,9 @@ if (tokens.length) {
       requests.push({ insertTable: { rows: entry.block.rows.length, columns: entry.block.rows[0].length, location: { index: at } } })
     } else if (entry.block.kind === 'image') {
       const src = entry.block.src || ''
-      if (/^https:\/\//.test(src) && /\.(png|jpe?g|gif)(\?|$)/i.test(src)) {
-        requests.push({ insertInlineImage: { uri: src, location: { index: at } } })
-      } else {
-        skippedImages.push({ src, reason: /^https:\/\//.test(src) ? 'Docs cannot fetch this image format' : 'not a public https URL, Docs can only fetch' })
-      }
+      const uri = stagedUri.get(src)
+      if (uri) requests.push({ insertInlineImage: { uri, location: { index: at } } })
+      else skippedImages.push({ src, reason: /^https?:\/\//.test(src) ? 'Docs cannot fetch this image format' : 'image file not found or not a PNG, JPEG or GIF' })
     }
   }
   if (requests.length) {
@@ -390,6 +443,11 @@ if (tables.length) {
   }
 }
 
+if (staged.length) {
+  const t = Date.now()
+  await unstage(staged)
+  console.log(`IMAGES unshared and temporary copies deleted in ${Date.now() - t}ms`)
+}
 for (const img of skippedImages) console.log(`  image not published: ${img.src.slice(0, 50)} — ${img.reason}`)
 console.log('DOC https://docs.google.com/document/d/' + docId + '/edit')
 fs.writeFileSync(path.join(DIR, 'last-native-doc.txt'), docId)

@@ -257,16 +257,54 @@ Two defects in the mapper's own first run were found and fixed rather than docum
 
 ### What it costs, stated plainly
 
-- **Local images cannot be published.** Docs fetches images itself, anonymously, so it accepts only a public `https` PNG, JPEG or GIF. Uploading the image to the user's own Drive and referencing it does not work: both `drive.google.com/uc` and the thumbnail URL were refused, because the fetcher cannot see a private file. A `.ico` was refused too. The DOCX path is the only one that embeds local images, and only when the HTML puts `<img>` at block level; wrapped in a `<p>` the Word exporter drops it silently, which is worth its own look in the product.
+- **Local images need staging** (see the next section — this was the decision's biggest open cost, and it is now solved and measured).
 - **A checkbox cannot be published as checked.** The API creates checkbox bullets but exposes no way to tick one.
 - **Mixed lists are approximate.** A Docs list has one preset, so unordered children under an ordered parent come out as `a.`, `b.`.
 - **The mapper is ours to maintain.** Every construct is code, and index arithmetic is where its bugs will live. The four-pass discipline and the fixture corpus exist so that those bugs are caught by a round trip rather than by a user.
 
-### The image policy this forces, and the one question left
+## Images, solved — the routes measured on 2026-09-21
 
-For v1: remote `https` PNG/JPEG/GIF images are inlined; every other image is **not published and named to the user** — which document, which image, and why — rather than silently dropped or published broken. That is the honest-failure rule R4 and R8 already ask for.
+Jarmo asked whether an image can go in inline as base64. It can, and the answer is more useful than a yes: four routes were measured, three of them work, and they differ in ways that decide the product's behaviour.
 
-The alternative is uploading local images to the user's Drive and making them link-visible so Google's fetcher can read them. That publishes a private screenshot to anyone holding the link, so it is a privacy decision, not a technical one. It is **not** in v1 and belongs to Jarmo.
+### 1. A `data:` URI in the Docs API — real, but capped at 2 KB
+
+`insertInlineImage` accepts a `data:image/png;base64,…` URI and Google stores the bytes as its own copy. The first test passed, then the size test failed at every realistic size with one error:
+
+```
+400 — Invalid requests[0].insertInlineImage: The URL must be 2K bytes or less.
+```
+
+A 2 KB URI is about 1.4 KB of image. The first pass only "worked" because the fixture was a 4×4 pixel square. **Inline base64 is therefore useless for a real picture**, and the size test is the reason the record does not claim otherwise.
+
+### 2. A `data:` URI inside an import — no cap, but the wrong adapter
+
+A 1.24 MB `data:` URI imported cleanly through both the Markdown and the HTML route, in 4.3 and 5.2 seconds, with the image hosted by Google afterwards. So the cap belongs to the Docs API's URL field, not to Google's importer. It is not a route the chosen adapter can use: an import replaces the document wholesale, which is exactly what costs the template and the revision guard.
+
+While testing it, the HTML-import candidate was measured properly for the first time, since it was the one route nobody had run. It is not a hidden winner: it wraps list items in blockquote markers, drops inline-code formatting and loses blockquotes, though it does keep images and the horizontal rule.
+
+### 3. Staging through the user's own Drive — the route the product will use
+
+Upload the image to the user's Drive as an app-created file, make it link-readable, insert it by URL, then revoke the sharing and delete the temporary file. Measured end to end:
+
+| Step | 1 image, 0.93 MB | 6 images, 4.11 MB |
+|---|---|---|
+| upload + share (parallel) | 2.2 s | 3.7 s |
+| one `insertInlineImage` batch | 2.1 s | 2.3 s |
+| unshare + delete (parallel) | 1.4 s | 1.3 s |
+| **total** | **5.7 s** | **7.2 s** |
+
+**The picture survives the cleanup.** After the sharing was revoked *and* the uploaded file deleted, the document still reports the image as Google-hosted, and a PDF export of that document still contains the image stream. Google copies the bytes into the document rather than linking to the Drive file. A staging leftover check after the run found zero temporary files.
+
+The exposure this buys is small but real: for a few seconds the image is readable by anyone holding an unguessable Drive URL. Nothing else in the user's Drive is touched, and the temporary copy is deleted.
+
+### The image policy for v1
+
+Local PNG, JPEG and GIF images are published, through staging, in parallel, with the temporary copies removed afterwards. Remote `https` images Google can fetch are inserted directly, with no upload. Anything else — a `.ico`, an `.svg`, a file that is missing — is **not published and named to the user**: which image, and why. That is the honest-failure rule R4 and R8 already ask for, and it is now the only case where an image goes missing.
+
+Two things follow that Jarmo should know rather than discover:
+
+- The staging mechanism belongs in the privacy policy's Google section (decision 8), described plainly: to publish a picture, Ritemark puts a temporary copy in your own Drive, shares it by link for a few seconds, and deletes it again.
+- A Settings switch to publish without images is worth having for users who would rather not have that moment at all, and for speed on image-heavy documents.
 
 ## The evidence that was weighed
 

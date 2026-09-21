@@ -13,6 +13,10 @@ No credential is stored here. The canary client's secret and the tokens lived on
 | `inspect-doc.mjs` | reads a created document back through the Docs API and probes it for comments, scripts, fonts and inline image objects |
 | `docs-mapper.mts` | the chosen adapter: Markdown -> Docs API, in four passes. Run it with a template id as the second argument to publish into a template copy |
 | `docx/make-docx.mts` | runs Ritemark's real `exportToWordV2` outside the extension host, to measure the DOCX candidate with the code we would reuse |
+| `image-routes.mjs`, `image-routes-large.mjs` | the four ways a local image might reach a Doc, small and real-sized |
+| `image-limits.mjs` | finds the 2 KB cap on an `insertInlineImage` URI, which is what rules out inline base64 |
+| `image-batch.mjs` | what publishing several images actually costs, staged in parallel |
+| `html-import.mts` | the fourth adapter candidate: our normalized export HTML, uploaded and converted, with local images inlined |
 | `docx/image-probe.mts`, `docx/image-html-probe.mts` | why a local image survives one HTML shape and not another |
 | `docx/entity-test.mts` | the minimal reproduction of the entity-decoding defect in the Word exporter |
 | `fixtures/corpus.md` | the fidelity corpus: headings, inline styles, code, lists, quotes, table, images, unsafe markup, a Ritemark comment, Unicode |
@@ -48,6 +52,6 @@ The stub lives in that throwaway `node_modules` on purpose and is deleted afterw
 
 ## Known gaps in what was measured
 
-Windows, the cancel/timeout/port-collision matrix, the Picker template grant, Mermaid diagrams, per-image size limits, and a Sync that rewrites an existing document through the mapper rather than creating a new one.
+Windows, the cancel/timeout/port-collision matrix, the Picker template grant, Mermaid diagrams, and a Sync that rewrites an existing document through the mapper rather than creating a new one. Image size was measured up to 4 MB across six files; the ceiling Google enforces on a staged image was not probed.
 
 Every run here fed the pipeline `marked`'s HTML, not TipTap's. That difference already showed its teeth once: `marked` wraps an image in a `<p>`, and the Word exporter drops an image in that position while keeping one at block level. Before the fidelity matrix is frozen, the corpus needs one pass through real editor HTML.

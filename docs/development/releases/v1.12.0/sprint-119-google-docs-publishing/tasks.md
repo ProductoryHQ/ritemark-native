@@ -20,7 +20,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Select one conversion adapter and record scored rationale plus unsupported-format contract. *(native Docs API, decided 2026-09-20 under Jarmo's delegation, on measured results; unsupported-format contract recorded: local images, checked checkboxes, mixed-list glyphs)*
 - [ ] Freeze exact Create/Sync API sequence, same-ID proof, idempotency/orphan strategy, preflight/verification, error mapping, retry budget, and cancellation semantics.
 - [ ] Freeze binding schema, workspace/document identity, Save As/copy/rename/collision/account mismatch/corruption/migration behavior, and atomic persistence.
-- [ ] Freeze dirty/untitled snapshot rule, concurrency, overwrite warning frequency, remote-edit version response, telemetry/log allowlist, and support error codes.
+- [ ] Freeze dirty/untitled snapshot rule, concurrency, overwrite warning frequency, remote-edit version response, telemetry/log allowlist, and support error codes. *(remote-edit response decided in substance: the Docs revisionId is the only trustworthy signal and `requiredRevisionId` is the guard)*
+- [x] Decide how images reach the document. *(2026-09-21: staging through the user's own Drive; the Docs API caps a data: URI at 2 KB)*
 - [ ] Approve `design.md`, feature flag, threat/privacy model, dependency choice, architecture impact, and native/live test matrix.
 - [ ] **Jarmo Phase 0 gate:** authorize production implementation.
 
