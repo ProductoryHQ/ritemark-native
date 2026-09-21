@@ -66,7 +66,8 @@ async function start() {
       return
     }
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end('Ritemark Phase 0 canary: code received. You can close this tab.')
-    writeState({ code, verifier, callbackLog: log, codeReceivedAt: new Date().toISOString() })
+    writeState({ code, verifier, callbackLog: log, codeReceivedAt: new Date().toISOString(), pickedFileIds: url.searchParams.get('picked_file_ids') })
+    if (url.searchParams.get('picked_file_ids')) console.log('PICKED', url.searchParams.get('picked_file_ids'))
     console.log('CODE captured, length', code.length)
     setTimeout(() => { server.close(); console.log('listener closed') }, 500)
   })
@@ -84,6 +85,7 @@ async function start() {
     state,
     access_type: 'offline',
     prompt: 'consent',
+    ...(process.env.CANARY_PICKER ? { trigger_onepick: 'true', mimetypes: 'application/vnd.google-apps.document' } : {}),
   })}`
   writeState({ port, redirect, verifier, state, startedAt: new Date().toISOString() })
   console.log('REDIRECT_URI', redirect)

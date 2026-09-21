@@ -2,7 +2,7 @@
 
 Track: SDD (integration-first Phase 0)<br>
 Release tier: extension — all product code lands under `extensions/ritemark/`; Google's Desktop-app OAuth client uses a loopback redirect, so no shell, patch or `product.json` change is planned. Phase 0 re-confirms this.<br>
-Status: **Phase 0 — integration research (canon Phase 1 RESEARCH), first canary session run 2026-09-20**. Scope and Phase 0 were approved at kickoff on 2026-09-18. Implementation (canon Phase 2→3) stays gated on Jarmo's approval of `research/integration-decisions.md`.<br>
+Status: **Phase 3 — implementation (canon Phase 3 DEVELOP), started 2026-09-21** after Jarmo approved the Phase 0 record. Scope and Phase 0 were approved at kickoff on 2026-09-18. Implementation (canon Phase 2→3) stays gated on Jarmo's approval of `research/integration-decisions.md`.<br>
 Branch: `sprint-119-google-docs-publishing`, created 2026-09-18 from main `c2522479`<br>
 Worktree: `.claude/worktrees/sprint-119-google-docs-publishing`<br>
 Issue: [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) under milestone `v1.12.0`<br>
@@ -154,5 +154,5 @@ Add an experimental, default-on `google-docs-publishing` flag as a kill switch. 
 - [x] Jarmo approved this sprint plan: scope and integration-first Phase 0 (2026-09-18). This does not authorize implementation.
 - [x] GitHub issue [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) is created under milestone `v1.12.0` (2026-09-18).
 - [x] Dedicated branch `sprint-119-google-docs-publishing` is created after approval (2026-09-18, from main `c2522479`).
-- [ ] Phase 0 research and all decisions in `research/integration-decisions.md` are approved (the implementation gate).
-- [ ] SDD artifacts, including R11, and the feature-flag decision are approved.
+- [x] Phase 0 research and all decisions in `research/integration-decisions.md` are approved (the implementation gate). *(Jarmo, 2026-09-21: "approved, hakka koodi kirjutama")*
+- [x] SDD artifacts, including R11, and the feature-flag decision are approved. *(same approval)*

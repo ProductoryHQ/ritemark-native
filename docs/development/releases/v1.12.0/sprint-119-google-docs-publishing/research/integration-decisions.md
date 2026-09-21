@@ -1,6 +1,6 @@
 # Sprint 119 Integration Decisions
 
-**Status:** In progress. Opened 2026-09-20. This file is the Phase 0 gate: no OAuth production configuration, dependency, message contract or product code starts until Jarmo approves it.<br>
+**Status:** **Approved by Jarmo on 2026-09-21** ("approved, hakka koodi kirjutama"). Opened 2026-09-20. Implementation may start; the open items listed per decision remain open and are carried into implementation or release readiness.<br>
 **Decisions:** 8 (see [spec.md](../spec.md) § Phase 0 Decisions). Decision 6 is partly recorded below; the rest are open.<br>
 **Rule:** every entry records what was observed, when, and by whom. No credential, token or secret value belongs in this file.
 
@@ -10,12 +10,22 @@
 |---|---|---|
 | 1 | OAuth desktop flow, redirect/PKCE/state, scope set, consent publication, test accounts, release credential injection | Flow canaried end to end 2026-09-20; recommendation below, publication still open |
 | 2 | Direct Markdown import vs DOCX conversion vs native Docs API | **Decided 2026-09-20: native Docs API.** Built, run and measured; see the decision below |
-| 3 | Template selection/grant/copy semantics | Copy-and-replace proven on the chosen adapter 2026-09-20; the Picker grant is still untested |
+| 3 | Template selection/grant/copy semantics | Decided and proven end to end 2026-09-21: desktop Picker over the same loopback, then `files.copy` and the mapper |
 | 4 | Create and same-ID Sync sequence, idempotency, verification, retry/cancel | Same-ID update, version signals and atomicity measured 2026-09-20 |
 | 5 | Binding schema, workspace identity, rename/copy/Save As/account switch | Open |
 | 6 | Credentials and operations | Recorded 2026-09-20; publication and verification open |
 | 7 | Feature flag, telemetry allowlist, threat model, dependency choice, architecture impact, canary matrix | Open |
 | 8 | Google user-data facts for the Ritemark privacy policy (R11) | Open |
+
+## Decision 3 — templates through the desktop Picker, proven
+
+Measured on 2026-09-21. The desktop Picker is not a separate integration: it is the same installed-app authorization request with `trigger_onepick=true` and `mimetypes=application/vnd.google-apps.document` added. Google's guide does not say whether a loopback redirect is supported, so it was tested.
+
+It is. The flow went account chooser → the Testing interstitial → a Picker-specific consent page served from `drive.google.com/picker/oauth/…`, which reads "For the files you're about to pick, Ritemark will be allowed to …" → the Picker itself, filtered to Google Docs. Choosing one document and pressing **Insert** redirected to `127.0.0.1` with `picked_file_ids=<id>` alongside the ordinary `code` and `state`.
+
+After the normal code exchange, the new token could read the picked file's metadata (`canCopy: true`) and `files.copy` it — exactly what Create-from-template needs. So template selection is one more loopback authorization with two extra parameters, it needs no scope beyond `drive.file`, and the copy then goes through the same mapper that was already shown to keep a template's page header.
+
+What the user sees: a browser tab with a Drive file picker restricted to Google Docs. Ritemark learns only the ID of the one file chosen.
 
 ## Decision 6 — credentials and operations
 

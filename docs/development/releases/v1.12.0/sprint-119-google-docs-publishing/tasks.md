@@ -23,7 +23,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Freeze dirty/untitled snapshot rule, concurrency, overwrite warning frequency, remote-edit version response, telemetry/log allowlist, and support error codes. *(remote-edit response decided in substance: the Docs revisionId is the only trustworthy signal and `requiredRevisionId` is the guard)*
 - [x] Decide how images reach the document. *(2026-09-21: staging through the user's own Drive; the Docs API caps a data: URI at 2 KB)*
 - [ ] Approve `design.md`, feature flag, threat/privacy model, dependency choice, architecture impact, and native/live test matrix.
-- [ ] **Jarmo Phase 0 gate:** authorize production implementation.
+- [x] **Jarmo Phase 0 gate:** authorize production implementation. *(2026-09-21: "approved, hakka koodi kirjutama")*
 
 ## Phase 1: OAuth and account service (W1 — R1, R2, R8, R9)
 
