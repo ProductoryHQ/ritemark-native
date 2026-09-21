@@ -27,67 +27,67 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 1: OAuth and account service (W1 — R1, R2, R8, R9)
 
-- [ ] Add Google-Docs-specific domain/account types and exact redacted projections.
-- [ ] Add validated public OAuth configuration with actionable unavailable state; keep all tokens/credentials out of source defaults and webviews.
-- [ ] Implement one-attempt OAuth controller with cryptographic state, PKCE, bounded callback listener, system-browser launch, cancel/timeout/replay protection, and disposal.
-- [ ] Implement token exchange, identity verification, SecretStorage commit, serialized refresh, reauthorization classification, revocation attempt, disconnect, and account switching.
-- [ ] Add injected HTTP/browser/listener/clock/random/SecretStorage adapters.
-- [ ] Test success, cancel, denial, timeout, port failure, malformed/mismatched/replayed callback, partial token commit, refresh/revoke failures, dispose, and flag-off.
-- [ ] Add redaction tests that seed token/email/file/content markers through every error/log path.
+- [x] Add Google-Docs-specific domain/account types and exact redacted projections. *(`googleDocs/types.ts`; projections carry no token, account id or file id)*
+- [x] Add validated public OAuth configuration with actionable unavailable state; keep all tokens/credentials out of source defaults and webviews. *(`config.ts`, esbuild `define`, runtime override for RunDev; the unavailable state is shown in Settings)*
+- [x] Implement one-attempt OAuth controller with cryptographic state, PKCE, bounded callback listener, system-browser launch, cancel/timeout/replay protection, and disposal. *(`oauth.ts`; cancel verified on RunDev 2026-09-21)*
+- [x] Implement token exchange, identity verification, SecretStorage commit, serialized refresh, reauthorization classification, revocation attempt, disconnect, and account switching. *(`GoogleAccountService.ts`; connect verified on RunDev with jarmo@productory.eu)*
+- [x] Add injected HTTP/browser/listener/clock/random/SecretStorage adapters.
+- [x] Test success, cancel, denial, timeout, port failure, malformed/mismatched/replayed callback, partial token commit, refresh/revoke failures, dispose, and flag-off. *(`oauth.test.ts`; flag-off is covered in `GoogleDocsController.test.ts`)*
+- [ ] Add redaction tests that seed token/email/file/content markers through every error/log path. *(projection key-set assertions only; no marker-seeding sweep through log paths yet)*
 
 ## Phase 2: Binding store and identity (W2 — R6, R8, R9)
 
-- [ ] Add versioned binding/store codecs, canonical URI + workspace identity, and safe redacted projection.
-- [ ] Add temp-write + fsync/close where appropriate + atomic rename and last-known-good recovery.
-- [ ] Add monotonic registry revisions and per-document events for multiple editor webviews.
-- [ ] Register VS Code rename/move handling with destination collision checks and transactional migration.
-- [ ] Implement Save As/copy isolation, account mismatch, unknown/corrupt schema, remove-binding confirmation, and feature-off/disconnect persistence.
-- [ ] Test POSIX/Windows URI normalization, multi-root/no-folder, two editors, concurrent writes, interrupted temp, rename collision, external copy, reload, and newer schema.
+- [x] Add versioned binding/store codecs, canonical URI + workspace identity, and safe redacted projection. *(`GoogleDocsBindingStore.ts`)*
+- [x] Add temp-write + fsync/close where appropriate + atomic rename and last-known-good recovery. *(temp-then-rename plus last-good copy; no explicit fsync)*
+- [ ] Add monotonic registry revisions and per-document events for multiple editor webviews. *(per-document projection push to every editor showing the document; no revision counter)*
+- [x] Register VS Code rename/move handling with destination collision checks and transactional migration. *(`onDidRenameFiles` → `documentRenamed`, collision refused and reported)*
+- [ ] Implement Save As/copy isolation, account mismatch, unknown/corrupt schema, remove-binding confirmation, and feature-off/disconnect persistence. *(links are keyed by URI, so Save As and copies start unlinked; account mismatch, corrupt store and the unlink confirmation are implemented)*
+- [ ] Test POSIX/Windows URI normalization, multi-root/no-folder, two editors, concurrent writes, interrupted temp, rename collision, external copy, reload, and newer schema. *(store tests cover rename, collision, corruption, failed writes and concurrency; Windows URIs and multi-root not covered)*
 
 ## Phase 3: Google client and templates (W3 — R2, R3, R5, R7, R8)
 
-- [ ] Add injected authenticated HTTP client with bounded timeout, abort, safe fields, stable internal errors, retry guidance, and response validation.
-- [ ] Implement the approved template picker/grant flow and verify file type/account/access before committing selection.
-- [ ] Implement template change/remove/unavailable and copy/use semantics required by the selected adapter.
-- [ ] Implement only required file create/update/get/verify/version operations; do not add general Drive listing/search.
-- [ ] Prove every mutation addresses the exact file ID and unknown outcomes require verification before retry.
-- [ ] Add contract fixtures for 401/403/404/409/429/5xx/network/timeout/malformed/aborted/unknown results.
+- [x] Add injected authenticated HTTP client with bounded timeout, abort, safe fields, stable internal errors, retry guidance, and response validation. *(60 s deadline including the body (`fetchWithDeadline`), stable error codes, one 401 refresh-and-retry)*
+- [ ] Implement the approved template picker/grant flow and verify file type/account/access before committing selection. *(implemented; not yet exercised on RunDev)*
+- [ ] Implement template change/remove/unavailable and copy/use semantics required by the selected adapter. *(implemented; not yet exercised on RunDev)*
+- [x] Implement only required file create/update/get/verify/version operations; do not add general Drive listing/search. *(the only query is `findByOperation` on Ritemark's own tag)*
+- [x] Prove every mutation addresses the exact file ID and unknown outcomes require verification before retry. *(same file ID across Create and two Syncs on RunDev 2026-09-21; indeterminate Create recovered through the appProperties tag (publisher test))*
+- [ ] Add contract fixtures for 401/403/404/409/429/5xx/network/timeout/malformed/aborted/unknown results. *(`mapHttpError` via the publisher fake plus the deadline tests; no 409 fixture)*
 
 ## Phase 4: Conversion adapter (W4 — R4, R5, R7)
 
-- [ ] Extract pure export buffer/structure helpers needed by the selected adapter; do not couple cloud publishing to Save dialogs or synchronous file writes.
-- [ ] Route source through the approved normalized comment/safety chokepoint and validate document-relative assets.
-- [ ] Implement the one selected adapter with deterministic bounded output and no product fallback to unapproved candidates.
-- [ ] Add semantic/golden fixtures for every R4 construct and explicit missing/oversized/unsupported image behavior.
-- [ ] Assert Ritemark comments, unsafe markup, credentials, and local-only metadata never reach provider requests.
+- [x] Extract pure export buffer/structure helpers needed by the selected adapter; do not couple cloud publishing to Save dialogs or synchronous file writes. *(publisher reuses `buildNormalizedExportHtml`; no Save dialog coupling)*
+- [x] Route source through the approved normalized comment/safety chokepoint and validate document-relative assets. *(`export/v2/htmlPipeline.ts`; local images resolve against the document folder)*
+- [x] Implement the one selected adapter with deterministic bounded output and no product fallback to unapproved candidates. *(native Docs API mapper (`mapper.ts`))*
+- [ ] Add semantic/golden fixtures for every R4 construct and explicit missing/oversized/unsupported image behavior. *(`mapper.test.ts` covers the constructs; missing images are reported by name)*
+- [ ] Assert Ritemark comments, unsafe markup, credentials, and local-only metadata never reach provider requests. *(comments are stripped at the chokepoint and only http/mailto links pass; no dedicated negative test yet)*
 - [ ] Run PDF/Word/Copy Markdown regression suite after any shared export refactor.
 
 ## Phase 5: Publisher, controller, and protocols (W5 — R5–R9)
 
-- [ ] Add versioned Settings/editor request-result-event codecs with exact field/runtime validation.
-- [ ] Freeze source snapshot at accepted request and enforce saved/dirty/untitled/unsupported URI contract.
-- [ ] Add operation IDs/generations and per-binding serialization/deduplication; reject stale Create/Sync/cancel/results.
-- [ ] Implement Create preflight, conversion, optional template step, remote mutation, verification, and atomic binding commit.
-- [ ] Implement response-loss/orphan-created-unbound recovery and ensure repeated Create never silently duplicates a bound result.
-- [ ] Implement Sync matching-account/target/version preflight, overwrite decision, conversion, exact-ID update, verification, and atomic last-success commit.
-- [ ] Implement Already up to date, target unavailable/wrong type, account mismatch, verification required, bounded retry, and stage-honest cancellation.
-- [ ] Broadcast only redacted per-document state to relevant editors and coordinated account state to Settings.
-- [ ] Test same title/different IDs, two documents, two editors, concurrent requests, reload, disconnect mid-operation, stale generations, and all failure stages.
+- [x] Add versioned Settings/editor request-result-event codecs with exact field/runtime validation. *(`protocol.ts`, exact keys, 40 MB cap)*
+- [ ] Freeze source snapshot at accepted request and enforce saved/dirty/untitled/unsupported URI contract. *(the HTML is captured when the request is accepted, and untitled documents are refused; dirty-buffer policy not yet written down)*
+- [ ] Add operation IDs/generations and per-binding serialization/deduplication; reject stale Create/Sync/cancel/results. *(per-document busy guard plus Create operation ids; no generation counter)*
+- [x] Implement Create preflight, conversion, optional template step, remote mutation, verification, and atomic binding commit. *(verified on RunDev 2026-09-21)*
+- [x] Implement response-loss/orphan-created-unbound recovery and ensure repeated Create never silently duplicates a bound result.
+- [x] Implement Sync matching-account/target/version preflight, overwrite decision, conversion, exact-ID update, verification, and atomic last-success commit. *(first-sync confirmation and remote-edit overwrite verified on RunDev 2026-09-21)*
+- [x] Implement Already up to date, target unavailable/wrong type, account mismatch, verification required, bounded retry, and stage-honest cancellation. *(up-to-date verified on RunDev; the other outcomes are covered by controller tests)*
+- [x] Broadcast only redacted per-document state to relevant editors and coordinated account state to Settings.
+- [ ] Test same title/different IDs, two documents, two editors, concurrent requests, reload, disconnect mid-operation, stale generations, and all failure stages. *(controller and publisher tests; the two-editor and reload cases are not automated)*
 
 ## Phase 6: Settings and editor UX (W6 — R1, R3, R5–R10)
 
-- [ ] Implement Google Docs publishing account card states from `design.md`, separate from Google AI API key.
-- [ ] Implement Connect/Cancel/Reauthorize/Disconnect with system-browser handoff, focus restoration, safe status, and configuration-unavailable guidance.
-- [ ] Implement Choose/Change/Remove template with cancellation preservation and unavailable/wrong-type feedback.
-- [ ] Add Create Google Docs/Sync/Open Google Doc/Remove publishing link states to the export surface without regressing PDF/Word/Copy.
-- [ ] Implement preparing/converting/uploading/verifying/success/already-up-to-date/error/verification-required progress and safe retry choices.
-- [ ] Implement overwrite disclosure and stronger remote-edit warning under the approved frequency rule.
-- [ ] Add experimental/default-true `google-docs-publishing` to flags/settings and gate Settings UI, editor UI, callbacks, and every host handler coherently.
+- [x] Implement Google Docs publishing account card states from `design.md`, separate from Google AI API key. *(`GoogleDocsSettingsCard.tsx`; its own card, separate from the Google AI key)*
+- [x] Implement Connect/Cancel/Reauthorize/Disconnect with system-browser handoff, focus restoration, safe status, and configuration-unavailable guidance. *(connect and cancel verified on RunDev; reauthorize and disconnect covered by tests)*
+- [ ] Implement Choose/Change/Remove template with cancellation preservation and unavailable/wrong-type feedback. *(implemented; the Picker has not been run on RunDev)*
+- [x] Add Create Google Docs/Sync/Open Google Doc/Remove publishing link states to the export surface without regressing PDF/Word/Copy. *(verified on RunDev; PDF, Word and Copy entries unchanged)*
+- [x] Implement preparing/converting/uploading/verifying/success/already-up-to-date/error/verification-required progress and safe retry choices. *(native progress plus a stage line in the menu)*
+- [x] Implement overwrite disclosure and stronger remote-edit warning under the approved frequency rule. *(first-sync once per document; remote-edit warning whenever the revision moved)*
+- [x] Add experimental/default-true `google-docs-publishing` to flags/settings and gate Settings UI, editor UI, callbacks, and every host handler coherently.
 - [ ] Verify keyboard flow, screen-reader names/live regions, focus/dialog behavior, 200% zoom, narrow width, high contrast, and reduced motion.
 
 ## Phase 7: Security, integration, and native evidence (W7 — R1–R10)
 
-- [ ] Run OAuth/account, SecretStorage, redaction, callback lifecycle, binding, publisher, adapter, protocol, feature-gate, and existing-export tests.
+- [ ] Run OAuth/account, SecretStorage, redaction, callback lifecycle, binding, publisher, adapter, protocol, feature-gate, and existing-export tests. *(unit suites green 2026-09-21; the chained `npm test` stops early at the pre-existing `ClaudeCodeNodeExecutor.integration` failure (`vscode` module), so the rest were run individually)*
 - [ ] Run the complete fake-transport fault matrix and assert last-success/binding invariants after each failure.
 - [ ] Run authenticated dedicated-account Create, template Create, same-ID Sync, remote manual edit, response-loss recovery where safely injectable, revoke/re-auth, and disconnect canaries.
 - [ ] Verify returned file IDs remain identical across Sync and captured evidence contains no credential/content/private identity.
@@ -97,20 +97,20 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 8: QA and closeout (W8 — R10)
 
-- [ ] Rebuild committed webview artifacts after source changes and verify clean bundle provenance.
+- [x] Rebuild committed webview artifacts after source changes and verify clean bundle provenance.
 - [ ] Run focused webview/extension/export/feature/security tests and builds.
 - [ ] Run `./scripts/validate-qa.sh` through repository QA.
-- [ ] Update `docs/development/architecture.md` for subsystem/protocol/SecretStorage/binding/rename/conversion/flag, with a valid Last updated date.
+- [x] Update `docs/development/architecture.md` for subsystem/protocol/SecretStorage/binding/rename/conversion/flag, with a valid Last updated date. *(2026-09-21)*
 - [ ] Update privacy/security docs, Google Docs user/recovery guide, changelog, v1.12.0 release notes, parent release tracker, issue, and PR evidence.
 - [ ] Confirm all Google Cloud external blockers have owners/status and no production/test credentials appear in the repository or artifacts.
 - [ ] Verify every checked requirement/task against branch diff and evidence before readiness handoff.
 
 ## Phase 9: Ritemark's own legal pages (W9 — R11) (added 2026-09-18)
 
-- [ ] Record the Google user-data facts and consent-screen fields for the privacy policy in `research/integration-decisions.md` (Phase 0 decision 8).
+- [x] Record the Google user-data facts and consent-screen fields for the privacy policy in `research/integration-decisions.md` (Phase 0 decision 8). *(recorded in `research/google-user-data-facts.md` instead)*
 - [ ] Hand off the `ritemark-web` privacy/terms pages (EN + ET, provider Productory Services OÜ, Google Docs section from the facts) and the `productory-2026` update (short Ritemark reference, links to ritemark.app, old URLs keep resolving), and record their status.
-- [ ] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78).
-- [ ] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77).
-- [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79).
+- [x] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78). *(`research/r11-link-evidence.md`)*
+- [x] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77). *(no test asserted the old URLs; grep clean)*
+- [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79). *(HTTP 200 on 2026-09-21; whether they point to ritemark.app is not re-checked here)*
 - [ ] Configure and verify the consent screen's ritemark.app URLs and authorized domain (S80), and check the policy text against the approved facts (S81).
 - [ ] Update `docs/microsoft-store-submission/LEGAL-AND-URLS.md`, and record Jarmo's Partner Center URL change.

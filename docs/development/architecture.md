@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-14 (Sprint 117 host-owned comment tasks)
+**Last updated:** 2026-09-21 (Sprint 119 Google Docs publishing)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -143,6 +143,7 @@ extensions/ritemark/src/
 ├── features/        Feature flags — flags.ts registry, featureGate.ts
 ├── conversations/   Durable project-scoped agent conversations, migration, typed protocol/controller
 ├── commentTasks/    Comment→agent tasks — durable store, typed protocol, controller, prompt builder
+├── googleDocs/      Publish to Google Docs — OAuth, account, link store, Docs API mapper, publisher, controller
 ├── editorSync/      Markdown/CSV disk-model-view coordinator, typed protocol, retry and three-way state
 ├── ai/              Shared AI utilities — modelConfig.ts, connectivity, analytics
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
@@ -284,6 +285,35 @@ Over `MAILTO_MAX_URL_CHARS` (1800 encoded) the transport returns `too-long` **be
 `DialogContent` and `DialogOverlay` sit at **z-80**. Before this they were z-50, below `ThreadRail` and `DocumentHeader` (z-60) and the Comments menu (z-70), so app chrome painted over modals; `ConversationsPanel` had a private workaround that shifted and shrank its dialog to dodge the 56px rail. z-80 stays *below* the z-90/z-100 popovers, which must remain visible when they open from inside a dialog — that ceiling is deliberate.
 
 Below 640px a dialog goes full bleed: no inset, no rounded corners, no border. The AI sidebar is typically 280–500px, where a centred card spends its width on margins and then clips its own prose.
+
+### Google Docs publishing (Sprint 119)
+
+A Markdown file can be published as a Google Doc and later synced to the same Doc. The design is one-way: Ritemark writes and Google Docs receives. Nothing is read back into the Markdown. The decisions and their evidence are in `docs/development/releases/v1.12.0/sprint-119-google-docs-publishing/research/integration-decisions.md`.
+
+| Module | Role |
+|---|---|
+| `googleDocs/config.ts` | OAuth client id and secret, compiled in by esbuild `define` from `RITEMARK_GOOGLE_CLIENT_ID` / `RITEMARK_GOOGLE_CLIENT_SECRET` (a runtime env var of the same name overrides them for RunDev). Neither is committed or treated as a secret: a desktop client cannot keep one. A build without them shows "unavailable in this build". |
+| `googleDocs/oauth.ts` | Installed-app flow: system browser, loopback on `127.0.0.1` with an OS-assigned port, S256 PKCE, one-time `state`, a 5-minute attempt timeout. The desktop Picker is the same flow with `trigger_onepick`. Also `fetchWithDeadline`: every Google request, body included, has a 60 s deadline. |
+| `googleDocs/GoogleApiClient.ts` | The only Drive/Docs calls, all scoped to `drive.file`. One refresh-and-retry on 401. `mapHttpError` turns HTTP results into `GoogleDocsError` codes. There is no listing or search beyond finding Ritemark's own tagged file. |
+| `googleDocs/GoogleAccountService.ts` | Tokens and identity in `SecretStorage` (`ritemark.googleDocs.account.v1`). Serialized refresh; `reauthorize` state on `invalid_grant`; disconnect revokes at Google first. The template choice is in `globalState`. |
+| `googleDocs/GoogleDocsBindingStore.ts` | File URI → Doc link records in `<globalStorage>/google-docs/v1/bindings.json`: temp-then-rename writes, a last-good copy, corrupt files set aside and never guessed around, and rename with collision refusal. |
+| `googleDocs/mapper.ts` | Editor export HTML → Docs API requests in four passes: text with placeholders, styles and one bullet run per list, tables and images at placeholders, then table cells. |
+| `googleDocs/imageStaging.ts` | A local image is uploaded to the user's Drive and shared by link only while Docs copies it, then unshared and deleted. `insertInlineImage` caps a data URI at 2 KB, so there is no inline route. |
+| `googleDocs/GoogleDocsPublisher.ts` | Create and Sync. Create tags the file with `appProperties` so a lost response is recovered rather than duplicated. Sync checks account, trash and `revisionId`, writes with `requiredRevisionId`, and skips an unchanged source (sha256 of the normalized HTML). |
+| `googleDocs/GoogleDocsController.ts` | Owns every decision and all user-facing copy. It has no `vscode` import: UI, transport and flag are injected, and `vscodeGoogleDocs.ts` composes it. Confirmations, progress and results use native modals and notifications. |
+| `googleDocs/protocol.ts` | Exact-key decoding. The editor sends `google-docs/publish {html, title}`, `open`, `unlink`, `open-settings` and `request-projection`; Settings sends `connect`, `cancel`, `disconnect`, `choose-template` and `clear-template`. **A webview can never name a destination file**: the host takes it from its own link record. |
+
+Webviews see only projections: `GoogleDocsDocumentProjection` (state, Doc URL, title, last sync time, bound account email, stage) for the editor's Export menu, and `GoogleDocsSettingsProjection` for the Settings card. No token, account id, file id or revision leaves the host. `ritemark.aiSettings` accepts an optional section (`'google-docs'`), so an action can open Settings at the card. The flag is `google-docs-publishing` (experimental, default on).
+
+Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermaid and SVG inlining) and passes it through `export/v2/htmlPipeline.ts`, so comments are stripped at the same chokepoint.
+
+#### TO BE — known limits carried out of Sprint 119
+
+| Limit | Why |
+|---|---|
+| A checked task item arrives unchecked | The Docs API creates checkbox bullets but cannot tick one. |
+| A mixed list takes one bullet style | A Docs list has one preset, so bullets nested under a numbered item show `a.`/`b.` glyphs. |
+| Dialogs are native even with `window.dialogStyle: custom` | Found on RunDev; the confirmation logic is covered by `GoogleDocsController.test.ts` instead of automated UI clicks. |
 
 ---
 
@@ -958,6 +988,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-21 | Sprint 119 | **Publish to Google Docs (v1.12.0).** New `src/googleDocs/` subsystem: installed-app OAuth with PKCE and loopback plus the desktop Picker for templates, `SecretStorage` account, `<globalStorage>/google-docs/v1/` link store, native Docs API mapper, Drive-staged images, the Create/Sync publisher, a `vscode`-free controller, and an exact-key protocol (`google-docs/*`). Export menu and Settings card render host projections only. New flag `google-docs-publishing` (experimental, default on). OAuth client configuration comes in through the esbuild `define`. `ritemark.aiSettings` takes an optional section. Privacy and terms links moved to ritemark.app (R11). Editor fix found on RunDev: new `src/utils/imagePaths.ts` is shared by host and webview, so bare relative image paths (`img/a.png`) display, and `../` images no longer save as their `vscode-resource` display URI. |
 | 2026-09-14 | Sprint 117 | **Host-owned comment tasks (v1.11.0, #156/#281).** New `src/commentTasks/` subsystem — `types.ts` (record, codecs, projection, transition table), exact-field `protocol.ts`, `CommentTaskStore` under `<globalStorage>/comment-tasks/v1/` on the `ConversationStore` file pattern, a `vscode`-free `CommentTaskController`, and one `commentTaskPrompt.ts` builder. Assignment is now a typed request/result/projection contract (`comment-task/accept` · `destination-preview` · `open-conversation` · `retry` · `cancel` → `comment-task/result`, plus per-document `comment-task/projection`, host↔sidebar `comment-task/enqueue` / `enqueue-result` / `dequeued`, `sidebar/ready`, `conversation/active`, `conversation/select`, and editor→host `comment:recover`). Deleted: `comment:send-to-ai`, `comment:submit`, `comment:task-status` + `broadcastCommentTaskStatus`, the editor's module-global status map, the sidebar's `commentTasks` slice and `finalizeCommentTasks`, its silent destination choice, and the webview prompt builder. Destination is the conversation open in the AI sidebar (Jarmo, D5). Both comment kinds carry `data-comment-id` (`<!-- {id:…} body -->` carrier for standalone notes) with legacy IDs minted in one undoable transaction at dispatch. `deriveRuntimeAvailabilities` moved to shared `src/runtime/availability.ts`; cancelled turns normalise to `cancelled` instead of `completed`/`failed` (F24). R10 adds the `ResizableComposer` and `AgentMentionPicker` primitives and a width-aware collapsed marker. No new flag, runtime kind, or `AgentRuntime` change. |
 | 2026-09-13 | Sprint 116 | **Complete runtime and model baseline.** Manifest schema v3 installs complete vendor packages: Codex 0.154.0 preserves its official package tree, Claude Code 2.1.270 pairs with Agent SDK 0.3.270, and OpenCode 1.18.30 owns ripgrep 15.1.0 through a scoped PATH entry; ACP stays 1.4.0. Codex cache effort parsing supports current and legacy schemas, explicit unknown thread events are dropped, and immediate Stop handles the measured pre-active-turn race. Canonical model IDs/defaults are refreshed in `modelConfig.ts`; catalog resolution rejects stale static snapshots below the bundled floor. |
 | 2026-09-03 | v1.10.0 RC bugfix | **Codex service-compatibility correction.** The bundled `0.149.0` app-server was invalidated after a real GPT-5.6 turn returned a newer-runtime requirement and failed to decode the service's current `max` effort value. The exact cross-platform app-server + code-mode-host manifest now pins official Codex `0.153.0`; the generated protocol subset remains backward compatible, manifest mutation gates pass, and a fresh-profile RUNDEV canary proves `Bundled with app · Ready · v0.153.0` plus a real GPT-5.6 response. Native Intel/Windows and packaged-app canaries remain release gates. |

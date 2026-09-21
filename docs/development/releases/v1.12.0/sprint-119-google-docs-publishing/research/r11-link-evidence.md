@@ -17,6 +17,10 @@ Checked with `curl -sI` on 2026-09-21. The server dates are below.
 - `https://ritemark.app/en/privacy/` → HTTP/2 200, Mon, 21 Sep 2026 06:42:30 GMT
 - `https://ritemark.app/en/terms/` → HTTP/2 200, Mon, 21 Sep 2026 06:42:32 GMT
 
+The consent screen's home page:
+
+- `https://ritemark.app/` → HTTP/2 302 to `/et/`, then 200, Mon, 21 Sep 2026 07:22:05 GMT. The redirect goes by locale; from an Estonian connection it lands on the Estonian home page. Not checked here: whether the page content meets Google's brand-verification requirements.
+
 The old URLs still resolve, so apps up to 1.11 still reach a policy:
 
 - `https://www.productory.ai/en/privacy/` → HTTP/2 200, Mon, 21 Sep 2026 06:42:34 GMT
