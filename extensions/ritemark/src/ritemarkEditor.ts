@@ -25,6 +25,7 @@ import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
 import { canonicalMarkdownProjection, ensureTrailingNewline } from './editorSync/state';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
+import { isRelativeImagePath } from './utils/imagePaths';
 import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
@@ -358,8 +359,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     while ((match = imageRegex.exec(markdown)) !== null) {
       const imagePath = match[2];
 
-      // Only process relative paths (starting with ./ or ../)
-      if (!imagePath.startsWith('./') && !imagePath.startsWith('../')) {
+      // Only local paths beside the document: ./a.png, ../a.png and the
+      // common bare form img/a.png. The webview restores exactly these on
+      // save (utils/imagePaths), so the two sides must use the same test.
+      if (!isRelativeImagePath(imagePath)) {
         continue;
       }
 

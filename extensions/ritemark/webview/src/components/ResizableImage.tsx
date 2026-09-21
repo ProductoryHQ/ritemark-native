@@ -11,6 +11,7 @@ import { NodeViewWrapper } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Icon } from './ui/Icon'
 import { sendToExtension } from '../bridge'
+import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
 import {
   Dialog,
   DialogContent,
@@ -184,7 +185,8 @@ export function ResizableImage({ node, selected }: ResizableImageProps) {
   }, [])
 
   // Check if this is a local image (has relative path in title)
-  const isLocalImage = title && (title.startsWith('./') || title.startsWith('../'))
+  const isLocalImage = Boolean(title && isRelativeImagePath(title)
+    && (title.startsWith('./') || title.startsWith('../') || isWebviewResourceUri(src)))
 
   // Sprint 82 R4: draw.io diagrams open their editor on click instead of
   // showing resize handles (diagram size is set inside draw.io itself)
