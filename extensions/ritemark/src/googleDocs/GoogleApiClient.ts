@@ -9,7 +9,7 @@
  * the error message, which callers log but never show.
  */
 
-import type { FetchLike } from './oauth';
+import { DEFAULT_REQUEST_TIMEOUT_MS, fetchWithDeadline, type FetchLike } from './oauth';
 import {
   GOOGLE_DOC_MIME,
   GoogleDocsError,
@@ -55,6 +55,8 @@ export interface DocsStructuralElement {
 
 export interface GoogleApiClientDependencies {
   fetch?: FetchLike;
+  /** Deadline for one request including its body; defaults to 60 s. */
+  requestTimeoutMs?: number;
   /** Returns a currently valid access token, refreshing it if needed. */
   getAccessToken(): Promise<string>;
   /** Called once on a 401; returns a fresh token or throws reauthorization. */
@@ -195,17 +197,11 @@ export class GoogleApiClient {
   }
 
   private async request(method: string, url: string, body?: string | Buffer, contentType?: string) {
-    const send = async (token: string) => {
-      try {
-        return await this.fetch(url, {
-          method,
-          headers: { authorization: `Bearer ${token}`, ...(body !== undefined && contentType ? { 'content-type': contentType } : {}) },
-          body,
-        });
-      } catch (e) {
-        throw new GoogleDocsError('offline', `Could not reach Google: ${String(e)}`);
-      }
-    };
+    const send = (token: string) => fetchWithDeadline(this.fetch, url, {
+      method,
+      headers: { authorization: `Bearer ${token}`, ...(body !== undefined && contentType ? { 'content-type': contentType } : {}) },
+      body,
+    }, this.deps.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
     let res = await send(await this.deps.getAccessToken());
     if (res.status === 401) {
       // One refresh, one retry. A second 401 is a revoked or expired grant.

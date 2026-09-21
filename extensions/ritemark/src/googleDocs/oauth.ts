@@ -21,12 +21,54 @@ const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 export const DEFAULT_ATTEMPT_TIMEOUT_MS = 5 * 60_000;
+/** One Google request, including reading its body. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+export interface FetchResponseLike {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  headers?: { get(name: string): string | null };
+}
 
 export type FetchLike = (url: string, init?: {
   method?: string;
   headers?: Record<string, string>;
   body?: string | Buffer | URLSearchParams;
-}) => Promise<{ ok: boolean; status: number; text(): Promise<string>; headers?: { get(name: string): string | null } }>;
+  signal?: AbortSignal;
+}) => Promise<FetchResponseLike>;
+
+/**
+ * Fetch with a deadline that also covers reading the body, so a stalled
+ * connection surfaces as an error instead of an endless "Preparing…". The
+ * body is buffered; every caller reads it once as text anyway.
+ *
+ * A timed-out write has an unknown outcome. It maps to provider-unavailable,
+ * which Create already treats as "look for the tagged file before retrying"
+ * and which leaves a Sync's link untouched, so the next Sync re-checks.
+ */
+export async function fetchWithDeadline(
+  fetch: FetchLike,
+  url: string,
+  init: Parameters<FetchLike>[1],
+  timeoutMs: number,
+): Promise<FetchResponseLike> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, headers: res.headers, text: async () => text };
+  } catch (e) {
+    if (timedOut) {
+      throw new GoogleDocsError('provider-unavailable', `Google did not answer within ${Math.round(timeoutMs / 1000)} s`);
+    }
+    throw new GoogleDocsError('offline', `Could not reach Google: ${String(e)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface LoopbackResponse {
   status: number;
@@ -49,6 +91,7 @@ export interface GoogleOAuthDependencies {
   randomBytes?: (size: number) => Buffer;
   now?: () => number;
   timeoutMs?: number;
+  requestTimeoutMs?: number;
 }
 
 export interface OAuthAttemptOptions {
@@ -115,6 +158,7 @@ export class GoogleOAuthFlow {
   private readonly randomBytes: (size: number) => Buffer;
   private readonly now: () => number;
   private readonly timeoutMs: number;
+  private readonly requestTimeoutMs: number;
 
   constructor(private readonly deps: GoogleOAuthDependencies) {
     this.fetch = deps.fetch ?? (globalThis.fetch as unknown as FetchLike);
@@ -122,6 +166,7 @@ export class GoogleOAuthFlow {
     this.randomBytes = deps.randomBytes ?? nodeRandomBytes;
     this.now = deps.now ?? Date.now;
     this.timeoutMs = deps.timeoutMs ?? DEFAULT_ATTEMPT_TIMEOUT_MS;
+    this.requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   }
 
   /**
@@ -281,14 +326,10 @@ export class GoogleOAuthFlow {
   }
 
   private async post(url: string, body: URLSearchParams) {
-    try {
-      return await this.fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-    } catch (e) {
-      throw new GoogleDocsError('offline', `Could not reach Google: ${String(e)}`);
-    }
+    return fetchWithDeadline(this.fetch, url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }, this.requestTimeoutMs);
   }
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { GoogleOAuthFlow, type FetchLike, type LoopbackResponse, type StartLoopback } from './oauth';
+import { GoogleOAuthFlow, fetchWithDeadline, type FetchLike, type LoopbackResponse, type StartLoopback } from './oauth';
+import { GoogleApiClient } from './GoogleApiClient';
 import { GoogleDocsError } from './types';
 
 const config = { clientId: 'client.apps.googleusercontent.com', clientSecret: 'public-desktop-secret' };
@@ -181,6 +182,41 @@ async function main(): Promise<void> {
     });
     assert.equal(await failing.revoke({ accessToken: 'a', refreshToken: 'r', expiresAt: 0, scope: 's' }), false,
       'revoke is best effort and never throws');
+  }
+
+  // ── Every Google request has a deadline, body included ─────────────────────
+  {
+    // A connection that never answers: the deadline aborts it.
+    const stalled: FetchLike = (_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    });
+    await assert.rejects(fetchWithDeadline(stalled, 'https://x', {}, 20),
+      (e: unknown) => e instanceof GoogleDocsError && e.code === 'provider-unavailable' && /did not answer/.test(e.message));
+
+    // Headers arrive, the body stalls: still bounded.
+    const slowBody: FetchLike = async (_url, init) => ({
+      ok: true, status: 200,
+      text: () => new Promise((_resolve, reject) => { init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))); }),
+    });
+    await assert.rejects(fetchWithDeadline(slowBody, 'https://x', {}, 20),
+      (e: unknown) => e instanceof GoogleDocsError && e.code === 'provider-unavailable');
+
+    // A network failure is "offline", not a timeout.
+    const down: FetchLike = async () => { throw new Error('ENOTFOUND'); };
+    await assert.rejects(fetchWithDeadline(down, 'https://x', {}, 1000),
+      (e: unknown) => e instanceof GoogleDocsError && e.code === 'offline');
+
+    // The body is buffered and readable once the deadline has been cleared.
+    const fine: FetchLike = async () => ({ ok: true, status: 200, text: async () => '{"ok":1}' });
+    const res = await fetchWithDeadline(fine, 'https://x', {}, 1000);
+    assert.equal(await res.text(), '{"ok":1}');
+
+    // The API client and the token endpoint both use it.
+    const client = new GoogleApiClient({ fetch: stalled, requestTimeoutMs: 20, getAccessToken: async () => 't', refreshAccessToken: async () => 't' });
+    await assert.rejects(client.getFile('f'), (e: unknown) => e instanceof GoogleDocsError && e.code === 'provider-unavailable');
+    const flow = new GoogleOAuthFlow({ config: { clientId: 'x.apps.googleusercontent.com', clientSecret: 's' }, openExternal: async () => true, fetch: stalled, requestTimeoutMs: 20 });
+    await assert.rejects(flow.refresh({ accessToken: 'a', refreshToken: 'r', expiresAt: 0, scope: 's' }),
+      (e: unknown) => e instanceof GoogleDocsError && e.code === 'provider-unavailable');
   }
 
   console.log('googleDocs/oauth: all assertions passed');
