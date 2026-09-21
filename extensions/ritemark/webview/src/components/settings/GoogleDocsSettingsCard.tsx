@@ -38,7 +38,7 @@ export function GoogleDocsSettingsCard({ projection }: { projection: GoogleDocsS
   const { state } = projection;
 
   return (
-    <section className="mb-8">
+    <section id="settings-section-google-docs" className="mb-8 scroll-mt-6">
       <div className="flex items-center gap-2 mb-4">
         <Icon name="cloud-arrow-up" size={20} className="text-ink-strong" />
         <h2 className="text-lg font-semibold text-ink-strong">

@@ -176,6 +176,8 @@ export function RitemarkSettings() {
   const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>({ enabled: false });
   const [codexLoading, setCodexLoading] = useState(false);
   const [googleDocs, setGoogleDocs] = useState<GoogleDocsSettingsProjection | null>(null);
+  // Another feature opened Settings to show one section (Sprint 119).
+  const [focusSection, setFocusSection] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -226,6 +228,10 @@ export function RitemarkSettings() {
         case 'google-docs/settings':
           setGoogleDocs(message.projection ?? null);
           break;
+
+        case 'settings:focus-section':
+          if (typeof message.section === 'string') setFocusSection(message.section);
+          break;
       }
     };
 
@@ -234,6 +240,15 @@ export function RitemarkSettings() {
 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  // Scroll to a requested section once it has rendered.
+  useEffect(() => {
+    if (!focusSection || !settings) return;
+    const target = document.getElementById(`settings-section-${focusSection}`);
+    if (!target) return;
+    target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setFocusSection(null);
+  }, [focusSection, settings, googleDocs]);
 
   // Reset the manual update-check click marker as soon as the backend reports
   // a non-checking state, OR after 15s as a safety net (prevents a stuck

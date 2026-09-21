@@ -140,10 +140,19 @@ const RITEMARK_THEMES = [
   },
 ];
 
+/** Settings sections other features can open the page at. */
+export type SettingsSection = 'google-docs';
+
+export function isSettingsSection(value: unknown): value is SettingsSection {
+  return value === 'google-docs';
+}
+
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   public static readonly viewType = 'ritemark.settings';
 
   private static panel: vscode.WebviewPanel | undefined;
+  /** A section to scroll to once the page has rendered (Sprint 119). */
+  private pendingSection: SettingsSection | undefined;
   private codexAppServer: CodexAppServer | null = null;
   private codexAuth: CodexAuth | null = null;
   private disposeClaudeStatusListener: (() => void) | null = null;
@@ -222,9 +231,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   }
 
   /**
-   * Open the settings panel (singleton)
+   * Open the settings panel (singleton), optionally scrolled to one section.
    */
-  public async open(): Promise<void> {
+  public async open(section?: SettingsSection): Promise<void> {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
@@ -232,8 +241,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     // If panel exists, reveal it
     if (RitemarkSettingsProvider.panel) {
       RitemarkSettingsProvider.panel.reveal(column);
+      if (section) {
+        void RitemarkSettingsProvider.panel.webview.postMessage({ type: 'settings:focus-section', section });
+      }
       return;
     }
+    // A new page asks for its data with 'ready'; the section follows that.
+    this.pendingSection = section;
 
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
@@ -268,6 +282,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     switch (message.type) {
       case 'ready':
         await this.sendCurrentSettings(webview);
+        if (this.pendingSection) {
+          void webview.postMessage({ type: 'settings:focus-section', section: this.pendingSection });
+          this.pendingSection = undefined;
+        }
         break;
 
       case 'openExternal': {

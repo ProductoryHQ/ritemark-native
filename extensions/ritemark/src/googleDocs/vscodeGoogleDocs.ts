@@ -59,7 +59,7 @@ export function createGoogleDocsFeature(
     warn: async (message, actions = []) => vscode.window.showWarningMessage(message, ...actions),
     error: async (message, actions = []) => vscode.window.showErrorMessage(message, ...actions),
     openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
-    openSettings: () => { void vscode.commands.executeCommand('ritemark.aiSettings'); },
+    openSettings: () => { void vscode.commands.executeCommand('ritemark.aiSettings', 'google-docs'); },
   };
 
   const controller = new GoogleDocsController({

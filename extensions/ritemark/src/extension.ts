@@ -24,7 +24,7 @@ import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
 import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
-import { RitemarkSettingsProvider } from './settings/RitemarkSettingsProvider';
+import { RitemarkSettingsProvider, isSettingsSection } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
@@ -669,8 +669,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register AI settings command (opens branded settings page)
   context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.aiSettings', () => {
-      settingsProvider?.open();
+    vscode.commands.registerCommand('ritemark.aiSettings', (section?: unknown) => {
+      settingsProvider?.open(isSettingsSection(section) ? section : undefined);
     })
   );
 
