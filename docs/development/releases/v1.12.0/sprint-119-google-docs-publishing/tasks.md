@@ -47,8 +47,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 3: Google client and templates (W3 — R2, R3, R5, R7, R8)
 
 - [x] Add injected authenticated HTTP client with bounded timeout, abort, safe fields, stable internal errors, retry guidance, and response validation. *(60 s deadline including the body (`fetchWithDeadline`), stable error codes, one 401 refresh-and-retry)*
-- [ ] Implement the approved template picker/grant flow and verify file type/account/access before committing selection. *(implemented; not yet exercised on RunDev)*
-- [ ] Implement template change/remove/unavailable and copy/use semantics required by the selected adapter. *(implemented; not yet exercised on RunDev)*
+- [x] Implement the approved template picker/grant flow and verify file type/account/access before committing selection. *(desktop Picker over loopback; verified on RunDev 2026-09-21)*
+- [x] Implement template change/remove/unavailable and copy/use semantics required by the selected adapter. *(copy, then keep only the first tab; remove verified on RunDev; unavailable covered by the publisher test)*
 - [x] Implement only required file create/update/get/verify/version operations; do not add general Drive listing/search. *(the only query is `findByOperation` on Ritemark's own tag)*
 - [x] Prove every mutation addresses the exact file ID and unknown outcomes require verification before retry. *(same file ID across Create and two Syncs on RunDev 2026-09-21; indeterminate Create recovered through the appProperties tag (publisher test))*
 - [ ] Add contract fixtures for 401/403/404/409/429/5xx/network/timeout/malformed/aborted/unknown results. *(`mapHttpError` via the publisher fake plus the deadline tests; no 409 fixture)*
@@ -77,8 +77,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 6: Settings and editor UX (W6 — R1, R3, R5–R10)
 
 - [x] Implement Google Docs publishing account card states from `design.md`, separate from Google AI API key. *(`GoogleDocsSettingsCard.tsx`; its own card, separate from the Google AI key)*
-- [x] Implement Connect/Cancel/Reauthorize/Disconnect with system-browser handoff, focus restoration, safe status, and configuration-unavailable guidance. *(connect and cancel verified on RunDev; reauthorize and disconnect covered by tests)*
-- [ ] Implement Choose/Change/Remove template with cancellation preservation and unavailable/wrong-type feedback. *(implemented; the Picker has not been run on RunDev)*
+- [x] Implement Connect/Cancel/Reauthorize/Disconnect with system-browser handoff, focus restoration, safe status, and configuration-unavailable guidance. *(connect, cancel and disconnect verified on RunDev; reauthorize covered by tests)*
+- [x] Implement Choose/Change/Remove template with cancellation preservation and unavailable/wrong-type feedback. *(choose and remove verified on RunDev 2026-09-21; change is the same Picker flow)*
 - [x] Add Create Google Docs/Sync/Open Google Doc/Remove publishing link states to the export surface without regressing PDF/Word/Copy. *(verified on RunDev; PDF, Word and Copy entries unchanged)*
 - [x] Implement preparing/converting/uploading/verifying/success/already-up-to-date/error/verification-required progress and safe retry choices. *(native progress plus a stage line in the menu)*
 - [x] Implement overwrite disclosure and stronger remote-edit warning under the approved frequency rule. *(first-sync once per document; remote-edit warning whenever the revision moved)*

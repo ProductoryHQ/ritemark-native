@@ -299,7 +299,7 @@ A Markdown file can be published as a Google Doc and later synced to the same Do
 | `googleDocs/GoogleDocsBindingStore.ts` | File URI → Doc link records in `<globalStorage>/google-docs/v1/bindings.json`: temp-then-rename writes, a last-good copy, corrupt files set aside and never guessed around, and rename with collision refusal. |
 | `googleDocs/mapper.ts` | Editor export HTML → Docs API requests in four passes: text with placeholders, styles and one bullet run per list, tables and images at placeholders, then table cells. |
 | `googleDocs/imageStaging.ts` | A local image is uploaded to the user's Drive and shared by link only while Docs copies it, then unshared and deleted. `insertInlineImage` caps a data URI at 2 KB, so there is no inline route. |
-| `googleDocs/GoogleDocsPublisher.ts` | Create and Sync. Create tags the file with `appProperties` so a lost response is recovered rather than duplicated. Sync checks account, trash and `revisionId`, writes with `requiredRevisionId`, and skips an unchanged source (sha256 of the normalized HTML). |
+| `googleDocs/GoogleDocsPublisher.ts` | Create and Sync. Create tags the file with `appProperties` so a lost response is recovered rather than duplicated. A template copy keeps only its first tab, renamed after the new Doc, because Docs writes and Sync address only that tab. Sync checks account, trash and `revisionId`, writes with `requiredRevisionId`, and skips an unchanged source (sha256 of the normalized HTML). |
 | `googleDocs/GoogleDocsController.ts` | Owns every decision and all user-facing copy. It has no `vscode` import: UI, transport and flag are injected, and `vscodeGoogleDocs.ts` composes it. Confirmations, progress and results use native modals and notifications. |
 | `googleDocs/protocol.ts` | Exact-key decoding. The editor sends `google-docs/publish {html, title}`, `open`, `unlink`, `open-settings` and `request-projection`; Settings sends `connect`, `cancel`, `disconnect`, `choose-template` and `clear-template`. **A webview can never name a destination file**: the host takes it from its own link record. |
 
@@ -313,7 +313,7 @@ Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermai
 |---|---|
 | A checked task item arrives unchecked | The Docs API creates checkbox bullets but cannot tick one. |
 | A mixed list takes one bullet style | A Docs list has one preset, so bullets nested under a numbered item show `a.`/`b.` glyphs. |
-| Dialogs are native even with `window.dialogStyle: custom` | Found on RunDev; the confirmation logic is covered by `GoogleDocsController.test.ts` instead of automated UI clicks. |
+| Sync writes only the first tab | Tabs a user adds in Google Docs later are left alone, and are not overwritten. |
 
 ---
 

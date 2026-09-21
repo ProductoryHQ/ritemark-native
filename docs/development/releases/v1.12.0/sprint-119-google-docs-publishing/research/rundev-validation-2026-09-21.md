@@ -17,17 +17,29 @@
 | Sync with no change | "… is already up to date." No write. |
 | Remote edit, then Sync | A sentence typed into the Doc in Google Docs was detected. The native remote-edit warning appeared; Jarmo chose Overwrite with Ritemark. The Doc matches Ritemark again, same file ID. |
 
+### Second round: templates, remove link, disconnect
+
+| Step | Result |
+| --- | --- |
+| Choose template | The card shows "The Google file picker opened in your browser" with Cancel. Jarmo picked "Digital Nation AI koolitus" in Google's picker, and the card showed it with Change template and Remove template. |
+| Create from the template | The new Doc took the template's styles (Arvo headings, purple H1, magenta H2), and the link record stores the template id. **But the template had four document tabs**: the Ritemark text went into the first tab ("I osa"), and the other three tabs carried the whole training content into the new Doc. Fixed (commit `414ad69e`), see below. |
+| Remove Google Docs link | After a window reload the dialogs were in-window, as `window.dialogStyle: custom` intends, so this one was clicked over DevTools. The link record was removed, and the menu went back to Create Google Doc. The Google Doc stayed. |
+| Create from the template again | One tab, named after the Doc ("Ritemark template check (Sprint 119)"), with the template's icon cleared and its styles kept. |
+| Remove template | The card went back to "None (Google Docs default styles)". |
+| Disconnect | The card shows Connect Google account, and the editor menu shows Connect Google Docs…. Both link records are kept for a later reconnect. Revocation at Google is best-effort and was not checked separately. |
+
 ## Found and fixed in this run
 
 - **Settings opened at the top**, far above the Google Docs card. `ritemark.aiSettings` now takes a section (commit `9f2151ec`).
 - **Bare relative images did not display in the editor** (`![x](img/a.png)`). Jarmo reported it. While fixing it, a worse existing bug turned up: `../` images were saved back as their `vscode-resource` display URI. Both are fixed through one shared rule in `src/utils/imagePaths.ts`, with a round-trip test (commit `d08d3b46`). On RunDev, an edit and save kept `![A red square](img/red.png)` intact.
+- **A multi-tab template leaked its other tabs into every new Doc.** Docs writes and Sync address only the first tab. After copying, Create now deletes the other tabs and the first tab's children, and renames the kept tab (commit `414ad69e`, uses `deleteTab` and `updateDocumentTabProperties`).
 - **A stalled Google request could hang forever.** It wasn't observed failing, but the plan requires a bound. There is now a 60 s deadline including the body (commit `8a766399`).
 
 ## Found, not fixed here
 
 - **Saving drops strikethrough** (`~~x~~` → `x`). The Markdown serializer has no strike rule. This predates Sprint 119 and is unrelated to Google Docs, so it was filed as a separate task.
-- **Extension dialogs stay native with `window.dialogStyle: custom`** on RunDev, so they cannot be clicked over DevTools. The confirmation logic is covered by `GoogleDocsController.test.ts`.
+- **`window.dialogStyle: custom` took effect only after a window reload,** not after an app restart, so the first confirmation dialogs were native. That is a dev-profile quirk, not a product issue.
 
 ## Not exercised in this run
 
-Choosing, changing and removing a template (the desktop Picker), Remove Google Docs link, Disconnect, reauthorization, images that fail to upload, rename, Windows, and a packaged build.
+Changing a template (the same Picker flow as choosing), reauthorization after a revoked grant, images that fail to upload, rename, Windows, and a packaged build.
