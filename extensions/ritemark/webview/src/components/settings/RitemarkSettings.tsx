@@ -11,6 +11,7 @@ import { Switch } from '../ui/switch';
 import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
 import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
+import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
 
 interface SettingsData {
   codexIntegration: boolean;
@@ -37,6 +38,8 @@ interface SettingsData {
   elevenlabsKeyConfigured: boolean;
   transcriptionStorageBytes: number;
   chatFontSize: number;
+  // Sprint 119: Google Docs publishing account (null when the feature is off).
+  googleDocs?: GoogleDocsSettingsProjection | null;
   currentTheme: string;
   availableThemes: ThemeInfo[];
   updateCenter: {
@@ -172,6 +175,7 @@ export function RitemarkSettings() {
   const [localChatFontSize, setLocalChatFontSize] = useState(13);
   const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>({ enabled: false });
   const [codexLoading, setCodexLoading] = useState(false);
+  const [googleDocs, setGoogleDocs] = useState<GoogleDocsSettingsProjection | null>(null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -180,6 +184,7 @@ export function RitemarkSettings() {
       switch (message.type) {
         case 'settings':
           setSettings(message.data);
+          setGoogleDocs(message.data.googleDocs ?? null);
           setLocalAgentTimeout(message.data.agentTimeout || 15);
           setLocalChatFontSize(message.data.chatFontSize || 13);
           // Don't overwrite user input if they're typing
@@ -216,6 +221,10 @@ export function RitemarkSettings() {
 
         case 'codex:loginStarting':
           setCodexLoading(true);
+          break;
+
+        case 'google-docs/settings':
+          setGoogleDocs(message.projection ?? null);
           break;
       }
     };
@@ -1203,6 +1212,9 @@ export function RitemarkSettings() {
         )}
 
       </section>
+
+      {/* Google Docs Section (Sprint 119) */}
+      <GoogleDocsSettingsCard projection={googleDocs} />
 
       {/* Agent Timeout Section */}
       <section className="mb-8">

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Icon } from '../ui/Icon'
+import { googleDocsMenuItems, type GoogleDocsAction, type GoogleDocsProjection } from './googleDocsMenu'
 
 interface ExportMenuProps {
   isOpen: boolean
@@ -8,6 +9,9 @@ interface ExportMenuProps {
   onExportWord: (templateId?: string) => void
   onCopyAsMarkdown: () => void
   anchorElement: HTMLElement | null
+  /** Host projection for Google Docs publishing; null hides the section. */
+  googleDocs?: GoogleDocsProjection | null
+  onGoogleDocsAction?: (action: GoogleDocsAction) => void
 }
 
 /**
@@ -28,6 +32,8 @@ export function ExportMenu({
   onExportWord,
   onCopyAsMarkdown,
   anchorElement,
+  googleDocs = null,
+  onGoogleDocsAction,
 }: ExportMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
@@ -110,6 +116,8 @@ export function ExportMenu({
     setTimeout(() => setCopied(false), 2000)
   }, [onCopyAsMarkdown])
 
+  const googleDocsItems = onGoogleDocsAction ? googleDocsMenuItems(googleDocs) : []
+
   if (!isOpen) return null
 
   return (
@@ -132,6 +140,33 @@ export function ExportMenu({
           <Icon name="file-doc" size={16} className="export-menu-icon" />
           <span>Export Word</span>
         </button>
+
+        {googleDocsItems.length > 0 && (
+          <>
+            <div className="export-menu-divider" />
+            {googleDocsItems.map((item) => (
+              <button
+                key={item.label}
+                className="export-menu-item"
+                disabled={item.disabled}
+                title={item.description}
+                aria-busy={item.icon === 'circle-notch' || undefined}
+                onClick={() => {
+                  if (!item.action || !onGoogleDocsAction) return
+                  onGoogleDocsAction(item.action)
+                  onClose()
+                }}
+              >
+                <Icon
+                  name={item.icon}
+                  size={16}
+                  className={`export-menu-icon${item.icon === 'circle-notch' ? ' export-menu-spin' : ''}`}
+                />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </>
+        )}
 
         <div className="export-menu-divider" />
 
@@ -207,6 +242,26 @@ export function ExportMenu({
 
         .export-menu-item:active {
           opacity: 0.8;
+        }
+
+        .export-menu-item:disabled,
+        .export-menu-item:disabled:hover {
+          cursor: default;
+          background: transparent;
+          color: var(--vscode-disabledForeground, var(--vscode-menu-foreground));
+          opacity: 1;
+        }
+
+        .export-menu-item span {
+          white-space: nowrap;
+        }
+
+        .export-menu-spin {
+          animation: export-menu-spin 1s linear infinite;
+        }
+
+        @keyframes export-menu-spin {
+          to { transform: rotate(360deg); }
         }
 
         /* Success state for copy feedback */
