@@ -93,7 +93,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Verify returned file IDs remain identical across Sync and captured evidence contains no credential/content/private identity.
 - [ ] Run RUNDEV plus packaged macOS arm64/x64 and native Windows connection/browser/callback/picker/open-link/publish matrix.
 - [ ] Walk every ★ scenario and link dated evidence; automate or justify every remaining scenario.
-- [ ] Confirm OAuth consent/publishing/verification and production configuration are release-ready, not merely working for test users.
+- [ ] Confirm OAuth consent/publishing/verification and production configuration are release-ready, not merely working for test users. *(consent screen In production and branding verified 2026-09-21; the production client is not yet compiled into release builds through CI secrets)*
 
 ## Phase 8: QA and closeout (W8 — R10)
 
@@ -112,5 +112,5 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78). *(`research/r11-link-evidence.md`)*
 - [x] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77). *(no test asserted the old URLs; grep clean)*
 - [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79). *(HTTP 200 on 2026-09-21; whether they point to ritemark.app is not re-checked here)*
-- [ ] Configure and verify the consent screen's ritemark.app URLs and authorized domain (S80), and check the policy text against the approved facts (S81).
+- [x] Configure and verify the consent screen's ritemark.app URLs and authorized domain (S80), and check the policy text against the approved facts (S81). *(2026-09-21: domain owner-verified in Search Console, branding verified and published; the policy was written from `research/google-user-data-facts.md`, and ritemark-web tests pin its key statements)*
 - [ ] Update `docs/microsoft-store-submission/LEGAL-AND-URLS.md`, and record Jarmo's Partner Center URL change.
