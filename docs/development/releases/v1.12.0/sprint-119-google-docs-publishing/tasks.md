@@ -108,7 +108,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 9: Ritemark's own legal pages (W9 — R11) (added 2026-09-18)
 
 - [x] Record the Google user-data facts and consent-screen fields for the privacy policy in `research/integration-decisions.md` (Phase 0 decision 8). *(recorded in `research/google-user-data-facts.md` instead)*
-- [ ] Hand off the `ritemark-web` privacy/terms pages (EN + ET, provider Productory Services OÜ, Google Docs section from the facts) and the `productory-2026` update (short Ritemark reference, links to ritemark.app, old URLs keep resolving), and record their status.
+- [x] Hand off the `ritemark-web` privacy/terms pages (EN + ET, provider Productory Services OÜ, Google Docs section from the facts) and the `productory-2026` update (short Ritemark reference, links to ritemark.app, old URLs keep resolving), and record their status. *(pages: ritemark-web #119; productory-2026 #21; Google Docs section approved and published 2026-09-21 via ritemark-web #152; see `research/r11-link-evidence.md`)*
 - [x] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78). *(`research/r11-link-evidence.md`)*
 - [x] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77). *(no test asserted the old URLs; grep clean)*
 - [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79). *(HTTP 200 on 2026-09-21; whether they point to ritemark.app is not re-checked here)*
