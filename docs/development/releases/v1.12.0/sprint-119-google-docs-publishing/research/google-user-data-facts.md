@@ -31,7 +31,7 @@ Everything stays on the user's device and at Google. **No document content, toke
 
 | Data | Where | Code |
 | --- | --- | --- |
-| OAuth access and refresh tokens, account id, email, display name | The operating system's secure credential store (macOS Keychain, Windows Credential Manager), through the editor's secret storage | `GoogleAccountService`, key `ritemark.googleDocs.account.v1` |
+| OAuth access and refresh tokens, account id, email, display name | The editor's `SecretStorage`: the value is encrypted with Electron `safeStorage` (a Keychain-held key on macOS, DPAPI on Windows) and stored in the app's local state (`vscode/src/vs/platform/secrets/common/secrets.ts`, `encryption/electron-main/encryptionMainService.ts`) | `GoogleAccountService`, key `ritemark.googleDocs.account.v1` |
 | Chosen template (file id and name) | The app's local state | key `ritemark.googleDocs.template.v1` |
 | Links between local files and Google Docs: local file path, Google file id, account id and email, Doc title, created and last-synced times, last revision id, a hash of the last published content, and whether the first-sync warning was confirmed | A JSON file in the app's local storage folder (`google-docs/v1/bindings.json`, plus a last-good copy) | `GoogleDocsBindingStore` |
 
