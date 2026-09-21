@@ -96,6 +96,23 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  /**
+   * Sprint 119: the same per-document index carries Google Docs publishing
+   * projections, so a document's publish state reaches only its own editors.
+   */
+  public static postToDocumentEditors(documentUri: string, message: unknown): void {
+    const webviews = RitemarkEditorProvider.commentTaskWebviews.get(documentUri);
+    if (!webviews) { return; }
+    for (const webview of webviews) {
+      webview.postMessage(message).then(undefined, () => {});
+    }
+  }
+
+  /** Canonical URIs of every document currently open in a Ritemark editor. */
+  public static openDocumentUris(): string[] {
+    return [...RitemarkEditorProvider.commentTaskWebviews.keys()];
+  }
+
   /** Resolvers for insertDiagram waiting on the webview's imageInserted ack. */
   private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
@@ -121,6 +138,28 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     RitemarkEditorProvider._wordCountStatusBar.text = '0 words';
     RitemarkEditorProvider._wordCountStatusBar.tooltip = 'Word count';
     context.subscriptions.push(RitemarkEditorProvider._wordCountStatusBar);
+
+    // Sprint 119: Google Docs projections travel over the per-document index.
+    const googleDocsExt = require('./extension') as typeof import('./extension');
+    googleDocsExt.googleDocs?.setDocumentTransport({
+      postToDocument: (documentUri, projection) =>
+        RitemarkEditorProvider.postToDocumentEditors(documentUri, { type: 'google-docs/projection', projection }),
+      openDocuments: () => RitemarkEditorProvider.openDocumentUris(),
+    });
+    // A rename inside Ritemark carries the publishing link along; an external
+    // copy or move does not, and is never guessed at (R6).
+    context.subscriptions.push(
+      vscode.workspace.onDidRenameFiles(async (event) => {
+        const ext = require('./extension') as typeof import('./extension');
+        for (const { oldUri, newUri } of event.files) {
+          try {
+            await ext.googleDocs?.controller.documentRenamed(oldUri.toString(), newUri.toString());
+          } catch (error) {
+            console.warn('[googleDocs] Could not follow a rename:', error);
+          }
+        }
+      }),
+    );
 
     // Sprint 117 (D4): a rename inside Ritemark moves a document's tasks with
     // it. Nothing else follows — an external move or delete leaves the records
@@ -649,6 +688,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
 
+        // Sprint 119: Google Docs publishing. The host resolves the document
+        // identity itself; the webview can only name an action.
+        if (typeof message.type === 'string' && message.type.startsWith('google-docs/')) {
+          void this.handleGoogleDocsMessage(document, message);
+          return;
+        }
+
         // Sprint 117 (#292): the recovery buttons on a rejected comment task.
         // The editor webview cannot reach the sidebar's own sign-in surfaces,
         // so it asks the host to open them. Deliberately NOT under the
@@ -997,6 +1043,21 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Lazy require avoids a load-time circular import with ./extension.
     const ext = require('./extension') as typeof import('./extension');
     await ext.commentTaskController?.publish(document.uri.toString());
+  }
+
+  private async handleGoogleDocsMessage(document: vscode.TextDocument, message: unknown): Promise<void> {
+    const ext = require('./extension') as typeof import('./extension');
+    const feature = ext.googleDocs;
+    if (!feature) { return; }
+    const fsPath = document.uri.fsPath;
+    await feature.controller.handleEditorMessage(
+      {
+        uri: document.uri.toString(),
+        path: fsPath,
+        baseName: path.basename(fsPath, path.extname(fsPath)),
+      },
+      message,
+    );
   }
 
   private async handleCommentTaskRequest(

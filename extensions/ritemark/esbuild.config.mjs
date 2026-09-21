@@ -51,6 +51,17 @@ const options = {
   target: 'node20', // VS Code 1.117 / Electron ships Node 20.x (prod build prerequisite)
   sourcemap: true,
   external,
+  // Sprint 119: Google's installed-app OAuth client. Google documents a desktop
+  // client's ID and secret as public build configuration that a distributed app
+  // cannot keep secret, so they are injected here at compile time from the
+  // environment rather than committed. Absent values build a working app whose
+  // Google Docs card reports "unavailable in this build".
+  define: {
+    __RITEMARK_GOOGLE_OAUTH__: JSON.stringify(JSON.stringify({
+      clientId: process.env.RITEMARK_GOOGLE_CLIENT_ID ?? '',
+      clientSecret: process.env.RITEMARK_GOOGLE_CLIENT_SECRET ?? '',
+    })),
+  },
   logLevel: 'info',
   // CJS format => no code-splitting => each entry is fully self-contained (browserMcpAdapter
   // stays standalone, no shared chunk with extension.js).

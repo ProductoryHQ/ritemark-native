@@ -258,6 +258,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
 
+    // Sprint 119: every Google Docs action goes to the one host controller,
+    // which answers with a fresh projection through the settings listener.
+    if (typeof message.type === 'string' && message.type.startsWith('google-docs/')) {
+      await RitemarkSettingsProvider.googleDocsFeature()?.controller.handleSettingsMessage(message);
+      return;
+    }
+
     switch (message.type) {
       case 'ready':
         await this.sendCurrentSettings(webview);
@@ -465,8 +472,17 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     };
   }
 
+  /** Lazy require avoids a load-time circular import with ../extension. */
+  private static googleDocsFeature() {
+    const ext = require('../extension') as typeof import('../extension');
+    return ext.googleDocs;
+  }
+
   private async resolvePanel(panel: vscode.WebviewPanel): Promise<void> {
     RitemarkSettingsProvider.panel = panel;
+    RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener((projection) => {
+      panel.webview.postMessage({ type: 'google-docs/settings', projection }).then(undefined, () => {});
+    });
     panel.title = 'Ritemark Settings';
     panel.webview.options = this.getWebviewOptions();
     panel.webview.html = await this.getHtmlContent(panel.webview);
@@ -482,6 +498,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     panel.onDidDispose(() => {
       if (RitemarkSettingsProvider.panel === panel) {
         RitemarkSettingsProvider.panel = undefined;
+        RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener(null);
       }
       this.stopClaudeLoginPolling();
     });
@@ -640,6 +657,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Update-adjacent components
         componentStatus,
+
+        // Sprint 119: Google Docs publishing card (redacted projection only).
+        googleDocs: RitemarkSettingsProvider.googleDocsFeature()?.controller.settingsProjection() ?? null,
       },
     });
 

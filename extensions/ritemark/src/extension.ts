@@ -19,6 +19,7 @@ import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
+import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
@@ -66,6 +67,13 @@ export let unifiedViewProvider: UnifiedViewProvider;
  */
 export let commentTaskStore: CommentTaskStore | undefined;
 export let commentTaskController: CommentTaskController | undefined;
+
+/**
+ * Sprint 119: Google Docs publishing. Exported like the comment-task stack so
+ * the editor provider and the Settings page reach one controller without a
+ * circular import at load time.
+ */
+export let googleDocs: GoogleDocsFeature | undefined;
 
 // Agent Library view provider
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
@@ -395,6 +403,16 @@ export function activate(context: vscode.ExtensionContext) {
   void commentTaskController.recoverUnfinished().catch((error: unknown) => {
     console.warn('[commentTasks] Could not recover unfinished tasks:', error);
   });
+
+  // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
+  // Always composed, even with the flag off: flag-off hides the surfaces but
+  // keeps the account and document links readable, so turning it back on
+  // restores them without a network call (R10).
+  googleDocs = createGoogleDocsFeature(
+    context,
+    () => isEnabled('google-docs-publishing'),
+    (message) => console.log(message),
+  );
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
   // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live
