@@ -23,7 +23,7 @@
  */
 
 import { parse, type HTMLElement } from 'node-html-parser';
-import type { DocsDocument, DocsStructuralElement } from './GoogleApiClient';
+import type { DocsDocument, DocsStructuralElement, DocsTabOutline } from './GoogleApiClient';
 
 export interface Run {
   start: number;
@@ -472,6 +472,29 @@ export function tableCellRequests(doc: DocsDocument, tables: string[][][]): unkn
         if (r === 0) requests.push({ updateTextStyle: { range: { startIndex: at, endIndex: at + value.length }, textStyle: { bold: true }, fields: 'bold' } });
       }
     }
+  }
+  return requests;
+}
+
+/**
+ * A template copy keeps only its first tab — the one Ritemark writes into and
+ * Sync replaces — renamed after the new Doc, with the template's icon cleared.
+ * Any other tab would carry the template's own content into every Doc created
+ * from it. Deleting a tab deletes its children, so only the first tab's
+ * children and the other top-level tabs are named.
+ */
+export function singleTabRequests(tabs: DocsTabOutline[], title: string): unknown[] {
+  const [first, ...rest] = tabs;
+  const firstId = first?.tabProperties?.tabId;
+  if (!firstId) return [];
+  const requests: unknown[] = [];
+  for (const tab of [...(first.childTabs ?? []), ...rest]) {
+    const tabId = tab.tabProperties?.tabId;
+    if (tabId) requests.push({ deleteTab: { tabId } });
+  }
+  const name = title.trim().slice(0, 100);
+  if (requests.length || (name && first.tabProperties?.title !== name)) {
+    requests.push({ updateDocumentTabProperties: { tabProperties: { tabId: firstId, title: name || 'Tab 1' }, fields: 'title,iconEmoji' } });
   }
   return requests;
 }

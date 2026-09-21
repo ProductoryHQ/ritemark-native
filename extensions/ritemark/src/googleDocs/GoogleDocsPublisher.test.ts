@@ -4,14 +4,14 @@ import * as os from 'os';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import type { GoogleAccountService } from './GoogleAccountService';
-import type { DocsDocument, DriveFileMeta } from './GoogleApiClient';
+import type { DocsDocument, DriveFileMeta, DocsTabOutline } from './GoogleApiClient';
 import type { GoogleDocsBindingStore } from './GoogleDocsBindingStore';
 import { GoogleDocsPublisher, type PublishPrompts } from './GoogleDocsPublisher';
 import { GOOGLE_DOC_MIME, GoogleDocsError, RITEMARK_APP_PROPERTY, type GoogleDocsBindingV1, type GoogleTemplateChoice } from './types';
 
 // ── A small, honest fake of the parts of Drive and Docs the publisher uses ─────
 
-interface FakeDoc { id: string; name: string; mimeType: string; trashed: boolean; revision: number; text: string; appProperties: Record<string, string> }
+interface FakeDoc { id: string; name: string; mimeType: string; trashed: boolean; revision: number; text: string; appProperties: Record<string, string>; tabs?: DocsTabOutline[] }
 
 class FakeGoogle {
   docs = new Map<string, FakeDoc>();
@@ -50,12 +50,16 @@ class FakeGoogle {
     },
     copyDocument: async (sourceId: string, name: string, operationId: string): Promise<DriveFileMeta> => {
       const source = this.must(sourceId);
-      const doc = this.add({ id: `doc-${++this.seq}`, name, text: source.text, appProperties: { [RITEMARK_APP_PROPERTY]: operationId } });
+      const doc = this.add({ id: `doc-${++this.seq}`, name, text: source.text, appProperties: { [RITEMARK_APP_PROPERTY]: operationId }, tabs: structuredClone(source.tabs) });
       return { id: doc.id, name, mimeType: GOOGLE_DOC_MIME, trashed: false };
     },
     findByOperation: async (operationId: string): Promise<DriveFileMeta | null> => {
       const found = [...this.docs.values()].find((d) => d.appProperties[RITEMARK_APP_PROPERTY] === operationId && !d.trashed);
       return found ? { id: found.id, name: found.name, mimeType: found.mimeType, trashed: false } : null;
+    },
+    getDocumentTabs: async (id: string): Promise<{ tabs?: DocsTabOutline[] }> => {
+      const d = this.must(id);
+      return { tabs: d.tabs ?? [{ tabProperties: { tabId: 't.0', title: 'Tab 1' } }] };
     },
     getDocument: async (id: string): Promise<DocsDocument> => {
       const d = this.must(id);
@@ -75,7 +79,13 @@ class FakeGoogle {
       }
       this.writes.push({ docId, requiredRevisionId, requests });
       for (const raw of requests as Record<string, any>[]) {
-        if (raw.deleteContentRange) {
+        if (raw.deleteTab) {
+          d.tabs = (d.tabs ?? []).filter((t) => t.tabProperties?.tabId !== raw.deleteTab.tabId)
+            .map((t) => ({ ...t, childTabs: (t.childTabs ?? []).filter((c) => c.tabProperties?.tabId !== raw.deleteTab.tabId) }));
+        } else if (raw.updateDocumentTabProperties) {
+          const props = raw.updateDocumentTabProperties.tabProperties;
+          for (const t of d.tabs ?? []) if (t.tabProperties?.tabId === props.tabId) t.tabProperties = { ...t.tabProperties, title: props.title };
+        } else if (raw.deleteContentRange) {
           const { startIndex, endIndex } = raw.deleteContentRange.range;
           d.text = d.text.slice(0, startIndex - 1) + d.text.slice(endIndex - 1);
         } else if (raw.insertText) {
@@ -167,6 +177,24 @@ async function main(): Promise<void> {
     assert.ok(!doc.text.includes('TEMPLATE BODY'), 'the template body is cleared');
     assert.ok(doc.text.includes('Fresh text'));
     assert.equal(google.docs.get('tpl')!.text, 'TEMPLATE BODY', 'the template itself is untouched');
+  }
+
+  // ── A multi-tab template leaves one tab, named after the new Doc ─────────
+  {
+    const google = new FakeGoogle();
+    google.add({ id: 'tpl', name: 'Training', text: 'PART ONE', tabs: [
+      { tabProperties: { tabId: 't.1', title: 'I osa' }, childTabs: [{ tabProperties: { tabId: 't.1a', title: 'Notes' } }] },
+      { tabProperties: { tabId: 't.2', title: 'II osa' } },
+      { tabProperties: { tabId: 't.3', title: 'III osa' } },
+    ] });
+    const store = memoryStore();
+    const publisher = new GoogleDocsPublisher({ account: fakeAccount(google, 'acct-1', { fileId: 'tpl', name: 'Training', accountId: 'acct-1' }), store });
+    await publisher.publish(input('<p>Fresh text</p>'), prompts().p, onStage);
+    const created = google.docs.get(store.data.get(DOC_URI)!.fileId)!;
+    assert.deepEqual(created.tabs!.map((t) => [t.tabProperties?.tabId, t.tabProperties?.title, (t.childTabs ?? []).length]),
+      [['t.1', 'Course', 0]], 'only the first tab survives, without children, renamed');
+    assert.ok(created.text.includes('Fresh text'));
+    assert.equal(google.docs.get('tpl')!.tabs!.length, 3, 'the template keeps its tabs');
   }
   {
     const google = new FakeGoogle();

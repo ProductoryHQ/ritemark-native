@@ -40,6 +40,12 @@ export interface DocsDocument {
   headers?: Record<string, unknown>;
 }
 
+/** Just enough of `documents.get?includeTabsContent=true` to see the tab tree. */
+export interface DocsTabOutline {
+  tabProperties?: { tabId?: string; title?: string };
+  childTabs?: DocsTabOutline[];
+}
+
 export interface DocsStructuralElement {
   startIndex?: number;
   endIndex: number;
@@ -175,6 +181,12 @@ export class GoogleApiClient {
 
   getDocument(documentId: string): Promise<DocsDocument> {
     return this.json('GET', `${DOCS}/documents/${encodeURIComponent(documentId)}`);
+  }
+
+  /** The tab tree only — ids and titles, no content. */
+  getDocumentTabs(documentId: string): Promise<{ tabs?: DocsTabOutline[] }> {
+    const fields = encodeURIComponent('tabs(tabProperties(tabId,title),childTabs(tabProperties(tabId,title)))');
+    return this.json('GET', `${DOCS}/documents/${encodeURIComponent(documentId)}?includeTabsContent=true&fields=${fields}`);
   }
 
   /**

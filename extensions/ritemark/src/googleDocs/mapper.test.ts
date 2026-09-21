@@ -6,6 +6,7 @@ import {
   htmlToBlocks,
   locatePlaceholders,
   placeholderRequests,
+  singleTabRequests,
   tableCellRequests,
   type Block,
 } from './mapper';
@@ -196,5 +197,22 @@ assert.ok(cells.some((c) => c.updateTextStyle?.textStyle?.bold), 'the header row
 assert.deepEqual(bodyClearRange({ ...docWithTokens, body: { content: [{ endIndex: 1 }, { startIndex: 1, endIndex: 2 }] } }), null,
   'an empty document has nothing to clear');
 assert.deepEqual(bodyClearRange(docWithTokens), { startIndex: 1, endIndex: 89 }, 'the final newline is never deleted');
+
+// ── Template copies keep one tab ───────────────────────────────────────────
+{
+  assert.deepEqual(singleTabRequests([], 'Doc'), [], 'no tab data, no requests');
+  assert.deepEqual(singleTabRequests([{ tabProperties: { tabId: 't.0', title: 'Doc' } }], 'Doc'), [],
+    'a single tab that already has the name is left alone');
+  assert.deepEqual(singleTabRequests([{ tabProperties: { tabId: 't.0', title: 'Tab 1' } }], 'Doc'),
+    [{ updateDocumentTabProperties: { tabProperties: { tabId: 't.0', title: 'Doc' }, fields: 'title,iconEmoji' } }]);
+  assert.deepEqual(singleTabRequests([
+    { tabProperties: { tabId: 'a', title: 'I osa' }, childTabs: [{ tabProperties: { tabId: 'a1' } }] },
+    { tabProperties: { tabId: 'b' }, childTabs: [{ tabProperties: { tabId: 'b1' } }] },
+  ], 'Doc'), [
+    { deleteTab: { tabId: 'a1' } },
+    { deleteTab: { tabId: 'b' } },
+    { updateDocumentTabProperties: { tabProperties: { tabId: 'a', title: 'Doc' }, fields: 'title,iconEmoji' } },
+  ], "the first tab's children and every other top-level tab go; a deleted tab takes its own children");
+}
 
 console.log('googleDocs/mapper: all assertions passed');

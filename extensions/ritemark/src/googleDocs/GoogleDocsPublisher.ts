@@ -30,6 +30,7 @@ import {
   htmlToBlocks,
   locatePlaceholders,
   placeholderRequests,
+  singleTabRequests,
   tableCellRequests,
   type Block,
 } from './mapper';
@@ -155,6 +156,13 @@ export class GoogleDocsPublisher {
     }
 
     onStage('writing');
+    if (template) {
+      // A multi-tab template would otherwise bring its other tabs' content
+      // into the new Doc (found on RunDev 2026-09-21).
+      const outline = await client.getDocumentTabs(file.id);
+      const tabRequests = singleTabRequests(outline.tabs ?? [], input.title);
+      if (tabRequests.length) await client.batchUpdate(file.id, tabRequests);
+    }
     const { skipped, revisionId } = await this.writeBody(file.id, blocks, { templated: Boolean(template), documentPath: input.documentPath, onStage });
 
     onStage('verifying');
