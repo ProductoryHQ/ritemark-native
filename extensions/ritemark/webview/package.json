@@ -78,6 +78,7 @@
     "markdown-it": "15.0.0"
   },
   "devDependencies": {
+    "@mixmark-io/domino": "^2.2.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@types/turndown": "^5.0.4",

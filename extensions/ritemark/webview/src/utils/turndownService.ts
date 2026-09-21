@@ -10,6 +10,7 @@ import { tables, taskListItems } from 'turndown-plugin-gfm'
  * Includes:
  *  - ATX headings, fenced code blocks, `-` bullet, `*` italic, `**` bold
  *  - GFM tables + task list items
+ *  - `~~` strikethrough for `<s>`, `<del>` and `<strike>`
  *  - Pipe-escape rule for table cells (the GFM plugin doesn't escape `|`
  *    inside cell content by default and that breaks tables containing code)
  *  - Image rule preferring `title="./..."` over DOM-resolved `src` (used for
@@ -29,6 +30,21 @@ export function createTurndownService(): TurndownService {
 
   service.use(tables)
   service.use(taskListItems)
+
+  // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
+  // `~~x~~` as `<del>`. Turndown has no default rule for either, so without
+  // this the text survives a save but the mark is dropped. The GFM plugin's
+  // `strikethrough` rule writes a single `~`, which several parsers (markdown-it
+  // among them) do not read as strikethrough, so write `~~`. An empty run stays
+  // empty: `~~~~` at the start of a line would open a code fence.
+  service.addRule('strikethrough', {
+    filter(node) {
+      return node.nodeName === 'S' || node.nodeName === 'DEL' || node.nodeName === 'STRIKE'
+    },
+    replacement(content) {
+      return content.trim() ? `~~${content}~~` : content
+    },
+  })
 
   service.addRule('tableCellWithPipeEscape', {
     filter: ['th', 'td'],
