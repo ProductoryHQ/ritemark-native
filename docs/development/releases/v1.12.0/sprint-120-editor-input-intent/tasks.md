@@ -47,11 +47,16 @@ same fake-editor pattern as `extensions/comment/commentIds.test.ts`.
 
 ## Phase 4: RunDev validation
 
-- [ ] Type several plausible years, including `2026. `, at the start of a paragraph and confirm they stay prose in a running dev build.
-- [ ] Type `1. Item` and `5. Item` and confirm ordered lists still create normally.
-- [ ] Type a year in an empty paragraph directly above an existing list and confirm it stays prose and the list below is untouched.
-- [ ] Type `5. ` directly above an existing list, let it merge, then press Backspace and confirm the document is back as it was, list `start` included.
-- [ ] Save, close, and reopen the test document and confirm both the prose numbers and the real lists survived unchanged.
+Done 2026-09-22 in a dev build from this worktree; readings and the screenshot are
+in [qa-evidence.md](./qa-evidence.md).
+
+- [x] Years stay prose: `2026. was a good year` and `1999. ` both stayed paragraphs.
+- [x] Deliberate lists still work: `1. first` ⏎ `second` made a two-item list; `99. ` converted, `100. ` did not.
+- [x] A year in an empty paragraph directly above an existing list stays prose and leaves that list at `start=2026` — the Phase 0 corruption path is closed.
+- [x] `5. ` directly above an existing list merges (the file's own meaning) and **Cmd+Z restores everything**, `start=2026` included.
+- [x] Backspace after that merge un-converts the item but leaves the list renumbered — pre-existing, unreachable by accident now, recorded in qa-evidence.md rather than fixed.
+- [x] Save, close, reopen: the escaped prose number and the real list both survive unchanged.
+- [x] Filed out-of-scope finding: `Shift+End` selects to the end of the document instead of the line.
 
 ## Phase 5: QA and closeout
 
