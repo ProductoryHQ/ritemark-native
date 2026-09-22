@@ -137,7 +137,13 @@ echo ""
 echo -e "${YELLOW}Step 4: Compiling RiteMark extension...${NC}"
 cd "$VSCODE_DIR/extensions/ritemark"
 npm ci --legacy-peer-deps
+# Sprint 119: a release compile must carry the Google OAuth client (from the
+# environment or ~/.config/ritemark/release.env); esbuild refuses without it.
+# shellcheck source=scripts/google-oauth-release-env.sh
+source "$ROOT_DIR/scripts/google-oauth-release-env.sh"
+ritemark_load_google_oauth_env
 npm run compile
+node "$ROOT_DIR/scripts/check-google-oauth-build.mjs" out/extension.js
 echo -e "${GREEN}  Extension compiled${NC}"
 echo ""
 

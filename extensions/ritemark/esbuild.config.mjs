@@ -35,6 +35,27 @@ export const external = [
   'pdfkit',
 ];
 
+// Sprint 119: Google's installed-app OAuth client, read from the environment.
+// Trimmed, because a value pasted into ~/.config/ritemark/release.env or a CI
+// secret easily carries a trailing newline.
+const googleOAuth = {
+  clientId: (process.env.RITEMARK_GOOGLE_CLIENT_ID ?? '').trim(),
+  clientSecret: (process.env.RITEMARK_GOOGLE_CLIENT_SECRET ?? '').trim(),
+};
+
+/**
+ * Why a Google OAuth client configuration is unusable, or null when it is fine.
+ * Names the variable, never its value. Mirrors src/googleDocs/config.ts.
+ */
+export function googleOAuthProblem({ clientId, clientSecret }) {
+  if (!clientId) return 'RITEMARK_GOOGLE_CLIENT_ID is not set';
+  if (!clientId.endsWith('.apps.googleusercontent.com')) {
+    return 'RITEMARK_GOOGLE_CLIENT_ID is not a Google OAuth client ID (*.apps.googleusercontent.com)';
+  }
+  if (!clientSecret) return 'RITEMARK_GOOGLE_CLIENT_SECRET is not set';
+  return null;
+}
+
 /** @type {import('esbuild').BuildOptions} */
 const options = {
   entryPoints: {
@@ -55,12 +76,10 @@ const options = {
   // client's ID and secret as public build configuration that a distributed app
   // cannot keep secret, so they are injected here at compile time from the
   // environment rather than committed. Absent values build a working app whose
-  // Google Docs card reports "unavailable in this build".
+  // Google Docs card reports "unavailable in this build" — fine for development,
+  // refused for releases (RITEMARK_REQUIRE_GOOGLE_OAUTH=1, below).
   define: {
-    __RITEMARK_GOOGLE_OAUTH__: JSON.stringify(JSON.stringify({
-      clientId: process.env.RITEMARK_GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.RITEMARK_GOOGLE_CLIENT_SECRET ?? '',
-    })),
+    __RITEMARK_GOOGLE_OAUTH__: JSON.stringify(JSON.stringify(googleOAuth)),
   },
   logLevel: 'info',
   // CJS format => no code-splitting => each entry is fully self-contained (browserMcpAdapter
@@ -74,6 +93,18 @@ const isEntryPoint =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isEntryPoint) {
+  // Release builds (build-prod*.sh, the CI build workflows) set this so a
+  // missing client stops the build instead of shipping an app where Google
+  // Docs publishing is silently unavailable. Older sources ignore the variable.
+  if (process.env.RITEMARK_REQUIRE_GOOGLE_OAUTH === '1') {
+    const problem = googleOAuthProblem(googleOAuth);
+    if (problem) {
+      console.error(`[esbuild] release build refused: ${problem}.`);
+      console.error('[esbuild] Set it in CI secrets, or in ~/.config/ritemark/release.env for a local release build.');
+      process.exit(1);
+    }
+    console.log('[esbuild] Google OAuth client configured for this release build');
+  }
   if (watch) {
     const ctx = await esbuild.context(options);
     await ctx.watch();

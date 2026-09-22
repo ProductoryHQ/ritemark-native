@@ -167,6 +167,19 @@ removal is Jarmo's call, not yours.
 Copy it from the main checkout before Step 3 or `codesign-app.sh` stops with
 `APPLE_TEAM_ID not set`.
 
+⚠️ **Google OAuth client (since v1.12, Sprint 119).** `build-prod.sh` loads
+`RITEMARK_GOOGLE_CLIENT_ID` / `RITEMARK_GOOGLE_CLIENT_SECRET` from the
+environment or from `~/.config/ritemark/release.env`. That file is outside every
+worktree, mode 600, and needs no copy. The script sets
+`RITEMARK_REQUIRE_GOOGLE_OAUTH=1`, so the extension compile **refuses** to
+build without the client, and `scripts/check-google-oauth-build.mjs` then
+confirms that the bundle carries it. No value is ever printed. The CI build
+workflows take the same two values from repository secrets of the same names.
+An extension-tier release compiles with those variables set, and
+`release-extension.sh` refuses a bundle without the client. Gate testing should
+include Settings → Google Docs → Connect on the candidate, because that is the
+first run against the production client.
+
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
 ### Step 3 — Sign + DMG arm64 (NO notarization yet)
