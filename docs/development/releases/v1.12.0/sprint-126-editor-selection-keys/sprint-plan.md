@@ -3,7 +3,7 @@
 Track: Lightweight<br>
 Release tier: extension
 
-**Status:** Phase 0 complete — awaiting Jarmo's approval of the Open Decision and this plan.<br>
+**Status:** Implemented and validated — awaiting QA/PR. Decision approved and applied (Option B).<br>
 **Branch:** `sprint-126-editor-selection-keys`<br>
 **Issue:** [#332](https://github.com/ProductoryHQ/ritemark-native/issues/332) (label: bug)<br>
 **Worktree:** `.claude/worktrees/heuristic-albattani-0cd9ec`, branched from main `e9094517`<br>
@@ -35,6 +35,8 @@ On a paragraph that wraps onto several visual lines, what should `Shift+End` ext
 
 Recommendation: **Option B.** The clamp is what actually kills the data loss and is common to A and B; the visual-line part is what makes `Shift+End` mean "what `End` does, but extending," which is what a person pressing it intends.
 
+**Decided 2026-09-22 (Jarmo: "visual line, approved, start Phase 1").** Option B. Validated in a dev build: `Selection.modify('extend', …, 'lineboundary')` works inside the VS Code webview, so the Option A fallback was not needed — it remains in the code only as the defensive path for a browser without the API. Evidence: [qa-evidence.md](./qa-evidence.md).
+
 Also flagged, not assumed broken: `Shift-Mod-Home`/`Shift-Mod-End` (select to document start/end) are correct today. Phase 0 did not exercise them by hand; confirming they still work after the fix is a Definition of Done item, not a foregone conclusion.
 
 ## Scope
@@ -55,17 +57,17 @@ Also flagged, not assumed broken: `Shift-Mod-Home`/`Shift-Mod-End` (select to do
 
 ## Definition of Done
 
-- [ ] `Shift+End` never selects past the end of the current text block, from any position within it.
-- [ ] `Shift+Home` never selects past the start of the current text block.
-- [ ] The selection anchor is preserved — `Shift+End`/`Shift+Home` extend the existing selection, they do not replace it.
-- [ ] Repeated `Shift+End` (or `Shift+Home`) from the same position is idempotent.
-- [ ] `Shift-Mod-Home`/`Shift-Mod-End` still reach document start/end.
-- [ ] A unit test in the `orderedListTyping.test.ts` style pins the clamp against real ProseMirror state.
-- [ ] The new test is wired into `extensions/ritemark/package.json`'s `test` script.
-- [ ] `npm test` passes.
-- [ ] `./scripts/validate-qa.sh` passes.
-- [ ] Hand-validated in a dev build via `/rundev`, including the original repro document and a wrapped paragraph.
-- [ ] `docs/CHANGELOG.md` and `docs/releases/v1.12.0/release-notes.md` entries added.
+- [x] `Shift+End` never selects past the end of the current text block, from any position within it.
+- [x] `Shift+Home` never selects past the start of the current text block.
+- [x] The selection anchor is preserved — `Shift+End`/`Shift+Home` extend the existing selection, they do not replace it.
+- [x] Repeated `Shift+End` (or `Shift+Home`) from the same position is idempotent.
+- [x] `Shift-Mod-Home`/`Shift-Mod-End` still reach document start/end.
+- [x] A unit test in the `orderedListTyping.test.ts` style pins the clamp against real ProseMirror state.
+- [x] The new test is wired into `extensions/ritemark/package.json`'s `test` script.
+- [x] `npm test` passes.
+- [x] `./scripts/validate-qa.sh` passes.
+- [x] Hand-validated in a dev build via `/rundev`, including the original repro document and a wrapped paragraph.
+- [x] `docs/CHANGELOG.md` and `docs/releases/v1.12.0/release-notes.md` entries added.
 
 ## Risks
 
@@ -87,11 +89,12 @@ Also flagged, not assumed broken: `Shift-Mod-Home`/`Shift-Mod-End` (select to do
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-09-22 | Approved behaviour: `Shift+End`/`Shift+Home` extend to the **visual line** boundary, clamped to the current text block | Option B. Matches plain `End` and every native editor; the clamp is what stops the data loss. `Selection.modify` confirmed working in the webview, so the fallback stayed defensive |
 | 2026-09-22 | Phase 0 audit confirms the defect is Chrome's native `Shift+End`/`Shift+Home` fallback: TipTap's `Keymap` extension and ProseMirror's `baseKeymap` bind `Mod-a`/`Ctrl-a`/`Ctrl-e` but never `Home`/`End`/`Shift-Home`/`Shift-End`, and Ritemark's webview adds no handling of its own | `research/current-state-audit.md` |
 
 ## Planning Approval
 
-- [ ] Jarmo approves the `Shift+End`/`Shift+Home` behaviour decision (Option A, B, or C).
-- [ ] Jarmo approves this sprint plan.
+- [x] Jarmo approves the `Shift+End`/`Shift+Home` behaviour decision (Option A, B, or C). *(Option B, "visual line", 2026-09-22)*
+- [x] Jarmo approves this sprint plan. *("approved, start Phase 1", 2026-09-22)*
 - [x] GitHub issue exists and is labeled bug. ([#332](https://github.com/ProductoryHQ/ritemark-native/issues/332))
 - [x] Worktree and branch created for the Phase 0 audit. (`sprint-126-editor-selection-keys`, from main `e9094517`)
