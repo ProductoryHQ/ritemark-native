@@ -60,7 +60,26 @@ The experiments ran in the real Transcribe webview, reached over DevTools. No pr
 | S4 | One hour of synthetic capture | Normal for **340 s**. Then the context turned **`suspended` silently**: sample count frozen, no error, while the wall clock ran on for the rest of the hour. Heap steady at 36 MB, so there was **no leak**. The suspension coincided with opening a second `AudioContext` and a pending `getUserMedia` (S5). | **Critical for R6/R7.** (1) Elapsed time shown to the user must come from **samples written**, never the wall clock. (2) The recorder must listen for `statechange` and a track's `ended`/`mute`, try one `resume()`, and otherwise **stop and finalize honestly** with a visible reason. It must never go on "recording" silence. |
 | S5 | `getUserMedia({audio: true})` in the Transcribe webview | Pending for more than 15 s, while `permissions.query` already said `granted` and the devices were listed by name. Patch 004's handler waits for the macOS microphone prompt to be answered. | The UI needs a **"Waiting for microphone permission…"** state with **Cancel**, because the request can hang until the user answers the OS dialog. |
 
-Still open: the real-microphone capture at 16 kHz, which waits for the macOS prompt; a deliberate reproduction of S4's trigger; host-side transport and the file sink (Phase 1 prototype); and Windows.
+| S4b | Reproduce S4: while a capture runs, open, resume and close a second 16 kHz `AudioContext`, then call `getUserMedia` | The running capture stayed `running` throughout, with ratio 0.996 and no state change. | Neither a second context nor a failing `getUserMedia` suspends a capture. S4's likely trigger is OS-level: the pending macOS microphone prompt or input-device activation on a Mac with many virtual audio devices. The design must handle suspension from **any** cause (S4 consequence stands). |
+| S6 | `getUserMedia` after S5 | `NotFoundError: Requested device not found`, although inputs had been listed by name moments before. | The dev build shares the bundle ID `ai.productory.ritemark` with the installed signed app but is signed differently, so macOS's microphone permission (TCC) is unreliable for it. **The real-microphone check belongs on a signed candidate.** Map `NotFoundError` to "No microphone available" in the UI. |
+
+Still open: the real-microphone capture on a signed build; host-side transport and the file sink (a Phase 1 prototype with tests); and Windows.
+
+## 5. Proposed freeze, for Jarmo's Phase 0 approval
+
+| Topic | Proposal | Why |
+|---|---|---|
+| Capture node | ScriptProcessor (4096) in the Transcribe webview. No CSP change. | S2–S3: it keeps pace, including hidden, and the CSP stays as it is. AudioWorklet would widen `script-src` for no measured gain. Revisit if Chromium removes ScriptProcessor. |
+| Sample rate | Try `AudioContext({ sampleRate: 16000 })` first, so the browser resamples. Fall back to the device rate plus dictation's JavaScript resampler if the 16 kHz context fails. | A native resampler is better quality than linear interpolation; the fallback is already proven by dictation. Confirm on the signed build. |
+| Format and transport | 16 kHz mono 16-bit PCM WAV, sent in 1-second chunks of about 43 KB (base64) with `sessionId` and `sequence`. The host acknowledges each chunk; at most 4 may be unacknowledged, and if more pile up the recording stops and finalizes with a reason. | Small messages. The bound protects memory without dropping audio silently. |
+| Elapsed time | Computed from samples written. | S4: the wall clock lies after a suspension. |
+| Suspension or device loss | On `statechange` to suspended, a track `ended`, or `NotFoundError`: one `resume()` attempt. If that fails, stop and finalize what was recorded, with a visible reason. | S4 and S6. |
+| Permission | Show "Waiting for microphone permission…" with Cancel until `getUserMedia` settles. Show denial and "No microphone available" as distinct states. | S5 and S6. |
+| Destination | As decided on 2026-09-22. In the project: `recordings/` in the workspace folder. Multi-root: the active file's folder, otherwise ask once. No folder: ask before recording, remember the choice, and show it in the panel with Change. | Jarmo's direction, plus the proposals in §2.1. |
+| Partial file | Write `Recording … .wav.part` in the destination folder, and rename it to `.wav` on a validated Stop. On the next panel open, offer to recover or discard any `.part` left behind. | The rename is atomic on the same volume, so there's no cross-volume copy. The user can see and delete it. Recovery follows R6. |
+| Length | Warn at 2 hours (about 230 MB). Stop at 4 hours (about 460 MB), well under WAV's 4 GB limit. | Protects the disk and matches realistic meeting lengths. |
+| Flag | `transcribe-direct-recording`: experimental, default on, cross-platform. | Spec R8. |
+| Delivery tier | No patch or shell change. Patch 004 already grants webview microphone access on every platform. | D3; the signed build confirms. |
 
 ## 4. The spike plan (original)
 
