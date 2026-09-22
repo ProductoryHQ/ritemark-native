@@ -1,9 +1,10 @@
 # Sprint 118 — Direct Transcribe Recording
 
 **Track:** Full SDD<br>
-**Status:** Draft — prepared, not approved, no branch created<br>
+**Status:** Kicked off 2026-09-22 — Phase 0 (audit, spike, capture/storage decisions). Implementation is not authorized until Jarmo approves Phase 0.<br>
 **Branch after approval:** `sprint-118-transcribe-recording`<br>
-**Issue:** Pending release mapping<br>
+**Issue:** [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328)<br>
+**Worktree:** `.claude/worktrees/sprint-118-transcribe-recording`, branched from main `d8d90ad7`<br>
 **Release:** [v1.12.0](../release-plan.md)
 
 ## Goal
@@ -87,6 +88,8 @@ Add an experimental, default-on `transcribe-direct-recording` flag as a code-lev
 | 2026-09-13 | Recommend 16 kHz mono 16-bit PCM WAV as v1 capture baseline | Cross-platform, transcription-ready, deterministic, and approximately 115 MB/hour. Phase 0 validates real-device quality. |
 | 2026-09-13 | Start/Stop/Cancel only; Pause is out of scope | Keeps lifecycle and crash recovery small and testable for first release. |
 | 2026-09-13 | User owns finalized audio; partial capture is host-managed until finalization | Successful recordings are normal files, while cancelled/invalid partials do not pollute the library. |
+| 2026-09-22 | Kickoff approved: scope as packaged, audit-first Phase 0. Implementation waits for the Phase 0 gate. | Issue #328, branch `sprint-118-transcribe-recording` from main `d8d90ad7`. Jarmo: "118, alusta". |
+| 2026-09-22 | Destination: with a workspace folder open, a recording is saved into the project. With no folder open, Ritemark asks where to save before recording starts. | Jarmo: "enne funktsiooni lubamist küsi, et kuhu salvestada (kui pole kaustas)". Phase 0 still freezes the in-project folder name, multi-root choice, naming and collisions, and whether the chosen no-folder location is remembered. |
 
 ## Risks
 
@@ -107,7 +110,7 @@ Add an experimental, default-on `transcribe-direct-recording` flag as a code-lev
 
 ## Planning Approval
 
-- [ ] Jarmo approves scope and Phase 0 questions.
-- [ ] GitHub issue is created and assigned to milestone `v1.12.0`.
-- [ ] SDD artifacts and feature-flag decision are approved.
-- [ ] Dedicated branch is created after approval.
+- [x] Jarmo approves scope and Phase 0 questions. *(2026-09-22)*
+- [x] GitHub issue is created and assigned to milestone `v1.12.0`. *([#328](https://github.com/ProductoryHQ/ritemark-native/issues/328))*
+- [ ] SDD artifacts and feature-flag decision are approved. *(Phase 0 gate)*
+- [x] Dedicated branch is created after approval. *(`sprint-118-transcribe-recording`, 2026-09-22)*

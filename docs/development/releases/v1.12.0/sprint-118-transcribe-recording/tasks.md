@@ -10,7 +10,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Measure device sample rates, resampler quality, 16 kHz PCM compatibility, chunk/message bounds, backpressure, and one-hour size/drift/memory.
 - [ ] Verify current webview microphone delegation, CSP, macOS TCC, Windows behavior, and packaged/dev differences.
 - [ ] Freeze exact capture format, chunk size, sequence/replay rule, ack/backpressure bound, timer, and duration/size policy.
-- [ ] Freeze destination/naming/collision/multi-root/no-folder/user-ownership rules.
+- [ ] Freeze destination/naming/collision/multi-root/no-folder/user-ownership rules. *(Direction decided 2026-09-22: in-project with a folder open; ask before recording with none)*
 - [ ] Freeze one-active-session, panel hide/reload, shutdown, recovery, discard, and zero/invalid partial rules.
 - [ ] Approve `design.md`, default-on experimental flag, and shell-tier impact.
 - [ ] **Jarmo Phase 0 gate:** authorize implementation.
@@ -57,5 +57,5 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Run focused recording/speech/dictation/feature/webview/extension tests and builds.
 - [ ] Walk every ★ scenario and link evidence.
 - [ ] Run `./scripts/validate-qa.sh` through repository QA.
-- [ ] Update architecture, Transcribe/privacy user docs, changelog, v1.11 release notes, parent tracker, issue, and PR.
+- [ ] Update architecture, Transcribe/privacy user docs, changelog, v1.12.0 release notes (was v1.11 before the 2026-09-15 move), parent tracker, issue, and PR.
 - [ ] Verify every checked task against branch diff/evidence before readiness handoff.
