@@ -6,14 +6,14 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 0: Audit and freeze (W0 — R1–R8)
 
-- [ ] Capture current dictation/Transcribe/permission/pipeline evidence in `research/capture-and-storage-decisions.md`.
-- [ ] Measure device sample rates, resampler quality, 16 kHz PCM compatibility, chunk/message bounds, backpressure, and one-hour size/drift/memory.
-- [ ] Verify current webview microphone delegation, CSP, macOS TCC, Windows behavior, and packaged/dev differences.
-- [ ] Freeze exact capture format, chunk size, sequence/replay rule, ack/backpressure bound, timer, and duration/size policy.
-- [ ] Freeze destination/naming/collision/multi-root/no-folder/user-ownership rules. *(Direction decided 2026-09-22: in-project with a folder open; ask before recording with none)*
-- [ ] Freeze one-active-session, panel hide/reload, shutdown, recovery, discard, and zero/invalid partial rules.
-- [ ] Approve `design.md`, default-on experimental flag, and shell-tier impact.
-- [ ] **Jarmo Phase 0 gate:** authorize implementation.
+- [x] Capture current dictation/Transcribe/permission/pipeline evidence in `research/capture-and-storage-decisions.md`. *(audit re-verified, D1–D4)*
+- [ ] Measure device sample rates, resampler quality, 16 kHz PCM compatibility, chunk/message bounds, backpressure, and one-hour size/drift/memory. *(S1–S4b done on RunDev: 48 kHz default context, ScriptProcessor pace, hidden panel, one-hour run with no leak and a silent OS suspension found. Real-microphone resampling and host transport move to the signed-build check and Phase 1 tests, per the gate)*
+- [ ] Verify current webview microphone delegation, CSP, macOS TCC, Windows behavior, and packaged/dev differences. *(delegation and CSP verified, S5/S6 TCC behaviour recorded; the signed macOS build and Windows are still to run)*
+- [x] Freeze exact capture format, chunk size, sequence/replay rule, ack/backpressure bound, timer, and duration/size policy. *(§5, approved 2026-09-22)*
+- [x] Freeze destination/naming/collision/multi-root/no-folder/user-ownership rules. *(§2.1 and §5, approved 2026-09-22)*
+- [x] Freeze one-active-session, panel hide/reload, shutdown, recovery, discard, and zero/invalid partial rules. *(§2.3 and §5, approved 2026-09-22)*
+- [x] Approve `design.md`, default-on experimental flag, and shell-tier impact. *(approved with the gate; no shell change expected)*
+- [x] **Jarmo Phase 0 gate:** authorize implementation. *(2026-09-22: "kinnitan, alusta koodiga")*
 
 ## Phase 1: Host session and WAV sink (W1 — R3, R4, R6)
 

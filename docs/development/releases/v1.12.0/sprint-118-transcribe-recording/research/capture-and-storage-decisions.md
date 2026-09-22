@@ -1,6 +1,6 @@
 # Sprint 118 Phase 0 — Capture and Storage Decisions
 
-**Status:** In progress, started 2026-09-22 after the kickoff. The decisions below become binding only when Jarmo approves Phase 0.<br>
+**Status:** **Approved 2026-09-22** by Jarmo ("kinnitan, alusta koodiga"): the §5 freeze, including the 2 h warning and 4 h stop, the remembered no-folder location, the visible `.wav.part` with recovery, and the real-microphone check on a signed build.<br>
 **Spec anchors:** R1–R8 and "Phase 0 Decisions" 1–7 in [spec.md](../spec.md)<br>
 **Earlier evidence:** [current-state-audit.md](./current-state-audit.md), 2026-09-13
 

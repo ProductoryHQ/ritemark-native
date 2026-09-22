@@ -1,7 +1,7 @@
 # Sprint 118 — Direct Transcribe Recording
 
 **Track:** Full SDD<br>
-**Status:** Kicked off 2026-09-22 — Phase 0 (audit, spike, capture/storage decisions). Implementation is not authorized until Jarmo approves Phase 0.<br>
+**Status:** Implementation (Phase 1+). Phase 0 was approved on 2026-09-22.<br>
 **Branch after approval:** `sprint-118-transcribe-recording`<br>
 **Issue:** [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328)<br>
 **Worktree:** `.claude/worktrees/sprint-118-transcribe-recording`, branched from main `d8d90ad7`<br>
@@ -89,6 +89,7 @@ Add an experimental, default-on `transcribe-direct-recording` flag as a code-lev
 | 2026-09-13 | Start/Stop/Cancel only; Pause is out of scope | Keeps lifecycle and crash recovery small and testable for first release. |
 | 2026-09-13 | User owns finalized audio; partial capture is host-managed until finalization | Successful recordings are normal files, while cancelled/invalid partials do not pollute the library. |
 | 2026-09-22 | Kickoff approved: scope as packaged, audit-first Phase 0. Implementation waits for the Phase 0 gate. | Issue #328, branch `sprint-118-transcribe-recording` from main `d8d90ad7`. Jarmo: "118, alusta". |
+| 2026-09-22 | Phase 0 approved: the freeze in `research/capture-and-storage-decisions.md` §5. ScriptProcessor with no CSP change; 16 kHz WAV in 1 s chunks with at most 4 unacked; elapsed time from samples; an honest stop on suspension; a 2 h warning and 4 h stop; the no-folder location remembered and shown with Change; a visible `.wav.part` with recovery; the real-microphone check on a signed build. | Jarmo: "kinnitan, alusta koodiga" |
 | 2026-09-22 | Destination: with a workspace folder open, a recording is saved into the project. With no folder open, Ritemark asks where to save before recording starts. | Jarmo: "enne funktsiooni lubamist küsi, et kuhu salvestada (kui pole kaustas)". Phase 0 still freezes the in-project folder name, multi-root choice, naming and collisions, and whether the chosen no-folder location is remembered. |
 
 ## Risks
