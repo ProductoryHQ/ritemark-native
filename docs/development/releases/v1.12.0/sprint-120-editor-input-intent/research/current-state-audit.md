@@ -24,7 +24,46 @@ It is **the input rule, and only the input rule**. Both Markdown directions alre
    - the existing list's `start` changes from `2026` to `1999`, so its numbering silently changes;
    - pressing Backspace (the input-rule undo) turns the new item back into a paragraph but **leaves `start="1999"`**. The original numbering is not restored.
 
-   This is worse than the reported bug: an accidental conversion can renumber a list the author wrote earlier.
+   First reading: worse than the reported bug. That reading was wrong — see the next section, which is the one that stands.
+
+## The adjacent-list merge, re-examined (2026-09-22, before writing Phase 2 code)
+
+The merge in observation 3 comes from `tiptap-extension-auto-joiner`, not from the
+input rule: its `joinableNodes` always contains `bulletList` and `orderedList`
+whatever `elementsToJoin` says, so two adjacent ordered lists are always joined.
+Before writing a guard against it, the question was whether the *unjoined*
+document is even representable. It is not:
+
+| Markdown in | What the editor's `marked` gives back |
+| --- | --- |
+| `5. a` + blank line + `2026. b` | one `<ol start="5">` with items `a`, `b` |
+| `5. a` + `2026. b` | one `<ol start="5">` with items `a`, `b` |
+| the same two, separated by `<!-- -->` | two lists — but only because of the HTML comment |
+
+And in the other direction, saving two separate lists
+(`<ol start="5">a</ol><ol start="2026">b</ol>`) produces Markdown that reopens as
+a single list starting at 5.
+
+So a CommonMark file cannot hold two adjacent ordered lists with different start
+numbers; the first marker wins and the second is renumbered. Blocking the join
+would show the author two lists that silently become one the next time the file
+is opened — the editor would be promising something the format does not keep.
+**The merge is not a separate defect. It is what the file already means, shown at
+typing time.**
+
+What remains of observation 3 after the Phase 1 bound:
+
+- `1999. ` (and any 3+ digit number) no longer creates a list at all, so the
+  accidental path that motivated the finding is closed.
+- A deliberate `5. ` typed above an existing list still merges — and that is the
+  correct outcome, because the saved file would produce exactly that list.
+- The one thing still worth checking by hand is undo fidelity: after the merge,
+  Backspace (the input-rule undo) must put the document back as it was, including
+  the list's `start`. That is a Phase 4 check in the running app, not a guard in
+  the extension.
+
+`webview/src/utils/orderedListRoundTrip.test.ts` pins all of the above, so a
+future change cannot re-introduce a guard on a false premise.
 
 ## What the fix has to keep
 
@@ -61,3 +100,5 @@ This is why the bound below is **99**, not a number we invented.
 Option A is what this sprint proposes, with the bound taken from LibreOffice Writer rather than invented: one bound, no year knowledge, and every number a person actually starts a list with keeps working.
 
 **Decided 2026-09-22 (Jarmo):** Option A. The bound is 99, matching LibreOffice Writer's rule. The adjacent-list merge is fixed regardless of the option, because a bounded rule no longer fires there — but the sprint should also cover the merge case with a test, since a deliberate `5. ` typed above an existing list can still merge.
+
+**Addendum 2026-09-22 (same day, before Phase 2 code):** that last clause does not survive the round-trip evidence above. A deliberate `5. ` above an existing list merges, and the merge is correct — Markdown gives the same single list. Phase 2 therefore ships the round-trip test that documents this instead of a guard against the join. Nothing else in the decision changes: the bound is still 99.

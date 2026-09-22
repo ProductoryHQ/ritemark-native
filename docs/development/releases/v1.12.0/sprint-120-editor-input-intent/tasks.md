@@ -10,15 +10,25 @@ Implementation checklist for [sprint-plan.md](./sprint-plan.md). Tick `[x]` only
 
 ## Phase 1: Bounded input rule
 
-- [ ] Add a bounded ordered-list extension (e.g. `webview/src/extensions/BoundedOrderedList.ts`) that overrides `@tiptap/extension-ordered-list`'s `addInputRules()` with the approved `1`–`999` bound in place of the default `/^(\d+)\.\s$/`.
-- [ ] Wire the bounded extension into `webview/src/components/Editor.tsx` (currently `OrderedList.configure({ HTMLAttributes: { class: 'tiptap-ordered-list' } })` at line 373) in place of the unmodified `OrderedList`.
-- [ ] Add unit tests for the rule boundary, e.g. `webview/src/extensions/BoundedOrderedList.test.ts`: `1.`, `9.`, `99.`, `999.` convert to a list; `1000.`, `2026.` stay prose.
+The approved bound is **99** (LibreOffice Writer's), decided 2026-09-22 — the plan
+was drafted with a provisional `999`.
 
-## Phase 2: Adjacent-list merge/renumber fix
+- [x] Add `webview/src/extensions/BoundedOrderedList.ts`, overriding `@tiptap/extension-ordered-list`'s `addInputRules()` with `/^([1-9]\d?)\.\s$/` in place of the default `/^(\d+)\.\s$/`. The node, its `start` attribute, the join predicate and the keepMarks/keepAttributes variant are TipTap's own, unchanged.
+- [x] Wire it into `webview/src/components/Editor.tsx` in place of the unmodified `OrderedList`.
+- [x] Add `webview/src/extensions/BoundedOrderedList.test.ts`: `1.`, `2.`, `9.`, `10.`, `42.`, `99.` convert; `100.`, `999.`, `1999.`, `2026.`, `12345.` stay prose; non-markers (`0.`, `01.`, `1.` without a space, `1)`, a number mid-sentence) are untouched; both rule variants are bounded and the node is still `orderedList`.
+- [x] Register both new test files in the extension's `npm test` script.
 
-- [ ] Reproduce and fix the case where typing a number in an empty paragraph directly above an existing ordered list merges it into that list and rewrites the list's `start`.
-- [ ] Add a test: an empty paragraph directly above a `start="2026"` list, typing an in-range number (e.g. `5. `), confirms the existing list's `start` is preserved.
-- [ ] Add a test for the Backspace input-rule undo: reverting the new item's conversion must not leave the adjacent list's `start` changed from before the keystroke.
+## Phase 2: Adjacent lists — what the file can actually hold
+
+Re-scoped 2026-09-22 after the round-trip probe (see the audit's *The adjacent-list
+merge, re-examined*): Markdown cannot represent two adjacent ordered lists with
+different starts, so blocking the join would make the editor diverge from the file.
+No guard is written; the format truth is pinned in a test instead.
+
+- [x] Probe the load and save paths to establish whether two adjacent ordered lists survive a round trip. They do not — the first marker wins.
+- [x] Record the finding and the revised conclusion in `research/current-state-audit.md`.
+- [x] Add `webview/src/utils/orderedListRoundTrip.test.ts`: a year stays prose through save and reopen, a deliberate list keeps its `start`, an authored `2026.` list still loads as a list, and two adjacent lists reopen as one.
+- [ ] Phase 4 hand check: after a deliberate `5. ` merges into the list below, Backspace restores the document as it was, including the list's `start`.
 
 ## Phase 3: Round-trip regression
 
@@ -32,7 +42,8 @@ Implementation checklist for [sprint-plan.md](./sprint-plan.md). Tick `[x]` only
 
 - [ ] Type several plausible years, including `2026. `, at the start of a paragraph and confirm they stay prose in a running dev build.
 - [ ] Type `1. Item` and `5. Item` and confirm ordered lists still create normally.
-- [ ] Type a number in an empty paragraph directly above an existing list and confirm the existing list's numbering is unaffected.
+- [ ] Type a year in an empty paragraph directly above an existing list and confirm it stays prose and the list below is untouched.
+- [ ] Type `5. ` directly above an existing list, let it merge, then press Backspace and confirm the document is back as it was, list `start` included.
 - [ ] Save, close, and reopen the test document and confirm both the prose numbers and the real lists survived unchanged.
 
 ## Phase 5: QA and closeout
