@@ -8,7 +8,7 @@ import { sendToExtension, onMessage } from '../bridge'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import BulletList from '@tiptap/extension-bullet-list'
-import OrderedList from '@tiptap/extension-ordered-list'
+import { BoundedOrderedList } from '../extensions/BoundedOrderedList'
 import ListItem from '@tiptap/extension-list-item'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -370,7 +370,9 @@ export function Editor({
           class: 'tiptap-bullet-list',
         },
       }),
-      OrderedList.configure({
+      // Sprint 120 (#280): same as TipTap's ordered list, except a number
+      // only starts a list up to 99, so a year stays prose.
+      BoundedOrderedList.configure({
         HTMLAttributes: {
           class: 'tiptap-ordered-list',
         },

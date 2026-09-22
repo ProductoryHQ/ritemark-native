@@ -12,7 +12,8 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 |---|---|---|
 | 119 | Publish to Google Docs (Create, Sync, templates, one narrow permission); Ritemark's own privacy policy and terms links; relative-image and Export-menu keyboard fixes | Gate 1, and **Gate 2 for the first native Windows run of the loopback OAuth flow** |
 | 118 | Record in Transcribe: microphone capture into a WAV in the project, recovery after an interruption, tooltips on every Transcribe button | Gate 1, and **Gate 2 for the first native Windows capture**. The dev build could not prove macOS permission under the real bundle ID |
-| 120, 122–125 | _Not started_ | — |
+| 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
+| 122–125 | _Not started_ | — |
 
 ## Automated checks (before handover)
 
@@ -46,6 +47,13 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] With no folder open (File → Close Folder), the first Record asks where to save before recording; the next one does not ask, and **Change** changes it
 - [ ] Deny microphone access in System Settings → Privacy & Security → Microphone, then Record: the panel says access is denied, and **Microphone Settings** opens that page
 - [ ] Hover over Record, Add recording, and the recording card buttons: each shows a tooltip. A disabled Record says why
+
+### A typed number and a numbered list (Sprint 120)
+
+- [ ] Type `2026. ` at the start of a paragraph and keep writing: it stays a sentence, and after save + reopen it is still a sentence
+- [ ] Type `1. ` and `5. ` at the start of a paragraph: both still start a numbered list, and Enter continues it
+- [ ] Type `100. ` at the start of a paragraph: it stays a sentence (99 is the last number that converts)
+- [ ] Open a file that already contains a list starting at a high number (for example `2026. item`): it still opens as a list
 
 ### Regression sweep
 
