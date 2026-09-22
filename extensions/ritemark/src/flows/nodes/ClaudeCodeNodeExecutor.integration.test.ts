@@ -16,6 +16,34 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+// Standalone `tsx` runs outside an extension host. This path touches two
+// vscode APIs at run time: getSetupStatus() reads the agent-runtime preference
+// through workspace.getConfiguration (the stub returns each default, as a host
+// with no user setting would), and runAgent() lazily loads modelCatalog, which
+// constructs a vscode.EventEmitter at module load.
+const Module = require('module') as {
+  _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
+};
+const originalResolve = Module._resolveFilename.bind(Module);
+Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]) {
+  if (request === 'vscode') return '__vscode_claude_code_test_stub__';
+  return originalResolve(request, ...rest);
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(require as any).cache['__vscode_claude_code_test_stub__'] = {
+  id: '__vscode_claude_code_test_stub__',
+  filename: '__vscode_claude_code_test_stub__',
+  loaded: true,
+  children: [],
+  paths: [],
+  exports: {
+    EventEmitter: class {},
+    workspace: {
+      getConfiguration: () => ({ get: (_key: string, defaultValue?: unknown) => defaultValue }),
+    },
+  },
+};
+
 // Types
 interface FlowNode {
   id: string;
@@ -32,8 +60,9 @@ interface ExecutionContext {
   nodeLabels: Map<string, string>;
 }
 
-// Import the actual executor
-import { executeClaudeCodeNode } from './ClaudeCodeNodeExecutor';
+// Import after installing the extension-host boundary stub.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { executeClaudeCodeNode } = require('./ClaudeCodeNodeExecutor') as typeof import('./ClaudeCodeNodeExecutor');
 
 function createTestNode(data: Record<string, unknown>): FlowNode {
   return {
@@ -83,10 +112,11 @@ async function test(name: string, fn: () => Promise<void>, timeoutMs = 120000) {
   }
 
   beforeEach();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     // Add timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Test timed out after ${timeoutMs}ms`)), timeoutMs);
+      timer = setTimeout(() => reject(new Error(`Test timed out after ${timeoutMs}ms`)), timeoutMs);
     });
 
     await Promise.race([fn(), timeoutPromise]);
@@ -97,6 +127,7 @@ async function test(name: string, fn: () => Promise<void>, timeoutMs = 120000) {
     console.log(`    Error: ${error instanceof Error ? error.message : error}`);
     failed++;
   } finally {
+    clearTimeout(timer);
     afterEach();
   }
 }
@@ -231,4 +262,7 @@ async function runTests() {
   }
 }
 
-runTests().catch(console.error);
+runTests().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
