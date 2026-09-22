@@ -74,6 +74,8 @@ export interface RecordingControllerDeps {
   /** Moves a file to the OS trash; the controller falls back to delete. */
   moveToTrash(filePath: string): Promise<void>;
   postEvent(event: RecordingEvent): void;
+  /** The OS privacy page for the microphone (R2: the denied state's action). */
+  openMicrophoneSettings(): void;
   /** Something the panel shows changed. */
   onChange(): void;
   log?(message: string): void;
@@ -122,7 +124,6 @@ export class RecordingController {
    * requests without awaiting and chunks are still written in order.
    */
   handle(request: RecordingRequest): Promise<void> {
-    if (!this.deps.isEnabled()) return Promise.resolve();
     switch (request.type) {
       case 'transcribe:record/start':
         return this.start();
@@ -151,6 +152,9 @@ export class RecordingController {
         this.error = null;
         this.deps.onChange();
         return Promise.resolve();
+      case 'transcribe:record/openMicrophoneSettings':
+        this.deps.openMicrophoneSettings();
+        return Promise.resolve();
     }
   }
 
@@ -163,8 +167,14 @@ export class RecordingController {
   // ---------------------------------------------------------------- start
 
   private async start(): Promise<void> {
-    if (this.starting) return; // a picker is already open
+    if (this.starting) return; // a picker is already open; that start answers
+    if (!this.deps.isEnabled()) {
+      // The flag gates new recordings only; a session in progress always finishes.
+      this.deps.postEvent({ type: 'transcribe:record/notStarted' });
+      return;
+    }
     if (this.session) {
+      this.deps.postEvent({ type: 'transcribe:record/notStarted' });
       this.setError('already-recording');
       return;
     }
@@ -174,8 +184,10 @@ export class RecordingController {
     try {
       const target = await this.resolveDestination();
       if (!target) {
+        // The user closed a picker: nothing happened.
+        this.deps.postEvent({ type: 'transcribe:record/notStarted' });
         this.deps.onChange();
-        return; // the user closed a picker: nothing happened
+        return;
       }
       let sink: WavRecordingSink;
       let finalPath: string;
@@ -186,6 +198,7 @@ export class RecordingController {
         finalPath = reserved.finalPath;
       } catch (error) {
         this.deps.log?.(`[recording] destination failed: ${String(error)}`);
+        this.deps.postEvent({ type: 'transcribe:record/notStarted' });
         this.setError('destination-unavailable');
         return;
       }
@@ -221,7 +234,7 @@ export class RecordingController {
   }
 
   private async changeLocation(): Promise<void> {
-    if (this.session || this.starting) return;
+    if (this.session || this.starting || !this.deps.isEnabled()) return;
     const current = this.deps.state.get<string>(NO_FOLDER_LOCATION_KEY) ?? null;
     const chosen = await this.deps.chooseLocation(current);
     if (!chosen) return;

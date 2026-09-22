@@ -18,7 +18,8 @@ export type RecordingRequest =
   | { type: 'transcribe:record/captureFailed'; sessionId: string; code: CaptureFailureCode }
   | { type: 'transcribe:record/recover'; partialId: string }
   | { type: 'transcribe:record/discard'; partialId: string }
-  | { type: 'transcribe:record/dismissNotice' };
+  | { type: 'transcribe:record/dismissNotice' }
+  | { type: 'transcribe:record/openMicrophoneSettings' };
 
 /** Failures the webview can report before any audio exists (R2). */
 export type CaptureFailureCode = Extract<
@@ -27,12 +28,16 @@ export type CaptureFailureCode = Extract<
 >;
 
 /**
- * Host → webview events that are not part of the state projection. `ended`
- * tells the webview to stop capturing whenever the host closed the session
- * itself (limit, gap, write failure); why is carried by the projection.
+ * Host → webview events that are not part of the state projection.
+ * `notStarted` answers a start that produced no session (picker closed,
+ * folder unusable, feature off), so the webview can release the audio
+ * context it created inside the click. `ended` tells the webview to stop
+ * capturing whenever the host closed the session itself (limit, gap, write
+ * failure); why is carried by the projection.
  */
 export type RecordingEvent =
   | { type: 'transcribe:record/begin'; sessionId: string }
+  | { type: 'transcribe:record/notStarted' }
   | { type: 'transcribe:record/ack'; sessionId: string; sequence: number }
   | { type: 'transcribe:record/ended'; sessionId: string };
 
@@ -67,6 +72,7 @@ export function decodeRecordingRequest(raw: unknown): RecordingRequest | null {
     case 'transcribe:record/start':
     case 'transcribe:record/changeLocation':
     case 'transcribe:record/dismissNotice':
+    case 'transcribe:record/openMicrophoneSettings':
       return exactKeys(message, ['type']) ? { type: message.type } : null;
     case 'transcribe:record/captureStarted':
     case 'transcribe:record/cancel':

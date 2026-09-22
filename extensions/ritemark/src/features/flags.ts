@@ -53,12 +53,24 @@ export type FlagId =
   // Sprint 112: per-turn Composer thinking effort across agent runtimes
   | 'composer-thinking-effort'
   // Sprint 119: publish a Markdown document to Google Docs and Sync it later
-  | 'google-docs-publishing';
+  | 'google-docs-publishing'
+  // Sprint 118: record from the microphone directly in Transcribe (#328)
+  | 'transcribe-direct-recording';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 118: kill switch for Record in the Transcribe panel. Flag-off hides
+  // Record and interrupted-recording recovery; a recording already in progress
+  // still finishes, and every saved recording stays an ordinary file.
+  'transcribe-direct-recording': {
+    id: 'transcribe-direct-recording',
+    label: 'Transcribe Direct Recording',
+    description: 'Record from the microphone in the Transcribe panel. The recording is saved as a WAV file and transcribed like any added recording.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 119: kill switch for the whole Google Docs publishing surface —
   // Settings card, editor menu items and every host handler. Flag-off keeps
   // stored tokens and document links; it only stops offering the feature.

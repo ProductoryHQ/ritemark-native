@@ -5,6 +5,9 @@
  * knowingly, watch the job, open the result. The transcript itself lives in the
  * workbench editor (Phase 4).
  *
+ * Sprint 118 adds Record beside Add recording: a finished recording is a plain
+ * WAV that lands in the same engine-choice card as an added file.
+ *
  * Two things this surface refuses to do:
  *   - start anything before the user has chosen an engine, because that choice
  *     is where the privacy/cost trade is made (N2, N7);
@@ -16,6 +19,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { vscode } from '../../lib/vscode';
+import {
+  InterruptedRecordingRow,
+  LiveRecordingCard,
+  NoFolderLocation,
+  PermissionCard,
+  RecordDot,
+  RecordingProblem,
+  SavingCard,
+  useRecordingAnnouncement,
+} from './recording/RecordingCards';
+import { useTranscribeRecording } from './recording/useTranscribeRecording';
 import {
   formatDuration,
   formatRelativeDate,
@@ -32,6 +46,8 @@ export function TranscribePanel() {
   const [rejected, setRejected] = useState<{ fileName: string; reason: string } | null>(null);
   const [selectedEngine, setSelectedEngine] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const recording = useTranscribeRecording(state?.recording ?? null);
+  const announcement = useRecordingAnnouncement(recording.view, state?.recording ?? null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -65,6 +81,14 @@ export function TranscribePanel() {
     (job) => job.state === 'failed' || job.state === 'interrupted',
   );
   const nothingReady = usableEngines.length === 0;
+
+  // Sprint 118: what the recording surfaces show. The capture phase is the
+  // webview's own; the host phase covers a save still finishing after it.
+  const host = state.recording ?? null;
+  const capture = recording.view;
+  const recordingBusy = capture.phase !== 'idle' || (host !== null && host.phase !== 'idle');
+  const showSaving = capture.phase === 'stopping' || (capture.phase === 'idle' && host?.phase === 'finalizing');
+  const partials = host?.partials ?? [];
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -107,15 +131,34 @@ export function TranscribePanel() {
           here — a second gear inside the panel body puts it on its own row
           below the title, which reads as a stray control. */}
       <div className="p-3 pb-2">
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
-          disabled={nothingReady && !state.pending}
-        >
-          <Icon name="plus" size={14} />
-          Add recording
-        </Button>
+        {/* One row at every width: Add recording, with Record as an icon
+            button beside it (Jarmo, 2026-09-22 RunDev review). */}
+        <div className="flex gap-2">
+          <Button
+            className="min-w-0 flex-1"
+            size="lg"
+            onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
+            disabled={nothingReady && !state.pending}
+          >
+            <Icon name="plus" size={14} />
+            Add recording
+          </Button>
+          {host?.enabled && (
+            <Button
+              className="h-auto shrink-0 self-stretch rounded-lg"
+              size="icon-lg"
+              aria-label="Record"
+              title="Record"
+              onClick={() => recording.start()}
+              disabled={nothingReady || recordingBusy}
+            >
+              <RecordDot size="lg" />
+            </Button>
+          )}
+        </div>
+        {host?.enabled && !host.hasProject && host.noFolderLocation && capture.phase === 'idle' && (
+          <NoFolderLocation location={host.noFolderLocation} />
+        )}
         {dragging && (
           <div className="mt-2 rounded-lg border border-dashed border-accent bg-accent-soft/40 px-3 py-4 text-center text-xs text-accent-deep">
             Drop the recording here
@@ -124,6 +167,22 @@ export function TranscribePanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-4">
+        <div className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </div>
+
+        {host && capture.phase === 'idle' && !showSaving && <RecordingProblem host={host} platform={state.platform} />}
+        {capture.phase === 'permission' && <PermissionCard onCancel={() => recording.cancel()} />}
+        {capture.phase === 'recording' && host && (
+          <LiveRecordingCard
+            view={capture}
+            host={host}
+            onStop={() => recording.stop()}
+            onCancel={() => recording.cancel()}
+          />
+        )}
+        {showSaving && <SavingCard seconds={capture.savedSeconds} />}
+
         {rejected && (
           <div className="mx-3 mb-3 rounded-lg border border-ritemark-error/40 bg-ritemark-error-soft p-3">
             <div className="text-xs font-semibold text-ritemark-error">{rejected.fileName}</div>
@@ -152,8 +211,11 @@ export function TranscribePanel() {
           </Section>
         )}
 
-        {attentionJobs.length > 0 && (
+        {(attentionJobs.length > 0 || partials.length > 0) && (
           <Section title="Needs attention">
+            {partials.map((partial) => (
+              <InterruptedRecordingRow key={partial.id} partial={partial} />
+            ))}
             {attentionJobs.map((job) => (
               <AttentionRow key={job.id} job={job} />
             ))}
@@ -168,7 +230,7 @@ export function TranscribePanel() {
           </Section>
         )}
 
-        {!state.pending && !nothingReady && state.recordings.length === 0 && activeJobs.length === 0 && (
+        {!state.pending && !nothingReady && !recordingBusy && state.recordings.length === 0 && activeJobs.length === 0 && (
           <p className="px-4 py-6 text-center text-xs leading-relaxed text-ink-muted">
             {state.otherProjectCount > 0 ? (
               // The library is project-scoped, so an empty list here does NOT
@@ -183,7 +245,7 @@ export function TranscribePanel() {
               </>
             ) : (
               <>
-                Add a recording to transcribe it.
+                {host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.'}
                 <br />
                 {state.acceptedExtensions.join(', ')}
               </>

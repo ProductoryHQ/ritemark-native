@@ -290,6 +290,12 @@
             "default": true,
             "description": "Google Docs publishing: publish a Markdown document to Google Docs and Sync later changes to the same Doc. Kill-switch — disabling hides the feature but keeps your account connection and document links.",
             "scope": "application"
+          },
+          "ritemark.features.transcribe-direct-recording": {
+            "type": "boolean",
+            "default": true,
+            "description": "Transcribe recording: record from the microphone in the Transcribe panel. Kill-switch — disabling hides Record; recordings already saved stay ordinary files.",
+            "scope": "application"
           }
         }
       },
@@ -792,7 +798,7 @@
     "test:thinking-effort": "npx tsx src/runtime/thinkingEffort.test.ts && npx tsx webview/src/components/ai-sidebar/thinkingEffortGeometry.test.ts",
     "test:sprint113-language": "npx tsx src/speech/insightsLanguage.test.ts && npx tsx src/speech/workbenchProtocol.test.ts && npx tsx src/speech/insights.test.ts && npx tsx src/speech/insightsMarkdown.test.ts && npx tsx webview/src/components/transcribe/workbench/InsightsLanguageCombobox.test.ts && npx tsx webview/src/components/transcribe/workbench/workbenchLayout.test.ts",
     "test:editor-sync": "npx tsx src/editorSync/state.test.ts && npx tsx src/editorSync/protocol.test.ts && npx tsx src/editorSync/delivery.test.ts && npx tsx src/editorSync/saveReceipt.test.ts && npx tsx webview/src/documentSyncReducer.test.ts && npx tsx webview/src/editorValueReconciliation.test.ts && npm run test:task-list-roundtrip && npx tsx src/editorUndoKeybindings.test.ts",
-    "test:recording": "npx tsx src/speech/recording/recordingPaths.test.ts && npx tsx src/speech/recording/protocol.test.ts && npx tsx src/speech/recording/WavRecordingSink.test.ts && npx tsx src/speech/recording/RecordingController.test.ts",
+    "test:recording": "npx tsx src/speech/recording/recordingPaths.test.ts && npx tsx src/speech/recording/protocol.test.ts && npx tsx src/speech/recording/WavRecordingSink.test.ts && npx tsx src/speech/recording/RecordingController.test.ts && npx tsx src/speech/recording/recordingFlag.test.ts && npx tsx webview/src/components/transcribe/recording/capture.test.ts && npx tsx webview/src/components/transcribe/recording/captureSession.test.ts",
     "test:task-list-roundtrip": "npx tsx webview/src/utils/taskListRoundTrip.test.ts",
     "test:security-backports": "npx tsx webview/src/utils/securityBackports.test.ts",
     "test:claude-auth": "npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts",

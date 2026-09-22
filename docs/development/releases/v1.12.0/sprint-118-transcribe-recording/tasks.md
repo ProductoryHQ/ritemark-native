@@ -25,23 +25,23 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 2: Webview capture and permission handling (W2 — R1–R3, R7)
 
-- [ ] Add bounded capture hook with approved AudioWorklet/contained fallback and 16 kHz mono PCM output.
-- [ ] Add sequence/chunk metadata, bounded base64 transport, acknowledgment/backpressure, and final-count Stop.
-- [ ] Add permission-policy, denied, no-device, busy/unreadable, track-ended, suspended-context, and teardown handling.
-- [ ] Add fake MediaStream/AudioContext/resampler/chunking/cleanup tests.
+- [x] Add bounded capture hook with approved AudioWorklet/contained fallback and 16 kHz mono PCM output. *(ScriptProcessor per §5; 16 kHz context first, device rate + streaming box-filter resampler as the fallback. `recording/captureSession.ts`, `useTranscribeRecording.ts`)*
+- [x] Add sequence/chunk metadata, bounded base64 transport, acknowledgment/backpressure, and final-count Stop.
+- [x] Add permission-policy, denied, no-device, busy/unreadable, track-ended, suspended-context, and teardown handling.
+- [x] Add fake MediaStream/AudioContext/resampler/chunking/cleanup tests. *(`capture.test.ts`, `captureSession.test.ts`)*
 
 ## Phase 3: Destination, recovery, and pipeline (W3 — R4–R6)
 
-- [ ] Implement single/multi-root/no-folder destination flow and visible safe final name.
-- [ ] Route only validated final files through existing `_stageImport` and PendingImportCard.
-- [ ] Add interrupted recording recovery/save/discard with valid-WAV reconstruction.
+- [x] Implement single/multi-root/no-folder destination flow and visible safe final name. *(single folder verified in RunDev; multi-root and no-folder covered by controller tests)*
+- [x] Route only validated final files through existing `_stageImport` and PendingImportCard. *(RunDev 2026-09-22: Stop → pending card; recovered part → pending card)*
+- [x] Add interrupted recording recovery/save/discard with valid-WAV reconstruction. *(RunDev: window reload mid-recording → header checkpointed at shutdown → recovery card → valid 18.0 s WAV)*
 - [ ] Verify clear pending/transcription failure/cancel preserve finalized audio.
-- [ ] Verify SessionStore/JobManager/Workbench require no recording-specific branch.
+- [x] Verify SessionStore/JobManager/Workbench require no recording-specific branch. *(no diff in those files; a recorded file was transcribed on-device through the unchanged job path in RunDev)*
 
 ## Phase 4: UI, flag, and accessibility (W4 — R1, R2, R5, R6, R8)
 
-- [ ] Implement idle/recording/saving/error/conflict/recovery states from `design.md`.
-- [ ] Add experimental/default-true `transcribe-direct-recording` to registry/settings and gate UI/host coherently.
+- [x] Implement idle/recording/saving/error/conflict/recovery states from `design.md`. *(with the 2026-09-22 one-line button revision)*
+- [x] Add experimental/default-true `transcribe-direct-recording` to registry/settings and gate UI/host coherently. *(gates new starts only; a session in progress always finishes)*
 - [ ] Verify flag-off preserves every existing Transcribe behavior and finalized file.
 - [ ] Verify keyboard, screen reader, polite live status, focus, narrow width, 200% zoom, high contrast, and reduced motion.
 

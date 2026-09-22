@@ -27,6 +27,7 @@ interface Harness {
   trashed: string[];
   locationAsks: Array<string | null>;
   folderAsks: number;
+  settingsOpened: number;
   set: {
     folders(folders: WorkspaceFolderInfo[]): void;
     active(file: string | null): void;
@@ -53,6 +54,7 @@ function harness(root: string, opts: { fs?: SinkFs; store?: Map<string, unknown>
     trashed: [],
     locationAsks: [],
     folderAsks: 0,
+    settingsOpened: 0,
     set: {
       folders: (f) => { folders = f; },
       active: (f) => { active = f; },
@@ -78,6 +80,7 @@ function harness(root: string, opts: { fs?: SinkFs; store?: Map<string, unknown>
       fs.renameSync(p, path.join(trashDir, `${h.trashed.length}-${path.basename(p)}`));
     },
     postEvent: (e) => h.events.push(e),
+    openMicrophoneSettings: () => { h.settingsOpened++; },
     onChange: () => {},
   };
   h.controller = new RecordingController(h.deps);
@@ -356,6 +359,8 @@ async function run(): Promise<void> {
       const view = await h.controller.projection();
       assert.equal(view.error?.code, 'os-denied');
       assert.equal(view.error?.message, 'Microphone access is denied for Ritemark.');
+      await h.controller.handle({ type: 'transcribe:record/openMicrophoneSettings' });
+      assert.equal(h.settingsOpened, 1, 'the denied state can open the OS privacy page');
       assert.deepEqual(h.store.get(PARTIALS_KEY), []);
 
       // A new start clears the old error.
@@ -510,6 +515,7 @@ async function run(): Promise<void> {
       await h.controller.handle({ type: 'transcribe:record/start' });
       assert.deepEqual(h.locationAsks, [null], 'asked where to save before recording');
       assert.equal(h.controller.activeSessionId, null, 'closing the picker records nothing');
+      assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }], 'and the webview is told so');
       let view = await h.controller.projection();
       assert.equal(view.error, null);
       assert.equal(view.hasProject, false);
@@ -575,7 +581,7 @@ async function run(): Promise<void> {
       await h.controller.handle({ type: 'transcribe:record/start' });
       assert.equal(h.controller.activeSessionId, null);
       assert.equal((await h.controller.projection()).error?.code, 'destination-unavailable');
-      assert.equal(h.events.length, 0, 'the webview is never told to capture');
+      assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }], 'the webview is told not to capture');
     }
 
     // ------------------------------------------------ feature off
@@ -584,10 +590,19 @@ async function run(): Promise<void> {
       const h = harness(root, { folders: [project] });
       h.set.enabled(false);
       await h.controller.handle({ type: 'transcribe:record/start' });
-      assert.equal(h.events.length, 0);
+      assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }]);
       const view = await h.controller.projection();
       assert.equal(view.enabled, false);
       assert.deepEqual(view.partials, []);
+
+      // Turned off mid-recording: the session in progress still finishes.
+      h.set.enabled(true);
+      const id = await begin(h);
+      h.set.enabled(false);
+      await h.controller.handle(chunk(id, 0));
+      await h.controller.handle({ type: 'transcribe:record/stop', sessionId: id, finalSequence: 0, reason: 'user' });
+      assert.deepEqual(acks(h, id), [0]);
+      assertValidWav(h.staged.pop()!, 32_000);
     }
 
     console.log('RecordingController.test.ts: all tests passed');

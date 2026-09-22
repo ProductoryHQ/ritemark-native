@@ -25,6 +25,18 @@ Library and existing jobs continue below.
 
 At narrow width the two actions stack, Record first. They remain visually equal entry paths; Record is not a destructive/emergency red button.
 
+### Revised 2026-09-22 (RunDev review)
+
+Jarmo: the buttons must fit on one line, and Record can be an icon button. The idle row is now:
+
+```text
+┌──────────────────────────┐ ┌───┐
+│ + Add recording          │ │ ● │
+└──────────────────────────┘ └───┘
+```
+
+Record is a square icon button with the accessible name "Record", the same height as Add recording. Every recording card keeps its buttons on one row, primary first: `[■ Stop and use] [Cancel]`, `[Save recording] [Discard]`, `[Microphone Settings] [Dismiss]`.
+
 ## Recording State
 
 ```text
