@@ -1,6 +1,6 @@
 # Sprint 118 Design — Direct Recording in Transcribe
 
-**Status:** Draft for Phase 0 approval<br>
+**Status:** Approved with the Phase 0 gate (Jarmo, 2026-09-22)<br>
 **System:** Ritemark Indigo-Editorial<br>
 **Scope:** Start/Stop/Cancel, destination, permission, saving, recovery, and handoff to existing engine choice
 
@@ -106,9 +106,11 @@ No second permission request or file is created. Phase 0 decides whether an **Op
 
 ## Phase 0 Decisions for Jarmo
 
-- [ ] Approve separate Record/Add actions and responsive stacking.
-- [ ] Approve Start/Stop/Cancel only; no Pause in v1.11.
-- [ ] Approve visible destination, timer, acknowledged-size wording, and non-red live state.
-- [ ] Approve saving/no-interruption state and transition to existing pending card.
-- [ ] Approve permission/device/storage copy and interrupted recovery card.
-- [ ] Approve one-active-session conflict behavior.
+Approved together with the Phase 0 gate on 2026-09-22 ("kinnitan, alusta koodiga"). One session is allowed per extension host, which is per window; the conflict copy covers a second Record press in the same window.
+
+- [x] Approve separate Record/Add actions and responsive stacking.
+- [x] Approve Start/Stop/Cancel only; no Pause in v1.11.
+- [x] Approve visible destination, timer, acknowledged-size wording, and non-red live state.
+- [x] Approve saving/no-interruption state and transition to existing pending card.
+- [x] Approve permission/device/storage copy and interrupted recovery card.
+- [x] Approve one-active-session conflict behavior.

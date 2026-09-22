@@ -17,11 +17,11 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 1: Host session and WAV sink (W1 — R3, R4, R6)
 
-- [ ] Add versioned recording types and exact-field protocol/runtime validators.
-- [ ] Add `recordingPaths.ts` with safe roots, names, collision handling, and managed partial validation.
-- [ ] Add `WavRecordingSink` with reserved header, serialized append, byte/sample counts, finalize validation, and atomic promotion.
-- [ ] Add `RecordingController` with one-active-session, sequence/idempotency, ack/backpressure, terminal generations, shutdown checkpoint, and recovery inventory.
-- [ ] Test valid/invalid headers, duplicate/gap/stale chunks, disk full, collision, failed rename, crash recovery, and exact cleanup.
+- [x] Add versioned recording types and exact-field protocol/runtime validators. *(`src/speech/recording/types.ts`, `protocol.ts`; storage keys carry `:v1`)*
+- [x] Add `recordingPaths.ts` with safe roots, names, collision handling, and managed partial validation.
+- [x] Add `WavRecordingSink` with reserved header, serialized append, byte/sample counts, finalize validation, and atomic promotion.
+- [x] Add `RecordingController` with one-active-session, sequence/idempotency, ack/backpressure, terminal generations, shutdown checkpoint, and recovery inventory. *(host acks each chunk; the in-flight bound lives in the webview, W2)*
+- [x] Test valid/invalid headers, duplicate/gap/stale chunks, disk full, collision, failed rename, crash recovery, and exact cleanup. *(`npm run test:recording`, chained into `npm test`)*
 
 ## Phase 2: Webview capture and permission handling (W2 — R1–R3, R7)
 
