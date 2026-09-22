@@ -1,6 +1,6 @@
 # Release Plan — v1.12.0 Publish to Google Docs + Everyday UX
 
-**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 kicked off on 2026-09-22** and is in Phase 0. The other five have not started.<br>
+**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 kicked off on 2026-09-22** and is implemented and closing (QA, PR); its signed-build microphone and Windows capture checks join the release gate. The other five have not started.<br>
 **Target:** v1.12.0<br>
 **GitHub milestone:** [v1.12.0](https://github.com/ProductoryHQ/ritemark-native/milestone/10)<br>
 **Release type:** Full app distribution, provisionally shell-tier because Sprint 123 is expected to change integrated-browser/editor tab labels. Downgrade to extension-only only if Phase 0 proves no VS Code patch or shell source changes are required.<br>
@@ -84,7 +84,7 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 
 | Sprint | Working name | User outcome | GitHub issue | Dependency | Status |
 |---|---|---|---|---|---|
-| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328) | none | Kicked off 2026-09-22; Phase 0 on `sprint-118-transcribe-recording` |
+| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328) | none | Implemented and RunDev-validated 2026-09-22 on `sprint-118-transcribe-recording`; closing (QA, PR). Signed-build microphone and Windows capture carried to the release gate |
 | [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated; Ritemark gets its own legal pages (R11) | [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) | External Google Cloud/OAuth setup; Ritemark legal pages (`ritemark-web`) and Productory legal update (`productory-2026`) | Implemented and RunDev-validated 2026-09-22 on `sprint-119-google-docs-publishing`; closing (QA, PR); hardening tests carried to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325) |
 | Sprint 120 | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Planned |
 | Sprint 121 | Comment ergonomics and visible handoff | Comments are easy to compose and review, and AI assignment has a visible destination | [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | — | Absorbed into v1.11.0 Sprint 117 (2026-09-14) |
@@ -194,6 +194,10 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 ## Feature-Complete Definition
 
 - [ ] Sprint 118 merged; its issue (created at kickoff) closed or explicitly deferred with evidence.
+- [ ] Sprint 118 release-candidate checks, which only a candidate can prove:
+  - On the signed arm64 DMG: the first Record asks macOS for microphone access under the Ritemark name, a short recording with speech is saved, plays back, and transcribes on-device. The dev build's permission is tied to a different bundle ID (Phase 0 S6).
+  - On the Windows installer: the same, plus **Microphone Settings** opens the Windows privacy page after a denial. This is the first native Windows run of the capture path.
+  - A spoken recording's level is checked on both: the capture is unprocessed (no automatic gain), and Jarmo's dev-build test peaked around −19 dBFS.
 - [ ] Sprint 119 merged; #319 closed or explicitly deferred with evidence; the Google OAuth app is published and verified for public use; the Ritemark legal pages are live and the in-app links point to them. *(2026-09-21/22: OAuth app In production with verified branding; legal pages live, including the approved Google Docs section, ritemark-web #152; in-app links switched; merge pending)*
 - [ ] Sprint 119 release-candidate checks, which only a candidate can prove:
   - Both CI build workflows compile in the Google OAuth client from the `RITEMARK_GOOGLE_CLIENT_ID`/`_SECRET` repository secrets, and pass `scripts/check-google-oauth-build.mjs`.
@@ -223,7 +227,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
-| Sprint 118 | `sprint-118-transcribe-recording` | TBD | #328 | Phase 0 (kicked off 2026-09-22 from main `d8d90ad7`) | not run | not drafted |
+| Sprint 118 | `sprint-118-transcribe-recording` | TBD | #328 | Implemented; RunDev-validated with a real microphone and a one-hour synthetic run (2026-09-22) | `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 119 | `sprint-119-google-docs-publishing` | TBD | #319; follow-ups #325 | Implemented; RunDev-validated with real Google APIs and the production client (2026-09-22) | closing QA in progress | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 120 | `sprint-120-editor-input-intent` | TBD | #280 | not started | not run | not drafted |
 | Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
@@ -296,6 +300,7 @@ Because the planned tier is full app, release execution follows the standard cle
 
 | Date | Decision | Source |
 |---|---|---|
+| 2026-09-22 | Google Docs publishing ships fully in v1.12.0, not as an experiment: the `google-docs-publishing` flag becomes `stable`, the Settings card loses its Experimental label, and the now-inert `ritemark.features.google-docs-publishing` setting is removed. It gets the same product presentation as the other features: a feature page on ritemark.app, drafted in the v1.12.0 marketing materials. | Jarmo: "Google Docs läheb fully sisse! ja see vajab samasugust tootetutvustust!" |
 | 2026-09-22 | Kick off Sprint 118 (direct Transcribe recording): scope as packaged, audit-first Phase 0; issue [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328); branch `sprint-118-transcribe-recording` from main `d8d90ad7`. Destination: in the project with a folder open; with none, ask where to save before recording. | Jarmo: "118, alusta" |
 | 2026-09-22 | Close Sprint 119 after QA and merge. Items only a candidate can prove (CI and packaged-build OAuth, Windows loopback, Store URLs) become v1.12.0 release gates. Planned hardening tests move to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325). | Jarmo: "jah, tee 1–4 kohe" |
 | 2026-09-22 | Release builds compile in the production Google OAuth client ("Ritemark desktop"): from repository secrets in CI and from `~/.config/ritemark/release.env` locally. A release compile without it is refused. | Jarmo added the secrets and the local file; Claude wired the build paths |

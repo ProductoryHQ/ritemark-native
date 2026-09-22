@@ -35,27 +35,27 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Implement single/multi-root/no-folder destination flow and visible safe final name. *(single folder and no folder verified in RunDev 2026-09-22: ask before the first recording, remembered location, `(2)` on a same-minute collision, Change; multi-root covered by controller tests)*
 - [x] Route only validated final files through existing `_stageImport` and PendingImportCard. *(RunDev 2026-09-22: Stop → pending card; recovered part → pending card)*
 - [x] Add interrupted recording recovery/save/discard with valid-WAV reconstruction. *(RunDev: window reload mid-recording → header checkpointed at shutdown → recovery card → valid 18.0 s WAV)*
-- [ ] Verify clear pending/transcription failure/cancel preserve finalized audio.
+- [x] Verify clear pending/transcription failure/cancel preserve finalized audio. *(RunDev: clearing the card and Cancel keep the WAV; `JobManager` removes only its own `isTemp`/peaks files in the work dir, never the source, on success or failure)*
 - [x] Verify SessionStore/JobManager/Workbench require no recording-specific branch. *(no diff in those files; a recorded file was transcribed on-device through the unchanged job path in RunDev)*
 
 ## Phase 4: UI, flag, and accessibility (W4 — R1, R2, R5, R6, R8)
 
 - [x] Implement idle/recording/saving/error/conflict/recovery states from `design.md`. *(with the 2026-09-22 one-line button revision)*
 - [x] Add experimental/default-true `transcribe-direct-recording` to registry/settings and gate UI/host coherently. *(gates new starts only; a session in progress always finishes)*
-- [ ] Verify flag-off preserves every existing Transcribe behavior and finalized file.
-- [ ] Verify keyboard, screen reader, polite live status, focus, narrow width, 200% zoom, high contrast, and reduced motion.
+- [x] Verify flag-off preserves every existing Transcribe behavior and finalized file. *(RunDev 2026-09-22: setting off hides Record live; library, pending card and files unchanged)*
+- [ ] Verify keyboard, screen reader, polite live status, focus, narrow width, 200% zoom, high contrast, and reduced motion. *(keyboard, live status, focus, narrow width, 200% zoom (a label overflow found and fixed) and reduced motion done; screen reader and high contrast not run)*
 
 ## Phase 5: Long-run and native validation (W5 — R7)
 
-- [ ] Run one-hour deterministic stream with measured memory, queue depth, size, duration, and content integrity.
+- [x] Run one-hour deterministic stream with measured memory, queue depth, size, duration, and content integrity. *(RunDev 2026-09-22, see qa-evidence.md: valid 3632.64 s WAV, no buffer lost, webview heap flat, host RSS back to baseline after Stop)*
 - [ ] Run real-device RUNDEV/macOS packaged capture, playback, probe, pending import, local engine, and ElevenLabs consent path.
 - [ ] Run native Windows capture/playback/probe/pending-import matrix.
 - [ ] Confirm shell/permission manifest impact and record any release-tier consequence.
 
 ## Phase 6: QA and closeout (W6 — R8)
 
-- [ ] Run focused recording/speech/dictation/feature/webview/extension tests and builds.
-- [ ] Walk every ★ scenario and link evidence.
-- [ ] Run `./scripts/validate-qa.sh` through repository QA.
-- [ ] Update architecture, Transcribe/privacy user docs, changelog, v1.12.0 release notes (was v1.11 before the 2026-09-15 move), parent tracker, issue, and PR.
+- [x] Run focused recording/speech/dictation/feature/webview/extension tests and builds. *(`npm test` full chain, both type-checks, webview build)*
+- [x] Walk every ★ scenario and link evidence. *([qa-evidence.md](./qa-evidence.md); the signed build, Windows, the screen reader and high contrast are open and named there)*
+- [x] Run `./scripts/validate-qa.sh` through repository QA. *(exit 0, 2026-09-22)*
+- [ ] Update architecture, Transcribe/privacy user docs, changelog, v1.12.0 release notes (was v1.11 before the 2026-09-15 move), parent tracker, issue, and PR. *(architecture, `docs/user/features/transcribe.md`, `docs/CHANGELOG.md` v1.12.0 section, release notes done; tracker, issue and PR at closeout)*
 - [ ] Verify every checked task against branch diff/evidence before readiness handoff.

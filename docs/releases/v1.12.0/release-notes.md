@@ -18,6 +18,26 @@ Sync is deliberately one-way. Your markdown file is the original, and nothing is
 
 Two things Google's API can't do: a ticked checkbox arrives unticked, and bullets nested under a numbered item show as a., b. [How publishing works](../../user/features/google-docs.md)
 
+## Record in Transcribe
+
+Sprint 118 lets you record from your microphone straight into Transcribe.
+
+The Transcribe panel has a new **Record** button, marked with a dot, beside **Add recording**. The first time you press it, your operating system asks for microphone permission. While it waits, the panel shows "Waiting for microphone permission…" with **Cancel**. Every button in the panel now has a tooltip that says what it does, or why it is unavailable.
+
+While you record, the panel shows the elapsed time and the approximate size of the audio saved so far. **Stop and use** puts the recording into the same engine-choice card as Add recording. Nothing is transcribed and nothing is uploaded until you choose an engine. The recording is an ordinary audio file that stays where it was saved, and clearing the card keeps it. **Cancel** asks first once there are more than 5 seconds of audio, and moves the recording to the Trash rather than deleting it.
+
+**Where the file goes.** With a folder open, recordings go into a `recordings` folder inside the project. With several folders open, they go into the folder of the file you are editing, and otherwise Ritemark asks which. With no folder open, Ritemark asks where to save before the first recording, remembers the choice, and shows it under the buttons with **Change**. A file is named by date and time, like `Recording 2026-09-22 14.05.wav`, and is a 16 kHz mono WAV of about 115 MB per hour. An existing file is never overwritten: a second recording in the same minute gets " (2)".
+
+**A recording is written to disk as it happens,** as a `.wav.part` file next to where it will land. If the panel reloads, or Ritemark quits or crashes mid-recording, the audio is kept. The panel then shows "Recording interrupted" with **Save recording** and **Discard**. Discard moves it to the Trash.
+
+**When recording can't continue,** it stops and what was recorded is saved, with a note saying why. That happens if the system pauses audio input, the microphone disconnects, or Ritemark can't keep up with saving. A warning appears after 2 hours; at 4 hours the recording stops and saves automatically.
+
+**If microphone access is denied,** the panel says so and offers **Microphone Settings**, which opens the system privacy settings on macOS and Windows.
+
+**The microphone is recorded as it is,** with no echo cancellation or noise suppression, so the other side of a call played through your speakers is kept.
+
+Record works on macOS and Windows, wherever Transcribe runs. It is on by default. The setting `ritemark.features.transcribe-direct-recording` switches it off and hides **Record**; a recording already in progress still finishes. [How recording works](../../user/features/transcribe.md#record-directly)
+
 ## Ritemark's own privacy policy and terms
 
 Ritemark now has its own privacy policy and terms of use on ritemark.app, in English and Estonian. Productory Services OÜ remains the provider. The links in the app (analytics consent and AI information) point there now. The privacy policy has a section on exactly what Google Docs publishing does with your Google data. The old productory.ai addresses still work for earlier versions.

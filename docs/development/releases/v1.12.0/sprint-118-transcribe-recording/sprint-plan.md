@@ -1,7 +1,7 @@
 # Sprint 118 — Direct Transcribe Recording
 
 **Track:** Full SDD<br>
-**Status:** Implementation (Phase 1+). Phase 0 was approved on 2026-09-22.<br>
+**Status:** Closing (QA and PR). Implemented and RunDev-validated on 2026-09-22; Phase 0 approved the same day. Evidence: [qa-evidence.md](./qa-evidence.md).<br>
 **Branch after approval:** `sprint-118-transcribe-recording`<br>
 **Issue:** [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328)<br>
 **Worktree:** `.claude/worktrees/sprint-118-transcribe-recording`, branched from main `d8d90ad7`<br>
