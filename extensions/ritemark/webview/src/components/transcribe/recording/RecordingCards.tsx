@@ -153,9 +153,9 @@ export function LiveRecordingCard({
       ) : (
         <div className="mt-3 flex gap-2">
           <Tooltip className="min-w-0 flex-1" label="Stop recording, then choose how to transcribe it">
-            <Button data-recording-stop size="sm" className="w-full" onClick={onStop}>
+            <Button data-recording-stop size="sm" className="w-full min-w-0" onClick={onStop}>
               <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-[2px] bg-current" />
-              Stop and use
+              <span className="truncate">Stop and use</span>
             </Button>
           </Tooltip>
           <Tooltip label="Stop and discard this recording">
@@ -262,8 +262,8 @@ export function InterruptedRecordingRow({ partial }: { partial: InterruptedRecor
       <p className="mt-1 text-[10.5px] leading-relaxed text-ink-body">Ritemark closed before the file was finalized.</p>
       <div className="mt-2 flex gap-2">
         <Tooltip className="min-w-0 flex-1" label="Save what was recorded, then choose how to transcribe it">
-          <Button size="sm" className="w-full" onClick={() => post({ type: 'transcribe:record/recover', partialId: partial.id })}>
-            Save recording
+          <Button size="sm" className="w-full min-w-0" onClick={() => post({ type: 'transcribe:record/recover', partialId: partial.id })}>
+            <span className="truncate">Save recording</span>
           </Button>
         </Tooltip>
         <Tooltip label="Move the interrupted recording to the Trash">

@@ -139,14 +139,16 @@ export function TranscribePanel() {
             className="min-w-0 flex-1"
             label={nothingReady && !state.pending ? 'Set up a transcription engine first' : 'Choose an audio file to transcribe'}
           >
+            {/* At 200% zoom the sidebar is narrow: the label ellipsizes rather
+                than overflowing the button; the tooltip keeps the full name. */}
             <Button
-              className="w-full"
+              className="w-full min-w-0"
               size="lg"
               onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
               disabled={nothingReady && !state.pending}
             >
               <Icon name="plus" size={14} />
-              Add recording
+              <span className="truncate">Add recording</span>
             </Button>
           </Tooltip>
           {host?.enabled && (
