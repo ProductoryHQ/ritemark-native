@@ -14,16 +14,17 @@ Testing procedures for Ritemark Flows - visual AI workflows.
 ## Quick Reference
 
 ```bash
-# Run all unit/mock tests (fast, free)
+# Run the default suite: every hermetic unit/mock test, the Save File
+# executor's real file I/O test included (fast, free, no login or keys)
 cd extensions/ritemark && npm test
 
 # Run only flow integration tests (mock)
 cd extensions/ritemark && npx tsx src/flows/FlowIntegration.test.ts
 
-# Run executor integration tests (real file I/O, free)
+# Run the Save File executor test on its own (real file I/O, free; also part of npm test)
 cd extensions/ritemark && npm run test:integration:free
 
-# Run ALL integration tests (includes real API calls, costs money)
+# Run the executor integration tests (real API calls, costs money; NOT part of npm test)
 cd extensions/ritemark && npm run test:integration
 
 # Run everything
@@ -34,15 +35,26 @@ cd extensions/ritemark && npm run test:all
 
 ## Test Files Overview
 
-| Test File | Purpose | Cost |
-|-----------|---------|------|
-| `src/flows/flowTypes.test.ts` | Node type mappings between backend and React Flow | Free |
-| `src/flows/FlowExecutor.test.ts` | Executor routing to correct node handlers | Free |
-| `src/flows/nodes/ClaudeCodeNodeExecutor.test.ts` | Variable interpolation, Claude Code node | Free |
-| `src/flows/FlowIntegration.test.ts` | Full flow validation against real `.flow.json` files | Free |
-| `src/flows/nodes/SaveFileNodeExecutor.integration.test.ts` | Real file I/O operations | Free |
-| `src/flows/nodes/LLMNodeExecutor.integration.test.ts` | Real OpenAI/Gemini API calls | ~$0.02 |
-| `src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts` | Real Claude Code SDK calls | ~$0.10 |
+| Test File | Purpose | Cost | In `npm test` |
+|-----------|---------|------|---------------|
+| `src/flows/flowTypes.test.ts` | Node type mappings between backend and React Flow | Free | Yes |
+| `src/flows/FlowExecutor.test.ts` | Executor routing to correct node handlers | Free | Yes |
+| `src/flows/nodes/ClaudeCodeNodeExecutor.test.ts` | Variable interpolation, Claude Code node | Free | Yes |
+| `src/flows/FlowIntegration.test.ts` | Full flow validation against real `.flow.json` files | Free | Yes |
+| `src/flows/nodes/SaveFileNodeExecutor.integration.test.ts` | Real file I/O operations (stubs `vscode`, temp dir) | Free | Yes |
+| `src/flows/nodes/LLMNodeExecutor.integration.test.ts` | Real OpenAI/Gemini API calls | ~$0.02 | No — `test:integration` |
+| `src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts` | Real Claude Code SDK calls | ~$0.10 | No — `test:integration` |
+
+### Default suite vs live integration tests
+
+`npm test` must stay hermetic. It runs without a Claude login, API keys, network or an extension host, and it exits non-zero if any file fails. Every entry is `npx tsx <file>` joined with `&&`, so one file that always fails stops every file after it. A test that needs a live environment goes in `test:integration`, never in `test` or `pretest`.
+
+`npm run test:integration` is the live tier:
+- `LLMNodeExecutor.integration.test.ts` needs `OPENAI_API_KEY` and `GOOGLE_AI_API_KEY`. A case whose key is missing is skipped.
+- `ClaudeCodeNodeExecutor.integration.test.ts` needs a Claude Code login (run `claude` once in a terminal).
+- `SKIP_API_TESTS=true` skips the API cases in both files.
+
+**Known gap (2026-09-22):** both live files currently fail under `tsx` whatever the credentials. The executors reach `import * as vscode from 'vscode'`: `LLMNodeExecutor` through `src/ai/apiKeyManager.ts`, and `ClaudeCodeNodeExecutor` through `src/agent/AgentRunner.ts` → `src/ai/modelCatalog/index.ts`. That module exists only inside an extension host. `SaveFileNodeExecutor.integration.test.ts` shows the pattern to follow: stub `vscode` before loading the executor. Until the two files get such a stub, `test:integration` and `test:all` exit non-zero.
 
 ---
 

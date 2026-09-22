@@ -318,11 +318,13 @@ vscode.window.registerCustomEditorProvider(
 
 ### Extension Testing
 ```bash
-npm run test              # Run integration tests
+cd extensions/ritemark
+npm test                  # Default suite: hermetic unit tests, must exit 0
+npm run test:integration  # Live executor tests (API keys / Claude login); not in npm test
 ```
-- Tests run in Extension Development Host
-- Use Mocha framework
-- Can't run tests while VS Code Stable is open (use Insiders)
+- Ritemark does not use Mocha or the Extension Development Host test runner. Each test file is a standalone `npx tsx <file>.test.ts` script that exits non-zero on failure, chained with `&&` in `package.json` (`pretest` first, then `test`).
+- `npm test` must stay hermetic: no login, API key, network or real `vscode` module. A test that needs any of those goes in `test:integration`. One file that always fails in the `&&` chain hides every file after it.
+- Flow and integration-tier details: `.claude/skills/flow-testing/SKILL.md`.
 
 ### Debugging Extensions
 1. Open extension source
