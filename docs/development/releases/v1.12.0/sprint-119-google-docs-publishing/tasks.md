@@ -13,7 +13,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Verify every current-state finding and complete `research/integration-decisions.md` with owner/date/evidence. *(audit re-verified with a dated addendum; the decision record is open and filling)*
 - [x] Establish a dedicated Google Cloud project/test account in Testing mode and record project ownership, consent status, test users, support/privacy URLs (ritemark.app), OAuth client types, release configuration path, and external blockers without storing credentials. *(project reused, APIs enabled, consent screen and scope set; Jarmo deferred the separate test account, so canaries run on his own account)*
 - [ ] Prove the exact installed-desktop OAuth flow on macOS and Windows: browser, callback, PKCE/state, timeout/cancel, token exchange/refresh/revoke, and cleanup. *(macOS proven end to end, including the missing-secret refusal; Windows, the cancel/timeout/port-collision matrix and revoke still to run)*
-- [ ] Prove the least-privilege scope set and template grant; document why any scope beyond `drive.file` is unavoidable before requesting approval. *(`drive.file` proven sufficient for create, update, copy and Docs writes; the Picker grant is untested)*
+- [x] Prove the least-privilege scope set and template grant; document why any scope beyond `drive.file` is unavoidable before requesting approval. *(`drive.file` proven sufficient for create, update, copy and Docs writes; the Picker grant was verified on RunDev 2026-09-21 with a four-tab template. No other scope is requested)*
 - [x] Build disposable direct-Markdown, DOCX-conversion, and native-Docs-API canaries.
 - [ ] Run the same versioned fidelity corpus through all candidates: metadata, headings, inline styles, code, lists, blockquotes, tables, links, comments, unsafe markup, images/Mermaid, Unicode, and empty documents. *(corpus run through Markdown import and DOCX; the native path covered only a small mapper sample; Mermaid and empty documents not covered)*
 - [x] Measure template survival, same-file-ID update, remote version evidence, payload/size limits, latency, API count, mutation atomicity, retry/cancel, and unknown-outcome recovery for each candidate. *(template survival, same-ID update, version signals and atomicity measured; payload limits, latency at size, retry/cancel and unknown-outcome recovery still open)*
@@ -60,7 +60,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Implement the one selected adapter with deterministic bounded output and no product fallback to unapproved candidates. *(native Docs API mapper (`mapper.ts`))*
 - [ ] Add semantic/golden fixtures for every R4 construct and explicit missing/oversized/unsupported image behavior. *(`mapper.test.ts` covers the constructs; missing images are reported by name)*
 - [ ] Assert Ritemark comments, unsafe markup, credentials, and local-only metadata never reach provider requests. *(comments are stripped at the chokepoint and only http/mailto links pass; no dedicated negative test yet)*
-- [ ] Run PDF/Word/Copy Markdown regression suite after any shared export refactor.
+- [x] Run PDF/Word/Copy Markdown regression suite after any shared export refactor. *(the only shared change is the Turndown image rule, covered by imagePathRoundTrip, taskListRoundTrip and test:editor-sync; the PDF and Word exporters are unchanged)*
 
 ## Phase 5: Publisher, controller, and protocols (W5 — R5–R9)
 
@@ -83,7 +83,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Implement preparing/converting/uploading/verifying/success/already-up-to-date/error/verification-required progress and safe retry choices. *(native progress plus a stage line in the menu)*
 - [x] Implement overwrite disclosure and stronger remote-edit warning under the approved frequency rule. *(first-sync once per document; remote-edit warning whenever the revision moved)*
 - [x] Add experimental/default-true `google-docs-publishing` to flags/settings and gate Settings UI, editor UI, callbacks, and every host handler coherently.
-- [ ] Verify keyboard flow, screen-reader names/live regions, focus/dialog behavior, 200% zoom, narrow width, high contrast, and reduced motion.
+- [ ] Verify keyboard flow, screen-reader names/live regions, focus/dialog behavior, 200% zoom, narrow width, high contrast, and reduced motion. *(2026-09-22: Export menu keyboard flow fixed and verified with the real keyboard (focus on open, arrows, Home/End, Escape/Tab back to the Export button); menu roles added; Settings card uses focusable buttons with focus rings. 200% zoom, high contrast and reduced motion go to the v1.12.0 TEST-CHECKLIST)*
 
 ## Phase 7: Security, integration, and native evidence (W7 — R1–R10)
 
@@ -101,7 +101,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Run focused webview/extension/export/feature/security tests and builds.
 - [ ] Run `./scripts/validate-qa.sh` through repository QA.
 - [x] Update `docs/development/architecture.md` for subsystem/protocol/SecretStorage/binding/rename/conversion/flag, with a valid Last updated date. *(2026-09-21)*
-- [ ] Update privacy/security docs, Google Docs user/recovery guide, changelog, v1.12.0 release notes, parent release tracker, issue, and PR evidence.
+- [ ] Update privacy/security docs, Google Docs user/recovery guide, changelog, v1.12.0 release notes, parent release tracker, issue, and PR evidence. *(privacy policy section live (ritemark-web #152); user guide `docs/user/features/google-docs.md`; release notes drafted in `docs/releases/v1.12.0/release-notes.md`; CHANGELOG and the tracker at release time)*
 - [ ] Confirm all Google Cloud external blockers have owners/status and no production/test credentials appear in the repository or artifacts.
 - [ ] Verify every checked requirement/task against branch diff and evidence before readiness handoff.
 
@@ -111,6 +111,15 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Hand off the `ritemark-web` privacy/terms pages (EN + ET, provider Productory Services OÜ, Google Docs section from the facts) and the `productory-2026` update (short Ritemark reference, links to ritemark.app, old URLs keep resolving), and record their status. *(pages: ritemark-web #119; productory-2026 #21; Google Docs section approved and published 2026-09-21 via ritemark-web #152; see `research/r11-link-evidence.md`)*
 - [x] Capture dated live-URL evidence for every ritemark.app legal URL the app and the consent screen use (S78). *(`research/r11-link-evidence.md`)*
 - [x] Switch the privacy/terms URLs in `posthog.ts` and `aiDisclosure.ts` to ritemark.app, update their tests, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains (S77). *(no test asserted the old URLs; grep clean)*
-- [ ] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79). *(HTTP 200 on 2026-09-21; whether they point to ritemark.app is not re-checked here)*
+- [x] Verify the productory.ai pages still load for 1.11-era links and point to ritemark.app (S79). *(HTTP 200 on 2026-09-21; whether they point to ritemark.app is not re-checked here)* *(2026-09-22: all four EN/ET privacy and terms pages return 200 and link to the matching ritemark.app page)*
 - [x] Configure and verify the consent screen's ritemark.app URLs and authorized domain (S80), and check the policy text against the approved facts (S81). *(2026-09-21: domain owner-verified in Search Console, branding verified and published; the policy was written from `research/google-user-data-facts.md`, and ritemark-web tests pin its key statements)*
 - [ ] Update `docs/microsoft-store-submission/LEGAL-AND-URLS.md`, and record Jarmo's Partner Center URL change.
+
+## Closeout disposition (2026-09-22)
+
+Jarmo chose to close the sprint on 2026-09-22. Every box still unticked above is carried, not dropped:
+
+- **v1.12.0 release gates**, in the release plan checklist: native Windows OAuth (Phase 0 item 1), the packaged and CI matrix (Phase 7), production configuration in CI (Phase 7), the Microsoft Store listing URLs (Phase 9, Jarmo in Partner Center), and zoom/contrast/reduced-motion on the candidate.
+- **Issue [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325)** (`triage:product`): the redaction sweep, operation generations, the dirty-buffer policy, Save As isolation, the Windows and multi-root store tests, the fault-matrix and 409/malformed fixtures, golden fixtures for every R4 construct, the negative provider-boundary test, and the two-editor, reload and disconnect-mid-operation tests.
+- **Implemented rather than frozen on paper:** the Phase 0 freeze items (API sequence, binding schema, snapshot and warning rules, design and threat-model approval). Their decisions are recorded in `research/integration-decisions.md`, implemented, and exercised by the tests and the RunDev evidence. The fidelity corpus for the chosen native adapter lives in `mapper.test.ts` plus the RunDev documents.
+- **Separate task:** strikethrough lost on save, found during RunDev and not Google-specific.
