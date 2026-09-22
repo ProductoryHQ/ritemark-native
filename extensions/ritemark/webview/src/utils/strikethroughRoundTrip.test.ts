@@ -25,9 +25,20 @@ const schema = getSchema([StarterKit])
 const turndown = createTurndownService()
 addTipTapTaskListTurndownRules(turndown)
 
-function load(markdown: string): PMNode {
-  const html = editorMarked.parse(markdown) as string
+function fromHTML(html: string): PMNode {
   return PMDOMParser.fromSchema(schema).parse(createDocument(html).body)
+}
+
+function load(markdown: string): PMNode {
+  return fromHTML(editorMarked.parse(markdown) as string)
+}
+
+function blockTypes(doc: PMNode): string[] {
+  const types: string[] = []
+  doc.descendants(node => {
+    if (node.isBlock) types.push(node.type.name)
+  })
+  return types
 }
 
 function getHTML(doc: PMNode): string {
@@ -99,6 +110,41 @@ for (const markdown of [
   assert.deepEqual(struckText(doc), ['old'], '`marked` reads a single-tilde strike')
   assert.equal(save(doc), 'An ~~old~~ form.', 'the saved form is the double tilde')
 }
+
+// ---- literal tildes inside struck text ----
+// A struck run that starts with `~` used to be written `~~~5 min~~`: a code
+// fence that turned the rest of the document into a code block on reopen.
+{
+  const doc = fromHTML('<p><s>~5 min</s></p><p>Next paragraph</p>')
+  const markdown = save(doc)
+  assert.equal(markdown, '~~\\~5 min~~\n\nNext paragraph', 'a leading tilde is escaped, not merged into the delimiter')
+  const reopened = load(markdown)
+  assert.deepEqual(blockTypes(reopened), ['paragraph', 'paragraph'], 'no code block appears and the next paragraph survives')
+  assert.deepEqual(struckText(reopened), ['~5 min'])
+}
+
+for (const text of ['~', '~~', '~~~foo', '~foo', 'foo~', 'foo~~', 'a~~b', 'a~~~b', '~a~', 'back\\slash~']) {
+  for (const html of [`<p><s>${text}</s></p><p>After</p>`, `<p>Before <s>${text}</s> after</p>`, `<ul><li><p><s>${text}</s></p></li></ul>`]) {
+    const doc = fromHTML(html)
+    const markdown = save(doc)
+    const reopened = load(markdown)
+    assert.deepEqual(blockTypes(reopened), blockTypes(doc), `block structure survives for ${JSON.stringify(html)} → ${JSON.stringify(markdown)}`)
+    assert.deepEqual(struckText(reopened), [text], `struck text survives for ${JSON.stringify(html)} → ${JSON.stringify(markdown)}`)
+    assert.equal(save(reopened), markdown, `a second save is stable for ${JSON.stringify(html)}`)
+  }
+}
+
+// Only tildes that would be read as delimiters are escaped.
+assert.equal(turndown.turndown('<p><s>a~b</s></p>'), '~~a~b~~', 'a single inner tilde is written as it is')
+assert.equal(turndown.turndown('<p><s>foo~</s></p>'), '~~foo&#126;~~', 'a final tilde is a character reference')
+// TipTap's code mark excludes every other mark, so the editor never produces
+// this; pasted or DOCX HTML can, and the Markdown layer must keep it intact.
+assert.equal(turndown.turndown('<p><s><code>~x~</code></s></p>'), '~~`~x~`~~', 'code spans are literal and never escaped')
+assert.equal(
+  (editorMarked.parse('~~`~x~`~~') as string).trim(),
+  '<p><del><code>~x~</code></del></p>',
+  'and the code keeps its tildes on reopen',
+)
 
 // ---- an empty strike run never turns into a `~~~~` code fence ----
 assert.equal(turndown.turndown('<p><s></s>text</p>'), 'text', 'an empty strike element writes nothing')

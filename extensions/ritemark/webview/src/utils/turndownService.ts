@@ -43,7 +43,7 @@ export function createTurndownService(): TurndownService {
       return node.nodeName === 'S' || node.nodeName === 'DEL' || node.nodeName === 'STRIKE'
     },
     replacement(content) {
-      return content.trim() ? `~~${content}~~` : content
+      return content.trim() ? `~~${escapeStrikeTildes(content)}~~` : content
     },
   })
 
@@ -79,4 +79,34 @@ export function createTurndownService(): TurndownService {
   })
 
   return service
+}
+
+/** A code span, an existing backslash escape, or a run of tildes. */
+const STRIKE_CONTENT_TOKENS = /(`+)[\s\S]*?(?<!`)\1(?!`)|\\[\s\S]|~+/g
+
+/**
+ * Escape the literal tildes in a struck run that `marked` would read as part of
+ * a delimiter. A leading tilde would make the run start `~~~`, which opens a
+ * code fence at the start of a line and swallows the rest of the document on
+ * reopen. Two or more tildes inside the text close the strike early. And
+ * `marked` only closes a strike after a character that is not a tilde, escaped
+ * or not, so a final tilde is written as the character reference `&#126;`.
+ *
+ * A single tilde inside the text is not a delimiter and stays as written.
+ * Code spans are literal, so they are left alone, as are the backslash escapes
+ * Turndown already wrote (it writes a leading `~~~` as `\~~~`).
+ */
+function escapeStrikeTildes(content: string): string {
+  return content.replace(
+    STRIKE_CONTENT_TOKENS,
+    (match: string, _codeFence: string | undefined, offset: number) => {
+      if (match[0] !== '~') return match
+      const atStart = offset === 0
+      const atEnd = offset + match.length === content.length
+      if (match.length === 1 && !atStart && !atEnd) return match
+      return atEnd
+        ? '\\~'.repeat(match.length - 1) + '&#126;'
+        : '\\~'.repeat(match.length)
+    },
+  )
 }
