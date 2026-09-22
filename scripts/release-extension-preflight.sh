@@ -72,6 +72,7 @@ SHELL_TIER_PATHS=(
   ".github/workflows/build-"
   "scripts/build-prod.sh"
   "scripts/build-prod-windows.sh"
+  "scripts/google-oauth-release-env.sh"
   "scripts/build-provenance.mjs"
   "scripts/tree-sha256.mjs"
   "scripts/stage-extension-for-shell-build.sh"
