@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as os from 'os';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
@@ -26,6 +27,7 @@ import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap 
 import { canonicalMarkdownProjection, ensureTrailingNewline } from './editorSync/state';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 import { isRelativeImagePath } from './utils/imagePaths';
+import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
 import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
@@ -615,16 +617,34 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     console.log('[Ritemark] Script path:', scriptPath.toString());
     console.log('[Ritemark] Script URI:', scriptUri.toString());
 
-    // Get directory of the markdown file for local resource access
-    const docDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
+    // Local resource access. The document's own directory alone is not enough:
+    // a Markdown image may point anywhere in the project (`../images/a.svg`, a
+    // sibling `assets/` folder, the workspace root), and a path outside every
+    // root comes back from the webview loader as HTTP 401 — the image fails to
+    // render, and the PDF/Word/Google Docs exporters lose it too, because they
+    // rasterize SVGs by fetching that same webview URI. See webviewResourceRoots
+    // for the two limits that keep this from becoming "the whole disk".
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const workspaceFolderPath = workspaceFolder?.uri.scheme === 'file'
+      ? workspaceFolder.uri.fsPath
+      : null;
+    const rootInput = {
+      documentPath: document.uri.fsPath,
+      workspaceFolderPath,
+      homeDir: os.homedir(),
+    };
+    const resourceRoots = resolveDocumentResourceRoots({
+      mediaPath: vscode.Uri.joinPath(this.context.extensionUri, 'media').fsPath,
+      ...rootInput,
+    });
 
     webviewPanel.webview.options = {
       enableScripts: true,
       enableForms: true,  // Enable form inputs and file handling
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-        docDir  // Allow loading images from document directory
-      ]
+      // Fixed when the webview is created: adding or removing a workspace
+      // folder does not re-open editors that are already on screen, so such a
+      // document keeps the roots it started with until it is reopened.
+      localResourceRoots: resourceRoots.map(root => vscode.Uri.file(root))
     };
 
     const syncBootstrap = this.documentSync.prepareView(document, webviewPanel);
@@ -651,21 +671,26 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       RitemarkEditorProvider._wordCountStatusBar?.show();
     }
 
-    // Sprint 82 polish: when an image file under the document's folder changes
-    // on disk (e.g. a .drawio.svg saved from the diagram editor), refresh the
-    // embedded image in place. The webview swaps the matching image node's src
-    // for a cache-busted URI; the markdown itself is untouched (turndown
-    // serializes from the title attribute, which keeps the relative path).
+    // Sprint 82 polish: when an image file the document embeds changes on disk
+    // (e.g. a .drawio.svg saved from the diagram editor), refresh the embedded
+    // image in place. The webview swaps the matching image node's src for a
+    // cache-busted URI; the markdown itself is untouched (turndown serializes
+    // from the title attribute, which keeps the relative path).
+    //
+    // Watched over the widest resource root rather than the document's own
+    // folder, so an image at `../images/` is covered — the same reach the
+    // webview now has.
+    const watchRoot = vscode.Uri.file(resolveDocumentRoot(rootInput));
     const imageWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(docDir, '**/*.{png,jpg,jpeg,gif,svg,webp}')
+      new vscode.RelativePattern(watchRoot, '**/*.{png,jpg,jpeg,gif,svg,webp}')
     );
     imageWatcher.onDidChange((uri) => {
       if (isDisposed) { return; }
-      const rel = path.relative(path.dirname(document.uri.fsPath), uri.fsPath).split(path.sep).join('/');
-      if (!document.getText().includes(rel)) { return; }
+      const rel = toMarkdownRelativePath(path.dirname(document.uri.fsPath), uri.fsPath);
+      if (!document.getText().includes(rel.replace(/^\.\//, ''))) { return; }
       void webview.postMessage({
         type: 'imageRefreshed',
-        path: `./${rel}`,
+        path: rel,
         displaySrc: `${webview.asWebviewUri(uri).toString()}?v=${Date.now()}`
       });
     });
