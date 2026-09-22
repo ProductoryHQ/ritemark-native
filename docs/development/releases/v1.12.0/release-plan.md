@@ -1,6 +1,6 @@
 # Release Plan — v1.12.0 Publish to Google Docs + Everyday UX
 
-**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 is merged** (2026-09-22, PR #330): direct recording in Transcribe; its signed-build microphone and Windows capture checks join the release gate. **Sprint 120 is merged** (2026-09-22, PR #331): a typed number only starts a list up to 99. The other four have not started.<br>
+**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Eight sprints now stand: 118, 119, 120, 122–126. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 is merged** (2026-09-22, PR #330): direct recording in Transcribe; its signed-build microphone and Windows capture checks join the release gate. **Sprint 120 is merged** (2026-09-22, PR #331): a typed number only starts a list up to 99. **Sprint 126 is merged** (2026-09-22, PR #336): Shift+End selects the line rather than the rest of the document. The other four have not started.<br>
 **Target:** v1.12.0<br>
 **GitHub milestone:** [v1.12.0](https://github.com/ProductoryHQ/ritemark-native/milestone/10)<br>
 **Release type:** Full app distribution, provisionally shell-tier because Sprint 123 is expected to change integrated-browser/editor tab labels. Downgrade to extension-only only if Phase 0 proves no VS Code patch or shell source changes are required.<br>
@@ -92,8 +92,9 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 | Sprint 123 | Findability across long work | Users can search transcripts and distinguish crowded tabs | [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283) | none; can run after Sprint 120 while 121/122 follow their dependency | Planned |
 | Sprint 124 | Word preview fidelity | Word documents get PDF-like page viewing and measured fidelity improvements | [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284) | none; establishes the Office-preview asset boundary | Planned |
 | Sprint 125 | PowerPoint preview | Modern `.pptx` files open locally in a secure read-only slide preview | [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) | Sprint 124 viewer shell and asset boundary | Planned |
+| [Sprint 126](./sprint-126-editor-selection-keys/sprint-plan.md) | Editor selection keys | Shift+End selects the line you are on, and can never reach past the current block | [#332](https://github.com/ProductoryHQ/ritemark-native/issues/332) | none | Merged 2026-09-22 (PR #336) |
 
-Headline order: 119 first, since its external OAuth blockers gate it and nothing else waits on it; 118 has no hard interdependency with 119, and the order between them is Jarmo’s call. Mainline UX order: 120 → 122, with Sprint 123 as an independent findability track after Sprint 120. Office-preview order: 124 → 125. The Office track may proceed independently once release foundations are stable, but Sprint 125 does not start before Sprint 124 has established and validated the preview asset boundary. The release remains feature-incomplete until all seven sprints are merged or explicitly deferred.
+Headline order: 119 first, since its external OAuth blockers gate it and nothing else waits on it; 118 has no hard interdependency with 119, and the order between them is Jarmo’s call. Mainline UX order: 120 → 122, with Sprint 123 as an independent findability track after Sprint 120. Office-preview order: 124 → 125. The Office track may proceed independently once release foundations are stable, but Sprint 125 does not start before Sprint 124 has established and validated the preview asset boundary. Sprint 126 was added on 2026-09-22 out of that order, as an unplanned data-loss fix. The release remains feature-incomplete until all eight sprints are merged or explicitly deferred.
 
 ## Sprint Outcomes and Boundaries
 
@@ -109,6 +110,18 @@ Headline order: 119 first, since its external OAuth blockers gate it and nothing
 - Undo/redo and save/reopen behavior are covered, not only the first keystroke.
 
 **Boundary:** Phase 0 must identify whether the behavior comes from TipTap's ordered-list input rule, an editor wrapper, or Markdown rehydration. The fix belongs at the narrowest correct layer and must not special-case one literal year.
+
+### Sprint 126 — Editor selection keys
+
+**Goal:** stop a selection keystroke from reaching content the person is not looking at.
+
+**Required outcomes:**
+
+- `Shift+End` and `Shift+Home` extend to the end and start of the current visual line, matching plain `End`/`Home`.
+- Neither can extend past the paragraph, list item or code block holding the cursor.
+- Plain `Home`/`End` and the document-boundary `Shift+Mod+Home`/`End` are unchanged.
+
+**Boundary:** the typing and selection layer only. Nothing in the Markdown load or save path changes. Added unplanned on 2026-09-22 after a data-loss report; not part of the original v1.12.0 map.
 
 ### Sprint 121 — Comment ergonomics and visible handoff
 
@@ -211,6 +224,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 - [ ] Sprint 123 merged; #283 closed or explicitly deferred with evidence.
 - [ ] Sprint 124 merged; #284 closed or explicitly deferred with evidence.
 - [ ] Sprint 125 merged; #285 closed or explicitly deferred with evidence.
+- [x] Sprint 126 merged; #332 closed or explicitly deferred with evidence. *(merged 2026-09-22 as `032437c8`; #332 closed)*
 - [ ] v1.11.0 Sprint 117 is merged before Sprint 122 starts.
 - [ ] Every new or changed webview↔host message is typed/validated at its boundary.
 - [ ] `docs/development/architecture.md` is updated for any structural message, subsystem, feature-flag, or shell-patch change; its date is not older than the relevant sprint branch.
@@ -235,6 +249,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 | Sprint 123 | `sprint-123-findability` | TBD | #283 | not started | not run | not drafted |
 | Sprint 124 | `sprint-124-word-preview-fidelity` | TBD | #284 | not started | not run | not drafted |
 | Sprint 125 | `sprint-125-powerpoint-preview` | TBD | #285 | blocked on Sprint 124 asset boundary | not run | not drafted |
+| Sprint 126 | `sprint-126-editor-selection-keys` | [#336](https://github.com/ProductoryHQ/ritemark-native/pull/336) | #332 (closed) | **Merged 2026-09-22** as `032437c8`; dev-build validated, evidence in the sprint's `qa-evidence.md` | full `npm test` + webview typecheck green; `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
 
 ## Risk Register
 
@@ -304,6 +319,8 @@ Because the planned tier is full app, release execution follows the standard cle
 | 2026-09-22 | Kick off Sprint 120 (editor input intent): lightweight track, audit-first Phase 0; issue [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280); branch `sprint-120-editor-input-intent` from main `e9094517`. Phase 0 found a second defect: typing a number above an existing ordered list merges into it and rewrites its `start`. | Jarmo: "alusta ja liigume edasi" |
 | 2026-09-22 | Sprint 120 input-rule bound: convert `1.`–`99.` only, the bound LibreOffice Writer uses in its own autoformat; three digits and up stay prose. No year-specific logic. | Jarmo: "kas sa tead kuidas MS word teeb seda? või Libre? kui ei tea siis variant A on ka ok" — LibreOffice's source answers it, so the bound follows that precedent |
 | 2026-09-22 | Sprint 120 does **not** guard against the adjacent-list merge found in Phase 0. A round-trip probe showed Markdown cannot hold two adjacent ordered lists with different starts — the first marker wins — so blocking the merge would show a document the file cannot keep. The behaviour is pinned in `orderedListRoundTrip.test.ts` instead, and Cmd+Z restores the original numbering. | Evidence in the sprint audit, *The adjacent-list merge, re-examined* |
+| 2026-09-22 | Add Sprint 126 (editor selection keys) to v1.12.0, unplanned: `Shift+End` selected to the end of the document, so a following keystroke destroyed blocks elsewhere. Numbered 126 because 121 is a retired gap (#281) and 122–125 are allocated. | Data-loss report [#332](https://github.com/ProductoryHQ/ritemark-native/issues/332); Jarmo: "approved, start Phase 1" |
+| 2026-09-22 | Sprint 126 `Shift+End`/`Shift+Home` extend to the **visual line**, clamped to the current text block — not to the whole paragraph. The browser computes the line boundary; the clamp is what removes the data loss and still applies without it. Plain `Home`/`End` stay untouched. | Jarmo: "visual line, approved, start Phase 1" |
 | 2026-09-22 | Kick off Sprint 118 (direct Transcribe recording): scope as packaged, audit-first Phase 0; issue [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328); branch `sprint-118-transcribe-recording` from main `d8d90ad7`. Destination: in the project with a folder open; with none, ask where to save before recording. | Jarmo: "118, alusta" |
 | 2026-09-22 | Close Sprint 119 after QA and merge. Items only a candidate can prove (CI and packaged-build OAuth, Windows loopback, Store URLs) become v1.12.0 release gates. Planned hardening tests move to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325). | Jarmo: "jah, tee 1–4 kohe" |
 | 2026-09-22 | Release builds compile in the production Google OAuth client ("Ritemark desktop"): from repository secrets in CI and from `~/.config/ritemark/release.env` locally. A release compile without it is refused. | Jarmo added the secrets and the local file; Claude wired the build paths |
