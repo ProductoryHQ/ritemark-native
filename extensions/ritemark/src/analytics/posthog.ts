@@ -45,8 +45,8 @@ const { PostHog } = require('posthog-node') as {
 const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
 const GLOBAL_STATE_UUID_KEY = 'ritemark.analytics.anonymousId';
 const GLOBAL_STATE_NOTICE_KEY = 'ritemark.analytics.hasSeenNotice';
-const PRIVACY_POLICY_URL = 'https://www.productory.ai/en/privacy/';
-const TERMS_OF_USE_URL = 'https://www.productory.ai/en/terms/';
+const PRIVACY_POLICY_URL = 'https://ritemark.app/en/privacy/';
+const TERMS_OF_USE_URL = 'https://ritemark.app/en/terms/';
 
 let client: AnalyticsClient | null = null;
 let anonymousId: string | null = null;

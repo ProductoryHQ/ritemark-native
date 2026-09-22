@@ -222,3 +222,28 @@ Implication: the release plan must track Google Cloud configuration as an extern
 ## Audit Exit Criteria
 
 This audit is input, not authorization. W0 must verify the current Google API behavior, run candidate canaries, and turn every question above into an explicit approved decision before production changes begin.
+
+## Addendum — re-verification at kickoff (2026-09-18)
+
+The audit above is kept as written on 2026-09-13. At kickoff it was re-checked against main `c2522479`, which by then included Sprint 116 (runtime/model baseline), Sprint 117 (comment-to-agent handoff, PR #293) and Sprint 126 (Store certification, PR #304). 36 claims still hold, and nothing under `export/v2`, `ExportMenu.tsx`, `App.tsx`, `RitemarkSettings.tsx` or `features/flags.ts` has changed since the audit. The corrections and new precedents below supersede the original text wherever the two conflict.
+
+### Corrections
+
+| Audit reference | What it said | What the code says on 2026-09-18 |
+|---|---|---|
+| Audited paths list, F19 | Flags are projected through `features/featureSettings.ts` | That file does not exist and never did. Experimental flags reach users as `ritemark.features.<id>` entries in `extensions/ritemark/package.json`; the editor receives them through the `load.features` payload in `ritemarkEditor.ts`, and Settings receives them as booleans from `RitemarkSettingsProvider.ts`. There is no `google-docs-publishing` flag yet. |
+| Reuse table, F4 | `buildNormalizedExportHtml` "and tests"; add Google fixtures to "the same tests" | `htmlPipeline.ts` and `stripComments` have no tests. The extension `npm test` script's only export tests are `export/v2/imageSource.test.ts` and `export/saveAsMarkdown.test.ts`, and neither exercises the normalizer. Phase 0 creates the first normalizer fixtures rather than extending existing ones. |
+| F9 | Settings "sends masked configuration state" | The host sends full API key values to the Settings webview (`RitemarkSettingsProvider.ts`, commented "masked for display, full for input"); masking is only a password input in the webview. OAuth tokens must not follow this pattern: the webview gets a redacted projection only (R2). |
+| F14, F17 | No rename hook exists; Sprint 119 must add the first | Since Sprint 117, `ritemarkEditor.ts` registers `workspace.onDidRenameFiles` and moves records through `CommentTaskStore.renameSource`. That store is versioned, lives in global storage, is keyed by document URI and is written atomically, and on purpose it does not follow external moves. This is the direct precedent for the binding registry (R6). |
+| F16 | Only a global `activeWebviews` broadcast exists | `activeWebviews` still exists for global broadcasts, but Sprint 117 added a per-document `commentTaskWebviews: Map<uri, Set<Webview>>` with cleanup on dispose. That fixes the "comment-status" class of bug the audit warned about, and binding/operation events should use the same per-URI targeting. |
+| F23 | The Word exporter warns on image failures | It warns only when an image fails to decode. Any image `tryLoadImageSource` returns null for is dropped silently, including every http(s) image and anything that isn't PNG/JPEG. R4's "honest preview/error policy" has no existing behaviour to reuse. |
+
+### New since 2026-09-13
+
+- **Comments in raw Markdown (Sprint 117).** Standalone comments are saved as `<!-- {id:…} body -->` (`commentTurndownRules.ts`, `commentMarkedExtension.ts`), and both comment types carry `data-comment-id`. The HTML normalizer's patterns still catch them. But the raw file text and Copy as Markdown now carry comments with stable IDs, so a direct-Markdown adapter must strip both forms before upload (R4).
+- **Typed, gated host protocol (Sprint 117).** `comment-task/*` requests go through one host controller with a typed decoder (`commentTasks/protocol.ts`), a feature-flag gate in `extension.ts`, document scope via `resolveProjectScope`, and a frozen document snapshot with version and dirty state (`CommentTaskController.ts`). This is the template for Sprint 119's missing typed protocol (F12) and for Phase 0 question 4 (dirty-buffer freeze).
+- **Honest outcomes when handing off externally (Sprint 126).** `reporting/reportTransport.ts` opens `mailto:` with typed results (`opened`, `no-handler`, `too-long`) and treats "opened" as not delivered. This is the precedent for the "Could not verify" and handed-off states (F21, R8).
+- **Shared dialog layering.** `ui/dialog.tsx` now sits at z-80, above the header/rail (z-60) and the Comments menu (z-70) and below popovers (z-90/100), and goes full-screen below 640px. Publishing dialogs use it as is.
+- **Store policy 10.1.5 (patch 016).** The build now removes software-download promotion. Google onboarding copy must not tell users to download or install anything.
+- **OAuth precedent.** There is no `registerUriHandler`. `branding/product.json` already declares `urlProtocol: "ritemark"`, but Google's Desktop-app client type uses a loopback redirect, so Sprint 119 does not need that protocol or any shell change. Existing sign-in flows only open an `authUrl` owned by the Claude or Codex CLI, so Ritemark has no loopback or PKCE code of its own.
+- **Legal links in the app (R11).** `extensions/ritemark/src/analytics/posthog.ts` and `extensions/ritemark/webview/src/components/ai-sidebar/aiDisclosure.ts` link to `https://www.productory.ai/en/privacy/` and `/en/terms/`. `https://ritemark.app/en/privacy/` and `/en/terms/` return 404 as of 2026-09-18.

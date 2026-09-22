@@ -369,7 +369,19 @@ jobs:
       - name: Compile extension
         shell: bash
         working-directory: r/vscode/extensions/ritemark
-        run: npm run compile
+        env:
+          # Sprint 119: Google Docs publishing's OAuth client, kept out of the
+          # public repo as repository secrets. With the require flag, sources
+          # that have the feature refuse to compile without it; older sources
+          # ignore both. GitHub masks the values in logs.
+          RITEMARK_GOOGLE_CLIENT_ID: ${{ secrets.RITEMARK_GOOGLE_CLIENT_ID }}
+          RITEMARK_GOOGLE_CLIENT_SECRET: ${{ secrets.RITEMARK_GOOGLE_CLIENT_SECRET }}
+          RITEMARK_REQUIRE_GOOGLE_OAUTH: '1'
+        run: |
+          npm run compile
+          if [ -f ../../../scripts/check-google-oauth-build.mjs ]; then
+            node ../../../scripts/check-google-oauth-build.mjs out/extension.js
+          fi
 
       - name: Preserve dependency-backed workbench font
         shell: bash

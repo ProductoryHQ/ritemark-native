@@ -125,6 +125,14 @@ if [ ! -f "$EXTENSION_DIR/out/extension.js" ]; then
     exit 1
 fi
 
+# Sprint 119: the compiled bundle must carry the Google OAuth client, or the
+# update would ship Google Docs publishing as "unavailable in this build".
+# Compile with RITEMARK_GOOGLE_CLIENT_ID/_SECRET set (see RELEASING.md).
+if ! node "$PROJECT_ROOT/scripts/check-google-oauth-build.mjs" "$EXTENSION_DIR/out/extension.js"; then
+    echo -e "${RED}Error: recompile the extension with the Google OAuth client before releasing.${NC}"
+    exit 1
+fi
+
 if [ ! -f "$EXTENSION_DIR/media/webview.js" ]; then
     echo -e "${RED}Error: Webview not built. Run 'npm run build' in extensions/ritemark/webview${NC}"
     exit 1

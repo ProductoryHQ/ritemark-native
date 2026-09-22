@@ -378,6 +378,8 @@ open "VSCode-darwin-arm64/Ritemark Native.app"
 
 ## Testing Issues
 
+These issues apply to the generic VS Code Extension Development Host test runner. Ritemark's own `npm test` in `extensions/ritemark` does not use it: it runs standalone `tsx` files and needs no VS Code instance. See `SKILL.md` ## Extension Testing.
+
 ### Issue: Tests fail with "VS Code instance already running"
 
 **Solution:**

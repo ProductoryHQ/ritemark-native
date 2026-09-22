@@ -85,7 +85,7 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 | Sprint | Working name | User outcome | GitHub issue | Dependency | Status |
 |---|---|---|---|---|---|
 | [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | none yet | none | Moved from v1.11.0 (2026-09-15); full SDD package ready, capture/storage freeze open |
-| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated; Ritemark gets its own legal pages (R11) | [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) | External Google Cloud/OAuth setup; Ritemark legal pages (`ritemark-web`) and Productory legal update (`productory-2026`) | Kicked off 2026-09-18; Phase 0 in progress on `sprint-119-google-docs-publishing` |
+| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated; Ritemark gets its own legal pages (R11) | [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) | External Google Cloud/OAuth setup; Ritemark legal pages (`ritemark-web`) and Productory legal update (`productory-2026`) | Implemented and RunDev-validated 2026-09-22 on `sprint-119-google-docs-publishing`; closing (QA, PR); hardening tests carried to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325) |
 | Sprint 120 | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Planned |
 | Sprint 121 | Comment ergonomics and visible handoff | Comments are easy to compose and review, and AI assignment has a visible destination | [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | — | Absorbed into v1.11.0 Sprint 117 (2026-09-14) |
 | Sprint 122 | Agent conversation clarity | Active conversation, long-prompt composer, and destination-aware links behave predictably | [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | v1.11.0 Sprint 117 merged (interaction vocabulary, composer primitive); existing durable conversation APIs | Planned |
@@ -194,7 +194,13 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 ## Feature-Complete Definition
 
 - [ ] Sprint 118 merged; its issue (created at kickoff) closed or explicitly deferred with evidence.
-- [ ] Sprint 119 merged; #319 closed or explicitly deferred with evidence; the Google OAuth app is published and verified for public use; the Ritemark legal pages are live and the in-app links point to them.
+- [ ] Sprint 119 merged; #319 closed or explicitly deferred with evidence; the Google OAuth app is published and verified for public use; the Ritemark legal pages are live and the in-app links point to them. *(2026-09-21/22: OAuth app In production with verified branding; legal pages live, including the approved Google Docs section, ritemark-web #152; in-app links switched; merge pending)*
+- [ ] Sprint 119 release-candidate checks, which only a candidate can prove:
+  - Both CI build workflows compile in the Google OAuth client from the `RITEMARK_GOOGLE_CLIENT_ID`/`_SECRET` repository secrets, and pass `scripts/check-google-oauth-build.mjs`.
+  - `build-prod.sh` does the same from `~/.config/ritemark/release.env`.
+  - On the signed arm64 DMG, the Intel DMG and the Windows installer: Settings → Google Docs → Connect shows "Ritemark" on Google's consent screen, then Create (with a local image) and Sync work. Windows is the first native run of the loopback OAuth flow.
+  - Jarmo changes the Microsoft Store listing's privacy and terms URLs to ritemark.app in Partner Center, recorded in `docs/microsoft-store-submission/LEGAL-AND-URLS.md`.
+  - After release: delete the disposable canary OAuth client and the Phase 0 / RunDev test Docs, each with Jarmo's go-ahead.
 - [ ] Sprint 120 merged; #280 closed or explicitly deferred with evidence.
 - [ ] Sprint 121 absorbed into v1.11.0 Sprint 117; #281 closes with that sprint.
 - [ ] Sprint 122 merged; #282 closed or explicitly deferred with evidence.
@@ -218,7 +224,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Sprint 118 | `sprint-118-transcribe-recording` | TBD | none yet | not started | not run | not drafted |
-| Sprint 119 | `sprint-119-google-docs-publishing` | TBD | #319 | Phase 0 in progress (kicked off 2026-09-18 from main `c2522479`) | not run | not drafted |
+| Sprint 119 | `sprint-119-google-docs-publishing` | TBD | #319; follow-ups #325 | Implemented; RunDev-validated with real Google APIs and the production client (2026-09-22) | closing QA in progress | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 120 | `sprint-120-editor-input-intent` | TBD | #280 | not started | not run | not drafted |
 | Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
 | Sprint 122 | `sprint-122-conversation-clarity` | TBD | #282 | not started | not run | not drafted |
@@ -230,7 +236,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 
 | Risk | Severity | Retirement plan | Status |
 |---|---|---|---|
-| Google OAuth consent publication or verification is not finished in time, leaving shipped users on seven-day Testing tokens or an unverified-app block | High | Create the project at Phase 0 start; submit for publication and verification right after the Phase 0 gate fixes the scopes; track owner and status in the Sprint 119 tracker | Open |
+| Google OAuth consent publication or verification is not finished in time, leaving shipped users on seven-day Testing tokens or an unverified-app block | High | Create the project at Phase 0 start; submit for publication and verification right after the Phase 0 gate fixes the scopes; track owner and status in the Sprint 119 tracker | Closed 2026-09-21: the app is In production with verified branding; `drive.file` needs no scope review |
 | Ritemark legal pages are not live when the consent screen or the in-app links need them | Medium | Start the `ritemark-web` and `productory-2026` work in parallel with Phase 0; keep the old productory.ai URLs resolving for installed apps | Open |
 | Ordered-list suppression breaks legitimate high-number list starts or imported CommonMark | High | Phase 0 input-rule audit; explicit boundary tests for intentional lists, paste, save, reopen, undo/redo | Open |
 | Sprint 121 duplicates or races the v1.11.0 comment dispatch refactor | High | Treat Sprint 117 as a hard dependency; one canonical conversation ID and one queue/dispatch path | Closed 2026-09-14 (absorbed) |
@@ -290,6 +296,10 @@ Because the planned tier is full app, release execution follows the standard cle
 
 | Date | Decision | Source |
 |---|---|---|
+| 2026-09-22 | Close Sprint 119 after QA and merge. Items only a candidate can prove (CI and packaged-build OAuth, Windows loopback, Store URLs) become v1.12.0 release gates. Planned hardening tests move to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325). | Jarmo: "jah, tee 1–4 kohe" |
+| 2026-09-22 | Release builds compile in the production Google OAuth client ("Ritemark desktop"): from repository secrets in CI and from `~/.config/ritemark/release.env` locally. A release compile without it is refused. | Jarmo added the secrets and the local file; Claude wired the build paths |
+| 2026-09-21 | Google OAuth app published (Testing → In production), with branding verified and published. `drive.file` needs no scope review. | Jarmo: "jah, vajuta mõlemat", after verifying ritemark.app in Search Console |
+| 2026-09-21 | Google Docs section of the Ritemark privacy policy approved and published (EN + ET, ritemark-web #152) | Jarmo: "poliitika tekst kinnitatud, avalda see" |
 | 2026-09-18 | Kick off Sprint 119: scope and Phase 0 approved; issue [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319); branch `sprint-119-google-docs-publishing` from main `c2522479`. Implementation stays gated on Jarmo's approval of `research/integration-decisions.md`. | Jarmo: "jah" to the kickoff as proposed |
 | 2026-09-18 | Phase 0 may create the Google Cloud project in Testing mode, with test users only, for disposable canaries. Publication, verification and the production client configuration wait for the Phase 0 gate. | Resolves a contradiction in the Sprint 119 package, whose Phase 0 tasks needed a project its own gate text forbade. Jarmo approved it with the kickoff |
 | 2026-09-18 | Ritemark gets its own privacy policy and terms on ritemark.app, and Productory Services OÜ stays the provider. The native side is Sprint 119 R11. The pages (`ritemark-web`) and the Productory update (`productory-2026`) are external dependencies, because sprints are repo-scoped | Jarmo: "Toode on arenenud ja seega väärt eraldi" |

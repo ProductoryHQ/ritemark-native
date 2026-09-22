@@ -51,12 +51,24 @@ export type FlagId =
   // Sprint 109: host-owned durable conversation archive + Conversations UI
   | 'durableAgentConversations'
   // Sprint 112: per-turn Composer thinking effort across agent runtimes
-  | 'composer-thinking-effort';
+  | 'composer-thinking-effort'
+  // Sprint 119: publish a Markdown document to Google Docs and Sync it later
+  | 'google-docs-publishing';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 119: kill switch for the whole Google Docs publishing surface —
+  // Settings card, editor menu items and every host handler. Flag-off keeps
+  // stored tokens and document links; it only stops offering the feature.
+  'google-docs-publishing': {
+    id: 'google-docs-publishing',
+    label: 'Google Docs Publishing',
+    description: 'Publish a Markdown document to Google Docs and keep that same Doc updated with Sync.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   'composer-thinking-effort': {
     id: 'composer-thinking-effort',
     label: 'Composer Thinking Effort',
