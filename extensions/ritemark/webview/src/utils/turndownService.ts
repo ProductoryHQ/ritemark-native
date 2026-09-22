@@ -11,6 +11,7 @@ import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/im
  * Includes:
  *  - ATX headings, fenced code blocks, `-` bullet, `*` italic, `**` bold
  *  - GFM tables + task list items
+ *  - `~~` strikethrough for `<s>`, `<del>` and `<strike>`
  *  - Pipe-escape rule for table cells (the GFM plugin doesn't escape `|`
  *    inside cell content by default and that breaks tables containing code)
  *  - Image rule preferring `title="./..."` over DOM-resolved `src` (used for
@@ -30,6 +31,21 @@ export function createTurndownService(): TurndownService {
 
   service.use(tables)
   service.use(taskListItems)
+
+  // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
+  // `~~x~~` as `<del>`. Turndown has no default rule for either, so without
+  // this the text survives a save but the mark is dropped. The GFM plugin's
+  // `strikethrough` rule writes a single `~`, which several parsers (markdown-it
+  // among them) do not read as strikethrough, so write `~~`. An empty run stays
+  // empty: `~~~~` at the start of a line would open a code fence.
+  service.addRule('strikethrough', {
+    filter(node) {
+      return node.nodeName === 'S' || node.nodeName === 'DEL' || node.nodeName === 'STRIKE'
+    },
+    replacement(content) {
+      return content.trim() ? `~~${escapeStrikeTildes(content)}~~` : content
+    },
+  })
 
   service.addRule('tableCellWithPipeEscape', {
     filter: ['th', 'td'],
@@ -63,4 +79,33 @@ export function createTurndownService(): TurndownService {
   })
 
   return service
+}
+
+/** A code span, an existing backslash escape, or a run of tildes. */
+const STRIKE_CONTENT_TOKENS = /(`+)[\s\S]*?(?<!`)\1(?!`)|\\[\s\S]|~+/g
+
+/**
+ * Escape every literal tilde in a struck run, because `marked` reads tildes
+ * inside a strike as delimiters. A leading tilde makes the run start `~~~`,
+ * which opens a code fence at the start of a line and swallows the rest of the
+ * document on reopen. Two tildes together close the strike early. Two single
+ * tildes pair up as a nested strike and vanish: `~~a~b~c~~` reopens as `abc`.
+ * `marked` also only closes a strike after a character that is not a tilde,
+ * escaped or not, so a final tilde is written as the character reference
+ * `&#126;`.
+ *
+ * Code spans are literal, so they are left alone, as are the backslash escapes
+ * Turndown already wrote (it writes a leading `~~~` as `\~~~`).
+ */
+function escapeStrikeTildes(content: string): string {
+  return content.replace(
+    STRIKE_CONTENT_TOKENS,
+    (match: string, _codeFence: string | undefined, offset: number) => {
+      if (match[0] !== '~') return match
+      const escaped = '\\~'.repeat(match.length)
+      return offset + match.length === content.length
+        ? escaped.slice(0, -2) + '&#126;'
+        : escaped
+    },
+  )
 }
