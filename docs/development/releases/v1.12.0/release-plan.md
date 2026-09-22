@@ -1,6 +1,6 @@
 # Release Plan — v1.12.0 Publish to Google Docs + Everyday UX
 
-**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 kicked off on 2026-09-22** and is implemented and closing (QA, PR); its signed-build microphone and Windows capture checks join the release gate. The other five have not started.<br>
+**Status:** Mapped. Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14. **Sprints 118 and 119 moved here from v1.11.0 on 2026-09-15**, packages intact, when that release was re-cut around Microsoft Store certification. Seven sprints now stand: 118, 119, 120, 122–125. **Sprint 119 is merged** (2026-09-22, PR #326): Google Docs publishing, with its OAuth app in production. **Sprint 118 is merged** (2026-09-22, PR #330): direct recording in Transcribe; its signed-build microphone and Windows capture checks join the release gate. **Sprint 120 is merged** (2026-09-22, PR #331): a typed number only starts a list up to 99. The other four have not started.<br>
 **Target:** v1.12.0<br>
 **GitHub milestone:** [v1.12.0](https://github.com/ProductoryHQ/ritemark-native/milestone/10)<br>
 **Release type:** Full app distribution, provisionally shell-tier because Sprint 123 is expected to change integrated-browser/editor tab labels. Downgrade to extension-only only if Phase 0 proves no VS Code patch or shell source changes are required.<br>
@@ -84,9 +84,9 @@ Sprint 121 was absorbed into v1.11.0 Sprint 117 on 2026-09-14, so v1.12.0 carrie
 
 | Sprint | Working name | User outcome | GitHub issue | Dependency | Status |
 |---|---|---|---|---|---|
-| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328) | none | Implemented and RunDev-validated 2026-09-22 on `sprint-118-transcribe-recording`; closing (QA, PR). Signed-build microphone and Windows capture carried to the release gate |
-| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated; Ritemark gets its own legal pages (R11) | [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) | External Google Cloud/OAuth setup; Ritemark legal pages (`ritemark-web`) and Productory legal update (`productory-2026`) | Implemented and RunDev-validated 2026-09-22 on `sprint-119-google-docs-publishing`; closing (QA, PR); hardening tests carried to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325) |
-| Sprint 120 | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Implemented |
+| [Sprint 118](./sprint-118-transcribe-recording/sprint-plan.md) | Transcriber direct recording | Record straight into the Transcribe panel instead of only uploading a file | [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328) | none | Merged 2026-09-22 (PR #330). Signed-build microphone and Windows capture carried to the release gate |
+| [Sprint 119](./sprint-119-google-docs-publishing/sprint-plan.md) | Publish to Google Docs | Push a finished markdown document to a Google Doc and keep it updated; Ritemark gets its own legal pages (R11) | [#319](https://github.com/ProductoryHQ/ritemark-native/issues/319) | External Google Cloud/OAuth setup; Ritemark legal pages (`ritemark-web`) and Productory legal update (`productory-2026`) | Merged 2026-09-22 (PR #326); hardening tests carried to [#325](https://github.com/ProductoryHQ/ritemark-native/issues/325) |
+| [Sprint 120](./sprint-120-editor-input-intent/sprint-plan.md) | Editor input intent | Years and similar prose stay prose; deliberate numbered lists still work | [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) | none | Merged 2026-09-22 (PR #331) |
 | Sprint 121 | Comment ergonomics and visible handoff | Comments are easy to compose and review, and AI assignment has a visible destination | [#281](https://github.com/ProductoryHQ/ritemark-native/issues/281) | — | Absorbed into v1.11.0 Sprint 117 (2026-09-14) |
 | Sprint 122 | Agent conversation clarity | Active conversation, long-prompt composer, and destination-aware links behave predictably | [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) | v1.11.0 Sprint 117 merged (interaction vocabulary, composer primitive); existing durable conversation APIs | Planned |
 | Sprint 123 | Findability across long work | Users can search transcripts and distinguish crowded tabs | [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283) | none; can run after Sprint 120 while 121/122 follow their dependency | Planned |
@@ -193,19 +193,19 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 
 ## Feature-Complete Definition
 
-- [ ] Sprint 118 merged; its issue (created at kickoff) closed or explicitly deferred with evidence.
+- [x] Sprint 118 merged; its issue (created at kickoff) closed or explicitly deferred with evidence. *(merged 2026-09-22 as `e9094517`, PR #330; #328 closed)*
 - [ ] Sprint 118 release-candidate checks, which only a candidate can prove:
   - On the signed arm64 DMG: the first Record asks macOS for microphone access under the Ritemark name, a short recording with speech is saved, plays back, and transcribes on-device. The dev build's permission is tied to a different bundle ID (Phase 0 S6).
   - On the Windows installer: the same, plus **Microphone Settings** opens the Windows privacy page after a denial. This is the first native Windows run of the capture path.
   - A spoken recording's level is checked on both: the capture is unprocessed (no automatic gain), and Jarmo's dev-build test peaked around −19 dBFS.
-- [ ] Sprint 119 merged; #319 closed or explicitly deferred with evidence; the Google OAuth app is published and verified for public use; the Ritemark legal pages are live and the in-app links point to them. *(2026-09-21/22: OAuth app In production with verified branding; legal pages live, including the approved Google Docs section, ritemark-web #152; in-app links switched; merge pending)*
+- [x] Sprint 119 merged; #319 closed or explicitly deferred with evidence; the Google OAuth app is published and verified for public use; the Ritemark legal pages are live and the in-app links point to them. *(2026-09-21/22: OAuth app In production with verified branding; legal pages live, including the approved Google Docs section, ritemark-web #152; in-app links switched. Merged 2026-09-22 as `b9f4717d`, PR #326; #319 closed)*
 - [ ] Sprint 119 release-candidate checks, which only a candidate can prove:
   - Both CI build workflows compile in the Google OAuth client from the `RITEMARK_GOOGLE_CLIENT_ID`/`_SECRET` repository secrets, and pass `scripts/check-google-oauth-build.mjs`.
   - `build-prod.sh` does the same from `~/.config/ritemark/release.env`.
   - On the signed arm64 DMG, the Intel DMG and the Windows installer: Settings → Google Docs → Connect shows "Ritemark" on Google's consent screen, then Create (with a local image) and Sync work. Windows is the first native run of the loopback OAuth flow.
   - Jarmo changes the Microsoft Store listing's privacy and terms URLs to ritemark.app in Partner Center, recorded in `docs/microsoft-store-submission/LEGAL-AND-URLS.md`.
   - After release: delete the disposable canary OAuth client and the Phase 0 / RunDev test Docs, each with Jarmo's go-ahead.
-- [ ] Sprint 120 merged; #280 closed or explicitly deferred with evidence.
+- [x] Sprint 120 merged; #280 closed or explicitly deferred with evidence. *(merged 2026-09-22 as `d97712c7`; #280 closed)*
 - [ ] Sprint 121 absorbed into v1.11.0 Sprint 117; #281 closes with that sprint.
 - [ ] Sprint 122 merged; #282 closed or explicitly deferred with evidence.
 - [ ] Sprint 123 merged; #283 closed or explicitly deferred with evidence.
@@ -227,9 +227,9 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
-| Sprint 118 | `sprint-118-transcribe-recording` | TBD | #328 | Implemented; RunDev-validated with a real microphone and a one-hour synthetic run (2026-09-22) | `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
-| Sprint 119 | `sprint-119-google-docs-publishing` | TBD | #319; follow-ups #325 | Implemented; RunDev-validated with real Google APIs and the production client (2026-09-22) | closing QA in progress | drafted in `docs/releases/v1.12.0/release-notes.md` |
-| Sprint 120 | `sprint-120-editor-input-intent` | [#331](https://github.com/ProductoryHQ/ritemark-native/pull/331) | #280 | Implemented; RunDev-validated in a dev build (2026-09-22), evidence in the sprint's `qa-evidence.md` | full `npm test` + webview typecheck green; `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
+| Sprint 118 | `sprint-118-transcribe-recording` | [#330](https://github.com/ProductoryHQ/ritemark-native/pull/330) | #328 (closed) | **Merged 2026-09-22** as `e9094517`; RunDev-validated with a real microphone and a one-hour synthetic run | `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
+| Sprint 119 | `sprint-119-google-docs-publishing` | [#326](https://github.com/ProductoryHQ/ritemark-native/pull/326) | #319 (closed); follow-ups #325 | **Merged 2026-09-22** as `b9f4717d`; RunDev-validated with real Google APIs and the production client | `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
+| Sprint 120 | `sprint-120-editor-input-intent` | [#331](https://github.com/ProductoryHQ/ritemark-native/pull/331) | #280 (closed) | **Merged 2026-09-22** as `d97712c7`; RunDev-validated in a dev build, evidence in the sprint's `qa-evidence.md` | full `npm test` + webview typecheck green; `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
 | Sprint 122 | `sprint-122-conversation-clarity` | TBD | #282 | not started | not run | not drafted |
 | Sprint 123 | `sprint-123-findability` | TBD | #283 | not started | not run | not drafted |
