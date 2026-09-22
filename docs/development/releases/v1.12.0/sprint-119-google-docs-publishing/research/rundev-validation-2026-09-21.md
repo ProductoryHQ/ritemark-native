@@ -28,6 +28,17 @@
 | Remove template | The card went back to "None (Google Docs default styles)". |
 | Disconnect | The card shows Connect Google account, and the editor menu shows Connect Google Docs…. Both link records are kept for a later reconnect. Revocation at Google is best-effort and was not checked separately. |
 
+### Third round (2026-09-22): the production client
+
+The dev app ran with the production client "Ritemark desktop", loaded from `~/.config/ritemark/release.env` through `scripts/google-oauth-release-env.sh`. No value was printed. The OAuth app had been published the day before, with verified branding.
+
+| Step | Result |
+| --- | --- |
+| Disconnect the old test-client connection, then Connect | Sign-in completed as **tuiskjarmo@gmail.com**, which was never a test user. So the app accepts any Google account, as publication intended. The card shows Connected. |
+| Create with a local image | The menu's busy line showed "Uploading images…". The Doc was created with the heading, the full-size image, bold text and bullets. The link record carries the new account. |
+| Staged image cleanup | No `ritemark-publish-image.*` file in the account's Drive or its Bin afterwards. This matches the privacy policy: the uploaded copy is deleted. |
+| Document linked to the other account | The menu shows only "Reconnect Google account…", with "This document was published with jarmo@productory.eu. Connect that account to sync it." |
+
 ## Found and fixed in this run
 
 - **Settings opened at the top**, far above the Google Docs card. `ritemark.aiSettings` now takes a section (commit `9f2151ec`).
