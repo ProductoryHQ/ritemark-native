@@ -13,6 +13,29 @@
  * Skip: Set SKIP_API_TESTS=true
  */
 
+// Standalone `tsx` runs outside an extension host. On this path the only
+// vscode API touched at run time is the EventEmitter constructor:
+// apiKeyManager and modelCatalog each build one at module load.
+const Module = require('module') as {
+  _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
+};
+const originalResolve = Module._resolveFilename.bind(Module);
+Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]) {
+  if (request === 'vscode') return '__vscode_llm_test_stub__';
+  return originalResolve(request, ...rest);
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(require as any).cache['__vscode_llm_test_stub__'] = {
+  id: '__vscode_llm_test_stub__',
+  filename: '__vscode_llm_test_stub__',
+  loaded: true,
+  children: [],
+  paths: [],
+  exports: {
+    EventEmitter: class {},
+  },
+};
+
 // Types
 interface FlowNode {
   id: string;
@@ -29,8 +52,24 @@ interface ExecutionContext {
   nodeLabels: Map<string, string>;
 }
 
-// Import the actual executor
-import { executeLLMNode } from './LLMNodeExecutor';
+// Import after installing the extension-host boundary stub.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { executeLLMNode, setExtensionContext } = require('./LLMNodeExecutor') as typeof import('./LLMNodeExecutor');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { initAPIKeyManager } = require('../../ai/apiKeyManager') as typeof import('../../ai/apiKeyManager');
+
+// The executor reads both keys from SecretStorage, which extension.ts wires
+// up. Here the environment variables stand in for it, read on every call so a
+// case can swap a key mid-run.
+const SECRET_ENV: Record<string, string> = {
+  'openai-api-key': 'OPENAI_API_KEY',
+  'google-ai-key': 'GOOGLE_AI_API_KEY',
+};
+const extensionContext = {
+  secrets: { get: async (key: string) => process.env[SECRET_ENV[key]] },
+} as unknown as import('vscode').ExtensionContext;
+initAPIKeyManager(extensionContext);
+setExtensionContext(extensionContext);
 
 function createTestNode(data: Record<string, unknown>): FlowNode {
   return {
@@ -146,10 +185,10 @@ async function runTests() {
   // Gemini Tests
   console.log('\nGemini Tests:');
 
-  await test('should call Gemini 2.0 Flash and return response', async () => {
+  await test('should call the default Gemini flow model and return response', async () => {
+    // No model: the executor falls back to the catalog's Gemini flow default.
     const node = createTestNode({
       provider: 'gemini',
-      model: 'gemini-2.0-flash',
       userPrompt: 'Reply with exactly: "Gemini test passed"',
     });
 
@@ -205,4 +244,7 @@ async function runTests() {
   }
 }
 
-runTests().catch(console.error);
+runTests().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

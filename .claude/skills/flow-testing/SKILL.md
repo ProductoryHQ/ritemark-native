@@ -54,8 +54,6 @@ cd extensions/ritemark && npm run test:all
 - `ClaudeCodeNodeExecutor.integration.test.ts` needs a Claude Code login (run `claude` once in a terminal).
 - `SKIP_API_TESTS=true` skips the API cases in both files.
 
-**Known gap (2026-09-22):** both live files currently fail under `tsx` whatever the credentials. The executors reach `import * as vscode from 'vscode'`: `LLMNodeExecutor` through `src/ai/apiKeyManager.ts`, and `ClaudeCodeNodeExecutor` through `src/agent/AgentRunner.ts` → `src/ai/modelCatalog/index.ts`. That module exists only inside an extension host. `SaveFileNodeExecutor.integration.test.ts` shows the pattern to follow: stub `vscode` before loading the executor. Until the two files get such a stub, `test:integration` and `test:all` exit non-zero.
-
 ---
 
 ## What Each Test Validates
