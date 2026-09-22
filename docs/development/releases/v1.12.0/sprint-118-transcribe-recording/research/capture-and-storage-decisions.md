@@ -48,7 +48,21 @@ Per spec R3, R4 and R6: one active session per app, and a non-interruptible Stop
 
 ### 2.4 Length (spec decision 5): to decide from measurements
 
-## 3. The spike, next
+## 3. Spike results so far (RunDev, 2026-09-22)
+
+The experiments ran in the real Transcribe webview, reached over DevTools. No product code was changed. CDP evaluations were marked as user gestures, which a Record click provides in real use. Harness: `spike118/harness.js` in the session scratchpad, not committed.
+
+| # | Experiment | Result | Consequence |
+|---|---|---|---|
+| S1 | `audioWorklet.addModule()` from a blob URL and from a data URL, under the current CSP | Both `AbortError: Unable to load a worklet's module`. The default `AudioContext` runs at **48,000 Hz** and starts **suspended** until a user gesture. | An AudioWorklet needs a CSP change: `script-src` plus `${webview.cspSource}` for a module shipped in `media/`. Otherwise use ScriptProcessor. The context must be resumed inside the Record click. |
+| S2 | ScriptProcessor (4096) on a synthetic 440 Hz source, 10 s | 475,136 of about 480,000 samples, ratio 0.99. Callbacks about every 85 ms, largest gap 151 ms. | ScriptProcessor keeps pace. The shortfall is the one start-up buffer, not drift. |
+| S3 | The same capture with Transcribe hidden (Search view shown) for 80 s | Ratio 0.998, no gap over 400 ms, heap steady at 36 MB. | A hidden panel does not pause capture (`retainContextWhenHidden: true`). A retained webview reports `document.hidden === false` even when hidden, so hiddenness can't be detected that way. It isn't needed. |
+| S4 | One hour of synthetic capture | Normal for **340 s**. Then the context turned **`suspended` silently**: sample count frozen, no error, while the wall clock ran on for the rest of the hour. Heap steady at 36 MB, so there was **no leak**. The suspension coincided with opening a second `AudioContext` and a pending `getUserMedia` (S5). | **Critical for R6/R7.** (1) Elapsed time shown to the user must come from **samples written**, never the wall clock. (2) The recorder must listen for `statechange` and a track's `ended`/`mute`, try one `resume()`, and otherwise **stop and finalize honestly** with a visible reason. It must never go on "recording" silence. |
+| S5 | `getUserMedia({audio: true})` in the Transcribe webview | Pending for more than 15 s, while `permissions.query` already said `granted` and the devices were listed by name. Patch 004's handler waits for the macOS microphone prompt to be answered. | The UI needs a **"Waiting for microphone permission…"** state with **Cancel**, because the request can hang until the user answers the OS dialog. |
+
+Still open: the real-microphone capture at 16 kHz, which waits for the macOS prompt; a deliberate reproduction of S4's trigger; host-side transport and the file sink (Phase 1 prototype); and Windows.
+
+## 4. The spike plan (original)
 
 Run in the sprint worktree's RunDev. Only the microphone test needs a person there, for one macOS permission click. The long runs use a synthetic source.
 
