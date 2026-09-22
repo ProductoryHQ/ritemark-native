@@ -25,10 +25,23 @@ export interface SinkFs {
   open(filePath: string, mode: 'create' | 'update'): Promise<SinkFile>;
   size(filePath: string): Promise<number>;
   exists(filePath: string): Promise<boolean>;
-  rename(from: string, to: string): Promise<void>;
+  /**
+   * Move `from` to `to` only if `to` does not exist; otherwise reject with an
+   * `EEXIST` error. Never replaces a file (R4) — unlike a plain rename, which
+   * silently overwrites on every platform.
+   */
+  renameNoReplace(from: string, to: string): Promise<void>;
   remove(filePath: string): Promise<void>;
   mkdirp(dirPath: string): Promise<void>;
 }
+
+const errorCode = (error: unknown): string | undefined => (error as NodeJS.ErrnoException | null)?.code;
+
+export const isNameTaken = (error: unknown): boolean => errorCode(error) === 'EEXIST';
+export const isMissing = (error: unknown): boolean => errorCode(error) === 'ENOENT';
+
+const nameTaken = (target: string): NodeJS.ErrnoException =>
+  Object.assign(new Error(`EEXIST: ${target} already exists`), { code: 'EEXIST' });
 
 export const nodeSinkFs: SinkFs = {
   async open(filePath, mode) {
@@ -52,7 +65,21 @@ export const nodeSinkFs: SinkFs = {
   },
   size: async (filePath) => (await fsp.stat(filePath)).size,
   exists: async (filePath) => fsp.access(filePath).then(() => true, () => false),
-  rename: (from, to) => fsp.rename(from, to),
+  async renameNoReplace(from, to) {
+    // A hard link is created atomically and fails with EEXIST if the name is
+    // taken, so no file can appear between the check and the move.
+    try {
+      await fsp.link(from, to);
+    } catch (error) {
+      if (isNameTaken(error)) throw error;
+      // No hard links on this volume (FAT/exFAT, some network shares): the
+      // best available is a checked rename.
+      if (await fsp.access(to).then(() => true, () => false)) throw nameTaken(to);
+      await fsp.rename(from, to);
+      return;
+    }
+    await fsp.unlink(from);
+  },
   remove: (filePath) => fsp.rm(filePath, { force: true }),
   mkdirp: async (dirPath) => { await fsp.mkdir(dirPath, { recursive: true }); },
 };
@@ -219,11 +246,14 @@ export async function rebuildPartial(fs: SinkFs, partPath: string): Promise<{ da
  * overwritten (R4).
  */
 export async function promoteFile(fs: SinkFs, partPath: string, preferredFinalPath: string): Promise<string> {
-  let target = preferredFinalPath;
-  for (let n = 2; await fs.exists(target); n++) {
-    if (n > 999) throw new RecordingSinkError('name-taken', 'No free name for the recording');
-    target = preferredFinalPath.replace(/( \(\d+\))?\.wav$/, ` (${n}).wav`);
+  for (let n = 1; n <= 999; n++) {
+    const target = n === 1 ? preferredFinalPath : preferredFinalPath.replace(/( \(\d+\))?\.wav$/, ` (${n}).wav`);
+    try {
+      await fs.renameNoReplace(partPath, target);
+      return target;
+    } catch (error) {
+      if (!isNameTaken(error)) throw error;
+    }
   }
-  await fs.rename(partPath, target);
-  return target;
+  throw new RecordingSinkError('name-taken', 'No free name for the recording');
 }

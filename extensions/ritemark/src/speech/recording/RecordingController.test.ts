@@ -110,6 +110,8 @@ function assertValidWav(file: string, dataBytes: number): void {
   assert.ok(isValidWavHeader(bytes.subarray(0, WAV_HEADER_BYTES), dataBytes), `${path.basename(file)} header`);
 }
 
+const coded = (code: string) => Object.assign(new Error(code), { code });
+
 /** A filesystem that records sizes and headers but stores no audio, for the four-hour limit. */
 function sparseFs(): SinkFs {
   const files = new Map<string, { size: number; header: Buffer }>();
@@ -133,9 +135,15 @@ function sparseFs(): SinkFs {
       if (!entry) throw new Error('ENOENT');
       return handle(entry);
     },
-    async size(p) { const e = files.get(p); if (!e) throw new Error('ENOENT'); return e.size; },
+    async size(p) { const e = files.get(p); if (!e) throw coded('ENOENT'); return e.size; },
     async exists(p) { return files.has(p); },
-    async rename(from, to) { const e = files.get(from); if (!e) throw new Error('ENOENT'); files.delete(from); files.set(to, e); },
+    async renameNoReplace(from, to) {
+      const e = files.get(from);
+      if (!e) throw coded('ENOENT');
+      if (files.has(to)) throw coded('EEXIST');
+      files.delete(from);
+      files.set(to, e);
+    },
     async remove(p) { files.delete(p); },
     async mkdirp() {},
   };
@@ -474,9 +482,9 @@ async function run(): Promise<void> {
       let renameFails = true;
       const flaky: SinkFs = {
         ...nodeSinkFs,
-        rename: async (from, to) => {
-          if (renameFails) throw new Error('EPERM: operation not permitted');
-          return nodeSinkFs.rename(from, to);
+        renameNoReplace: async (from, to) => {
+          if (renameFails) throw coded('EPERM');
+          return nodeSinkFs.renameNoReplace(from, to);
         },
       };
       const h = harness(root, { folders: [project], fs: flaky });
@@ -493,6 +501,50 @@ async function run(): Promise<void> {
       assertValidWav(h.staged.pop()!, 32_000);
       view = await h.controller.projection();
       assert.deepEqual(view.partials, []);
+    }
+
+    // ------------------------------------------------ the panel goes away while a picker is open
+    {
+      fresh();
+      const h = harness(root);
+      const chosen = path.join(root, 'Picked');
+      let answer!: (dir: string | undefined) => void;
+      h.deps.chooseLocation = () => new Promise((resolve) => { answer = resolve; });
+      const starting = h.controller.handle({ type: 'transcribe:record/start' });
+      await h.controller.detach(); // the webview that pressed Record reloads
+      answer(chosen);
+      await starting;
+      assert.equal(h.controller.activeSessionId, null, 'no session nobody can see or stop');
+      assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }]);
+      assert.ok(!fs.existsSync(chosen) || fs.readdirSync(chosen).length === 0, 'no .part left behind');
+      assert.deepEqual(h.store.get(PARTIALS_KEY) ?? [], []);
+      // The next Record from the new panel works normally.
+      h.deps.chooseLocation = async () => chosen;
+      const id = await begin(h);
+      await h.controller.handle({ type: 'transcribe:record/cancel', sessionId: id });
+    }
+
+    // ------------------------------------------------ an unreadable partial is kept, not forgotten
+    {
+      fresh();
+      const store = new Map<string, unknown>();
+      const first = harness(root, { folders: [project], store });
+      const id = await begin(first);
+      await first.controller.handle(chunk(id, 0));
+      await first.controller.dispose();
+      let locked = true;
+      const guarded: SinkFs = {
+        ...nodeSinkFs,
+        size: async (p) => {
+          if (locked) throw coded('EACCES');
+          return nodeSinkFs.size(p);
+        },
+      };
+      const restarted = harness(root, { folders: [project], store, fs: guarded });
+      assert.deepEqual((await restarted.controller.projection()).partials, [], 'not offered while unreadable');
+      assert.equal((store.get(PARTIALS_KEY) as unknown[]).length, 1, 'but not forgotten either');
+      locked = false;
+      assert.equal((await restarted.controller.projection()).partials.length, 1, 'offered again once readable');
     }
 
     // ------------------------------------------------ the final name was taken while recording

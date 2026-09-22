@@ -141,6 +141,17 @@ async function run(): Promise<void> {
     assert.equal(await promoteFile(nodeSinkFs, failing, final), path.join(dir, 'Recording (3).wav'));
     assert.equal(fs.statSync(final).size, WAV_HEADER_BYTES + 1000, 'the first file is untouched');
 
+    // A name that appears between any check and the move is still never overwritten.
+    const blind: SinkFs = { ...nodeSinkFs, exists: async () => false };
+    const racer = path.join(dir, 'racer.wav.part');
+    fs.writeFileSync(racer, Buffer.concat([wavHeader(4), pcm(2, 1)]));
+    const contested = path.join(dir, 'Contested.wav');
+    fs.writeFileSync(contested, 'written by someone else a moment ago');
+    assert.equal(await promoteFile(blind, racer, contested), path.join(dir, 'Contested (2).wav'));
+    assert.equal(fs.readFileSync(contested, 'utf8'), 'written by someone else a moment ago');
+    assert.ok(!fs.existsSync(racer), 'the part is moved, not copied');
+    await assert.rejects(nodeSinkFs.renameNoReplace(path.join(dir, 'Contested (2).wav'), contested), (error: NodeJS.ErrnoException) => error.code === 'EEXIST');
+
     console.log('WavRecordingSink.test.ts: all tests passed');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

@@ -41,7 +41,7 @@ import {
   type RecordingProjection,
   type StopReason,
 } from './types';
-import { RecordingSinkError, WavRecordingSink, promoteFile, rebuildPartial, recoverableDataBytes, type SinkFs } from './WavRecordingSink';
+import { RecordingSinkError, WavRecordingSink, isMissing, promoteFile, rebuildPartial, recoverableDataBytes, type SinkFs } from './WavRecordingSink';
 
 export const PARTIALS_KEY = 'speech:recording:partials:v1';
 export const NO_FOLDER_LOCATION_KEY = 'speech:recording:noFolderLocation:v1';
@@ -103,6 +103,12 @@ export const INTERRUPTED_NOTICE = 'The recording was interrupted when the Transc
 export class RecordingController {
   private session: ActiveSession | null = null;
   private starting = false;
+  /**
+   * Bumped whenever the webview that asked for a recording goes away. A start
+   * whose picker resolves after that belongs to nobody and must not open a
+   * session the new panel cannot see or stop.
+   */
+  private viewGeneration = 0;
   private error: RecordingProjection['error'] = null;
   private notice: string | null = null;
   private partials: PartialEntry[];
@@ -181,10 +187,11 @@ export class RecordingController {
     this.starting = true;
     this.error = null;
     this.notice = null;
+    const generation = this.viewGeneration;
     try {
       const target = await this.resolveDestination();
-      if (!target) {
-        // The user closed a picker: nothing happened.
+      if (!target || generation !== this.viewGeneration) {
+        // The user closed a picker, or the panel that asked is gone: nothing happened.
         this.deps.postEvent({ type: 'transcribe:record/notStarted' });
         this.deps.onChange();
         return;
@@ -200,6 +207,11 @@ export class RecordingController {
         this.deps.log?.(`[recording] destination failed: ${String(error)}`);
         this.deps.postEvent({ type: 'transcribe:record/notStarted' });
         this.setError('destination-unavailable');
+        return;
+      }
+      if (generation !== this.viewGeneration) {
+        await sink.discard().catch(() => {});
+        this.deps.postEvent({ type: 'transcribe:record/notStarted' });
         return;
       }
       const id = this.deps.newId();
@@ -381,6 +393,7 @@ export class RecordingController {
    * the panel offers to save or discard (R6).
    */
   async detach(): Promise<void> {
+    this.viewGeneration++;
     const session = this.session;
     if (!session || session.phase === 'finalizing') return;
     session.phase = 'finalizing';
@@ -397,6 +410,7 @@ export class RecordingController {
 
   /** Extension shutdown: close the file with a correct header, keep the entry. */
   async dispose(): Promise<void> {
+    this.viewGeneration++;
     const session = this.session;
     if (!session) return;
     this.endSession(session);
@@ -461,8 +475,15 @@ export class RecordingController {
       let size: number;
       try {
         size = await this.deps.fs.size(entry.partPath);
-      } catch {
-        continue; // moved or deleted outside Ritemark: forget it
+      } catch (error) {
+        // Gone for good (moved or deleted outside Ritemark): forget it. Anything
+        // else — permissions, an unmounted or syncing folder — may clear, so the
+        // entry is kept and offered again once the file is readable.
+        if (!isMissing(error)) {
+          this.deps.log?.(`[recording] cannot read interrupted recording: ${String(error)}`);
+          keep.push(entry);
+        }
+        continue;
       }
       const dataBytes = recoverableDataBytes(size);
       if (dataBytes === 0) {
