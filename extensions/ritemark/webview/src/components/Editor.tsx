@@ -23,6 +23,7 @@ import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
 import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
 import { HeadingLevelShortcuts } from '../extensions/HeadingLevelShortcuts'
+import { SelectionBoundaryKeys } from '../extensions/SelectionBoundaryKeys'
 import { SearchExtension } from '../extensions/SearchExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
@@ -358,6 +359,11 @@ export function Editor({
       // including the TOC click landing boundary. Must come after StarterKit
       // so this binding gets the first dispatch chance.
       HeadingLevelShortcuts,
+      // Sprint 126 (#332): binds Shift-Home/Shift-End, which neither TipTap nor
+      // ProseMirror binds. Without them Chrome's native contenteditable default
+      // extended Shift+End to the end of the document, and the next Delete wiped
+      // every block below the caret. Same placement reason as above.
+      SelectionBoundaryKeys,
       CodeBlockWithCopyExtension.configure({
         lowlight,
         defaultLanguage: 'plaintext',
