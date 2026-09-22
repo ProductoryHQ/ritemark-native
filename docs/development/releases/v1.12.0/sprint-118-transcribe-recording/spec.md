@@ -1,6 +1,6 @@
 # Sprint 118 Spec — Direct Transcribe Recording
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** pending · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** [#328](https://github.com/ProductoryHQ/ritemark-native/issues/328) · **Evidence:** [research/current-state-audit.md](./research/current-state-audit.md)
 
 ## Purpose
 
@@ -37,6 +37,7 @@ Acceptance criteria:
 - Stop cannot be triggered twice and transitions through a non-interruptible **Saving recording…** state until host result.
 - Successful save opens the existing pending-import card; it does not automatically choose an engine or upload.
 - Pause/resume, trimming, monitoring, and input selection are not shown in v1.11.
+- *(revised 2026-09-22)* The release is now v1.12.0; the sprint moved there on 2026-09-15. The criterion is unchanged: none of these controls ship in this sprint.
 
 ### R2: Permission and device honesty
 
@@ -118,6 +119,7 @@ Acceptance criteria:
 - No audio bytes enter logs, telemetry, Memento, webview persisted state, or transcript metadata beyond existing file path/fingerprint rules.
 - Controls/status are keyboard/screen-reader accessible, non-color-only, usable at narrow width/200% zoom/high contrast/reduced motion.
 - Capture protocol/sink/UI tests and existing Transcribe/dictation regressions pass; architecture, user docs, changelog, v1.11 release notes, tracker, issue, and QA are current.
+- *(revised 2026-09-22)* Read "v1.11 release notes" as the v1.12.0 release notes (`docs/releases/v1.12.0/release-notes.md`), because the sprint moved releases on 2026-09-15.
 
 ## Non-Requirements
 
@@ -130,7 +132,7 @@ Acceptance criteria:
 ## Phase 0 Decisions
 
 1. Validate and approve sample format, resampler, chunk size, message/backpressure bounds, and long-run drift/size.
-2. Freeze workspace, multi-root, no-folder, naming, collision, and user-ownership rules.
+2. Freeze workspace, multi-root, no-folder, naming, collision, and user-ownership rules. *(Decided 2026-09-22 by Jarmo: with a folder open, save into the project; with no folder open, ask where to save before recording starts. Phase 0 freezes the rest.)*
 3. Freeze panel hide/reload/disposal, app-shutdown, partial recovery, and discard behavior.
 4. Approve one-active-session ownership and stop/finalization atomicity.
 5. Decide duration/size warning or hard limit from measured evidence.

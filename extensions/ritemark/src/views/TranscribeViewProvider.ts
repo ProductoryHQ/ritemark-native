@@ -10,9 +10,12 @@
  * and Ritemark tokens instead of a second hand-rolled stylesheet.
  */
 
+import { randomUUID } from 'crypto';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { isEnabled } from '../features';
 import type { EngineRegistry } from '../speech/engineRegistry';
 import type { JobManager } from '../speech/JobManager';
 import type { SessionStore } from '../speech/SessionStore';
@@ -20,6 +23,9 @@ import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, classifyInput } from '../speech/aud
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
 import { ensureModelDownloaded } from '../voiceDictation/modelManager';
+import { RecordingController } from '../speech/recording/RecordingController';
+import { decodeRecordingRequest, isRecordingMessage } from '../speech/recording/protocol';
+import { nodeSinkFs } from '../speech/recording/WavRecordingSink';
 import type { EngineId, TranscriptionJob, TranscriptSession } from '../speech/types';
 
 /** What a row in the panel needs; deliberately not the whole session. */
@@ -55,6 +61,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   /** Whether the library is showing every project's recordings, not just this one's. */
   private _showAllProjects = false;
   private readonly _disposables: vscode.Disposable[] = [];
+  /** Sprint 118: direct recording. Owns the file; the webview only captures. */
+  private readonly _recording: RecordingController;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -73,10 +81,67 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         }
       }),
     });
+
+    // Record appears or disappears as soon as its kill switch changes.
+    this._disposables.push(
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('ritemark.features.transcribe-direct-recording')) void this._pushState();
+      }),
+    );
+
+    this._recording = new RecordingController({
+      fs: nodeSinkFs,
+      state: this._memento,
+      newId: () => randomUUID(),
+      now: () => new Date(),
+      home: os.homedir(),
+      isEnabled: () => isEnabled('transcribe-direct-recording'),
+      workspaceFolders: () =>
+        (vscode.workspace.workspaceFolders ?? [])
+          .filter((folder) => folder.uri.scheme === 'file')
+          .map((folder) => ({ name: folder.name, path: folder.uri.fsPath })),
+      activeFilePath,
+      chooseWorkspaceFolder: async () => {
+        const folder = await vscode.window.showWorkspaceFolderPick({
+          placeHolder: 'Save the recording in which folder?',
+        });
+        return folder && folder.uri.scheme === 'file' ? { name: folder.name, path: folder.uri.fsPath } : undefined;
+      },
+      chooseLocation: async (current) => {
+        const picked = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          title: 'Where should Ritemark save recordings?',
+          openLabel: 'Save recordings here',
+          defaultUri: vscode.Uri.file(current ?? os.homedir()),
+        });
+        return picked?.[0]?.fsPath;
+      },
+      stageImport: (finalPath) => this._stageImport(finalPath),
+      moveToTrash: async (filePath) => {
+        await vscode.workspace.fs.delete(vscode.Uri.file(filePath), { useTrash: true });
+      },
+      postEvent: (event) => this._post(event),
+      openMicrophoneSettings: () => {
+        const page = MICROPHONE_SETTINGS[process.platform];
+        if (page) void vscode.env.openExternal(vscode.Uri.parse(page));
+      },
+      onChange: () => void this._pushState(),
+      log: (message) => console.log(message),
+    });
   }
 
   dispose(): void {
     for (const disposable of this._disposables) disposable.dispose();
+  }
+
+  /**
+   * Extension shutdown: close an in-progress recording with a correct header.
+   * It stays a `.wav.part` that the panel offers to save next time (R6).
+   */
+  async prepareForShutdown(): Promise<void> {
+    await this._recording.dispose();
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -88,10 +153,28 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
+    webviewView.onDidDispose(() => {
+      if (this._view !== webviewView) return;
+      this._view = null;
+      // The capture died with the webview; keep what was written (R6).
+      void this._recording.detach();
+    });
+
     webviewView.webview.onDidReceiveMessage((message) => {
+      // Sprint 118 R3: every recording message is decoded against its exact
+      // shape; a malformed one stops an active recording honestly. Handled
+      // without awaiting so chunks keep their order (the controller queues the
+      // write synchronously).
+      if (isRecordingMessage(message)) {
+        const request = decodeRecordingRequest(message);
+        void (request ? this._recording.handle(request) : this._recording.handleMalformed());
+        return;
+      }
       switch (message.type) {
         case 'transcribe:ready':
-          void this._pushState();
+          // A (re)loaded panel cannot own a capture that was running in the
+          // webview it replaced: that recording becomes an interrupted one.
+          void this._recording.detach().then(() => this._pushState());
           break;
         case 'transcribe:pickFile':
           void this._pickFile();
@@ -337,7 +420,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     }));
 
     const lastEngineId = this._memento.get<string>('speech:lastEngineId');
-    const preferred = await this._registry.preferred(lastEngineId);
+    const [preferred, recording] = await Promise.all([
+      this._registry.preferred(lastEngineId),
+      this._recording.projection(),
+    ]);
 
     this._post({
       type: 'transcribe:state',
@@ -353,6 +439,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         otherProjectCount: elsewhere.length,
         showAllProjects: this._showAllProjects,
         hasProject: root !== null,
+        recording,
       },
     });
 
@@ -406,9 +493,28 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   }
 }
 
+/** The OS privacy page where the user grants Ritemark the microphone. */
+const MICROPHONE_SETTINGS: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+  win32: 'ms-settings:privacy-microphone',
+};
+
 /** The folder a recording belongs to, or null when none is open. */
 function currentWorkspaceRoot(): string | null {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+}
+
+/**
+ * The file in the active editor tab. Ritemark opens Markdown in a custom
+ * editor, so `activeTextEditor` is usually empty; the tab input is not.
+ */
+function activeFilePath(): string | null {
+  const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  const uri =
+    input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom || input instanceof vscode.TabInputNotebook
+      ? input.uri
+      : undefined;
+  return uri?.scheme === 'file' ? uri.fsPath : null;
 }
 
 function isActive(job: TranscriptionJob): boolean {

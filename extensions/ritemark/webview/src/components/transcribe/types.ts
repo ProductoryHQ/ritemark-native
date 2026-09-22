@@ -77,6 +77,32 @@ export interface TranscribeState {
   showAllProjects: boolean;
   /** False when no folder is open, which is its own kind of "project". */
   hasProject: boolean;
+  /** Sprint 118: direct recording, as the host sees it. */
+  recording: RecordingProjection;
+}
+
+/** Mirrors `src/speech/recording/types.ts` — `RecordingProjection`. */
+export interface RecordingProjection {
+  enabled: boolean;
+  phase: 'idle' | 'preparing' | 'recording' | 'finalizing';
+  sessionId: string | null;
+  fileName: string | null;
+  folderLabel: string | null;
+  durationSec: number;
+  warnLong: boolean;
+  noFolderLocation: string | null;
+  hasProject: boolean;
+  error: { code: string; message: string } | null;
+  notice: string | null;
+  partials: InterruptedRecording[];
+}
+
+/** A `.wav.part` left by an interrupted recording, addressed by id only. */
+export interface InterruptedRecording {
+  id: string;
+  fileName: string;
+  folderLabel: string;
+  durationSec: number;
 }
 
 export const ACTIVE_STATES: JobState[] = ['queued', 'preparing', 'uploading', 'transcribing', 'saving'];

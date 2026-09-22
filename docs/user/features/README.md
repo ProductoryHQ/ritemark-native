@@ -71,7 +71,7 @@ These work across all modes.
 
 | Feature | Description |
 |---------|-------------|
-| [Transcribe](transcribe.md) | Turn a recording into a speaker-attributed document |
+| [Transcribe](transcribe.md) | Record or add a recording, and turn it into a speaker-attributed document |
 | [Export](export.md) | PDF and Word export |
 | [Publish to Google Docs](google-docs.md) | Create a Google Doc from a document and keep it in sync |
 

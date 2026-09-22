@@ -1,6 +1,6 @@
 # Sprint 118 Design — Direct Recording in Transcribe
 
-**Status:** Draft for Phase 0 approval<br>
+**Status:** Approved with the Phase 0 gate (Jarmo, 2026-09-22)<br>
 **System:** Ritemark Indigo-Editorial<br>
 **Scope:** Start/Stop/Cancel, destination, permission, saving, recovery, and handoff to existing engine choice
 
@@ -24,6 +24,20 @@ Library and existing jobs continue below.
 ```
 
 At narrow width the two actions stack, Record first. They remain visually equal entry paths; Record is not a destructive/emergency red button.
+
+### Revised 2026-09-22 (RunDev review)
+
+Jarmo: the buttons must fit on one line, and Record can be an icon button. The idle row is now:
+
+```text
+┌──────────────────────────┐ ┌───┐
+│ + Add recording          │ │ ● │
+└──────────────────────────┘ └───┘
+```
+
+Record is a square icon button with the accessible name "Record", the same height as Add recording. Every recording card keeps its buttons on one row, primary first: `[■ Stop and use] [Cancel]`, `[Save recording] [Discard]`, `[Microphone Settings] [Dismiss]`.
+
+Every button has a tooltip (Jarmo: "nuppudel peaks olema tooltipid!"). It says what the button does, or why it is unavailable: a disabled Record says "A recording is in progress" or "Set up a transcription engine first". Long destination paths show their last two folders (`…/Meetings/2026/Recording … .wav`), and the full path is in a tooltip.
 
 ## Recording State
 
@@ -106,9 +120,11 @@ No second permission request or file is created. Phase 0 decides whether an **Op
 
 ## Phase 0 Decisions for Jarmo
 
-- [ ] Approve separate Record/Add actions and responsive stacking.
-- [ ] Approve Start/Stop/Cancel only; no Pause in v1.11.
-- [ ] Approve visible destination, timer, acknowledged-size wording, and non-red live state.
-- [ ] Approve saving/no-interruption state and transition to existing pending card.
-- [ ] Approve permission/device/storage copy and interrupted recovery card.
-- [ ] Approve one-active-session conflict behavior.
+Approved together with the Phase 0 gate on 2026-09-22 ("kinnitan, alusta koodiga"). One session is allowed per extension host, which is per window; the conflict copy covers a second Record press in the same window.
+
+- [x] Approve separate Record/Add actions and responsive stacking.
+- [x] Approve Start/Stop/Cancel only; no Pause in v1.11.
+- [x] Approve visible destination, timer, acknowledged-size wording, and non-red live state.
+- [x] Approve saving/no-interruption state and transition to existing pending card.
+- [x] Approve permission/device/storage copy and interrupted recovery card.
+- [x] Approve one-active-session conflict behavior.

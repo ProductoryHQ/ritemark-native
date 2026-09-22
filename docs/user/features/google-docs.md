@@ -4,7 +4,7 @@
 
 Ritemark can publish a markdown document as a Google Doc in your own Google Drive. After that, **Sync** replaces the Doc's text with your current version, so colleagues who work in Google Docs always read the latest copy. Your markdown file stays the original: nothing from the Google Doc is ever read back into it.
 
-*Available from Ritemark 1.12. Marked Experimental in Settings.*
+*Available from Ritemark 1.12.*
 
 ---
 
