@@ -123,7 +123,11 @@ for (const markdown of [
   assert.deepEqual(struckText(reopened), ['~5 min'])
 }
 
-for (const text of ['~', '~~', '~~~foo', '~foo', 'foo~', 'foo~~', 'a~~b', 'a~~~b', '~a~', 'back\\slash~']) {
+for (const text of [
+  '~', '~~', '~~~foo', '~foo', 'foo~', 'foo~~', 'a~b', 'a~~b', 'a~~~b', '~a~', 'back\\slash~',
+  // Two single tildes used to pair up as a nested strike and vanish on reopen.
+  'a~b~c', 'a~b~c~d', 'v1~v2 and v3~v4', 'from ~5 to ~10',
+]) {
   for (const html of [`<p><s>${text}</s></p><p>After</p>`, `<p>Before <s>${text}</s> after</p>`, `<ul><li><p><s>${text}</s></p></li></ul>`]) {
     const doc = fromHTML(html)
     const markdown = save(doc)
@@ -134,8 +138,7 @@ for (const text of ['~', '~~', '~~~foo', '~foo', 'foo~', 'foo~~', 'a~~b', 'a~~~b
   }
 }
 
-// Only tildes that would be read as delimiters are escaped.
-assert.equal(turndown.turndown('<p><s>a~b</s></p>'), '~~a~b~~', 'a single inner tilde is written as it is')
+assert.equal(turndown.turndown('<p><s>a~b~c</s></p>'), '~~a\\~b\\~c~~', 'every tilde inside struck text is escaped')
 assert.equal(turndown.turndown('<p><s>foo~</s></p>'), '~~foo&#126;~~', 'a final tilde is a character reference')
 // TipTap's code mark excludes every other mark, so the editor never produces
 // this; pasted or DOCX HTML can, and the Markdown layer must keep it intact.

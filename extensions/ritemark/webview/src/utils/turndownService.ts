@@ -85,14 +85,15 @@ export function createTurndownService(): TurndownService {
 const STRIKE_CONTENT_TOKENS = /(`+)[\s\S]*?(?<!`)\1(?!`)|\\[\s\S]|~+/g
 
 /**
- * Escape the literal tildes in a struck run that `marked` would read as part of
- * a delimiter. A leading tilde would make the run start `~~~`, which opens a
- * code fence at the start of a line and swallows the rest of the document on
- * reopen. Two or more tildes inside the text close the strike early. And
- * `marked` only closes a strike after a character that is not a tilde, escaped
- * or not, so a final tilde is written as the character reference `&#126;`.
+ * Escape every literal tilde in a struck run, because `marked` reads tildes
+ * inside a strike as delimiters. A leading tilde makes the run start `~~~`,
+ * which opens a code fence at the start of a line and swallows the rest of the
+ * document on reopen. Two tildes together close the strike early. Two single
+ * tildes pair up as a nested strike and vanish: `~~a~b~c~~` reopens as `abc`.
+ * `marked` also only closes a strike after a character that is not a tilde,
+ * escaped or not, so a final tilde is written as the character reference
+ * `&#126;`.
  *
- * A single tilde inside the text is not a delimiter and stays as written.
  * Code spans are literal, so they are left alone, as are the backslash escapes
  * Turndown already wrote (it writes a leading `~~~` as `\~~~`).
  */
@@ -101,12 +102,10 @@ function escapeStrikeTildes(content: string): string {
     STRIKE_CONTENT_TOKENS,
     (match: string, _codeFence: string | undefined, offset: number) => {
       if (match[0] !== '~') return match
-      const atStart = offset === 0
-      const atEnd = offset + match.length === content.length
-      if (match.length === 1 && !atStart && !atEnd) return match
-      return atEnd
-        ? '\\~'.repeat(match.length - 1) + '&#126;'
-        : '\\~'.repeat(match.length)
+      const escaped = '\\~'.repeat(match.length)
+      return offset + match.length === content.length
+        ? escaped.slice(0, -2) + '&#126;'
+        : escaped
     },
   )
 }
