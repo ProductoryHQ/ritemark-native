@@ -71,14 +71,16 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
-  // Sprint 119: kill switch for the whole Google Docs publishing surface —
-  // Settings card, editor menu items and every host handler. Flag-off keeps
-  // stored tokens and document links; it only stops offering the feature.
+  // Sprint 119: gates the whole Google Docs publishing surface — Settings
+  // card, editor menu items and every host handler. Stable since 2026-09-22:
+  // it ships fully in v1.12.0 (Jarmo), so there is no user setting; the
+  // code-level kill switch is `status: 'disabled'`, which keeps stored tokens
+  // and document links and only stops offering the feature.
   'google-docs-publishing': {
     id: 'google-docs-publishing',
     label: 'Google Docs Publishing',
     description: 'Publish a Markdown document to Google Docs and keep that same Doc updated with Sync.',
-    status: 'experimental',
+    status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
   'composer-thinking-effort': {

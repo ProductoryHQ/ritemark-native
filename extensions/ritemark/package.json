@@ -285,12 +285,6 @@
             "description": "Composer Thinking Effort: choose a model-supported effort for the next Agent Chat message. Kill-switch — disable to use provider defaults.",
             "scope": "application"
           },
-          "ritemark.features.google-docs-publishing": {
-            "type": "boolean",
-            "default": true,
-            "description": "Google Docs publishing: publish a Markdown document to Google Docs and Sync later changes to the same Doc. Kill-switch — disabling hides the feature but keeps your account connection and document links.",
-            "scope": "application"
-          },
           "ritemark.features.transcribe-direct-recording": {
             "type": "boolean",
             "default": true,
