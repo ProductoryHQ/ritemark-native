@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Icon } from '../ui/Icon'
 import { googleDocsMenuItems, type GoogleDocsAction, type GoogleDocsProjection } from './googleDocsMenu'
 
@@ -22,6 +22,9 @@ interface ExportMenuProps {
  * - Click outside closes menu
  * - ESC key closes menu
  * - Menu item click triggers export and closes menu
+ * - Keyboard (Sprint 119): opening focuses the first item; Arrow keys, Home and
+ *   End move between enabled items; Escape and Tab close the menu and return
+ *   focus to the Export button. Without this the menu was mouse-only.
  *
  * Z-index: 100 (below bubble menu 200, above header 60)
  */
@@ -38,19 +41,56 @@ export function ExportMenu({
   const menuRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
+  const closeAndRestoreFocus = useCallback(() => {
+    onClose()
+    anchorElement?.focus()
+  }, [onClose, anchorElement])
+
   // Handle ESC key
   useEffect(() => {
     if (!isOpen) return
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        closeAndRestoreFocus()
       }
     }
 
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
+  }, [isOpen, closeAndRestoreFocus])
+
+  // Keyboard navigation between the enabled items (a busy line is skipped).
+  const enabledItems = useCallback(
+    () => Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('.export-menu-item:not(:disabled)') ?? []),
+    [],
+  )
+
+  useEffect(() => {
+    if (!isOpen) return
+    const frame = requestAnimationFrame(() => enabledItems()[0]?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [isOpen, enabledItems])
+
+  const handleMenuKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = enabledItems()
+    if (items.length === 0) return
+    const current = items.indexOf(document.activeElement as HTMLButtonElement)
+    const moveTo = (index: number) => {
+      event.preventDefault()
+      items[(index + items.length) % items.length].focus()
+    }
+    switch (event.key) {
+      case 'ArrowDown': moveTo(current + 1); break
+      case 'ArrowUp': moveTo(current < 0 ? items.length - 1 : current - 1); break
+      case 'Home': moveTo(0); break
+      case 'End': moveTo(items.length - 1); break
+      case 'Tab':
+        event.preventDefault()
+        closeAndRestoreFocus()
+        break
+    }
+  }, [enabledItems, closeAndRestoreFocus])
 
   // Handle click outside
   useEffect(() => {
@@ -101,13 +141,13 @@ export function ExportMenu({
 
   const handleExportPDF = useCallback((templateId = 'default') => {
     onExportPDF(templateId)
-    onClose()
-  }, [onExportPDF, onClose])
+    closeAndRestoreFocus()
+  }, [onExportPDF, closeAndRestoreFocus])
 
   const handleExportWord = useCallback((templateId = 'default') => {
     onExportWord(templateId)
-    onClose()
-  }, [onExportWord, onClose])
+    closeAndRestoreFocus()
+  }, [onExportWord, closeAndRestoreFocus])
 
   const handleCopyAsMarkdown = useCallback(async () => {
     await onCopyAsMarkdown()
@@ -125,6 +165,9 @@ export function ExportMenu({
       <div
         ref={menuRef}
         className="export-menu"
+        role="menu"
+        aria-label="Export"
+        onKeyDown={handleMenuKeyDown}
         style={{
           position: 'fixed',
           top: `${position.top}px`,
@@ -132,29 +175,30 @@ export function ExportMenu({
           transform: 'translateX(-100%)', // Right-align with button
         }}
       >
-        <button className="export-menu-item" onClick={() => handleExportPDF('clean')}>
+        <button className="export-menu-item" role="menuitem" onClick={() => handleExportPDF('clean')}>
           <Icon name="file-text" size={16} className="export-menu-icon" />
           <span>Export PDF</span>
         </button>
-        <button className="export-menu-item" onClick={() => handleExportWord('clean')}>
+        <button className="export-menu-item" role="menuitem" onClick={() => handleExportWord('clean')}>
           <Icon name="file-doc" size={16} className="export-menu-icon" />
           <span>Export Word</span>
         </button>
 
         {googleDocsItems.length > 0 && (
           <>
-            <div className="export-menu-divider" />
+            <div className="export-menu-divider" role="separator" />
             {googleDocsItems.map((item) => (
               <button
                 key={item.label}
                 className="export-menu-item"
+                role="menuitem"
                 disabled={item.disabled}
                 title={item.description}
                 aria-busy={item.icon === 'circle-notch' || undefined}
                 onClick={() => {
                   if (!item.action || !onGoogleDocsAction) return
                   onGoogleDocsAction(item.action)
-                  onClose()
+                  closeAndRestoreFocus()
                 }}
               >
                 <Icon
@@ -168,10 +212,11 @@ export function ExportMenu({
           </>
         )}
 
-        <div className="export-menu-divider" />
+        <div className="export-menu-divider" role="separator" />
 
         <button
           className={`export-menu-item ${copied ? 'export-menu-item-success' : ''}`}
+          role="menuitem"
           onClick={handleCopyAsMarkdown}
         >
           {copied ? (
@@ -242,6 +287,22 @@ export function ExportMenu({
 
         .export-menu-item:active {
           opacity: 0.8;
+        }
+
+        .export-menu-item:focus-visible {
+          outline: 1px solid var(--vscode-focusBorder);
+          outline-offset: -1px;
+          background: var(--vscode-menu-selectionBackground);
+          color: var(--vscode-menu-selectionForeground);
+        }
+
+        /* An icon always takes its row's text colour when the row is
+           highlighted (Icon's muted default is a fill attribute, which CSS
+           overrides). */
+        .export-menu-item:hover:not(:disabled) svg,
+        .export-menu-item:focus-visible svg {
+          fill: currentColor;
+          color: currentColor;
         }
 
         .export-menu-item:disabled,
