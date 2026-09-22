@@ -84,6 +84,9 @@ let flowScheduler: FlowScheduler | null = null;
 // Settings provider
 let settingsProvider: RitemarkSettingsProvider | null = null;
 
+// Sprint 118: Transcribe panel, so shutdown can close an in-progress recording cleanly
+let transcribeView: { prepareForShutdown(): Promise<void> } | null = null;
+
 const DEFAULT_DRAFTS_DIR_NAME = 'Ritemark';
 
 function buildCsvTemplate(columns = 10, rows = 20): string {
@@ -497,6 +500,7 @@ export function activate(context: vscode.ExtensionContext) {
       speech.store,
       context.globalState,
     );
+    transcribeView = transcribeViewProvider;
     context.subscriptions.push(
       transcribeViewProvider,
       vscode.window.registerWebviewViewProvider(TranscribeViewProvider.viewType, transcribeViewProvider, {
@@ -938,6 +942,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
+  await transcribeView?.prepareForShutdown();
   await unifiedViewProvider?.prepareForShutdown();
   await shutdownAnalytics();
 }

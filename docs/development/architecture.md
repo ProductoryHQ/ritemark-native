@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-21 (Sprint 119 Google Docs publishing)
+**Last updated:** 2026-09-22 (Sprint 118 direct Transcribe recording)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -150,7 +150,7 @@ extensions/ritemark/src/
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime
 ├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
-├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions
+├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts, transcriptWorkbenchProvider.ts
@@ -303,7 +303,7 @@ A Markdown file can be published as a Google Doc and later synced to the same Do
 | `googleDocs/GoogleDocsController.ts` | Owns every decision and all user-facing copy. It has no `vscode` import: UI, transport and flag are injected, and `vscodeGoogleDocs.ts` composes it. Confirmations, progress and results use native modals and notifications. |
 | `googleDocs/protocol.ts` | Exact-key decoding. The editor sends `google-docs/publish {html, title}`, `open`, `unlink`, `open-settings` and `request-projection`; Settings sends `connect`, `cancel`, `disconnect`, `choose-template` and `clear-template`. **A webview can never name a destination file**: the host takes it from its own link record. |
 
-Webviews see only projections: `GoogleDocsDocumentProjection` (state, Doc URL, title, last sync time, bound account email, stage) for the editor's Export menu, and `GoogleDocsSettingsProjection` for the Settings card. No token, account id, file id or revision leaves the host. `ritemark.aiSettings` accepts an optional section (`'google-docs'`), so an action can open Settings at the card. The flag is `google-docs-publishing` (experimental, default on).
+Webviews see only projections: `GoogleDocsDocumentProjection` (state, Doc URL, title, last sync time, bound account email, stage) for the editor's Export menu, and `GoogleDocsSettingsProjection` for the Settings card. No token, account id, file id or revision leaves the host. `ritemark.aiSettings` accepts an optional section (`'google-docs'`), so an action can open Settings at the card. The flag is `google-docs-publishing`: experimental with a default-on setting when it merged, `stable` since 2026-09-22, when Jarmo decided it ships fully in v1.12.0.
 
 Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermaid and SVG inlining) and passes it through `export/v2/htmlPipeline.ts`, so comments are stripped at the same chokepoint.
 
@@ -787,7 +787,8 @@ src/speech/
 ├── workbenchProtocol.ts     typed/validated webview → host requests
 ├── transcriptMarkdown.ts    session → document
 ├── exportTranscript.ts      where the document lands
-└── activeTranscript.ts      resolver so the AI sidebar gets the transcript, not the .m4a
+├── activeTranscript.ts      resolver so the AI sidebar gets the transcript, not the .m4a
+└── recording/               direct recording (Sprint 118), see below
 ```
 
 **Two facts shape every surface** and are not implementation details:
@@ -835,6 +836,78 @@ or adding another provider stack.
   windowed — windowing renumbers speakers and breaks global rename.
 - Webview `<audio>` + `asWebviewUri` serves range requests (seek to 45:00 in a
   42 MB file: 223 ms). The first `play()` must ride a real user gesture.
+
+### Direct recording (Sprint 118)
+
+Record in the Transcribe panel is **capture, not transcription**: it produces one
+ordinary 16 kHz mono PCM16 WAV and hands it to the provider's existing
+`_stageImport`, so the engine/privacy/cost choice stays exactly where Add recording
+puts it. `SessionStore`, `JobManager` and the workbench have no recording branch.
+
+```
+src/speech/recording/
+├── types.ts               frozen Phase 0 constants, error codes, RecordingProjection
+├── protocol.ts            exact-field decoder for transcribe:record/* (ids, never paths)
+├── recordingPaths.ts      destination rules, names, (n) collisions, canonical WAV header
+├── WavRecordingSink.ts    exclusive .wav.part, serialized append, validate, promote, rebuild
+└── RecordingController.ts one session per host; no vscode import (deps injected)
+
+webview/src/components/transcribe/recording/
+├── capture.ts             resampler, PCM16 chunker, ack ledger, error naming (pure)
+├── captureSession.ts      mic + audio graph lifecycle against an injected AudioEnv
+├── useTranscribeRecording.ts   browser AudioEnv + React binding
+└── RecordingCards.tsx     permission, live, saving, problem, interrupted-recovery UI
+```
+
+**Split of ownership.** The webview owns the microphone and the audio graph; the
+host owns every path and the file. The webview never names a file: partials are
+addressed by an opaque host id. `TranscribeViewProvider` routes every
+`transcribe:record/*` message through the decoder; a malformed one stops an
+active recording honestly (it is finalized, never dropped).
+
+**Capture (webview).** A `ScriptProcessor(4096)` in an `AudioContext` created
+**inside the Record click** — Chromium only lets a context run when created in a
+user gesture, and the host may show a folder picker before it answers, so the
+host replies `begin` or `notStarted` and the webview releases the context on
+the latter. A 16 kHz context is tried first (browser resampling); the fallback is
+the device rate plus a streaming box-filter resampler. Input is unprocessed
+(no echo cancellation or noise suppression). 1 s PCM16 chunks carry
+`sessionId` + `sequence`; the host acks each one, at most 4 may be unacked, and a
+fifth stops with `too-slow` rather than buffering. Elapsed time and size come from
+**acked samples**, never the wall clock. A suspended context gets one `resume()`,
+then an honest `suspended` stop; a track `ended` stops with `device-lost`.
+
+**File (host).** `WavRecordingSink` creates `<name>.wav.part` exclusively with a
+placeholder header and appends in accepted order through one serialized queue.
+Stop = checkpoint (header patched, fsync, close), read-back validation, then a
+never-overwrite rename to `.wav` (` (n)` if the name was taken meanwhile). A
+duplicate chunk is re-acked and changes nothing; a gap or a length mismatch stops
+and saves; chunks for another or finished session are ignored. The 4-hour limit
+(`MAX_DATA_BYTES`) is enforced by the host, not trusted to the webview.
+
+**Interruption.** Each session is registered in `globalState`
+(`speech:recording:partials:v1`) before any audio exists. A reloaded panel
+(`transcribe:ready`) or a disposed view detaches the session and checkpoints the
+file; `deactivate()` checkpoints through `TranscribeViewProvider.prepareForShutdown`.
+The projection lists registered partials with audio; empty or vanished ones are
+forgotten. Save rebuilds the header from the size (dropping a torn trailing byte),
+validates, promotes and stages; Discard and Cancel move the file to the OS trash,
+falling back to delete.
+
+**Destination.** One workspace folder → `<folder>/recordings/`; several → the
+active tab's folder (`tabGroups` input, since Markdown opens in a custom editor),
+otherwise a quick pick; none → a folder picker before the first recording, the
+choice remembered in `globalState` (`speech:recording:noFolderLocation:v1`) and
+shown with Change.
+
+**Flag.** `transcribe-direct-recording` (experimental, default-true setting, all
+platforms) gates new starts only; a session in progress always finishes. No CSP,
+patch or shell change: patch 004 already grants webview microphone access.
+
+**UI primitives added.** `webview/src/components/ui/tooltip.tsx` — the shared
+Radix tooltip. Its trigger is a wrapping span because `Button` does not forward
+refs (React 18) and a disabled button gets no pointer events; every Transcribe
+panel button uses it instead of a native `title`.
 
 **Open debt:** live dictation (`voiceDictation/`) still has its own whisper
 integration with a 30 s timeout and `--no-timestamps`, deliberately untouched by
@@ -988,6 +1061,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-22 | Sprint 118 | **Direct recording in Transcribe (v1.12.0, #328).** New `src/speech/recording/` (exact-field `transcribe:record/*` protocol, destination/naming rules, crash-safe `WavRecordingSink`, vscode-free `RecordingController`) and webview `components/transcribe/recording/` (click-time `AudioContext`, 16 kHz capture with a streaming resampler fallback, ack-bounded 1 s PCM16 chunks, injected `AudioEnv`). The recording is handed to the unchanged `_stageImport`. Partials are registered before audio exists, checkpointed on detach and deactivate, and recovered by header rebuild. New flag `transcribe-direct-recording` (experimental, default on, gates starts only). New shared `ui/tooltip.tsx`. No CSP, patch or shell-tier change. |
 | 2026-09-21 | Sprint 119 | **Publish to Google Docs (v1.12.0).** New `src/googleDocs/` subsystem: installed-app OAuth with PKCE and loopback plus the desktop Picker for templates, `SecretStorage` account, `<globalStorage>/google-docs/v1/` link store, native Docs API mapper, Drive-staged images, the Create/Sync publisher, a `vscode`-free controller, and an exact-key protocol (`google-docs/*`). Export menu and Settings card render host projections only. New flag `google-docs-publishing` (experimental, default on). OAuth client configuration comes in through the esbuild `define`. `ritemark.aiSettings` takes an optional section. Privacy and terms links moved to ritemark.app (R11). Editor fix found on RunDev: new `src/utils/imagePaths.ts` is shared by host and webview, so bare relative image paths (`img/a.png`) display, and `../` images no longer save as their `vscode-resource` display URI. |
 | 2026-09-14 | Sprint 117 | **Host-owned comment tasks (v1.11.0, #156/#281).** New `src/commentTasks/` subsystem — `types.ts` (record, codecs, projection, transition table), exact-field `protocol.ts`, `CommentTaskStore` under `<globalStorage>/comment-tasks/v1/` on the `ConversationStore` file pattern, a `vscode`-free `CommentTaskController`, and one `commentTaskPrompt.ts` builder. Assignment is now a typed request/result/projection contract (`comment-task/accept` · `destination-preview` · `open-conversation` · `retry` · `cancel` → `comment-task/result`, plus per-document `comment-task/projection`, host↔sidebar `comment-task/enqueue` / `enqueue-result` / `dequeued`, `sidebar/ready`, `conversation/active`, `conversation/select`, and editor→host `comment:recover`). Deleted: `comment:send-to-ai`, `comment:submit`, `comment:task-status` + `broadcastCommentTaskStatus`, the editor's module-global status map, the sidebar's `commentTasks` slice and `finalizeCommentTasks`, its silent destination choice, and the webview prompt builder. Destination is the conversation open in the AI sidebar (Jarmo, D5). Both comment kinds carry `data-comment-id` (`<!-- {id:…} body -->` carrier for standalone notes) with legacy IDs minted in one undoable transaction at dispatch. `deriveRuntimeAvailabilities` moved to shared `src/runtime/availability.ts`; cancelled turns normalise to `cancelled` instead of `completed`/`failed` (F24). R10 adds the `ResizableComposer` and `AgentMentionPicker` primitives and a width-aware collapsed marker. No new flag, runtime kind, or `AgentRuntime` change. |
 | 2026-09-13 | Sprint 116 | **Complete runtime and model baseline.** Manifest schema v3 installs complete vendor packages: Codex 0.154.0 preserves its official package tree, Claude Code 2.1.270 pairs with Agent SDK 0.3.270, and OpenCode 1.18.30 owns ripgrep 15.1.0 through a scoped PATH entry; ACP stays 1.4.0. Codex cache effort parsing supports current and legacy schemas, explicit unknown thread events are dropped, and immediate Stop handles the measured pre-active-turn race. Canonical model IDs/defaults are refreshed in `modelConfig.ts`; catalog resolution rejects stale static snapshots below the bundled floor. |

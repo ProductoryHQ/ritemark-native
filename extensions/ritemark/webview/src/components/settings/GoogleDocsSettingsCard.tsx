@@ -50,9 +50,6 @@ export function GoogleDocsSettingsCard({ projection }: { projection: GoogleDocsS
         <div className="flex items-center justify-between mb-2">
           <div>
             <span className="text-sm font-medium text-ink-strong">Google account</span>
-            <span className="ml-2 text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
-              Experimental
-            </span>
           </div>
           {state === 'connected' && (
             <span className="flex items-center gap-1 text-xs text-ritemark-success">
