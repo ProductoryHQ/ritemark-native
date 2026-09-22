@@ -13,9 +13,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../ui/button';
 import { Icon } from '../../ui/Icon';
+import { Tooltip } from '../../ui/tooltip';
 import { vscode } from '../../../lib/vscode';
 import { formatDuration, type InterruptedRecording, type RecordingProjection } from '../types';
-import { formatElapsed, formatSavedSize } from './capture';
+import { displayPath, formatElapsed, formatSavedSize, fullPath, shortFolder } from './capture';
 import type { CaptureView } from './captureSession';
 
 /** Cancel asks first once there is audio worth keeping (design: "meaningful"). */
@@ -60,9 +61,11 @@ export function RecordDot({ live = false, size = 'md' }: { live?: boolean; size?
   );
 }
 
-function destination(host: RecordingProjection): string | null {
+/** Where the live recording goes: shortened for the sidebar, in full for the tooltip. */
+function destination(host: RecordingProjection): { short: string; full: string } | null {
   if (!host.fileName) return null;
-  return host.folderLabel ? `${host.folderLabel}/${host.fileName}` : host.fileName;
+  if (!host.folderLabel) return { short: host.fileName, full: host.fileName };
+  return { short: displayPath(host.folderLabel, host.fileName), full: fullPath(host.folderLabel, host.fileName) };
 }
 
 export function PermissionCard({ onCancel }: { onCancel: () => void }) {
@@ -76,9 +79,11 @@ export function PermissionCard({ onCancel }: { onCancel: () => void }) {
         Allow Ritemark to use the microphone when your system asks.
       </p>
       <div className="mt-3">
-        <Button variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
+        <Tooltip label="Stop waiting. Nothing is recorded.">
+          <Button variant="secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+        </Tooltip>
       </div>
     </Card>
   );
@@ -111,9 +116,9 @@ export function LiveRecordingCard({
         </span>
       </div>
       {where && (
-        <div className="mt-1.5 truncate text-[11px] text-ink-muted" title={where}>
-          {where}
-        </div>
+        <Tooltip className="mt-1.5 flex min-w-0" side="top" label={where.full}>
+          <span className="truncate text-[11px] text-ink-muted">{where.short}</span>
+        </Tooltip>
       )}
       <div className="mt-0.5 text-[11px] text-ink-muted">{formatSavedSize(view.savedSeconds)}</div>
       {host.warnLong && host.sessionId === view.sessionId && (
@@ -125,35 +130,43 @@ export function LiveRecordingCard({
         <div className="mt-3">
           <p className="text-[11px] leading-relaxed text-ink-body">Discard this recording? It moves to the Trash.</p>
           <div className="mt-2 flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              autoFocus
-              onClick={() => {
-                setConfirming(false);
-                requestAnimationFrame(() => cardRef.current?.querySelector<HTMLButtonElement>('[data-recording-stop]')?.focus());
-              }}
-            >
-              Keep recording
-            </Button>
-            <Button variant="destructive" size="sm" onClick={onCancel}>
-              Discard
-            </Button>
+            <Tooltip label="Go back. The recording continues.">
+              <Button
+                variant="secondary"
+                size="sm"
+                autoFocus
+                onClick={() => {
+                  setConfirming(false);
+                  requestAnimationFrame(() => cardRef.current?.querySelector<HTMLButtonElement>('[data-recording-stop]')?.focus());
+                }}
+              >
+                Keep recording
+              </Button>
+            </Tooltip>
+            <Tooltip label="Stop and move this recording to the Trash">
+              <Button variant="destructive" size="sm" onClick={onCancel}>
+                Discard
+              </Button>
+            </Tooltip>
           </div>
         </div>
       ) : (
         <div className="mt-3 flex gap-2">
-          <Button data-recording-stop size="sm" className="flex-1" onClick={onStop}>
-            <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-[2px] bg-current" />
-            Stop and use
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => (view.savedSeconds >= CONFIRM_CANCEL_AFTER_SEC ? setConfirming(true) : onCancel())}
-          >
-            Cancel
-          </Button>
+          <Tooltip className="min-w-0 flex-1" label="Stop recording, then choose how to transcribe it">
+            <Button data-recording-stop size="sm" className="w-full" onClick={onStop}>
+              <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-[2px] bg-current" />
+              Stop and use
+            </Button>
+          </Tooltip>
+          <Tooltip label="Stop and discard this recording">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => (view.savedSeconds >= CONFIRM_CANCEL_AFTER_SEC ? setConfirming(true) : onCancel())}
+            >
+              Cancel
+            </Button>
+          </Tooltip>
         </div>
       )}
     </Card>
@@ -178,17 +191,19 @@ export function NoFolderLocation({ location }: { location: string }) {
   return (
     <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10.5px] text-ink-muted">
       <Icon name="folder-open" size={12} tone="inherit" className="shrink-0" />
-      <span className="truncate" title={location}>
-        Recordings are saved in {location}
-      </span>
-      <Button
-        variant="link"
-        size="sm"
-        className="h-auto shrink-0 px-0 py-0 text-[10.5px] font-semibold has-[>svg]:px-0"
-        onClick={() => post({ type: 'transcribe:record/changeLocation' })}
-      >
-        Change
-      </Button>
+      <Tooltip className="min-w-0" label={location}>
+        <span className="truncate">Recordings are saved in {shortFolder(location)}</span>
+      </Tooltip>
+      <Tooltip className="shrink-0" label="Choose where recordings are saved">
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto px-0 py-0 text-[10.5px] font-semibold has-[>svg]:px-0"
+          onClick={() => post({ type: 'transcribe:record/changeLocation' })}
+        >
+          Change
+        </Button>
+      </Tooltip>
     </div>
   );
 }
@@ -201,13 +216,17 @@ export function RecordingProblem({ host, platform }: { host: RecordingProjection
         <p className="text-xs leading-relaxed text-ritemark-error">{host.error.message}</p>
         <div className="mt-2 flex gap-2">
           {canOpenSettings && (
-            <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/openMicrophoneSettings' })}>
-              Microphone Settings
-            </Button>
+            <Tooltip label="Open the system privacy settings to allow Ritemark to use the microphone">
+              <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/openMicrophoneSettings' })}>
+                Microphone Settings
+              </Button>
+            </Tooltip>
           )}
-          <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/dismissNotice' })}>
-            Dismiss
-          </Button>
+          <Tooltip label="Hide this message">
+            <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/dismissNotice' })}>
+              Dismiss
+            </Button>
+          </Tooltip>
         </div>
       </Card>
     );
@@ -220,9 +239,11 @@ export function RecordingProblem({ host, platform }: { host: RecordingProjection
           <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-body">{host.notice}</p>
         </div>
         <div className="mt-2">
-          <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/dismissNotice' })}>
-            Dismiss
-          </Button>
+          <Tooltip label="Hide this message">
+            <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/dismissNotice' })}>
+              Dismiss
+            </Button>
+          </Tooltip>
         </div>
       </Card>
     );
@@ -231,21 +252,25 @@ export function RecordingProblem({ host, platform }: { host: RecordingProjection
 }
 
 export function InterruptedRecordingRow({ partial }: { partial: InterruptedRecording }) {
-  const where = `${partial.folderLabel}/${partial.fileName}`;
+  const full = fullPath(partial.folderLabel, partial.fileName);
   return (
     <div className="mx-3 mb-2 rounded-lg border border-ritemark-warning/40 bg-ritemark-warning-soft/60 p-2.5">
       <div className="text-xs font-semibold">Recording interrupted · about {formatDuration(partial.durationSec)}</div>
-      <div className="mt-0.5 truncate text-[10.5px] text-ink-muted" title={where}>
-        {where}
-      </div>
+      <Tooltip className="mt-0.5 flex min-w-0" side="top" label={full}>
+        <span className="truncate text-[10.5px] text-ink-muted">{displayPath(partial.folderLabel, partial.fileName)}</span>
+      </Tooltip>
       <p className="mt-1 text-[10.5px] leading-relaxed text-ink-body">Ritemark closed before the file was finalized.</p>
       <div className="mt-2 flex gap-2">
-        <Button size="sm" className="flex-1" onClick={() => post({ type: 'transcribe:record/recover', partialId: partial.id })}>
-          Save recording
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/discard', partialId: partial.id })}>
-          Discard
-        </Button>
+        <Tooltip className="min-w-0 flex-1" label="Save what was recorded, then choose how to transcribe it">
+          <Button size="sm" className="w-full" onClick={() => post({ type: 'transcribe:record/recover', partialId: partial.id })}>
+            Save recording
+          </Button>
+        </Tooltip>
+        <Tooltip label="Move the interrupted recording to the Trash">
+          <Button variant="secondary" size="sm" onClick={() => post({ type: 'transcribe:record/discard', partialId: partial.id })}>
+            Discard
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );

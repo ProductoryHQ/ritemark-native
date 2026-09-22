@@ -37,6 +37,8 @@ Jarmo: the buttons must fit on one line, and Record can be an icon button. The i
 
 Record is a square icon button with the accessible name "Record", the same height as Add recording. Every recording card keeps its buttons on one row, primary first: `[■ Stop and use] [Cancel]`, `[Save recording] [Discard]`, `[Microphone Settings] [Dismiss]`.
 
+Every button has a tooltip (Jarmo: "nuppudel peaks olema tooltipid!"). It says what the button does, or why it is unavailable: a disabled Record says "A recording is in progress" or "Set up a transcription engine first". Long destination paths show their last two folders (`…/Meetings/2026/Recording … .wav`), and the full path is in a tooltip.
+
 ## Recording State
 
 ```text

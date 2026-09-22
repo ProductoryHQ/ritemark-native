@@ -14,7 +14,10 @@ import {
   MAX_UNACKED_CHUNKS,
   StreamingResampler,
   classifyCaptureError,
+  displayPath,
   floatToInt16,
+  fullPath,
+  shortFolder,
   formatElapsed,
   formatSavedSize,
   int16ToBase64,
@@ -134,6 +137,20 @@ function run(): void {
   assert.equal(formatSavedSize(1), 'Less than 0.1 MB saved');
   assert.equal(formatSavedSize(60), 'About 1.9 MB saved');
   assert.equal(formatSavedSize(754), 'About 24 MB saved');
+
+  // --- paths short enough for the sidebar
+  assert.equal(shortFolder('~/Documents/Recordings'), '~/Documents/Recordings');
+  assert.equal(shortFolder('Notes/recordings'), 'Notes/recordings');
+  assert.equal(shortFolder('/Volumes/Work'), '/Volumes/Work');
+  assert.equal(shortFolder('/private/tmp/claude-501/scratchpad/spike118/voice2'), '…/spike118/voice2');
+  assert.equal(shortFolder('~/Library/Mobile Documents/Meetings/2026'), '…/Meetings/2026');
+  assert.equal(shortFolder('C:\\Users\\maria\\OneDrive\\Recordings\\2026'), '…\\Recordings\\2026');
+  assert.equal(shortFolder('~\\Documents\\Recordings'), '~\\Documents\\Recordings');
+  assert.equal(displayPath('Notes/recordings', 'Recording 2026-09-22 14.05.wav'), 'Notes/recordings/Recording 2026-09-22 14.05.wav');
+  assert.equal(displayPath('/a/b/c/d/e', 'x.wav'), '…/d/e/x.wav');
+  assert.equal(displayPath('D:\\Audio\\Team\\Weekly\\2026', 'x.wav'), '…\\Weekly\\2026\\x.wav');
+  assert.equal(fullPath('D:\\Audio', 'x.wav'), 'D:\\Audio\\x.wav');
+  assert.equal(fullPath('~/Voice', 'x.wav'), '~/Voice/x.wav');
 
   console.log('capture.test.ts: all tests passed');
 }

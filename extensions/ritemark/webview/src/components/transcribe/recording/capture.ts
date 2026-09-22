@@ -202,6 +202,29 @@ export function formatElapsed(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
+/**
+ * A folder label short enough for the sidebar: `~/Documents/Recordings` and
+ * `Notes/recordings` stay as they are; a deep path keeps its last two folders
+ * (`…/Meetings/2026`). The full path goes in a tooltip.
+ */
+export function shortFolder(label: string): string {
+  const sep = label.includes('\\') && !label.includes('/') ? '\\' : '/';
+  const parts = label.split(/[\\/]/).filter((part, index) => part !== '' || index === 0);
+  return parts.length <= 4 ? label : `…${sep}${parts.slice(-2).join(sep)}`;
+}
+
+const separatorOf = (label: string): string => (label.includes('\\') && !label.includes('/') ? '\\' : '/');
+
+/** `folder/file`, with the folder shortened and the platform's separator kept. */
+export function displayPath(folderLabel: string, fileName: string): string {
+  return `${shortFolder(folderLabel)}${separatorOf(folderLabel)}${fileName}`;
+}
+
+/** `folder/file` in full, for a tooltip. */
+export function fullPath(folderLabel: string, fileName: string): string {
+  return `${folderLabel}${separatorOf(folderLabel)}${fileName}`;
+}
+
 /** Approximate size of the confirmed audio: `About 24 MB saved`. */
 export function formatSavedSize(seconds: number): string {
   const mb = (seconds * BYTES_PER_SECOND) / 1_000_000;

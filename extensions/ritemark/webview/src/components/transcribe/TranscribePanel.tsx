@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
 import { vscode } from '../../lib/vscode';
 import {
   InterruptedRecordingRow,
@@ -134,26 +135,41 @@ export function TranscribePanel() {
         {/* One row at every width: Add recording, with Record as an icon
             button beside it (Jarmo, 2026-09-22 RunDev review). */}
         <div className="flex gap-2">
-          <Button
+          <Tooltip
             className="min-w-0 flex-1"
-            size="lg"
-            onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
-            disabled={nothingReady && !state.pending}
+            label={nothingReady && !state.pending ? 'Set up a transcription engine first' : 'Choose an audio file to transcribe'}
           >
-            <Icon name="plus" size={14} />
-            Add recording
-          </Button>
-          {host?.enabled && (
             <Button
-              className="h-auto shrink-0 self-stretch rounded-lg"
-              size="icon-lg"
-              aria-label="Record"
-              title="Record"
-              onClick={() => recording.start()}
-              disabled={nothingReady || recordingBusy}
+              className="w-full"
+              size="lg"
+              onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
+              disabled={nothingReady && !state.pending}
             >
-              <RecordDot size="lg" />
+              <Icon name="plus" size={14} />
+              Add recording
             </Button>
+          </Tooltip>
+          {host?.enabled && (
+            <Tooltip
+              className="shrink-0"
+              label={
+                recordingBusy
+                  ? 'A recording is in progress'
+                  : nothingReady
+                    ? 'Set up a transcription engine first'
+                    : 'Record from the microphone'
+              }
+            >
+              <Button
+                className="rounded-lg"
+                size="icon-lg"
+                aria-label="Record"
+                onClick={() => recording.start()}
+                disabled={nothingReady || recordingBusy}
+              >
+                <RecordDot size="lg" />
+              </Button>
+            </Tooltip>
           )}
         </div>
         {host?.enabled && !host.hasProject && host.noFolderLocation && capture.phase === 'idle' && (
@@ -350,24 +366,31 @@ function PendingImportCard({
       )}
 
       <div className="mt-3 flex gap-2">
-        <Button
-          className="flex-1"
-          size="sm"
-          disabled={!selected?.readiness.ready}
-          onClick={() =>
-            vscode.postMessage({ type: 'transcribe:start', engineId: selectedEngineId, language: null })
-          }
+        <Tooltip
+          className="min-w-0 flex-1"
+          label={selected?.readiness.ready ? 'Start transcribing with the selected engine' : 'Choose an engine that is ready'}
         >
-          <Icon name="play" size={14} />
-          Transcribe
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => vscode.postMessage({ type: 'transcribe:clearPending' })}
-        >
-          Cancel
-        </Button>
+          <Button
+            className="w-full"
+            size="sm"
+            disabled={!selected?.readiness.ready}
+            onClick={() =>
+              vscode.postMessage({ type: 'transcribe:start', engineId: selectedEngineId, language: null })
+            }
+          >
+            <Icon name="play" size={14} />
+            Transcribe
+          </Button>
+        </Tooltip>
+        <Tooltip label="Don't transcribe now. The audio file stays where it is.">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => vscode.postMessage({ type: 'transcribe:clearPending' })}
+          >
+            Cancel
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -508,15 +531,16 @@ function JobRow({ job }: { job: TranscriptionJob }) {
             {formatDuration(job.durationSec)} · {job.engine === 'elevenlabs' ? 'ElevenLabs' : 'On-device'}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0"
-          title="Cancel"
-          onClick={() => vscode.postMessage({ type: 'transcribe:cancel', jobId: job.id })}
-        >
-          <Icon name="x" size={14} />
-        </Button>
+        <Tooltip className="shrink-0" label="Cancel transcription">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Cancel transcription"
+            onClick={() => vscode.postMessage({ type: 'transcribe:cancel', jobId: job.id })}
+          >
+            <Icon name="x" size={14} />
+          </Button>
+        </Tooltip>
       </div>
 
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-hairline">
@@ -622,30 +646,34 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
           </div>
         )}
       </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="shrink-0 opacity-0 group-hover:opacity-100"
-        title="Open saved document"
-        onClick={(event) => {
-          event.stopPropagation();
-          vscode.postMessage({ type: 'transcribe:openExport', sessionId: recording.sessionId });
-        }}
-      >
-        <Icon name="file-text" size={14} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="shrink-0 opacity-0 group-hover:opacity-100"
-        title="Remove transcript"
-        onClick={(event) => {
-          event.stopPropagation();
-          vscode.postMessage({ type: 'transcribe:deleteSession', sessionId: recording.sessionId });
-        }}
-      >
-        <Icon name="trash" size={14} />
-      </Button>
+      <Tooltip className="shrink-0" label="Open saved document">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label="Open saved document"
+          onClick={(event) => {
+            event.stopPropagation();
+            vscode.postMessage({ type: 'transcribe:openExport', sessionId: recording.sessionId });
+          }}
+        >
+          <Icon name="file-text" size={14} />
+        </Button>
+      </Tooltip>
+      <Tooltip className="shrink-0" label="Remove transcript. The recording is kept.">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label="Remove transcript"
+          onClick={(event) => {
+            event.stopPropagation();
+            vscode.postMessage({ type: 'transcribe:deleteSession', sessionId: recording.sessionId });
+          }}
+        >
+          <Icon name="trash" size={14} />
+        </Button>
+      </Tooltip>
     </div>
   );
 }

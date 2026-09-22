@@ -32,7 +32,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 3: Destination, recovery, and pipeline (W3 — R4–R6)
 
-- [x] Implement single/multi-root/no-folder destination flow and visible safe final name. *(single folder verified in RunDev; multi-root and no-folder covered by controller tests)*
+- [x] Implement single/multi-root/no-folder destination flow and visible safe final name. *(single folder and no folder verified in RunDev 2026-09-22: ask before the first recording, remembered location, `(2)` on a same-minute collision, Change; multi-root covered by controller tests)*
 - [x] Route only validated final files through existing `_stageImport` and PendingImportCard. *(RunDev 2026-09-22: Stop → pending card; recovered part → pending card)*
 - [x] Add interrupted recording recovery/save/discard with valid-WAV reconstruction. *(RunDev: window reload mid-recording → header checkpointed at shutdown → recovery card → valid 18.0 s WAV)*
 - [ ] Verify clear pending/transcription failure/cancel preserve finalized audio.
