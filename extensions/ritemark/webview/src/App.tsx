@@ -13,6 +13,7 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
+import type { GoogleDocsAction, GoogleDocsProjection } from './components/header/googleDocsMenu'
 import { PropertiesSidePanel } from './components/properties'
 import { AgentConfiguratorPanel } from './components/agent'
 import type { AgentFrontmatter, AgentSkill } from './components/agent'
@@ -141,6 +142,9 @@ function App() {
   const [showPropertiesModal, setShowPropertiesModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportButtonRef = useRef<HTMLElement | null>(null)
+  // Google Docs publishing (Sprint 119): the host owns the link; this view
+  // only renders its projection and sends intent.
+  const [googleDocs, setGoogleDocs] = useState<GoogleDocsProjection | null>(null)
 
   // Agent mode state
   const [isAgentMode, setIsAgentMode] = useState(false)
@@ -340,6 +344,10 @@ function App() {
 
         case 'agentFlowsUpdated':
           setAgentFlows((message.flows as string[]) || [])
+          break
+
+        case 'google-docs/projection':
+          setGoogleDocs((message.projection as GoogleDocsProjection) ?? null)
           break
       }
     })
@@ -655,6 +663,25 @@ function App() {
     })
   }, [content, properties])
 
+  // Same export HTML as Word/PDF, so every target sees one rendering of the
+  // document. The payload is exactly { html, title }: the host picks the
+  // destination from its own link record, never from the webview.
+  const handlePublishGoogleDocs = useCallback(async () => {
+    const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
+    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
+    const title = typeof properties.title === 'string' && properties.title.trim() ? properties.title.trim() : null
+    sendToExtension('google-docs/publish', { html, title })
+  }, [properties])
+
+  const handleGoogleDocsAction = useCallback((action: GoogleDocsAction) => {
+    switch (action) {
+      case 'publish': void handlePublishGoogleDocs(); break
+      case 'open': sendToExtension('google-docs/open', {}); break
+      case 'unlink': sendToExtension('google-docs/unlink', {}); break
+      case 'settings': sendToExtension('google-docs/open-settings', {}); break
+    }
+  }, [handlePublishGoogleDocs])
+
   const handleCopyAsMarkdown = useCallback(() => {
     if (!editorRef.current) return
     const html = getSelectionHTML(editorRef.current)
@@ -662,6 +689,12 @@ function App() {
     const markdown = turndownService.turndown(cleanedHTML)
     writeClipboard(markdown)
   }, [])
+
+  // Ask the host for this document's Google Docs state once it is showing a
+  // Markdown document; later changes are pushed without asking.
+  useEffect(() => {
+    if (isReady && fileType === 'markdown') sendToExtension('google-docs/request-projection', {})
+  }, [isReady, fileType])
 
   // Scroll-spy: track which heading is currently topmost in the editor view.
   // Uses a scroll listener (not IntersectionObserver) so the active heading is
@@ -884,6 +917,8 @@ function App() {
         onExportWord={handleExportWord}
         onCopyAsMarkdown={handleCopyAsMarkdown}
         anchorElement={exportButtonRef.current}
+        googleDocs={googleDocs}
+        onGoogleDocsAction={handleGoogleDocsAction}
       />
 
       <DocumentConflictDialog

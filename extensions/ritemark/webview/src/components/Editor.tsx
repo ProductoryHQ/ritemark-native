@@ -17,6 +17,7 @@ import { CustomLink } from '../extensions/CustomLink'
 import { createLowlight, common } from 'lowlight'
 import { Marked } from 'marked'
 import { createTurndownService } from '../utils/turndownService'
+import { sameRelativeImagePath } from '../../../src/utils/imagePaths'
 import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
@@ -683,9 +684,11 @@ export function Editor({
         // cache-buster so the webview actually refetches.
         const { state, view } = editor
         const tr = state.tr
+        const changedPath = message.path
         let changed = false
         state.doc.descendants((node, pos) => {
-          if (node.type.name === 'image' && node.attrs.title === message.path) {
+          if (node.type.name === 'image' && typeof node.attrs.title === 'string'
+            && sameRelativeImagePath(node.attrs.title, changedPath)) {
             tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: message.displaySrc })
             changed = true
           }

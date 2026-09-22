@@ -99,7 +99,13 @@ echo "Installing webview dependencies from package-lock.json..."
 
 echo "Rebuilding committed webview and extension bundles..."
 (cd extensions/ritemark/webview && npm run build)
+# Sprint 119: a release compile must carry the Google OAuth client (from the
+# environment or ~/.config/ritemark/release.env); esbuild refuses without it.
+# shellcheck source=scripts/google-oauth-release-env.sh
+source "$PROJECT_DIR/scripts/google-oauth-release-env.sh"
+ritemark_load_google_oauth_env
 (cd extensions/ritemark && npm run compile)
+node "$PROJECT_DIR/scripts/check-google-oauth-build.mjs" extensions/ritemark/out/extension.js
 
 if ! git diff --quiet -- extensions/ritemark/media/webview.js; then
   # A bundle committed from a CRLF working copy (Git for Windows' core.autocrlf

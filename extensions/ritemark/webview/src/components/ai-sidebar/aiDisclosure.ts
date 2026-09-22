@@ -4,8 +4,8 @@ import { modelDisplayName } from './modelPresentation';
 export const AI_DISCLOSURE_STORAGE_KEY = 'ritemark.ai-disclosure.acknowledged.v1';
 
 export const AI_INFORMATION_URL = 'https://ritemark.app/en/support/guides/ai-information';
-export const RITEMARK_PRIVACY_URL = 'https://www.productory.ai/en/privacy/';
-export const RITEMARK_TERMS_URL = 'https://www.productory.ai/en/terms/';
+export const RITEMARK_PRIVACY_URL = 'https://ritemark.app/en/privacy/';
+export const RITEMARK_TERMS_URL = 'https://ritemark.app/en/terms/';
 
 export type DisclosureRuntimeId = 'claude-code' | 'codex' | 'opencode';
 

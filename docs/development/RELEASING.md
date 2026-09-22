@@ -70,3 +70,9 @@ You don't have to — Claude will say "this ships as an extension release" or "t
 **What if an update breaks something?** Ritemark keeps the previous working version on disk. If a new version fails to start correctly, the next launch detects that it never confirmed and automatically reverts to the previous working version.
 
 **Why are shell releases slower?** They replace the entire signed app bundle, which has to go through Apple notarization and a hardening window before it's safe to publish widely. Extension releases never touch that bundle, so none of that applies.
+
+**Where do the Google Docs publishing keys come from?** Since v1.12, every release build compiles in Ritemark's Google OAuth client ("Ritemark desktop" in Google Cloud). It comes from two places you set up once:
+- two GitHub repository secrets, `RITEMARK_GOOGLE_CLIENT_ID` and `RITEMARK_GOOGLE_CLIENT_SECRET`, for the Windows and Intel Mac builds;
+- the file `~/.config/ritemark/release.env` on your Mac, for the Apple Silicon build and extension releases.
+
+If either is missing, the build stops with a message saying which value is absent. It never ships an app where Google Docs quietly says "not available". If you ever create a new client secret in Google Cloud, update both places.

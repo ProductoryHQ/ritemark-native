@@ -1,5 +1,6 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
+import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -42,18 +43,21 @@ export function createTurndownService(): TurndownService {
     },
   })
 
-  // Image rule: when title starts with "./", that's the canonical relative
-  // path (set by paste-flow's saveImage response or mammoth's convertImage
-  // hook); the DOM-resolved src is just for display.
+  // Image rule: the title holds the canonical relative path whenever the src
+  // is only a display URI — set by the host's image mapping (./a.png,
+  // ../a.png, img/a.png) or by paste-flow's saveImage and mammoth's
+  // convertImage (always ./). A title on a remote image is the author's own
+  // caption and never replaces its src.
   service.addRule('imageWithRelativePath', {
     filter: 'img',
     replacement(_content, node) {
       const el = node as HTMLImageElement
       const alt = el.alt || ''
       const title = el.getAttribute('title') || ''
-      const src = title.startsWith('./')
+      const displaySrc = el.getAttribute('src') || el.src
+      const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
         ? title
-        : el.getAttribute('src') || el.src
+        : displaySrc
       return `![${alt}](${src})`
     },
   })

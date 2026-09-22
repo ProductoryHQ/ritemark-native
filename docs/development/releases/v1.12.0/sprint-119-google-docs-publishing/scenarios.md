@@ -478,6 +478,38 @@ Behavioral acceptance scenarios for [spec.md](./spec.md). A ★ scenario require
 **When** Connect, template Create, untemplated Create, Sync, revoke/re-auth, open-link, and disconnect are exercised<br>
 **Then** all pass with the same IDs and redacted evidence required by the release tracker.
 
+## Ritemark's own legal pages (R11, added 2026-09-18)
+
+### S77 — In-app legal links point to ritemark.app
+
+**Given** a build that contains the R11 link switch<br>
+**When** the analytics consent notice and the AI disclosure render their privacy and terms links<br>
+**Then** every link targets ritemark.app, and no productory.ai privacy or terms URL remains in the extension or webview source.
+
+### S78 ★ — Links switch only after the pages are live
+
+**Given** the ritemark.app privacy or terms page does not yet answer HTTP 200<br>
+**When** the R11 link-switch task is evaluated for completion<br>
+**Then** it stays open, and it closes only with dated live-URL evidence for every URL the app uses.
+
+### S79 ★ — Installed apps still reach a correct policy
+
+**Given** Ritemark 1.11 or earlier, which links to the productory.ai privacy and terms pages<br>
+**When** a user opens those links after the Productory pages are updated<br>
+**Then** the pages load, state that Ritemark has its own policy, and link to the matching ritemark.app page.
+
+### S80 ★ — Consent screen names Ritemark's own pages
+
+**Given** the Google OAuth consent screen configuration<br>
+**When** a test user starts Connect Google account<br>
+**Then** the screen shows the app name Ritemark, and the home page, privacy policy and terms links all resolve on ritemark.app, the verified authorized domain.
+
+### S81 — The privacy policy states the Google facts
+
+**Given** the approved Phase 0 integration decisions<br>
+**When** the Ritemark privacy policy's Google Docs section is compared with them<br>
+**Then** scopes, data read and written, storage location, revocation and disconnect match exactly, and the page states that no document content or Google data passes through Productory servers.
+
 ## Scenario Evidence Rule
 
 Every ★ scenario needs dated platform/build evidence linked from `tasks.md` or the sprint closeout. Every non-star scenario needs an automated assertion or a written reason approved before the task is checked. Passing Create alone is not sufficient: same-ID Sync, account mismatch, response-loss recovery, copied-file isolation, and flag-off forged-message rejection are release-critical.

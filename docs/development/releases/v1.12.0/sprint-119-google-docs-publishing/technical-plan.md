@@ -218,13 +218,20 @@ Phase 0 selects one primary adapter and may retain another only as a documented 
 ## Workstream 8: Docs, QA, and release blockers (R10)
 
 - Update architecture for subsystem, webview protocols, token/binding ownership, conversion seam, feature flag, and branch-date rule.
-- Update privacy/security documentation, user connection/publishing/recovery guide, changelog, v1.11 release notes, issue, and parent tracker.
+- Update privacy/security documentation, user connection/publishing/recovery guide, changelog, v1.12.0 release notes, issue, and parent tracker.
 - Record Google Cloud project owner, consent-screen state, production/test OAuth clients, approved redirect configuration, support contact/privacy URLs, and any verification/publishing lead time as explicit release blockers without committing credentials.
 - Run focused tests/builds, webview bundle, native evidence, `./scripts/validate-qa.sh`, and release readiness gate only after implementation.
 
+## Workstream 9: Ritemark's own legal pages (R11, added 2026-09-18)
+
+- Phase 0 (W0) records the Google user-data facts the privacy policy must state, and the consent-screen fields: app name, support email, home page, privacy and terms URLs, authorized domain, and domain-verification state.
+- Hand the `ritemark-web` and `productory-2026` work off to those repositories with the facts attached; this repository does not edit their code. Record their merge/publish status and live-URL checks in `research/integration-decisions.md` or the sprint closeout.
+- After dated live-URL evidence, switch `PRIVACY_POLICY_URL`/`TERMS_OF_USE_URL` in `extensions/ritemark/src/analytics/posthog.ts` and `RITEMARK_PRIVACY_URL`/`RITEMARK_TERMS_URL` in `extensions/ritemark/webview/src/components/ai-sidebar/aiDisclosure.ts` to the ritemark.app pages. Update `aiDisclosure.test.ts` and `analytics.test.ts` if they assert the URLs, rebuild the webview bundle, and grep that no productory.ai privacy/terms URL remains.
+- Update `docs/microsoft-store-submission/LEGAL-AND-URLS.md` with the new URLs, and record the Partner Center change as Jarmo's action.
+
 ## Implementation Order
 
-W0 audit/canaries → Phase 0 approval → W1 OAuth and W2 binding foundations → W3 provider client/template → W4 selected converter → W5 controller/protocol → W6 UX → W7 evidence → W8 docs/QA.
+W0 audit/canaries → Phase 0 approval → W1 OAuth and W2 binding foundations → W3 provider client/template → W4 selected converter → W5 controller/protocol → W6 UX → W7 evidence → W8 docs/QA. W9 runs alongside: its facts come out of W0, and its link switch waits only for the live pages, not for W1–W8.
 
 W1 and W2 may proceed in parallel only after Phase 0 approval because their contracts meet in W5. W3 and W4 may proceed after their shared API/conversion decision is frozen. No UI should be considered complete before unknown-outcome, account-mismatch, and copied-file scenarios work end to end.
 

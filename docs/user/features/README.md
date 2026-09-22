@@ -73,6 +73,7 @@ These work across all modes.
 |---------|-------------|
 | [Transcribe](transcribe.md) | Turn a recording into a speaker-attributed document |
 | [Export](export.md) | PDF and Word export |
+| [Publish to Google Docs](google-docs.md) | Create a Google Doc from a document and keep it in sync |
 
 ---
 

@@ -210,6 +210,6 @@ These are not code tasks that can be inferred or completed without an owner:
 4. Which remote version/revision signal reliably detects edits since last Sync for the selected path?
 5. How does Create recover from an indeterminate response without duplicate Google Docs, given converted Workspace creation cannot use pre-generated IDs?
 6. Which image flow stays within least privilege, payload limits, and failure atomicity?
-7. Is the Google OAuth application operationally production-ready for a public v1.11 release?
+7. Is the Google OAuth application operationally production-ready for a public v1.11 release? *(The sprint moved to v1.12.0 on 2026-09-15; read this as the v1.12.0 release.)*
 
 Until all seven have accepted evidence in `research/integration-decisions.md`, Sprint 119 remains research-only.
