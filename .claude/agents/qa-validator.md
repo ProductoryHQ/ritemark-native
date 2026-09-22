@@ -95,15 +95,19 @@ FIX:
 4. Delete the old patch, commit the new one
 ```
 
-### 7. Flow Tests (CRITICAL when flows modified)
+### 7. Extension Test Suite — `npm test` (CRITICAL when flows modified)
 
-**Check:** All flow integration tests pass
+**Check:** `npm test` exits 0
 
 ```bash
 # Validation command
-cd extensions/ritemark && npm test
-# Must pass all tests including FlowIntegration.test.ts
+cd extensions/ritemark && npm test; echo "test_exit=$?"
+# Must print test_exit=0
 ```
+
+`npm test` runs the `pretest` chain, then the `test` chain in `extensions/ritemark/package.json`. Each entry is a standalone `npx tsx <file>.test.ts`, joined with `&&`: the first failing file stops the run and the exit code is non-zero. Exit 0 therefore means every file ran and passed, including `FlowIntegration.test.ts`. The last file in the `test` string is the last one that runs.
+
+The default suite is hermetic. It needs no Claude login, no API keys, no network and no extension host. `SaveFileNodeExecutor.integration.test.ts` belongs in it because it stubs `vscode` and writes only to a temp directory. Tests that call real services live in `npm run test:integration`, which is **not** part of this gate. Never add a test that needs a live environment to `test` or `pretest`. A file that always fails there hides every file after it, which is how about 50 test files went unrun until 2026-09-22.
 
 **When to run:** If any of these are modified:
 - `src/flows/**/*.ts`
@@ -114,18 +118,24 @@ cd extensions/ritemark && npm test
 
 **If fails:**
 ```
-FAILED: Flow tests
+FAILED: Extension test suite
 
-Flow integration tests failed. This means:
+npm test stopped at the first failing file (the last test output printed).
+Files after it in the chain did not run.
+
+For flow files, a failure usually means:
 - Flow validation errors
 - Execution order problems
 - Variable interpolation bugs
 - Node chaining issues
 
 FIX:
-1. Run: cd extensions/ritemark && npx tsx src/flows/FlowIntegration.test.ts
+1. Re-run the failing file alone: cd extensions/ritemark && npx tsx <file>
+   (flows: npx tsx src/flows/FlowIntegration.test.ts)
 2. Check specific test failures
 3. See .claude/skills/flow-testing/SKILL.md for debugging guide
+4. Re-run npm test until it prints test_exit=0. Do not report the gate as passed
+   because each file passes when run on its own.
 ```
 
 ### 8. Debug Code Check (WARNING)
@@ -299,7 +309,7 @@ ls -la extensions/ritemark/media/webview.js                    # 2. Bundle size
 grep -q "@tailwind base" extensions/ritemark/media/webview.js && echo FAIL || echo OK  # 4. CSS processed
 cd extensions/ritemark && npm run compile                      # 5. TypeScript
 ./scripts/apply-patches.sh --dry-run                           # 6. Patches applied
-cd extensions/ritemark && npm test                             # 7. Flow tests (+ all unit tests)
+cd extensions/ritemark && npm test                             # 7. Extension test suite (hermetic; must exit 0)
 grep -r "console\.log" extensions/ritemark/src/                # 8. Debug code
 ```
 
