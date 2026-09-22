@@ -229,7 +229,7 @@ Absorbed into v1.11.0 Sprint 117 on 2026-09-14. Its outcomes now live in [`../v1
 |---|---|---|---|---|---|---|
 | Sprint 118 | `sprint-118-transcribe-recording` | TBD | #328 | Implemented; RunDev-validated with a real microphone and a one-hour synthetic run (2026-09-22) | `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 119 | `sprint-119-google-docs-publishing` | TBD | #319; follow-ups #325 | Implemented; RunDev-validated with real Google APIs and the production client (2026-09-22) | closing QA in progress | drafted in `docs/releases/v1.12.0/release-notes.md` |
-| Sprint 120 | `sprint-120-editor-input-intent` | TBD | #280 | Implemented; RunDev-validated in a dev build (2026-09-22), evidence in the sprint's `qa-evidence.md` | full `npm test` + webview typecheck green; `validate-qa.sh` pending | drafted in `docs/releases/v1.12.0/release-notes.md` |
+| Sprint 120 | `sprint-120-editor-input-intent` | [#331](https://github.com/ProductoryHQ/ritemark-native/pull/331) | #280 | Implemented; RunDev-validated in a dev build (2026-09-22), evidence in the sprint's `qa-evidence.md` | full `npm test` + webview typecheck green; `validate-qa.sh` passed | drafted in `docs/releases/v1.12.0/release-notes.md` |
 | Sprint 121 | `sprint-121-comment-ergonomics` | — | #281 | absorbed into v1.11.0 Sprint 117 | n/a | n/a |
 | Sprint 122 | `sprint-122-conversation-clarity` | TBD | #282 | not started | not run | not drafted |
 | Sprint 123 | `sprint-123-findability` | TBD | #283 | not started | not run | not drafted |

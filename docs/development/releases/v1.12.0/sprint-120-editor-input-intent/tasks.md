@@ -60,9 +60,11 @@ in [qa-evidence.md](./qa-evidence.md).
 
 ## Phase 5: QA and closeout
 
-- [ ] Run `npm test` (webview + extension host suites) and record the result.
-- [ ] Run `./scripts/validate-qa.sh` and record the result.
-- [ ] Update `docs/development/architecture.md` if the extension structure changed.
-- [ ] Add a `docs/CHANGELOG.md` entry and a `docs/releases/v1.12.0/release-notes.md` entry.
-- [ ] Update the v1.12.0 release-plan tracker (Sprint 120 row: branch, PR, merge/QA/release-note status) and close issue [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) with evidence.
-- [ ] Open the PR from `sprint-120-editor-input-intent` to `main`.
+- [x] Run `npm test` (webview + extension host suites) and record the result. *(green, exit 0; all three new tests ran inside it)*
+- [x] Run `./scripts/validate-qa.sh` and record the result. *(passed)*
+- [x] `docs/development/architecture.md` needs no change: the sprint adds one TipTap extension in the webview and alters no extension-host structure.
+- [x] Add a `docs/CHANGELOG.md` entry and a `docs/releases/v1.12.0/release-notes.md` entry.
+- [x] Add the Sprint 120 block to `docs/releases/v1.12.0/TEST-CHECKLIST.md`.
+- [x] Update the v1.12.0 release-plan tracker (Sprint 120 row: branch, PR, merge/QA/release-note status).
+- [x] Open the PR from `sprint-120-editor-input-intent` to `main`. *([#331](https://github.com/ProductoryHQ/ritemark-native/pull/331))*
+- [ ] Merge the PR and close issue [#280](https://github.com/ProductoryHQ/ritemark-native/issues/280) with evidence. *(admin merge needs Jarmo's authorization)*
