@@ -32,11 +32,18 @@ No guard is written; the format truth is pinned in a test instead.
 
 ## Phase 3: Round-trip regression
 
-- [ ] Typing: a prose number at the start of a paragraph does not convert; an in-range number does; assert against editor document state, not just the rendered DOM class.
-- [ ] Paste: pasting Markdown containing both an escaped prose number (`2026\. a`) and a real list (`1. a`) preserves both semantics after paste.
-- [ ] Save: Turndown output for a prose-number paragraph stays escaped (`2026\. a`); output for a real list is unescaped (`1. a`).
-- [ ] Reopen: a document saved through the fix round-trips through the scoped `marked` load path back to the same editor state it was saved from.
-- [ ] Undo/redo: both the suppressed-conversion case and the real-list-creation case survive at least one undo/redo cycle without state drift.
+`webview/src/extensions/orderedListTyping.test.ts` types character by character
+into a real ProseMirror document built from the editor's own schema, through
+TipTap's own input-rules plugin, then saves and reopens the result — no DOM, the
+same fake-editor pattern as `extensions/comment/commentIds.test.ts`.
+
+- [x] Typing: assert against document state, not a rendered class. `2026. was a good year for lists.` stays one paragraph with every character intact; `1. `, `5. `, `99. ` produce `orderedList(start=N)`; `100. ` and `1999. ` stay paragraphs; a number mid-sentence never converts.
+- [x] Confirm the test would catch the defect: with the stock `@tiptap/extension-ordered-list` swapped back in, it fails on the first assertion (`orderedList(start=2026)` instead of `paragraph`).
+- [x] Save: the typed year serializes escaped (`2026\.`), a typed list serializes as a real marker — asserted on the document the typing produced, not a hand-written fixture.
+- [x] Reopen: each saved string is parsed back through the editor's `marked` instance; the year has no `<ol>`, the list does.
+- [x] Undo: Backspace straight after a conversion (`undoInputRule`) removes the list and puts `5. ` back as plain text.
+- [x] Paste: nothing to change or test — `handlePaste` in `Editor.tsx` only intercepts images, the ordered-list extension has no paste rule, and input rules do not run on paste. Pasted text stays text; pasted Markdown is converted only on the load path, which this sprint does not touch.
+- [ ] Undo of a merge, and the full undo/redo stack: needs the auto-joiner and the history plugin, which live in the assembled editor — Phase 4.
 
 ## Phase 4: RunDev validation
 
