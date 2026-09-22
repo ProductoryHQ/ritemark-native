@@ -27,7 +27,7 @@ Driven through CDP against the editor webview, reading `window.getSelection()` a
 | Control: `Shift+Cmd+End` | | not claimed by the new binding (selection untouched) — `Shift-End` and `Meta-Shift-End` are distinct keymap entries. |
 | Control: plain `End` | | not claimed by the new binding — it was correct before and is left alone. |
 
-Screenshot of the clamped selection (`Start here.` highlighted; the wrapped paragraph and the ordered list below it untouched): `/tmp/claude-501/shots/shift-end-wrapped.png`, captured 2026-09-22. The AI sidebar's "Working on selected text" panel independently showed `Start here.` — i.e. the *host* also saw a one-paragraph selection, not a DOM-only artefact.
+Screenshot of the clamped selection (`Start here.` highlighted; the wrapped paragraph and the ordered list below it untouched): [`../screenshots/s126-shift-end-clamped.png`](../screenshots/s126-shift-end-clamped.png), captured 2026-09-22. The AI sidebar's "Working on selected text" panel independently showed `Start here.` — i.e. the *host* also saw a one-paragraph selection, not a DOM-only artefact.
 
 **`Selection.modify` works inside the VS Code webview.** The Option A fallback in the sprint plan is therefore not needed, and stays in the code only as the defensive path for a browser that lacks the API.
 
