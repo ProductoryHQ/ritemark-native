@@ -21,6 +21,7 @@ import BulletList from '@tiptap/extension-bullet-list'
 import OrderedList from '@tiptap/extension-ordered-list'
 import ListItem from '@tiptap/extension-list-item'
 import { TextSelection } from '@tiptap/pm/state'
+import { keydownHandler } from '@tiptap/pm/keymap'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import {
   clampHeadToTextblock,
@@ -200,6 +201,57 @@ function selectedText(doc: PMNode, anchor: number, head: number): string {
     'art here.',
     'without Selection.modify the fallback still cannot leave the text block',
   )
+}
+
+// --- which keystrokes the binding actually claims -------------------------
+
+{
+  // The clamp is only safe if it fires for exactly the two keys it is meant
+  // for. `Shift-End` must not swallow `Shift-Mod-End` (select to end of
+  // document, correct as-is) or plain `End` (correct as-is). That is a fact
+  // about prosemirror-keymap's normalization, so assert it against the real
+  // handler rather than trusting the naming.
+  const claimed: string[] = []
+  const handler = keydownHandler({
+    'Shift-Home': () => {
+      claimed.push('Shift-Home')
+      return true
+    },
+    'Shift-End': () => {
+      claimed.push('Shift-End')
+      return true
+    },
+  })
+  const view = { state: {}, dispatch() {} } as never
+  const press = (key: string, mods: Partial<Record<'shift' | 'meta' | 'ctrl' | 'alt', boolean>> = {}) => {
+    claimed.length = 0
+    const handled = handler(view, {
+      key,
+      keyCode: 0,
+      shiftKey: !!mods.shift,
+      metaKey: !!mods.meta,
+      ctrlKey: !!mods.ctrl,
+      altKey: !!mods.alt,
+    } as never)
+    return { handled, claimed: claimed[0] ?? null }
+  }
+
+  assert.deepEqual(press('End', { shift: true }), { handled: true, claimed: 'Shift-End' })
+  assert.deepEqual(press('Home', { shift: true }), { handled: true, claimed: 'Shift-Home' })
+
+  for (const [label, key, mods] of [
+    ['Cmd+Shift+End', 'End', { shift: true, meta: true }],
+    ['Cmd+Shift+Home', 'Home', { shift: true, meta: true }],
+    ['Ctrl+Shift+End', 'End', { shift: true, ctrl: true }],
+    ['plain End', 'End', {}],
+    ['plain Home', 'Home', {}],
+  ] as const) {
+    assert.deepEqual(
+      press(key, mods),
+      { handled: false, claimed: null },
+      `${label} must be left to the browser`,
+    )
+  }
 }
 
 console.log('selectionBoundary.test.ts: all assertions passed')
