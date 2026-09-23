@@ -14,7 +14,8 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 118 | Record in Transcribe: microphone capture into a WAV in the project, recovery after an interruption, tooltips on every Transcribe button | Gate 1, and **Gate 2 for the first native Windows capture**. The dev build could not prove macOS permission under the real bundle ID |
 | 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
-| 123–125 | _Not started_ | — |
+| 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
+| 124–125 | _Not started_ | — |
 
 ## Automated checks (before handover)
 
@@ -66,6 +67,15 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] Ask the agent for links to a file and a folder in the project, a missing file, a web page and a `mailto:` address: the file opens, the folder is selected in the project tree, the missing file is named, the web page opens in the browser, the `mailto:` link explains itself and offers **Copy link**
 - [ ] Right-click each of those links: the menu fits the destination; **Copy path** puts the path on the clipboard
 
+### Findability (Sprint 123)
+
+- [ ] Open a long transcript and press Cmd+F: the search field takes focus; type a word and see "1 of N" with the match highlighted
+- [ ] Enter / Shift+Enter and the arrows move between matches, wrapping at the ends; a word marked as uncertain is found and keeps its marking
+- [ ] Play the recording and search: the transcript stops following; **Back to playing line** returns to the playing line and following resumes
+- [ ] Scroll the transcript with the mouse wheel while it plays: **Back to playing line** appears
+- [ ] A word that is not there shows "No matches"; Escape clears the field
+- [ ] Open eight or more files with long names: the tab row fits without scrolling sideways; hovering a tab shows its full name
+
 ### Regression sweep
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
@@ -81,6 +91,8 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] Record → Stop and use gives a playable file. On-device transcription is not available on Intel; the engine card says so, and ElevenLabs is offered if a key is set
 
 ### Windows
+
+- [ ] With many files open, the tab row shrinks to fit and hovering a tab shows its full name (Sprint 123)
 
 - [ ] Installer signed by `Productory Services OÜ`; standard-user install and clean uninstall
 - [ ] **Google Docs Connect** completes in the browser and returns to Ritemark. This is the first native Windows run of the loopback OAuth flow. Then Create and Sync

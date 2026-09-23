@@ -5,8 +5,13 @@ export const WORKBENCH_LAYOUT_CLASSES = {
     'min-h-0 shrink-0 max-h-[50%] overflow-y-auto overscroll-contain md:max-h-none md:overflow-visible',
   panes:
     'grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] md:flex md:flex-row',
+  // Sprint 123: the transcript is a column — the search bar on top, the
+  // scrolling lines below — the same shape as the Insights rail. The bar never
+  // scrolls, so nothing shows through or around it.
+  transcriptColumn: 'flex min-h-0 min-w-0 flex-col md:flex-1',
+  transcriptSearch: 'shrink-0 border-b border-hairline bg-surface px-3 py-2 sm:px-5',
   transcript:
-    'min-h-0 min-w-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 md:flex-1',
+    'min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 md:flex-1',
   insights:
     'flex min-h-0 min-w-0 flex-col border-t border-hairline bg-surface-muted md:w-72 md:flex-none md:border-l md:border-t-0',
   insightsScroller:

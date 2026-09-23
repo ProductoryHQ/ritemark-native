@@ -3,7 +3,7 @@
 Checklist for [sprint-plan.md](./sprint-plan.md). Tick `[x]` only with a commit
 on this branch behind it.
 
-> **Gate:** Phase 0 is done. No code until Jarmo approves the plan.
+> **Gate:** passed — plan approved 2026-09-23.
 
 ## Phase 0: Audit (done)
 
@@ -11,31 +11,32 @@ on this branch behind it.
 
 ## Phase 1: Transcript search logic
 
-- [ ] A pure module (e.g. `workbench/transcriptSearch.ts`) that finds case-insensitive matches in each segment's *shown* text — plain text, or the word-by-word text when a segment has unsure words.
-- [ ] A pure function that splits a segment's text runs (whole text, or per word) at match boundaries, marking which pieces are a match and which is the current one.
-- [ ] Tests: counts, order across segments, matches spanning several words, the current-match wrap at the ends, no match, empty query, and letters like õ ä ö ü.
+- [x] `workbench/transcriptSearch.ts`: `segmentRuns` (kept in step with `SegmentText`), `findTranscriptMatches` (case folded per character so offsets stay aligned), `stepMatch`, `matchCountLabel`.
+- [x] `splitRunsAtMatches`: cuts the shown runs at match boundaries, marking plain / match / current pieces; a word the engine was unsure about stays one run.
+- [x] `transcriptSearch.test.ts`: reading order across segments, case, matches across words, non-overlap, wrap, count, õ ä ö ü, the dotted İ, empty and no-match queries, splitting without losing a character.
 
 ## Phase 2: Search bar and navigation
 
-- [ ] Search field above the transcript with count, Previous / Next (shadcn buttons with tooltips), Enter / Shift+Enter, Escape, "No matches".
-- [ ] Highlight in `SegmentText` for both renderings, keeping the unsure-word marking.
-- [ ] Going to a match scrolls it into view and pauses Follow playback; Cmd/Ctrl+F focuses the field.
-- [ ] "Back to playing line" appears while following is paused during playback and resumes following.
+- [x] `TranscriptSearchBar.tsx`: field, polite live count, Previous / Next / Clear (shadcn buttons with tooltips), Enter / Shift+Enter, Escape clears then leaves.
+- [x] `HighlightedSegmentText` in `Workbench.tsx` renders matches in both segment shapes and keeps the unsure-word marking; segments without matches render exactly as before.
+- [x] A new query starts at the first match at or after the playing line; going to a match scrolls it into view and pauses Follow playback; a transcript update (a speaker renamed) keeps the current match. Cmd/Ctrl+F focuses the field.
+- [x] "Back to playing line" appears whenever following is paused during playback — after a search or a wheel scroll — and resumes following.
+- [x] Layout (Jarmo, on the first build): the bar moved out of the scroller into its own row — `transcriptColumn` / `transcriptSearch` in `layout.ts`, the Insights rail's shape.
 
 ## Phase 3: Tab row
 
-- [ ] Add `workbench.editor.tabSizing: "shrink"` to `contributes.configurationDefaults` in `extensions/ritemark/package.json`.
-- [ ] Check on a fresh profile: long names shrink only when the row is full; hover shows the full name; active tab, close buttons and Ctrl+Tab unchanged; browser tabs still show the page title only.
+- [x] `workbench.editor.tabSizing: "shrink"` in the extension's `configurationDefaults`.
+- [x] Fresh profile: seven tabs fit an 800 px row; hover shows the full path. Two details differ from the plan's wording, both VS Code's own shrink-mode rules: names are clipped with a fade rather than an ellipsis, and the close button shows on hover (also on the active tab). Recorded for Jarmo's call.
 
 ## Phase 4: RunDev validation
 
-- [ ] A long transcript: search, navigate, pause/resume following, play and rename speakers while searching.
-- [ ] Keyboard only: Cmd/Ctrl+F, Enter, Shift+Enter, Escape, Tab to the buttons.
-- [ ] The tab-row checks from Phase 3 in the running app.
+- [x] A 600-segment, one-hour transcript: search, navigate, wrap, pause and resume following, wheel pause — rename a speaker mid-search — see [qa-evidence.md](./qa-evidence.md).
+- [x] Keyboard: Cmd+F, Enter, Shift+Enter, Escape twice.
+- [x] The tab-row checks from Phase 3 in the running app.
 
 ## Phase 5: QA and closeout
 
-- [ ] `npm test` and `./scripts/validate-qa.sh`, results recorded.
-- [ ] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (including a Windows tab-row line for the Windows gate).
-- [ ] `docs/development/architecture.md` if the workbench's structure changed.
-- [ ] Release-plan tracker row, PR, and close [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283).
+- [x] `npm test` and `./scripts/validate-qa.sh`, results recorded.
+- [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (including a Windows tab-row line for the Windows gate).
+- [x] `docs/development/architecture.md` if the workbench's structure changed. *(Transcript search section and history row.)*
+- [x] Release-plan tracker row. PR opened; close [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283).

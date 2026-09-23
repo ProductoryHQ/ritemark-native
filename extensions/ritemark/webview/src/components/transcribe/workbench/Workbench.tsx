@@ -10,7 +10,7 @@
  * Every `play()` here hangs off a click, and nothing auto-plays on open.
  */
 
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/button';
 import { vscode } from '../../../lib/vscode';
@@ -34,6 +34,14 @@ import {
 } from '../../../../../src/speech/insightsLanguage';
 import { normalizeSpeakerLabel } from '../../../../../src/speech/speakerNames';
 import { WORKBENCH_LAYOUT_CLASSES } from './layout';
+import { TranscriptSearchBar } from './TranscriptSearchBar';
+import {
+  findTranscriptMatches,
+  matchCountLabel,
+  segmentRuns,
+  splitRunsAtMatches,
+  stepMatch,
+} from './transcriptSearch';
 
 interface EngineStatus {
   id: string;
@@ -109,6 +117,72 @@ export function Workbench() {
   const segments = session?.segments ?? [];
   const activeIndex = useMemo(() => activeSegmentIndex(segments, currentTime), [segments, currentTime]);
 
+  // Sprint 123 (#283): search in the loaded transcript. It only reads what is
+  // shown — nothing about the session changes. Going to a match pauses Follow
+  // playback so the playing line does not drag the view away from it.
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredQuery = useDeferredValue(searchQuery);
+  const searchEngine = session?.engine ?? '';
+  const matches = useMemo(
+    () => findTranscriptMatches(segments, searchEngine, deferredQuery),
+    [segments, searchEngine, deferredQuery],
+  );
+  const [currentMatch, setCurrentMatch] = useState(-1);
+  const revealCurrentMatch = useRef(false);
+
+  // The transcript changed under the same query (a speaker renamed, say):
+  // keep the current match where it is, only within range.
+  useEffect(() => {
+    setCurrentMatch((current) => (matches.length === 0 ? -1 : Math.min(Math.max(current, 0), matches.length - 1)));
+  }, [matches]);
+
+  // A new query starts at the first match at or after the playing line, and
+  // goes there. Only a new query (or another transcript) does this — playback
+  // moving on, or a rename, must not move the view.
+  useEffect(() => {
+    if (matches.length === 0) {
+      setCurrentMatch(-1);
+      return;
+    }
+    const fromPlaying = matches.findIndex((match) => match.segmentIndex >= activeIndex);
+    setCurrentMatch(fromPlaying >= 0 ? fromPlaying : 0);
+    setFollowPlayback(false);
+    revealCurrentMatch.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deferredQuery, session?.id]);
+
+  const stepSearch = useCallback((direction: 1 | -1) => {
+    setCurrentMatch((current) => stepMatch(current, matches.length, direction));
+    setFollowPlayback(false);
+    revealCurrentMatch.current = true;
+  }, [matches.length]);
+
+  useEffect(() => {
+    if (!revealCurrentMatch.current) return;
+    revealCurrentMatch.current = false;
+    transcriptRef.current
+      ?.querySelector('[data-search-current]')
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [currentMatch, matches]);
+
+  /** Per segment: its match ranges and which of them, if any, is the current one. */
+  const highlightBySegment = useMemo(() => {
+    const bySegment = new Map<number, { ranges: Array<{ start: number; end: number }>; current: number }>();
+    matches.forEach((match, index) => {
+      const entry = bySegment.get(match.segmentIndex) ?? { ranges: [], current: -1 };
+      if (index === currentMatch) entry.current = entry.ranges.length;
+      entry.ranges.push({ start: match.start, end: match.end });
+      bySegment.set(match.segmentIndex, entry);
+    });
+    return bySegment;
+  }, [matches, currentMatch]);
+
+  const backToPlayingLine = useCallback(() => {
+    setFollowPlayback(true);
+    activeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     setInsightsLanguage(session.insights?.language?.selected ?? { kind: 'auto' });
@@ -138,6 +212,13 @@ export function Workbench() {
   // Keyboard: space toggles, arrows skip. Bound on the container rather than
   // the document so it cannot fight the editor's own shortcuts.
   const onKeyDown = (event: React.KeyboardEvent) => {
+    // Cmd/Ctrl+F: search this transcript (works from anywhere in the workbench).
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+      return;
+    }
     if (isInteractivePlaybackTarget(event.target)) return;
     if (event.key === ' ') {
       event.preventDefault();
@@ -281,24 +362,38 @@ export function Workbench() {
       </div>
 
       <div className={WORKBENCH_LAYOUT_CLASSES.panes} data-workbench-panes>
-        <div
-          ref={transcriptRef}
-          className={WORKBENCH_LAYOUT_CLASSES.transcript}
-          onWheel={() => setFollowPlayback(false)}
-        >
-          <div className="mx-auto min-w-0 max-w-3xl">
-            {segments.map((segment, index) => (
-              <SegmentRow
-                key={segment.id}
-                ref={index === activeIndex ? activeRef : undefined}
-                segment={segment}
-                speakers={session.speakers}
-                previousSpeaker={index > 0 ? segments[index - 1].speaker : undefined}
-                active={index === activeIndex}
-                engine={lowConfidenceEngine}
-                onSeek={() => seek(segment.start, true)}
-              />
-            ))}
+        <div className={WORKBENCH_LAYOUT_CLASSES.transcriptColumn} data-transcript-column>
+          <TranscriptSearchBar
+            ref={searchInputRef}
+            query={searchQuery}
+            countLabel={matchCountLabel(currentMatch, matches.length, deferredQuery)}
+            hasMatches={matches.length > 0}
+            showBackToPlaying={!followPlayback && playing}
+            onQueryChange={setSearchQuery}
+            onStep={stepSearch}
+            onLeave={() => transcriptRef.current?.closest<HTMLElement>('[tabindex="0"]')?.focus()}
+            onBackToPlaying={backToPlayingLine}
+          />
+          <div
+            ref={transcriptRef}
+            className={WORKBENCH_LAYOUT_CLASSES.transcript}
+            onWheel={() => setFollowPlayback(false)}
+          >
+            <div className="mx-auto min-w-0 max-w-3xl">
+              {segments.map((segment, index) => (
+                <SegmentRow
+                  key={segment.id}
+                  ref={index === activeIndex ? activeRef : undefined}
+                  segment={segment}
+                  speakers={session.speakers}
+                  previousSpeaker={index > 0 ? segments[index - 1].speaker : undefined}
+                  active={index === activeIndex}
+                  engine={lowConfidenceEngine}
+                  highlight={highlightBySegment.get(index)}
+                  onSeek={() => seek(segment.start, true)}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -499,12 +594,19 @@ interface SegmentRowProps {
   previousSpeaker: string | undefined;
   active: boolean;
   engine: string;
+  /** Sprint 123: this segment's search matches, and which one is current (-1: none). */
+  highlight?: SegmentHighlight;
   onSeek: () => void;
+}
+
+interface SegmentHighlight {
+  ranges: Array<{ start: number; end: number }>;
+  current: number;
 }
 
 /** forwardRef so the container can scroll the playing line into view. */
 const SegmentRow = forwardRef<HTMLDivElement, SegmentRowProps>(function SegmentRow(
-  { segment, speakers, previousSpeaker, active, engine, onSeek },
+  { segment, speakers, previousSpeaker, active, engine, highlight, onSeek },
   ref,
 ) {
   const label = speakerLabelFor(speakers, segment.speaker);
@@ -539,7 +641,7 @@ const SegmentRow = forwardRef<HTMLDivElement, SegmentRowProps>(function SegmentR
         <div className="mt-0.5 text-[10px] tabular-nums text-ink-faint">{formatClock(segment.start)}</div>
       </div>
       <p className={['min-w-0 flex-1 break-words text-sm leading-relaxed', active ? 'text-ink-strong' : 'text-ink-body'].join(' ')}>
-        <SegmentText segment={segment} engine={engine} />
+        {highlight ? <HighlightedSegmentText segment={segment} engine={engine} highlight={highlight} /> : <SegmentText segment={segment} engine={engine} />}
       </p>
     </div>
   );
@@ -574,6 +676,60 @@ function SegmentText({ segment, engine }: { segment: WorkbenchSegment; engine: s
           </span>
         ) : (
           <span key={index}>{word.text} </span>
+        ),
+      )}
+    </>
+  );
+}
+
+const LOW_CONFIDENCE_CLASS =
+  'rounded-sm bg-ritemark-warning-soft decoration-dotted underline-offset-4 [text-decoration-line:underline] [text-decoration-color:var(--r-warning)]';
+
+/**
+ * Sprint 123: the same text as `SegmentText`, cut into pieces at search
+ * matches. Words the engine was unsure about keep their marking; a match that
+ * crosses words is marked in each of them.
+ */
+function HighlightedSegmentText({
+  segment,
+  engine,
+  highlight,
+}: {
+  segment: WorkbenchSegment;
+  engine: string;
+  highlight: SegmentHighlight;
+}) {
+  const runs = segmentRuns(segment, engine);
+  const split = splitRunsAtMatches(runs, highlight.ranges, highlight.current);
+  const pieces = (entries: typeof split[number]['pieces']) =>
+    entries.map((piece, index) =>
+      piece.kind === 'text' ? (
+        <span key={index}>{piece.text}</span>
+      ) : (
+        <mark
+          key={index}
+          data-search-current={piece.kind === 'current' ? '' : undefined}
+          className={
+            piece.kind === 'current'
+              ? 'rounded-[2px] bg-accent text-white'
+              : 'rounded-[2px] bg-accent-soft text-ink-strong shadow-[inset_0_-2px_0_var(--r-accent)]'
+          }
+        >
+          {piece.text}
+        </mark>
+      ),
+    );
+
+  if (runs.length === 1 && !runs[0].lowConfidence) return <>{pieces(split[0].pieces)}</>;
+  return (
+    <>
+      {split.map(({ run, pieces: runPieces }, index) =>
+        run.lowConfidence ? (
+          <span key={index} className={LOW_CONFIDENCE_CLASS} title="The engine was unsure about this word">
+            {pieces(runPieces)}
+          </span>
+        ) : (
+          <span key={index}>{pieces(runPieces)}</span>
         ),
       )}
     </>
