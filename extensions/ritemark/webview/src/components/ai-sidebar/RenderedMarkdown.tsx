@@ -5,11 +5,12 @@
  * that integrate with VS Code's theme variables.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
 import { classifyChatHref, stripLineSuffix } from './chatLinks';
+import { ChatLinkMenu, type ChatLinkMenuRequest } from './ChatLinkMenu';
 
 // Configure marked for safety + good defaults
 marked.setOptions({
@@ -45,6 +46,9 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
         vscode.postMessage({ type: 'openExternal', url: link.url });
       } else if (link.kind === 'file') {
         vscode.postMessage({ type: 'chat:open-file', filePath: link.path });
+      } else if (link.kind === 'unsupported') {
+        // Sprint 122 (#282): never followed, but never silent — the host says why.
+        vscode.postMessage({ type: 'chat:link-unsupported', scheme: link.scheme, href: link.href });
       }
       return;
     }
@@ -63,14 +67,44 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     }
   }, []);
 
+  // Sprint 122 (#282): right-click on a link — or Shift+F10 / the menu key
+  // while it has focus — offers what can be done with that destination.
+  // Anywhere else, the ordinary menu.
+  const [linkMenu, setLinkMenu] = useState<ChatLinkMenuRequest | null>(null);
+  const openLinkMenu = useCallback((target: EventTarget, point: { x: number; y: number } | null): boolean => {
+    const anchor = (target as HTMLElement).closest('a');
+    if (!anchor) return false;
+    const link = classifyChatHref(anchor.getAttribute('href'));
+    if (link.kind === 'none') return false;
+    // Without a pointer position (keyboard), the menu sits under the link.
+    const rect = anchor.getBoundingClientRect();
+    setLinkMenu({ x: point?.x ?? rect.left, y: point?.y ?? rect.bottom, target: link, anchor });
+    return true;
+  }, []);
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const fromKeyboard = e.clientX === 0 && e.clientY === 0;
+    if (openLinkMenu(e.target, fromKeyboard ? null : { x: e.clientX, y: e.clientY })) e.preventDefault();
+  }, [openLinkMenu]);
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // macOS has no keyboard context-menu key of its own, so Shift+F10 is handled
+    // here on every platform (as VS Code does), along with the Menu key.
+    if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
+    if (openLinkMenu(e.target, null)) e.preventDefault();
+  }, [openLinkMenu]);
+
   if (!html) return null;
 
   return (
-    <div
-      className={cn('rendered-markdown', className)}
-      onClick={handleClick}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <>
+      <div
+        className={cn('rendered-markdown', className)}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        onKeyDown={handleKeyDown}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {linkMenu && <ChatLinkMenu key={`${linkMenu.x},${linkMenu.y}`} request={linkMenu} onClose={() => setLinkMenu(null)} />}
+    </>
   );
 }
 

@@ -4,7 +4,7 @@
  * Supports @ agent mentions with autocomplete, slash commands, and drag-and-drop file paths.
  */
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Icon } from '../ui/Icon';
 import {
   Select,
@@ -30,6 +30,9 @@ import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
+import { composerBounds, forgetComposerHeight, rememberComposerHeight, rememberedComposerHeight } from '../comment/ResizableComposer';
+import { ComposerResizeHandle } from './ComposerResizeHandle';
+import { dragCeiling } from './composerResize';
 import { ThinkingEffortControl } from './ThinkingEffortControl';
 import { deriveRuntimeAvailabilities, RUNTIME_LABELS } from './runtimeAvailability';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
@@ -50,6 +53,16 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
+
+/** Sprint 122: the chat composer's slot in the per-surface session height. */
+const CHAT_COMPOSER_SURFACE = 'agent-chat';
+/** Two lines when empty, as before. */
+const CHAT_COMPOSER_BOUNDS_ROWS = 2;
+/** Floor and ceiling from Sprint 117's composer bounds, measured for this field:
+ *  `leading-relaxed` (1.625) text and `py-2.5` (2 × 10 px) padding, no border. */
+const CHAT_COMPOSER_BOUNDS = composerBounds({ minRows: CHAT_COMPOSER_BOUNDS_ROWS, lineHeightEm: 1.625, chromePx: 20 });
+/** A dragged-tall composer still leaves this much of the conversation in view. */
+const CHAT_TRANSCRIPT_STRIP_PX = 72;
 
 /** Dropped file path chip */
 interface PathChip {
@@ -351,9 +364,8 @@ export function ChatInput() {
       setAttachments([]);
       setShowMentionPopup(false);
       setShowCommandPopup(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      // The composer height follows `value` (layout effect below), so clearing
+      // the text is what shrinks it back.
       return;
     }
 
@@ -411,10 +423,8 @@ export function ChatInput() {
     setShowCommandPopup(false);
     clearPinnedAgentContent();
     clearPinnedAgentDismissal();
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    // The composer height follows `value` (layout effect below), so clearing
+    // the text is what shrinks it back.
   }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
@@ -860,13 +870,62 @@ export function ChatInput() {
   // implying that ACP receives context the host deliberately does not send.
   const showBrowserContextChip = !isOpenCode && currentBrowserContext?.url && !hideBrowserContext;
 
-  // Auto-resize textarea
+  // Sprint 122 (#282): until the person sizes it, the composer fits its text —
+  // up to 8 lines or 40% of the window, where it used to stop at 120 px. Its
+  // top edge is a resize handle (ComposerResizeHandle): drag up for taller,
+  // down for shorter (Jarmo, 2026-09-23: a box docked at the bottom is sized
+  // from its top). A chosen height is exact — the text scrolls inside it — is
+  // not limited by the 8-line ceiling, and is kept for the session.
+  // Double-clicking the handle goes back to fitting the text.
+  const [userHeight, setUserHeight] = useState<number | null>(() => rememberedComposerHeight(CHAT_COMPOSER_SURFACE));
+
+  // The field may never push the Send row out of view. It gets only the room
+  // the sidebar column has left once everything else in it is placed — the
+  // header, banners, the AI disclosure, the chips and the controls row. The
+  // transcript (the column's growing child) gives way first. At 200% zoom in
+  // a short window this is what keeps Send on screen.
+  const [roomPx, setRoomPx] = useState<number | null>(null);
+  const [fieldMetrics, setFieldMetrics] = useState({ floorPx: 62, linePx: 21 });
   useEffect(() => {
+    const root = containerRef.current;
+    const column = root?.parentElement;
+    const el = textareaRef.current;
+    if (!root || !column || !el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      let others = 0;
+      for (const child of Array.from(column.children)) {
+        if (child === root || getComputedStyle(child).flexGrow !== '0') continue;
+        others += child.getBoundingClientRect().height;
+      }
+      const chrome = root.getBoundingClientRect().height - el.getBoundingClientRect().height;
+      setRoomPx(Math.max(0, Math.floor(column.clientHeight - others - chrome)));
+      const style = getComputedStyle(el);
+      const floorPx = Math.round(parseFloat(style.minHeight)) || 62;
+      const linePx = Math.round(parseFloat(style.lineHeight)) || 21;
+      setFieldMetrics((prev) => (prev.floorPx === floorPx && prev.linePx === linePx ? prev : { floorPx, linePx }));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(column);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
+    if (userHeight !== null) {
+      el.style.height = `${userHeight}px`;
+      return;
+    }
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-  }, [value]);
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, userHeight]);
+
+  const composerHeightBounds = {
+    min: fieldMetrics.floorPx,
+    max: dragCeiling(roomPx, fieldMetrics.floorPx, CHAT_TRANSCRIPT_STRIP_PX),
+  };
 
   const attachmentCount = attachments.length;
   const imageCount = attachments.filter((a) => a.kind === 'image').length;
@@ -1055,7 +1114,19 @@ export function ChatInput() {
         />
       )}
 
-      <div className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] shadow-[0_1px_2px_rgba(30,27,75,0.04)] focus-within:border-[var(--r-hairline-strong)] focus-within:shadow-[0_0_0_1px_rgba(100,116,139,0.08)]">
+      <div className="relative overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)] shadow-[0_1px_2px_rgba(30,27,75,0.04)] focus-within:border-[var(--r-hairline-strong)] focus-within:shadow-[0_0_0_1px_rgba(100,116,139,0.08)]">
+        <ComposerResizeHandle
+          currentHeight={() => textareaRef.current?.getBoundingClientRect().height ?? fieldMetrics.floorPx}
+          valueNow={userHeight ?? textareaRef.current?.getBoundingClientRect().height ?? fieldMetrics.floorPx}
+          bounds={composerHeightBounds}
+          lineStep={fieldMetrics.linePx}
+          onResize={setUserHeight}
+          onCommit={(height) => rememberComposerHeight(CHAT_COMPOSER_SURFACE, height)}
+          onReset={() => {
+            setUserHeight(null);
+            forgetComposerHeight(CHAT_COMPOSER_SURFACE);
+          }}
+        />
         {/* Context chips: active file + browser + manually added paths + @mentions + pinned agent */}
         {(showActiveFileChip || showBrowserContextChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
@@ -1177,9 +1248,17 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
-          rows={2}
-          className="block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ fontSize: 'var(--chat-font-size, 13px)' }}
+          rows={CHAT_COMPOSER_BOUNDS_ROWS}
+          className="block w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            fontSize: 'var(--chat-font-size, 13px)',
+            minHeight: CHAT_COMPOSER_BOUNDS.min,
+            // A chosen height is only ever limited by the room; fitting the
+            // text stops at the 8-line / 40% ceiling as well.
+            maxHeight: userHeight !== null
+              ? (roomPx === null ? 'none' : `${roomPx}px`)
+              : (roomPx === null ? CHAT_COMPOSER_BOUNDS.max : `min(${CHAT_COMPOSER_BOUNDS.max}, ${roomPx}px)`),
+          }}
         />
 
         {/* Attachment thumbnail strip */}

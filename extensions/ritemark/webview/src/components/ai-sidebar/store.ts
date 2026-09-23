@@ -63,6 +63,7 @@ import {
 } from './promptQueue';
 import { deriveActivityState } from './activityState';
 import { resolveInboundConversationId } from './conversationRouting';
+import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation } from './conversationProjection';
 import type {
   AgentId,
@@ -2004,13 +2005,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     },
 
     setPinnedConversationIds: (ids) => {
-      const unique = [...new Set(ids)].slice(0, 5);
+      const unique = [...new Set(ids)].slice(0, MAX_PINNED_CONVERSATIONS);
       set({ pinnedConversationIds: unique });
     },
 
     pinConversation: (id) => {
       const state = get();
-      if (state.pinnedConversationIds.includes(id) || state.pinnedConversationIds.length >= 5) return;
+      if (state.pinnedConversationIds.includes(id) || state.pinnedConversationIds.length >= MAX_PINNED_CONVERSATIONS) return;
       set({ pinnedConversationIds: [...state.pinnedConversationIds, id] });
     },
 

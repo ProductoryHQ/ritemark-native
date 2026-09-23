@@ -42,6 +42,16 @@ Record works on macOS and Windows, wherever Transcribe runs. It is on by default
 
 Ritemark now has its own privacy policy and terms of use on ritemark.app, in English and Estonian. Productory Services OÜ remains the provider. The links in the app (analytics consent and AI information) point there now. The privacy policy has a section on exactly what Google Docs publishing does with your Google data. The old productory.ai addresses still work for earlier versions.
 
+## Clearer Agent Chat
+
+Sprint 122 makes it obvious which conversation you are in, gives long prompts room, and makes every link in a reply do something.
+
+**The conversation is named.** A header above the transcript shows the title of the conversation you are in. Its **⋮** menu has **Rename**, **Pin** or **Unpin**, and **Delete** — the same actions, words and confirmations as the conversation history.
+
+**The composer has room.** It grows with what you write, up to eight lines instead of about five. To set the height yourself, drag the handle on its top edge — up for taller, down for shorter, as tall as the sidebar allows — or focus it and use the arrow keys. Double-click the handle to go back to fitting the text. Ritemark keeps the height you chose while it is open, and the send button and model control always stay on screen, even at large zoom levels.
+
+**Links do something, or say why not.** A file in your project opens in its editor, and a folder is shown in the project tree. A file outside your project is shown in Finder rather than opened, because a path in a reply is written by the AI, not by you. A missing file names the path. A link Ritemark does not open from chat, such as `mailto:`, says so and offers **Copy link**. Right-click a link, or press Shift+F10, for the rest: **Reveal in project**, **Locate in Finder**, **Copy path**, **Open in browser** or **Copy link**, depending on where it points.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.

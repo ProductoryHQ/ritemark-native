@@ -2,7 +2,7 @@
  * chatLinks tests — chat markdown link classification.
  */
 import assert from 'node:assert/strict'
-import { classifyChatHref, stripLineSuffix } from './chatLinks'
+import { chatLinkMenu, classifyChatHref, stripLineSuffix } from './chatLinks'
 
 // Workspace-relative and absolute paths are file targets.
 assert.deepEqual(classifyChatHref('koondfail.md'), { kind: 'file', path: 'koondfail.md' })
@@ -29,13 +29,54 @@ assert.deepEqual(classifyChatHref('HTTP://example.com'), { kind: 'external', url
 // file:// URLs resolve to their filesystem path.
 assert.deepEqual(classifyChatHref('file:///tmp/ws/report.md'), { kind: 'file', path: '/tmp/ws/report.md' })
 
-// Anchors, empty, and foreign schemes are ignored — especially the dangerous ones.
+// Anchors and empty hrefs are not links to anything.
 assert.deepEqual(classifyChatHref('#section'), { kind: 'none' })
 assert.deepEqual(classifyChatHref(''), { kind: 'none' })
 assert.deepEqual(classifyChatHref(undefined), { kind: 'none' })
-assert.deepEqual(classifyChatHref('mailto:x@y.z'), { kind: 'none' })
-assert.deepEqual(classifyChatHref('command:workbench.action.openSettings'), { kind: 'none' })
-assert.deepEqual(classifyChatHref('javascript:alert(1)'), { kind: 'none' })
-assert.deepEqual(classifyChatHref('vscode://file/etc/passwd'), { kind: 'none' })
+
+// Foreign schemes are never followed — especially the dangerous ones — but
+// since Sprint 122 (#282) they are named, so the click can say why nothing
+// opened instead of doing nothing at all.
+assert.deepEqual(classifyChatHref('mailto:x@y.z'), { kind: 'unsupported', href: 'mailto:x@y.z', scheme: 'mailto' })
+assert.deepEqual(classifyChatHref('command:workbench.action.openSettings'), {
+  kind: 'unsupported',
+  href: 'command:workbench.action.openSettings',
+  scheme: 'command',
+})
+assert.deepEqual(classifyChatHref('javascript:alert(1)'), { kind: 'unsupported', href: 'javascript:alert(1)', scheme: 'javascript' })
+assert.deepEqual(classifyChatHref('vscode://file/etc/passwd'), { kind: 'unsupported', href: 'vscode://file/etc/passwd', scheme: 'vscode' })
+assert.deepEqual(classifyChatHref('VSCODE://x'), { kind: 'unsupported', href: 'VSCODE://x', scheme: 'vscode' })
+assert.equal(classifyChatHref('data:text/html,<b>x</b>').kind, 'unsupported')
+
+// --- Sprint 122: the context menu per destination. The first item is what an
+// ordinary click does; an out-of-project path is only revealed or copied.
+const labels = (items: ReturnType<typeof chatLinkMenu>) => items.map((item) => `${item.action}:${item.label}`)
+
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'project-file' }, 'mac')), [
+  'open:Open',
+  'reveal-in-project:Reveal in project',
+  'copy:Copy path',
+])
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'project-folder' }, 'mac')), [
+  'reveal-in-project:Reveal in project',
+  'locate:Locate in Finder',
+  'copy:Copy path',
+])
+for (const local of ['outside-file', 'outside-folder'] as const) {
+  const items = chatLinkMenu({ kind: 'local', local }, 'mac')
+  assert.deepEqual(labels(items), ['locate:Locate in Finder', 'copy:Copy path'])
+  assert.ok(!items.some((item) => item.action === 'open'), `${local} is never opened from chat`)
+}
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'missing' }, 'mac')), ['copy:Copy path'])
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'needs-folder' }, 'mac')), ['copy:Copy path'])
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'inaccessible' }, 'mac')), ['copy:Copy path'])
+assert.deepEqual(labels(chatLinkMenu({ kind: 'external' }, 'mac')), ['open-web:Open in browser', 'copy:Copy link'])
+assert.deepEqual(labels(chatLinkMenu({ kind: 'unsupported' }, 'mac')), ['copy:Copy link'])
+
+// Windows says File Explorer, not Finder.
+assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'outside-file' }, 'other')), [
+  'locate:Show in File Explorer',
+  'copy:Copy path',
+])
 
 console.log('chatLinks tests passed.')
