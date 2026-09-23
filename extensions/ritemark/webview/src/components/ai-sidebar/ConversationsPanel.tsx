@@ -1,18 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
-import {
-  Dialog,
-  DialogBody,
-  DialogButton,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
 import { Icon } from '../ui/Icon';
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
+import { useConversationDialogs } from './ConversationDialogs';
 import { ConversationTooltip } from './ConversationTooltip';
+import { conversationPinState, conversationStatusLabel, type ConversationPinState } from './conversationActionsModel';
 import { useAISidebarStore } from './store';
 
 function relativeTime(value: string): string {
@@ -26,50 +18,30 @@ function relativeTime(value: string): string {
 }
 
 function lifecycleCopy(summary: ConversationSummaryV1): string {
-  if (summary.lifecycle.state === 'working') return 'Working';
-  if (summary.lifecycle.state === 'needs-user') return 'Needs you';
-  if (summary.lifecycle.state === 'interrupted') return 'Interrupted';
-  return relativeTime(summary.lastActivityAt);
+  return conversationStatusLabel(summary) ?? relativeTime(summary.lastActivityAt);
 }
 
 interface ConversationRowProps {
   summary: ConversationSummaryV1;
-  pinned: boolean;
+  pin: ConversationPinState;
   current: boolean;
   onOpen: () => void;
   onRename: () => void;
   onPin: () => void;
-  pinDisabled: boolean;
   onDelete: () => void;
 }
 
-interface DeleteTarget {
-  summary: ConversationSummaryV1;
-  recovery: boolean;
-}
-
-// Radix portals into the full webview, which also contains the permanent 56px rail.
-// Offset by half the rail and reserve 16px margins inside the conversation pane.
-// The 56px ThreadRail used to paint over dialogs (z-60 vs z-50), so this
-// dialog shifted and shrank to dodge it. The dialog now sits at z-80, so only
-// the max-width remains — and below 640px DialogContent goes full bleed anyway.
-const CONVERSATION_DIALOG_LAYOUT = 'max-w-[320px]';
-const CONVERSATION_DIALOG_FOOTER_LAYOUT = 'flex-col gap-2 px-4 min-[280px]:flex-row min-[280px]:gap-2.5 min-[280px]:px-5';
-const CONVERSATION_DIALOG_ACTION_LAYOUT = 'w-full min-[280px]:w-auto';
-
 function ConversationRow({
   summary,
-  pinned,
+  pin,
   current,
   onOpen,
   onRename,
   onPin,
-  pinDisabled,
   onDelete,
 }: ConversationRowProps) {
-  const pinLabel = pinDisabled
-    ? 'Unpin a conversation before pinning another.'
-    : `${pinned ? 'Unpin' : 'Pin'} ${summary.title}`;
+  const renameLabel = `Rename ${summary.title}`;
+  const deleteLabel = `Delete ${summary.title}`;
   return (
     <div className={`group relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 ${current ? 'bg-[var(--r-accent-soft)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
       <button
@@ -87,17 +59,21 @@ function ConversationRow({
         </div>
       </div>
       <div className="relative z-10 flex shrink-0 items-center gap-1 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100">
-        <button type="button" onClick={onRename} aria-label={`Rename ${summary.title}`} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-          <Icon name="pencil-simple" size={14} />
-        </button>
-        <ConversationTooltip label={pinLabel}>
-          <button type="button" onClick={() => { if (!pinDisabled) onPin(); }} aria-label={pinLabel} aria-disabled={pinDisabled || undefined} className={`flex h-7 w-7 items-center justify-center rounded-[7px] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${pinDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-[var(--r-surface)]'}`}>
-            <Icon name={pinned ? 'push-pin-slash' : 'push-pin'} size={14} />
+        <ConversationTooltip label={renameLabel}>
+          <button type="button" onClick={onRename} aria-label={renameLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+            <Icon name="pencil-simple" size={14} />
           </button>
         </ConversationTooltip>
-        <button type="button" onClick={onDelete} aria-label={`Delete ${summary.title}`} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-          <Icon name="trash" size={14} tone="inherit" />
-        </button>
+        <ConversationTooltip label={pin.label}>
+          <button type="button" onClick={() => { if (!pin.atCapacity) onPin(); }} aria-label={pin.label} aria-disabled={pin.atCapacity || undefined} className={`flex h-7 w-7 items-center justify-center rounded-[7px] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${pin.atCapacity ? 'cursor-not-allowed opacity-50' : 'hover:bg-[var(--r-surface)]'}`}>
+            <Icon name={pin.icon} size={14} />
+          </button>
+        </ConversationTooltip>
+        <ConversationTooltip label={deleteLabel}>
+          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+            <Icon name="trash" size={14} tone="inherit" />
+          </button>
+        </ConversationTooltip>
       </div>
     </div>
   );
@@ -112,6 +88,8 @@ function EarlierConversationRow({
   onMove: () => void;
   onDelete: () => void;
 }) {
+  const moveLabel = `Move ${summary.title} to this project`;
+  const deleteLabel = `Delete ${summary.title}`;
   return (
     <div className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 hover:bg-[var(--r-surface-soft)]">
       <ConversationBubbleIcon identityColorSlot={summary.identityColorSlot} />
@@ -120,80 +98,18 @@ function EarlierConversationRow({
         <div className="mt-0.5 text-[11px] text-[var(--r-ink-muted)]">Project unknown</div>
       </div>
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100">
-        <button type="button" onClick={onMove} aria-label={`Move ${summary.title} to this project`} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-          <Icon name="folder-open" size={14} />
-        </button>
-        <button type="button" onClick={onDelete} aria-label={`Delete ${summary.title}`} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-          <Icon name="trash" size={14} tone="inherit" />
-        </button>
+        <ConversationTooltip label={moveLabel}>
+          <button type="button" onClick={onMove} aria-label={moveLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+            <Icon name="folder-open" size={14} />
+          </button>
+        </ConversationTooltip>
+        <ConversationTooltip label={deleteLabel}>
+          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+            <Icon name="trash" size={14} tone="inherit" />
+          </button>
+        </ConversationTooltip>
       </div>
     </div>
-  );
-}
-
-function RenameConversationDialog({
-  target,
-  title,
-  onTitleChange,
-  onClose,
-  onSave,
-}: {
-  target: ConversationSummaryV1 | null;
-  title: string;
-  onTitleChange: (title: string) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
-        <form onSubmit={(event) => { event.preventDefault(); onSave(); }}>
-          <DialogHeader><DialogTitle>Rename conversation</DialogTitle></DialogHeader>
-          <DialogBody>
-            <DialogDescription className="sr-only">Choose a new title for this conversation.</DialogDescription>
-            <label className="block text-[12px] font-medium text-[var(--r-ink-body)]" htmlFor="conversation-title">Title</label>
-            <input
-              id="conversation-title"
-              autoFocus
-              maxLength={80}
-              value={title}
-              onChange={(event) => onTitleChange(event.target.value)}
-              className="mt-1.5 w-full rounded-[6px] border border-[var(--r-hairline-strong)] bg-[var(--r-surface)] px-3 py-2 text-[13px] text-[var(--r-ink-strong)] outline-none focus:border-[var(--r-accent)] focus:ring-4 focus:ring-[var(--r-ring-color)]"
-            />
-          </DialogBody>
-          <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
-            <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onClose}>Cancel</DialogButton>
-            <DialogButton type="submit" className={CONVERSATION_DIALOG_ACTION_LAYOUT} disabled={!title.trim()}>Save</DialogButton>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DeleteConversationDialog({
-  target,
-  onClose,
-  onConfirm,
-}: {
-  target: DeleteTarget | null;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  const isRunning = target?.summary.lifecycle.state === 'working' || target?.summary.lifecycle.state === 'needs-user';
-  return (
-    <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
-        <DialogHeader><DialogTitle>Delete conversation?</DialogTitle></DialogHeader>
-        <DialogBody className="min-w-0">
-          <DialogDescription className="break-words">“{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.</DialogDescription>
-        </DialogBody>
-        <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
-          <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onClose}>Cancel</DialogButton>
-          <DialogButton type="button" variant="danger" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onConfirm}>{isRunning ? 'Stop and delete' : 'Delete'}</DialogButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -207,14 +123,10 @@ export function ConversationsPanel() {
   const openConversations = useAISidebarStore((state) => state.conversations);
   const pin = useAISidebarStore((state) => state.pinConversation);
   const unpin = useAISidebarStore((state) => state.unpinConversation);
-  const rename = useAISidebarStore((state) => state.renameHostConversation);
   const moveEarlier = useAISidebarStore((state) => state.moveEarlierConversation);
-  const remove = useAISidebarStore((state) => state.deleteHostConversation);
   const toggle = useAISidebarStore((state) => state.toggleHistoryPanel);
   const notice = useAISidebarStore((state) => state.conversationStoreNotice);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [renameTarget, setRenameTarget] = useState<ConversationSummaryV1 | null>(null);
-  const [renameTitle, setRenameTitle] = useState('');
+  const { requestRename, requestDelete, dialogs } = useConversationDialogs();
 
   const ordered = useMemo(
     () => [...summaries].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt) || a.conversationId.localeCompare(b.conversationId)),
@@ -223,40 +135,30 @@ export function ConversationsPanel() {
   const pinned = ordered.filter((summary) => pinnedIds.includes(summary.conversationId));
   const activeRecent = ordered.filter((summary) => !pinnedIds.includes(summary.conversationId));
 
-  const renderRows = (rows: ConversationSummaryV1[]) => rows.map((summary) => (
-    <ConversationRow
-      key={summary.conversationId}
-      summary={summary}
-      pinned={pinnedIds.includes(summary.conversationId)}
-      current={summary.conversationId === activeId}
-      onOpen={() => openConversations[summary.conversationId] ? switchConversation(summary.conversationId) : open(summary.conversationId)}
-      onRename={() => { setRenameTarget(summary); setRenameTitle(summary.title); }}
-      onPin={() => pinnedIds.includes(summary.conversationId) ? unpin(summary.conversationId) : pin(summary.conversationId)}
-      pinDisabled={!pinnedIds.includes(summary.conversationId) && pinnedIds.length >= 5}
-      onDelete={() => setDeleteTarget({ summary, recovery: false })}
-    />
-  ));
+  const renderRows = (rows: ConversationSummaryV1[]) => rows.map((summary) => {
+    const pinState = conversationPinState(summary.conversationId, summary.title, pinnedIds);
+    return (
+      <ConversationRow
+        key={summary.conversationId}
+        summary={summary}
+        pin={pinState}
+        current={summary.conversationId === activeId}
+        onOpen={() => openConversations[summary.conversationId] ? switchConversation(summary.conversationId) : open(summary.conversationId)}
+        onRename={() => requestRename(summary)}
+        onPin={() => pinState.pinned ? unpin(summary.conversationId) : pin(summary.conversationId)}
+        onDelete={() => requestDelete(summary)}
+      />
+    );
+  });
 
   const renderEarlierRows = () => earlier.map((summary) => (
     <EarlierConversationRow
       key={summary.conversationId}
       summary={summary}
       onMove={() => moveEarlier(summary.conversationId)}
-      onDelete={() => setDeleteTarget({ summary, recovery: true })}
+      onDelete={() => requestDelete(summary, true)}
     />
   ));
-
-  const saveRename = () => {
-    if (!renameTarget || !renameTitle.trim()) return;
-    rename(renameTarget.conversationId, renameTitle);
-    setRenameTarget(null);
-  };
-  const confirmDelete = () => {
-    if (!deleteTarget) return;
-    const isRunning = deleteTarget.summary.lifecycle.state === 'working' || deleteTarget.summary.lifecycle.state === 'needs-user';
-    remove(deleteTarget.summary.conversationId, isRunning, deleteTarget.recovery);
-    setDeleteTarget(null);
-  };
 
   return (
     <section className="absolute inset-y-0 left-0 right-[56px] z-50 flex flex-col bg-[var(--r-surface)]" aria-label="All conversations">
@@ -271,8 +173,7 @@ export function ConversationsPanel() {
         {activeRecent.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Active &amp; recent</div>{renderRows(activeRecent)}</div>}
         {earlier.length > 0 && <div><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Project unknown</div>{renderEarlierRows()}</div>}
       </div>
-      <RenameConversationDialog target={renameTarget} title={renameTitle} onTitleChange={setRenameTitle} onClose={() => setRenameTarget(null)} onSave={saveRename} />
-      <DeleteConversationDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
+      {dialogs}
     </section>
   );
 }

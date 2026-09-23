@@ -21,6 +21,7 @@ import { OpenCodeSetupView } from './OpenCodeSetupView';
 import { ChatInput } from './ChatInput';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ConversationsPanel } from './ConversationsPanel';
+import { ConversationHeader } from './ConversationHeader';
 import { ThreadRail } from './ThreadRail';
 import { ActivePlanBanner } from './ActivePlanBanner';
 import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
@@ -334,6 +335,8 @@ export function AISidebar() {
           */}
           <div className="flex-1 min-h-0 flex overflow-hidden border-t border-[var(--r-hairline)]">
             <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              {/* Sprint 122 (#282): the conversation you are in, named, with History's actions. */}
+              <ConversationHeader />
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {agentConversation.length > 0 || codexConversation.length > 0
                   ? <UnifiedConversationView />

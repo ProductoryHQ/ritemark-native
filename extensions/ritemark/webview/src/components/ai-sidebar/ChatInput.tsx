@@ -4,7 +4,7 @@
  * Supports @ agent mentions with autocomplete, slash commands, and drag-and-drop file paths.
  */
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Icon } from '../ui/Icon';
 import {
   Select,
@@ -30,6 +30,7 @@ import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
+import { composerBounds, rememberComposerHeight, rememberedComposerHeight } from '../comment/ResizableComposer';
 import { ThinkingEffortControl } from './ThinkingEffortControl';
 import { deriveRuntimeAvailabilities, RUNTIME_LABELS } from './runtimeAvailability';
 import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionPopup';
@@ -50,6 +51,14 @@ const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',
 
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
+
+/** Sprint 122: the chat composer's slot in the per-surface session height. */
+const CHAT_COMPOSER_SURFACE = 'agent-chat';
+/** Two lines when empty, as before. */
+const CHAT_COMPOSER_BOUNDS_ROWS = 2;
+/** Floor and ceiling from Sprint 117's composer bounds, measured for this field:
+ *  `leading-relaxed` (1.625) text and `py-2.5` (2 × 10 px) padding, no border. */
+const CHAT_COMPOSER_BOUNDS = composerBounds({ minRows: CHAT_COMPOSER_BOUNDS_ROWS, lineHeightEm: 1.625, chromePx: 20 });
 
 /** Dropped file path chip */
 interface PathChip {
@@ -351,9 +360,8 @@ export function ChatInput() {
       setAttachments([]);
       setShowMentionPopup(false);
       setShowCommandPopup(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      // The composer height follows `value` (layout effect below), so clearing
+      // the text is what shrinks it back.
       return;
     }
 
@@ -411,10 +419,8 @@ export function ChatInput() {
     setShowCommandPopup(false);
     clearPinnedAgentContent();
     clearPinnedAgentDismissal();
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    // The composer height follows `value` (layout effect below), so clearing
+    // the text is what shrinks it back.
   }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
@@ -860,13 +866,37 @@ export function ChatInput() {
   // implying that ACP receives context the host deliberately does not send.
   const showBrowserContextChip = !isOpenCode && currentBrowserContext?.url && !hideBrowserContext;
 
-  // Auto-resize textarea
-  useEffect(() => {
+  // Sprint 122 (#282): the composer grows with the prompt up to the shared
+  // ceiling — 8 lines or 40% of the window, where it used to stop at 120 px —
+  // and a person can drag it taller or shorter (Sprint 117's composer bounds).
+  // A dragged height is kept for the session; the field never shrinks below it
+  // and only grows past it when the text does.
+  const userHeightRef = useRef<number | null>(rememberedComposerHeight(CHAT_COMPOSER_SURFACE));
+  const lastSetHeightRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    el.style.height = `${Math.max(el.scrollHeight, userHeightRef.current ?? 0)}px`;
+    lastSetHeightRef.current = el.getBoundingClientRect().height;
   }, [value]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const height = el.getBoundingClientRect().height;
+      // The layout effect records every height it sets; any other change is
+      // the person dragging the handle.
+      if (lastSetHeightRef.current === null || Math.abs(height - lastSetHeightRef.current) <= 1) return;
+      userHeightRef.current = height;
+      lastSetHeightRef.current = height;
+      rememberComposerHeight(CHAT_COMPOSER_SURFACE, height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const attachmentCount = attachments.length;
   const imageCount = attachments.filter((a) => a.kind === 'image').length;
@@ -1177,9 +1207,9 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
-          rows={2}
-          className="block w-full resize-none bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ fontSize: 'var(--chat-font-size, 13px)' }}
+          rows={CHAT_COMPOSER_BOUNDS_ROWS}
+          className="block w-full resize-y overflow-y-auto bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ fontSize: 'var(--chat-font-size, 13px)', minHeight: CHAT_COMPOSER_BOUNDS.min, maxHeight: CHAT_COMPOSER_BOUNDS.max }}
         />
 
         {/* Attachment thumbnail strip */}

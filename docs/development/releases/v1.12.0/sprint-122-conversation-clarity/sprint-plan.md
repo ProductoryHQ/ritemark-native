@@ -3,7 +3,7 @@
 Track: Lightweight (three workstreams, one shared surface)<br>
 Release tier: extension
 
-**Status:** Plan — awaiting Jarmo's approval. No code until then.<br>
+**Status:** Implementation — plan approved 2026-09-23.<br>
 **Branch:** `sprint-122-conversation-clarity`<br>
 **Issue:** [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282)<br>
 **Worktree:** `.claude/worktrees/sprint-122-conversation-clarity`, branched from main `04231de2`<br>
@@ -27,8 +27,8 @@ while a file outside the project is a dead end.
 
 **A. Active-conversation header.** A persistent header above the transcript with
 the conversation title and the same three actions History already has — pin or
-unpin, rename, delete with confirmation. Same words, same icons, same disabled
-rule for pinning. A long title truncates on screen and stays complete for a
+unpin, rename, delete with confirmation. Same words, same icons, same five-pin
+limit. A long title truncates on screen and stays complete for a
 screen reader.
 
 **B. A composer you can make taller.** Replace `ChatInput`'s 120 px cap with
@@ -70,7 +70,7 @@ rather than opened.
 ## Definition of Done
 
 - [ ] The header names the current conversation at all times, and long titles truncate while keeping their full accessible name.
-- [ ] Pin/unpin, rename and delete behave and read exactly as in History, including the one-pin rule and the running-conversation confirm.
+- [ ] Pin/unpin, rename and delete behave and read exactly as in History, including the five-pin limit and the running-conversation confirm.
 - [ ] The composer can be made taller and shorter; Send, Stop and the model control stay visible at every height, at the minimum sidebar width and at 200 % zoom.
 - [ ] Every row of the table above is what actually happens, verified in a dev build.
 - [ ] No supported link is inert, and no unsupported scheme is opened.
@@ -83,15 +83,28 @@ rather than opened.
 - New URL schemes, `command:` links, or any privileged execution from chat.
 - An archive concept — the issue's "delete or archive" is met by History's existing delete-with-confirm.
 
-## Open decision for Jarmo
+## Decision
 
-The table above is my proposal, and the one place I am guessing at your intent is
-the out-of-project file: I chose **Locate in Finder** over opening it, because a
-path in a reply is written by the model, not by you. Say the word if you would
-rather it opened in Ritemark.
+The table above was proposed with one open choice: an out-of-project file is
+revealed with **Locate in Finder** rather than opened, because a path in a reply
+is written by the model, not by you.
+
+**Decided 2026-09-23 (Jarmo: "plaan on ok — Finderi valik sobib").** The table
+stands as written.
+
+## Product Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-23 | Header actions reuse History's pin/rename/delete exactly; no archive concept | The issue's "delete or archive" is met by the existing delete-with-confirm; a second vocabulary would contradict History |
+| 2026-09-23 | The composer uses Sprint 117's `ResizableComposer` | Built for this and says so in its docblock; no second primitive |
+| 2026-09-23 | Out-of-project file or folder: click = Locate in Finder | A chat path is model-authored; the workspace confinement stays |
+| 2026-09-23 | The header's rename / pin / delete sit behind one ⋮ menu, not three icon buttons | Jarmo, on the first build: "need pane ⋮ menüü alla". The title keeps the width; the menu items keep History's words and icons |
+| 2026-09-23 | The chat composer shares Sprint 117's *bounds and session height*, not the `ResizableComposer` component | The component carries the comment box's own field styling and footer layout; the chat composer has chips, attachments and pickers around its field. `composerBounds` and the per-surface session height are now exported from the same file and used by both |
+| 2026-09-23 | Everything clickable in the webview shows the pointing hand, as one zero-specificity global rule | Jarmo's standing rule for every web UI; the webview had none, and the new menu items needed it |
 
 ## Planning Approval
 
-- [ ] Jarmo approves this sprint plan.
+- [x] Jarmo approves this sprint plan. *("plaan on ok — Finderi valik sobib", 2026-09-23)*
 - [x] GitHub issue exists. ([#282](https://github.com/ProductoryHQ/ritemark-native/issues/282))
 - [x] Worktree and branch created. (`sprint-122-conversation-clarity`, from main `04231de2`)

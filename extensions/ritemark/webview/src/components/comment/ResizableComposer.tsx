@@ -11,7 +11,10 @@
  * minimum supported editor width.
  *
  * It is deliberately generic: v1.12.0 Sprint 122 applies the same primitive to
- * the agent composer rather than writing a second one.
+ * the agent composer rather than writing a second one. The agent composer keeps
+ * its own field (chips, attachments, pickers), so what it shares is the
+ * behaviour: `composerBounds` for the floor and ceiling, and the per-surface
+ * session height below.
  */
 import { useEffect, useRef, type ReactNode, type TextareaHTMLAttributes, type KeyboardEvent, type CSSProperties } from 'react'
 
@@ -24,13 +27,43 @@ export const COMPOSER_MIN_ROWS = 2
 export const COMPOSER_MAX_ROWS = 8
 export const COMPOSER_MAX_VIEWPORT_FRACTION = 0.4
 
-/** The height the user dragged to, remembered for the session only (D10) —
- *  never persisted, so a new window starts at the two-row floor again. */
-let sessionHeightPx: number | null = null
+/** The height a person dragged each composer to, remembered for the session
+ *  only (D10) — never persisted, so a new window starts at the floor again.
+ *  Keyed per surface: dragging the chat composer taller does not resize the
+ *  comment box. */
+const sessionHeights = new Map<string, number>()
 
 /** Exported for tests and for surfaces that reset the session, not for styling. */
-export function rememberedComposerHeight(): number | null {
-  return sessionHeightPx
+export function rememberedComposerHeight(surface = 'comment'): number | null {
+  return sessionHeights.get(surface) ?? null
+}
+
+export function rememberComposerHeight(surface: string, heightPx: number): void {
+  sessionHeights.set(surface, heightPx)
+}
+
+/**
+ * The floor and ceiling of a composer field, as CSS lengths: `rows` lines of
+ * text plus the field's vertical padding and borders, and the ceiling also
+ * capped at a share of the viewport so the transcript never disappears.
+ */
+export function composerBounds({
+  minRows = COMPOSER_MIN_ROWS,
+  maxRows = COMPOSER_MAX_ROWS,
+  maxViewportFraction = COMPOSER_MAX_VIEWPORT_FRACTION,
+  lineHeightEm = LINE_HEIGHT_EM,
+  chromePx = FIELD_CHROME_PX,
+}: {
+  minRows?: number
+  maxRows?: number
+  maxViewportFraction?: number
+  lineHeightEm?: number
+  chromePx?: number
+} = {}): { min: string; max: string } {
+  return {
+    min: `calc(${(minRows * lineHeightEm).toFixed(2)}em + ${chromePx}px)`,
+    max: `min(calc(${(maxRows * lineHeightEm).toFixed(2)}em + ${chromePx}px), ${Math.round(maxViewportFraction * 100)}vh)`,
+  }
 }
 
 export interface ResizableComposerProps {
@@ -84,23 +117,23 @@ export function ResizableComposer({
       element.focus()
       element.setSelectionRange(element.value.length, element.value.length)
     }
-    if (sessionHeightPx) element.style.height = `${sessionHeightPx}px`
+    const remembered = rememberedComposerHeight('comment')
+    if (remembered) element.style.height = `${remembered}px`
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(() => {
       // `style.height` is set only by the user's drag (or by the restore
       // above), so a width-driven reflow never overwrites the remembered size.
-      if (element.style.height) sessionHeightPx = element.getBoundingClientRect().height
+      if (element.style.height) rememberComposerHeight('comment', element.getBoundingClientRect().height)
     })
     observer.observe(element)
     // Mount-only: re-running this would fight the user's own drag.
     return () => observer.disconnect()
   }, [autoFocus])
 
+  const { min, max } = composerBounds({ minRows, maxRows, maxViewportFraction })
   const bounds = {
-    '--rm-composer-min': `calc(${(minRows * LINE_HEIGHT_EM).toFixed(2)}em + ${FIELD_CHROME_PX}px)`,
-    '--rm-composer-max': `min(calc(${(maxRows * LINE_HEIGHT_EM).toFixed(2)}em + ${FIELD_CHROME_PX}px), ${Math.round(
-      maxViewportFraction * 100,
-    )}vh)`,
+    '--rm-composer-min': min,
+    '--rm-composer-max': max,
   } as CSSProperties
 
   return (

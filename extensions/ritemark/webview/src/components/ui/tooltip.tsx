@@ -4,10 +4,10 @@
  *
  *   <Tooltip label="Record from the microphone"><Button …/></Tooltip>
  *
- * The trigger is always a wrapping span: `Button` does not forward refs, which
- * Radix needs to place the tooltip, and a disabled button receives no pointer
- * events — so the span is also what lets a tooltip explain why an action is
- * unavailable. Pass layout classes for the span through `className`.
+ * The trigger is always a wrapping span: a disabled button receives no pointer
+ * events, so the span is what lets a tooltip explain why an action is
+ * unavailable, and it works the same around any child. Pass layout classes for
+ * the span through `className`.
  *
  * Use it instead of a native `title`, which shows late or not at all in a
  * webview and never on keyboard focus.

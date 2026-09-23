@@ -16,7 +16,7 @@ reuse:
 
 | Action | Today, in History |
 | --- | --- |
-| Pin / Unpin | icon button, `push-pin` / `push-pin-slash`, label "Pin/Unpin <title>", disabled with "Unpin a conversation before pinning another." — **one pin at a time** |
+| Pin / Unpin | icon button, `push-pin` / `push-pin-slash`, label "Pin/Unpin <title>"; with **five** conversations pinned, pinning another is disabled with "Unpin a conversation before pinning another." |
 | Rename | `renameHostConversation`, a dialog with the title pre-filled |
 | Delete | `deleteHostConversation`, a confirm dialog whose button reads **Delete**, or **Stop and delete** while the conversation is running |
 

@@ -107,7 +107,9 @@ export function deriveThreadStatus(conversation: ConversationState): ThreadStatu
 // ── Title (R6 + Resolved Gap 1) ──────────────────────────────────────────
 
 export const THREAD_TITLE_MAX_CHARS = 60;
-export const NEW_THREAD_TITLE = 'New thread';
+// Sprint 122: "conversation", the word the rail's New conversation button and
+// History already use — the header is the first surface to show this title.
+export const NEW_THREAD_TITLE = 'New conversation';
 
 /** The prompt a thread's auto-title is derived from: its first user prompt. */
 export function firstPromptOf(conversation: ConversationState): string | null {
@@ -153,7 +155,7 @@ export function truncateThreadTitle(raw: string): string {
   return `${candidate.replace(/[\s.,;:!?]+$/, '')}…`;
 }
 
-/** The thread's rail/History title. Empty threads read as "New thread". */
+/** The thread's title before the host has saved one. Empty threads read as "New conversation". */
 export function deriveThreadTitle(conversation: ConversationState): string {
   const prompt = firstPromptOf(conversation);
   return prompt ? truncateThreadTitle(prompt) : NEW_THREAD_TITLE;

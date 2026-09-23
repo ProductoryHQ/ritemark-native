@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Icon } from '../ui/Icon';
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { ConversationTooltip } from './ConversationTooltip';
+import { conversationPinState } from './conversationActionsModel';
 import { selectRailConversationIds } from './conversationSelectors';
 import { useAISidebarStore } from './store';
 
@@ -40,13 +41,9 @@ export function ThreadRail() {
   const renderEntry = (id: string) => {
     const summary = byId.get(id);
     if (!summary) return null;
-    const isPinned = pinnedIds.includes(id);
+    const { pinned: isPinned, atCapacity: pinAtCapacity, label: pinLabel, icon: pinIcon } = conversationPinState(id, summary.title, pinnedIds);
     const isActive = activeId === id;
     const label = `${summary.title} — ${isPinned ? 'Pinned' : statusLabel(summary.lifecycle.state)}`;
-    const pinAtCapacity = !isPinned && pinnedIds.length >= 5;
-    const pinLabel = pinAtCapacity
-      ? 'Unpin a conversation before pinning another.'
-      : `${isPinned ? 'Unpin' : 'Pin'} ${summary.title}`;
     return (
       <div key={id} className="group relative h-10 w-10 shrink-0">
         <ConversationTooltip label={label}>
@@ -73,7 +70,7 @@ export function ThreadRail() {
             }}
             className={`group/pin pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[var(--r-accent)] opacity-0 transition-opacity motion-reduce:transition-none focus:pointer-events-auto focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 ${pinAtCapacity ? 'cursor-not-allowed group-hover:opacity-60 group-focus-within:opacity-60 focus:opacity-60' : 'hover:text-[var(--r-accent-deep)]'}`}
           >
-            <Icon name={isPinned ? 'push-pin-slash' : 'push-pin'} size={12} tone="inherit" className="scale-[0.667] transition-transform motion-reduce:transition-none group-hover/pin:scale-100 group-focus-visible/pin:scale-100" />
+            <Icon name={pinIcon} size={12} tone="inherit" className="scale-[0.667] transition-transform motion-reduce:transition-none group-hover/pin:scale-100 group-focus-visible/pin:scale-100" />
           </button>
         </ConversationTooltip>
       </div>

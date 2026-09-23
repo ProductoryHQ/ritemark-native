@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Everything clickable shows the pointing hand — Tailwind's preflight leaves
+   buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
+   any class (`cursor-not-allowed` on a refused action, `cursor-text`, …) and
+   every component rule still wins. */
+:where(
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="menuitemcheckbox"]:not([data-disabled]),
+  [role="menuitemradio"]:not([data-disabled]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="tab"],
+  a[href],
+  label[for],
+  summary,
+  select
+) {
+  cursor: pointer;
+}
+
 @font-face {
   font-family: 'Sofia Sans';
   font-style: normal;
