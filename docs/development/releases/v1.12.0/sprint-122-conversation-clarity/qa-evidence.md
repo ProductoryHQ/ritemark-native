@@ -25,19 +25,25 @@ and a real conversation whose reply contains six links —
 
 ## Composer (Phase 2)
 
+Re-run 2026-09-23 after Jarmo asked for a height the user drags freely: the corner
+grip was replaced by a handle on the composer's top edge.
+
 | Check | Result |
 | --- | --- |
 | Floor, empty | 62 px (two lines) |
-| Long prompt at 100 % | grows to 189 px (eight lines at 13 px), then scrolls; the controls row stays below it |
+| Long prompt, no chosen height | grows to 189 px (eight lines at 13 px), then scrolls; the controls row stays below it |
 | After Send | back to the floor |
-| Real drag on the grip | 62 → 102 px; typing and clearing the text both keep 102 px |
-| ~207 % zoom (View: Zoom In ×4), long prompt | the field is capped by the room the column has left (82 px) and scrolls; **model control and Send stay on screen** |
-| Back to 100 % | the dragged 102 px is still there — the zoom's temporary cap was not mistaken for a drag |
+| Drag the top edge up 150 px | 62 → 212 px — past the eight-line ceiling; `aria-valuenow` 212 |
+| Drag it down 60 px | 212 → 152 px |
+| Type, then clear, at a chosen height | the box stays exactly at the chosen height; longer text scrolls inside it |
+| Keyboard on the focused handle | ↑ +21 px (one line), ↓↓ −42 px, Home → 62 px floor, End → the largest the sidebar allows |
+| Double-click the handle | back to fitting the text (62 → 105 px for a five-sentence prompt) |
+| ~173 % zoom, End | the box takes the room left less a strip of conversation (216 px); **model control and Send stay on screen** |
+| Tooltip | "Drag to resize. Double-click to fit the text." on hover and focus |
 
-The zoom check found a real defect in the first build: with a long prompt at ~207 %
-zoom the field pushed the controls row off the bottom of the sidebar. Fixed by also
-capping the field by the column's remaining room, and by recording a drag only when
-the press starts on the resize grip.
+Earlier finding, still fixed: at ~207 % zoom a long prompt used to push the controls
+row off the bottom of the sidebar. Every height is capped by the column's remaining
+room.
 
 ## Links (Phase 3)
 

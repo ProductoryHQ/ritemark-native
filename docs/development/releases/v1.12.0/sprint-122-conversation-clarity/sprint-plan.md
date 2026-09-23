@@ -104,6 +104,7 @@ stands as written.
 | 2026-09-23 | Everything clickable in the webview shows the pointing hand, as one zero-specificity global rule | Jarmo's standing rule for every web UI; the webview had none, and the new menu items needed it |
 | 2026-09-23 | The chat composer is also capped by the room left in the sidebar column | RunDev at ~207 % zoom showed a long prompt pushing Send off screen; the vh ceiling alone cannot account for the header, banners and disclosure |
 | 2026-09-23 | Shift+F10 and the Menu key open a link's menu | macOS has no context-menu key, so without this the link menu was mouse-only |
+| 2026-09-23 | The composer is resized from a handle on its top edge, to any height the sidebar allows; a chosen height is exact (the text scrolls in it); double-click returns to fitting the text. Supersedes the native corner grip | Jarmo, on the PR build: "EI see kirjutuskast peaks olema dünaamiliselt lohistatava kõrgusega vertikaalselt kasutaja poolt". A box docked at the bottom of the sidebar left no room to drag its corner into |
 
 ## Planning Approval
 

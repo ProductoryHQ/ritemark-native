@@ -48,7 +48,7 @@ Sprint 122 makes it obvious which conversation you are in, gives long prompts ro
 
 **The conversation is named.** A header above the transcript shows the title of the conversation you are in. Its **⋮** menu has **Rename**, **Pin** or **Unpin**, and **Delete** — the same actions, words and confirmations as the conversation history.
 
-**The composer has room.** It grows with what you write, up to eight lines instead of about five, and you can drag its corner to make it taller or shorter. Ritemark keeps the height you chose while it is open. The send button and model control always stay on screen, even at large zoom levels.
+**The composer has room.** It grows with what you write, up to eight lines instead of about five. To set the height yourself, drag the handle on its top edge — up for taller, down for shorter, as tall as the sidebar allows — or focus it and use the arrow keys. Double-click the handle to go back to fitting the text. Ritemark keeps the height you chose while it is open, and the send button and model control always stay on screen, even at large zoom levels.
 
 **Links do something, or say why not.** A file in your project opens in its editor, and a folder is shown in the project tree. A file outside your project is shown in Finder rather than opened, because a path in a reply is written by the AI, not by you. A missing file names the path. A link Ritemark does not open from chat, such as `mailto:`, says so and offers **Copy link**. Right-click a link, or press Shift+F10, for the rest: **Reveal in project**, **Locate in Finder**, **Copy path**, **Open in browser** or **Copy link**, depending on where it points.
 

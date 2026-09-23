@@ -25,8 +25,9 @@ on this branch behind it.
 - [x] A dragged height is kept for the session per surface (`rememberComposerHeight('agent-chat', …)`); the field never shrinks below it and only grows past it with the text. The comment box's bounds are byte-identical to Sprint 117's, pinned by `composerBounds.test.ts`.
 - [x] Send / Stop / model controls stay in their own row below the field, outside the scrolling area.
 - [x] Checked in a dev build: a long prompt reaches the 189 px ceiling (8 lines at 13 px) and scrolls, with the controls row visible; after send it returns to the 62 px floor; a real drag took it to 102 px and neither typing nor clearing the text shrank it back.
+- [x] **Superseded 2026-09-23 (Jarmo):** the native corner grip is replaced by `ComposerResizeHandle` on the card's top edge — drag up/down or ↑/↓, Page Up/Down, Home/End on the focused handle; double-click fits the text again. A chosen height is exact and may exceed the 8-line ceiling, up to the room left in the column less a 72 px strip of conversation. Arithmetic in `composerResize.ts` with `composerResize.test.ts`.
 - [x] ~207 % zoom (Phase 4) found a defect: a long prompt pushed the controls row off the bottom. Fixed — the field is also capped by the room the sidebar column has left after the header, banners, disclosure, chips and controls, so Send stays on screen.
-- [x] A drag is recorded only when the press starts on the resize grip; a height that changes because the ceiling moved (zoom, a banner) is never kept. Verified: zoom in, fill, clear, zoom out — the dragged height survives.
+- [x] A height is recorded only from the handle (drag end or key press); a height that changes because the ceiling moved (zoom, a banner) is never kept.
 
 ## Phase 3: One link policy
 

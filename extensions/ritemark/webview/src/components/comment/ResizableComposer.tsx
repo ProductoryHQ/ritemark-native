@@ -42,6 +42,11 @@ export function rememberComposerHeight(surface: string, heightPx: number): void 
   sessionHeights.set(surface, heightPx)
 }
 
+/** Back to fitting the text: the surface no longer has a chosen height. */
+export function forgetComposerHeight(surface: string): void {
+  sessionHeights.delete(surface)
+}
+
 /**
  * The floor and ceiling of a composer field, as CSS lengths: `rows` lines of
  * text plus the field's vertical padding and borders, and the ceiling also

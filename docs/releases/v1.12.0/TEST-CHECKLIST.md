@@ -13,7 +13,7 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 119 | Publish to Google Docs (Create, Sync, templates, one narrow permission); Ritemark's own privacy policy and terms links; relative-image and Export-menu keyboard fixes | Gate 1, and **Gate 2 for the first native Windows run of the loopback OAuth flow** |
 | 118 | Record in Transcribe: microphone capture into a WAV in the project, recovery after an interruption, tooltips on every Transcribe button | Gate 1, and **Gate 2 for the first native Windows capture**. The dev build could not prove macOS permission under the real bundle ID |
 | 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
-| 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and can be dragged taller; every chat link opens, reveals, locates or explains | Gate 1 |
+| 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123–125 | _Not started_ | — |
 
 ## Automated checks (before handover)
@@ -61,7 +61,7 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] Start a conversation: the header above the transcript shows its title; **⋮ → Rename** changes it there and in History
 - [ ] **⋮ → Pin** pins it (the rail shows the pin); the menu then says **Unpin**
 - [ ] **⋮ → Delete** asks first, with the same dialog as History
-- [ ] Write a long prompt: the composer grows to about eight lines, then scrolls; drag its corner taller and it stays that height after sending
+- [ ] Write a long prompt: the composer grows to about eight lines, then scrolls. Drag the handle on its top edge up and down: the box follows, goes past eight lines, and keeps that height after sending; double-click the handle and it fits the text again
 - [ ] Zoom to 200 % (View → Zoom In) and write a long prompt: Send and the model control stay visible
 - [ ] Ask the agent for links to a file and a folder in the project, a missing file, a web page and a `mailto:` address: the file opens, the folder is selected in the project tree, the missing file is named, the web page opens in the browser, the `mailto:` link explains itself and offers **Copy link**
 - [ ] Right-click each of those links: the menu fits the destination; **Copy path** puts the path on the clipboard
