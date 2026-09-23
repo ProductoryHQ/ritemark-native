@@ -37,8 +37,8 @@ Partner Center displayed a warning suggesting the age-rating answer for digital 
 
 ## Next
 
-1. Await Microsoft's certification decision and inspect any actionable report.
-2. Never replace the bytes at the submitted v1.11.0 URL. A changed binary requires a new immutable URL and candidate.
-3. After publication, verify Store-origin installation, launch, edit/save, and uninstall, then complete the Store-related Gate 2 evidence.
+Certification and publication completed by 2026-09-23. The public listing and Store-origin verification are recorded in [`PUBLICATION-2026-09-23.md`](./PUBLICATION-2026-09-23.md).
+
+Never replace the bytes at the submitted v1.11.0 URL. A changed binary requires a new immutable URL and candidate.
 
 Partner Center remains the live source of certification status.

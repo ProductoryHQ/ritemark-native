@@ -116,6 +116,17 @@ This gate carries the **open Sprint 116 native-execution requirement**. It is no
 
 **Gate 2 verdict:** passed. Jarmo, 2026-09-18, *"pane edasi! Win ja x64 on testitud"*. The verdict was given for the gate as a whole; individual items above were not reported separately, so the Git-absent Windows case is not confirmed as seen on screen.
 
+### Microsoft Store publication addendum — 2026-09-23
+
+- [x] Microsoft certified and published Ritemark under public Store ID `XP9K8SP24TRNK4`.
+- [x] Public listing observed at `https://apps.microsoft.com/detail/xp9k8sp24trnk4`, showing Ritemark, `Productory Services OÜ`, Productivity, and the approved description.
+- [x] Jarmo confirmed Store-origin installation, launch, and uninstall.
+- [x] Fresh anonymous direct-download stream returned HTTP 200, `444207592` bytes, SHA-256 `0ebda5016e432b2f039613f74665343220006e39e7749ddb76d285d0a87b932b`, ETag `"215bc154378ab2bf8ab4cce863ebaf9d"`, and `cache-control: public, max-age=31536000, immutable`.
+- [ ] Store-origin edit/save was not separately stated in the owner confirmation.
+- [ ] Clean Windows 11 / Smart App Control On remains a separate internal hardening check; Store certification does not prove it.
+
+Store publication and the tested Store install path are complete. The two unchecked items above remain explicitly scoped evidence gaps and do not change the already-passed 2026-09-18 release Gate 2 verdict.
+
 ## Not verifiable before the gates
 
 - The Git-absent branch of both surfaces. The guarantee in source is structural — `renderLaunchCheckItem` takes no action argument in either branch, and no `scm.missing` string has a line that parses to a single link — but it has never been seen on screen. Windows Gate 2 is the first opportunity.

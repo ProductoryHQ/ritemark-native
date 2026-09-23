@@ -1,6 +1,6 @@
-# Partner Center live draft
+# Partner Center live state
 
-Last inspected: **2026-09-20**
+Last inspected: **2026-09-23**
 
 ## Product identity
 
@@ -9,12 +9,14 @@ Last inspected: **2026-09-20**
 | Product name | `Ritemark` |
 | Product type | EXE or MSI app |
 | Partner Center ID | `3a2a9010-fbe3-47cf-ae87-4d338f587830` |
-| Submission state | **In review** — submission complete; review in process |
-| Store ID | Available after the app is live |
-| Store deep link | Available after the app is live |
-| Web Store URL | Available after the app is live |
+| Submission state | **Live / published** |
+| Store ID | `XP9K8SP24TRNK4` |
+| Store deep link | Not separately captured |
+| Web Store URL | `https://apps.microsoft.com/detail/xp9k8sp24trnk4` |
 
 Onboarding is complete and all three verification checks passed. The stale new-account verification warning disappeared from the Store listing surface after refresh on 2026-09-02.
+
+The public Microsoft Store page was observed on 2026-09-23 with the Ritemark title, publisher `Productory Services OÜ`, Productivity category, approved description, and public product ID `XP9K8SP24TRNK4`. Jarmo confirmed Store-origin installation, launch, and uninstall the same day.
 
 ## Submission sections
 
@@ -110,4 +112,4 @@ Jarmo explicitly approved the IARC Terms of Use/adult-status attestation; the ra
 
 ## Hard boundary
 
-The v1.11.0 package was submitted on 2026-09-20 after validation and Jarmo's explicit approval. Do not replace the bytes at the submitted URL. Any changed binary requires a new versioned URL, candidate record, validation cycle, and explicit submission approval.
+The v1.11.0 package was submitted on 2026-09-20 and published by 2026-09-23. Do not replace the bytes at the submitted URL. Any changed binary requires a new versioned URL, candidate record, validation cycle, and explicit submission approval.

@@ -6,22 +6,24 @@ Release folders may describe why a particular Windows candidate was built, but S
 
 ## Current position
 
-Last reviewed: **2026-09-18**
+Last reviewed: **2026-09-23**
 
 | Area | State | Next action |
 |---|---|---|
 | Company developer account | Active; Partner Center accessible | Maintain account verification and contact details |
-| English Store listing | Active resubmission draft; corrected Windows poster art saved | Save Freemium and revised certification notes |
-| Public product/support pages | Ready | Recheck immediately before submission |
+| English Store listing | Live at `https://apps.microsoft.com/detail/xp9k8sp24trnk4` | Maintain accurate copy and media |
+| Public product/support pages | Ready | Monitor for availability and content changes |
 | Privacy and terms | Ready at Productory URLs | Use the approved Productory pages, not the 404 Ritemark paths |
 | Installer hosting | Complete: locked v1.11.0 object, direct HTTPS response, and fresh-download hash pass | Preserve all existing versioned objects unchanged |
-| Signed Windows package | v1.11.0 candidate 1 built, tested and hosted | Save the new URL in Partner Center and rerun package validation |
-| Store screenshots | Four installed-Windows screenshots plus corrected Windows poster art are saved | Preserve the corrected media during resubmission |
-| Submission | Not authorized | Keep as draft until package validation and final review pass, then obtain Jarmo's explicit Submit approval |
+| Signed Windows package | v1.11.0 candidate 1 certified and published; Store install/launch/uninstall verified | Keep the submitted bytes immutable; SAC-On and edit/save remain separate evidence items |
+| Store screenshots | Four installed-Windows screenshots plus corrected Windows poster art are live | Preserve accurate Windows media in future submissions |
+| Submission | Certified and live; Store ID `XP9K8SP24TRNK4` | Preserve evidence and monitor future certification changes |
 
 The detailed checklist is in [`STATUS.md`](./STATUS.md).
 
-## Work order
+## Canonical work order
+
+The first publication completed this sequence on 2026-09-23. Reuse it for future Store candidates rather than modifying the published v1.11.0 object.
 
 1. Complete and verify the Productory company developer account.
 2. Reserve the `Ritemark` product name and open an EXE/MSI draft.

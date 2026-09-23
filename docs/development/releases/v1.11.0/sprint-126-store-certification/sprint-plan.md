@@ -1,7 +1,7 @@
 # Sprint 126 — Microsoft Store Certification Gaps
 
 **Release:** [v1.11.0](../release-plan.md) · [milestone 11](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
-**Status:** **R1–R4 remediation is submitted; Microsoft review is in process from 2026-09-20** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). The immutable v1.11.0 package passed Partner Center malware and signing validation; Jarmo authorized the final resubmission.<br>
+**Status:** **Complete and Microsoft-certified; Store live from 2026-09-23** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). Public Store ID: `XP9K8SP24TRNK4`; Jarmo confirmed Store-origin install, launch, and uninstall.<br>
 **Track:** Audit-first; shared AI UX/host boundary, targeted VS Code distribution patch, and Store metadata operations.<br>
 **Owner:** Jarmo (scope, external account actions, release gates); implementation/QA assignees TBD at kickoff.<br>
 **Issue:** [#305](https://github.com/ProductoryHQ/ritemark-native/issues/305) under milestone `v1.11.0`, closed with the merge.<br>
@@ -60,7 +60,7 @@ Steps 2–3 follow approved Phase 0. Metadata preparation can proceed independen
 - [ ] User-facing changes are recorded in `docs/CHANGELOG.md` and v1.11.0 release notes; central Store documentation links the final evidence.
 - [ ] Release handoff explicitly separates completed sprint work from remaining candidate, release-gate and submission actions.
 
-Microsoft certification acceptance is an external follow-up, not a guaranteed sprint outcome. The candidate/download tests and authorized resubmission are complete, but do not label the app certified or published until Partner Center reports that result.
+Microsoft certification acceptance was the external follow-up and completed by 2026-09-23. The public listing and Store-origin verification are recorded in the central Store documentation; future binary changes still require a new immutable URL and certification cycle.
 
 ## Dependencies
 

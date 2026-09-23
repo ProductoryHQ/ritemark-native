@@ -32,6 +32,7 @@ This log captures material Store decisions that must survive individual releases
 | 2026-09-18 | Use v1.11.0 candidate 1 for the certification-remediation resubmission. | The immutable URL returns the approved 444207592-byte installer with SHA-256 `0ebda501…932b`; v1.10.0 and v1.10.1 remain unchanged. |
 | 2026-09-18 | Classify the Store offer as Freemium while keeping the product copy explicit about third-party AI costs. | Microsoft finding R1 requires Freemium because optional providers may require subscriptions or API credits. Ritemark itself does not sell an in-app subscription. |
 | 2026-09-18 | Treat the English UK `StoreLogo2` finding as the 2:3 poster-art slot and replace it with Windows artwork. | Jarmo uploaded and saved the 720×1080 `posterart_windows.png`; the replacement contains no Mac window chrome. |
+| 2026-09-23 | Record v1.11.0 as certified and live under public Store ID `XP9K8SP24TRNK4`. | The public listing is visible at `https://apps.microsoft.com/detail/xp9k8sp24trnk4`; Jarmo confirmed Store-origin install, launch, and uninstall. The submitted installer remains immutable. |
 
 ## Open decisions
 
@@ -39,10 +40,8 @@ Reconciliation on 2026-09-18: v1.11.0 candidate 1 supersedes v1.10.1 for the cer
 
 | Decision | Owner | Needed by |
 |---|---|---|
-| Partner Center Freemium save | Jarmo / authorized operator | Before package validation and final draft review |
-| v1.11.0 package URL and certification notes save | Jarmo / authorized operator | Before package validation and final draft review |
-| Exact Store candidate/hash | Jarmo: v1.11.0 candidate 1, `0ebda501…932b`; installer tested and hosted, final Submit approval pending | Before final draft review |
-| Submit authorization | Jarmo | After all validation and clean-Windows evidence |
+| Clean Windows 11 / Smart App Control On evidence | Jarmo / Windows test owner | Separate post-publication hardening evidence; not inferred from Store certification |
+| Store-origin edit/save evidence | Jarmo / Windows test owner | Optional completion of the full internal Store-origin matrix; install/launch/uninstall are already confirmed |
 
 ## Change procedure
 

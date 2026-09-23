@@ -1,6 +1,6 @@
 # Release Plan — v1.11.0 Store Compliance + Agent Task Honesty
 
-**Status:** Sprints 116, 117 and 126 are merged; the code side of the release is complete. Sprint 116 — [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286), [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native Intel/Windows execution remains a v1.11 release gate. Sprint 117 — [issue #292](https://github.com/ProductoryHQ/ritemark-native/issues/292), [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293); it absorbed v1.12.0 Sprint 121, and #156 and #281 closed with it. **Sprint 126 is the only remaining sprint in this release**; Sprints 118 and 119 moved to v1.12.0 on 2026-09-15.<br>
+**Status:** Released and live in Microsoft Store. Sprints 116, 117 and 126 are merged; Gate 1 and Gate 2 passed, v1.11.0 was published on 2026-09-18, and Microsoft Store product `XP9K8SP24TRNK4` was observed live with Store-origin install/launch/uninstall confirmed on 2026-09-23.<br>
 **Milestone:** [v1.11.0](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
 **Target:** v1.11.0<br>
 **Release type:** Full app distribution, **shell-tier** on two independent grounds — refreshed agent runtime binaries under `extensions/ritemark/binaries/agents/` (Sprint 116), and the targeted `patches/vscode/` change Sprint 126 R4 requires. A full rebuild, Gate 1 + Gate 2, notarization, the hardening window and Windows CI all apply; there is no extension-lane shortcut for this release.<br>
@@ -35,7 +35,7 @@ Underneath that, the release carries two honesty/hygiene debts already paid down
 |---|---|---|---|---|
 | [Sprint 116](./sprint-116-runtime-model-baseline/sprint-plan.md) | Runtime & model baseline refresh | Complete runtime package snapshot, lockstep SDKs, model catalog refresh, and measured protocol fixes | Audit-first SDD (Sprint 111 precedent) | Implementation complete; [issue #286](https://github.com/ProductoryHQ/ritemark-native/issues/286); [PR #287](https://github.com/ProductoryHQ/ritemark-native/pull/287); native execution deferred to release gates |
 | [Sprint 117](./sprint-117-comment-agent-honesty/sprint-plan.md) | Comment→agent pipeline honesty | Unify dispatch paths A/B; IDs for all comment forms; correct per-document status; reply-to-comment on completion (#156); carry `documentPath` to the runtime; availability gating; visible target conversation; absorbs v1.12.0 Sprint 121 (#281): tasks go to the conversation open in the AI sidebar, named on the Send surface, with no confirmation step, bounded composer resize, immediate filterable `@` agent picker, collapsed comments that never cover text | Full SDD — crosses webview, host, sidebar store, and all three runtimes | **Merged 2026-09-15**; [issue #292](https://github.com/ProductoryHQ/ritemark-native/issues/292), [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293); closed #156 and #281 |
-| [Sprint 126](./sprint-126-store-certification/sprint-plan.md) | Microsoft Store certification gaps | Freemium classification; inappropriate AI-output reporting; correct StoreLogo2 imagery; remove external Git acquisition promotion while preserving SCM | Audit-first — shared AI reporting, targeted shell patch, Store metadata | **R2 and R4 merged 2026-09-16**; [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). R1 and R3 are Partner Center work and remain open |
+| [Sprint 126](./sprint-126-store-certification/sprint-plan.md) | Microsoft Store certification gaps | Freemium classification; inappropriate AI-output reporting; correct StoreLogo2 imagery; remove external Git acquisition promotion while preserving SCM | Audit-first — shared AI reporting, targeted shell patch, Store metadata | **Complete and certified**; [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304); Store live 2026-09-23 |
 
 Order as run: 116 first so the rest validated against the final runtime/model baseline (same reasoning as v1.10.0’s Sprint 111-before-112), then 117. Both are merged. Sprint 126 runs on that landed baseline and is the only sprint left.
 
@@ -53,9 +53,9 @@ Sprint 126’s certified-candidate handoff depends on the release gates. Microso
 - [x] Sprint 117 issue [#292](https://github.com/ProductoryHQ/ritemark-native/issues/292) published under milestone `v1.11.0` 2026-09-14; #156 and #281 re-homed to it and closed with [PR #293](https://github.com/ProductoryHQ/ritemark-native/pull/293) on 2026-09-15.
 - [x] Sprint 126 added with report-to-deliverable traceability, acceptance checks, dependencies and explicit non-goals.
 - [x] Sprint 126 completed Phase 0, received implementation approval, published [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), and merged [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304) on 2026-09-16.
-- [ ] R1 (Freemium classification and listing copy) and R3 (live StoreLogo2 asset and replacement artwork) — Jarmo, in Partner Center.
-- [ ] Native darwin-x64 and win32-x64 execution plus signed artifact verification.
-- [ ] Release candidate built, signed, notarized and published to a **new** immutable installer URL, then resubmitted.
+- [x] R1 (Freemium classification and listing copy) and R3 (correct Windows StoreLogo2/poster art) saved in Partner Center.
+- [x] Native darwin-x64 and win32-x64 execution plus signed artifact verification passed Gate 2.
+- [x] Release candidate built, signed, notarized, published to a new immutable installer URL, resubmitted, certified, and published in Microsoft Store.
 
 ## SDD Package Index
 
@@ -146,26 +146,27 @@ Phase 0 must decide (research, not guessed here):
 
 | Risk | Severity | Note |
 |---|---|---|
-| Store certification remains blocked by four findings | High | Sprint 126 tracks each finding separately; require packaged-app and saved metadata evidence before resubmission |
+| Store certification blocked by four findings | Resolved | Sprint 126 cleared all four findings; Microsoft certified and published Store ID `XP9K8SP24TRNK4` by 2026-09-23 |
 | AI-output reports expose private content or have no reliable recipient | High | Sprint 126 Phase 0 freezes user-reviewed minimal payload, transport, retention and triage ownership |
 | The R4 Git fix needs a `patches/vscode/` change, which forces shell-tier and a full rebuild | Medium | Already shell-tier from the Sprint 116 runtime binaries, so the tier costs nothing extra — but the patch must survive an upstream bump, so it needs a persistent applicability check |
 | Metadata-only fixes are mistaken for full compliance | High | R2 and R4 require packaged-app evidence; all four findings are tracked separately to the end |
-| A further certification round returns new findings | Medium | Record as new intake rather than silently widening Sprint 126; acceptance is never promised |
-| Native Intel/Windows execution still unproven for this baseline | High | Remains a hard release gate before any candidate is built |
+| A future submission returns new findings | Medium | Record as new intake rather than rewriting the v1.11.0 evidence |
+| Native Intel/Windows execution unproven for this baseline | Resolved | Gate 2 passed on 2026-09-18 before publication |
 
-## Decisions needed from Jarmo before the remaining sprints start
+## Historical decisions
 
-1. Approve Sprint 126's implementation scope after its reporting/privacy, Git-promotion and live-artwork audit. Release inclusion and sequencing are decided; implementation is not yet approved.
-2. Decide the reporting destination and its triage owner — R2 cannot be specified without it.
-3. Resolved 2026-09-14: Sprint 117 runs the full correctness contract and absorbs Sprint 121.
-4. Resolved 2026-09-15: Sprints 118 and 119 move to v1.12.0; v1.11.0 ships once Sprint 126 and the release gates are done.
+Sprint 126's implementation, metadata, candidate, submission, certification, and publication decisions are complete. No sprint-start decision remains open for v1.11.0.
 
-## Current next steps
+1. The reporting destination and public contact is `info@productory.eu`; the implemented flow uses user-reviewed content and an honest email/copy fallback.
+2. Resolved 2026-09-14: Sprint 117 runs the full correctness contract and absorbs Sprint 121.
+3. Resolved 2026-09-15: Sprints 118 and 119 move to v1.12.0; v1.11.0 ships once Sprint 126 and the release gates are done.
+4. Resolved 2026-09-23: Microsoft certified and published v1.11.0 under Store ID `XP9K8SP24TRNK4`.
 
-1. Sprint 126 Phase 0: audit reporting surfaces/delivery/privacy, trace the Git acquisition promotion, identify the live StoreLogo2 asset, then freeze the specification for Jarmo's implementation approval.
-2. Create the Sprint 126 issue under milestone `v1.11.0` at scope freeze, and start on its own branch.
-3. Run native darwin-x64 and win32-x64 execution plus signed artifact verification before the v1.11 release candidate.
-4. Build, sign and notarize the candidate, publish it to a new immutable installer URL, then resubmit to Partner Center with per-finding evidence.
+## Post-release follow-up
+
+1. Preserve the submitted v1.11.0 installer bytes and publication evidence.
+2. Record a clean Windows 11 / Smart App Control On result if that separate hardening test is run.
+3. Record Store-origin edit/save if tested; the 2026-09-23 confirmation explicitly covers install, launch, and uninstall.
 
 ## Decisions Log
 
