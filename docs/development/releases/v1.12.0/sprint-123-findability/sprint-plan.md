@@ -84,7 +84,7 @@ hover and in the open-editors list. Browser tab labels need no change.
 | 2026-09-23 | No VS Code patch; the release tier stays extension | Browser tabs already show the page title; tab sizing is an extension-contributable default |
 | 2026-09-23 | **Back to playing line** also appears after a wheel scroll, not only after a search | That pause had no visible way back either. Approved with the plan (Jarmo: "plaan on ok, alusta") |
 | 2026-09-23 | The search bar sits in its own row above the scrolling transcript, not as a sticky header inside it | Jarmo on the first build: "layout errors - top gap and right gap"; the sticky header let text show through and did not reach the edges. Re-checked: "nüüd on korras" |
-| 2026-09-23 | In shrink mode long tab names are clipped with a fade (not an ellipsis), and the close button shows on hover, the active tab included | VS Code's own shrink-mode rules; changing either would need a VS Code patch. Cmd+W still closes the active tab. Pending Jarmo's confirmation |
+| 2026-09-23 | In shrink mode long tab names are clipped with a fade (not an ellipsis), and the close button shows on hover, the active tab included | VS Code's own shrink-mode rules; changing either would need a VS Code patch. Cmd+W still closes the active tab. Confirmed by Jarmo on PR #342: "jah, sobib" |
 
 ## Planning Approval
 
