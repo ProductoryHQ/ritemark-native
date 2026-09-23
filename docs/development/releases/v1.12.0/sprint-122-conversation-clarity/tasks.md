@@ -50,4 +50,4 @@ Readings in [qa-evidence.md](./qa-evidence.md).
 - [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md` ("Clearer Agent Chat"), and a Sprint 122 block in the v1.12.0 test checklist.
 - [x] `docs/development/architecture.md`: new "Agent Chat links and conversation actions (Sprint 122)" section and history row — the link trust boundary and the new sidebar messages are structural.
 - [x] Release-plan tracker row and decision rows.
-- [ ] PR, merge, and close [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) *(admin merge needs Jarmo's authorization)*.
+- [ ] PR [#339](https://github.com/ProductoryHQ/ritemark-native/pull/339) opened; merge and close [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) *(admin merge needs Jarmo's authorization)*.
