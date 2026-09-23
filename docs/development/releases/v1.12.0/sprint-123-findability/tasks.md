@@ -39,4 +39,4 @@ on this branch behind it.
 - [x] `npm test` and `./scripts/validate-qa.sh`, results recorded.
 - [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (including a Windows tab-row line for the Windows gate).
 - [x] `docs/development/architecture.md` if the workbench's structure changed. *(Transcript search section and history row.)*
-- [x] Release-plan tracker row. PR opened; close [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283).
+- [x] Release-plan tracker row. PR [#342](https://github.com/ProductoryHQ/ritemark-native/pull/342) opened; close [#283](https://github.com/ProductoryHQ/ritemark-native/issues/283).
