@@ -3,7 +3,7 @@
 Track: Lightweight (three workstreams, one shared surface)<br>
 Release tier: extension
 
-**Status:** Implementation — plan approved 2026-09-23.<br>
+**Status:** Implemented and RunDev-validated 2026-09-23 — closing (QA, PR).<br>
 **Branch:** `sprint-122-conversation-clarity`<br>
 **Issue:** [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282)<br>
 **Worktree:** `.claude/worktrees/sprint-122-conversation-clarity`, branched from main `04231de2`<br>
@@ -69,12 +69,12 @@ rather than opened.
 
 ## Definition of Done
 
-- [ ] The header names the current conversation at all times, and long titles truncate while keeping their full accessible name.
-- [ ] Pin/unpin, rename and delete behave and read exactly as in History, including the five-pin limit and the running-conversation confirm.
-- [ ] The composer can be made taller and shorter; Send, Stop and the model control stay visible at every height, at the minimum sidebar width and at 200 % zoom.
-- [ ] Every row of the table above is what actually happens, verified in a dev build.
-- [ ] No supported link is inert, and no unsupported scheme is opened.
-- [ ] `npm test` and `./scripts/validate-qa.sh` pass.
+- [x] The header names the current conversation at all times, and long titles truncate while keeping their full accessible name.
+- [x] Pin/unpin, rename and delete behave and read exactly as in History, including the five-pin limit and the running-conversation confirm (one shared model and dialogs; the running confirm is covered by test, not exercised live).
+- [x] The composer can be made taller and shorter; Send, Stop and the model control stay visible at every height and at ~207 % zoom (the narrowest drag width of the sidebar was not set separately).
+- [x] Every row of the table above is what actually happens, verified in a dev build — except that the web link's click was not exercised (it would open a browser on this machine) and Finder's window could not be observed.
+- [x] No supported link is inert, and no unsupported scheme is opened.
+- [x] `npm test` and `./scripts/validate-qa.sh` pass.
 
 ## Out of Scope
 
@@ -99,9 +99,11 @@ stands as written.
 | 2026-09-23 | Header actions reuse History's pin/rename/delete exactly; no archive concept | The issue's "delete or archive" is met by the existing delete-with-confirm; a second vocabulary would contradict History |
 | 2026-09-23 | The composer uses Sprint 117's `ResizableComposer` | Built for this and says so in its docblock; no second primitive |
 | 2026-09-23 | Out-of-project file or folder: click = Locate in Finder | A chat path is model-authored; the workspace confinement stays |
-| 2026-09-23 | The header's rename / pin / delete sit behind one ⋮ menu, not three icon buttons | Jarmo, on the first build: "need pane ⋮ menüü alla". The title keeps the width; the menu items keep History's words and icons |
+| 2026-09-23 | The header's rename / pin / delete sit behind one ⋮ menu, not three icon buttons | Jarmo, on the first build: "need pane : (kebab) meny alla". The title keeps the width; the menu items keep History's words and icons |
 | 2026-09-23 | The chat composer shares Sprint 117's *bounds and session height*, not the `ResizableComposer` component | The component carries the comment box's own field styling and footer layout; the chat composer has chips, attachments and pickers around its field. `composerBounds` and the per-surface session height are now exported from the same file and used by both |
 | 2026-09-23 | Everything clickable in the webview shows the pointing hand, as one zero-specificity global rule | Jarmo's standing rule for every web UI; the webview had none, and the new menu items needed it |
+| 2026-09-23 | The chat composer is also capped by the room left in the sidebar column | RunDev at ~207 % zoom showed a long prompt pushing Send off screen; the vh ceiling alone cannot account for the header, banners and disclosure |
+| 2026-09-23 | Shift+F10 and the Menu key open a link's menu | macOS has no context-menu key, so without this the link menu was mouse-only |
 
 ## Planning Approval
 

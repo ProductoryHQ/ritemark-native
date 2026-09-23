@@ -872,30 +872,68 @@ export function ChatInput() {
   // A dragged height is kept for the session; the field never shrinks below it
   // and only grows past it when the text does.
   const userHeightRef = useRef<number | null>(rememberedComposerHeight(CHAT_COMPOSER_SURFACE));
-  const lastSetHeightRef = useRef<number | null>(null);
 
+  // The field may never push the Send row out of view. Besides its own ceiling,
+  // it gets only the room the sidebar column has left once everything else in
+  // it is placed — the header, banners, the AI disclosure, the chips and the
+  // controls row. The transcript (the column's growing child) gives way first.
+  // At 200% zoom in a short window this is what keeps Send on screen.
+  const [roomPx, setRoomPx] = useState<number | null>(null);
+  useEffect(() => {
+    const root = containerRef.current;
+    const column = root?.parentElement;
+    const el = textareaRef.current;
+    if (!root || !column || !el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      let others = 0;
+      for (const child of Array.from(column.children)) {
+        if (child === root || getComputedStyle(child).flexGrow !== '0') continue;
+        others += child.getBoundingClientRect().height;
+      }
+      const chrome = root.getBoundingClientRect().height - el.getBoundingClientRect().height;
+      setRoomPx(Math.max(0, Math.floor(column.clientHeight - others - chrome)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(column);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  // Content height, never less than a height the person dragged to. The CSS
+  // ceiling (and the room above) clamps what is shown; the text scrolls.
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.max(el.scrollHeight, userHeightRef.current ?? 0)}px`;
-    lastSetHeightRef.current = el.getBoundingClientRect().height;
   }, [value]);
 
+  // A drag is a press that starts on the resize grip and ends anywhere. Only
+  // that is remembered — a height that changes because the ceiling moved
+  // (zoom, a banner appearing) is not the person's choice and is never kept.
   useEffect(() => {
     const el = textareaRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
+    if (!el) return;
+    const GRIP_PX = 16;
+    let dragging = false;
+    const onPointerDown = (event: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      dragging = event.clientX >= rect.right - GRIP_PX && event.clientY >= rect.bottom - GRIP_PX;
+    };
+    const onPointerUp = () => {
+      if (!dragging) return;
+      dragging = false;
       const height = el.getBoundingClientRect().height;
-      // The layout effect records every height it sets; any other change is
-      // the person dragging the handle.
-      if (lastSetHeightRef.current === null || Math.abs(height - lastSetHeightRef.current) <= 1) return;
       userHeightRef.current = height;
-      lastSetHeightRef.current = height;
       rememberComposerHeight(CHAT_COMPOSER_SURFACE, height);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
+    };
+    el.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
   }, []);
 
   const attachmentCount = attachments.length;
@@ -1209,7 +1247,11 @@ export function ChatInput() {
           placeholder={placeholder}
           rows={CHAT_COMPOSER_BOUNDS_ROWS}
           className="block w-full resize-y overflow-y-auto bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ fontSize: 'var(--chat-font-size, 13px)', minHeight: CHAT_COMPOSER_BOUNDS.min, maxHeight: CHAT_COMPOSER_BOUNDS.max }}
+          style={{
+            fontSize: 'var(--chat-font-size, 13px)',
+            minHeight: CHAT_COMPOSER_BOUNDS.min,
+            maxHeight: roomPx === null ? CHAT_COMPOSER_BOUNDS.max : `min(${CHAT_COMPOSER_BOUNDS.max}, ${roomPx}px)`,
+          }}
         />
 
         {/* Attachment thumbnail strip */}

@@ -25,25 +25,29 @@ on this branch behind it.
 - [x] A dragged height is kept for the session per surface (`rememberComposerHeight('agent-chat', …)`); the field never shrinks below it and only grows past it with the text. The comment box's bounds are byte-identical to Sprint 117's, pinned by `composerBounds.test.ts`.
 - [x] Send / Stop / model controls stay in their own row below the field, outside the scrolling area.
 - [x] Checked in a dev build: a long prompt reaches the 189 px ceiling (8 lines at 13 px) and scrolls, with the controls row visible; after send it returns to the 62 px floor; a real drag took it to 102 px and neither typing nor clearing the text shrank it back.
-- [ ] Minimum supported sidebar width and 200 % zoom — Phase 4.
+- [x] ~207 % zoom (Phase 4) found a defect: a long prompt pushed the controls row off the bottom. Fixed — the field is also capped by the room the sidebar column has left after the header, banners, disclosure, chips and controls, so Send stays on screen.
+- [x] A drag is recorded only when the press starts on the resize grip; a height that changes because the ceiling moved (zoom, a banner) is never kept. Verified: zoom in, fill, clear, zoom out — the dragged height survives.
 
 ## Phase 3: One link policy
 
-- [ ] Extend `chatLinks.ts` to the four classes: project file, other local target, web URL, unsupported.
-- [ ] Add the host outcomes it needs — reveal a folder in the project tree, locate an out-of-project target in Finder, and an explicit message for an unsupported scheme and for a directory (today both are silent).
-- [ ] Add the context menu with the destination-specific actions from the plan's table.
-- [ ] Unit-test the classifier per class, and test each host outcome through the bridge.
-- [ ] Confirm no unsupported scheme reaches `openExternal` and the workspace confinement is unchanged.
+- [x] `chatLinks.ts`: web, local path, or `unsupported` (named scheme) by syntax alone; `chatLinkMenu()` is the plan's table in one pure function. The webview has no filesystem access.
+- [x] `src/views/chatLinkTargets.ts` (no `vscode` import): resolves a local path with `realpath` into project file / project folder / outside file / outside folder / missing / inaccessible / needs a folder; `isChatLinkActionAllowed` is the only gate, and the host re-resolves before every action.
+- [x] `UnifiedViewProvider`: click → open (project file), reveal in the project tree (project folder — was silent), Locate in Finder (outside), or a message (missing, unreadable, no folder); `chat:link/resolve` for the menu; `chat:link-action` for the menu items; `chat:link-unsupported` shows why with **Copy link** (was silent). `openExternal` still takes http/https only.
+- [x] `ChatLinkMenu.tsx`: right-click on a link, or Shift+F10 / the Menu key on a focused link, opens the destination's menu; focus returns to the link on close.
+- [x] Tests: `chatLinks.test.ts` (classes, named schemes, every menu) and `src/views/chatLinkTargets.test.ts` (confinement, `..`, symlink escape, prefix-sharing sibling, permission error, the action gate, message wording).
 
 ## Phase 4: RunDev validation
 
-- [ ] Walk every row of the plan's link table in a running dev build and record what happened.
-- [ ] Exercise the header with two or three open conversations, including rename, pin and delete of a running one.
-- [ ] Resize the composer at the narrowest sidebar width and at 200 % zoom.
+Readings in [qa-evidence.md](./qa-evidence.md).
+
+- [x] Every row of the link table, in a running dev build, with a real conversation reply. The web link's click was not exercised (it would open a browser on this machine; that path is unchanged), and Finder's window for the outside file could not be observed from the session.
+- [x] Header: pin, rename and delete (cancelled) from the menu, keyboard, and History after the refactor. Delete of a *running* conversation ("Stop and delete") is covered by the shared model's test, not exercised live.
+- [x] Composer at ~207 % zoom with a long prompt — controls stay on screen (after the fix above). At ~207 % zoom the sidebar is 263 CSS px wide and 340 CSS px tall; the narrowest width the sidebar can be dragged to at 100 % was not set separately.
 
 ## Phase 5: QA and closeout
 
-- [ ] `npm test` and `./scripts/validate-qa.sh`, results recorded.
-- [ ] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist.
-- [ ] Update `docs/development/architecture.md` if the sidebar's structure changed.
-- [ ] Release-plan tracker row, PR, and close [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282).
+- [x] `npm test` (exit 0; the four new test files ran inside it) and `./scripts/validate-qa.sh` (passed).
+- [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md` ("Clearer Agent Chat"), and a Sprint 122 block in the v1.12.0 test checklist.
+- [x] `docs/development/architecture.md`: new "Agent Chat links and conversation actions (Sprint 122)" section and history row — the link trust boundary and the new sidebar messages are structural.
+- [x] Release-plan tracker row and decision rows.
+- [ ] PR, merge, and close [#282](https://github.com/ProductoryHQ/ritemark-native/issues/282) *(admin merge needs Jarmo's authorization)*.

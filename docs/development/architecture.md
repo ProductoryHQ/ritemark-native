@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-22 (Sprint 118 direct Transcribe recording)
+**Last updated:** 2026-09-23 (Sprint 122 agent conversation clarity)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -314,6 +314,23 @@ Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermai
 | A checked task item arrives unchecked | The Docs API creates checkbox bullets but cannot tick one. |
 | A mixed list takes one bullet style | A Docs list has one preset, so bullets nested under a numbered item show `a.`/`b.` glyphs. |
 | Sync writes only the first tab | Tabs a user adds in Google Docs later are left alone, and are not overwritten. |
+
+### Agent Chat links and conversation actions (Sprint 122)
+
+**Links in a reply.** Chat content is model-authored, so a link in it is a request, never an instruction. The trust boundary:
+
+| Side | Module | Knows |
+|---|---|---|
+| Webview | `components/ai-sidebar/chatLinks.ts` | Syntax only: web (`http`/`https`), local path, `unsupported` (any other scheme, named), or none. `chatLinkMenu()` is the per-destination menu table. No filesystem access. |
+| Host | `src/views/chatLinkTargets.ts` (no `vscode` import) | Resolves a local path with `realpath` against the workspace root: project file / project folder / outside file / outside folder / missing / inaccessible / needs a folder. A symlink that leads out of the project is *outside*. `isChatLinkActionAllowed()` is the only gate: only a project file is opened; anything outside is at most located in Finder or copied. |
+
+`UnifiedViewProvider` handles `chat:open-file` (a click: open, reveal in the project tree, locate in Finder, or a message), `chat:link/resolve` → `chat:link/resolved` (the menu asks what a path is), `chat:link-action` (menu items; re-resolved and re-checked before acting — what the menu showed is not a permission), and `chat:link-unsupported` (a notification with **Copy link**). `openExternal` still accepts http/https only. The menu is `ChatLinkMenu.tsx`, opened by right-click, Shift+F10 or the Menu key.
+
+**Conversation actions.** `conversationActionsModel.ts` holds the five-pin limit, the pin labels and the "Stop and delete" rule; `ConversationDialogs.tsx` holds History's rename and delete dialogs and the hook that owns them. History (`ConversationsPanel`), the thread rail and the new `ConversationHeader` all use these, and the store takes its limit from the same constant. The header's actions sit behind a ⋮ `ui/dropdown-menu`.
+
+**Composer.** `ChatInput` shares Sprint 117's `composerBounds` and per-surface session height from `comment/ResizableComposer.tsx`, and additionally caps the field by the room left in the sidebar column so the controls row can never be pushed out of view. A drag is recorded only when the press starts on the resize grip.
+
+`ui/button.tsx` forwards its ref (so a Button can be a Radix trigger), and `index.css` has one zero-specificity rule giving every clickable element the pointer cursor.
 
 ---
 
@@ -1061,6 +1078,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-23 | Sprint 122 | **Agent conversation clarity (v1.12.0, #282).** New `ConversationHeader` (title, ⋮ menu) over a shared `conversationActionsModel` + `ConversationDialogs` now used by History, the rail and the header. Chat link policy split at the trust boundary: webview `chatLinks.ts` classifies by syntax, host `src/views/chatLinkTargets.ts` resolves with `realpath` and gates every action; new sidebar messages `chat:link/resolve` / `chat:link/resolved`, `chat:link-action`, `chat:link-unsupported`; folders and unsupported schemes no longer fail silently; out-of-project targets are located, never opened. `ChatInput` uses Sprint 117's `composerBounds` plus a room cap. New `ui/dropdown-menu.tsx`; `ui/button.tsx` forwards refs; global pointer-cursor rule. No flag, patch or shell-tier change. |
 | 2026-09-22 | Sprint 118 | **Direct recording in Transcribe (v1.12.0, #328).** New `src/speech/recording/` (exact-field `transcribe:record/*` protocol, destination/naming rules, crash-safe `WavRecordingSink`, vscode-free `RecordingController`) and webview `components/transcribe/recording/` (click-time `AudioContext`, 16 kHz capture with a streaming resampler fallback, ack-bounded 1 s PCM16 chunks, injected `AudioEnv`). The recording is handed to the unchanged `_stageImport`. Partials are registered before audio exists, checkpointed on detach and deactivate, and recovered by header rebuild. New flag `transcribe-direct-recording` (experimental, default on, gates starts only). New shared `ui/tooltip.tsx`. No CSP, patch or shell-tier change. |
 | 2026-09-21 | Sprint 119 | **Publish to Google Docs (v1.12.0).** New `src/googleDocs/` subsystem: installed-app OAuth with PKCE and loopback plus the desktop Picker for templates, `SecretStorage` account, `<globalStorage>/google-docs/v1/` link store, native Docs API mapper, Drive-staged images, the Create/Sync publisher, a `vscode`-free controller, and an exact-key protocol (`google-docs/*`). Export menu and Settings card render host projections only. New flag `google-docs-publishing` (experimental, default on). OAuth client configuration comes in through the esbuild `define`. `ritemark.aiSettings` takes an optional section. Privacy and terms links moved to ritemark.app (R11). Editor fix found on RunDev: new `src/utils/imagePaths.ts` is shared by host and webview, so bare relative image paths (`img/a.png`) display, and `../` images no longer save as their `vscode-resource` display URI. |
 | 2026-09-14 | Sprint 117 | **Host-owned comment tasks (v1.11.0, #156/#281).** New `src/commentTasks/` subsystem — `types.ts` (record, codecs, projection, transition table), exact-field `protocol.ts`, `CommentTaskStore` under `<globalStorage>/comment-tasks/v1/` on the `ConversationStore` file pattern, a `vscode`-free `CommentTaskController`, and one `commentTaskPrompt.ts` builder. Assignment is now a typed request/result/projection contract (`comment-task/accept` · `destination-preview` · `open-conversation` · `retry` · `cancel` → `comment-task/result`, plus per-document `comment-task/projection`, host↔sidebar `comment-task/enqueue` / `enqueue-result` / `dequeued`, `sidebar/ready`, `conversation/active`, `conversation/select`, and editor→host `comment:recover`). Deleted: `comment:send-to-ai`, `comment:submit`, `comment:task-status` + `broadcastCommentTaskStatus`, the editor's module-global status map, the sidebar's `commentTasks` slice and `finalizeCommentTasks`, its silent destination choice, and the webview prompt builder. Destination is the conversation open in the AI sidebar (Jarmo, D5). Both comment kinds carry `data-comment-id` (`<!-- {id:…} body -->` carrier for standalone notes) with legacy IDs minted in one undoable transaction at dispatch. `deriveRuntimeAvailabilities` moved to shared `src/runtime/availability.ts`; cancelled turns normalise to `cancelled` instead of `completed`/`failed` (F24). R10 adds the `ResizableComposer` and `AgentMentionPicker` primitives and a width-aware collapsed marker. No new flag, runtime kind, or `AgentRuntime` change. |

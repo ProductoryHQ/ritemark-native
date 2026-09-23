@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { randomBytes } from 'crypto';
 import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
 import { openReportMail } from '../reporting/reportTransport';
@@ -128,6 +129,15 @@ import {
   AgentSidebarBootstrapError,
 } from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
+import {
+  chatLinkMessage,
+  clickActionFor,
+  isChatLinkActionAllowed,
+  resolveChatLocalTarget,
+  unsupportedSchemeMessage,
+  type ChatLinkAction,
+  type ChatLocalTarget,
+} from './chatLinkTargets';
 
 const _browserToolsInjector = new BrowserToolsInjector();
 
@@ -369,29 +379,56 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // links. The AI sidebar has its own host, so it must handle the same
           // message explicitly rather than silently dropping policy/provider
           // link clicks. Keep this surface restricted to web URLs.
-          const rawUrl = typeof message.url === 'string' ? message.url.trim() : '';
-          if (!rawUrl) break;
-          try {
-            const target = vscode.Uri.parse(rawUrl, true);
-            if (target.scheme === 'http' || target.scheme === 'https') {
-              const opened = await vscode.env.openExternal(target);
-              if (!opened) {
-                void vscode.window.showWarningMessage(`Could not open ${target.authority} in your browser.`);
-              }
-            }
-          } catch {
-            // Ignore malformed or unsupported external targets.
-          }
+          await this._openWebLink(typeof message.url === 'string' ? message.url : '');
           break;
         }
 
         case 'open-source': // legacy name from inline-code path clicks (was silently dropped)
         case 'chat:open-file': {
-          // Chat links/paths to workspace files open in Ritemark's own
-          // editors. Confined to the workspace folder — chat content is
-          // model-authored, so it never gets to open arbitrary disk paths.
+          // Chat links/paths: a project file opens in Ritemark's own editors,
+          // a project folder is revealed in the tree, anything outside the
+          // project is located in Finder, and a click that can do nothing says
+          // why (Sprint 122, #282). Chat content is model-authored, so the
+          // path is resolved and confined here, never trusted.
           const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
-          if (rawPath) await this._openWorkspaceFile(rawPath);
+          if (rawPath) await this._followChatLink(rawPath);
+          break;
+        }
+
+        case 'chat:link/resolve': {
+          // The link context menu asks what a path is before it shows its items.
+          const rawPath = typeof message.path === 'string' ? message.path.trim() : '';
+          const target = this._resolveChatLink(rawPath);
+          void this._view?.webview.postMessage({ type: 'chat:link/resolved', requestId: message.requestId, kind: target.kind });
+          break;
+        }
+
+        case 'chat:link-action': {
+          // A context-menu action. Re-resolved and re-checked here: what the
+          // menu showed a moment ago is not a permission.
+          const action = message.action;
+          if (action === 'open-web') {
+            await this._openWebLink(typeof message.url === 'string' ? message.url : '');
+            break;
+          }
+          if (action === 'copy') {
+            const text = typeof message.text === 'string' ? message.text : '';
+            if (text) await vscode.env.clipboard.writeText(text);
+            break;
+          }
+          if (action !== 'open' && action !== 'reveal-in-project' && action !== 'locate') break;
+          const rawPath = typeof message.path === 'string' ? message.path.trim() : '';
+          if (rawPath) await this._runChatLinkAction(action, rawPath);
+          break;
+        }
+
+        case 'chat:link-unsupported': {
+          // mailto:, vscode:, command:, … — never followed from chat, but never
+          // silent either: say so, and offer the link to copy.
+          const scheme = typeof message.scheme === 'string' ? message.scheme : '';
+          const href = typeof message.href === 'string' ? message.href : '';
+          const choice = await vscode.window.showInformationMessage(unsupportedSchemeMessage(scheme), 'Copy link');
+          if (choice === 'Copy link' && href) await vscode.env.clipboard.writeText(href);
           break;
         }
 
@@ -2471,37 +2508,68 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'settings:chatFontSize', fontSize });
   }
 
-  /**
-   * Open a chat-referenced file in the workspace. Relative paths resolve
-   * against the workspace root; the resolved realpath must stay INSIDE the
-   * workspace (chat content is model-authored — no traversal, no symlink
-   * escape). `vscode.open` routes through editor associations, so .md lands
-   * in Ritemark's editor, spreadsheets in theirs, etc.
-   */
-  private async _openWorkspaceFile(rawPath: string): Promise<void> {
-    const workspaceRoot = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceRoot) {
-      void vscode.window.showWarningMessage('Open a folder to follow file links from chat.');
-      return;
-    }
-    const fs = await import('fs');
-    const path = await import('path');
-    const resolved = path.isAbsolute(rawPath) ? rawPath : path.join(workspaceRoot, rawPath);
-    let realTarget: string;
-    let realRoot: string;
+  /** Web URLs only (http/https) — no other scheme reaches `openExternal` from the sidebar. */
+  private async _openWebLink(rawUrl: string): Promise<void> {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return;
     try {
-      realTarget = fs.realpathSync(resolved);
-      realRoot = fs.realpathSync(workspaceRoot);
+      const target = vscode.Uri.parse(trimmed, true);
+      if (target.scheme === 'http' || target.scheme === 'https') {
+        const opened = await vscode.env.openExternal(target);
+        if (!opened) {
+          void vscode.window.showWarningMessage(`Could not open ${target.authority} in your browser.`);
+        }
+      }
     } catch {
-      void vscode.window.showWarningMessage(`File not found in this workspace: ${rawPath}`);
+      // Ignore malformed or unsupported external targets.
+    }
+  }
+
+  /**
+   * What a chat-referenced local path is, resolved on the host with realpath
+   * against the workspace root (chat content is model-authored — no
+   * traversal, no symlink escape). See `chatLinkTargets.ts`.
+   */
+  private _resolveChatLink(rawPath: string): ChatLocalTarget {
+    const workspaceRoot = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return resolveChatLocalTarget(rawPath, workspaceRoot, {
+      realpath: (p) => fs.realpathSync(p),
+      isDirectory: (p) => fs.statSync(p).isDirectory(),
+    });
+  }
+
+  /** An ordinary click on a chat file link or path. */
+  private async _followChatLink(rawPath: string): Promise<void> {
+    const target = this._resolveChatLink(rawPath);
+    const action = clickActionFor(target.kind);
+    if (!action) {
+      const text = chatLinkMessage(target.kind, rawPath);
+      if (text) void vscode.window.showWarningMessage(text);
       return;
     }
-    if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) {
-      void vscode.window.showWarningMessage(`Chat links only open files inside the current folder: ${rawPath}`);
+    await this._runChatLinkAction(action, rawPath, target);
+  }
+
+  /**
+   * Open, reveal or locate a chat link target — only when the kind resolved
+   * NOW allows it. `vscode.open` routes through editor associations, so .md
+   * lands in Ritemark's editor, spreadsheets in theirs, etc.
+   */
+  private async _runChatLinkAction(
+    action: Exclude<ChatLinkAction, 'copy'>,
+    rawPath: string,
+    resolved?: ChatLocalTarget,
+  ): Promise<void> {
+    const target = resolved ?? this._resolveChatLink(rawPath);
+    if (!target.fsPath || !isChatLinkActionAllowed(action, target.kind)) {
+      const text = chatLinkMessage(target.kind, rawPath);
+      if (text) void vscode.window.showWarningMessage(text);
       return;
     }
-    if (!fs.statSync(realTarget).isFile()) return;
-    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(realTarget));
+    const uri = vscode.Uri.file(target.fsPath);
+    if (action === 'open') await vscode.commands.executeCommand('vscode.open', uri);
+    else if (action === 'reveal-in-project') await vscode.commands.executeCommand('revealInExplorer', uri);
+    else await vscode.commands.executeCommand('revealFileInOS', uri);
   }
 
   /** The UI-selected Claude model, reconciled against the resolved catalog. */
