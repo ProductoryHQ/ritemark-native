@@ -52,6 +52,16 @@ Sprint 122 makes it obvious which conversation you are in, gives long prompts ro
 
 **Links do something, or say why not.** A file in your project opens in its editor, and a folder is shown in the project tree. A file outside your project is shown in Finder rather than opened, because a path in a reply is written by the AI, not by you. A missing file names the path. A link Ritemark does not open from chat, such as `mailto:`, says so and offers **Copy link**. Right-click a link, or press Shift+F10, for the rest: **Reveal in project**, **Locate in Finder**, **Copy path**, **Open in browser** or **Copy link**, depending on where it points.
 
+## Find your way in long work
+
+Sprint 123 makes a long recording searchable and keeps a crowded tab row readable.
+
+**Search a transcript.** A search field sits above the transcript. Type a word or phrase and every match is highlighted as you type; case doesn't matter, and words the engine was unsure about are found too. The count shows where you are ("3 of 12"); the arrows, or Enter and Shift+Enter, move between matches. Cmd/Ctrl+F puts you in the field and Escape clears it.
+
+**Keep your place while the audio plays.** Going to a match stops the transcript from scrolling along with the audio, so you can read around it. **Back to playing line** brings you back to where the recording is — and it now also appears after you scroll away with the mouse wheel, which used to leave no visible way back.
+
+**A tab row that fits.** With many files open, tabs shrink to fit the row instead of running off the edge. Hover a tab for its full name.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.

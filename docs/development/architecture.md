@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-23 (Sprint 122 agent conversation clarity)
+**Last updated:** 2026-09-23 (Sprint 123 transcript search and tab sizing)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -854,6 +854,25 @@ or adding another provider stack.
 - Webview `<audio>` + `asWebviewUri` serves range requests (seek to 45:00 in a
   42 MB file: 223 ms). The first `play()` must ride a real user gesture.
 
+### Transcript search (Sprint 123)
+
+Search in the Transcript Workbench is webview-only and read-only: nothing is sent
+to the host and the session is never changed. `workbench/transcriptSearch.ts` holds
+the pure logic — `segmentRuns` mirrors how `SegmentText` renders a segment (its
+plain text, or word by word when a word was uncertain), matches are found in that
+shown text with per-character case folding so offsets stay aligned, and
+`splitRunsAtMatches` cuts the shown runs into plain / match / current pieces
+without losing the uncertain-word marking. `TranscriptSearchBar` sits in its own
+row above the scrolling transcript (`transcriptColumn` / `transcriptSearch` in
+`layout.ts`, the Insights rail's shape). A new query starts at the first match at
+or after the playing line; going to a match pauses Follow playback, and **Back to
+playing line** resumes it whenever following is paused during playback.
+
+The extension also defaults `workbench.editor.tabSizing` to `shrink` through its
+`configurationDefaults`, so a crowded tab row fits instead of scrolling. Browser
+tabs already use the page title (VS Code's own `BrowserEditorInput.getName()`); no
+VS Code patch was needed.
+
 ### Direct recording (Sprint 118)
 
 Record in the Transcribe panel is **capture, not transcription**: it produces one
@@ -1078,6 +1097,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-23 | Sprint 123 | **Transcript search and a fitting tab row (v1.12.0, #283).** New webview-only `workbench/transcriptSearch.ts` (pure matching and highlight splitting, tested) and `TranscriptSearchBar`; the transcript pane became a column with the search row above the scroller (`transcriptColumn` / `transcriptSearch` layout classes). Follow playback gains a visible resume. The extension defaults `workbench.editor.tabSizing` to `shrink`. No host, protocol, flag, patch or shell-tier change. |
 | 2026-09-23 | Sprint 122 | **Agent conversation clarity (v1.12.0, #282).** New `ConversationHeader` (title, ⋮ menu) over a shared `conversationActionsModel` + `ConversationDialogs` now used by History, the rail and the header. Chat link policy split at the trust boundary: webview `chatLinks.ts` classifies by syntax, host `src/views/chatLinkTargets.ts` resolves with `realpath` and gates every action; new sidebar messages `chat:link/resolve` / `chat:link/resolved`, `chat:link-action`, `chat:link-unsupported`; folders and unsupported schemes no longer fail silently; out-of-project targets are located, never opened. `ChatInput` fits its text up to Sprint 117's `composerBounds` and is resized from a top-edge handle (`ComposerResizeHandle`, `composerResize.ts`), capped by the room left in the column. New `ui/dropdown-menu.tsx`; `ui/button.tsx` forwards refs; global pointer-cursor rule. No flag, patch or shell-tier change. |
 | 2026-09-22 | Sprint 118 | **Direct recording in Transcribe (v1.12.0, #328).** New `src/speech/recording/` (exact-field `transcribe:record/*` protocol, destination/naming rules, crash-safe `WavRecordingSink`, vscode-free `RecordingController`) and webview `components/transcribe/recording/` (click-time `AudioContext`, 16 kHz capture with a streaming resampler fallback, ack-bounded 1 s PCM16 chunks, injected `AudioEnv`). The recording is handed to the unchanged `_stageImport`. Partials are registered before audio exists, checkpointed on detach and deactivate, and recovered by header rebuild. New flag `transcribe-direct-recording` (experimental, default on, gates starts only). New shared `ui/tooltip.tsx`. No CSP, patch or shell-tier change. |
 | 2026-09-21 | Sprint 119 | **Publish to Google Docs (v1.12.0).** New `src/googleDocs/` subsystem: installed-app OAuth with PKCE and loopback plus the desktop Picker for templates, `SecretStorage` account, `<globalStorage>/google-docs/v1/` link store, native Docs API mapper, Drive-staged images, the Create/Sync publisher, a `vscode`-free controller, and an exact-key protocol (`google-docs/*`). Export menu and Settings card render host projections only. New flag `google-docs-publishing` (experimental, default on). OAuth client configuration comes in through the esbuild `define`. `ritemark.aiSettings` takes an optional section. Privacy and terms links moved to ritemark.app (R11). Editor fix found on RunDev: new `src/utils/imagePaths.ts` is shared by host and webview, so bare relative image paths (`img/a.png`) display, and `../` images no longer save as their `vscode-resource` display URI. |
