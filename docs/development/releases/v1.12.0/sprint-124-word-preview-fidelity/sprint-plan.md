@@ -5,7 +5,7 @@ change has its own evidence checkpoint<br>
 Release tier: **shell** — the asset boundary adds a second webview bundle that
 `build-prod.sh` and the shell staging scripts must know (Phase 0 §6)
 
-**Status:** Planning — waiting for Jarmo's approval. No code before it.<br>
+**Status:** Implementation — plan approved 2026-09-23.<br>
 **Branch:** `sprint-124-word-preview-fidelity`<br>
 **Issue:** [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284)<br>
 **Worktree:** `.claude/worktrees/sprint-124-word-preview-fidelity`, branched from main `4070ffc6`<br>
@@ -120,7 +120,7 @@ for a small and a 50-page document. The Markdown editor, PDF, spreadsheet,
 transcription and AI views work as before, and `webview.js` no longer contains the
 Word renderer.
 
-## Proposed: the PDF viewer adopts the same toolbar
+## The PDF viewer adopts the same toolbar (approved)
 
 The PDF viewer has only page and zoom, with the same hand-rolled buttons. It would
 take the shared toolbar with the controls it can support now — page, zoom, fit
@@ -157,9 +157,10 @@ separate follow-up issue.
 |---|---|---|
 | 2026-09-23 | Spike 0.4.1, not 0.4.0 | 0.4.1 adds only a page-break fix on top of 0.4.0; both are Apache-2.0 |
 | 2026-09-23 | Generate the corpus with the existing `docx` package; Word supplies the ground truth | No new dependency; Word is installed here, LibreOffice is not |
+| 2026-09-23 | The PDF viewer adopts the shared toolbar (page, zoom, fit, Save as Markdown); PDF search and LibreOffice research become follow-up issues | Jarmo: "PDF saab sama tööriistariba" |
 
 ## Planning Approval
 
-- [ ] Jarmo approves this sprint plan.
+- [x] Jarmo approves this sprint plan. *("plaan on ok, PDF saab sama tööriistariba — alusta", 2026-09-23)*
 - [x] GitHub issue exists. ([#284](https://github.com/ProductoryHQ/ritemark-native/issues/284))
 - [x] Worktree and branch created. (`sprint-124-word-preview-fidelity`, from main `4070ffc6`)

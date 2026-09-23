@@ -3,7 +3,7 @@
 Checklist for [sprint-plan.md](./sprint-plan.md). Tick `[x]` only with a commit
 on this branch behind it.
 
-> **Gate:** waiting — no code until Jarmo approves the plan.
+> **Gate:** passed — plan approved 2026-09-23.
 
 ## Phase 0: Audit (done)
 
@@ -11,11 +11,11 @@ on this branch behind it.
 
 ## Phase 1: Corpus and renderer evidence (R1, R2)
 
-- [ ] Fixture generator (existing `docx` package) and the ~10 fixtures from R1, committed with a README of what each one tests.
-- [ ] Word ground truth: a script re-saves each fixture in Word and exports it to PDF, then converts the PDF to PNG pages (`pdftoppm`). *Needs Jarmo to allow Automation for Word once.*
-- [ ] Failure fixtures: renamed non-ZIP, truncated, password-protected, oversized archive.
-- [ ] Capture tool: renders each fixture in the dev build and saves one PNG per rendered page. Compare page counts and per-page difference (ImageMagick) and build side-by-side sheets.
-- [ ] Baseline 0.3.7 as shipped; then 0.4.1; then `ignoreLastRenderedPageBreak: false` on each; also check host-CSS leakage (R7). Write it up in `research/renderer-spike.md`.
+- [x] Fixture generator (existing `docx` package) and the ~10 fixtures from R1, committed with a README of what each one tests. *(11 fixtures; `11` added for 0.4.1's page-break-before fix)*
+- [x] Word ground truth: a script re-saves each fixture in Word and exports it to PDF, then converts the PDF to PNG pages (`pdftoppm`). *(01–10 done; 11's Word copy is pending — Word stopped answering scripts after the private-template export was halted)*
+- [x] Failure fixtures: renamed non-ZIP, truncated, password-protected, oversized archive. *(f1–f4 committed; f5 (~80 MB) generated with `--large`, not committed)*
+- [x] Capture tool: renders each fixture with a webview bundle in headless Chromium and saves one PNG per rendered page (`capture-preview.mjs`); `compare.py` records page counts and a per-page difference and builds side-by-side sheets.
+- [x] Baseline 0.3.7 as shipped; then 0.4.1; then `ignoreLastRenderedPageBreak: false` on each; also check host-CSS leakage (R7). Written up in `research/renderer-spike.md` — nine defects found, each with a fix.
 - [ ] **Checkpoint:** show Jarmo the sheets and the recommendation; change the dependency only after that.
 
 ## Phase 2: Asset boundary (R3)
@@ -32,7 +32,7 @@ on this branch behind it.
 - [ ] Search: Cmd/Ctrl+F, count, Enter / Shift+Enter, Escape; CSS Custom Highlight API, no DOM rewriting; pure match logic with tests.
 - [ ] Open externally always available: Word → Pages → system default.
 - [ ] `fileChanged` re-renders and keeps the page; `fileDeleted` shows a notice.
-- [ ] *(If approved)* the PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown. Open a follow-up issue for PDF search.
+- [ ] The PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown. Open a follow-up issue for PDF search.
 
 ## Phase 4: Safe failure and honest limits (R5, R6)
 
