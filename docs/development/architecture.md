@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-23 (Sprint 123 transcript search and tab sizing)
+**Last updated:** 2026-09-24 (Sprint 124 Office preview bundle and Word viewer)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -157,6 +157,8 @@ extensions/ritemark/src/
 ```
 
 Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (Markdown + CSV, editable) with multiple views per `TextDocument`; `src/editorSync/` owns their shared URI state and per-view delivery. `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`), as is `transcriptWorkbenchProvider.ts` — whose document is the AUDIO file, with the transcript held as session state beside it (Sprint 108).
+
+**Office previews (Sprint 124, #284).** `docxEditorProvider.ts` loads its own bundle, `media/office-preview.js` (`webview/src/office/`, built by `vite build --mode office`), not the shared `webview.js`; Sprint 125's PowerPoint preview joins it. Before sending a file the host runs `src/officePreview/officePackageCheck.ts` — size cap (50 MB, the file is not read whole above it), CFB container (password-protected / legacy), ZIP central directory (damaged, entry count, unpacked size and ratio) — and sends `loadError` with a plain title and detail instead of `load`. In the webview, `components/viewers/docx/prepareDocx.ts` rewrites the package's XML before docx-preview 0.4.1 renders it (`docxXml.ts`: Word's page markers honoured only where present, the marker after a manual break dropped, PAGE / NUMPAGES marked for per-page numbers, empty embedded font faces dropped, unsupported content scanned); `officeFonts.ts` aliases missing Office fonts at 88 %. The Word and PDF viewers share `viewers/ViewerToolbar.tsx` and the pure `viewerLayout.ts`; Word zoom is a transform on a stage inside a sizer (CSS `zoom` gave inconsistent geometry), search uses the CSS Custom Highlight API over `documentSearch.ts` matches, driven from `components/FindBarShell.tsx` — the floating find bar the Markdown editor's `FindBar.tsx` also renders, so the app has one search UX. Case-folded search helpers are shared with the transcript in `webview/src/utils/textSearch.ts`. The pre-commit hook, `build-prod.sh`, the extension-update file list and the bundle checks all know both bundles.
 
 Entry point `extension.ts` registers all providers, commands, and views.
 
@@ -689,7 +691,8 @@ interface UnifiedAttachment {
 
 ```
 tsc --noEmit + esbuild  extension host: 2 bundles (out/extension.js + out/browser/browserMcpAdapter.js)  [Sprint 92 #105]
-Vite → media/webview.js webview bundle: ~7.6 MB IIFE
+Vite → media/webview.js      editors and panels: ~8.3 MB IIFE
+Vite --mode office → media/office-preview.js   Word preview: ~1.3 MB IIFE  [Sprint 124]
 apply-patches.sh        applies patches/vscode/001–014.patch to /vscode submodule
 gulp darwin-arm64-min   VS Code full build against submodule
 codesign                Apple Developer ID + Hardened Runtime + agent binary re-signing (JKBSC3ZDT5)
@@ -1097,6 +1100,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-24 | Sprint 124 | **Word preview fidelity and an Office preview bundle (v1.12.0, #284).** New `media/office-preview.js` (second Vite build, `webview/src/office/`); Word code and Mammoth leave `webview.js` (8.93 → 8.35 MB). docx-preview 0.3.7 → 0.4.1 behind a pre-render XML pass (`viewers/docx/`) and a host package check (`src/officePreview/officePackageCheck.ts`, `loadError` message). Shared `ViewerToolbar` for Word and PDF. Release tooling (hook, build-prod both platforms, staging, extension-update list, preflights, notarization check) knows the new bundle — shell-tier. `getWordProcessorAppName` replaced by the provider's Word → Pages → default resolution. |
 | 2026-09-23 | Sprint 123 | **Transcript search and a fitting tab row (v1.12.0, #283).** New webview-only `workbench/transcriptSearch.ts` (pure matching and highlight splitting, tested) and `TranscriptSearchBar`; the transcript pane became a column with the search row above the scroller (`transcriptColumn` / `transcriptSearch` layout classes). Follow playback gains a visible resume. The extension defaults `workbench.editor.tabSizing` to `shrink`. No host, protocol, flag, patch or shell-tier change. |
 | 2026-09-23 | Sprint 122 | **Agent conversation clarity (v1.12.0, #282).** New `ConversationHeader` (title, ⋮ menu) over a shared `conversationActionsModel` + `ConversationDialogs` now used by History, the rail and the header. Chat link policy split at the trust boundary: webview `chatLinks.ts` classifies by syntax, host `src/views/chatLinkTargets.ts` resolves with `realpath` and gates every action; new sidebar messages `chat:link/resolve` / `chat:link/resolved`, `chat:link-action`, `chat:link-unsupported`; folders and unsupported schemes no longer fail silently; out-of-project targets are located, never opened. `ChatInput` fits its text up to Sprint 117's `composerBounds` and is resized from a top-edge handle (`ComposerResizeHandle`, `composerResize.ts`), capped by the room left in the column. New `ui/dropdown-menu.tsx`; `ui/button.tsx` forwards refs; global pointer-cursor rule. No flag, patch or shell-tier change. |
 | 2026-09-22 | Sprint 118 | **Direct recording in Transcribe (v1.12.0, #328).** New `src/speech/recording/` (exact-field `transcribe:record/*` protocol, destination/naming rules, crash-safe `WavRecordingSink`, vscode-free `RecordingController`) and webview `components/transcribe/recording/` (click-time `AudioContext`, 16 kHz capture with a streaming resampler fallback, ack-bounded 1 s PCM16 chunks, injected `AudioEnv`). The recording is handed to the unchanged `_stageImport`. Partials are registered before audio exists, checkpointed on detach and deactivate, and recovered by header rebuild. New flag `transcribe-direct-recording` (experimental, default on, gates starts only). New shared `ui/tooltip.tsx`. No CSP, patch or shell-tier change. |

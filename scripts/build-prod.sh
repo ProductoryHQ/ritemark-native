@@ -107,28 +107,38 @@ ritemark_load_google_oauth_env
 (cd extensions/ritemark && npm run compile)
 node "$PROJECT_DIR/scripts/check-google-oauth-build.mjs" extensions/ritemark/out/extension.js
 
-if ! git diff --quiet -- extensions/ritemark/media/webview.js; then
-  # A bundle committed from a CRLF working copy (Git for Windows' core.autocrlf
-  # default) differs from an LF rebuild only by the raw CR that esbuild keeps,
-  # as a `\r` escape, inside multi-line template literals. That residue is
-  # inert at runtime and CI ships the committed bytes unchanged, so it is not
-  # evidence of a stale bundle. Compare with the CR residue removed; only a
-  # real content difference blocks the build. When only residue differs, the
-  # tracked bundle is restored so this app ships the exact bytes CI ships.
-  strip_cr_residue() { perl -pe 's/\r//g; s/\\r//g'; }
-  if cmp -s <(git show HEAD:extensions/ritemark/media/webview.js | strip_cr_residue) \
-            <(strip_cr_residue < extensions/ritemark/media/webview.js); then
-    echo -e "${YELLOW}WARNING: committed webview.js differs from the clean rebuild only by CR residue${NC}"
-    echo "(a \\r escape inside template literals, left by a CRLF working copy)."
-    echo "Restoring the committed bundle so the app ships the tracked bytes, as CI does."
-    git checkout -- extensions/ritemark/media/webview.js
-  else
-    echo -e "${RED}ERROR: clean dependency build changed committed webview.js.${NC}"
-    echo "The committed bundle is stale or the lockfile does not reproduce it."
-    echo "Rebuild and commit the bundle before creating an RC."
+# Sprint 124: two committed bundles — the editors' webview.js and the Office
+# preview's office-preview.js. Both must be tracked and reproduced by the clean build.
+for bundle in webview.js office-preview.js; do
+  bundle_path="extensions/ritemark/media/$bundle"
+  if ! git ls-files --error-unmatch "$bundle_path" >/dev/null 2>&1; then
+    echo -e "${RED}ERROR: $bundle_path is not committed.${NC}"
+    echo "Build the webview (npm run build builds both bundles) and commit it before creating an RC."
     exit 1
   fi
-fi
+  if ! git diff --quiet -- "$bundle_path"; then
+    # A bundle committed from a CRLF working copy (Git for Windows' core.autocrlf
+    # default) differs from an LF rebuild only by the raw CR that esbuild keeps,
+    # as a `\r` escape, inside multi-line template literals. That residue is
+    # inert at runtime and CI ships the committed bytes unchanged, so it is not
+    # evidence of a stale bundle. Compare with the CR residue removed; only a
+    # real content difference blocks the build. When only residue differs, the
+    # tracked bundle is restored so this app ships the exact bytes CI ships.
+    strip_cr_residue() { perl -pe 's/\r//g; s/\\r//g'; }
+    if cmp -s <(git show HEAD:"$bundle_path" | strip_cr_residue) \
+              <(strip_cr_residue < "$bundle_path"); then
+      echo -e "${YELLOW}WARNING: committed $bundle differs from the clean rebuild only by CR residue${NC}"
+      echo "(a \\r escape inside template literals, left by a CRLF working copy)."
+      echo "Restoring the committed bundle so the app ships the tracked bytes, as CI does."
+      git checkout -- "$bundle_path"
+    else
+      echo -e "${RED}ERROR: clean dependency build changed committed $bundle.${NC}"
+      echo "The committed bundle is stale or the lockfile does not reproduce it."
+      echo "Rebuild and commit the bundle before creating an RC."
+      exit 1
+    fi
+  fi
+done
 
 echo "Applying the canonical VS Code patch stack..."
 ./scripts/apply-patches.sh

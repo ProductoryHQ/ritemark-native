@@ -5,6 +5,8 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { sendToExtension } from '../../bridge'
 import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
 import { stripExt } from '../../utils/imageNaming'
+import { PageIndicator, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
+import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
 
 interface PDFViewerProps {
   content: string  // base64-encoded PDF
@@ -28,7 +30,7 @@ function LazyPage({
   scale: number
   width: number
   height: number
-  onFirstPageLoad?: (page: { width: number; height: number }) => void
+  onFirstPageLoad?: (page: { width: number; height: number; originalWidth?: number; originalHeight?: number }) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(false)
@@ -104,6 +106,7 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
+  const [fit, setFit] = useState<FitMode>(null)
   const [error, setError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
@@ -186,10 +189,11 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     return { data: pdfData.slice(0) }
   }, [pdfData])
 
-  // Capture first page dimensions
-  const onFirstPageLoad = useCallback((page: { width: number; height: number }) => {
-    setPageWidth(page.width)
-    setPageHeight(page.height)
+  // Capture first page dimensions, at 100 % (the callback fires again after
+  // each zoom, with `width` already scaled).
+  const onFirstPageLoad = useCallback((page: { width: number; height: number; originalWidth?: number; originalHeight?: number }) => {
+    setPageWidth(page.originalWidth ?? page.width)
+    setPageHeight(page.originalHeight ?? page.height)
   }, [])
 
   const handleSaveAsMarkdown = useCallback(async () => {
@@ -229,6 +233,22 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     }
   }, [content, filename, isSavingMd, pdfData, workerSrc])
 
+  // Sprint 124 (#284): fit width / fit page follow the window until the user zooms by hand.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!fit || !container) return
+    const apply = () => {
+      const next = fit === 'width'
+        ? fitWidthZoom(pageWidth, container.clientWidth)
+        : fitPageZoom(pageWidth, pageHeight, container.clientWidth, container.clientHeight - 32)
+      setScale((s) => (Math.abs(s - next) > 0.001 ? next : s))
+    }
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [fit, pageWidth, pageHeight, pdfData])
+
   // Track current page from scroll position
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return
@@ -257,63 +277,33 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      {/* Toolbar */}
-      <div style={{
-        height: '40px',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 12px',
-        borderBottom: '1px solid var(--r-hairline, #e0e0e0)',
-        gap: '8px',
-        flexShrink: 0
-      }}>
-        <span style={{ color: 'var(--r-ink-muted, #888)', fontSize: '13px' }}>{filename}</span>
-        <div style={{ flex: 1 }} />
-
-        <span style={{ fontSize: '13px', color: 'var(--r-ink-muted, #888)' }}>
-          {currentPage} / {numPages || '...'}
-        </span>
-
-        <button
-          onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--r-ink-strong)' }}
-          title="Zoom out"
-        >
-          -
-        </button>
-        <span style={{ fontSize: '12px', minWidth: '40px', textAlign: 'center' }}>
-          {Math.round(scale * 100)}%
-        </span>
-        <button
-          onClick={() => setScale(s => Math.min(3, s + 0.25))}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', color: 'var(--r-ink-strong)' }}
-          title="Zoom in"
-        >
-          +
-        </button>
-
+    <div className="bg-surface" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      <ViewerToolbar>
+        <PageIndicator current={currentPage - 1} total={numPages} />
+        <ZoomControls
+          zoom={scale}
+          fit={fit}
+          onStep={(d) => {
+            setFit(null)
+            setScale((s) => stepZoom(s, d))
+          }}
+          onFit={setFit}
+          onSet={(s) => {
+            setFit(null)
+            setScale(s)
+          }}
+        />
+        <ToolbarSpacer />
         {canSaveAsMarkdown && (
-          <button
-            onClick={handleSaveAsMarkdown}
+          <ToolbarTextButton
+            icon="file-text"
+            label={isSavingMd ? 'Converting…' : 'Save as Markdown'}
+            tooltip={isSavingMd ? 'Converting the PDF to Markdown' : 'Save the PDF as a Markdown file (a best-effort conversion)'}
             disabled={isSavingMd || !pdfData}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: isSavingMd || !pdfData ? 'default' : 'pointer',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              color: 'var(--r-ink-strong)',
-              fontSize: '12px',
-              opacity: isSavingMd || !pdfData ? 0.5 : 1,
-              marginLeft: 4,
-            }}
-            title="Save the PDF as a Markdown file (best-effort heuristic conversion)"
-          >
-            {isSavingMd ? 'Converting…' : 'Save as Markdown'}
-          </button>
+            onClick={handleSaveAsMarkdown}
+          />
         )}
-      </div>
+      </ViewerToolbar>
 
       {/* PDF Content */}
       <div
