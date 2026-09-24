@@ -2,7 +2,7 @@
  * Platform-aware external app opening utilities
  */
 
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import { getCurrentPlatform } from './platform';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Check if an application is installed
@@ -60,6 +61,19 @@ export async function openInExternalApp(filePath: string, appName: string): Prom
   } else {
     // Linux: xdg-open
     await execAsync(`xdg-open "${filePath}"`);
+  }
+}
+
+/**
+ * Open a file with the system's default app for its type (Sprint 124: the
+ * Word preview's fallback when neither Word nor Pages is installed).
+ */
+export async function openWithDefaultApp(filePath: string): Promise<void> {
+  if (getCurrentPlatform() === 'darwin') {
+    await execFileAsync('open', [filePath]);
+  } else {
+    // Windows `start` and Linux `xdg-open` already open the default app.
+    await openInExternalApp(filePath, '');
   }
 }
 
@@ -133,24 +147,6 @@ export function getSpreadsheetAppName(preferExcel: boolean): string {
   }
   // Windows/Linux: no Numbers equivalent, use generic
   return 'default spreadsheet app';
-}
-
-/**
- * Get the platform-appropriate word processor app name
- * @param preferWord - true if Word is installed
- * @returns Display name for the word processor app
- */
-export function getWordProcessorAppName(preferWord: boolean): string {
-  const platform = getCurrentPlatform();
-
-  if (preferWord) {
-    return 'Microsoft Word';
-  }
-
-  if (platform === 'darwin') {
-    return 'Pages';
-  }
-  return 'default application';
 }
 
 /**

@@ -1,0 +1,31 @@
+/*
+ * Sprint 124 (#284) — the Word preview's page surround, and the rules that keep
+ * the webview's own CSS off the drawn document (R7).
+ */
+
+/* Tailwind's preflight sets `img { max-width: 100% }`. An image anchored behind
+   the text sits in a zero-width box, so it shrank to nothing: covers and
+   page-edge bands vanished (renderer spike, defect 4). */
+.ritemark-docx .docx-wrapper img {
+  max-width: none;
+}
+
+.ritemark-docx .docx-wrapper {
+  background: var(--r-surface-muted);
+  padding: 24px 24px 0;
+}
+
+.ritemark-docx .docx-wrapper > section.docx {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 16px rgb(0 0 0 / 0.08);
+  margin-bottom: 24px;
+}
+
+/* Search matches, drawn with the CSS Custom Highlight API so the document's DOM is not rewritten. */
+::highlight(ritemark-doc-search) {
+  background-color: var(--r-accent-soft);
+}
+
+::highlight(ritemark-doc-search-current) {
+  background-color: var(--r-accent);
+  color: #fff;
+}

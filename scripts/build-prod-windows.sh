@@ -260,6 +260,13 @@ if [ -d "$BUILD_OUTPUT/resources/app/extensions/ritemark" ]; then
     else
         echo -e "${RED}  webview.js missing!${NC}"
     fi
+
+    # Sprint 124: the Office preview (Word) bundle
+    if [ -s "$BUILD_OUTPUT/resources/app/extensions/ritemark/media/office-preview.js" ]; then
+        echo -e "${GREEN}  office-preview.js found${NC}"
+    else
+        echo -e "${RED}  office-preview.js missing!${NC}"
+    fi
 else
     echo -e "${RED}  Extension folder missing in build!${NC}"
 fi

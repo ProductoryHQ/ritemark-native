@@ -4,7 +4,7 @@
 //
 //   node capture-preview.mjs [--css extra.css] <bundle.js> <out-dir> <file.docx>...
 //
-// The bundle is loaded as-is (the shipped `media/webview.js`, or a spike build),
+// The bundle is loaded as-is (`media/office-preview.js`; during the spike, `webview.js` builds),
 // behind a stub `acquireVsCodeApi`, and receives the same `load` message the
 // DOCX editor provider sends. Pages are `section.docx` elements, captured at
 // 1 CSS px = 1 image px, which matches `pdftoppm -r 96` of Word's PDF.
@@ -120,7 +120,7 @@ for (const docxArg of docxArgs) {
   let status = 'ok'
   let renderMs = null
   try {
-    await waitFor(`!!document.querySelector('section.docx') || /Failed to load|Unsupported/.test(document.body.innerText)`, 120000)
+    await waitFor(`!!document.querySelector('section.docx') || /Failed to load|Unsupported|can’t be read|couldn’t draw|isn’t supported/.test(document.body.innerText)`, 120000)
     renderMs = Date.now() - t0 // message posted -> first page or error on screen (100 ms polling)
     await sleep(500) // images and embedded fonts settle
   } catch (e) {
@@ -128,7 +128,7 @@ for (const docxArg of docxArgs) {
   }
   const info = await evaluate(`(() => {
     const pages = [...document.querySelectorAll('section.docx')]
-    const err = /Failed to load[^\\n]*\\n?[^\\n]*/.exec(document.body.innerText)
+    const err = /(Failed to load|can’t be read|couldn’t draw|isn’t supported)[^\\n]*\\n?[^\\n]*/.exec(document.body.innerText)
     return { heights: pages.map((p) => Math.round(p.getBoundingClientRect().height)), widths: pages.map((p) => Math.round(p.getBoundingClientRect().width)), error: err ? err[0] : null, heap: performance.memory ? performance.memory.usedJSHeapSize : null }
   })()`)
   if (info.error) status = 'error: ' + info.error.replace(/\s+/g, ' ')

@@ -213,6 +213,15 @@ else
   ok "media/webview.js present with ai-sidebar sentinel"
 fi
 
+OFFICE_JS="$EXT_DIR/media/office-preview.js"
+if [[ ! -f "$OFFICE_JS" ]]; then
+  fail "media/office-preview.js missing from the bundled extension (Word preview)"
+elif ! grep -q "ritemark-docx" "$OFFICE_JS"; then
+  fail "media/office-preview.js missing the Word viewer (stale or stubbed bundle)"
+else
+  ok "media/office-preview.js present with the Word viewer"
+fi
+
 echo ""
 echo "========================================"
 if [[ $ERRORS -gt 0 ]]; then

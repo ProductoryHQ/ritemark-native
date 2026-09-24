@@ -20,25 +20,29 @@ on this branch behind it.
 
 ## Phase 2: Asset boundary (R3)
 
-- [ ] Second Vite build → `media/office-preview.js`, with its own small entry that owns the `load` / `ready` handshake for Word.
-- [ ] `DocxEditorProvider` loads it; `DOCXViewer` and its libraries leave `webview.js`.
-- [ ] Pre-commit hook (size, raw-Tailwind, freshness, sentinel for the new file); `release-extension.sh` file list; `release-extension-preflight.sh`; `check-bundled-extension-complete.sh`.
-- [ ] Shell-tier: `build-prod.sh` and `build-prod-windows.sh` clean-rebuild checks; `stage-extension-for-shell-build.sh` required files.
+*`webview.js` 8.93 → 8.35 MB; `office-preview.js` 1.27 MB (374 KB gzipped). Also `verify-notarization.sh`.*
+
+
+- [x] Second Vite build → `media/office-preview.js`, with its own small entry that owns the `load` / `ready` handshake for Word.
+- [x] `DocxEditorProvider` loads it; `DOCXViewer` and its libraries leave `webview.js`.
+- [x] Pre-commit hook (size, raw-Tailwind, freshness, sentinel for the new file); `release-extension.sh` file list; `release-extension-preflight.sh`; `check-bundled-extension-complete.sh`.
+- [x] Shell-tier: `build-prod.sh` and `build-prod-windows.sh` clean-rebuild checks; `stage-extension-for-shell-build.sh` required files.
 
 ## Phase 3: Viewer controls (R4)
 
-- [ ] Shared viewer toolbar (shadcn Buttons, tooltips, single-line): page N of M, previous / next, zoom − / + with %, fit width, fit page, Refresh, Open externally, Save as Markdown.
-- [ ] Page tracking and fit / zoom over docx-preview's rendered pages.
-- [ ] Search: Cmd/Ctrl+F, count, Enter / Shift+Enter, Escape; CSS Custom Highlight API, no DOM rewriting; pure match logic with tests.
-- [ ] Open externally always available: Word → Pages → system default.
-- [ ] `fileChanged` re-renders and keeps the page; `fileDeleted` shows a notice.
-- [ ] The PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown. Open a follow-up issue for PDF search.
+- [x] Shared viewer toolbar (shadcn Buttons, tooltips, single-line): page N of M, previous / next, zoom − / + with %, fit width, fit page, Refresh, Open externally, Save as Markdown.
+- [x] Page tracking and fit / zoom over docx-preview's rendered pages.
+- [x] Search: Cmd/Ctrl+F, count, Enter / Shift+Enter, Escape; CSS Custom Highlight API, no DOM rewriting; pure match logic with tests.
+- [x] Open externally always available: Word → Pages → system default.
+- [x] `fileChanged` re-renders and keeps the page; `fileDeleted` shows a notice.
+- [x] The PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown.
+- [ ] Open a follow-up issue for PDF search.
 
 ## Phase 4: Safe failure and honest limits (R5, R6)
 
-- [ ] Host pre-check: size cap, ZIP entry count, total uncompressed size and ratio, not-a-ZIP, and password-protected (CFB container) detection; each gets its own message.
-- [ ] Render failure: what happened, **Try again**, **Open externally**; no endless loading.
-- [ ] Unsupported-content scan (charts, SmartArt, embedded objects, plus what the corpus shows) and a one-line notice.
+- [x] Host pre-check: size cap, ZIP entry count, total uncompressed size and ratio, not-a-ZIP, and password-protected (CFB container) detection; each gets its own message.
+- [x] Render failure: what happened, **Try again**, **Open externally**; no endless loading.
+- [x] Unsupported-content scan (charts, SmartArt, embedded objects, plus what the corpus shows) and a one-line notice.
 - [ ] User docs: what the Word preview shows and where it differs from Word.
 
 ## Phase 5: RunDev validation (R1–R7)

@@ -177,6 +177,19 @@ else
   ok "webview.js present, fresh (${WEBVIEW_SIZE} bytes), contains ai-sidebar sentinel"
 fi
 
+# Sprint 124: the Office preview (Word) is its own bundle, and ships alongside.
+OFFICE_JS="extensions/ritemark/media/office-preview.js"
+OFFICE_SIZE=$(file_size "$OFFICE_JS")
+if [[ ! -f "$OFFICE_JS" ]]; then
+  fail "$OFFICE_JS does not exist — run: cd extensions/ritemark/webview && npm run build"
+elif [[ $OFFICE_SIZE -lt 200000 ]]; then
+  fail "$OFFICE_JS too small (${OFFICE_SIZE} bytes, need >200KB) — stale or stubbed build"
+elif ! grep -q "ritemark-docx" "$OFFICE_JS"; then
+  fail "$OFFICE_JS missing the Word viewer (ritemark-docx) — stale or stubbed build"
+else
+  ok "office-preview.js present (${OFFICE_SIZE} bytes), contains the Word viewer"
+fi
+
 # -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
