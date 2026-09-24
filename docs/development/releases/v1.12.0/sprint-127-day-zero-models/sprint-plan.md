@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: eight requirements; host↔binary and cross-repository boundaries; an automatically published feed is a trust boundary)<br>
 Override with: "use plain full track"<br>
 Release tier: extension. Client changes stay under `extensions/ritemark/src/`, and the publisher lives in `jarmo-productory/ritemark-public`. No `binaries/agents/`, patch, `product.json` or other shell-tier path changes.<br>
-Status: **Phase 3 (DEVELOP) — plan approved by Jarmo on 2026-09-24** ("tee sprint ja asap töösse"). Research done 2026-09-24.<br>
+Status: **Phase 3 (DEVELOP) done on 2026-09-24; Phase 4 (QA) waits on Jarmo.** The plan was approved by Jarmo on 2026-09-24 ("tee sprint ja asap töösse"). The client and the publisher payload are implemented and tested. Going live needs the payload applied to `ritemark-public` with its key and switch ([APPLY.md](./ritemark-public/APPLY.md)), and then audits A1–A5 and A7.<br>
 Branch: `sprint-127-day-zero-models`, created locally on 2026-09-24 from `03076a6`. This cloud session may push only the remote ref `claude/anthropic-models-bundled-cli-gtjld9`, so the sprint branch is pushed there (Q4).<br>
 Issue: [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) under milestone `v1.12.0`<br>
 Release: [v1.12.0](../release-plan.md), proposed (see Q3)
@@ -85,6 +85,17 @@ No new flag. The work extends the existing stable `remote-model-catalog` flag ("
 - [ ] An unavailable model is always named: substitution notice and clear error (R6).
 - [ ] The id guard, automated-row limits and both kill switches are verified (R7).
 - [ ] The architecture doc, the release skill and the public README describe the new authority model (R8).
+
+## Implementation Notes (2026-09-24)
+
+- `R1`: implemented. Feed rows with `claudeCode.inject` are declared to Claude Code as `settings.modelPicker` plus the output budget, both for discovery and for the session that runs the model. Unit-tested. The offline smoke check ran the real CLI 2.1.270 and 2.1.281 against a local API stand-in: the declared model was listed and requested with `max_tokens` 64000 and no tools ([evidence](./research/evidence/canary-smoke-2026-09-24.json)). Still to do: A1 and S1–S2 on a Max subscription.
+- `R2`: implemented. `/v1/models` runs only for API-key sign-in. S7–S9 are manual QA.
+- `R3`: implemented. Per-row `mergeStatic()`: tombstones, automated rows never defaults, `minAppVersion`. Covered by unit tests S10–S15 and S33.
+- `R4`: implemented as the [ritemark-public payload](./ritemark-public/APPLY.md), with 70 `node --test` tests and the smoke check above. The workflow's triggers, permissions and pinned actions are guarded by tests. It goes live when Jarmo applies it; the first scheduled run is the S16 acceptance test.
+- `R5`: implemented. The feed is polled every 10 minutes with ETag and when a stale sidebar is shown. S24 timing is manual QA.
+- `R6`: implemented. The substitution line and named model-unavailable errors are unit-tested. A2 confirms the subscription-plan wording.
+- `R7`: implemented. The id guard exists in both the client and the publisher. The automated-row limits are checked by the additions-only diff and in the client. The `remote-model-catalog` flag switches off fetch, injection and declarations.
+- `R8`: done for `architecture.md`, the release skill, `feeds/README.md` (payload), the CHANGELOG, the release notes and the test checklist. The public README goes public when the payload is applied.
 
 ## Risks
 

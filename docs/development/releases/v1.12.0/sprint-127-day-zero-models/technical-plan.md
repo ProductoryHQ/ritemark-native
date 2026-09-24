@@ -11,6 +11,20 @@ Architecture for [spec.md](./spec.md). Snippets are proposed shapes; when the co
 - **W3 — Flows unchanged.** A Flow's Claude Code node runs the catalog default, and defaults are never automated rows, so it never needs a declaration.
 - **W7 — payload location.** Push access to `ritemark-public` was denied for this session. The publisher is built under [ritemark-public/](./ritemark-public/APPLY.md), mirroring the target layout. Jarmo applies it, and `ritemark-public` then owns it. A nested `.github/` under `docs/` does not run in this repository.
 
+## Revisions (2026-09-24, W7 implementation)
+
+- **Watermark = the bundled lineup's `updatedAt` (`2026-09-13T00:00:00Z`)**, not the newest bundled Claude model's `created_at`. The lineup was curated from every model that existed on that date, so anything created earlier and left out was left out on purpose. It also needs no API call to derive. Opus 5.5 appeared after CLI 2.1.278, which does not know it, so it stays a candidate. If the first dry run does not list it, compare its `created_at` with the watermark ([APPLY.md](./ritemark-public/APPLY.md) step 5).
+- **The watermark stays below every pending model.** A candidate that is cooling down, over the per-run cap, or failed holds the watermark below its `created_at`. Otherwise a newer model's publish would skip it for good. `selectCandidates()` became `newModels()`, and the cap and cooldown moved into `publishOnce()`.
+- **Schema rules live in `schema.mjs`.** `validate.mjs` is the command-line check: schema, size cap, config, and, with `--base <ref>`, the additions-only diff (S21). The workflow runs it after rebasing onto `origin/main` and before it pushes.
+- **The canary is stricter than planned.** It uses streaming input so the list check runs before the one prompt (as in the probes). It also requires every assistant message to come from the declared model or a dated snapshot of it. A runtime that cannot be fetched counts as a failed canary, not a crashed run.
+- **Dry run.** `workflow_dispatch` has a `dry_run` input. It runs the canary and writes nothing, even while `MODEL_CATALOG_AUTOPUBLISH` is off. The kill switch is enforced at job level and again in the script.
+- **Failures are reported last.** The script exits 0 after a failed canary and sets the `failed` output. The workflow commits any model that passed in the same run, then fails in its last step. The cooldown state is saved to the Actions cache only when it changed, under a key per run.
+- **A feed dated in the future stops a publish** with a clear message, instead of failing the additions-only check.
+- **Tests use frozen fixtures** (`fixtures/feed.fixture.json`, `fixtures/config.fixture.json`) because the live feed changes with every publish. Only one test reads the live files, to check that they are valid. `workflows.test.mjs` guards the workflow files: triggers, pinned SHAs, permissions, where the secret is used, and `persist-credentials: false`.
+- **Offline smoke check** `canary-smoke.mjs` runs the real CLI and SDK against a local API stand-in, with no key. Use it before adding a Claude Code version to the canary list. Evidence: [evidence/canary-smoke-2026-09-24.json](./research/evidence/canary-smoke-2026-09-24.json) (2.1.270 and 2.1.281 both pass).
+- **Export keeps what only the feed carries.** `buildPublishedFeed()` (`src/ai/modelCatalog/feedExport.ts`, tested, not bundled) writes the bundled lineup. It keeps automated rows and tombstones that the lineup does not curate, and providers the app does not know. `--merge <feed>` makes a release-time refresh safe.
+- **Docs location.** The publisher's documentation is `feeds/README.md` in `ritemark-public` (spec R8 revision).
+
 ## Architecture Overview
 
 ```
@@ -192,18 +206,18 @@ Secrets and variables, set up by Jarmo:
 - `MODEL_CATALOG_AUTOPUBLISH=on`.
 
 Failure handling:
-- A failed canary exits non-zero; GitHub's scheduled-workflow failure email is the alert.
+- A failed canary fails the workflow run, and GitHub's scheduled-workflow failure email is the alert. The run fails in its last step, after any model that passed has been committed (W7 revision).
 - The candidate's cooldown (1 h, doubling to 24 h) is kept in the Actions cache, so a persistent failure cannot burn API spend every 10 minutes.
 
 Bootstrap:
 1. `extensions/ritemark/scripts/export-bundled-model-catalog.ts` prints the bundled catalog as feed JSON.
-2. Commit it as the complete current lineup for every provider, with the watermark set to the newest bundled Claude model's `created_at`. This repairs C3 for older clients.
+2. Commit it as the complete current lineup for every provider, with the watermark set to the newest bundled Claude model's `created_at`. The watermark was later revised to the bundled lineup's `updatedAt` (W7 revision). This repairs C3 for older clients.
 3. The first scheduled run then detects, canaries and publishes Opus 5.5. It is the pipeline's live acceptance test.
 
 ## Workstream 8: Documentation, release process, QA (R8)
 
 - `docs/development/architecture.md`: Model Catalog AS IS → TO BE (authority split, merge rule, runtime declarations, publisher), a changelog row, and a Sprint 89 memo addendum.
 - `.claude/skills/release/SKILL.md`: when a shell release changes the bundled Claude Code version, add it to `canary.claudeCodeVersions`. Before a release, refresh the feed's non-Anthropic lineup with `export-bundled-model-catalog.ts` so older clients stay current.
-- `ritemark-public/README.md`: a short "Model catalog feed" section covering switches, secrets and the tombstone how-to.
+- `ritemark-public/feeds/README.md`: the "Model catalog feed" documentation, covering how it works, switches, secrets, the tombstone how-to, lineup refresh and operations (revised 2026-09-24).
 - `extensions/ritemark/package.json` `test` chain: add `src/ai/modelCatalog/runtimeDeclarations.test.ts` and the new resolver and remote-source tests.
 - `qa-evidence.md`: the scenario matrix, with S24 timing.

@@ -102,6 +102,8 @@ Acceptance criteria:
 - The `ritemark-public` README documents the publisher, its switches and its secrets.
 - The new tests run in `npm test`.
 
+*(Revised 2026-09-24.)* The publisher's documentation is `feeds/README.md` in `ritemark-public`, next to the feed. The repository's root README is the product landing page, and it is left unchanged.
+
 ## Non-Requirements
 
 - Updating the bundled CLI outside a shell release (C2) is a separate shell-tier decision. This sprint makes model visibility independent of it.

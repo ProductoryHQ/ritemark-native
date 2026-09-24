@@ -396,6 +396,7 @@ If feed/metadata is stale or missing, the release is BLOCKED — even if binarie
 1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy."
 2. **Issue sweep.** `gh issue list --repo ProductoryHQ/ritemark-native --state open`; map every open issue against the shipped scope; verify that each `Fixes #NNN` auto-close actually happened; close what the release genuinely resolved with a comment naming the version. Do not close partial or reputation-dependent issues (Windows Smart App Control, #130, is the standing example) — surface those to Jarmo.
 3. Run the release closeout (Step 10). A release whose worktree is still `BLOCKED` for build output is not finished.
+4. **Model catalog feed.** Do the duties in **Model catalog feed duties** below: canary versions, then a lineup refresh.
 
 ### Step 10 — Release closeout (reclaim the release worktree)
 
@@ -577,6 +578,27 @@ For changes confined to `extensions/ritemark/` — i.e. extension-tier per `CLAU
 6. No closeout step: an extension release is built in the main checkout and leaves no release worktree or multi-GB output behind.
 
 See `docs/development/RELEASING.md` for the plain-language version Jarmo can follow without engineering background.
+
+## Model catalog feed duties (Sprint 127)
+
+`feeds/model-catalog.json` in `jarmo-productory/ritemark-public` is the model list every app fetches. Its `Model catalog autopublish` workflow adds new Anthropic models automatically, after a canary on each Claude Code version listed in `feeds/model-catalog.config.json`. The full contract is that repository's `feeds/README.md`. Releases have two duties toward it, both done in a ritemark-public checkout and committed to its `main`.
+
+1. **A shell release that changes the bundled Claude Code version** (`extensions/ritemark/binaries/agents/manifest.json`). Do this before Gate 1.
+   - Run `node scripts/model-catalog/canary-smoke.mjs <new version>`. It runs offline and needs no key.
+   - If it passes, add the version to `canary.claudeCodeVersions`. Keep every version that apps at or above `autoRowMinAppVersion` still bundle. Also update `canary.agentSdkVersion` if the Agent SDK changed.
+   - If it fails, do not add the version. Every canary would then fail and publishing would stop. Raise it with Jarmo before the release, because on that CLI a declared model would not work as tested.
+2. **Any release that changes `extensions/ritemark/src/ai/modelCatalog/bundledCatalog.ts`.** After publishing, refresh the feed so older apps, which take a fresher feed as a whole, see the current lineup:
+
+   ```bash
+   cd extensions/ritemark
+   npx tsx scripts/export-bundled-model-catalog.ts --merge <ritemark-public>/feeds/model-catalog.json > /tmp/model-catalog.json
+   cp /tmp/model-catalog.json <ritemark-public>/feeds/model-catalog.json
+   cd <ritemark-public> && node scripts/model-catalog/validate.mjs
+   ```
+
+   `--merge` keeps automated rows and tombstones that the bundled lineup does not curate. Never redirect straight onto the file being merged, because the shell empties it before it is read.
+
+One-time gate for **v1.12.0**: ship the client only after the publisher's first automatic publish is recorded (Sprint 127 release gate). Subscription users with a saved API key lose the key-based model list in 1.12.0.
 
 ## Gotchas
 

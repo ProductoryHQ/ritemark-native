@@ -1,0 +1,35 @@
+{
+  "source": {
+    "id": "claude-opus-5-5",
+    "display_name": "Claude Opus 5.5",
+    "created_at": "2026-09-23T17:00:00Z",
+    "max_input_tokens": 1000000,
+    "max_tokens": 128000,
+    "capabilities": {
+      "effort": {
+        "supported": true,
+        "low": { "supported": true },
+        "medium": { "supported": true },
+        "high": { "supported": true },
+        "xhigh": { "supported": true },
+        "max": { "supported": true }
+      }
+    }
+  },
+  "publishedAt": "2026-09-24T09:10:00Z",
+  "familyHeadOrder": 1,
+  "autoRowMinAppVersion": "1.12.0",
+  "row": {
+    "id": "claude-opus-5-5",
+    "label": "Opus 5.5",
+    "description": "Newest Opus model",
+    "tier": "high",
+    "deprecated": false,
+    "order": 0.5,
+    "minAppVersion": "1.12.0",
+    "thinkingEffort": { "levels": ["low", "medium", "high", "xhigh", "max"] },
+    "provenance": "auto",
+    "addedAt": "2026-09-24T09:10:00Z",
+    "claudeCode": { "inject": true, "maxOutputTokens": 64000 }
+  }
+}

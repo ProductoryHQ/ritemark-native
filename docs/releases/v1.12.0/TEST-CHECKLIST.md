@@ -15,6 +15,7 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
+| 127 | New Anthropic models without an app update: the public model list gains them automatically after a canary, the app declares them to its bundled Claude Code, the list follows the sign-in method, and substitution is visible | Gate 1, **after the publisher's first automatic publish** (release gate) |
 | 124–125 | _Not started_ | — |
 
 ## Automated checks (before handover)
@@ -75,6 +76,16 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] Scroll the transcript with the mouse wheel while it plays: **Back to playing line** appears
 - [ ] A word that is not there shows "No matches"; Escape clears the field
 - [ ] Open eight or more files with long names: the tab row fits without scrolling sideways; hovering a tab shows its full name
+
+### New Claude models without an update (Sprint 127)
+
+Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-models/tasks.md` Phase 7.
+
+- [ ] **Release gate:** ritemark-public `feeds/model-catalog.json` carries the automated Opus 5.5 row (`"provenance": "auto"`), committed by github-actions[bot]
+- [ ] Signed in with a Claude subscription (Max): the model menu lists **Opus 5.5** without a restart. Choose it and send a prompt: the reply arrives, and the conversation runs on Opus 5.5 (S1, S2)
+- [ ] Also save an API key in Settings while signed in with the subscription: the menu still follows the subscription (S7)
+- [ ] Sign in with an API key only: the menu lists the models the key can use (S8)
+- [ ] Choose a model the account cannot use (for example, one outside the plan): the error names the model and points to the model menu, and the conversation stays open (S29)
 
 ### Regression sweep
 

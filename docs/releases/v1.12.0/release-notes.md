@@ -62,6 +62,20 @@ Sprint 123 makes a long recording searchable and keeps a crowded tab row readabl
 
 **A tab row that fits.** With many files open, tabs shrink to fit the row instead of running off the edge. Hover a tab for its full name.
 
+## New Claude models without waiting for an update
+
+With Sprint 127, new Anthropic models reach Ritemark on their own, without an app update or a restart.
+
+Until now, if you signed in with a Claude subscription, the model menu listed only the models built into the copy of Claude Code that ships inside Ritemark. A new model waited for the next Ritemark release.
+
+Now Ritemark checks its public model list every 10 minutes. When Anthropic releases a model, an automatic check first runs it on the exact Claude Code version that Ritemark ships. Once that passes, the model appears in the menu.
+
+**Your sign-in decides the list.** With a Claude subscription, the menu follows your subscription, even when an API key is also saved in Settings. With an API key, it follows what your key can use, from the first day.
+
+**No silent switches.** If the model you last used is no longer available, Ritemark says so in the chat, for example "Opus 5.5 isn't available right now — using Sonnet 5." It no longer switches quietly. If your account can't use a model, for example because your plan or organization doesn't include it, the message names the model and asks you to choose another in the model menu.
+
+The recommended default stays a deliberate choice: a new model is never made the default automatically.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.
