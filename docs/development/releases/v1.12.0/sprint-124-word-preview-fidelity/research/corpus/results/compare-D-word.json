@@ -1,0 +1,138 @@
+[
+  {
+    "name": "01-headings-styles",
+    "word_pages": 5,
+    "preview_pages": 5,
+    "preview_first_page_height_px": 1292,
+    "mean_diff_percent": 9.09,
+    "page_diffs": [
+      9.48,
+      10.01,
+      10.54,
+      9.83,
+      5.57
+    ]
+  },
+  {
+    "name": "02-lists",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.59,
+    "page_diffs": [
+      2.59
+    ]
+  },
+  {
+    "name": "03-tables",
+    "word_pages": 3,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 2663,
+    "mean_diff_percent": 7.89,
+    "page_diffs": [
+      7.89
+    ]
+  },
+  {
+    "name": "04-images",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 9.14,
+    "page_diffs": [
+      9.14
+    ]
+  },
+  {
+    "name": "05-headers-footers",
+    "word_pages": 4,
+    "preview_pages": 7,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 1.87,
+    "page_diffs": [
+      1.0,
+      1.93,
+      2.62,
+      1.91
+    ]
+  },
+  {
+    "name": "06-footnotes",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.91,
+    "page_diffs": [
+      3.91
+    ]
+  },
+  {
+    "name": "07-sections-landscape",
+    "word_pages": 3,
+    "preview_pages": 3,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.22,
+    "page_diffs": [
+      2.01,
+      2.58,
+      2.07
+    ]
+  },
+  {
+    "name": "08-fonts",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 6.88,
+    "page_diffs": [
+      6.88
+    ]
+  },
+  {
+    "name": "09-long-document",
+    "word_pages": 29,
+    "preview_pages": 28,
+    "preview_first_page_height_px": 1337,
+    "mean_diff_percent": 9.79,
+    "page_diffs": [
+      9.87,
+      9.5,
+      10.08,
+      9.99,
+      9.51,
+      9.93,
+      9.97,
+      10.0,
+      9.56,
+      10.07,
+      10.05,
+      9.28,
+      9.95,
+      9.89,
+      9.81,
+      9.59,
+      9.61,
+      10.1,
+      9.52,
+      9.85,
+      9.92,
+      9.87,
+      9.25,
+      9.49,
+      10.08,
+      9.62,
+      10.0,
+      9.88
+    ]
+  },
+  {
+    "name": "10-unsupported-content",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.66,
+    "page_diffs": [
+      3.66
+    ]
+  }
+]

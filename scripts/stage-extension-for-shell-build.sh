@@ -20,7 +20,7 @@ if [ -e "$STAGING_DIR" ]; then
   exit 1
 fi
 
-for required_path in package.json out/extension.js media/webview.js; do
+for required_path in package.json out/extension.js media/webview.js media/office-preview.js; do
   if [ ! -s "$SOURCE_DIR/$required_path" ]; then
     echo "ERROR: Refusing to stage incomplete extension; missing or empty: $SOURCE_DIR/$required_path" >&2
     exit 1
@@ -30,7 +30,7 @@ done
 mkdir -p "$(dirname "$STAGING_DIR")"
 mv "$SOURCE_DIR" "$STAGING_DIR"
 
-for required_path in package.json out/extension.js media/webview.js; do
+for required_path in package.json out/extension.js media/webview.js media/office-preview.js; do
   if [ ! -s "$STAGING_DIR/$required_path" ]; then
     echo "ERROR: Extension staging validation failed: $STAGING_DIR/$required_path" >&2
     mv "$STAGING_DIR" "$SOURCE_DIR" 2>/dev/null || true

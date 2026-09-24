@@ -281,7 +281,14 @@ if [ -d "$EXT_PATH" ]; then
     else
         fail "webview.js not found in extension"
     fi
-    
+
+    # Sprint 124: the Office preview (Word) bundle
+    if [ -s "$EXT_PATH/media/office-preview.js" ]; then
+        pass "office-preview.js present"
+    else
+        fail "office-preview.js not found in extension (Word preview)"
+    fi
+
     # Check node_modules
     NODE_MODULES="$EXT_PATH/node_modules"
     if [ -d "$NODE_MODULES" ]; then

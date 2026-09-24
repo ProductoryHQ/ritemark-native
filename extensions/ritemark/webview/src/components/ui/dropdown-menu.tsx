@@ -30,7 +30,7 @@ const DropdownMenuContent = React.forwardRef<
       collisionPadding={8}
       className={cn(
         // Above the 56 px thread rail (z-60), below dialogs (z-80) and tooltips (z-100).
-        'z-[70] min-w-[10rem] max-w-[16rem] overflow-hidden rounded-md border border-hairline-strong bg-white p-1 font-ui text-ink-strong shadow-md',
+        'z-[70] min-w-[10rem] max-w-[16rem] overflow-hidden rounded-md border border-hairline-strong bg-surface p-1 font-ui text-ink-strong shadow-md',
         className
       )}
       {...props}

@@ -1,0 +1,66 @@
+/*
+ * Sprint 124 (#284) — the Word preview's page surround, and the rules that keep
+ * the webview's own CSS off the drawn document (R7).
+ */
+
+/* Tailwind's preflight sets `img { max-width: 100% }`, and VS Code's own webview
+   defaults add `max-height: 100%`. An image anchored behind the text sits in a
+   zero-size box, so it shrank to nothing: covers and page-edge bands vanished
+   (renderer spike, defect 4). */
+.ritemark-docx .docx-wrapper img {
+  max-width: none;
+  max-height: none;
+}
+
+.ritemark-docx {
+  --ritemark-docx-surround: color-mix(in srgb, var(--r-ink-strong) 7%, var(--r-surface));
+}
+
+.ritemark-docx .docx-scroller {
+  background: var(--ritemark-docx-surround);
+}
+
+/* Zoom: the stage is drawn at 100 % and scaled; the sizer takes the scaled
+   size so the scroll range follows, and centres the pages while they are
+   narrower than the window. */
+.ritemark-docx .docx-sizer {
+  margin: 0 auto;
+}
+
+.ritemark-docx .docx-stage {
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+.ritemark-docx .docx-wrapper {
+  background: var(--ritemark-docx-surround);
+  padding: 24px 24px 0;
+}
+
+/* docx-preview hyphenates every document; Word only when the document asks. */
+.ritemark-docx .docx-wrapper .docx {
+  hyphens: manual;
+}
+
+.ritemark-docx.docx-hyphenate .docx-wrapper .docx {
+  hyphens: auto;
+}
+
+/* Each page is its own stacking context, so an image placed behind the text
+   (z-index: -1) paints above the page's white background and below its text,
+   as in Word — whatever creates a stacking context above it (the zoom transform). */
+.ritemark-docx .docx-wrapper > section.docx {
+  isolation: isolate;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 16px rgb(0 0 0 / 0.08);
+  margin-bottom: 24px;
+}
+
+/* Search matches, drawn with the CSS Custom Highlight API so the document's DOM is not rewritten. */
+::highlight(ritemark-doc-search) {
+  background-color: var(--r-accent-soft);
+}
+
+::highlight(ritemark-doc-search-current) {
+  background-color: var(--r-accent);
+  color: #fff;
+}

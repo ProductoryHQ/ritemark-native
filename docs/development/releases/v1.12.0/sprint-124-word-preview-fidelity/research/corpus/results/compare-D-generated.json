@@ -1,0 +1,106 @@
+[
+  {
+    "name": "01-headings-styles",
+    "word_pages": 5,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 5296,
+    "mean_diff_percent": 9.48,
+    "page_diffs": [
+      9.48
+    ]
+  },
+  {
+    "name": "02-lists",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.59,
+    "page_diffs": [
+      2.59
+    ]
+  },
+  {
+    "name": "03-tables",
+    "word_pages": 3,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 3865,
+    "mean_diff_percent": 8.5,
+    "page_diffs": [
+      8.5
+    ]
+  },
+  {
+    "name": "04-images",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1203,
+    "mean_diff_percent": 9.23,
+    "page_diffs": [
+      9.23
+    ]
+  },
+  {
+    "name": "05-headers-footers",
+    "word_pages": 4,
+    "preview_pages": 4,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.17,
+    "page_diffs": [
+      1.0,
+      2.61,
+      2.56,
+      2.51
+    ]
+  },
+  {
+    "name": "06-footnotes",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.91,
+    "page_diffs": [
+      3.91
+    ]
+  },
+  {
+    "name": "07-sections-landscape",
+    "word_pages": 3,
+    "preview_pages": 2,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.56,
+    "page_diffs": [
+      4.01,
+      3.11
+    ]
+  },
+  {
+    "name": "08-fonts",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 6.88,
+    "page_diffs": [
+      6.88
+    ]
+  },
+  {
+    "name": "09-long-document",
+    "word_pages": 29,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 32291,
+    "mean_diff_percent": 9.87,
+    "page_diffs": [
+      9.87
+    ]
+  },
+  {
+    "name": "10-unsupported-content",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.62,
+    "page_diffs": [
+      3.62
+    ]
+  }
+]
