@@ -190,6 +190,7 @@ FILES=$(find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map' | sed 
 FILES="$FILES
 media/webview.js
 media/webview.js.map
+media/office-preview.js
 package.json"
 
 # Files whose absence is legitimate and must NOT abort the release. Everything

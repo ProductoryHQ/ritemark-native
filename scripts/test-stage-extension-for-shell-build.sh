@@ -14,6 +14,7 @@ make_complete_extension() {
   printf '{"name":"ritemark"}\n' > "$target/package.json"
   printf 'compiled extension\n' > "$target/out/extension.js"
   printf 'compiled webview\n' > "$target/media/webview.js"
+  printf 'compiled office preview\n' > "$target/media/office-preview.js"
   printf 'preserve me\n' > "$target/runtime data/sentinel.txt"
 }
 
@@ -27,6 +28,7 @@ test ! -e "$SOURCE"
 test -s "$DESTINATION/package.json"
 test -s "$DESTINATION/out/extension.js"
 test -s "$DESTINATION/media/webview.js"
+test -s "$DESTINATION/media/office-preview.js"
 test "$(cat "$DESTINATION/runtime data/sentinel.txt")" = "preserve me"
 
 DESTINATION_SHA="$(node "$TREE_HASHER" "$DESTINATION")"
@@ -63,5 +65,19 @@ fi
 
 test -d "$INCOMPLETE_SOURCE"
 test ! -e "$INCOMPLETE_DESTINATION"
+
+# Sprint 124: an extension without the Office preview bundle is incomplete too.
+NO_OFFICE_SOURCE="$TEST_ROOT/no-office/ritemark"
+NO_OFFICE_DESTINATION="$TEST_ROOT/no-office-stage/ritemark"
+make_complete_extension "$NO_OFFICE_SOURCE"
+rm "$NO_OFFICE_SOURCE/media/office-preview.js"
+
+if bash "$STAGER" "$NO_OFFICE_SOURCE" "$NO_OFFICE_DESTINATION" >/dev/null 2>&1; then
+  echo "ERROR: Extension without office-preview.js was staged" >&2
+  exit 1
+fi
+
+test -d "$NO_OFFICE_SOURCE"
+test ! -e "$NO_OFFICE_DESTINATION"
 
 echo "Extension shell-build staging tests passed"

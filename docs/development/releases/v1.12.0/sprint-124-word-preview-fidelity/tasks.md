@@ -1,0 +1,76 @@
+# Sprint 124 Tasks
+
+Checklist for [sprint-plan.md](./sprint-plan.md). Tick `[x]` only with a commit
+on this branch behind it.
+
+> **Gate:** passed — plan approved 2026-09-23.
+
+## Phase 0: Audit (done)
+
+- [x] Record what the Word viewer, its host, the renderer and the shared bundle do today, what a second bundle touches, and what tooling exists for ground truth, in `research/current-state-audit.md`. *(2026-09-23)*
+
+## Phase 1: Corpus and renderer evidence (R1, R2)
+
+- [x] Fixture generator (existing `docx` package) and the ~10 fixtures from R1, committed with a README of what each one tests. *(11 fixtures; `11` added for 0.4.1's page-break-before fix)*
+- [x] Word ground truth: a script re-saves each fixture in Word and exports it to PDF, then converts the PDF to PNG pages (`pdftoppm`). *(01–10 done; 11's Word copy is pending — Word stopped answering scripts after the private-template export was halted)*
+- [x] Failure fixtures: renamed non-ZIP, truncated, password-protected, oversized archive. *(f1–f4 committed; f5 (~80 MB) generated with `--large`, not committed)*
+- [x] Capture tool: renders each fixture with a webview bundle in headless Chromium and saves one PNG per rendered page (`capture-preview.mjs`); `compare.py` records page counts and a per-page difference and builds side-by-side sheets.
+- [x] Baseline 0.3.7 as shipped; then 0.4.1; then `ignoreLastRenderedPageBreak: false` on each; also check host-CSS leakage (R7). Written up in `research/renderer-spike.md` — nine defects found, each with a fix.
+- [x] **Checkpoint:** show Jarmo the sheets and the recommendation; change the dependency only after that. *(2026-09-24: 0.4.1, conditional markers and the 88 % font alias approved)*
+
+## Phase 2: Asset boundary (R3)
+
+*`webview.js` 8.93 → 8.35 MB; `office-preview.js` 1.27 MB (374 KB gzipped). Also `verify-notarization.sh`.*
+
+
+- [x] Second Vite build → `media/office-preview.js`, with its own small entry that owns the `load` / `ready` handshake for Word.
+- [x] `DocxEditorProvider` loads it; `DOCXViewer` and its libraries leave `webview.js`.
+- [x] Pre-commit hook (size, raw-Tailwind, freshness, sentinel for the new file); `release-extension.sh` file list; `release-extension-preflight.sh`; `check-bundled-extension-complete.sh`.
+- [x] Shell-tier: `build-prod.sh` and `build-prod-windows.sh` clean-rebuild checks; `stage-extension-for-shell-build.sh` required files.
+
+## Phase 3: Viewer controls (R4)
+
+- [x] Shared viewer toolbar (shadcn Buttons, tooltips, single-line): page N of M, previous / next, zoom − / + with %, fit width, fit page, Refresh, Open externally, Save as Markdown.
+- [x] Page tracking and fit / zoom over docx-preview's rendered pages.
+- [x] Search: Cmd/Ctrl+F, count, Enter / Shift+Enter, Escape; CSS Custom Highlight API, no DOM rewriting; pure match logic with tests.
+- [x] Open externally always available: Word → Pages → system default.
+- [x] `fileChanged` re-renders and keeps the page; `fileDeleted` shows a notice.
+- [x] The PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown.
+- [x] Open a follow-up issue for PDF search. ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344))
+
+## Phase 4: Safe failure and honest limits (R5, R6)
+
+- [x] Host pre-check: size cap, ZIP entry count, total uncompressed size and ratio, not-a-ZIP, and password-protected (CFB container) detection; each gets its own message.
+- [x] Render failure: what happened, **Try again**, **Open externally**; no endless loading.
+- [x] Unsupported-content scan (charts, SmartArt, embedded objects, plus what the corpus shows) and a one-line notice.
+- [x] User docs: what the Word preview shows and where it differs from Word. *(`docs/user/features/previews.md`)*
+
+## Phase 5: RunDev validation (R1–R7)
+
+*Eight defects found while driving it, all fixed — see `qa-evidence.md`.*
+
+
+- [x] Run the corpus in a dev build: page counts, sheets, and difference scores for the chosen renderer versus the baseline, recorded in `qa-evidence.md`.
+- [x] Every control, keyboard path and failure fixture driven live.
+- [x] Open time and memory for small and 50-page documents; no regression in the Markdown, PDF, spreadsheet, transcription and AI views. *(Markdown, PDF and the AI sidebar checked live; spreadsheets and transcription share no code with this change)*
+
+## Phase 6: QA and closeout
+
+- [x] `npm test` and `./scripts/validate-qa.sh`, results recorded. *(both exit 0; the staging test now requires `office-preview.js` too)*
+- [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with the Windows three-fixture line).
+- [x] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
+- [x] Follow-up issue: PDF search ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344)). *(LibreOffice dropped, 2026-09-24)*
+- [x] Release-plan tracker row, PR [#345](https://github.com/ProductoryHQ/ritemark-native/pull/345); close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).
+
+## Phase 7: Toolbar redesign (R4 revised, added 2026-09-24)
+
+*Jarmo found the first toolbar short of good design and UX; see the R4 revision in the sprint plan.*
+
+- [x] `ViewerToolbar.tsx`: `PageIndicator`, `ZoomControls` (− / zoom menu / +), `SplitButton`, `ToolbarIconButton`, `ToolbarTextButton`; compact under 560 px; `ZOOM_PRESETS` in `viewerLayout.ts`.
+- [x] `FindBarShell.tsx`: the floating find bar shared by the Markdown editor (`FindBar.tsx`) and the Word preview; "No results" reads "No matches".
+- [x] `DOCXViewer.tsx`: magnifier and Cmd/Ctrl+F open the find bar; **Open in Word ▾** with **Save as Markdown** as its second action; Refresh and the page arrows leave the bar (**Try again** stays in the failure view).
+- [x] `PDFViewer.tsx`: page text, zoom controls, **Save as Markdown**.
+- [x] The fit icons added for the first toolbar leave `Icon.tsx` again (they were never in `iconography.md`).
+- [x] Dark theme: `bg-surface` for `dropdown-menu.tsx` and `context-menu.tsx`; the find bar's buttons get `text-ink-strong`.
+- [x] Driven live (light, dark, narrow; Word, PDF, Markdown) and recorded in `qa-evidence.md`; `npm test`, both `tsc`, `./scripts/validate-qa.sh` pass.
+- [x] User docs, CHANGELOG, release notes and the v1.12.0 test checklist describe the new toolbar.

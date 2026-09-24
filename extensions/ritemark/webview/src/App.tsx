@@ -10,7 +10,6 @@ import {
 import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
-import { DOCXViewer } from './components/viewers/DOCXViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
 import type { GoogleDocsAction, GoogleDocsProjection } from './components/header/googleDocsMenu'
@@ -44,7 +43,8 @@ import {
 } from '../../src/editorSync/protocol'
 import { canonicalJson } from '../../src/editorSync/state'
 
-type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf' | 'docx'
+// Word documents open in the Office preview bundle (Sprint 124), not here.
+type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf'
 type SidePanel = 'none' | 'toc' | 'properties' | 'agent'
 
 // Minimum container width (px) at which the inline ToC panel is shown.
@@ -775,17 +775,6 @@ function App() {
         content={content}
         filename={filename}
         workerSrc={workerSrc}
-        canSaveAsMarkdown={features.saveAsMarkdownFromPreview}
-      />
-    )
-  }
-
-  // Route to DOCXViewer for Word documents
-  if (fileType === 'docx') {
-    return (
-      <DOCXViewer
-        content={content}
-        filename={filename}
         canSaveAsMarkdown={features.saveAsMarkdownFromPreview}
       />
     )

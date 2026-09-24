@@ -72,6 +72,7 @@ These work across all modes.
 | Feature | Description |
 |---------|-------------|
 | [Transcribe](transcribe.md) | Record or add a recording, and turn it into a speaker-attributed document |
+| [Word and PDF Previews](previews.md) | Read `.docx` and `.pdf` files page by page: zoom, fit, search, open in Word |
 | [Export](export.md) | PDF and Word export |
 | [Publish to Google Docs](google-docs.md) | Create a Google Doc from a document and keep it in sync |
 
@@ -86,6 +87,8 @@ These work across all modes.
 | `.md`, `.markdown` | Text | Full WYSIWYG editing |
 | `.csv` | Data | Inline cell editing |
 | `.xlsx`, `.xls` | Data | View and open in Excel/Numbers |
+| `.docx` | Preview | Read page by page, search, open in Word ([previews](previews.md)) |
+| `.pdf` | Preview | Read page by page, save as Markdown ([previews](previews.md)) |
 
 ### Key Shortcuts
 

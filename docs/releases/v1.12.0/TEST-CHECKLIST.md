@@ -15,7 +15,8 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
-| 124–125 | _Not started_ | — |
+| 124 | Word preview: Word's pages and page numbers, images behind text, font aliases; one toolbar for Word and PDF (pages, zoom, fit, Word search); plain refusals; the preview in its own bundle (`office-preview.js`) | Gate 1 (the built app carries `office-preview.js`), and **Gate 2 for the Windows Word preview** |
+| 125 | _Not started_ | — |
 
 ## Automated checks (before handover)
 
@@ -76,10 +77,27 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] A word that is not there shows "No matches"; Escape clears the field
 - [ ] Open eight or more files with long names: the tab row fits without scrolling sideways; hovering a tab shows its full name
 
+### Word and PDF previews (Sprint 124)
+
+Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/research/corpus/` (`word/` holds the Word-saved forms).
+
+- [ ] `word/05-headers-footers.docx`: 4 pages, footers read Page 2 of 4 … Page 4 of 4, no blank pages
+- [ ] `word/09-long-document.docx`: 28 pages; *Page N of 28* follows scrolling; − / + zoom, and the zoom menu's **Fit width**, **Fit page** and sizes behave
+- [ ] Cmd+F or the magnifier in a Word document opens the same find bar as in Markdown: count, highlights, Enter / Shift+Enter, Escape closes it
+- [ ] `word/10-unsupported-content.docx` shows the charts-and-equations notice
+- [ ] `fixtures/f3-password-protected.docx` and `fixtures/f4-decompression-bomb.docx` show their reasons with **Try again** and **Open in Word**
+- [ ] A real Word document with a cover image: the cover shows
+- [ ] **Open in Word** opens the file in Word; the arrow beside it offers **Save as Markdown**
+- [ ] A narrow editor (under about 560 px): the toolbar stays on one line, and the labels become icons that keep their tooltips
+- [ ] A PDF: the same page counter and zoom; **Save as Markdown** on the right
+- [ ] Dark theme: the zoom menu, the Open in Word menu and the find bar are dark and readable
+- [ ] A Markdown file still opens in the editor, and its Cmd+F find bar works as before
+
 ### Regression sweep
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
 - [ ] Typing at speed, task lists, undo/redo, and saving without conflict warnings
+- [ ] Dark theme: the AI sidebar's menus and the table of contents' right-click menu have a dark background (they were white with pale text)
 
 **Gate 1 verdict:** _pending_
 
@@ -93,6 +111,7 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 ### Windows
 
 - [ ] With many files open, the tab row shrinks to fit and hovering a tab shows its full name (Sprint 123)
+- [ ] Word preview (Sprint 124): `word/05-headers-footers.docx`, `word/07-sections-landscape.docx` and `word/10-unsupported-content.docx` from the corpus — pages, page numbers, the landscape section and the notice as on macOS; Calibri is drawn as Calibri; **Open in Word** opens Word
 
 - [ ] Installer signed by `Productory Services OÜ`; standard-user install and clean uninstall
 - [ ] **Google Docs Connect** completes in the browser and returns to Ritemark. This is the first native Windows run of the loopback OAuth flow. Then Create and Sync

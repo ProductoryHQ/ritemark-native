@@ -62,6 +62,16 @@ Sprint 123 makes a long recording searchable and keeps a crowded tab row readabl
 
 **A tab row that fits.** With many files open, tabs shrink to fit the row instead of running off the edge. Hover a tab for its full name.
 
+## Word documents, as pages
+
+Sprint 124 makes a Word document look like the document you sent, not a long web page.
+
+**Word's own pages.** A document last saved in Word now shows its pages where Word put them, with the right number on each page. Covers and page decorations placed behind the text appear, fonts embedded in the document are used, and blank pages after page breaks are gone. Office fonts your Mac doesn't have — Calibri, Cambria, Aptos — are drawn in a close system font instead of Times.
+
+**Move through it like a PDF.** Word and PDF previews now share one quiet toolbar: the page you are on, zoom, and a zoom menu with **Fit width**, **Fit page** and the usual sizes. **Open in Word** is the main button, with **Save as Markdown** behind its arrow. In a Word document, Cmd/Ctrl+F or the magnifier opens the same find bar as the Markdown editor, with a count and Enter / Shift+Enter between matches. Edit the file in Word and the preview follows, on the same page.
+
+**Honest about the rest.** When a document has charts, SmartArt or equations that the preview can't draw exactly, a note says so. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in Word (or Pages, or your default app). A document made by another program, such as a Google Docs export, has no saved page breaks, so it still shows fewer, longer pages.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.
@@ -71,3 +81,4 @@ Sprint 123 makes a long recording searchable and keeps a crowded tab row readabl
 - **The Export menu works from the keyboard.** Opening it with Enter now moves focus into the menu. The arrow keys move between entries, and Escape or Tab closes the menu and returns focus to the Export button. Previously no entry could be reached without a mouse.
 - **Shift+End no longer selects the rest of the document.** Holding Shift and pressing End selected everything from the cursor to the end of the file instead of to the end of the line, so the next keystroke could wipe out paragraphs and lists further down without you noticing. Shift+End and Shift+Home now select to the end and start of the line you are on, and can never reach past the paragraph, list item or code block the cursor is in.
 - **Conversation titles are in the language you wrote in.** When your own Claude setup contained text in another language, such as skills described in Estonian, an English prompt was often given a title in that language. The title now follows the language of your prompt.
+- **Menus are readable in the dark theme.** Drop-down and right-click menus, such as those in the AI sidebar, stayed white in the dark theme with near-white text on them. They now follow the theme.
