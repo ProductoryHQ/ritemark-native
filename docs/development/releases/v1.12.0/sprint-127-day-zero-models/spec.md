@@ -1,6 +1,6 @@
 # Sprint 127 Spec — New Anthropic models on day zero
 
-**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** pending ([draft](./research/github-issue-draft.md)) · **Evidence:** [research/model-visibility-audit.md](./research/model-visibility-audit.md)
+**Parent:** [sprint-plan.md](./sprint-plan.md) · **Release:** [v1.12.0](../release-plan.md) · **Issue:** [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) · **Evidence:** [research/model-visibility-audit.md](./research/model-visibility-audit.md)
 
 ## Purpose
 
@@ -118,11 +118,11 @@ Acceptance criteria:
 - **2026-09-24 (Jarmo):** existence / runnability / presentation are separate authorities; the CLI list is not the existence authority.
 - **2026-09-24 (Jarmo):** subscription users may see a model before the CLI knows it natively, through a runtime declaration after a canary.
 - **2026-09-24 (Jarmo):** publishing is fully automatic and immediate.
+- **2026-09-24 — Q1, where the publisher runs:** it runs in `ritemark-public`. This session was denied push access there, so the publisher is delivered as an apply-ready, tested payload ([ritemark-public/APPLY.md](./ritemark-public/APPLY.md)) for Jarmo to apply.
+- **2026-09-24 — Q4, branch:** the local branch is `sprint-127-day-zero-models`, pushed to the remote ref `claude/anthropic-models-bundled-cli-gtjld9`, the only ref this session may push.
+- **2026-09-24 — Q5, context window:** deferred. The feed carries no `contextWindow` until audit A3 shows how `CLAUDE_CODE_MAX_CONTEXT_TOKENS` behaves for an unknown model. Until then, an undeclared window uses the CLI's conservative default.
 
 ## Open Questions
 
-- **Q1 — Where the publisher runs.** Recommended: `ritemark-public` itself, which has free Actions minutes and sits next to the feed. Implementing it needs push access to that repository from the sprint session, or Jarmo applies the reviewed files.
-- **Q2 — Credentials.** Jarmo creates a dedicated Anthropic workspace API key with a spend cap, stored as `MODEL_CATALOG_ANTHROPIC_API_KEY` in `ritemark-public`, and sets `MODEL_CATALOG_AUTOPUBLISH=on`.
-- **Q3 — Release vehicle.** The client half ships with v1.12.0 by default. release-manager may pick an earlier extension-tier release if main allows. The feed backfill and the publisher go live at merge, independent of any app release.
-- **Q4 — Branch.** Phase 3 needs `sprint-127-day-zero-models`. This session may push only `claude/anthropic-models-bundled-cli-gtjld9` unless Jarmo allows the sprint branch.
-- **Q5 — Context window.** Whether the feed declares `contextWindow` (`CLAUDE_CODE_MAX_CONTEXT_TOKENS`) depends on audit A3.
+- **Q2 — Credentials.** Jarmo creates a dedicated Anthropic workspace API key with a spend cap, stored as `MODEL_CATALOG_ANTHROPIC_API_KEY` in `ritemark-public`, and sets `MODEL_CATALOG_AUTOPUBLISH=on`. The publisher is inert until both exist.
+- **Q3 — Release vehicle.** The client half ships with v1.12.0 by default. release-manager may pick an earlier extension-tier release if main allows. The feed bootstrap and the publisher go live when applied, independent of any app release.

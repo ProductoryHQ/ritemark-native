@@ -1,4 +1,4 @@
-import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext } from '../agent/types';
+import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext, ClaudeModelDeclaration } from '../agent/types';
 import type {
   RuntimeContinuationDescriptorV1,
   RuntimeContinuationRequest,
@@ -106,6 +106,8 @@ export interface RuntimeSessionConfig {
   allowedTools?: string[];
   /** API key for Claude Code (api-key auth method) */
   anthropicApiKey?: string;
+  /** Sprint 127 R1: Claude Code only — declares a model the bundled CLI may not know. */
+  claudeModelDeclaration?: ClaudeModelDeclaration;
   /** BYOK provider env vars for AcpRuntime */
   byokEnv?: Record<string, string>;
   /** Host-owned native descriptor and/or deterministic transcript fallback. */

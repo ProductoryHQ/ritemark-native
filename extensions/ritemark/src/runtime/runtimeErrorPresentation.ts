@@ -54,6 +54,28 @@ export function standaloneClaudeOAuthExpirationError(text: string | undefined): 
     : undefined;
 }
 
+/**
+ * Sprint 127 R6: the model a Claude failure says is unavailable — the CLI's own
+ * wording (2.1.270) or the API's `not_found_error` — so the transcript can name
+ * it instead of showing a raw diagnostic. The Ritemark runtime never passes a
+ * `fallbackModel`, so the CLI does not silently switch models on this error.
+ */
+const CLAUDE_UNAVAILABLE_MODEL_PATTERNS = [
+  /There's an issue with the selected model \(([^)\s]+)\)/i,
+  /not_found_error[^\n]{0,200}?model:\s*([A-Za-z0-9._[\]-]+)/i,
+  /([A-Za-z0-9._[\] -]{1,80}?) is not available\. Your organization restricts model selection/i,
+  /((?:Opus|Sonnet|Haiku|Fable) with 1M context) is not available for your account/i,
+];
+
+export function claudeUnavailableModel(error: string | undefined): string | undefined {
+  if (!error) return undefined;
+  for (const pattern of CLAUDE_UNAVAILABLE_MODEL_PATTERNS) {
+    const model = pattern.exec(error)?.[1]?.trim();
+    if (model) return model;
+  }
+  return undefined;
+}
+
 export function classifyClaudeAuthenticationError(
   error: string | undefined,
   usesApiKey: boolean,
@@ -90,6 +112,15 @@ export function presentRuntimeError(
     return {
       message: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
       failureKind: 'api-key-authentication',
+    };
+  }
+
+  // Deliberately no failureKind: persisted conversation and comment-task
+  // records accept only the authentication kinds.
+  const unavailableModel = agentId === 'claude-code' ? claudeUnavailableModel(error) : undefined;
+  if (unavailableModel) {
+    return {
+      message: `Claude can't use ${unavailableModel} with this account. Choose another model in the model menu, then resend your message.`,
     };
   }
 

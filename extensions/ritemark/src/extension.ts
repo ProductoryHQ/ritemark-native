@@ -426,10 +426,17 @@ export function activate(context: vscode.ExtensionContext) {
     const results: modelCatalog.DiscoveryResults = {};
     const claudeSetup = await getSetupStatus();
     results.codex = await discoverCodex();
+    // Sprint 127 R2: the Claude list describes the account that runs requests —
+    // /v1/models only when Claude Code itself runs on Ritemark's API key
+    // (same rule as UnifiedViewProvider's session setup); otherwise the
+    // runtime's own list plus the models the catalog declares to it (R1).
     results.anthropic = await discoverAnthropic({
-      apiKey: (await context.secrets.get('anthropic-api-key')) ?? null,
+      apiKey: claudeSetup.authMethod === 'api-key'
+        ? (await context.secrets.get('anthropic-api-key')) ?? null
+        : null,
       workspacePath,
       binaryPath: claudeSetup.binaryPath,
+      declarations: modelCatalog.getClaudeRuntimeDeclarations(),
     });
     results.openai = await discoverOpenAI((await context.secrets.get('openai-api-key')) ?? null);
     results.gemini = await discoverGemini((await context.secrets.get('google-ai-key')) ?? null);

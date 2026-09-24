@@ -3,9 +3,9 @@
 Track: SDD (auto-detected: eight requirements; host↔binary and cross-repository boundaries; an automatically published feed is a trust boundary)<br>
 Override with: "use plain full track"<br>
 Release tier: extension. Client changes stay under `extensions/ritemark/src/`, and the publisher lives in `jarmo-productory/ritemark-public`. No `binaries/agents/`, patch, `product.json` or other shell-tier path changes.<br>
-Status: **Phase 2 (PLAN) — awaiting Jarmo's approval.** Research done 2026-09-24.<br>
-Branch: `sprint-127-day-zero-models`, created at Phase 3. The planning documents are on `claude/anthropic-models-bundled-cli-gtjld9` (see Q4).<br>
-Issue: pending — [draft](./research/github-issue-draft.md)<br>
+Status: **Phase 3 (DEVELOP) — plan approved by Jarmo on 2026-09-24** ("tee sprint ja asap töösse"). Research done 2026-09-24.<br>
+Branch: `sprint-127-day-zero-models`, created locally on 2026-09-24 from `03076a6`. This cloud session may push only the remote ref `claude/anthropic-models-bundled-cli-gtjld9`, so the sprint branch is pushed there (Q4).<br>
+Issue: [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) under milestone `v1.12.0`<br>
 Release: [v1.12.0](../release-plan.md), proposed (see Q3)
 
 ## SDD Artifacts
@@ -63,10 +63,17 @@ A newly released Anthropic model can be chosen in the Claude Code agent by every
   - **E4 — No new flag.** `remote-model-catalog` gates feed, probes and declarations.
   - **E5 — Automated rows carry `minAppVersion`** equal to this client's release, so older clients are unaffected.
   - **E6 — The client validates Claude ids before declaring them.** The CLI accepts arbitrary strings as picker rows.
+- **2026-09-24 (Jarmo) — plan approved:** "tee sprint ja asap töösse". E1–E6 are accepted with the plan.
+- **2026-09-24 — audits move to the QA gate.** A1–A5 and A7 need Jarmo's subscription accounts, Intel and Windows machines, or managed settings, and this cloud session has none of them. Implementation starts now; those items become QA-gate evidence in Phase 7 instead of a pre-code gate. A6 is measured at the first live publish.
+- **2026-09-24 — the publisher ships as an apply-ready payload.** This session was denied push access to `ritemark-public` (Q1). The publisher is built and tested in [ritemark-public/](./ritemark-public/APPLY.md), mirroring that repository's layout. Jarmo applies it, or grants access. Once applied, `ritemark-public` becomes its source of truth.
 
-## Feature Flag Check
+## Linked Issues
 
-- [x] Does this sprint need a feature flag? **No new flag.** The work extends the existing stable `remote-model-catalog` flag ("so new models appear without an app update"). Turning it off already reduces the catalog to the bundled or cached floor. This sprint makes the same switch also stop runtime declarations (R7, S32). The server-side switch is the `MODEL_CATALOG_AUTOPUBLISH` repository variable.
+- [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) — New Anthropic models don't reach Claude subscription users until a shell release.
+
+## Feature Flag Decision
+
+No new flag. The work extends the existing stable `remote-model-catalog` flag ("so new models appear without an app update"). Turning it off already reduces the catalog to the bundled or cached floor. This sprint makes the same switch also stop runtime declarations (R7, S32). The server-side switch is the `MODEL_CATALOG_AUTOPUBLISH` repository variable.
 
 ## Success Criteria
 
@@ -85,13 +92,15 @@ A newly released Anthropic model can be chosen in the Claude Code agent by every
 - **Plan limits.** A subscription may not include a new model. R6 turns that into a named error; A2 captures the shape.
 - **Scheduler latency.** GitHub schedules are best effort. A6 measures it, and `workflow_dispatch` is the manual override.
 - **Old clients.** Older clients use whole-document freshness, so the bootstrap commit must be a complete current lineup for every provider. `export-bundled-model-catalog.ts` produces it, and the release skill keeps it current.
+- **Order of going live.** Subscription users who also saved an Anthropic API key used to get `/v1/models` (R2 removes that, because the list described the key's account, not theirs). From then on they get new models through the publisher. The publisher must therefore be live before the client ships, or they briefly see fewer models than today. This is a release gate item (tasks Phase 7).
 - **Unsigned feed.** The Sprint 89 deferral stands. The additions-only publisher, client id validation, automated rows never becoming defaults, and tombstones bound the impact.
 
 ## Pre-Implementation Gate
 
-- Jarmo answers Q1–Q4 in [spec.md](./spec.md#open-questions). The main ones are push access to `ritemark-public` for Phase 1 and the Anthropic key.
-- Phase 0 audit items A1–A5 run before Phase 2 code; A6 and A7 are measured during Phase 1.
+- Passed 2026-09-24 with the plan's approval.
+- Q1 (publisher location and access) and Q4 (branch) are resolved, see [spec.md](./spec.md#resolved-questions). Q2, Jarmo creating the Anthropic key and variable, is needed only for the publisher to go live.
+- Audit items A1–A5 and A7 are verified at the QA gate (Phase 7). A6 is measured at the first live publish (Phase 1).
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-09-24)

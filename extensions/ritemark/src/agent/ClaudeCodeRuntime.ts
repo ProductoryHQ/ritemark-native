@@ -45,6 +45,8 @@ export class ClaudeCodeSession implements RuntimeSession {
   /** Model of the live session — used to decide reuse vs recreate. */
   private _activeModel: string | undefined;
   private _activeResolvedModel: string | undefined;
+  /** Sprint 127 R1: a changed declaration for the running model needs a new CLI process. */
+  private _activeDeclarationKey: string;
 
   /**
    * Pending question requests, so respondToApproval() can look them up.
@@ -66,6 +68,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._binaryPath = binaryPath;
     this._activeModel = config.model;
     this._activeResolvedModel = config.expectedResolvedModel;
+    this._activeDeclarationKey = declarationKey(config);
     this._session = ClaudeCodeSession._build(config, binaryPath);
   }
 
@@ -82,6 +85,7 @@ export class ClaudeCodeSession implements RuntimeSession {
       workspacePath: config.workspacePath,
       model: config.model,
       expectedResolvedModel: config.expectedResolvedModel,
+      ...(config.claudeModelDeclaration ? { modelDeclaration: config.claudeModelDeclaration } : {}),
       pathToClaudeCodeExecutable: binaryPath,
       excludedFolders: config.excludedFolders,
       extraSystemPromptAppend: config.extraSystemPrompt,
@@ -126,7 +130,8 @@ export class ClaudeCodeSession implements RuntimeSession {
 
     if (this._session.isActive
       && this._activeModel === config.model
-      && this._activeResolvedModel === config.expectedResolvedModel) {
+      && this._activeResolvedModel === config.expectedResolvedModel
+      && this._activeDeclarationKey === declarationKey(config)) {
       this._session.setApprovalMode(config.approvalMode ?? 'auto', config.planFirst === true);
       return;
     }
@@ -136,6 +141,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._pendingQuestions.clear();
     this._activeModel = config.model;
     this._activeResolvedModel = config.expectedResolvedModel;
+    this._activeDeclarationKey = declarationKey(config);
     this._session = ClaudeCodeSession._build(config, binaryPath);
     if (hadLiveSession) {
       config.onProgress({
@@ -355,4 +361,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     }
     this._sessions.clear();
   }
+}
+
+function declarationKey(config: RuntimeSessionConfig): string {
+  return JSON.stringify(config.claudeModelDeclaration ?? null);
 }

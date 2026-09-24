@@ -1,6 +1,6 @@
 # GitHub issue draft — Sprint 127
 
-Not yet published: opening it on `ProductoryHQ/ritemark-native` needs Jarmo's go-ahead.
+Published 2026-09-24 as [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) when Jarmo approved the sprint.
 
 **Title:** New Anthropic models don't reach Claude subscription users until a shell release
 

@@ -2,6 +2,15 @@
 
 Architecture for [spec.md](./spec.md). Snippets are proposed shapes; when the code diverges, update this file first. Evidence: [research/model-visibility-audit.md](./research/model-visibility-audit.md).
 
+## Revisions (2026-09-24, at implementation start)
+
+- **W1/W3 — `contextWindow` deferred (Q5).** The field is not in the schema until audit A3; only `maxOutputTokens` maps to the runtime environment.
+- **W2 — no `liveKind`.** Nothing consumes it. `ResolvedProvider.source` keeps its values, and the static layer reports `remote` or `cache` when that document contributed rows at least as fresh as the bundled catalog, else `bundled`.
+- **W3 — sessions declare only what they run.** Discovery declares every declared row. A session declares only the model it runs, and only when that model is a declared row. `modelPicker` from the flag layer replaces a user's own `modelPicker` for that session ("wins outright"), so a session that does not need it must not carry it.
+- **W6 — no new `failureKind`.** `conversations/types.ts` validates persisted `failureKind` against the authentication kinds, so a new value would change a stored format. Model-unavailable errors get their own message and no kind.
+- **W3 — Flows unchanged.** A Flow's Claude Code node runs the catalog default, and defaults are never automated rows, so it never needs a declaration.
+- **W7 — payload location.** Push access to `ritemark-public` was denied for this session. The publisher is built under [ritemark-public/](./ritemark-public/APPLY.md), mirroring the target layout. Jarmo applies it, and `ritemark-public` then owns it. A nested `.github/` under `docs/` does not run in this repository.
+
 ## Architecture Overview
 
 ```

@@ -3,11 +3,36 @@ import {
   AgentSession,
   buildClaudeSystemAppend,
   buildClaudeTurnPrompt,
+  claudeRuntimeOptions,
   claudeSdkAssistantError,
   DEFAULT_SETTING_SOURCES,
   modelMatchesExpectedIdentity,
   normalizeClaudeSdkSuccessResult,
 } from './AgentRunner';
+
+// Sprint 127 R1: a declared model reaches the CLI as a modelPicker row plus its
+// environment; a model the CLI knows natively leaves settings and env untouched.
+function testSprint127ClaudeRuntimeOptions(): void {
+  assert.deepEqual(claudeRuntimeOptions(undefined, undefined), {}, 'native model: nothing added');
+
+  const declaration = {
+    settings: { modelPicker: { options: [{ model: 'claude-opus-5-5', label: 'Opus 5.5' }] } },
+    env: { CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000' },
+  };
+  const declared = claudeRuntimeOptions(undefined, declaration);
+  assert.deepEqual(declared.settings, declaration.settings);
+  assert.equal(declared.env?.CLAUDE_CODE_MAX_OUTPUT_TOKENS, '64000');
+  assert.equal(declared.env?.PATH, process.env.PATH, 'declaration env extends, never replaces, the process env');
+  assert.equal(declared.env?.ANTHROPIC_API_KEY, process.env.ANTHROPIC_API_KEY);
+
+  const withKey = claudeRuntimeOptions('sk-ant-test', declaration);
+  assert.equal(withKey.env?.ANTHROPIC_API_KEY, 'sk-ant-test', 'API-key mode still wins');
+  assert.equal(withKey.env?.CLAUDE_CODE_MAX_OUTPUT_TOKENS, '64000');
+
+  const keyOnly = claudeRuntimeOptions('sk-ant-test', undefined);
+  assert.equal(keyOnly.settings, undefined, 'no modelPicker without a declaration');
+  assert.equal(keyOnly.env?.ANTHROPIC_API_KEY, 'sk-ant-test');
+}
 
 function testCanonicalModelIdentityMatching(): void {
   assert.equal(
@@ -459,6 +484,7 @@ async function main() {
   await testWarmSessionThinkingEffortUpdatesBeforeInput();
   await testWarmSessionUnsupportedEffortFallsBackToAuto();
   await testSyntheticAuthSuccessEnvelopeFailsTheTurn();
+  testSprint127ClaudeRuntimeOptions();
   console.log('AgentRunner lifecycle tests passed.');
 }
 
