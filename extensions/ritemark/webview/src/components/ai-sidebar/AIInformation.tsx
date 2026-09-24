@@ -151,7 +151,7 @@ export function AIInformationDialog({
               <h3 id="ai-current-selection" className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--r-ink-muted)]">
                 Current selection
               </h3>
-              <dl className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/50 text-[12px]">
+              <dl className="overflow-hidden rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_50%,transparent)] text-[12px]">
                 {[
                   ['Runtime', identity.runtimeLabel],
                   ['Provider / service', identity.providerLabel],
