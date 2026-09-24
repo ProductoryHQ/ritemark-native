@@ -9,29 +9,29 @@ is uploaded: the preview is drawn on your computer.
 
 ## The toolbar
 
-Both previews share one toolbar.
+Both previews share one toolbar. Scroll to move through the pages.
 
 | Control | What it does |
 |---------|--------------|
-| **↑ 3 / 12 ↓** | The page you are reading, and the previous or next page |
-| **− 100 % +** | Zoom out or in |
-| **Fit width** | Make the page as wide as the window |
-| **Fit page** | Show one whole page |
-| **Search** (Word) | Find text on every page. See below |
-| **Save as Markdown** | Save the document as a Markdown file, with its images in `./images/` |
-| **Open in Word** (Word) | Open the file in Microsoft Word, or in Pages or your default app when Word is not installed |
-| **↻** (Word) | Read the file from disk again |
+| *Page 3 of 12* | The page you are reading |
+| **−** / **+** | Zoom out or in |
+| **Fit width ▾** | The zoom menu: **Fit width** makes the page as wide as the window, **Fit page** shows one whole page, or pick a size from 50 % to 200 % |
+| Magnifier (Word) | Find text on every page. See below |
+| **Open in Word ▾** (Word) | Open the file in Microsoft Word, or in Pages or your default app when Word is not installed. The arrow beside it offers **Save as Markdown** |
+| **Save as Markdown** (PDF) | Save the document as a Markdown file, with its images in `./images/` |
 
 Fit width and fit page follow the window as you resize it, until you zoom by hand.
+In a narrow window the labels become icons; hover one to see what it does.
 
 ## Searching a Word document
 
-Press **Cmd+F** (Ctrl+F on Windows), or click the search field, and type.
+Press **Cmd+F** (Ctrl+F on Windows), or click the magnifier, and type. The find bar
+is the same one the Markdown editor uses.
 
 - Every match is highlighted; the current one more strongly.
 - The count shows where you are, e.g. *3 of 12*.
 - **Enter** goes to the next match, **Shift+Enter** to the previous one. At the end it starts again from the beginning.
-- **Escape** clears the search. Press it again to leave the field.
+- **Escape** closes the find bar and clears the highlights.
 
 Case doesn't matter, and a match can't run from one paragraph into the next.
 

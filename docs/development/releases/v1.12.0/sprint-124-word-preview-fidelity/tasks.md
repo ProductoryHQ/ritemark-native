@@ -61,3 +61,16 @@ on this branch behind it.
 - [x] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
 - [x] Follow-up issue: PDF search ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344)). *(LibreOffice dropped, 2026-09-24)*
 - [x] Release-plan tracker row, PR [#345](https://github.com/ProductoryHQ/ritemark-native/pull/345); close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).
+
+## Phase 7: Toolbar redesign (R4 revised, added 2026-09-24)
+
+*Jarmo found the first toolbar short of good design and UX; see the R4 revision in the sprint plan.*
+
+- [x] `ViewerToolbar.tsx`: `PageIndicator`, `ZoomControls` (− / zoom menu / +), `SplitButton`, `ToolbarIconButton`, `ToolbarTextButton`; compact under 560 px; `ZOOM_PRESETS` in `viewerLayout.ts`.
+- [x] `FindBarShell.tsx`: the floating find bar shared by the Markdown editor (`FindBar.tsx`) and the Word preview; "No results" reads "No matches".
+- [x] `DOCXViewer.tsx`: magnifier and Cmd/Ctrl+F open the find bar; **Open in Word ▾** with **Save as Markdown** as its second action; Refresh and the page arrows leave the bar (**Try again** stays in the failure view).
+- [x] `PDFViewer.tsx`: page text, zoom controls, **Save as Markdown**.
+- [x] The fit icons added for the first toolbar leave `Icon.tsx` again (they were never in `iconography.md`).
+- [x] Dark theme: `bg-surface` for `dropdown-menu.tsx` and `context-menu.tsx`; the find bar's buttons get `text-ink-strong`.
+- [x] Driven live (light, dark, narrow; Word, PDF, Markdown) and recorded in `qa-evidence.md`; `npm test`, both `tsc`, `./scripts/validate-qa.sh` pass.
+- [x] User docs, CHANGELOG, release notes and the v1.12.0 test checklist describe the new toolbar.

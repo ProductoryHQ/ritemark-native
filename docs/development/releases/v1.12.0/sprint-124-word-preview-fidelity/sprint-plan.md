@@ -97,6 +97,27 @@ One toolbar, with shadcn Buttons, a tooltip on each, and single-line labels:
 The document also follows external edits (re-render, keeping the page) and
 deletion (a clear notice).
 
+#### R4, revised 2026-09-24 — a toolbar built from what a reader does
+
+The first build put all fourteen controls on the bar at equal weight; Jarmo judged
+it short of good design and UX. Reading and scrolling is nearly everything a person
+does in a Word preview, so the bar now has seven controls:
+
+- ***Page 3 of 28*** as quiet text — no previous / next arrows; scrolling and
+  Page Down do that;
+- **− [Fit width ▾] +** — one menu holds fit width, fit page and sizes from 50 %
+  to 200 %, replacing two ambiguous fit icons;
+- a **magnifier** that opens the Markdown editor's floating find bar (Cmd/Ctrl+F
+  as before) — one search UX across the app instead of a field always open;
+- **Open in Word ▾** as the primary action, with **Save as Markdown** as its
+  second action behind the arrow, as the spreadsheet's **Open in Excel ▾**;
+- no **Refresh** on the bar: the preview follows edits by itself, and the failure
+  view keeps **Try again**.
+
+Under 560 px the labels become icons that keep their tooltips, so the bar never
+wraps. The PDF viewer takes the page text, the zoom controls and **Save as
+Markdown**.
+
 ### R5: Safe failure
 
 The host checks size and the ZIP's directory before sending anything. Too large,
@@ -142,7 +163,7 @@ separate follow-up issue.
 - [x] The corpus, its generator and the Word ground truth are committed, with the comparison results.
 - [x] The renderer decision is recorded with evidence and was shown to Jarmo before the dependency changed.
 - [x] Ordinary Word-saved documents show stable page boundaries, fonts, images, tables, lists, headers and footers within the documented limits.
-- [x] The toolbar gives page position, zoom, fit width / fit page, search, refresh, Open externally and Save as Markdown, with a tooltip on every button.
+- [x] The toolbar gives page position, zoom, fit width / fit page, search, Open externally and Save as Markdown, with a tooltip on every button; it stays on one line in a narrow pane (R4 revised 2026-09-24: Refresh and the page arrows left the bar, search moved to the shared find bar).
 - [x] External edits re-render; deletion shows a notice.
 - [x] Each failure fixture ends in a specific message with a way out; nothing hangs.
 - [x] Content the preview cannot draw is announced; limits are documented.
@@ -161,6 +182,9 @@ separate follow-up issue.
 | 2026-09-24 | No LibreOffice path, not even an installed one, for now. Claude Desktop converts Office files with LibreOffice inside its own 9 GB Linux VM; ChatGPT uses docx-preview by default and a gated .NET/Open XML SDK engine. Neither fits Ritemark today | Jarmo: "libre office on overkill" |
 | 2026-09-24 | Sprint 125 (PowerPoint) follows right after this sprint, not merged into it; its renderer spike runs now, in parallel; this sprint's bundle, toolbar and failure handling are built Office-generic | Jarmo: "jah, järjest" |
 | 2026-09-23 | The PDF viewer adopts the shared toolbar (page, zoom, fit, Save as Markdown); PDF search and LibreOffice research become follow-up issues | Jarmo: "PDF saab sama tööriistariba" |
+| 2026-09-24 | **Toolbar redesign (R4 revised):** seven controls instead of fourteen; zoom menu; search through the shared find bar; Refresh leaves the bar | Jarmo: the toolbar "ei vasta hea disaini ja uxi tingimustele"; the proposal, with Refresh and the always-open search field removed, was answered with the next row |
+| 2026-09-24 | **Open in Word** is the primary action; **Save as Markdown** is its second action, in the arrow menu | Jarmo: "open in word primary action ja save as markdown second" |
+| 2026-09-24 | The page arrows leave the bar; *Page N of M* stays as text | Recommended in the proposal; Jarmo did not rule on it separately. Easy to put back |
 
 ## Planning Approval
 

@@ -1,35 +1,65 @@
 /**
  * Sprint 124 (#284) R4 — the toolbar of the page-based previews (Word, PDF).
  *
- * One vocabulary for both: page N / M with previous and next, zoom − / % / +
- * with fit width and fit page, an optional search field, and the file actions.
- * The file name is not repeated here: the tab and the breadcrumbs show it. Every button is a shadcn Button with a tooltip; labels stay on
- * one line, and the bar wraps on a narrow pane instead of squeezing them.
+ * Built from what a reader does. Reading and scrolling is nearly everything, so
+ * the bar stays quiet: where you are (Page 3 of 28), how big it is (− Fit width ▾ +),
+ * and, on the right, the one thing you leave the preview for (Open in Word ▾, with
+ * Save as Markdown as its second action). Search is not a field on the bar: the
+ * magnifier and Cmd/Ctrl+F open the same floating find bar as the Markdown editor.
+ * The file name is not repeated: the tab and the breadcrumbs show it.
+ *
+ * Every button is a shadcn Button with a tooltip; labels stay on one line. Under
+ * 560 px the labels shorten to icons (with their tooltips) instead of wrapping.
  */
-import { forwardRef, type KeyboardEvent, type ReactNode } from 'react';
-import { Button } from '../ui/button';
-import { Icon, type PhosphorIconName as IconName } from '../ui/Icon';
-import { Tooltip } from '../ui/tooltip';
-import { pageLabel, zoomLabel, type FitMode } from './viewerLayout';
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Button } from '../ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Icon, type PhosphorIconName as IconName } from '../ui/Icon'
+import { Tooltip } from '../ui/tooltip'
+import { ZOOM_PRESETS, zoomLabel, type FitMode } from './viewerLayout'
+
+const COMPACT_BELOW_PX = 560
+const CompactContext = createContext(false)
 
 export function ViewerToolbar({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [compact, setCompact] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => setCompact(el.clientWidth < COMPACT_BELOW_PX)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   return (
-    <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline bg-surface px-3 py-1" data-viewer-toolbar>
-      {children}
-    </div>
-  );
+    <CompactContext.Provider value={compact}>
+      <div
+        ref={ref}
+        className="flex h-10 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3"
+        data-viewer-toolbar
+        data-compact={compact || undefined}
+      >
+        {children}
+      </div>
+    </CompactContext.Provider>
+  )
 }
 
 export function ToolbarSpacer() {
-  return <div className="min-w-0 flex-1" />;
+  return <div className="min-w-0 flex-1" />
 }
 
-export function ToolbarGroup({ children, label }: { children: ReactNode; label: string }) {
+/** "Page 3 of 28" — orientation, not a control. */
+export function PageIndicator({ current, total }: { current: number; total: number }) {
+  const compact = useContext(CompactContext)
+  const text = total <= 0 ? '' : compact ? `${current + 1} / ${total}` : `Page ${current + 1} of ${total}`
   return (
-    <div role="group" aria-label={label} className="flex shrink-0 items-center gap-0.5">
-      {children}
-    </div>
-  );
+    <span className="shrink-0 whitespace-nowrap px-1 font-ui text-[12px] tabular-nums text-ink-muted" aria-live="polite">
+      {text}
+    </span>
+  )
 }
 
 export function ToolbarIconButton({
@@ -37,14 +67,12 @@ export function ToolbarIconButton({
   label,
   tooltip,
   onClick,
-  disabled,
   pressed,
 }: {
   icon: IconName;
   label: string;
   tooltip: string;
   onClick: () => void;
-  disabled?: boolean;
   pressed?: boolean;
 }) {
   return (
@@ -53,18 +81,18 @@ export function ToolbarIconButton({
         type="button"
         variant="ghost"
         size="icon-sm"
-        className={pressed ? 'size-8 bg-surface-muted text-ink-strong' : 'size-8'}
+        className={pressed ? 'size-8 bg-surface-soft text-ink-strong' : 'size-8 text-ink-body'}
         aria-label={label}
         aria-pressed={pressed}
-        disabled={disabled}
         onClick={onClick}
       >
-        <Icon name={icon} size={16} />
+        <Icon name={icon} size={16} tone="inherit" />
       </Button>
     </Tooltip>
-  );
+  )
 }
 
+/** A text button that becomes its icon (keeping the tooltip) on a narrow bar. */
 export function ToolbarTextButton({
   icon,
   label,
@@ -72,109 +100,157 @@ export function ToolbarTextButton({
   onClick,
   disabled,
 }: {
-  icon?: IconName;
+  icon: IconName;
   label: string;
   tooltip: string;
   onClick: () => void;
   disabled?: boolean;
 }) {
+  const compact = useContext(CompactContext)
   return (
     <Tooltip label={tooltip}>
-      <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 whitespace-nowrap" disabled={disabled} onClick={onClick}>
-        {icon && <Icon name={icon} size={14} />}
-        {label}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 shrink-0 whitespace-nowrap text-ink-strong"
+        aria-label={compact ? label : undefined}
+        disabled={disabled}
+        onClick={onClick}
+      >
+        <Icon name={icon} size={14} tone="inherit" />
+        {!compact && label}
       </Button>
     </Tooltip>
-  );
+  )
 }
 
-export function PageControls({ current, total, onStep }: { current: number; total: number; onStep: (direction: 1 | -1) => void }) {
-  return (
-    <ToolbarGroup label="Pages">
-      <ToolbarIconButton icon="caret-up" label="Previous page" tooltip="Previous page" disabled={current <= 0} onClick={() => onStep(-1)} />
-      <span className="min-w-[4rem] text-center font-ui text-[12px] tabular-nums text-ink-muted" aria-live="polite">
-        {pageLabel(current, total)}
-      </span>
-      <ToolbarIconButton icon="caret-down" label="Next page" tooltip="Next page" disabled={current >= total - 1} onClick={() => onStep(1)} />
-    </ToolbarGroup>
-  );
-}
-
-export function ZoomControls({
-  zoom,
-  fit,
-  onStep,
-  onFit,
-}: {
+export interface ZoomControlsProps {
   zoom: number;
   fit: FitMode;
   onStep: (direction: 1 | -1) => void;
   onFit: (mode: 'width' | 'page') => void;
-}) {
-  return (
-    <ToolbarGroup label="Zoom">
-      <ToolbarIconButton icon="minus" label="Zoom out" tooltip="Zoom out" onClick={() => onStep(-1)} />
-      <span className="min-w-[3rem] text-center font-ui text-[12px] tabular-nums text-ink-muted">{zoomLabel(zoom)}</span>
-      <ToolbarIconButton icon="plus" label="Zoom in" tooltip="Zoom in" onClick={() => onStep(1)} />
-      <ToolbarIconButton
-        icon="arrows-out-line-horizontal"
-        label="Fit width"
-        tooltip="Fit the page width to the window"
-        pressed={fit === 'width'}
-        onClick={() => onFit('width')}
-      />
-      <ToolbarIconButton icon="corners-out" label="Fit page" tooltip="Show one whole page" pressed={fit === 'page'} onClick={() => onFit('page')} />
-    </ToolbarGroup>
-  );
+  onSet: (zoom: number) => void;
 }
 
-export interface DocumentSearchFieldProps {
-  query: string;
-  countLabel: string;
-  hasMatches: boolean;
-  onQueryChange: (query: string) => void;
-  onStep: (direction: 1 | -1) => void;
-  onLeave: () => void;
-}
-
-/** The search field: Enter / Shift+Enter move between matches, Escape clears (a second Escape leaves). */
-export const DocumentSearchField = forwardRef<HTMLInputElement, DocumentSearchFieldProps>(function DocumentSearchField(
-  { query, countLabel, hasMatches, onQueryChange, onStep, onLeave },
-  inputRef,
-) {
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (hasMatches) onStep(event.shiftKey ? -1 : 1);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      if (query) onQueryChange('');
-      else onLeave();
-    }
-  };
-
+/** − [Fit width ▾] + : the menu holds the two fits and the usual sizes. */
+export function ZoomControls({ zoom, fit, onStep, onFit, onSet }: ZoomControlsProps) {
+  const compact = useContext(CompactContext)
+  const current = compact ? zoomLabel(zoom) : fit === 'width' ? 'Fit width' : fit === 'page' ? 'Fit page' : zoomLabel(zoom)
+  const check = (on: boolean) => <Icon name="check" size={14} tone="inherit" className={on ? undefined : 'invisible'} />
   return (
-    <div className="flex flex-none items-center gap-0.5" data-document-search>
-      <div className="relative w-44">
-        <Icon name="magnifying-glass" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2" />
-        <input
-          ref={inputRef}
-          type="search"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Search"
-          aria-label="Search the document"
-          spellCheck={false}
-          className="h-8 w-full min-w-0 rounded-md border border-hairline-strong bg-surface pl-8 pr-2 font-ui text-[13px] text-ink-strong outline-none placeholder:text-ink-faint focus:border-accent focus:ring-[4px] focus:ring-[var(--r-ring-color)] [&::-webkit-search-cancel-button]:hidden"
-        />
-      </div>
-      <span role="status" aria-live="polite" className={`${countLabel ? 'min-w-[4.5rem] px-1' : ''} shrink-0 text-right font-ui text-[11px] tabular-nums text-ink-muted`}>
-        {countLabel}
-      </span>
-      <ToolbarIconButton icon="caret-up" label="Previous match" tooltip="Previous match (Shift+Enter)" disabled={!hasMatches} onClick={() => onStep(-1)} />
-      <ToolbarIconButton icon="caret-down" label="Next match" tooltip="Next match (Enter)" disabled={!hasMatches} onClick={() => onStep(1)} />
-      {query && <ToolbarIconButton icon="x" label="Clear search" tooltip="Clear search (Escape)" onClick={() => onQueryChange('')} />}
+    <div role="group" aria-label="Zoom" className="flex shrink-0 items-center gap-0.5">
+      <Tooltip label="Zoom out">
+        <Button type="button" variant="ghost" size="icon-sm" className="size-8 text-ink-body" aria-label="Zoom out" onClick={() => onStep(-1)}>
+          <Icon name="minus" size={16} tone="inherit" />
+        </Button>
+      </Tooltip>
+      <DropdownMenu modal={false}>
+        <Tooltip label="Fit the page to the window, or choose a size">
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={`h-8 justify-center gap-1 px-2 font-ui text-[12px] tabular-nums text-ink-strong ${compact ? '' : 'min-w-[5.75rem]'}`}
+              aria-label={`Zoom: ${current}`}
+            >
+              {current}
+              <Icon name="caret-down" size={12} tone="inherit" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="min-w-[9rem]">
+          <DropdownMenuItem onSelect={() => onFit('width')}>
+            {check(fit === 'width')}
+            Fit width
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onFit('page')}>
+            {check(fit === 'page')}
+            Fit page
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {ZOOM_PRESETS.map((preset) => (
+            <DropdownMenuItem key={preset} onSelect={() => onSet(preset)}>
+              {check(!fit && Math.abs(zoom - preset) < 0.001)}
+              {zoomLabel(preset)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Tooltip label="Zoom in">
+        <Button type="button" variant="ghost" size="icon-sm" className="size-8 text-ink-body" aria-label="Zoom in" onClick={() => onStep(1)}>
+          <Icon name="plus" size={16} tone="inherit" />
+        </Button>
+      </Tooltip>
     </div>
-  );
-});
+  )
+}
+
+export interface SplitAction {
+  icon: IconName;
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+}
+
+/**
+ * The primary action with its second action behind a caret — the pattern of the
+ * spreadsheet toolbar's "Open in Excel ▾". Without second actions it is one button.
+ */
+export function SplitButton({
+  icon,
+  label,
+  tooltip,
+  onClick,
+  menuLabel,
+  actions,
+}: {
+  icon: IconName;
+  label: string;
+  tooltip: string;
+  onClick: () => void;
+  menuLabel: string;
+  actions: SplitAction[];
+}) {
+  const compact = useContext(CompactContext)
+  return (
+    <div className="flex h-8 shrink-0 items-stretch overflow-hidden rounded-md border border-hairline-strong bg-surface">
+      <Tooltip label={tooltip}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-full rounded-none whitespace-nowrap px-2.5 text-ink-strong"
+          aria-label={compact ? label : undefined}
+          onClick={onClick}
+        >
+          <Icon name={icon} size={14} tone="inherit" />
+          {!compact && label}
+        </Button>
+      </Tooltip>
+      {actions.length > 0 && (
+        <>
+          <div className="w-px bg-hairline-strong" aria-hidden />
+          <DropdownMenu modal={false}>
+            <Tooltip label={menuLabel}>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" className="h-full w-7 rounded-none text-ink-body" aria-label={menuLabel}>
+                  <Icon name="caret-down" size={12} tone="inherit" />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {actions.map((action) => (
+                <DropdownMenuItem key={action.label} disabled={action.disabled} onSelect={action.onSelect}>
+                  <Icon name={action.icon} size={14} tone="inherit" />
+                  {action.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
+    </div>
+  )
+}

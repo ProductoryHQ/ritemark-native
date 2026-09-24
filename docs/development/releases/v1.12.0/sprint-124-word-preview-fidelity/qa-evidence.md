@@ -51,6 +51,32 @@ documented limit). 03's long table is not split at Word's markers (documented).
 | PDF (29 pages) | same toolbar; quick next ×3 → 3 → 6; zoom 110 %; fit width 175 %; fit page 98 %; a fresh open starts at 1 / 29 |
 | Markdown file | opens in the editor as before |
 
+The toolbar, search and page-arrow rows above describe the first toolbar, which
+the redesign below replaced.
+
+## The redesigned toolbar (R4 revised), driven 2026-09-24
+
+Real clicks and keys through agent-browser; readings from the webview DOM.
+
+| Check | Result |
+|---|---|
+| Word toolbar at 1088 px | seven controls on one line: *Page 1 of 28*, −, **100 % ▾**, +, magnifier, **Open in Word** \| ▾; every control centred at 19.5 px in the 40 px bar |
+| Narrow pane (root at 480 px) | compact: *1 / 28*, the zoom label, icon-only magnifier and Open in Word; `scrollWidth` = width, still one 40 px line |
+| Zoom menu | Fit width, Fit page, then 50–200 %; a check on the current one; ↓ ↓ Enter from the keyboard picks Fit page; + from there goes to 100 % |
+| Split button | the arrow opens a menu with **Save as Markdown**; choosing it opens the save dialog proposing `09-long-document.md` next to the file; cancel writes nothing |
+| Find bar in 09 | Cmd+F opens it with the field focused; "harbour" → 1 of 134, 134 highlights and one current; Enter → 2 of 134; Shift+Enter ×2 → 134 of 134; Escape closes it, clears the highlights and returns focus to the document |
+| Magnifier | opens the find bar (pressed), a second click closes it |
+| PDF (29 pages) at 1088 px and 480 px | *Page 1 of 29*, zoom controls and **Save as Markdown**; compact: *1 / 29* and the Save icon |
+| Markdown editor, Cmd+F | the same find bar (now the shared `FindBarShell`): focused, a count, Enter moves, Escape closes |
+| Dark theme | see the two fixes below |
+
+Found while driving it, and fixed:
+
+| Found | Fix |
+|---|---|
+| In the dark theme every drop-down and right-click menu was a white panel with near-white text: `dropdown-menu.tsx` and `context-menu.tsx` hard-coded `bg-white` (on `main` too — the AI sidebar's menus and the table of contents' menu had it) | `bg-surface`, which follows the theme |
+| In the dark theme the find bar's arrows and close button were nearly invisible: the shadcn ghost buttons had no text colour of their own | `text-ink-strong`, the colour the old hand-rolled buttons used |
+
 ## Cost
 
 | Document | Pages | Open → first page drawn | JS heap |
@@ -96,6 +122,8 @@ no longer loads the 8.9 MB editor bundle.
   checklist line with three fixtures.
 - **A Mac without Word.** The Pages / default-app fallback for Open externally was
   not exercised; Word is installed here.
+- **Open in Word from the redesigned split button** was not clicked again (Word
+  was to stay closed); its handler is the one driven above and did not change.
 - **Word's PDF of Jarmo's template.** The scripted export of a client document was
   stopped, so its page count against Word is not measured.
 - **ZIP64 packages** (over 4 GB, or over 65 535 parts): the reader handles the

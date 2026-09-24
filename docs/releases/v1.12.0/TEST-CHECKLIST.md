@@ -82,19 +82,22 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/research/corpus/` (`word/` holds the Word-saved forms).
 
 - [ ] `word/05-headers-footers.docx`: 4 pages, footers read Page 2 of 4 … Page 4 of 4, no blank pages
-- [ ] `word/09-long-document.docx`: 28 pages; next / previous page, zoom, **Fit width** and **Fit page** behave; quick clicks on next page are not lost
-- [ ] Cmd+F in a Word document: count, highlights, Enter / Shift+Enter, Escape
+- [ ] `word/09-long-document.docx`: 28 pages; *Page N of 28* follows scrolling; − / + zoom, and the zoom menu's **Fit width**, **Fit page** and sizes behave
+- [ ] Cmd+F or the magnifier in a Word document opens the same find bar as in Markdown: count, highlights, Enter / Shift+Enter, Escape closes it
 - [ ] `word/10-unsupported-content.docx` shows the charts-and-equations notice
 - [ ] `fixtures/f3-password-protected.docx` and `fixtures/f4-decompression-bomb.docx` show their reasons with **Try again** and **Open in Word**
 - [ ] A real Word document with a cover image: the cover shows
-- [ ] **Open in Word** opens the file in Word
-- [ ] A PDF: the same toolbar, pages, zoom and fit
-- [ ] A Markdown file still opens in the editor
+- [ ] **Open in Word** opens the file in Word; the arrow beside it offers **Save as Markdown**
+- [ ] A narrow editor (under about 560 px): the toolbar stays on one line, and the labels become icons that keep their tooltips
+- [ ] A PDF: the same page counter and zoom; **Save as Markdown** on the right
+- [ ] Dark theme: the zoom menu, the Open in Word menu and the find bar are dark and readable
+- [ ] A Markdown file still opens in the editor, and its Cmd+F find bar works as before
 
 ### Regression sweep
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
 - [ ] Typing at speed, task lists, undo/redo, and saving without conflict warnings
+- [ ] Dark theme: the AI sidebar's menus and the table of contents' right-click menu have a dark background (they were white with pale text)
 
 **Gate 1 verdict:** _pending_
 

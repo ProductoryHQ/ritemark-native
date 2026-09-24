@@ -5,7 +5,7 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { sendToExtension } from '../../bridge'
 import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
 import { stripExt } from '../../utils/imageNaming'
-import { PageControls, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
+import { PageIndicator, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
 
 interface PDFViewerProps {
@@ -249,18 +249,6 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     return () => observer.disconnect()
   }, [fit, pageWidth, pageHeight, pdfData])
 
-  // Step from the page last asked for: quick clicks arrive before the scroll has moved.
-  const requestedPage = useRef(0)
-  requestedPage.current = currentPage - 1
-  const stepPage = useCallback((direction: 1 | -1) => {
-    const container = containerRef.current
-    if (!container) return
-    const page = Math.max(0, Math.min(requestedPage.current + direction, numPages - 1))
-    requestedPage.current = page
-    setCurrentPage(page + 1)
-    container.scrollTop = page * ((pageHeight * scale) + 16)
-  }, [numPages, pageHeight, scale])
-
   // Track current page from scroll position
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return
@@ -291,7 +279,7 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
   return (
     <div className="bg-surface" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       <ViewerToolbar>
-        <PageControls current={currentPage - 1} total={numPages} onStep={stepPage} />
+        <PageIndicator current={currentPage - 1} total={numPages} />
         <ZoomControls
           zoom={scale}
           fit={fit}
@@ -300,6 +288,10 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
             setScale((s) => stepZoom(s, d))
           }}
           onFit={setFit}
+          onSet={(s) => {
+            setFit(null)
+            setScale(s)
+          }}
         />
         <ToolbarSpacer />
         {canSaveAsMarkdown && (

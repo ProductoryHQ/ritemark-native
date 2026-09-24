@@ -5,6 +5,8 @@
 
 /** The zoom ladder − and + walk, as in a browser. */
 export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3] as const;
+/** The sizes the zoom menu offers. */
+export const ZOOM_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 export const MIN_ZOOM = ZOOM_STEPS[0];
 export const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1];
 

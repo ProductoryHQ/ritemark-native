@@ -23,12 +23,12 @@ import { installOfficeFontAliases } from './docx/officeFonts'
 import { prepareDocx } from './docx/prepareDocx'
 import { fillPageNumbers, renderedPages, textChunks } from './docx/renderedDocx'
 import { findDocumentMatches } from './documentSearch'
+import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import {
-  DocumentSearchField,
-  PageControls,
+  PageIndicator,
+  SplitButton,
   ToolbarIconButton,
   ToolbarSpacer,
-  ToolbarTextButton,
   ViewerToolbar,
   ZoomControls,
 } from './ViewerToolbar'
@@ -69,6 +69,7 @@ const RENDER_OPTIONS = {
 const SEARCH_HIGHLIGHT = 'ritemark-doc-search'
 const CURRENT_HIGHLIGHT = 'ritemark-doc-search-current'
 const SLOW_RENDER_MS = 15000
+const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
 
 function decodeBase64ToBytes(base64: string): Uint8Array {
   const binaryString = atob(base64)
@@ -124,7 +125,8 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const sizerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const styleRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+  const searchRef = useRef<FindBarShellHandle>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const pageToRestore = useRef<number | null>(null)
   const zoomChosen = useRef(false)
   const revealMatch = useRef(false)
@@ -243,15 +245,6 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     if (!page) return
     scroller.scrollTop += page.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12
   }, [])
-
-  // Step from the page last asked for, not the last one scrolling reported: quick
-  // clicks arrive before the scroll has moved.
-  const stepPage = useCallback((direction: 1 | -1) => {
-    const next = Math.max(0, Math.min(currentPageRef.current + direction, pageCount - 1))
-    currentPageRef.current = next
-    setCurrentPage(next)
-    goToPage(next)
-  }, [pageCount, goToPage])
 
   // Apply the zoom: scale the stage, and give the sizer the scaled size so the scroll range matches.
   const applyZoom = useCallback(() => {
@@ -389,18 +382,27 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     setCurrentMatch((c) => stepMatch(c, matches.length, direction))
   }, [matches.length])
 
-  // Cmd/Ctrl+F puts you in the search field.
+  // Search opens as the floating find bar, as in the Markdown editor: the
+  // magnifier or Cmd/Ctrl+F; Escape or × closes it and clears the highlights.
+  const openSearch = useCallback(() => {
+    setSearchOpen(true)
+    searchRef.current?.focus()
+  }, [])
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setQuery('')
+    scrollerRef.current?.focus()
+  }, [])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
-        searchRef.current?.focus()
-        searchRef.current?.select()
+        openSearch()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [openSearch])
 
   const handleRefresh = useCallback(() => {
     pageToRestore.current = currentPageRef.current
@@ -489,7 +491,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       <ViewerToolbar>
         {ready && (
           <>
-            <PageControls current={currentPage} total={pageCount} onStep={stepPage} />
+            <PageIndicator current={currentPage} total={pageCount} />
             <ZoomControls
               zoom={zoom}
               fit={fit}
@@ -498,32 +500,33 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
                 setZoom((z) => stepZoom(z, d))
               }}
               onFit={setFit}
+              onSet={(z) => {
+                setFit(null)
+                setZoom(z)
+              }}
             />
           </>
         )}
         <ToolbarSpacer />
         {ready && (
-          <DocumentSearchField
-            ref={searchRef}
-            query={query}
-            countLabel={matchCountLabel(currentMatch, matches.length, deferredQuery)}
-            hasMatches={matches.length > 0}
-            onQueryChange={setQuery}
-            onStep={stepSearch}
-            onLeave={() => scrollerRef.current?.focus()}
+          <ToolbarIconButton
+            icon="magnifying-glass"
+            label="Find in document"
+            tooltip={`Find in document (${isMac ? 'Cmd' : 'Ctrl'}+F)`}
+            pressed={searchOpen}
+            onClick={searchOpen ? closeSearch : openSearch}
           />
         )}
-        {canSaveAsMarkdown && ready && (
-          <ToolbarTextButton
-            icon="file-text"
-            label={isSavingMd ? 'Converting…' : 'Save as Markdown'}
-            tooltip={isSavingMd ? 'Converting the document to Markdown' : 'Save the document as a Markdown file, with its images in ./images/'}
-            disabled={isSavingMd}
-            onClick={handleSaveAsMarkdown}
-          />
-        )}
-        <ToolbarTextButton icon="arrow-square-out" label={openLabel} tooltip="See the document exactly as it is, in a word processor" onClick={handleOpenExternally} />
-        <ToolbarIconButton icon="arrow-clockwise" label="Refresh" tooltip="Read the file from disk again" onClick={handleRefresh} />
+        <SplitButton
+          icon="arrow-square-out"
+          label={openLabel}
+          tooltip="See the document exactly as it is, and edit it"
+          onClick={handleOpenExternally}
+          menuLabel="More ways to use this document"
+          actions={canSaveAsMarkdown && ready
+            ? [{ icon: 'file-text', label: isSavingMd ? 'Converting…' : 'Save as Markdown', onSelect: handleSaveAsMarkdown, disabled: isSavingMd }]
+            : []}
+        />
       </ViewerToolbar>
 
       {deleted && (
@@ -574,16 +577,29 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       {/* docx-preview writes its generated styles here */}
       <div ref={styleRef} style={{ display: 'none' }} />
 
-      {/* The drawn document; also the scroller */}
-      <div
-        ref={scrollerRef}
-        tabIndex={-1}
-        onScroll={onScroll}
-        className="docx-scroller min-h-0 flex-1 overflow-auto outline-none"
-        style={{ display: ready ? 'block' : 'none' }}
-      >
-        <div ref={sizerRef} className="docx-sizer">
-          <div ref={stageRef} className="docx-stage" />
+      {/* The drawn document; also the scroller. The find bar floats over its top. */}
+      <div className="relative flex min-h-0 flex-1 flex-col" style={{ display: ready ? 'flex' : 'none' }}>
+        {ready && searchOpen && (
+          <FindBarShell
+            ref={searchRef}
+            query={query}
+            onQueryChange={setQuery}
+            countLabel={matchCountLabel(currentMatch, matches.length, deferredQuery)}
+            hasMatches={matches.length > 0}
+            onNext={() => stepSearch(1)}
+            onPrevious={() => stepSearch(-1)}
+            onClose={closeSearch}
+          />
+        )}
+        <div
+          ref={scrollerRef}
+          tabIndex={-1}
+          onScroll={onScroll}
+          className="docx-scroller min-h-0 flex-1 overflow-auto outline-none"
+        >
+          <div ref={sizerRef} className="docx-sizer">
+            <div ref={stageRef} className="docx-stage" />
+          </div>
         </div>
       </div>
 
