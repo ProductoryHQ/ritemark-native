@@ -131,8 +131,7 @@ separate follow-up issue.
 
 - Editing DOCX; legacy `.doc` (the existing message stays).
 - Computing page breaks ourselves (re-implementing Word's layout).
-- LibreOffice conversion. It is not installed here, and Word is the ground truth.
-  The research item from #284 moves to a follow-up issue.
+- LibreOffice conversion, installed or bundled (Jarmo, 2026-09-24: overkill for now).
 - Cloud conversion; bundling or requiring any office suite.
 - Lazy-loading Mermaid and the rest of #107.
 - Windows golden screenshots. There is no Windows machine here; the Windows gate
@@ -157,6 +156,10 @@ separate follow-up issue.
 |---|---|---|
 | 2026-09-23 | Spike 0.4.1, not 0.4.0 | 0.4.1 adds only a page-break fix on top of 0.4.0; both are Apache-2.0 |
 | 2026-09-23 | Generate the corpus with the existing `docx` package; Word supplies the ground truth | No new dependency; Word is installed here, LibreOffice is not |
+| 2026-09-24 | **Renderer checkpoint passed:** adopt docx-preview 0.4.1 and honour Word's saved page markers only in documents that carry them, with the pre- and post-render fixes from `research/renderer-spike.md` | Evidence in the spike; Jarmo: "0.4.1 ok" |
+| 2026-09-24 | Office fonts that only Word can see (Calibri, Calibri Light, Aptos, Aptos Display, Cambria) are aliased to system fonts at 88 % when they are not installed; Carlito / Caladea are not shipped | Jarmo: "fondid 88% ok" |
+| 2026-09-24 | No LibreOffice path, not even an installed one, for now. Claude Desktop converts Office files with LibreOffice inside its own 9 GB Linux VM; ChatGPT uses docx-preview by default and a gated .NET/Open XML SDK engine. Neither fits Ritemark today | Jarmo: "libre office on overkill" |
+| 2026-09-24 | Sprint 125 (PowerPoint) follows right after this sprint, not merged into it; its renderer spike runs now, in parallel; this sprint's bundle, toolbar and failure handling are built Office-generic | Jarmo: "jah, järjest" |
 | 2026-09-23 | The PDF viewer adopts the shared toolbar (page, zoom, fit, Save as Markdown); PDF search and LibreOffice research become follow-up issues | Jarmo: "PDF saab sama tööriistariba" |
 
 ## Planning Approval

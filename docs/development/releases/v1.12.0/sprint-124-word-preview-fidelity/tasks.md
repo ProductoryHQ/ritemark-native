@@ -16,7 +16,7 @@ on this branch behind it.
 - [x] Failure fixtures: renamed non-ZIP, truncated, password-protected, oversized archive. *(f1–f4 committed; f5 (~80 MB) generated with `--large`, not committed)*
 - [x] Capture tool: renders each fixture with a webview bundle in headless Chromium and saves one PNG per rendered page (`capture-preview.mjs`); `compare.py` records page counts and a per-page difference and builds side-by-side sheets.
 - [x] Baseline 0.3.7 as shipped; then 0.4.1; then `ignoreLastRenderedPageBreak: false` on each; also check host-CSS leakage (R7). Written up in `research/renderer-spike.md` — nine defects found, each with a fix.
-- [ ] **Checkpoint:** show Jarmo the sheets and the recommendation; change the dependency only after that.
+- [x] **Checkpoint:** show Jarmo the sheets and the recommendation; change the dependency only after that. *(2026-09-24: 0.4.1, conditional markers and the 88 % font alias approved)*
 
 ## Phase 2: Asset boundary (R3)
 
@@ -52,5 +52,5 @@ on this branch behind it.
 - [ ] `npm test` and `./scripts/validate-qa.sh`, results recorded.
 - [ ] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with the Windows three-fixture line).
 - [ ] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
-- [ ] Follow-up issues: LibreOffice research, PDF search.
+- [ ] Follow-up issue: PDF search. *(LibreOffice dropped, 2026-09-24)*
 - [ ] Release-plan tracker row, PR, and close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).

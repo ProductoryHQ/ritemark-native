@@ -98,6 +98,12 @@ in the scratchpad only; nothing from it is in the repository. It has:
 Word's own PDF of it is still to come: the scripted export was stopped, since it
 is a client document. So its page count against Word is not yet measured.
 
+## Checkpoint (2026-09-24)
+
+Jarmo approved recommendations 1–5 as written, with the 88 % alias and no Carlito /
+Caladea. After Word was restarted, its copy of fixture 11 was made: **3 pages**, the
+same as 0.4.1 renders.
+
 ## Recommendation
 
 1. **Adopt docx-preview 0.4.1.** It is equal on 01–10 and better on 11. We call

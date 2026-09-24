@@ -19,19 +19,24 @@ on run argv
   set outDocx to item 2 of argv
   set outPdf to item 3 of argv
   set pw to item 4 of argv
+  set AppleScript's text item delimiters to "/"
+  set docName to last text item of inPath
   tell application "Microsoft Word"
     open (POSIX file inPath)
-    -- Word opens asynchronously, slowest on its first launch.
+    -- Word opens asynchronously, slowest on its first launch. Address the
+    -- document by name: after a crash Word may put a recovery window in front.
     repeat 60 times
-      if (count of documents) > 0 then exit repeat
+      if exists document docName then exit repeat
       delay 0.5
     end repeat
-    set d to active document
+    set d to document docName
     if pw is "" then
       save as d file name outDocx file format format document default
     else
       save as d file name outDocx file format format document default password pw
     end if
+    -- After "save as" the document carries the new file's name.
+    set d to document (last text item of outDocx)
     if outPdf is not "-" then
       save as d file name outPdf file format format PDF
     end if
@@ -41,7 +46,13 @@ end run
 APPLESCRIPT
 }
 
-for f in fixtures/[0-9][0-9]-*.docx; do
+if [ $# -gt 0 ]; then
+  # Only the named fixtures, e.g. `word-ground-truth.sh 04-images 11-break-before-even-odd`.
+  set -- $(printf 'fixtures/%s.docx ' "$@")
+else
+  set -- fixtures/[0-9][0-9]-*.docx
+fi
+for f in "$@"; do
   name=$(basename "$f" .docx)
   echo "== $name"
   word_save "$HERE/$f" "$HERE/word/$name.docx" "$HERE/word/$name.pdf"
