@@ -104,6 +104,24 @@ Jarmo approved recommendations 1–5 as written, with the 88 % alias and no Carl
 Caladea. After Word was restarted, its copy of fixture 11 was made: **3 pages**, the
 same as 0.4.1 renders.
 
+## After implementation (2026-09-24)
+
+Built as recommended, then driven in a dev build ([qa-evidence.md](../qa-evidence.md)).
+The real app showed four things the headless harness had not:
+
+- **VS Code's own webview defaults** add `img { max-height: 100% }` to Tailwind's
+  `max-width`, so defect 4 needed both reset. The harness now carries the VS Code
+  rule.
+- **CSS `zoom` gives contradictory geometry** in this Chromium (142):
+  getBoundingClientRect stays unscaled while scrolling scales. Zoom is a transform
+  on a stage inside a sizer instead; each page is its own stacking context, so
+  images behind the text stay above the page's white background.
+- **docx-preview hyphenates every document**; Word only when the document sets
+  `w:autoHyphenation`. The preview now follows the document.
+- The Word-saved forms measure the same as variant D plus the fixes: 01 5/5, 05 4/4
+  with correct page numbers, 07 3/3, 09 28/29, 11 3/3; the generated 07 keeps its
+  3 pages.
+
 ## Recommendation
 
 1. **Adopt docx-preview 0.4.1.** It is equal on 01–10 and better on 11. We call

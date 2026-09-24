@@ -14,6 +14,7 @@ import {
   markPageFields,
   parseRelationships,
   scanUnsupported,
+  wantsAutoHyphenation,
 } from './docxXml';
 
 const MARKER = '<w:lastRenderedPageBreak/>';
@@ -171,9 +172,16 @@ assert.equal(hasPageMarkers(p(r(t('x')))), false);
   const chart = '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId5"/></a:graphicData>';
   const u = scanUnsupported([p(r(t('x'))), chart, '<m:oMathPara><m:oMath/></m:oMathPara>']);
   assert.deepEqual(u, { charts: true, smartArt: false, embeddedObjects: false, equations: true });
-  assert.equal(describeUnsupported(u), "This document has charts and equations that the preview can't show exactly.");
-  assert.equal(describeUnsupported({ charts: false, smartArt: true, embeddedObjects: true, equations: true }), "This document has SmartArt diagrams, embedded objects and equations that the preview can't show exactly.");
+  assert.equal(describeUnsupported(u), "This document has charts and equations that the preview can’t show exactly.");
+  assert.equal(describeUnsupported({ charts: false, smartArt: true, embeddedObjects: true, equations: true }), "This document has SmartArt diagrams, embedded objects and equations that the preview can’t show exactly.");
   assert.equal(describeUnsupported(scanUnsupported([p(r(t('plain')))])), null);
 }
+
+// automatic hyphenation follows the document's settings
+assert.equal(wantsAutoHyphenation(null), false);
+assert.equal(wantsAutoHyphenation('<w:settings><w:zoom w:percent="100"/></w:settings>'), false);
+assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation/></w:settings>'), true);
+assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation w:val="true"/></w:settings>'), true);
+assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation w:val="0"/></w:settings>'), false);
 
 console.log('docxXml.test.ts: all passed');

@@ -1,0 +1,150 @@
+[
+  {
+    "name": "01-headings-styles",
+    "word_pages": 5,
+    "preview_pages": 5,
+    "preview_first_page_height_px": 1249,
+    "mean_diff_percent": 9.58,
+    "page_diffs": [
+      9.72,
+      10.96,
+      11.3,
+      10.31,
+      5.6
+    ]
+  },
+  {
+    "name": "02-lists",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.64,
+    "page_diffs": [
+      2.64
+    ]
+  },
+  {
+    "name": "03-tables",
+    "word_pages": 3,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 2615,
+    "mean_diff_percent": 8.6,
+    "page_diffs": [
+      8.6
+    ]
+  },
+  {
+    "name": "04-images",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 8.91,
+    "page_diffs": [
+      8.91
+    ]
+  },
+  {
+    "name": "05-headers-footers",
+    "word_pages": 4,
+    "preview_pages": 4,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.19,
+    "page_diffs": [
+      1.0,
+      2.61,
+      2.57,
+      2.57
+    ]
+  },
+  {
+    "name": "06-footnotes",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 4.05,
+    "page_diffs": [
+      4.05
+    ]
+  },
+  {
+    "name": "07-sections-landscape",
+    "word_pages": 3,
+    "preview_pages": 3,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 2.29,
+    "page_diffs": [
+      2.18,
+      2.57,
+      2.11
+    ]
+  },
+  {
+    "name": "08-fonts",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 6.9,
+    "page_diffs": [
+      6.9
+    ]
+  },
+  {
+    "name": "09-long-document",
+    "word_pages": 29,
+    "preview_pages": 28,
+    "preview_first_page_height_px": 1269,
+    "mean_diff_percent": 10.25,
+    "page_diffs": [
+      10.46,
+      10.37,
+      10.56,
+      10.46,
+      10.1,
+      9.82,
+      10.56,
+      10.4,
+      9.82,
+      10.48,
+      10.54,
+      10.16,
+      10.19,
+      10.22,
+      10.29,
+      10.14,
+      10.0,
+      10.52,
+      9.76,
+      10.15,
+      10.36,
+      10.42,
+      10.15,
+      9.9,
+      10.25,
+      10.23,
+      10.46,
+      10.36
+    ]
+  },
+  {
+    "name": "10-unsupported-content",
+    "word_pages": 1,
+    "preview_pages": 1,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 3.63,
+    "page_diffs": [
+      3.63
+    ]
+  },
+  {
+    "name": "11-break-before-even-odd",
+    "word_pages": 3,
+    "preview_pages": 3,
+    "preview_first_page_height_px": 1122,
+    "mean_diff_percent": 1.18,
+    "page_diffs": [
+      1.11,
+      1.22,
+      1.21
+    ]
+  }
+]

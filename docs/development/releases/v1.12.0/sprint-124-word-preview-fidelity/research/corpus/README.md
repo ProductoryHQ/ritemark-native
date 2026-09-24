@@ -27,7 +27,7 @@ plus Word's PDF export of each.
 | `f2-truncated` | The first half of `01` |
 | `f3-password-protected` | `01` saved by Word with the password `ritemark` |
 | `f4-decompression-bomb` | A 0.5 MB archive whose `document.xml` inflates to 512 MB |
-| `f5-oversized` | ~80 MB of images; `--large` only, not committed |
+| `f5-oversized` | 80 MB of incompressible images; `node generate-corpus.mjs --large` writes only this file; not committed |
 
 **Not covered:** embedded fonts (no redistributable TTF in the repo; Word-saved
 documents with embedded fonts were checked against a private document, see the
@@ -37,9 +37,9 @@ spike write-up), endnotes, text boxes, SmartArt.
 
 | Step | Command |
 |---|---|
-| Generate | `node generate-corpus.mjs` (after `npm ci` in `extensions/ritemark`) |
+| Generate | `node generate-corpus.mjs` (after `npm ci` in `extensions/ritemark`). It rewrites the committed fixtures with new timestamps; restore them with git if nothing else changed |
 | Word ground truth | `bash word-ground-truth.sh` — macOS with Word; the first run asks for permission to control Word. Needs `pdftoppm` (poppler) |
-| Capture a preview | `node capture-preview.mjs [--css extra.css] <webview bundle> <out-dir> <file.docx>...` — headless Chromium (Playwright's cached shell, or Google Chrome) |
+| Capture a preview | `node capture-preview.mjs [--css extra.css] <bundle> <out-dir> <file.docx>...` — `media/office-preview.js` in headless Chromium (Playwright's cached shell, or Google Chrome), with VS Code's webview image defaults applied |
 | Compare | `python3 compare.py word/png <capture-dir> <out-dir> --sheets` — needs Pillow |
 
 `word/png/` is regenerated from the PDFs and is not committed.

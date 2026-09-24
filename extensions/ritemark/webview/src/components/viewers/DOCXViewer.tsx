@@ -105,6 +105,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const [zoom, setZoom] = useState(1)
   const [fit, setFit] = useState<FitMode>(null)
   const [unsupportedNote, setUnsupportedNote] = useState<string | null>(null)
+  const [hyphenate, setHyphenate] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [openLabel, setOpenLabel] = useState('Open in Word')
   const [query, setQuery] = useState('')
@@ -118,7 +119,10 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     warnings: string[]
   } | null>(null)
 
+  // scroller (overflow) > sizer (the scaled size, for scrolling) > stage (drawn at 100 %, then scaled)
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const sizerRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const styleRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const pageToRestore = useRef<number | null>(null)
@@ -170,9 +174,9 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
 
   // Render the document whenever new bytes arrive.
   useEffect(() => {
-    const scroller = scrollerRef.current
+    const stage = stageRef.current
     const styles = styleRef.current
-    if (!content || loadError || !scroller || !styles) return
+    if (!content || loadError || !stage || !styles) return
     let cancelled = false
     setPhase('loading')
     setSlow(false)
@@ -185,15 +189,16 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         installOfficeFontAliases()
         const prepared = await prepareDocx(decodeBase64ToBytes(content))
         if (cancelled) return
-        scroller.innerHTML = ''
+        stage.innerHTML = ''
         styles.innerHTML = ''
-        await renderAsync(prepared.data, scroller, styles, {
+        await renderAsync(prepared.data, stage, styles, {
           ...RENDER_OPTIONS,
           ignoreLastRenderedPageBreak: !prepared.honourPageMarkers,
         })
         if (cancelled) return
-        setPageCount(fillPageNumbers(scroller))
+        setPageCount(fillPageNumbers(stage))
         setUnsupportedNote(describeUnsupported(prepared.unsupported))
+        setHyphenate(prepared.autoHyphenation)
         setRenderError(null)
         setPhase('ready')
         setRenderVersion((v) => v + 1)
@@ -213,37 +218,67 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     }
   }, [content, loadError])
 
-  const wrapper = useCallback(() => scrollerRef.current?.querySelector<HTMLElement>('.docx-wrapper') ?? null, [])
-
-  /** The pages' size at 100 %: the widest page, and the tallest. */
-  const naturalPageSize = useCallback((): { width: number; height: number } => {
-    const scroller = scrollerRef.current
-    if (!scroller) return { width: 0, height: 0 }
-    const pages = renderedPages(scroller)
-    let width = 0
-    let height = 0
-    for (const page of pages) {
-      const rect = page.getBoundingClientRect()
-      width = Math.max(width, rect.width / zoom)
-      height = Math.max(height, rect.height / zoom)
-    }
-    return { width, height }
-  }, [zoom])
+  /**
+   * Sizes at 100 %, from layout (offset sizes ignore the scale transform):
+   * the drawn document with its margins, and one page with the margins around it.
+   * Zoom is a transform, not CSS `zoom`: in this Chromium, `zoom` leaves
+   * getBoundingClientRect unscaled while scrolling is scaled, so positions
+   * could not be trusted.
+   */
+  const naturalSizes = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage) return { stageWidth: 0, stageHeight: 0, pageHeight: 0 }
+    const pages = renderedPages(stage)
+    const margin = stage.offsetWidth - Math.max(0, ...pages.map((page) => page.offsetWidth))
+    const pageHeight = Math.max(0, ...pages.map((page) => page.offsetHeight)) + margin
+    return { stageWidth: stage.offsetWidth, stageHeight: stage.offsetHeight, pageHeight }
+  }, [])
 
   const goToPage = useCallback((index: number) => {
     const scroller = scrollerRef.current
-    if (!scroller) return
-    const pages = renderedPages(scroller)
+    const stage = stageRef.current
+    if (!scroller || !stage) return
+    const pages = renderedPages(stage)
     const page = pages[Math.max(0, Math.min(index, pages.length - 1))]
     if (!page) return
     scroller.scrollTop += page.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12
   }, [])
 
-  // Apply the zoom to the drawn document.
+  // Step from the page last asked for, not the last one scrolling reported: quick
+  // clicks arrive before the scroll has moved.
+  const stepPage = useCallback((direction: 1 | -1) => {
+    const next = Math.max(0, Math.min(currentPageRef.current + direction, pageCount - 1))
+    currentPageRef.current = next
+    setCurrentPage(next)
+    goToPage(next)
+  }, [pageCount, goToPage])
+
+  // Apply the zoom: scale the stage, and give the sizer the scaled size so the scroll range matches.
+  const applyZoom = useCallback(() => {
+    const stage = stageRef.current
+    const sizer = sizerRef.current
+    if (!stage || !sizer) return
+    stage.style.transform = `scale(${zoom})`
+    sizer.style.width = `${stage.offsetWidth * zoom}px`
+    sizer.style.height = `${stage.offsetHeight * zoom}px`
+  }, [zoom])
+
+  const lastAppliedZoom = useRef(zoom)
   useEffect(() => {
-    const el = wrapper()
-    if (el) el.style.zoom = String(zoom)
-  }, [zoom, renderVersion, wrapper])
+    if (phase !== 'ready') return
+    applyZoom()
+    // Keep the reader on the page they were reading when the scale changes.
+    if (lastAppliedZoom.current !== zoom) {
+      lastAppliedZoom.current = zoom
+      if (!revealMatch.current) goToPage(currentPageRef.current)
+    }
+    const stage = stageRef.current
+    if (!stage) return
+    // Images and fonts settle after the first paint and change the drawn size.
+    const observer = new ResizeObserver(applyZoom)
+    observer.observe(stage)
+    return () => observer.disconnect()
+  }, [zoom, phase, renderVersion, applyZoom, goToPage])
 
   // After a render: the first time, fit the width (never above 100 %); after a refresh, return to the page.
   useEffect(() => {
@@ -252,34 +287,32 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     if (!scroller) return
     if (!zoomChosen.current) {
       zoomChosen.current = true
-      const { width } = naturalPageSize()
-      setZoom(Math.min(1, fitWidthZoom(width, scroller.clientWidth)))
+      const { stageWidth } = naturalSizes()
+      setZoom(Math.min(1, fitWidthZoom(stageWidth, scroller.clientWidth, 0)))
     }
     if (pageToRestore.current !== null) {
       const page = pageToRestore.current
       pageToRestore.current = null
       requestAnimationFrame(() => goToPage(page))
     }
-    // naturalPageSize changes with zoom; this runs once per render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, renderVersion])
+  }, [phase, renderVersion, naturalSizes, goToPage])
 
   // Fit width / fit page follow the window until the user zooms by hand.
   useEffect(() => {
     const scroller = scrollerRef.current
     if (!fit || phase !== 'ready' || !scroller) return
     const apply = () => {
-      const { width, height } = naturalPageSize()
+      const { stageWidth, pageHeight } = naturalSizes()
       const next = fit === 'width'
-        ? fitWidthZoom(width, scroller.clientWidth)
-        : fitPageZoom(width, height, scroller.clientWidth, scroller.clientHeight)
+        ? fitWidthZoom(stageWidth, scroller.clientWidth, 0)
+        : fitPageZoom(stageWidth, pageHeight, scroller.clientWidth, scroller.clientHeight, 0)
       setZoom((z) => (Math.abs(z - next) > 0.001 ? next : z))
     }
     apply()
     const observer = new ResizeObserver(apply)
     observer.observe(scroller)
     return () => observer.disconnect()
-  }, [fit, phase, renderVersion, naturalPageSize])
+  }, [fit, phase, renderVersion, naturalSizes])
 
   // Track the page being read.
   const scrollFrame = useRef(0)
@@ -288,9 +321,10 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     scrollFrame.current = requestAnimationFrame(() => {
       scrollFrame.current = 0
       const scroller = scrollerRef.current
-      if (!scroller) return
+      const stage = stageRef.current
+      if (!scroller || !stage) return
       const top = scroller.getBoundingClientRect().top
-      const tops = renderedPages(scroller).map((page) => page.getBoundingClientRect().top - top)
+      const tops = renderedPages(stage).map((page) => page.getBoundingClientRect().top - top)
       setCurrentPage(pageAtScroll(tops, scroller.clientHeight))
     })
   }, [])
@@ -299,12 +333,13 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   // Search: find matches in the drawn text; highlight without touching the DOM.
   useEffect(() => {
     const scroller = scrollerRef.current
-    if (phase !== 'ready' || !scroller) {
+    const stage = stageRef.current
+    if (phase !== 'ready' || !scroller || !stage) {
       setMatches([])
       setCurrentMatch(-1)
       return
     }
-    const { nodes, chunks } = textChunks(scroller)
+    const { nodes, chunks } = textChunks(stage)
     const ranges = findDocumentMatches(chunks, deferredQuery).map((m) => {
       const range = document.createRange()
       range.setStart(nodes[m.start.chunk], m.start.offset)
@@ -450,11 +485,11 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const ready = phase === 'ready' && !failure
 
   return (
-    <div className="ritemark-docx relative flex h-full flex-col bg-surface">
-      <ViewerToolbar title={filename}>
+    <div className={`ritemark-docx relative flex h-full flex-col bg-surface${hyphenate ? ' docx-hyphenate' : ''}`}>
+      <ViewerToolbar>
         {ready && (
           <>
-            <PageControls current={currentPage} total={pageCount} onStep={(d) => goToPage(currentPage + d)} />
+            <PageControls current={currentPage} total={pageCount} onStep={stepPage} />
             <ZoomControls
               zoom={zoom}
               fit={fit}
@@ -544,9 +579,13 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         ref={scrollerRef}
         tabIndex={-1}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-auto outline-none"
+        className="docx-scroller min-h-0 flex-1 overflow-auto outline-none"
         style={{ display: ready ? 'block' : 'none' }}
-      />
+      >
+        <div ref={sizerRef} className="docx-sizer">
+          <div ref={stageRef} className="docx-stage" />
+        </div>
+      </div>
 
       {/* Save-as-Markdown toast */}
       {saveToast && (

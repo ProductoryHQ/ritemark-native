@@ -2,7 +2,7 @@
 // Sprint 124 R1: generate the Word preview corpus.
 //
 //   node generate-corpus.mjs            -> fixtures/*.docx (committed)
-//   node generate-corpus.mjs --large    -> also the oversized fixture (not committed)
+//   node generate-corpus.mjs --large    -> only fixtures/f5-oversized.docx (~80 MB, not committed)
 //
 // Uses the extension's own `docx` and `jszip` packages, so the corpus needs no
 // new dependency. Run `npm ci` in extensions/ritemark first. Output is
@@ -460,9 +460,11 @@ async function injectChart(buf) {
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
 
-for (const [name, doc, post] of fixtures) await write(name, doc, post)
+const largeOnly = process.argv.includes('--large')
+if (!largeOnly) for (const [name, doc, post] of fixtures) await write(name, doc, post)
 
 // ---------------------------------------------------------------- failure fixtures (R5)
+if (!largeOnly) {
 
 fs.writeFileSync(path.join(out, 'f1-not-a-zip.docx'), 'This is a plain text file with a .docx name.\n')
 console.log('f1-not-a-zip.docx')
@@ -484,15 +486,36 @@ console.log('f2-truncated.docx')
   console.log(`f4-decompression-bomb.docx  ${bomb.length} bytes`)
 }
 
-if (process.argv.includes('--large')) {
-  // Genuinely large: many distinct images, ~80 MB. Not committed (see .gitignore).
+}
+
+if (largeOnly) {
+  // Genuinely large: 40 photographs' worth of noise that no compressor can shrink. Not committed.
+  let seed = 0x2f6b1a3d
+  const noisePng = (width, height) => {
+    const rows = []
+    for (let y = 0; y < height; y++) {
+      const row = Buffer.alloc(1 + width * 3)
+      for (let x = 1; x < row.length; x++) {
+        seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5 // xorshift32, deterministic
+        row[x] = seed & 0xff
+      }
+      rows.push(row)
+    }
+    const ihdr = Buffer.alloc(13)
+    ihdr.writeUInt32BE(width, 0)
+    ihdr.writeUInt32BE(height, 4)
+    ihdr.set([8, 2, 0, 0, 0], 8)
+    return Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', ihdr),
+      chunk('IDAT', zlib.deflateSync(Buffer.concat(rows), { level: 1 })),
+      chunk('IEND', Buffer.alloc(0)),
+    ])
+  }
   const children = [H('A large document', d.HeadingLevel.HEADING_1)]
   for (let i = 0; i < 40; i++) {
-    const noise = Buffer.alloc(2_000_000)
-    for (let j = 0; j < noise.length; j++) noise[j] = (j * 2654435761 + i * 40503) >>> 24
-    children.push(new d.Paragraph({ children: [new d.ImageRun({ data: png(1000, 666, [i * 6, 90, 200 - i * 4], [240, 240, 240]), transformation: { width: 500, height: 333 } })] }))
+    children.push(new d.Paragraph({ children: [new d.ImageRun({ data: noisePng(1000, 666), transformation: { width: 500, height: 333 } })] }))
     children.push(P(`Attachment ${i + 1}`))
-    children.push(new d.Paragraph({ children: [new d.TextRun({ text: noise.toString('base64').slice(0, 2_000_000), size: 2 })] }))
   }
   await write('f5-oversized.docx', new d.Document({ styles: STYLES, sections: [{ children }] }))
 }

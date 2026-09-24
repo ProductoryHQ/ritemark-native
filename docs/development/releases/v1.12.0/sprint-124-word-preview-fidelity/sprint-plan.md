@@ -5,7 +5,7 @@ change has its own evidence checkpoint<br>
 Release tier: **shell** — the asset boundary adds a second webview bundle that
 `build-prod.sh` and the shell staging scripts must know (Phase 0 §6)
 
-**Status:** Implementation — plan approved 2026-09-23.<br>
+**Status:** In review — implemented and RunDev-validated 2026-09-24.<br>
 **Branch:** `sprint-124-word-preview-fidelity`<br>
 **Issue:** [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284)<br>
 **Worktree:** `.claude/worktrees/sprint-124-word-preview-fidelity`, branched from main `4070ffc6`<br>
@@ -139,16 +139,16 @@ separate follow-up issue.
 
 ## Definition of Done
 
-- [ ] The corpus, its generator and the Word ground truth are committed, with the comparison results.
-- [ ] The renderer decision is recorded with evidence and was shown to Jarmo before the dependency changed.
-- [ ] Ordinary Word-saved documents show stable page boundaries, fonts, images, tables, lists, headers and footers within the documented limits.
-- [ ] The toolbar gives page position, zoom, fit width / fit page, search, refresh, Open externally and Save as Markdown, with a tooltip on every button.
-- [ ] External edits re-render; deletion shows a notice.
-- [ ] Each failure fixture ends in a specific message with a way out; nothing hangs.
-- [ ] Content the preview cannot draw is announced; limits are documented.
-- [ ] The Word renderer is absent from `webview.js`; a Word tab loads `office-preview.js`; the release tooling ships and checks both.
-- [ ] Other webviews show no regression; open time and memory are recorded.
-- [ ] `npm test`, `./scripts/validate-qa.sh`, and RunDev validation of the corpus in a dev build pass.
+- [x] The corpus, its generator and the Word ground truth are committed, with the comparison results.
+- [x] The renderer decision is recorded with evidence and was shown to Jarmo before the dependency changed.
+- [x] Ordinary Word-saved documents show stable page boundaries, fonts, images, tables, lists, headers and footers within the documented limits.
+- [x] The toolbar gives page position, zoom, fit width / fit page, search, refresh, Open externally and Save as Markdown, with a tooltip on every button.
+- [x] External edits re-render; deletion shows a notice.
+- [x] Each failure fixture ends in a specific message with a way out; nothing hangs.
+- [x] Content the preview cannot draw is announced; limits are documented.
+- [x] The Word renderer is absent from `webview.js`; a Word tab loads `office-preview.js`; the release tooling ships and checks both.
+- [x] Other webviews show no regression; open time and memory are recorded.
+- [x] `npm test`, `./scripts/validate-qa.sh`, and RunDev validation of the corpus in a dev build pass.
 
 ## Product Decisions
 

@@ -11,6 +11,7 @@ import {
   markPageFields,
   parseRelationships,
   scanUnsupported,
+  wantsAutoHyphenation,
   type UnsupportedContent,
 } from './docxXml';
 
@@ -20,6 +21,8 @@ export interface PreparedDocx {
   /** Honour Word's saved page markers (`ignoreLastRenderedPageBreak: false`) — only when the document has them. */
   honourPageMarkers: boolean;
   unsupported: UnsupportedContent;
+  /** The document turns automatic hyphenation on (Word's default is off). */
+  autoHyphenation: boolean;
 }
 
 const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
@@ -97,6 +100,9 @@ export async function prepareDocx(bytes: Uint8Array): Promise<PreparedDocx> {
     write('word/fontTable.xml', tableXml, dropFontEmbeds(tableXml, empty));
   }
 
+  const settings = zip.file('word/settings.xml');
+  const autoHyphenation = wantsAutoHyphenation(settings ? await settings.async('string') : null);
+
   const data = changed ? await zip.generateAsync({ type: 'uint8array', compression: 'STORE' }) : bytes;
-  return { data, honourPageMarkers, unsupported: scanUnsupported(scanned) };
+  return { data, honourPageMarkers, unsupported: scanUnsupported(scanned), autoHyphenation };
 }

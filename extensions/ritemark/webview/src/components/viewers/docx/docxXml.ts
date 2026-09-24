@@ -161,6 +161,18 @@ export function markPageFields(xml: string): string {
   return out;
 }
 
+/**
+ * Word hyphenates automatically only when the document asks for it
+ * (`<w:autoHyphenation/>` in its settings); docx-preview hyphenates always.
+ */
+export function wantsAutoHyphenation(settingsXml: string | null): boolean {
+  if (!settingsXml) return false;
+  const m = /<w:autoHyphenation\b([^>]*)\/>/.exec(settingsXml);
+  if (!m) return false;
+  const val = /w:val="([^"]*)"/.exec(m[1])?.[1];
+  return val === undefined || val === '1' || val === 'true' || val === 'on';
+}
+
 /** Relationship id -> target, from a `.rels` part. */
 export function parseRelationships(relsXml: string): Map<string, string> {
   const map = new Map<string, string>();
@@ -216,5 +228,5 @@ export function describeUnsupported(u: UnsupportedContent): string | null {
   if (u.equations) parts.push('equations');
   if (!parts.length) return null;
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return `This document has ${list} that the preview can't show exactly.`;
+  return `This document has ${list} that the preview can’t show exactly.`;
 }

@@ -249,10 +249,15 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     return () => observer.disconnect()
   }, [fit, pageWidth, pageHeight, pdfData])
 
-  const goToPage = useCallback((index: number) => {
+  // Step from the page last asked for: quick clicks arrive before the scroll has moved.
+  const requestedPage = useRef(0)
+  requestedPage.current = currentPage - 1
+  const stepPage = useCallback((direction: 1 | -1) => {
     const container = containerRef.current
     if (!container) return
-    const page = Math.max(0, Math.min(index, numPages - 1))
+    const page = Math.max(0, Math.min(requestedPage.current + direction, numPages - 1))
+    requestedPage.current = page
+    setCurrentPage(page + 1)
     container.scrollTop = page * ((pageHeight * scale) + 16)
   }, [numPages, pageHeight, scale])
 
@@ -285,8 +290,8 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
 
   return (
     <div className="bg-surface" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      <ViewerToolbar title={filename}>
-        <PageControls current={currentPage - 1} total={numPages} onStep={(d) => goToPage(currentPage - 1 + d)} />
+      <ViewerToolbar>
+        <PageControls current={currentPage - 1} total={numPages} onStep={stepPage} />
         <ZoomControls
           zoom={scale}
           fit={fit}

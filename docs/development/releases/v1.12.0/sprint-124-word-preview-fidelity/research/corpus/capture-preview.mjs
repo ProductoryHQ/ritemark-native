@@ -44,6 +44,9 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-docx-capture-'))
 const harness = path.join(work, 'harness.html')
 fs.writeFileSync(harness, `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>html, body, #root { height: 100%; width: 100%; margin: 0; overflow: hidden; }</style>
+<!-- VS Code's own webview defaults, which the real preview runs under; one of them
+     (img max-height) hid images behind the text until the viewer reset it. -->
+<style>@layer vscode-default { img, video { max-width: 100%; max-height: 100%; } }</style>
 <style>${extraCss}</style>
 <script>window.acquireVsCodeApi = () => ({ postMessage() {}, getState() { return undefined }, setState() {} })</script>
 </head><body><div id="root"></div><script src="${new URL('file://' + bundle).href}"></script></body></html>`)

@@ -36,25 +36,28 @@ on this branch behind it.
 - [x] Open externally always available: Word → Pages → system default.
 - [x] `fileChanged` re-renders and keeps the page; `fileDeleted` shows a notice.
 - [x] The PDF viewer adopts the toolbar: page, zoom, fit, Save as Markdown.
-- [ ] Open a follow-up issue for PDF search.
+- [x] Open a follow-up issue for PDF search. ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344))
 
 ## Phase 4: Safe failure and honest limits (R5, R6)
 
 - [x] Host pre-check: size cap, ZIP entry count, total uncompressed size and ratio, not-a-ZIP, and password-protected (CFB container) detection; each gets its own message.
 - [x] Render failure: what happened, **Try again**, **Open externally**; no endless loading.
 - [x] Unsupported-content scan (charts, SmartArt, embedded objects, plus what the corpus shows) and a one-line notice.
-- [ ] User docs: what the Word preview shows and where it differs from Word.
+- [x] User docs: what the Word preview shows and where it differs from Word. *(`docs/user/features/previews.md`)*
 
 ## Phase 5: RunDev validation (R1–R7)
 
-- [ ] Run the corpus in a dev build: page counts, sheets, and difference scores for the chosen renderer versus the baseline, recorded in `qa-evidence.md`.
-- [ ] Every control, keyboard path and failure fixture driven live.
-- [ ] Open time and memory for small and 50-page documents; no regression in the Markdown, PDF, spreadsheet, transcription and AI views.
+*Eight defects found while driving it, all fixed — see `qa-evidence.md`.*
+
+
+- [x] Run the corpus in a dev build: page counts, sheets, and difference scores for the chosen renderer versus the baseline, recorded in `qa-evidence.md`.
+- [x] Every control, keyboard path and failure fixture driven live.
+- [x] Open time and memory for small and 50-page documents; no regression in the Markdown, PDF, spreadsheet, transcription and AI views. *(Markdown, PDF and the AI sidebar checked live; spreadsheets and transcription share no code with this change)*
 
 ## Phase 6: QA and closeout
 
-- [ ] `npm test` and `./scripts/validate-qa.sh`, results recorded.
-- [ ] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with the Windows three-fixture line).
-- [ ] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
-- [ ] Follow-up issue: PDF search. *(LibreOffice dropped, 2026-09-24)*
+- [x] `npm test` and `./scripts/validate-qa.sh`, results recorded. *(both exit 0; the staging test now requires `office-preview.js` too)*
+- [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with the Windows three-fixture line).
+- [x] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
+- [x] Follow-up issue: PDF search ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344)). *(LibreOffice dropped, 2026-09-24)*
 - [ ] Release-plan tracker row, PR, and close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).

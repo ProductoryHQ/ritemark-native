@@ -1,9 +1,9 @@
 /**
  * Sprint 124 (#284) R4 — the toolbar of the page-based previews (Word, PDF).
  *
- * One vocabulary for both: the file name, page N / M with previous and next,
- * zoom − / % / + with fit width and fit page, an optional search field, and the
- * file actions. Every button is a shadcn Button with a tooltip; labels stay on
+ * One vocabulary for both: page N / M with previous and next, zoom − / % / +
+ * with fit width and fit page, an optional search field, and the file actions.
+ * The file name is not repeated here: the tab and the breadcrumbs show it. Every button is a shadcn Button with a tooltip; labels stay on
  * one line, and the bar wraps on a narrow pane instead of squeezing them.
  */
 import { forwardRef, type KeyboardEvent, type ReactNode } from 'react';
@@ -12,12 +12,9 @@ import { Icon, type PhosphorIconName as IconName } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
 import { pageLabel, zoomLabel, type FitMode } from './viewerLayout';
 
-export function ViewerToolbar({ title, children }: { title: string; children: ReactNode }) {
+export function ViewerToolbar({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline bg-surface px-3 py-1" data-viewer-toolbar>
-      <span className="hidden min-w-0 max-w-[16rem] truncate font-ui text-[13px] text-ink-muted sm:block">
-        {title}
-      </span>
       {children}
     </div>
   );
@@ -157,8 +154,8 @@ export const DocumentSearchField = forwardRef<HTMLInputElement, DocumentSearchFi
   };
 
   return (
-    <div className="flex min-w-[12rem] max-w-[22rem] flex-1 items-center gap-0.5" data-document-search>
-      <div className="relative min-w-0 flex-1">
+    <div className="flex flex-none items-center gap-0.5" data-document-search>
+      <div className="relative w-44">
         <Icon name="magnifying-glass" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input
           ref={inputRef}
@@ -172,7 +169,7 @@ export const DocumentSearchField = forwardRef<HTMLInputElement, DocumentSearchFi
           className="h-8 w-full min-w-0 rounded-md border border-hairline-strong bg-surface pl-8 pr-2 font-ui text-[13px] text-ink-strong outline-none placeholder:text-ink-faint focus:border-accent focus:ring-[4px] focus:ring-[var(--r-ring-color)] [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
-      <span role="status" aria-live="polite" className="min-w-[4.5rem] shrink-0 text-right font-ui text-[11px] tabular-nums text-ink-muted">
+      <span role="status" aria-live="polite" className={`${countLabel ? 'min-w-[4.5rem] px-1' : ''} shrink-0 text-right font-ui text-[11px] tabular-nums text-ink-muted`}>
         {countLabel}
       </span>
       <ToolbarIconButton icon="caret-up" label="Previous match" tooltip="Previous match (Shift+Enter)" disabled={!hasMatches} onClick={() => onStep(-1)} />
