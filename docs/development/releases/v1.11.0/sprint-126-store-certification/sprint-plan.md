@@ -1,7 +1,7 @@
 # Sprint 126 — Microsoft Store Certification Gaps
 
 **Release:** [v1.11.0](../release-plan.md) · [milestone 11](https://github.com/ProductoryHQ/ritemark-native/milestone/11)<br>
-**Status:** **R2 and R4 merged 2026-09-16** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). R1 (Freemium) and R3 (StoreLogo2 artwork) are Jarmo's Partner Center work and remain open; the resubmission depends on them plus a new signed candidate at a new immutable URL.<br>
+**Status:** **Complete and Microsoft-certified; Store live from 2026-09-23** — [issue #305](https://github.com/ProductoryHQ/ritemark-native/issues/305), [PR #304](https://github.com/ProductoryHQ/ritemark-native/pull/304). Public Store ID: `XP9K8SP24TRNK4`; Jarmo confirmed Store-origin install, launch, and uninstall.<br>
 **Track:** Audit-first; shared AI UX/host boundary, targeted VS Code distribution patch, and Store metadata operations.<br>
 **Owner:** Jarmo (scope, external account actions, release gates); implementation/QA assignees TBD at kickoff.<br>
 **Issue:** [#305](https://github.com/ProductoryHQ/ritemark-native/issues/305) under milestone `v1.11.0`, closed with the merge.<br>
@@ -49,18 +49,18 @@ Steps 2–3 follow approved Phase 0. Metadata preparation can proceed independen
 
 ## Definition of Done
 
-- [ ] R1–R4 each have implementation/metadata evidence and a reviewer reproduction path.
+- [ ] R1–R4 each have implementation/metadata evidence and a reviewer reproduction path. R2–R4 are prepared; R1 waits for the saved Partner Center classification.
 - [ ] Reporting is discoverable on every in-scope generative surface and tested across the three runtime paths where applicable.
 - [ ] A test report reaches the agreed recipient; the UI never claims delivery when it only opens a compose window or when transport fails.
 - [ ] Users can preview/cancel reporting; payload minimization, secret exclusion, inaccessible destination and retry behavior are tested.
 - [ ] Windows Git-absent and Git-installed cases pass; no external Git download promotion remains on the reported path, and installed Git functionality is preserved.
-- [ ] Exact StoreLogo2 asset is identified, corrected and verified in the saved English UK listing; other images are checked for the same issue.
-- [ ] Freemium classification and related copy are saved and verified, without inventing Ritemark subscription/payment features.
+- [x] Exact StoreLogo2 slot is identified as the 2:3 poster art, corrected with Windows artwork and verified by Jarmo in the saved English UK listing.
+- [x] Freemium classification is saved and verified, without inventing Ritemark subscription/payment features. Existing listing copy already explains optional third-party provider costs.
 - [ ] Repository QA and relevant UI/native checks pass; architecture documentation is updated if message contracts, flags or module structure change.
 - [ ] User-facing changes are recorded in `docs/CHANGELOG.md` and v1.11.0 release notes; central Store documentation links the final evidence.
 - [ ] Release handoff explicitly separates completed sprint work from remaining candidate, release-gate and submission actions.
 
-Microsoft certification acceptance is an external follow-up, not a guaranteed sprint outcome. Until candidate/download tests and authorized resubmission are complete, do not label the Store submission ready or accepted.
+Microsoft certification acceptance was the external follow-up and completed by 2026-09-23. The public listing and Store-origin verification are recorded in the central Store documentation; future binary changes still require a new immutable URL and certification cycle.
 
 ## Dependencies
 

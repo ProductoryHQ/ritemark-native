@@ -6,22 +6,24 @@ Release folders may describe why a particular Windows candidate was built, but S
 
 ## Current position
 
-Last reviewed: **2026-09-11**
+Last reviewed: **2026-09-23**
 
 | Area | State | Next action |
 |---|---|---|
 | Company developer account | Active; Partner Center accessible | Maintain account verification and contact details |
-| English Store listing | `Ritemark` reserved; EXE/MSI draft active | Complete draft sections after account-state propagation and field decisions |
-| Public product/support pages | Ready | Recheck immediately before submission |
+| English Store listing | Live at `https://apps.microsoft.com/detail/xp9k8sp24trnk4` | Maintain accurate copy and media |
+| Public product/support pages | Ready | Monitor for availability and content changes |
 | Privacy and terms | Ready at Productory URLs | Use the approved Productory pages, not the 404 Ritemark paths |
-| Installer hosting | Complete: locked v1.10.1 object, direct HTTPS response, and fresh-download hash pass | Preserve the object unchanged and reuse the guarded procedure for new versioned keys |
-| Signed Windows package | v1.10.1 candidate 3 published and audited | Complete clean-machine test and Store-specific approval |
-| Store screenshots | Four installed-Windows v1.10.1 images selected | Jarmo review and Partner Center preview |
-| Submission | Not authorized | Keep as draft until the final candidate and all checks pass |
+| Installer hosting | Complete: locked v1.11.0 object, direct HTTPS response, and fresh-download hash pass | Preserve all existing versioned objects unchanged |
+| Signed Windows package | v1.11.0 candidate 1 certified and published; Store install/launch/uninstall verified | Keep the submitted bytes immutable; SAC-On and edit/save remain separate evidence items |
+| Store screenshots | Four installed-Windows screenshots plus corrected Windows poster art are live | Preserve accurate Windows media in future submissions |
+| Submission | Certified and live; Store ID `XP9K8SP24TRNK4` | Preserve evidence and monitor future certification changes |
 
 The detailed checklist is in [`STATUS.md`](./STATUS.md).
 
-## Work order
+## Canonical work order
+
+The first publication completed this sequence on 2026-09-23. Reuse it for future Store candidates rather than modifying the published v1.11.0 object.
 
 1. Complete and verify the Productory company developer account.
 2. Reserve the `Ritemark` product name and open an EXE/MSI draft.
@@ -46,7 +48,7 @@ The detailed checklist is in [`STATUS.md`](./STATUS.md).
 | [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md) | Current live product ID, section state, and pending decisions |
 | [`PACKAGE-AND-CERTIFICATION.md`](./PACKAGE-AND-CERTIFICATION.md) | Installer, signature, URL, hash, and test gates |
 | [`HOSTING-AND-DOWNLOADS.md`](./HOSTING-AND-DOWNLOADS.md) | DNS, R2 architecture, immutable object paths, upload, verification, and rollback |
-| [`WINDOWS-TEST-GUIDE-ET.md`](./WINDOWS-TEST-GUIDE-ET.md) | Estonian clean-Windows test instructions for the exact v1.10.1 candidate |
+| [`WINDOWS-TEST-GUIDE-ET.md`](./WINDOWS-TEST-GUIDE-ET.md) | Historical clean-Windows test instructions; candidate identity must be updated before reuse |
 | [`LEGAL-AND-URLS.md`](./LEGAL-AND-URLS.md) | Canonical public URLs and live checks |
 | [`ASSETS.md`](./ASSETS.md) | Store logo and screenshot inventory |
 | [`DECISIONS.md`](./DECISIONS.md) | Durable decisions and change log |

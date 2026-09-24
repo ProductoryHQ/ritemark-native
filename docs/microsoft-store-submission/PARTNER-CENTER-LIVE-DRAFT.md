@@ -1,6 +1,6 @@
-# Partner Center live draft
+# Partner Center live state
 
-Last inspected: **2026-09-02**
+Last inspected: **2026-09-23**
 
 ## Product identity
 
@@ -9,23 +9,25 @@ Last inspected: **2026-09-02**
 | Product name | `Ritemark` |
 | Product type | EXE or MSI app |
 | Partner Center ID | `3a2a9010-fbe3-47cf-ae87-4d338f587830` |
-| Submission state | In draft |
-| Store ID | Available after the app is live |
-| Store deep link | Available after the app is live |
-| Web Store URL | Available after the app is live |
+| Submission state | **Live / published** |
+| Store ID | `XP9K8SP24TRNK4` |
+| Store deep link | Not separately captured |
+| Web Store URL | `https://apps.microsoft.com/detail/xp9k8sp24trnk4` |
 
 Onboarding is complete and all three verification checks passed. The stale new-account verification warning disappeared from the Store listing surface after refresh on 2026-09-02.
+
+The public Microsoft Store page was observed on 2026-09-23 with the Ritemark title, publisher `Productory Services OÜ`, Productivity category, approved description, and public product ID `XP9K8SP24TRNK4`. Jarmo confirmed Store-origin installation, launch, and uninstall the same day.
 
 ## Submission sections
 
 | Section | Live state / proposed value | Save state |
 |---|---|---|
-| Availability | 240/240 markets, discoverable, Free, future regions not automatic | Complete; no unsaved changes observed |
-| Properties | Productivity, policy/product URLs, generative-AI declaration persisted | Support-contact URL remains blank |
-| Age ratings | Questionnaire complete; IARC preview generated | Awaiting explicit IARC Terms/adult-status attestation and **Save** |
-| Packages | Final package does not exist | Intentionally blocked |
-| Store listing | Manage listing page renders without the account-verification propagation alert | No language added yet |
-| Package validation | Depends on Packages | Blocked |
+| Availability | 240/240 markets, discoverable, **Freemium**, future regions not automatic | Saved 2026-09-18 |
+| Properties | Productivity, policy/product URLs, generative-AI declaration and v1.11.0 certification notes persisted | Saved 2026-09-18 |
+| Age ratings | Questionnaire and IARC rating completed | Complete |
+| Packages | Package ID `23647104`, x64, immutable v1.11.0 URL; existing install settings preserved | Saved 2026-09-18 |
+| Store listing | English (United Kingdom) listing exists; corrected Windows 2:3 poster art saved | Complete for this remediation |
+| Package validation | v1.11.0 validation completed | Malware clean; code sign valid; three automatic-identification checks inconclusive, not failed |
 
 ## Availability decisions
 
@@ -34,9 +36,9 @@ Live confirmed values:
 - markets: 240 of 240;
 - discoverability: discoverable in Microsoft Store;
 - automatically include new regions: unchecked;
-- pricing model: `Free: no payment necessary`.
+- pricing model: `Freemium: optional in-app purchases`.
 
-Jarmo confirmed these values on 2026-09-01. Partner Center showed no unsaved Availability changes.
+Microsoft's 2026-09-15 report requires the Freemium classification because optional third-party AI may require paid provider access. Ritemark itself does not sell an in-app subscription.
 
 ## Properties mapping
 
@@ -47,7 +49,7 @@ Jarmo confirmed these values on 2026-09-01. Partner Center showed no unsaved Ava
 | Privacy policy | `https://www.productory.ai/en/privacy/` |
 | Website | `https://ritemark.app/en/` |
 | Support contact info | Intended: `https://ritemark.app/en/support/`; live field currently clears input and remains blank |
-| Public email | Pending explicit confirmation |
+| Public email | `info@productory.eu` |
 | Public phone | Pending explicit confirmation |
 | Public address | Pending explicit confirmation |
 | Non-Microsoft driver / NT service | Unchecked; final candidate audit must confirm |
@@ -106,8 +108,8 @@ Generated preview highlights:
 - Russia PCBP: `18+`;
 - PEGI: `Parental Guidance Recommended`.
 
-The preview now requires a checkbox attesting agreement to the IARC Terms of Use and that the publisher representative is of the age of majority in their jurisdiction. **Save** remains disabled until that legal attestation is checked. Obtain Jarmo's explicit confirmation before checking it or saving the ratings.
+Jarmo explicitly approved the IARC Terms of Use/adult-status attestation; the ratings were saved and remained complete for the v1.11.0 resubmission.
 
 ## Hard boundary
 
-Do not add a package placeholder and do not select Submit. The exact signed EXE, immutable HTTPS URL, SHA-256, Windows evidence, and final approval remain mandatory.
+The v1.11.0 package was submitted on 2026-09-20 and published by 2026-09-23. Do not replace the bytes at the submitted URL. Any changed binary requires a new versioned URL, candidate record, validation cycle, and explicit submission approval.

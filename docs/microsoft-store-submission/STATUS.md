@@ -1,12 +1,12 @@
 # Microsoft Store status
 
-Last updated: **2026-09-15**
+Last updated: **2026-09-23**
 
 ## High-level status
 
-**Submitted. Awaiting Microsoft’s certification decision.** The v1.10.1 candidate 3 submission was completed in Partner Center on 2026-09-12 at ~12:08 UTC with Jarmo’s explicit approval, and shows **In review** with a stated Microsoft SLA of three business days. Package ID `23647104` (x64), installer `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, SHA-256 `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250`, re-verified by a fresh HTTPS download immediately before Submit.
+**Ritemark v1.11.0 is certified and live in Microsoft Store.** The public product ID is `XP9K8SP24TRNK4` and the canonical web listing is `https://apps.microsoft.com/detail/xp9k8sp24trnk4`. The public page was observed on 2026-09-23 with the Ritemark title, `Productory Services OÜ` publisher, Productivity category, and approved listing copy. Jarmo confirmed Store-origin installation, launch, and uninstall on 2026-09-23. See [`PUBLICATION-2026-09-23.md`](./PUBLICATION-2026-09-23.md).
 
-Submission completion is **not** certification approval and **not** Store publication. Clean Windows 11 / Smart App Control On testing on a machine other than the developer’s is still outstanding, and the submission must not be represented as having covered it. The full record is in [`SUBMISSION-2026-09-12.md`](./SUBMISSION-2026-09-12.md); **Partner Center remains the live source of certification status** — this file is a snapshot.
+The immutable v1.11.0 installer is hosted at `https://getritemark.com/windows/v1.11.0/Ritemark-Setup.exe`: 444207592 bytes, SHA-256 `0ebda5016e432b2f039613f74665343220006e39e7749ddb76d285d0a87b932b`. A fresh anonymous HTTPS stream on 2026-09-23 returned HTTP 200, the same length/hash/ETag, executable content type, and `immutable` cache policy. No installer or probe file was left behind. **Partner Center and the public Store page remain the live sources of publication status** — this file is a snapshot.
 
 ## Account and Partner Center
 
@@ -23,6 +23,8 @@ Submission completion is **not** certification approval and **not** Store public
 - [x] `Ritemark` product name reserved.
 - [x] EXE/MSI app draft created.
 - [x] Partner Center ID recorded: `3a2a9010-fbe3-47cf-ae87-4d338f587830`.
+- [x] Public Store product ID recorded: `XP9K8SP24TRNK4`.
+- [x] Canonical public listing recorded: `https://apps.microsoft.com/detail/xp9k8sp24trnk4`.
 - [x] New account verification state propagated to the Store listing surface; the stale verification warning disappeared on 2026-09-02.
 - [x] English (United Kingdom) listing created and saved — **Complete**, with four installed-Windows screenshots (2026-09-12).
 
@@ -35,7 +37,7 @@ Submission completion is **not** certification approval and **not** Store public
 - [x] Approved Productory privacy and terms URLs verified.
 - [x] Required 1:1 Store-logo source collected.
 - [x] Category confirmed in the live Partner Center taxonomy: **Productivity**.
-- [x] Pricing confirmed and observed in Partner Center: **Free: no payment necessary**.
+- [x] Pricing changed and saved in Partner Center as **Freemium: optional in-app purchases**, matching Microsoft's finding about optional third-party AI costs. Ritemark itself does not sell a subscription.
 - [x] Market availability confirmed and observed: all 240 regions; future regions are not added automatically.
 - [x] Normal Microsoft Store discoverability confirmed.
 - [x] Age-rating questionnaire answers completed and rating preview generated in Partner Center.
@@ -59,6 +61,7 @@ Submission completion is **not** certification approval and **not** Store public
 - [x] Production immutability control `windows-immutable` for `windows/` is configured, indefinite, enabled, and verified in Cloudflare Dashboard.
 - [x] Versioned installer URL contains the exact tested bytes.
 - [x] Fresh URL download matches the recorded SHA-256 and byte length.
+- [x] v1.11.0 is published at a new immutable key; v1.10.1 remains unchanged.
 
 ## Store media
 
@@ -68,23 +71,25 @@ Submission completion is **not** certification approval and **not** Store public
 - [ ] Final screenshots contain no development-host title, test-only UI, private project names, secrets, or misleading platform chrome — the four screenshots went into the submitted listing, but no separate hygiene review is recorded, so this item stays open rather than being marked done retroactively.
 - [x] Four final screenshots selected, ordered, approved by Jarmo and submitted.
 - [x] Captions reviewed in the English listing — saved as part of the **Complete** listing.
-- [x] Square logo and 2:3 poster art uploaded by Jarmo, accepted and saved. The repository’s 1024px logo source was **rejected** by Partner Center and is not the final uploaded asset.
+- [x] Square logo and corrected 2:3 Windows poster art uploaded and saved by Jarmo. The replacement source is [`assets/store-screenshots/1.10.1/posterart_windows.png`](./assets/store-screenshots/1.10.1/posterart_windows.png); it contains Windows UI rather than the previously submitted Mac screenshot.
 
 ## Store certification (separate from completed direct-release gates)
 
-- [x] Certification notes finalized — they disclose offline local editing, optional provider credentials, and the silent installation parameters.
-- [x] Partner Center package validation status **Completed** — malware scan clean, code signing valid. Silent install, Apps & Features identity and bundleware checks came back **automatic identification inconclusive** with a link to manual verification; they were not reported as passed automated checks. Manual evidence for the same hash is in [`release-candidates/v1.10.1-candidate-3.md`](./release-candidates/v1.10.1-candidate-3.md).
-- [ ] Clean Windows 11 / Smart App Control On test passes.
-- [x] Developer-machine install, launch, edit/save, and uninstall evidence refers to the exact hosted v1.10.1 SHA-256. Clean-machine evidence remains pending.
+- [x] Certification notes updated and saved with the four-finding remediation summary, reviewer steps, and v1.11.0 package identity.
+- [x] v1.11.0 Partner Center package validation status **Completed** — malware scan clean and code signing valid. Silent install, Apps & Features identity and bundleware checks came back **automatic identification inconclusive**; they were not reported as passed automated checks. Manual install/uninstall evidence for the exact v1.11.0 candidate is recorded in [`release-candidates/v1.11.0-candidate-1.md`](./release-candidates/v1.11.0-candidate-1.md).
+- [x] Jarmo's install/use confirmation and candidate install/uninstall evidence refer to the exact hosted v1.11.0 SHA-256. Clean-machine evidence remains pending.
 - [x] Final Partner Center review completed without placeholders (2026-09-12).
-- [x] Jarmo explicitly approved **Submit to the Store** for v1.10.1 candidate 3 (2026-09-12).
-- [ ] Microsoft certification passes — **In review** since 2026-09-12; no decision recorded here yet.
-- [ ] Store-origin install passes.
-- [ ] Gate 2 records the Store and direct-download evidence.
+- [x] Jarmo explicitly approved the original v1.10.1 **Submit to the Store** action (2026-09-12).
+- [x] Microsoft returned the v1.10.1 certification report on 2026-09-15 — **Attention needed**, four findings recorded in Sprint 126.
+- [x] Jarmo explicitly approved **Submit anyway** for the v1.11.0 resubmission on 2026-09-20 after the completed validation report and pricing warning were reviewed.
+- [x] Partner Center accepted the resubmission and displayed **In review**, submission complete, and review **in process** on 2026-09-20; see [`SUBMISSION-2026-09-20.md`](./SUBMISSION-2026-09-20.md).
+- [x] Microsoft certified and published the v1.11.0 resubmission; the public Store page was observed on 2026-09-23.
+- [x] Jarmo confirmed Store-origin install, launch, and uninstall on 2026-09-23.
+- [x] Gate 2 records the Store-origin and fresh direct-download evidence in [`PUBLICATION-2026-09-23.md`](./PUBLICATION-2026-09-23.md) and the v1.11.0 release checklist.
+- [ ] Clean Windows 11 / Smart App Control On test passes; Store publication does not retroactively prove this separate internal hardening check.
 
 ## Immediate next actions
 
-1. Await Microsoft’s certification decision and read any actionable report it returns.
-2. Kristiina: record clean Windows 11 / Smart App Control On evidence against the hosted v1.10.1 SHA-256. This is the one pre-submission item the submission did not cover.
-3. **Never replace the bytes at the submitted installer URL.** A changed binary needs a new immutable URL and a new candidate — the R2 `windows-immutable` control and the uploader’s `If-None-Match: *` both refuse an overwrite, and working around either would invalidate the submitted hash.
-4. After publication: verify Store-origin install, launch, edit/save and uninstall, then record it in Gate 2.
+1. Record a clean Windows 11 / Smart App Control On result if that separate hardening test is run; do not infer it from certification.
+2. Record Store-origin edit/save separately if it is tested; the 2026-09-23 owner confirmation explicitly covers install, launch, and uninstall.
+3. **Never replace either v1.10.1 or v1.11.0 bytes.** Any changed binary needs a new immutable URL and candidate record.
