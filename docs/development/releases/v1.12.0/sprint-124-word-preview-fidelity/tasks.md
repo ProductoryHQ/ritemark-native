@@ -60,4 +60,4 @@ on this branch behind it.
 - [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with the Windows three-fixture line).
 - [x] `docs/development/architecture.md`: the Office-preview bundle and the Word viewer.
 - [x] Follow-up issue: PDF search ([#344](https://github.com/ProductoryHQ/ritemark-native/issues/344)). *(LibreOffice dropped, 2026-09-24)*
-- [ ] Release-plan tracker row, PR, and close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).
+- [x] Release-plan tracker row, PR [#345](https://github.com/ProductoryHQ/ritemark-native/pull/345); close [#284](https://github.com/ProductoryHQ/ritemark-native/issues/284).
