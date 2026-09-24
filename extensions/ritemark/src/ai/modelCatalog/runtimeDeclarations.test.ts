@@ -32,8 +32,8 @@ const CURATED: ModelEntry = { id: 'claude-sonnet-5', label: 'Sonnet 5', descript
 
 test('only rows that ask to be injected are declared', () => {
   const d = buildClaudeRuntimeDeclarations([CURATED, AUTO_ROW]);
-  assert.deepStrictEqual(d.pickerOptions, [{ model: 'claude-opus-5-5', label: 'Opus 5.5', description: 'Newest Opus model' }]);
-  assert.deepStrictEqual(d.envByModel, { 'claude-opus-5-5': { CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000' } });
+  assert.deepStrictEqual(d.pickerOptions, [{ model: 'claude-opus-6', label: 'Opus 6', description: 'Newest Opus model' }]);
+  assert.deepStrictEqual(d.envByModel, { 'claude-opus-6': { CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000' } });
 });
 
 test('nothing to declare yields the shared empty value', () => {
@@ -57,20 +57,20 @@ test('S30/S14: retired rows and malformed ids are never declared', () => {
 test('declared options follow catalog order and the signature tracks changes', () => {
   const later: ModelEntry = { ...AUTO_ROW, id: 'claude-sonnet-6', label: 'Sonnet 6', order: -0.5 };
   const d = buildClaudeRuntimeDeclarations([AUTO_ROW, later]);
-  assert.deepStrictEqual(d.pickerOptions.map((o) => o.model), ['claude-sonnet-6', 'claude-opus-5-5']);
+  assert.deepStrictEqual(d.pickerOptions.map((o) => o.model), ['claude-sonnet-6', 'claude-opus-6']);
   assert.notStrictEqual(d.signature, buildClaudeRuntimeDeclarations([AUTO_ROW]).signature);
   assert.strictEqual(d.signature, buildClaudeRuntimeDeclarations([later, AUTO_ROW]).signature);
 });
 
 test('discovery lists every declared model through modelPicker', () => {
   const settings = discoveryPickerSettings(buildClaudeRuntimeDeclarations([AUTO_ROW]));
-  assert.deepStrictEqual(settings, { modelPicker: { options: [{ model: 'claude-opus-5-5', label: 'Opus 5.5', description: 'Newest Opus model' }] } });
+  assert.deepStrictEqual(settings, { modelPicker: { options: [{ model: 'claude-opus-6', label: 'Opus 6', description: 'Newest Opus model' }] } });
 });
 
 test('a session declares only the model it runs, and only when it is declared', () => {
   const d = buildClaudeRuntimeDeclarations([AUTO_ROW]);
-  assert.deepStrictEqual(sessionDeclarationFor(d, 'claude-opus-5-5'), {
-    settings: { modelPicker: { options: [{ model: 'claude-opus-5-5', label: 'Opus 5.5', description: 'Newest Opus model' }] } },
+  assert.deepStrictEqual(sessionDeclarationFor(d, 'claude-opus-6'), {
+    settings: { modelPicker: { options: [{ model: 'claude-opus-6', label: 'Opus 6', description: 'Newest Opus model' }] } },
     env: { CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000' },
   });
   assert.strictEqual(sessionDeclarationFor(d, 'claude-sonnet-5'), undefined, 'a native model leaves user settings alone');
@@ -79,20 +79,20 @@ test('a session declares only the model it runs, and only when it is declared', 
 
 test('S3: a natively listed identity shadows the declared row, modulo [1m]', () => {
   const rows = [
-    { id: 'opus[1m]', resolvedModel: 'claude-opus-5-5[1m]' },
-    { id: 'claude-opus-5-5', resolvedModel: 'claude-opus-5-5' },
+    { id: 'opus[1m]', resolvedModel: 'claude-opus-6[1m]' },
+    { id: 'claude-opus-6', resolvedModel: 'claude-opus-6' },
     { id: 'sonnet', resolvedModel: 'claude-sonnet-5' },
   ];
-  assert.deepStrictEqual(dropShadowedDeclarations(rows, ['claude-opus-5-5']).map((r) => r.id), ['opus[1m]', 'sonnet']);
+  assert.deepStrictEqual(dropShadowedDeclarations(rows, ['claude-opus-6']).map((r) => r.id), ['opus[1m]', 'sonnet']);
 });
 
 test('S1: a declared row the runtime does not know natively stays', () => {
   const rows = [
     { id: 'opus[1m]', resolvedModel: 'claude-opus-5[1m]' },
-    { id: 'claude-opus-5-5', resolvedModel: 'claude-opus-5-5' },
+    { id: 'claude-opus-6', resolvedModel: 'claude-opus-6' },
   ];
-  assert.deepStrictEqual(dropShadowedDeclarations(rows, ['claude-opus-5-5']).map((r) => r.id), ['opus[1m]', 'claude-opus-5-5']);
-  assert.deepStrictEqual(dropShadowedDeclarations(rows, []).map((r) => r.id), ['opus[1m]', 'claude-opus-5-5']);
+  assert.deepStrictEqual(dropShadowedDeclarations(rows, ['claude-opus-6']).map((r) => r.id), ['opus[1m]', 'claude-opus-6']);
+  assert.deepStrictEqual(dropShadowedDeclarations(rows, []).map((r) => r.id), ['opus[1m]', 'claude-opus-6']);
 });
 
 test('S25/R5: the CLI is re-probed only when the declared set changes', () => {

@@ -9,11 +9,11 @@ Architecture for [spec.md](./spec.md). Snippets are proposed shapes; when the co
 - **W3 — sessions declare only what they run.** Discovery declares every declared row. A session declares only the model it runs, and only when that model is a declared row. `modelPicker` from the flag layer replaces a user's own `modelPicker` for that session ("wins outright"), so a session that does not need it must not carry it.
 - **W6 — no new `failureKind`.** `conversations/types.ts` validates persisted `failureKind` against the authentication kinds, so a new value would change a stored format. Model-unavailable errors get their own message and no kind.
 - **W3 — Flows unchanged.** A Flow's Claude Code node runs the catalog default, and defaults are never automated rows, so it never needs a declaration.
-- **W7 — payload location.** Push access to `ritemark-public` was denied for this session. The publisher is built under [ritemark-public/](./ritemark-public/APPLY.md), mirroring the target layout. Jarmo applies it, and `ritemark-public` then owns it. A nested `.github/` under `docs/` does not run in this repository.
+- **W7 — payload location.** Push access to `ritemark-public` was denied for this session. The publisher is built under `ritemark-public/`, mirroring the target layout. Jarmo applies it, and `ritemark-public` then owns it. A nested `.github/` under `docs/` does not run in this repository. *(Withdrawn by D4; the payload is preserved in commit `e03b8fc`.)*
 
 ## Revisions (2026-09-24, W7 implementation)
 
-- **Watermark = the bundled lineup's `updatedAt` (`2026-09-13T00:00:00Z`)**, not the newest bundled Claude model's `created_at`. The lineup was curated from every model that existed on that date, so anything created earlier and left out was left out on purpose. It also needs no API call to derive. Opus 5.5 appeared after CLI 2.1.278, which does not know it, so it stays a candidate. If the first dry run does not list it, compare its `created_at` with the watermark ([APPLY.md](./ritemark-public/APPLY.md) step 5).
+- **Watermark = the bundled lineup's `updatedAt` (`2026-09-13T00:00:00Z`)**, not the newest bundled Claude model's `created_at`. The lineup was curated from every model that existed on that date, so anything created earlier and left out was left out on purpose. It also needs no API call to derive. Opus 5.5 appeared after CLI 2.1.278, which does not know it, so it stays a candidate. If the first dry run does not list it, compare its `created_at` with the watermark (the payload's APPLY.md, step 5).
 - **The watermark stays below every pending model.** A candidate that is cooling down, over the per-run cap, or failed holds the watermark below its `created_at`. Otherwise a newer model's publish would skip it for good. `selectCandidates()` became `newModels()`, and the cap and cooldown moved into `publishOnce()`.
 - **Schema rules live in `schema.mjs`.** `validate.mjs` is the command-line check: schema, size cap, config, and, with `--base <ref>`, the additions-only diff (S21). The workflow runs it after rebasing onto `origin/main` and before it pushes.
 - **The canary is stricter than planned.** It uses streaming input so the list check runs before the one prompt (as in the probes). It also requires every assistant message to come from the declared model or a dated snapshot of it. A runtime that cannot be fetched counts as a failed canary, not a crashed run.
@@ -24,6 +24,13 @@ Architecture for [spec.md](./spec.md). Snippets are proposed shapes; when the co
 - **Offline smoke check** `canary-smoke.mjs` runs the real CLI and SDK against a local API stand-in, with no key. Use it before adding a Claude Code version to the canary list. Evidence: [evidence/canary-smoke-2026-09-24.json](./research/evidence/canary-smoke-2026-09-24.json) (2.1.270 and 2.1.281 both pass).
 - **Export keeps what only the feed carries.** `buildPublishedFeed()` (`src/ai/modelCatalog/feedExport.ts`, tested, not bundled) writes the bundled lineup. It keeps automated rows and tombstones that the lineup does not curate, and providers the app does not know. `--merge <feed>` makes a release-time refresh safe.
 - **Docs location.** The publisher's documentation is `feeds/README.md` in `ritemark-public` (spec R8 revision).
+
+## Revisions (2026-09-24, D4)
+
+- **W7 is withdrawn.** The publisher payload is removed; its history is in commit `e03b8fc`. Runtime declarations (W3) stay for hand-added feed rows. The release skill limits them to models whose Anthropic minimum Claude Code version the bundled CLI meets. The app does not read Anthropic's catalog, so it cannot enforce that at runtime.
+- **W9 is added: Claude Code currency (R9).** Bump to 2.1.281 / SDK 0.3.281, with Opus 5.5 in the bundled lineup.
+- **W10 is added: the pre-release catalog check (R10).**
+- **The automatic-publisher line in the diagram below is historical.**
 
 ## Architecture Overview
 
@@ -186,7 +193,7 @@ Tests: 304 keeps the cache and does not probe; a changed body with the same decl
 
 Tests: substitution notice text; error classification fixtures from A2.
 
-## Workstream 7: Publisher in `ritemark-public` (R4, R7)
+## Workstream 7: Publisher in `ritemark-public` (R4, R7) — withdrawn 2026-09-24 (D4)
 
 Files in `jarmo-productory/ritemark-public` (public repository, so Actions minutes are free):
 
@@ -218,6 +225,41 @@ Bootstrap:
 
 - `docs/development/architecture.md`: Model Catalog AS IS → TO BE (authority split, merge rule, runtime declarations, publisher), a changelog row, and a Sprint 89 memo addendum.
 - `.claude/skills/release/SKILL.md`: when a shell release changes the bundled Claude Code version, add it to `canary.claudeCodeVersions`. Before a release, refresh the feed's non-Anthropic lineup with `export-bundled-model-catalog.ts` so older clients stay current.
-- `ritemark-public/feeds/README.md`: the "Model catalog feed" documentation, covering how it works, switches, secrets, the tombstone how-to, lineup refresh and operations (revised 2026-09-24).
+- ~~`ritemark-public/feeds/README.md`: the "Model catalog feed" documentation, covering how it works, switches, secrets, the tombstone how-to, lineup refresh and operations (revised 2026-09-24).~~ Withdrawn by D4. The rules for hand edits to the feed live in the `release` skill.
 - `extensions/ritemark/package.json` `test` chain: add `src/ai/modelCatalog/runtimeDeclarations.test.ts` and the new resolver and remote-source tests.
 - `qa-evidence.md`: the scenario matrix, with S24 timing.
+
+## Workstream 9: Claude Code currency (R9, added 2026-09-24, D4)
+
+**Runtime pins.** These change in one commit, because the validator enforces lockstep:
+- `extensions/ritemark/binaries/agents/manifest.json`: the three `claude/runtime` rows (darwin-arm64, darwin-x64, win32-x64) move to 2.1.281. Update `version`, `sourceUrl`, `archiveFilename`, `npmIntegrity` (from the registry), `sha256` (the npm tarball) and `installedSha256` (the extracted `package/claude` or `package/claude.exe`). All values are measured from the published npm packages, never typed.
+- `scripts/validate-agent-runtime-manifest.mjs`: the approved snapshot `claude/runtime` 2.1.281 and `APPROVED_SDKS.claude` 0.3.281. Update the snapshot string in its test.
+- `extensions/ritemark/package.json` and `package-lock.json`: `@anthropic-ai/claude-agent-sdk` 0.3.281 through `npm install --save-exact`, so npm rewrites the lock entries, including the eight optional platform packages.
+
+**Evidence.** It goes into `docs/development/agent-runtime-compatibility.md` (pre-commit check 11):
+- The validator and its tests.
+- `fetch-agent-runtimes` verification of every Claude target (hash and architecture).
+- A review of the SDK `sdk.d.ts` diff from 0.3.270 to 0.3.281, plus `tsc` and the full `npm test`.
+- The linux-x64 probes on 2.1.281 / 0.3.281: `supportedModels()` lists Opus 5.5 natively, and a captured request for it is well-formed.
+- Native darwin and Windows execution is marked not proven here. It is proven at Gate 1 and Gate 2 and in PR CI.
+
+**Lineup.** `modelConfig.ts` gains the Opus 5.5 id.
+- `bundledCatalog.ts` gains a curated row with no `claudeCode` declaration, because the bundled CLI knows the model natively.
+- Order: Sonnet 5, Opus 5.5, Opus 5, Fable 5.1, Opus 4.8, Fable 5, Haiku 4.5. Sonnet 5 stays the default.
+- The Opus descriptions are adjusted, and the lineup `updatedAt` moves to 2026-09-24.
+- The shared automated-row fixture moves to a hypothetical `claude-opus-6`, so its tests keep describing a model newer than the bundle.
+
+## Workstream 10: Pre-release catalog check (R10, added 2026-09-24, D4)
+
+- `src/ai/modelCatalog/anthropicCatalogCheck.ts` is pure, tested, and not part of the extension bundle:
+  - `ANTHROPIC_MODEL_CATALOG_URL`.
+  - `parseAnthropicCatalog(raw, now)`: strict on the fields the check uses. That means `schema_version` 1, `version`, `issued_at` and `expires_at` (not expired), and `surfaces.cc.model_selector_config[id=cc].models[]` with `id`, `name`, `section` and an optional `min_claude_code_version`.
+  - `checkAnthropicCatalog({ catalog, claudeCodeVersions, bundledModelIds })` returns `{ alerts, warnings, mainModels }`.
+  - Versions compare numerically. A dated snapshot (`-YYYYMMDD`) of a bundled id counts as present.
+- `extensions/ritemark/scripts/check-anthropic-model-catalog.ts` fetches the catalog with a timeout. It reads the Claude versions from the runtime manifest and the bundled ids from `BUNDLED_CATALOG`, prints the report, and exits 1 on any alert or on a fetch or parse failure.
+- `package.json`: the `check:anthropic-models` script. `anthropicCatalogCheck.test.ts` joins the `test` chain; the test uses a trimmed sample of the real catalog in `testdata/`.
+- Release process:
+  - The `release` skill runs the check in Step 0 of a full release, where an alert blocks until Claude Code is updated or Jarmo defers explicitly, and in the extension-only release, where an alert is reported to Jarmo.
+  - release-manager Gate 1 lists it.
+  - The skill's feed section keeps the `export-bundled-model-catalog.ts --merge` rule for hand edits, and adds the minimum-version rule for declarations.
+

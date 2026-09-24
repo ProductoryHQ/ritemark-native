@@ -988,7 +988,9 @@ surfaces. A provider-default row uses one accessible trailing `*` in the picker.
 
 ### AS IS — Existence, runnability and presentation (post-Sprint 127, #343)
 
-Before Sprint 127, a subscription user saw only the models that the bundled CLI was compiled with ("live wins"), and a stale feed was ignored as a whole. So a new Anthropic model waited for a CLI bump in a shell release. Sprint 127 splits the one authority into three (Jarmo, 2026-09-24):
+Before Sprint 127, a subscription user saw only the models that the bundled CLI was compiled with ("live wins"), and a stale feed was ignored as a whole. So a new Anthropic model waited for a CLI bump in a shell release. Sprint 127 splits the one authority into three (Jarmo, 2026-09-24).
+
+Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties each new model to a minimum Claude Code version** (`min_claude_code_version` in its Claude Code model catalog). So new Claude models reach users mainly through a *current bundled Claude Code*, which every release checks (below).
 
 | Question | Authority | Mechanism |
 |---|---|---|
@@ -1018,18 +1020,20 @@ Before Sprint 127, a subscription user saw only the models that the bundled CLI 
 - A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.`
 - Model-unavailable CLI and API errors name the model and point to the model menu. They add no new `failureKind`.
 
-**Publisher** (`jarmo-productory/ritemark-public`, documented in its `feeds/README.md`):
-1. A scheduled workflow runs every 10 minutes and lists `/v1/models` with a Ritemark key.
-2. It selects new Claude ids created after a watermark.
-3. It runs a canary on every pinned Claude Code version: `settings.modelPicker`, one tool-less turn, with listed, init, served model and result all checked.
-4. It appends an automated row, runs an additions-only check, and pushes.
-
-Kill switch: `MODEL_CATALOG_AUTOPUBLISH`. Failed canaries cool down from 1 hour, doubling to 24 hours. Release duties (canary versions, lineup refresh with `scripts/export-bundled-model-catalog.ts --merge`) are in `.claude/skills/release/SKILL.md`.
+**Claude Code currency (D4).**
+- v1.12.0 bundles Claude Code 2.1.281 with SDK 0.3.281, and it lists Opus 5.5 natively.
+- Before each release, `npm run check:anthropic-models` reads Anthropic's catalog (`downloads.claude.ai/model-catalog/v1/catalog.json`, undocumented) through `anthropicCatalogCheck.ts`. That module is pure and not bundled.
+- The check raises an alert when the catalog cannot be read, has changed shape or has expired, or when a model needs a newer Claude Code than the runtime manifest bundles. It warns when a `main` model is missing from the bundled lineup.
+- The app itself never reads this catalog.
+- The feed in `ritemark-public` is edited by hand when needed. There is no publisher: the automatic one was withdrawn with D4.
+- A feed row may declare a model only when the bundled Claude Code meets Anthropic's minimum for that model.
+- Release steps are in `.claude/skills/release/SKILL.md` ## Claude Code and model currency.
 
 Open items:
 - A per-model `contextWindow` declaration waits for audit A3 (Sprint 127 Q5).
 - The signed feed is still deferred (Sprint 89).
-- Anthropic's server-served CLI catalog (`tengu_delegated_quail`) is welcome but not relied on.
+- Anthropic's server-served CLI catalog (`tengu_delegated_quail`) is welcome but not relied on. Anthropic keeps it off by default.
+- Delivering new models between app releases needs a Claude Code update channel outside full releases. That is a separate decision (D4).
 - A system CLI older than the flag-settings `modelPicker` cannot take declarations (S4).
 
 ### Agent Chat bootstrap boundary (v1.10.0 RC correction)
@@ -1181,8 +1185,16 @@ The decisions that define the system. Changing any of these is an architecture-l
 | 2026-07-08 | Sprint 92 | **Extension host esbuild bundling (GH #105), v1.8.2.** `tsc -p ./` (emit) replaced by `tsc --noEmit` (typecheck) + `esbuild.config.mjs` (emit). The ~130 loose `out/*.js` files collapse to two self-contained bundles: `out/extension.js` (~5 MB, first-party + inlined pure-JS deps) and the standalone `out/browser/browserMcpAdapter.js` subprocess. `external`: `vscode`, `fsevents`, `pdfkit`, and (invisibly, via `new Function` import) the two ESM agent SDKs — so `node_modules` is retained but massively reduced in relevance. Fixed two `__dirname`-depth path landmines (`bundledAgentRuntime.ts`, `BrowserToolsInjector.ts`) that assumed the old multi-level `out/` tree. Closes the Windows EMFILE class + the 0-byte tsc trap. New "bundle-safe extension code" rule added to the `vscode-development` skill. Unblocks #107/#108. |
 | 2026-07-08 | Sprint 90 | **Export Integrity (GH #127, #76), shipped in v1.8.1.** Fail-safe image export: the single chokepoint `export/v2/imageSource.ts` now returns `null` (skip) for SVG bytes and encoder-undecodable data-URLs (GIF/BMP/TIFF for pdfkit), and the IMG case in `pdfHtmlExporter.ts`/`wordHtmlExporter.ts` is wrapped in per-node try/catch — one bad image can no longer abort a whole export. SVG/draw.io rendering: new webview `lib/svgRasterExport.ts` (`inlineSvgImagesForExport` + shared `rasterizeSvgToPngDataUrl`, extracted from the mermaid path) rasterizes inline + file-referenced `.svg`/`.drawio.svg` to PNG via `<canvas>` before the HTML is posted to the host — **no new native dependency**. Atomic `saveAsMarkdown`: tracks only newly-created image paths and unlinks exactly those on failure. Shared `parseImageDataUrl` in `imageWriter.ts` accepts the compound `svg+xml` subtype (fixes `/image` SVG insert). Planned `export-svg-rasterization` flag dropped (webview flags not plumbed; graceful-skip already provides the safety). |
 
-| 2026-09-24 | Sprint 127 | **Day-zero Anthropic models (#343), v1.12.0.** Model visibility no longer depends on the bundled CLI version or an app update. Existence, runnability and presentation became separate authorities (see Model Configuration → post-Sprint 127). New in `src/ai/modelCatalog/`: `runtimeDeclarations.ts`, which turns feed rows into SDK `settings.modelPicker` and output-budget env for discovery and per session, and `feedExport.ts`, which builds the published feed from the bundled lineup and is not bundled. `resolver.ts`: `mergeStatic()` per-row merge with tombstones, and `resolveRequestedModelIn()` for honest substitution. `remoteSource.ts`: ETag, 304. `index.ts`: 10-minute feed poll and single-flight discovery refresh. Schema: `provenance`, `addedAt`, `retired`, `claudeCode`, and a Claude id pattern. `RuntimeSessionConfig.claudeModelDeclaration` flows through `ClaudeCodeRuntime` → `AgentRunner.claudeRuntimeOptions()`. `/v1/models` runs only for API-key sign-in. The publisher runs in `ritemark-public` (scheduled workflow with a canary on the pinned CLI, append-only automated rows). UnifiedViewProvider grew by 27 LOC (existing >1100 debt); the logic lives in `modelCatalog`. |
+| 2026-09-24 | Sprint 127 | **Day-zero Anthropic models (#343), v1.12.0.** Model visibility no longer depends on the bundled CLI version or an app update. Existence, runnability and presentation became separate authorities (see Model Configuration → post-Sprint 127). New in `src/ai/modelCatalog/`: `runtimeDeclarations.ts`, which turns feed rows into SDK `settings.modelPicker` and output-budget env for discovery and per session, and `feedExport.ts`, which builds the published feed from the bundled lineup and is not bundled. `resolver.ts`: `mergeStatic()` per-row merge with tombstones, and `resolveRequestedModelIn()` for honest substitution. `remoteSource.ts`: ETag, 304. `index.ts`: 10-minute feed poll and single-flight discovery refresh. Schema: `provenance`, `addedAt`, `retired`, `claudeCode`, and a Claude id pattern. `RuntimeSessionConfig.claudeModelDeclaration` flows through `ClaudeCodeRuntime` → `AgentRunner.claudeRuntimeOptions()`. `/v1/models` runs only for API-key sign-in. UnifiedViewProvider grew by 27 LOC (existing >1100 debt); the logic lives in `modelCatalog`.
+
+**D4 (same day):**
+- Claude Code 2.1.270 → 2.1.281 and SDK 0.3.270 → 0.3.281. This is shell-tier, so the change ships in v1.12.0.
+- Opus 5.5 joins the bundled lineup.
+- New `anthropicCatalogCheck.ts` plus the `check:anthropic-models` release gate.
+- The planned `ritemark-public` publisher was withdrawn before it was applied. |
 
 **Sprint 89 architecture-gate decision memo (2026-07-01, approved by Jarmo):** the Sprint 79 locked decision "Model IDs centralised in `modelConfig.ts`" is evolved — the single authority is now `src/ai/modelCatalog/` (resolver + remote catalog), not a static array. The single-place-to-look spirit is preserved; the mechanism is now dynamic and remotely updatable. Remote-catalog host: `jarmo-productory/ritemark-public`. Trust model v1: HTTPS + strict schema v1 + 512 KB cap + origin allowlist; pinned-key signature deferred to a follow-up issue.
 
-**Sprint 127 addendum to the Sprint 89 memo (2026-09-24, approved by Jarmo):** "live wins" is retired for the static layers. It assumed that the live probe was the existence authority, but for subscription users that probe is the list compiled into the bundled CLI. There are now three separate authorities. Existence is Anthropic's `/v1/models` for the credential in use; for subscription users it is the runtime list plus declared feed rows. Runnability is the runtime, which may run a model before it knows it natively through a canaried `settings.modelPicker` declaration. Presentation is Ritemark's per-row merge of bundled and feed rows. The feed is published fully automatically: a scheduled `ritemark-public` workflow appends canaried automated rows only. Defaults, curation and tombstones stay human. The trust model gains an additions-only publisher check and client-side id validation; signing stays deferred.
+**Sprint 127 addendum to the Sprint 89 memo (2026-09-24, approved by Jarmo):** "live wins" is retired for the static layers. It assumed that the live probe was the existence authority, but for subscription users that probe is the list compiled into the bundled CLI. There are now three separate authorities. Existence is Anthropic's `/v1/models` for the credential in use; for subscription users it is the runtime list plus declared feed rows. Runnability is the runtime, which may run a model before it knows it natively through a canaried `settings.modelPicker` declaration. Presentation is Ritemark's per-row merge of bundled and feed rows. Defaults, curation and tombstones stay human, and the trust model gains client-side id validation; signing stays deferred.
+
+*D4 (2026-09-24, Jarmo):* Anthropic ties new models to a minimum Claude Code version. The existence authority for subscription users is therefore, in practice, the bundled Claude Code, and each release checks it against Anthropic's catalog. The planned automatic feed publisher was withdrawn. Declarations remain for hand-edited feed rows that the bundled Claude Code supports.

@@ -103,6 +103,8 @@ Then the default remains the curated default (Sonnet 5)
 
 ## Feature: Automatic publishing (R4)
 
+*Withdrawn 2026-09-24 (D4). S16–S23 are kept for the record and are not tested.*
+
 ### ★ S16: A new model is published within one scheduled run
 Given `/v1/models` newly lists `claude-opus-6` with `created_at` after the watermark
 When the scheduled publisher runs
@@ -215,3 +217,45 @@ Then the automated rows are filtered out by `minAppVersion`
 Given an engineer opens `architecture.md` Model Catalog or the `release` skill
 When they look for how Anthropic models become visible
 Then they find the authority split, runtime declarations, the merge rule, the publisher, its switches, and the canary-version release step
+
+*(Revised 2026-09-24, D4.)* Then they find the authority split, runtime declarations, the merge rule, the Claude Code currency rule, the pre-release check and the rules for hand edits to the feed. There is no publisher.
+
+## Feature: Current Claude Code (R9, added 2026-09-24, D4)
+
+### ★ S35: Opus 5.5 is in the menu on v1.12.0
+Given a Claude Max subscriber on Ritemark v1.12.0, which bundles Claude Code 2.1.281
+When they open the Claude Code model menu
+Then "Opus 5.5" is listed once, because the bundled Claude Code lists it natively
+And choosing it starts a session whose init reports `claude-opus-5-5`, with no "Model mismatch" line
+
+### S36: Runtime pins stay in lockstep (refusal)
+Given the runtime manifest says Claude Code 2.1.281
+When `package.json` or `package-lock.json` pins another Agent SDK patch, or an optional SDK platform package differs
+Then the runtime manifest validator fails and names the mismatch
+
+### S37: Sonnet 5 stays the default
+Given the bundled lineup gains Opus 5.5
+When a new user opens the Claude Code model menu
+Then the default is still Sonnet 5
+
+## Feature: Pre-release check (R10, added 2026-09-24, D4)
+
+### ★ S38: The check passes and names the models
+Given Anthropic's catalog is reachable, valid and not expired
+And no Claude Code model in it needs a newer Claude Code than the bundled one
+When the release owner runs `npm run check:anthropic-models`
+Then it exits 0 and prints the catalog version, its expiry, the bundled Claude Code version and the `main` models
+And a `main` model missing from the bundled lineup is printed as a warning, where a dated snapshot of a bundled id counts as present
+
+### ★ S39: A Claude Code that has fallen behind raises an alert (refusal)
+Given the catalog lists a model with `min_claude_code_version` 2.1.290
+And the runtime manifest bundles Claude Code 2.1.281
+When the check runs
+Then it exits non-zero with an ALERT naming the model and both versions
+And a full release does not continue until Claude Code is updated or Jarmo defers it explicitly
+
+### ★ S40: A moved, broken or expired catalog raises an alert (refusal)
+Given the catalog URL answers with an error, invalid JSON, an unexpected shape, or an expired document
+When the check runs
+Then it exits non-zero with an ALERT naming the problem
+And no user is affected, because the app never reads the catalog

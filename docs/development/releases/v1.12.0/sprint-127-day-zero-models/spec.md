@@ -28,6 +28,8 @@ Acceptance criteria:
 - When the runtime also knows the model natively, including as a `[1m]` variant of the same identity, the menu shows one row, not two.
 - An organization's managed `modelPicker` or `availableModels` settings still take precedence over Ritemark's declaration.
 
+*(Revised 2026-09-24, D4.)* The mechanism stays, for hand-added feed rows. A feed row may declare a model only when Anthropic's catalog gives that model no minimum Claude Code version, or a minimum that the bundled Claude Code meets. Opus 5.5 needs 2.1.280, so it reaches users through R9, not through a declaration to 2.1.270. The acceptance criteria above therefore apply to a feed-declared model in general; the `claude-opus-5-5` example is historical.
+
 ### R2: The model list follows the credential that runs the request
 
 As a user who signs in one way and may have saved an API key for another feature, I want the Claude model list to describe the account that actually runs my requests.
@@ -62,6 +64,8 @@ Acceptance criteria:
 - A repository variable switches publishing off without a code change.
 - The workflow runs only on schedule and dispatch, never on pull-request code, with least-privilege permissions and pinned actions. Secrets never appear in logs.
 
+**Withdrawn 2026-09-24 (D4).** Anthropic ties new models to a minimum Claude Code version and already publishes a signed catalog of them ([audit](./research/anthropic-served-catalog.md)). An automatic publisher that declares new models to an older bundled CLI would work against both. R9 and R10 replace it. The publisher payload built for R4 was removed; its history is in commit `e03b8fc`.
+
 ### R5: Clients pick up a publish within minutes
 
 As a user with Ritemark open, I want a newly published model to appear without restarting.
@@ -92,6 +96,8 @@ Acceptance criteria:
 - A tombstone committed to the feed removes a model from menus within one refresh cycle (R5).
 - Automated rows carry `minAppVersion` set to the first app version with this sprint's client, so older clients keep their current behavior.
 
+*(Revised 2026-09-24, D4.)* With the publisher withdrawn, these guardrails protect feed rows edited by hand. The criteria are unchanged.
+
 ### R8: Documentation and release process
 
 As the next engineer, I want the new authority model written down where the next change will look.
@@ -104,15 +110,42 @@ Acceptance criteria:
 
 *(Revised 2026-09-24.)* The publisher's documentation is `feeds/README.md` in `ritemark-public`, next to the feed. The repository's root README is the product landing page, and it is left unchanged.
 
+*(Revised 2026-09-24, D4.)* The R8 documentation now covers R9 and R10. The release skill gains the pre-release check, the Claude Code currency steps and the rules for hand edits to the feed. The `ritemark-public` README item is withdrawn with R4.
+
+### R9: The bundled Claude Code supports every model Anthropic currently offers (added 2026-09-24, D4)
+
+As a Ritemark user, I want the Claude Code inside Ritemark to be one that Anthropic says supports the current models, so the newest model is in the menu and runs as Anthropic intends.
+
+Acceptance criteria:
+- v1.12.0 bundles Claude Code 2.1.281 for darwin-arm64, darwin-x64 and win32-x64, and Claude Agent SDK 0.3.281, in lockstep. The runtime manifest validator, the approved snapshot list, `package.json` and `package-lock.json` all agree, including all eight optional SDK platform packages.
+- The manifest rows carry the npm integrity, the archive SHA-256 and the installed-binary SHA-256 measured from the npm packages, and pass `fetch-agent-runtimes` verification for every target.
+- `docs/development/agent-runtime-compatibility.md` records the 2.1.281 measurements, and every check that could not run is marked as not proven (pre-commit check 11).
+- `src/ai/modelConfig.ts` has the Opus 5.5 id, and the bundled lineup has a curated Opus 5.5 row without a Claude Code declaration. Sonnet 5 stays the default.
+- A subscription user on v1.12.0 sees Opus 5.5 in the model menu because the bundled Claude Code lists it natively, and can run it.
+
+### R10: A pre-release check of Anthropic's catalog raises an alert (added 2026-09-24, D4)
+
+As the release owner, I want every release to check Anthropic's published model catalog, so a Claude Code that has fallen behind, or a catalog that has moved or changed, is caught before users are.
+
+Acceptance criteria:
+- `npm run check:anthropic-models` in `extensions/ritemark` fetches `https://downloads.claude.ai/model-catalog/v1/catalog.json` and parses it with a strict, unit-tested parser.
+- It exits non-zero with an `ALERT` line naming the problem when:
+  - the catalog cannot be fetched, is not JSON, fails the expected shape, or has expired;
+  - any Claude Code model (surface `cc`) carries a `min_claude_code_version` newer than the Claude Code version in the runtime manifest, on any target.
+- It prints a warning, and still exits 0, when a `main` model is missing from the bundled lineup. Dated snapshots of a bundled id count as present.
+- On success it prints the catalog version, its expiry, the bundled Claude Code version and the `main` models.
+- The release skill runs it in Step 0 (full release) and in the extension-only release, and release-manager Gate 1 requires it. An alert stops a full release until the bundled Claude Code is updated or Jarmo defers it explicitly. In an extension-only release, which cannot change Claude Code, the alert is reported to Jarmo.
+- The app itself does not read this catalog. Nothing that users see depends on this URL.
+
 ## Non-Requirements
 
-- Updating the bundled CLI outside a shell release (C2) is a separate shell-tier decision. This sprint makes model visibility independent of it.
+- Updating the bundled CLI outside a shell release (C2) is a separate shell-tier decision. This sprint makes model visibility independent of it. *(Revised 2026-09-24, D4: it no longer does. Anthropic ties new models to a CLI version, so delivering them between releases needs that channel.)*
 - Automatic default changes. The recommended default stays human-curated.
 - Automatic retirement. Only people add tombstones; automation never removes or deprecates.
 - Automated `behavesAs` profiles (audit: risk of `thinking: disabled` in CLI side paths).
-- Auto-publishing OpenAI, Gemini, Codex or OpenCode models. R3's merge rule applies to every provider, but R4 publishes Anthropic only.
+- Auto-publishing OpenAI, Gemini, Codex or OpenCode models. R3's merge rule applies to every provider, but R4 publishes Anthropic only. *(D4: R4 is withdrawn, so nothing is auto-published.)*
 - Using Claude Code's OAuth token from Ritemark code.
-- Depending on Anthropic's server-served CLI catalog. It is welcome when present, but not required.
+- Depending on Anthropic's server-served CLI catalog. It is welcome when present, but not required. *(D4: the app still does not read it at runtime. R10 reads it at release time only.)*
 - A signed feed. The Sprint 89 deferral stands; R7 guardrails limit the blast radius.
 
 ## Resolved Questions
@@ -120,11 +153,15 @@ Acceptance criteria:
 - **2026-09-24 (Jarmo):** existence / runnability / presentation are separate authorities; the CLI list is not the existence authority.
 - **2026-09-24 (Jarmo):** subscription users may see a model before the CLI knows it natively, through a runtime declaration after a canary.
 - **2026-09-24 (Jarmo):** publishing is fully automatic and immediate.
-- **2026-09-24 — Q1, where the publisher runs:** it runs in `ritemark-public`. This session was denied push access there, so the publisher is delivered as an apply-ready, tested payload ([ritemark-public/APPLY.md](./ritemark-public/APPLY.md)) for Jarmo to apply.
+- **2026-09-24 — Q1, where the publisher runs:** it runs in `ritemark-public`. This session was denied push access there, so the publisher is delivered as an apply-ready, tested payload for Jarmo to apply. *(Withdrawn by D4 on the same day; the payload is preserved in commit `e03b8fc`.)*
 - **2026-09-24 — Q4, branch:** the local branch is `sprint-127-day-zero-models`, pushed to the remote ref `claude/anthropic-models-bundled-cli-gtjld9`, the only ref this session may push.
 - **2026-09-24 — Q5, context window:** deferred. The feed carries no `contextWindow` until audit A3 shows how `CLAUDE_CODE_MAX_CONTEXT_TOKENS` behaves for an unknown model. Until then, an undeclared window uses the CLI's conservative default.
 
+- **2026-09-24 (Jarmo) — D4: follow Anthropic's catalog and keep Claude Code current.** R4 is withdrawn, R9 and R10 are added, and R1 is narrowed. The basis is the [served-catalog audit](./research/anthropic-served-catalog.md).
+- **2026-09-24 — Q2, credentials:** not needed. No Anthropic API key or workspace is used (D4).
+- **2026-09-24 — Q3, release vehicle:** v1.12.0. The Claude Code bump (R9) is shell-tier, and v1.12.0 is a shell release already (D4).
+
 ## Open Questions
 
-- **Q2 — Credentials.** Jarmo creates a dedicated Anthropic workspace API key with a spend cap, stored as `MODEL_CATALOG_ANTHROPIC_API_KEY` in `ritemark-public`, and sets `MODEL_CATALOG_AUTOPUBLISH=on`. The publisher is inert until both exist.
-- **Q3 — Release vehicle.** The client half ships with v1.12.0 by default. release-manager may pick an earlier extension-tier release if main allows. The feed bootstrap and the publisher go live when applied, independent of any app release.
+- ~~**Q2 — Credentials.**~~ Resolved by D4 (see above). Jarmo creates a dedicated Anthropic workspace API key with a spend cap, stored as `MODEL_CATALOG_ANTHROPIC_API_KEY` in `ritemark-public`, and sets `MODEL_CATALOG_AUTOPUBLISH=on`. The publisher is inert until both exist.
+- ~~**Q3 — Release vehicle.**~~ Resolved by D4 (see above). The client half ships with v1.12.0 by default. release-manager may pick an earlier extension-tier release if main allows. The feed bootstrap and the publisher go live when applied, independent of any app release.

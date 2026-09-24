@@ -62,13 +62,11 @@ Sprint 123 makes a long recording searchable and keeps a crowded tab row readabl
 
 **A tab row that fits.** With many files open, tabs shrink to fit the row instead of running off the edge. Hover a tab for its full name.
 
-## New Claude models without waiting for an update
+## Claude Opus 5.5
 
-With Sprint 127, new Anthropic models reach Ritemark on their own, without an app update or a restart.
+Sprint 127 brings Claude Opus 5.5 to Ritemark.
 
-Until now, if you signed in with a Claude subscription, the model menu listed only the models built into the copy of Claude Code that ships inside Ritemark. A new model waited for the next Ritemark release.
-
-Now Ritemark checks its public model list every 10 minutes. When Anthropic releases a model, an automatic check first runs it on the exact Claude Code version that Ritemark ships. Once that passes, the model appears in the menu.
+Anthropic requires Claude Code 2.1.280 or newer for Opus 5.5. Ritemark now ships Claude Code 2.1.281, so Opus 5.5 appears in the Claude Code model menu, whether you sign in with a Claude subscription or an API key. If you had chosen Opus, you move to Opus 5.5 automatically.
 
 **Your sign-in decides the list.** With a Claude subscription, the menu follows your subscription, even when an API key is also saved in Settings. With an API key, it follows what your key can use, from the first day.
 

@@ -15,7 +15,7 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 120 | A typed number only starts a numbered list up to 99, so a year such as `2026. ` stays a sentence | Gate 1 |
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
-| 127 | New Anthropic models without an app update: the public model list gains them automatically after a canary, the app declares them to its bundled Claude Code, the list follows the sign-in method, and substitution is visible | Gate 1, **after the publisher's first automatic publish** (release gate) |
+| 127 | Claude Code 2.1.281 with Opus 5.5; the Claude model list follows the sign-in method; a model that is not available is named instead of swapped silently | Gate 1 (Max subscription), and **Gate 2 for the new Claude Code on x64 and Windows** |
 | 124–125 | _Not started_ | — |
 
 ## Automated checks (before handover)
@@ -23,6 +23,8 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 _To be filled for the candidate: `validate-qa.sh`, preflight, `build-prod.sh`, byte-identical `media/webview.js`, provenance, `ritemarkVersion` 1.12.0._
 
 - [ ] `scripts/check-google-oauth-build.mjs` passes on the built extension for every platform (the client ID and secret compiled in from the CI secrets or `~/.config/ritemark/release.env`)
+- [ ] `(cd extensions/ritemark && npm run check:anthropic-models)` passes on the release source (Sprint 127 R10)
+- [ ] `./scripts/verify-agent-runtimes.sh` passes on the release Mac for Claude Code 2.1.281, and the runtime matrix gets its **Last verified** line (release-manager Step 2b)
 
 ## ⛔ Gate 1 — Jarmo, on the installed arm64 DMG (un-notarized)
 
@@ -77,12 +79,13 @@ Gatekeeper will warn: right-click → **Open**, or `xattr -dr com.apple.quaranti
 - [ ] A word that is not there shows "No matches"; Escape clears the field
 - [ ] Open eight or more files with long names: the tab row fits without scrolling sideways; hovering a tab shows its full name
 
-### New Claude models without an update (Sprint 127)
+### Claude Opus 5.5 and the model list (Sprint 127)
 
-Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-models/tasks.md` Phase 7.
+Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-models/tasks.md` Phases 7 and 8.
 
-- [ ] **Release gate:** ritemark-public `feeds/model-catalog.json` carries the automated Opus 5.5 row (`"provenance": "auto"`), committed by github-actions[bot]
-- [ ] Signed in with a Claude subscription (Max): the model menu lists **Opus 5.5** without a restart. Choose it and send a prompt: the reply arrives, and the conversation runs on Opus 5.5 (S1, S2)
+- [ ] Settings shows the bundled Claude Code as 2.1.281
+- [ ] Signed in with a Claude subscription (Max), the model menu lists **Opus 5.5**. Choose it and send a prompt: the reply arrives, and the conversation runs on Opus 5.5 (S35)
+- [ ] A conversation that had **Opus** chosen before the update continues on Opus 5.5 with no substitution line
 - [ ] Also save an API key in Settings while signed in with the subscription: the menu still follows the subscription (S7)
 - [ ] Sign in with an API key only: the menu lists the models the key can use (S8)
 - [ ] Choose a model the account cannot use (for example, one outside the plan): the error names the model and points to the model menu, and the conversation stays open (S29)
@@ -98,12 +101,15 @@ Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-mod
 
 ### macOS x64 (Intel)
 
+- [ ] A Claude Code chat on **Opus 5.5** replies (bundled Claude Code 2.1.281; Sprint 127)
+
 - [ ] Google Docs Connect, Create and Sync work
 - [ ] Record → Stop and use gives a playable file. On-device transcription is not available on Intel; the engine card says so, and ElevenLabs is offered if a key is set
 
 ### Windows
 
 - [ ] With many files open, the tab row shrinks to fit and hovering a tab shows its full name (Sprint 123)
+- [ ] A Claude Code chat on **Opus 5.5** replies (bundled Claude Code 2.1.281; Sprint 127)
 
 - [ ] Installer signed by `Productory Services OÜ`; standard-user install and clean uninstall
 - [ ] **Google Docs Connect** completes in the browser and returns to Ritemark. This is the first native Windows run of the loopback OAuth flow. Then Create and Sync

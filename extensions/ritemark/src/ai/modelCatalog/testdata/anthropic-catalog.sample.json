@@ -1,0 +1,222 @@
+{
+  "$comment": "Trimmed copy of https://downloads.claude.ai/model-catalog/v1/catalog.json version 1088 (captured 2026-09-24) for Sprint 127 R10 tests. Only the Claude Code surface keeps its models; one other surface is kept to show it is ignored.",
+  "$schema": "https://downloads.claude.ai/model-catalog/v1/schema.json",
+  "schema_version": 1,
+  "version": 1088,
+  "issued_at": "2026-09-24T11:21:38Z",
+  "expires_at": "2026-10-01T11:21:38Z",
+  "key_id": "claude-code-release-signing-key",
+  "surfaces": {
+    "cc": {
+      "model_selector_state": [
+        {
+          "id": "cc",
+          "model": "claude-opus-5",
+          "selection_source": "global_default"
+        }
+      ],
+      "model_selector_config": [
+        {
+          "id": "cc",
+          "models": [
+            {
+              "id": "claude-opus-5-5",
+              "name": "Opus 5.5",
+              "short_name": "Opus",
+              "description": "Most capable for ambitious work",
+              "section": "main",
+              "min_claude_code_version": "2.1.280",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "opus"
+              }
+            },
+            {
+              "id": "claude-sonnet-5",
+              "name": "Sonnet 5",
+              "short_name": "Sonnet",
+              "description": "Most efficient for everyday tasks",
+              "section": "main",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "sonnet"
+              }
+            },
+            {
+              "id": "claude-fable-5-1",
+              "name": "Fable 5.1",
+              "short_name": "Fable",
+              "description": "For your toughest challenges",
+              "section": "main",
+              "min_claude_code_version": "2.1.251",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "mythos"
+              }
+            },
+            {
+              "id": "claude-haiku-4-5-20251001",
+              "name": "Haiku 4.5",
+              "short_name": "Haiku",
+              "description": "Fastest for quick answers",
+              "section": "main",
+              "runtime": {
+                "max_output_tokens": 64000,
+                "family": "haiku"
+              }
+            },
+            {
+              "id": "claude-opus-5",
+              "name": "Opus 5",
+              "short_name": "Opus",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "opus"
+              }
+            },
+            {
+              "id": "claude-fable-5",
+              "name": "Fable 5",
+              "short_name": "Fable",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "mythos"
+              }
+            },
+            {
+              "id": "claude-opus-4-8",
+              "name": "Opus 4.8",
+              "short_name": "Opus",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "opus"
+              }
+            },
+            {
+              "id": "claude-opus-4-7",
+              "name": "Opus 4.7",
+              "short_name": "Opus",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "family": "opus"
+              }
+            },
+            {
+              "id": "claude-opus-4-6",
+              "name": "Opus 4.6",
+              "short_name": "Opus",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ],
+                "family": "opus"
+              }
+            },
+            {
+              "id": "claude-sonnet-4-6",
+              "name": "Sonnet 4.6",
+              "short_name": "Sonnet",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 128000,
+                "effort_levels": [
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ],
+                "family": "sonnet"
+              }
+            },
+            {
+              "id": "claude-opus-4-1-20250805",
+              "name": "Opus 4.1",
+              "short_name": "Opus",
+              "section": "overflow",
+              "runtime": {
+                "max_output_tokens": 32000,
+                "family": "opus"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "chat": {
+      "model_selector_config": [
+        {
+          "id": "chat",
+          "models": [
+            {
+              "id": "claude-fable-5-1",
+              "name": "Fable 5.1",
+              "short_name": "Fable",
+              "description": "For your toughest challenges",
+              "section": "main",
+              "min_claude_code_version": "2.1.251",
+              "runtime": {}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

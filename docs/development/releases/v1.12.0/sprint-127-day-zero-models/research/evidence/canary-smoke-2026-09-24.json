@@ -1,7 +1,7 @@
 {
   "date": "2026-09-24",
   "sdk": "0.3.270",
-  "command": "node scripts/model-catalog/canary-smoke.mjs 2.1.270 2.1.281 (from the ritemark-public payload root)",
+  "command": "node scripts/model-catalog/canary-smoke.mjs 2.1.270 2.1.281, run from the root of the ritemark-public payload. The payload was withdrawn by D4; the script is preserved in commit e03b8fc.",
   "note": "Real CLI + SDK from npm (integrity-checked); a local HTTP server stands in for the API; no credential used. model = a synthetic future id; request = the main streamed /v1/messages call.",
   "results": [
     {

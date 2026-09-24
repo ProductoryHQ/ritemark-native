@@ -16,23 +16,12 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Create branch `sprint-127-day-zero-models`; `git branch --show-current` verified 2026-09-24. It is pushed to `claude/anthropic-models-bundled-cli-gtjld9`.
 - Audit items A1–A5 and A7 moved to the Phase 7 QA gate on 2026-09-24 (see sprint-plan Product Decisions). They need Jarmo's accounts and machines; any result that changes a requirement goes through the scope-change protocol.
 
-## Phase 1: Feed bootstrap and publisher (W7 — R4, R7)
+## Phase 1: Feed bootstrap and publisher (W7 — R4, R7) — withdrawn 2026-09-24 (D4)
 
-The publisher is delivered as a payload under [ritemark-public/](./ritemark-public/APPLY.md) (technical-plan W7 revisions). Test command, from the payload root: `node --test 'scripts/model-catalog/*.test.mjs'` (70 tests, 2026-09-24).
+The publisher was built and tested as a `ritemark-public` payload in commit `e03b8fc`: 70 `node --test` tests, workflows, the bootstrap feed and `APPLY.md`. D4 withdrew it the same day, and the payload was removed. What stays:
 
-- [x] `extensions/ritemark/scripts/export-bundled-model-catalog.ts` prints the bundled catalog as feed JSON. `--merge` keeps automated rows and tombstones (`src/ai/modelCatalog/feedExport.ts` + `feedExport.test.ts`).
-- [x] Payload `feeds/model-catalog.json` holds the complete current lineup for every provider (generated 2026-09-24). `feeds/model-catalog.config.json` sets the watermark to the bundled lineup's `updatedAt` (W7 revision).
-- [x] `scripts/model-catalog/candidates.mjs` + tests (S18, S19; the watermark holds below pending models).
-- [x] `scripts/model-catalog/rows.mjs` + tests (label, tier, order, effort, `claudeCode`, `minAppVersion`). `fixtures/auto-row.fixture.json` is a copy of the W1 fixture.
-- [x] `scripts/model-catalog/canary.mjs` + stubbed-SDK tests, with an integrity check of the packed CLI and SDK. `canary-smoke.mjs` ran the real CLI 2.1.270 and 2.1.281 offline: [evidence](./research/evidence/canary-smoke-2026-09-24.json).
-- [x] `scripts/model-catalog/validate.mjs` + `schema.mjs` (schema, size cap, config, additions-only diff) + tests (S21, S30, S31).
-- [x] `scripts/model-catalog/autopublish.mjs` (kill switch S20, cooldown, commit message, dry run) + tests (S16, S17).
-- [x] `.github/workflows/model-catalog-autopublish.yml` (schedule, dispatch, concurrency, permissions, pinned actions) and `model-catalog-tests.yml`, guarded by `workflows.test.mjs` (S22, S23).
-- [x] `feeds/README.md` "Model catalog feed" documentation (spec R8 revision).
-- [ ] Jarmo: apply the payload to `ritemark-public` ([APPLY.md](./ritemark-public/APPLY.md) steps 1–3, which regenerate the feed so `updatedAt` is current).
-- [ ] Jarmo: `MODEL_CATALOG_ANTHROPIC_API_KEY` (dedicated workspace, spend cap), branch rules, then a dry run, then `MODEL_CATALOG_AUTOPUBLISH=on` (APPLY.md steps 4–5).
-- [ ] The first live run detects, canaries and publishes Opus 5.5. Record the commit link and timing (S16).
-- [ ] A6: record GitHub schedule latency over the first day of runs (queued time vs cron time), and put the honest "immediate" number in `feeds/README.md`.
+- [x] `extensions/ritemark/scripts/export-bundled-model-catalog.ts` prints the bundled catalog as feed JSON. `--merge` keeps automated rows and tombstones (`src/ai/modelCatalog/feedExport.ts` + `feedExport.test.ts`). It is the starting point for any hand edit to the feed.
+- The real-CLI smoke evidence ([canary-smoke-2026-09-24.json](./research/evidence/canary-smoke-2026-09-24.json)) still shows that 2.1.270 and 2.1.281 honor a `settings.modelPicker` declaration. That is the W3 mechanism kept for hand-added feed rows.
 
 ## Phase 2: Feed contract and static merge (W1, W2 — R3, R7)
 
@@ -66,25 +55,39 @@ The publisher is delivered as a payload under [ritemark-public/](./ritemark-publ
 
 ## Phase 7: Documentation, QA and closeout (W8 — R8)
 
-- [x] `docs/development/architecture.md`: Model Catalog TO BE → AS IS (new "post-Sprint 127" section; the Sprint 89 section is marked amended), the locked-decision line, a changelog row, and the Sprint 89 memo addendum (S34).
-- [x] `.claude/skills/release/SKILL.md`: "Model catalog feed duties" (canary versions with the offline smoke check, lineup refresh with `--merge`, the one-time v1.12.0 gate) and Step 9 item 4.
+- [x] `docs/development/architecture.md`: Model Catalog TO BE → AS IS (new "post-Sprint 127" section; the Sprint 89 section is marked amended), the locked-decision line, a changelog row, and the Sprint 89 memo addendum (S34). The D4 revision replaces the publisher paragraph with "Claude Code currency" and updates the changelog row and the memo.
+- [x] `.claude/skills/release/SKILL.md`: "Model catalog feed duties" and Step 9 item 4. D4 rewrote the section as "Claude Code and model currency": the pre-release check table, the Claude Code bump steps, the rules for hand edits to the feed, and the v1.12.0 gate. It also added Step 0, the extension-release step and release-manager Gate 1 rows.
 - [x] `extensions/ritemark/package.json` `test` chain includes the new tests; `npm test` green; `tsc --noEmit` clean (2026-09-24, re-run after `feedExport.test.ts` joined the chain).
-- [x] Update the v1.12.0 release plan tracker, `docs/CHANGELOG.md`, the v1.12.0 release notes draft, and `docs/releases/v1.12.0/TEST-CHECKLIST.md` (Sprint 127 Gate 1 rows).
+- [x] Update the v1.12.0 release plan tracker, `docs/CHANGELOG.md`, the v1.12.0 release notes draft, and `docs/releases/v1.12.0/TEST-CHECKLIST.md` (Sprint 127 Gate 1 rows). All four were revised for D4: Opus 5.5 via Claude Code 2.1.281, the check gate, and Gate 2 rows.
 - [x] Walk every `[x]` against the branch diff (SDD discrepancy check, 2026-09-24): every named symbol and file is present on the branch. Phase 1 was reworded for the payload.
 - [ ] Audit items, moved here from Phase 0 on 2026-09-24, recorded in `research/phase-0-audit.md`:
-  - [ ] A1: Pro and Max subscriptions, CLI 2.1.270, an injected row → listed, runs, init matches, a long session compacts sanely.
+  - [ ] A1: Pro and Max subscriptions, CLI 2.1.270, an injected row → listed, runs, init matches, a long session compacts sanely. *(D4: run it on v1.12.0 with Claude Code 2.1.281 and the native Opus 5.5 instead; S35.)*
   - [ ] A2: capture the error shapes for a model the account cannot use (plan, `availableModels`), and confirm the W6 classifier matches them.
   - [ ] A3: measure the effect of `CLAUDE_CODE_MAX_CONTEXT_TOKENS` on an unknown model's assumed window; decide whether `claudeCode.contextWindow` is needed (Q5).
   - [ ] A4: managed-settings `modelPicker` outranks the SDK layer.
   - [ ] A5: injection on darwin-x64 and win32-x64.
-  - [ ] A7: note any `[servedCatalog]` primary-mode behavior seen on the test accounts.
+  - [ ] A7: note any `[servedCatalog]` primary-mode behavior seen on the test accounts. See [anthropic-served-catalog.md](./research/anthropic-served-catalog.md).
 - [ ] QA matrix in `qa-evidence.md`. Use a build reporting a version ≥ `autoRowMinAppVersion`; use a release candidate, or a local uncommitted version bump in the QA worktree.
-  - [ ] ★ S1, S2 on a Max subscription; S3 with a newer CLI; S4 with a system CLI; S5 with managed settings; S6 without a workspace.
+  - [ ] ★ S1, S2 on a Max subscription; S3 with a newer CLI; S4 with a system CLI; S5 with managed settings; S6 without a workspace. *(D4: no current model qualifies for a declaration, so S1–S2 rest on unit evidence plus the real-CLI smoke evidence.)*
   - [ ] ★ S7, S8; S9.
   - [ ] ★ S10–S12, S14 (unit evidence); S13, S15.
-  - [ ] ★ S16, S17, S21 (publisher runs); S18–S20, S22, S23.
+  - ~~★ S16, S17, S21 (publisher runs); S18–S20, S22, S23.~~ Withdrawn (D4).
   - [ ] ★ S24 timing; S25–S27.
   - [ ] ★ S28, S29.
   - [ ] ★ S30; S31–S33.
-- [ ] Release gate: the publisher is live (first automatic publish recorded) before the client ships. Subscription users with a saved API key lose the key-based `/v1/models` list with R2 (sprint-plan Risks).
+  - [ ] ★ S35 on a Max subscription with v1.12.0; S36, S37 (unit evidence).
+  - [ ] ★ S38 against the live catalog; ★ S39, ★ S40 (unit evidence).
+- ~~Release gate: the publisher is live (first automatic publish recorded) before the client ships.~~ *(Replaced 2026-09-24, D4.)* Release gate: `npm run check:anthropic-models` passes on the release candidate's source (R10), and v1.12.0 bundles Claude Code 2.1.281 (R9).
 - [ ] Recommend `qa-validator` (Phase 4 gate) and `pr-reviewer`; commit and push the sprint branch; open the PR.
+
+## Phase 8: Claude Code currency and the pre-release check (W9, W10 — R9, R10; added 2026-09-24, D4)
+
+- [x] Scope change recorded first: D4 in `sprint-plan.md`; R4 withdrawn; R1 and R8 revised; R9 and R10 added in `spec.md`; S35–S40 in `scenarios.md`; W9 and W10 in `technical-plan.md`; audit [anthropic-served-catalog.md](./research/anthropic-served-catalog.md) with [evidence](./research/evidence/anthropic-served-catalog-2026-09-24.json).
+- [x] W9: `manifest.json` Claude rows → 2.1.281 with measured npm integrity, archive SHA-256 and installed SHA-256 for all three targets. `fetch-agent-runtimes` gives PASS for darwin-arm64, darwin-x64 and win32-x64.
+- [x] W9: `validate-agent-runtime-manifest.mjs` approved snapshots (2.1.281 / 0.3.281) + its test (11/11); `package.json` + `package-lock.json` Agent SDK 0.3.281 through npm. Only the SDK and its eight platform packages changed.
+- [x] W9: evidence in `docs/development/agent-runtime-compatibility.md`: validator, fetch verification, SDK type diff (additive), `tsc` + tests, linux-x64 probes ([cli-2.1.281-probes.json](./research/evidence/cli-2.1.281-probes.json)), and the not-proven items (native execution, an authenticated turn).
+- [x] W9: Opus 5.5 id in `modelConfig.ts`; curated row in `bundledCatalog.ts` (lineup dated 2026-09-24); Sonnet 5 stays the default (S37); tests. The shared fixture moved to a hypothetical `claude-opus-6`, and the older resolver tests derive their date from the lineup.
+- [x] W10: `anthropicCatalogCheck.ts` + `anthropicCatalogCheck.test.ts` (S38–S40, 11 tests) + trimmed sample fixture; `scripts/check-anthropic-model-catalog.ts`; `check:anthropic-models` npm script; test in the `test` chain. Live run: [evidence](./research/evidence/anthropic-models-check-2026-09-24.txt).
+- [x] W10: the `release` skill (Step 0, extension-only release, "Claude Code and model currency") and release-manager Gate 1 (red-flag row and extension step 1b).
+- [x] Remove the `ritemark-public/` payload; update `architecture.md`, `docs/CHANGELOG.md`, the v1.12.0 release notes, `TEST-CHECKLIST.md` and the release plan.
+- [ ] `tsc`, `npm run compile`, full `npm test`, validator tests, pre-commit hook; `qa-validator` before commit; commit and push.

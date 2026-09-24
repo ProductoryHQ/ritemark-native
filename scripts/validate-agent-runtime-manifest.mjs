@@ -10,7 +10,7 @@ const TARGETS = ['darwin-arm64', 'darwin-x64', 'win32-x64'];
 
 const APPROVED_COMPONENTS = {
   'codex/package': { vendor: 'openai', version: '0.154.0', targets: TARGETS, license: 'Apache-2.0', notice: '/openai/codex/' },
-  'claude/runtime': { vendor: 'anthropic', version: '2.1.270', targets: TARGETS, license: 'LicenseRef-Anthropic-Proprietary', notice: 'code.claude.com/' },
+  'claude/runtime': { vendor: 'anthropic', version: '2.1.281', targets: TARGETS, license: 'LicenseRef-Anthropic-Proprietary', notice: 'code.claude.com/' },
   'opencode/runtime': { vendor: 'anomalyco', version: '1.18.30', targets: TARGETS, license: 'MIT', notice: '/anomalyco/opencode/' },
   'opencode/ripgrep': { vendor: 'BurntSushi', version: '15.1.0', targets: TARGETS, license: 'MIT OR Unlicense', notice: '/BurntSushi/ripgrep/' },
 };
@@ -40,7 +40,7 @@ const CODEX_MEMBERS = {
   },
 };
 
-const APPROVED_SDKS = { claude: '0.3.270', acp: '1.4.0' };
+const APPROVED_SDKS = { claude: '0.3.281', acp: '1.4.0' };
 const CLAUDE_OPTIONAL_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk-darwin-arm64',
   '@anthropic-ai/claude-agent-sdk-darwin-x64',
