@@ -1,0 +1,182 @@
+[
+  {
+    "config": "aiden-eager",
+    "fixture": "01-title-bullets",
+    "runs": 5,
+    "totalMs": 35.200000047683716,
+    "parseMs": 7.200000047683716,
+    "buildMs": 3.5999999046325684,
+    "renderMs": 12.900000095367432,
+    "heapAfterMb": 3,
+    "rssBaseMb": 294.6,
+    "peakRssMb": 337.6,
+    "dom": 164,
+    "totals": [
+      52,
+      34,
+      53,
+      35,
+      34
+    ]
+  },
+  {
+    "config": "aiden-eager",
+    "fixture": "08-long-40-slides",
+    "runs": 5,
+    "totalMs": 124.29999995231628,
+    "parseMs": 13.799999952316284,
+    "buildMs": 8.299999952316284,
+    "renderMs": 43.80000019073486,
+    "heapAfterMb": 6.2,
+    "rssBaseMb": 298.2,
+    "peakRssMb": 391.9,
+    "dom": 1783,
+    "totals": [
+      126,
+      124,
+      123,
+      112,
+      167
+    ]
+  },
+  {
+    "config": "aiden-eager",
+    "fixture": "10-media-heavy-40",
+    "runs": 5,
+    "totalMs": 134.59999990463257,
+    "parseMs": 89.20000004768372,
+    "buildMs": 5.8999998569488525,
+    "renderMs": 24.800000190734863,
+    "heapAfterMb": 3.2,
+    "rssBaseMb": 326.1,
+    "peakRssMb": 424.7,
+    "dom": 360,
+    "totals": [
+      141,
+      130,
+      135,
+      126,
+      136
+    ]
+  },
+  {
+    "config": "aiden-lazy",
+    "fixture": "01-title-bullets",
+    "runs": 5,
+    "totalMs": 50,
+    "parseMs": 7.1000001430511475,
+    "buildMs": 2.5999999046325684,
+    "renderMs": 16.799999952316284,
+    "heapAfterMb": 2.7,
+    "rssBaseMb": 294.4,
+    "peakRssMb": 336.9,
+    "dom": 137,
+    "totals": [
+      71,
+      49,
+      50,
+      53,
+      50
+    ]
+  },
+  {
+    "config": "aiden-lazy",
+    "fixture": "08-long-40-slides",
+    "runs": 5,
+    "totalMs": 219.19999980926514,
+    "parseMs": 12.700000047683716,
+    "buildMs": 3.3999998569488525,
+    "renderMs": 174.79999995231628,
+    "heapAfterMb": 3.3,
+    "rssBaseMb": 298,
+    "peakRssMb": 362.7,
+    "dom": 285,
+    "totals": [
+      212,
+      222,
+      213,
+      219,
+      227
+    ]
+  },
+  {
+    "config": "aiden-lazy",
+    "fixture": "10-media-heavy-40",
+    "runs": 5,
+    "totalMs": 216.29999995231628,
+    "parseMs": 16.899999856948853,
+    "buildMs": 3.5,
+    "renderMs": 158.89999985694885,
+    "heapAfterMb": 2.9,
+    "rssBaseMb": 325.6,
+    "peakRssMb": 399.8,
+    "dom": 108,
+    "totals": [
+      203,
+      216,
+      214,
+      220,
+      220
+    ]
+  },
+  {
+    "config": "preview",
+    "fixture": "01-title-bullets",
+    "runs": 5,
+    "totalMs": 42.90000009536743,
+    "parseMs": null,
+    "buildMs": null,
+    "renderMs": 15.100000143051147,
+    "heapAfterMb": 3.6,
+    "rssBaseMb": 291.4,
+    "peakRssMb": 322.1,
+    "dom": 197,
+    "totals": [
+      41,
+      43,
+      42,
+      43,
+      54
+    ]
+  },
+  {
+    "config": "preview",
+    "fixture": "08-long-40-slides",
+    "runs": 5,
+    "totalMs": 81.5,
+    "parseMs": null,
+    "buildMs": null,
+    "renderMs": 29.40000009536743,
+    "heapAfterMb": 6.7,
+    "rssBaseMb": 295,
+    "peakRssMb": 351.6,
+    "dom": 2408,
+    "totals": [
+      82,
+      87,
+      77,
+      77,
+      82
+    ]
+  },
+  {
+    "config": "preview",
+    "fixture": "10-media-heavy-40",
+    "runs": 5,
+    "totalMs": 238,
+    "parseMs": null,
+    "buildMs": null,
+    "renderMs": 215.70000004768372,
+    "heapAfterMb": 6.7,
+    "rssBaseMb": 322.4,
+    "peakRssMb": 533.5,
+    "dom": 561,
+    "totals": [
+      243,
+      238,
+      238,
+      238,
+      255
+    ]
+  }
+]

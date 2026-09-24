@@ -1,0 +1,4 @@
+all            min  1220 KB  gzip  380 KB
+no-echarts     min   605 KB  gzip  171 KB
+no-jszip       min  1123 KB  gzip  351 KB
+renderer-only  min   508 KB  gzip  141 KB
