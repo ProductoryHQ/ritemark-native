@@ -26,6 +26,30 @@ export interface ModelThinkingEffort {
   defaultLevel?: ExplicitThinkingEffort;
 }
 
+/**
+ * Who wrote a catalog row (Sprint 127 R3/R4). `auto` rows come from the
+ * ritemark-public publisher: they may add a model, never become a default.
+ */
+export type ModelProvenance = 'curated' | 'auto';
+
+/**
+ * How to declare a model to the Claude Code runtime (Sprint 127 R1). The CLI
+ * lists and runs a declared model it does not know through the SDK's
+ * `settings.modelPicker`; `maxOutputTokens` replaces its conservative 32K
+ * default for unknown models.
+ */
+export interface ClaudeCodeDeclaration {
+  inject?: boolean;
+  maxOutputTokens?: number;
+  /** Curated rows only — ignored on `auto` rows (R7). */
+  behavesAs?: string;
+}
+
+/** Claude request ids the client will declare or accept from a feed (R7). */
+export const CLAUDE_MODEL_ID_PATTERN = /^claude-[a-z0-9]+(?:-[a-z0-9]+)*(?:\[1m\])?$/;
+
+const MAX_DECLARED_OUTPUT_TOKENS = 1_000_000;
+
 /** A single selectable model, as shown in a picker row. */
 export interface ModelEntry {
   /** Provider model id; OpenCode entries use a provider-qualified composite id. */
@@ -50,6 +74,14 @@ export interface ModelEntry {
   minAppVersion?: string;
   /** Authoritative model-scoped manual effort levels; absent means Auto-only. */
   thinkingEffort?: ModelThinkingEffort;
+  /** Omitted = 'curated'. */
+  provenance?: ModelProvenance;
+  /** When the row entered its catalog; omitted = the document's `updatedAt`. */
+  addedAt?: string;
+  /** Tombstone: never offered, never declared to a runtime. */
+  retired?: boolean;
+  /** Anthropic rows only. */
+  claudeCode?: ClaudeCodeDeclaration;
 }
 
 export type ModelTier = 'low' | 'medium' | 'high';
@@ -91,23 +123,63 @@ function fail(msg: string): never {
   throw new Error(`[modelCatalog] invalid catalog: ${msg}`);
 }
 
-function validateEntry(raw: unknown, where: string): ModelEntry {
+function validateEntry(raw: unknown, where: string, provider: Provider): ModelEntry {
   if (!isObject(raw)) fail(`${where} is not an object`);
-  const { id, label, description, tier, deprecated, order, minAppVersion, thinkingEffort } = raw;
+  const {
+    id, label, description, tier, deprecated, order, minAppVersion, thinkingEffort,
+    provenance, addedAt, retired, claudeCode,
+  } = raw;
   if (typeof id !== 'string' || id.length === 0) fail(`${where}.id must be a non-empty string`);
+  // Sprint 127 R7: a Claude id is passed to the CLI verbatim; the CLI itself
+  // accepts any string as a model-picker row, so the feed is checked here.
+  if (provider === 'anthropic' && !CLAUDE_MODEL_ID_PATTERN.test(id)) fail(`${where}.id must be a Claude model id`);
   if (typeof label !== 'string') fail(`${where}.label must be a string`);
   if (typeof description !== 'string') fail(`${where}.description must be a string`);
   if (typeof tier !== 'string' || !TIER_SET.has(tier)) fail(`${where}.tier must be one of ${TIERS.join('|')}`);
   if (typeof deprecated !== 'boolean') fail(`${where}.deprecated must be a boolean`);
   if (typeof order !== 'number' || !Number.isFinite(order)) fail(`${where}.order must be a finite number`);
   if (minAppVersion !== undefined && typeof minAppVersion !== 'string') fail(`${where}.minAppVersion must be a string`);
+  if (provenance !== undefined && provenance !== 'curated' && provenance !== 'auto') fail(`${where}.provenance must be curated|auto`);
+  if (addedAt !== undefined && (typeof addedAt !== 'string' || !Number.isFinite(Date.parse(addedAt)))) {
+    fail(`${where}.addedAt must be a parseable ISO-8601 timestamp`);
+  }
+  if (retired !== undefined && typeof retired !== 'boolean') fail(`${where}.retired must be a boolean`);
   const entry: ModelEntry = { id, label, description, tier: tier as ModelTier, deprecated, order };
   if (minAppVersion !== undefined) entry.minAppVersion = minAppVersion;
   if (thinkingEffort !== undefined) {
     const effort = objectAtThinkingEffort(thinkingEffort, `${where}.thinkingEffort`);
     entry.thinkingEffort = effort;
   }
+  if (provenance !== undefined) entry.provenance = provenance;
+  if (addedAt !== undefined) entry.addedAt = addedAt as string;
+  if (retired !== undefined) entry.retired = retired;
+  if (claudeCode !== undefined && provider === 'anthropic') {
+    entry.claudeCode = validateClaudeCode(claudeCode, `${where}.claudeCode`);
+  }
   return entry;
+}
+
+function validateClaudeCode(value: unknown, where: string): ClaudeCodeDeclaration {
+  if (!isObject(value)) fail(`${where} must be an object`);
+  const { inject, maxOutputTokens, behavesAs } = value;
+  if (inject !== undefined && typeof inject !== 'boolean') fail(`${where}.inject must be a boolean`);
+  if (maxOutputTokens !== undefined && (
+    typeof maxOutputTokens !== 'number'
+    || !Number.isSafeInteger(maxOutputTokens)
+    || maxOutputTokens <= 0
+    || maxOutputTokens > MAX_DECLARED_OUTPUT_TOKENS
+  )) {
+    fail(`${where}.maxOutputTokens must be a positive integer`);
+  }
+  if (behavesAs !== undefined && (typeof behavesAs !== 'string' || !CLAUDE_MODEL_ID_PATTERN.test(behavesAs))) {
+    fail(`${where}.behavesAs must be a Claude model id`);
+  }
+  // Unknown keys (e.g. a future contextWindow) are dropped, not rejected.
+  return {
+    ...(inject === undefined ? {} : { inject }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens: maxOutputTokens as number }),
+    ...(behavesAs === undefined ? {} : { behavesAs: behavesAs as string }),
+  };
 }
 
 function objectAtThinkingEffort(value: unknown, where: string): ModelThinkingEffort {
@@ -129,10 +201,10 @@ function objectAtThinkingEffort(value: unknown, where: string): ModelThinkingEff
   };
 }
 
-function validateProviderCatalog(raw: unknown, where: string): ProviderCatalog {
+function validateProviderCatalog(raw: unknown, where: string, provider: Provider): ProviderCatalog {
   if (!isObject(raw)) fail(`${where} is not an object`);
   if (!Array.isArray(raw.models)) fail(`${where}.models must be an array`);
-  const models = raw.models.map((m, i) => validateEntry(m, `${where}.models[${i}]`));
+  const models = raw.models.map((m, i) => validateEntry(m, `${where}.models[${i}]`, provider));
   const defaults: Partial<Record<Surface, string>> = {};
   if (raw.defaults !== undefined) {
     if (!isObject(raw.defaults)) fail(`${where}.defaults must be an object`);
@@ -160,7 +232,7 @@ export function validateCatalog(raw: unknown): ModelCatalog {
   const providers: Partial<Record<Provider, ProviderCatalog>> = {};
   for (const [key, value] of Object.entries(raw.providers)) {
     if (!PROVIDER_SET.has(key)) continue; // drop unknown providers (forward-compat)
-    providers[key as Provider] = validateProviderCatalog(value, `providers.${key}`);
+    providers[key as Provider] = validateProviderCatalog(value, `providers.${key}`, key as Provider);
   }
 
   return { schemaVersion: 1, updatedAt: raw.updatedAt, providers };

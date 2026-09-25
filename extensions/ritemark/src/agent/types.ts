@@ -6,6 +6,14 @@
  */
 
 import type { ExplicitThinkingEffort, ThinkingEffort } from '../runtime/thinkingEffort';
+import type { ClaudeSessionDeclaration } from '../ai/modelCatalog/runtimeDeclarations';
+
+/**
+ * Sprint 127 R1: how a Claude session declares a model the bundled CLI may not
+ * know — its `settings.modelPicker` row and extra CLI environment. Built by the
+ * model catalog; absent for every model the CLI knows natively.
+ */
+export type ClaudeModelDeclaration = ClaudeSessionDeclaration;
 
 /**
  * Available agent identifiers
@@ -276,6 +284,8 @@ export interface AgentExecutionOptions {
   workspacePath: string;
   /** Model drift fix (2026-08-05): one-shot runs pin a model explicitly. */
   model?: string;
+  /** Sprint 127 R1: declaration for a model the bundled CLI may not know. */
+  modelDeclaration?: ClaudeModelDeclaration;
   attachments?: FileAttachment[];
   allowedTools?: string[];
   settingSources?: AgentSettingSource[];
@@ -299,6 +309,8 @@ export interface AgentSessionConfig {
   model?: string;
   /** Canonical model identity expected from the SDK init event. */
   expectedResolvedModel?: string;
+  /** Sprint 127 R1: declaration for a model the bundled CLI may not know. */
+  modelDeclaration?: ClaudeModelDeclaration;
   anthropicApiKey?: string;
   pathToClaudeCodeExecutable?: string;
   /**

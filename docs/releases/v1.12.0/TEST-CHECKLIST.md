@@ -17,12 +17,15 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
 | 124 | Word preview: Word's pages and page numbers, images behind text, font aliases; one toolbar for Word and PDF (pages, zoom, fit, Word search); plain refusals; the preview in its own bundle (`office-preview.js`) | Gate 1 (the built app carries `office-preview.js`), and **Gate 2 for the Windows Word preview** |
 | 125 | PowerPoint preview: slides that scroll with speaker notes, the Word toolbar and find bar, chart fixes, links through the usual prompt, plain refusals; the host check now unpacks each part with a cap (Word files too); `ritemark.features.powerpoint-preview` kill switch | Gate 1, and **Gate 2 for Windows**: the PowerPoint app check is new there |
+| 127 | Claude Code 2.1.281 with Opus 5.5; the Claude model list follows the sign-in method; a model that is not available is named instead of swapped silently | Gate 1 (Max subscription), and **Gate 2 for the new Claude Code on x64 and Windows** |
 
 ## Automated checks (before handover)
 
 _To be filled for the candidate: `validate-qa.sh`, preflight, `build-prod.sh`, byte-identical `media/webview.js`, provenance, `ritemarkVersion` 1.12.0._
 
 - [ ] `scripts/check-google-oauth-build.mjs` passes on the built extension for every platform (the client ID and secret compiled in from the CI secrets or `~/.config/ritemark/release.env`)
+- [ ] `(cd extensions/ritemark && npm run check:anthropic-models)` passes on the release source (Sprint 127 R10)
+- [ ] `./scripts/verify-agent-runtimes.sh` passes on the release Mac for Claude Code 2.1.281, and the runtime matrix gets its **Last verified** line (release-manager Step 2b)
 
 ## ⛔ Gate 1 — Jarmo, on the installed arm64 DMG (un-notarized)
 
@@ -110,6 +113,17 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-125-powerpoint-preview/resea
 - [ ] Dark theme and a narrow editor: the toolbar and the notes are readable; the slides keep their own colours
 - [ ] A Word document and a PDF still open as before
 
+### Claude Opus 5.5 and the model list (Sprint 127)
+
+Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-models/tasks.md` Phases 7 and 8.
+
+- [ ] Settings shows the bundled Claude Code as 2.1.281
+- [ ] Signed in with a Claude subscription (Max), the model menu lists **Opus 5.5**. Choose it and send a prompt: the reply arrives, and the conversation runs on Opus 5.5 (S35)
+- [ ] A conversation that had **Opus** chosen before the update continues on Opus 5.5 with no substitution line
+- [ ] Also save an API key in Settings while signed in with the subscription: the menu still follows the subscription (S7)
+- [ ] Sign in with an API key only: the menu lists the models the key can use (S8)
+- [ ] Choose a model the account cannot use (for example, one outside the plan): the error names the model and points to the model menu, and the conversation stays open (S29)
+
 ### Regression sweep
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
@@ -122,6 +136,8 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-125-powerpoint-preview/resea
 
 ### macOS x64 (Intel)
 
+- [ ] A Claude Code chat on **Opus 5.5** replies (bundled Claude Code 2.1.281; Sprint 127)
+
 - [ ] Google Docs Connect, Create and Sync work
 - [ ] Record → Stop and use gives a playable file. On-device transcription is not available on Intel; the engine card says so, and ElevenLabs is offered if a key is set
 
@@ -130,6 +146,7 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-125-powerpoint-preview/resea
 - [ ] With many files open, the tab row shrinks to fit and hovering a tab shows its full name (Sprint 123)
 - [ ] Word preview (Sprint 124): `word/05-headers-footers.docx`, `word/07-sections-landscape.docx` and `word/10-unsupported-content.docx` from the corpus — pages, page numbers, the landscape section and the notice as on macOS; Calibri is drawn as Calibri; **Open in Word** opens Word
 - [ ] PowerPoint preview (Sprint 125): `ppt/05-charts.pptx`, `ppt/07-notes.pptx` and `ppt/11-powerpoint-themed.pptx` — slides, notes and charts as on macOS; the button says **Open in PowerPoint** only where PowerPoint is installed, else **Open in default app**
+- [ ] A Claude Code chat on **Opus 5.5** replies (bundled Claude Code 2.1.281; Sprint 127)
 
 - [ ] Installer signed by `Productory Services OÜ`; standard-user install and clean uninstall
 - [ ] **Google Docs Connect** completes in the browser and returns to Ritemark. This is the first native Windows run of the loopback OAuth flow. Then Create and Sync

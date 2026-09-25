@@ -22,6 +22,7 @@ import type {
   AgentProgress,
   AgentResult,
   AgentMetrics,
+  ClaudeModelDeclaration,
   FileAttachment,
   ModelOption,
   QueryHandle,
@@ -192,6 +193,27 @@ const DEFAULT_TIMEOUT_MINUTES = 15;
  * Compare values from the same identity layer. Claude request aliases such as
  * `default` are not expected to equal the canonical model reported at init.
  */
+/**
+ * Sprint 127 R1: SDK options that let the CLI run a model it may not know —
+ * the model's `settings.modelPicker` row and its environment — merged with the
+ * Ritemark API key when Claude runs in API-key mode.
+ */
+export function claudeRuntimeOptions(
+  anthropicApiKey: string | undefined,
+  declaration: ClaudeModelDeclaration | undefined,
+): { settings?: ClaudeModelDeclaration['settings']; env?: Record<string, string | undefined> } {
+  const options: { settings?: ClaudeModelDeclaration['settings']; env?: Record<string, string | undefined> } = {};
+  if (declaration?.settings) options.settings = declaration.settings;
+  if (anthropicApiKey || declaration?.env) {
+    options.env = {
+      ...process.env,
+      ...(declaration?.env ?? {}),
+      ...(anthropicApiKey ? { ANTHROPIC_API_KEY: anthropicApiKey } : {}),
+    };
+  }
+  return options;
+}
+
 export function modelMatchesExpectedIdentity(
   requestedModel: string | undefined,
   expectedResolvedModel: string | undefined,
@@ -332,6 +354,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     abortSignal,
     onProgress,
     pathToClaudeCodeExecutable,
+    modelDeclaration,
   } = options;
 
   const emitProgress: ExtendedProgressEmitter = (
@@ -401,6 +424,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         // from the user's personal config. Lazy require: modelCatalog pulls in
         // vscode, which the tsx unit tests cannot load at module scope.
         model: model ?? (require('../ai/modelCatalog') as typeof import('../ai/modelCatalog')).getDefault('anthropic', 'claude-code'),
+        ...claudeRuntimeOptions(undefined, modelDeclaration),
         settingSources: resolveSettingSources(settingSources),
         // Sprint 103 R2: headless flow runs auto-approve via canUseTool below —
         // same behavior as the old bypassPermissions without the dangerous flag.
@@ -576,6 +600,7 @@ export class AgentSession {
   private readonly _settingSources: AgentSettingSource[];
   private readonly _modelId: string | undefined;
   private readonly _expectedResolvedModel: string | undefined;
+  private readonly _modelDeclaration: ClaudeModelDeclaration | undefined;
   private readonly _anthropicApiKey: string | undefined;
   private readonly _pathToClaudeCodeExecutable: string | undefined;
   private readonly _resumeSessionId: string | undefined;
@@ -602,6 +627,7 @@ export class AgentSession {
     this._settingSources = resolveSettingSources(config.settingSources);
     this._modelId = config.model;
     this._expectedResolvedModel = config.expectedResolvedModel;
+    this._modelDeclaration = config.modelDeclaration;
     this._anthropicApiKey = config.anthropicApiKey;
     this._pathToClaudeCodeExecutable = config.pathToClaudeCodeExecutable;
     this._resumeSessionId = config.resumeSessionId;
@@ -1066,13 +1092,9 @@ export class AgentSession {
       queryOptions.model = this._modelId;
     }
 
-    // Pass Anthropic API key from Ritemark settings if available
-    if (this._anthropicApiKey) {
-      queryOptions.env = {
-        ...process.env,
-        ANTHROPIC_API_KEY: this._anthropicApiKey,
-      };
-    }
+    // Ritemark's Anthropic API key (API-key auth) and, for a model the bundled
+    // CLI may not know, its modelPicker row and environment (Sprint 127 R1).
+    Object.assign(queryOptions, claudeRuntimeOptions(this._anthropicApiKey, this._modelDeclaration));
 
     this._queryStream = query({
       prompt: this._createMessageStream(firstMsg),

@@ -1,0 +1,6 @@
+$ npm run check:anthropic-models   # 2026-09-24, sprint-127 branch after the Claude Code 2.1.281 bump
+Anthropic model catalog v1088, issued 2026-09-24T11:21:38Z, expires 2026-10-01T11:21:38Z.
+Bundled Claude Code: 2.1.281.
+Main models: Opus 5.5 (claude-opus-5-5, needs 2.1.280+); Sonnet 5 (claude-sonnet-5); Fable 5.1 (claude-fable-5-1, needs 2.1.251+); Haiku 4.5 (claude-haiku-4-5-20251001).
+OK: the bundled Claude Code supports every model in Anthropic's Claude Code catalog.
+exit code: 0

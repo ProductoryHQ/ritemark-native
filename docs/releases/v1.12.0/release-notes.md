@@ -82,6 +82,18 @@ Sprint 125 lets you read a presentation someone sent you without leaving Ritemar
 
 **Honest about the rest.** Animations, transitions, audio and video are not played; a note says when a presentation has audio, video or embedded objects. A link on a slide opens in your browser after Ritemark asks, as any link does. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in PowerPoint.
 
+## Claude Opus 5.5
+
+Sprint 127 brings Claude Opus 5.5 to Ritemark.
+
+Anthropic requires Claude Code 2.1.280 or newer for Opus 5.5. Ritemark now ships Claude Code 2.1.281, so Opus 5.5 appears in the Claude Code model menu, whether you sign in with a Claude subscription or an API key. If you had chosen Opus, you move to Opus 5.5 automatically.
+
+**Your sign-in decides the list.** With a Claude subscription, the menu follows your subscription, even when an API key is also saved in Settings. With an API key, it follows what your key can use, from the first day.
+
+**No silent switches.** If the model you last used is no longer available, Ritemark says so in the chat, for example "Opus 5.5 isn't available right now — using Sonnet 5." It no longer switches quietly. If your account can't use a model, for example because your plan or organization doesn't include it, the message names the model and asks you to choose another in the model menu.
+
+The recommended default stays a deliberate choice: a new model is never made the default automatically.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.

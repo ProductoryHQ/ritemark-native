@@ -1,0 +1,187 @@
+{
+  "captured": "2026-09-24",
+  "url": "https://downloads.claude.ai/model-catalog/v1/catalog.json",
+  "note": "Summary of Anthropic's public, signed Claude Code model catalog. Only the Claude Code surface (cc) is summarized; the full document is 134,837 bytes.",
+  "sha256": "d5ae38b24c476882f5ce969160a57219d1f92f81e9bbe1802fdd7e2dc32603d8",
+  "schema_version": 1,
+  "version": 1088,
+  "issued_at": "2026-09-24T11:21:38Z",
+  "expires_at": "2026-10-01T11:21:38Z",
+  "key_id": "claude-code-release-signing-key",
+  "signature": {
+    "algorithm": "RSASSA-PKCS1-v1_5-SHA512",
+    "publicKeySha256": "89a24e2e18d2f8fa4627a0a47cf76c3682aef237b60d2cd115d6f5202e2e9896"
+  },
+  "surfaces": [
+    "cc",
+    "ccd",
+    "ccr",
+    "chat",
+    "cowork"
+  ],
+  "cc_default_model": "claude-opus-5",
+  "cc_models": [
+    {
+      "id": "claude-opus-5-5",
+      "name": "Opus 5.5",
+      "section": "main",
+      "min_claude_code_version": "2.1.280",
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Sonnet 5",
+      "section": "main",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-fable-5-1",
+      "name": "Fable 5.1",
+      "section": "main",
+      "min_claude_code_version": "2.1.251",
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-haiku-4-5-20251001",
+      "name": "Haiku 4.5",
+      "section": "main",
+      "min_claude_code_version": null,
+      "max_output_tokens": 64000,
+      "effort_levels": null
+    },
+    {
+      "id": "claude-opus-5",
+      "name": "Opus 5",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-fable-5",
+      "name": "Fable 5",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Opus 4.8",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-opus-4-7",
+      "name": "Opus 4.7",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-opus-4-6",
+      "name": "Opus 4.6",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "name": "Sonnet 4.6",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 128000,
+      "effort_levels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ]
+    },
+    {
+      "id": "claude-opus-4-1-20250805",
+      "name": "Opus 4.1",
+      "section": "overflow",
+      "min_claude_code_version": null,
+      "max_output_tokens": 32000,
+      "effort_levels": null
+    }
+  ],
+  "npm_dist_tags_2026_09_24": {
+    "@anthropic-ai/claude-code": {
+      "latest": "2.1.281",
+      "next": "2.1.282",
+      "stable": "2.1.273"
+    },
+    "@anthropic-ai/claude-agent-sdk": {
+      "latest": "0.3.281",
+      "next": "0.3.282"
+    }
+  },
+  "cli_scan": {
+    "2.1.270": {
+      "claude-opus-5-5": 0,
+      "min_claude_code_version": 0,
+      "served_catalog_code": "present: fetches this URL; mode from server flag tengu_delegated_quail, default off"
+    },
+    "2.1.281": {
+      "claude-opus-5-5": 51,
+      "min_claude_code_version": "11 (all in embedded catalog snapshots)"
+    }
+  }
+}

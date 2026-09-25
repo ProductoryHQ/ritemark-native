@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { AgentId } from '../agent/types';
+import type { AgentId, ClaudeModelDeclaration } from '../agent/types';
 import type { AgentRuntime, RuntimeSession, RuntimeTurnResult, UnifiedApprovalRequest } from '../runtime/AgentRuntime';
 
 const TITLE_TIMEOUT_MS = 45_000;
@@ -23,6 +23,8 @@ export interface ConversationTitleGenerationInput {
   workspacePath: string;
   model?: string;
   anthropicApiKey?: string;
+  /** Sprint 127 R1: the title runs on the chat's model, declared like the chat's session. */
+  claudeModelDeclaration?: ClaudeModelDeclaration;
   byokEnv?: Record<string, string>;
   userPrompt: string;
   assistantResponse: string;
@@ -77,6 +79,7 @@ export class ConversationTitleGenerator {
         workspacePath: input.workspacePath,
         model: input.model,
         anthropicApiKey: input.anthropicApiKey,
+        ...(input.claudeModelDeclaration ? { claudeModelDeclaration: input.claudeModelDeclaration } : {}),
         byokEnv: input.byokEnv,
         extraSystemPrompt: TITLE_SYSTEM_PROMPT,
         allowedTools: [],

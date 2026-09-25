@@ -1,5 +1,30 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.12.0 Sprint 127 — Claude Code 2.1.281 / SDK 0.3.281 — 2026-09-24
+
+**Change:** Claude Code `2.1.270` → `2.1.281` with Claude Agent SDK `0.3.270` → `0.3.281`, in lockstep. Codex, OpenCode, ripgrep and ACP are unchanged.
+
+**Why:**
+- Anthropic's Claude Code model catalog lists Opus 5.5 with `min_claude_code_version` `2.1.280`, and 2.1.270 does not know the model.
+- 2.1.281 is npm `latest` (published 2026-09-23). The npm `stable` tag, 2.1.273, predates Opus 5.5.
+
+Evidence: [Sprint 127 served-catalog audit](./releases/v1.12.0/sprint-127-day-zero-models/research/anthropic-served-catalog.md).
+
+| Check | Result on 2.1.281 / 0.3.281 |
+|---|---|
+| Manifest rows (darwin-arm64, darwin-x64, win32-x64) | pass. npm integrity, archive SHA-256 and installed SHA-256 were measured from the published packages. `fetch-agent-runtimes.mjs --agent claude --all-platforms` gives PASS for all three targets (hash, safe layout, architecture). |
+| Lockstep pins | pass. `validate-agent-runtime-manifest.mjs` approves `2.1.281` / `0.3.281`, and `package.json`, `package-lock.json` and all eight optional SDK platform packages agree. The validator's tests pass (11/11). |
+| SDK type surface | pass, additive only. The `sdk.d.ts` diff from 0.3.270 widens unions and adds optional fields and new types (`SDKUsageReport`, `SDKStartupFailureReason`, MCP resource reads, `userSettings` as a settings source, a `highlights` thinking display). Ritemark calls none of the changed methods. `tsc --noEmit` is clean, and the full `npm test` passes. |
+| Model listing | pass. `supportedModels()` lists `default`/`sonnet` → `claude-sonnet-5`, `claude-fable-5-1`, `opus` → **`claude-opus-5-5`** and `haiku` → `claude-haiku-4-5-20251001`, all without a declaration. Saved `opus` selections follow the alias to Opus 5.5. |
+| Opus 5.5 request shape | pass. Adaptive thinking, `effort: medium` (the model default in Anthropic's catalog) and `max_tokens` 128000. 2.1.281 adds four betas for it that 2.1.270 did not send: `per-turn-control`, `server-side-fallback`, `fallback-credit` and `thinking-binding-controls`. |
+| `settings.modelPicker` declaration | pass. Offline smoke with a local API stand-in: a declared id is listed and requested with the declared budget and no tools. |
+| Native execution (darwin-arm64, darwin-x64, win32-x64) | **not proven here.** This session ran on linux-x64. `verify-agent-runtimes.sh` refuses unsupported hosts, and its OpenCode checks are unchanged by this bump. The proof comes from Gate 1 (arm64 DMG), Gate 2 (x64 DMG and Windows installer), and PR CI. |
+| Authenticated turn on Opus 5.5 | **not proven here.** No credentials were used. A Max subscription session is QA scenario S35. |
+
+Release-manager Step 2b runs `./scripts/verify-agent-runtimes.sh` on the release Mac and adds the **Last verified** line for 2.1.281 here.
+
+Probe evidence: [cli-2.1.281-probes.json](./releases/v1.12.0/sprint-127-day-zero-models/research/evidence/cli-2.1.281-probes.json) and [canary-smoke-2026-09-24.json](./releases/v1.12.0/sprint-127-day-zero-models/research/evidence/canary-smoke-2026-09-24.json).
+
 ## v1.11.0 Sprint 116 candidate — 2026-09-13
 
 **Candidate baseline:** Claude Code `2.1.270` with Claude Agent SDK `0.3.270`,
