@@ -29,6 +29,9 @@ import { markdownStyles } from './RenderedMarkdown';
 import type { ExtensionMessage } from './types';
 import { sendConversationRequest } from '../../bridge';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
+import { RuntimeNotice } from './RuntimeNotice';
 import { RuntimeAvailabilityNotice } from './RuntimeAvailabilityNotice';
 import { deriveRuntimeAvailabilities, listReadyAlternatives } from './runtimeAvailability';
 
@@ -154,7 +157,6 @@ export function AISidebar() {
   const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'Codex' : 'OpenCode';
   const bootstrapDisplayError = bootstrapError
     ?? (bootstrapTimedOut ? 'Agent Chat is taking longer than expected to load its local configuration.' : null);
-  const runtimeDisplayError = `Checking ${runtimeLabel} is taking longer than expected.`;
 
   useEffect(() => {
     if (ready || bootstrapError || bootstrapTimedOut) return;
@@ -244,29 +246,23 @@ export function AISidebar() {
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
+      {/* The same card as every other runtime notice (RuntimeNotice): the
+          check is still running, it is only slow. */}
       {ready && runtimeTimedOut && (
-        <div className="mx-3 mt-3 rounded-[10px] border border-[var(--r-warning)] bg-[var(--r-warning-soft)] p-3" role="alert">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--r-surface)] text-[var(--r-warning)]">
-              <Icon name="warning" size={16} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xs font-semibold text-[var(--r-ink-strong)]">Could not check {runtimeLabel}</h2>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--r-ink-muted)]">{runtimeDisplayError}</p>
-            </div>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
+        <div className="p-3">
+          <RuntimeNotice
+            tone="warning"
+            title={`Still checking ${runtimeLabel}`}
+            message={`Finding out whether ${runtimeLabel} is ready is taking longer than usual. Try again to start the check over.`}
+            primaryAction={{
+              label: 'Try again',
+              icon: 'arrows-clockwise',
+              onAction: () => {
                 setRuntimeTimedOut(false);
                 vscode.postMessage({ type: 'agent:status/recheck', runtimeId: selectedAgent });
-              }}
-              className="rounded-lg bg-[var(--r-indigo-600)] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[var(--r-indigo-700)]"
-            >
-              Try again
-            </button>
-          </div>
+              },
+            }}
+          />
         </div>
       )}
 
@@ -283,18 +279,21 @@ export function AISidebar() {
               {bootstrapDisplayError ?? 'Loading the local model catalog and your last selection.'}
             </p>
             {bootstrapDisplayError && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBootstrapTimedOut(false);
-                    useAISidebarStore.setState({ bootstrapError: null });
-                    vscode.postMessage({ type: 'agent:bootstrap/request' });
-                  }}
-                  className="rounded-lg bg-[var(--r-indigo-600)] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[var(--r-indigo-700)]"
-                >
-                  Try again
-                </button>
+              <div className="mt-4 flex justify-center">
+                <Tooltip label="Load Agent Chat's local configuration again">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setBootstrapTimedOut(false);
+                      useAISidebarStore.setState({ bootstrapError: null });
+                      vscode.postMessage({ type: 'agent:bootstrap/request' });
+                    }}
+                  >
+                    <Icon name="arrows-clockwise" size={12} tone="inherit" />
+                    Try again
+                  </Button>
+                </Tooltip>
               </div>
             )}
           </div>

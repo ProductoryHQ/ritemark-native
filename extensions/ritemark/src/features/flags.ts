@@ -55,12 +55,24 @@ export type FlagId =
   // Sprint 119: publish a Markdown document to Google Docs and Sync it later
   | 'google-docs-publishing'
   // Sprint 118: record from the microphone directly in Transcribe (#328)
-  | 'transcribe-direct-recording';
+  | 'transcribe-direct-recording'
+  // Sprint 125: read-only PowerPoint (.pptx) preview (#285)
+  | 'powerpoint-preview';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 125: kill switch for the PowerPoint preview. Default ON (HARD RULE #2).
+  // The .pptx editor stays registered when it is off, so a deck says the preview
+  // is turned off and offers PowerPoint rather than showing VS Code's binary-file page.
+  'powerpoint-preview': {
+    id: 'powerpoint-preview',
+    label: 'PowerPoint Preview',
+    description: 'Open PowerPoint (.pptx) files as a read-only preview of their slides, drawn locally.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 118: kill switch for Record in the Transcribe panel. Flag-off hides
   // Record and interrupted-recording recovery; a recording already in progress
   // still finishes, and every saved recording stays an ordinary file.

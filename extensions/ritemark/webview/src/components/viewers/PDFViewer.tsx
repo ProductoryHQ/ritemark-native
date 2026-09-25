@@ -3,12 +3,13 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import './documentSearch.css'
 import { sendToExtension } from '../../bridge'
 import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
 import { stripExt } from '../../utils/imageNaming'
 import { matchCountLabel, normalizeQuery, stepMatch } from '../../utils/textSearch'
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
-import { buildMatchRange, scrollPageIntoView } from './pdfSearchDom'
+import { buildMatchRange, isPageTextLayerRendered, scrollPageIntoView } from './pdfSearchDom'
 import { buildPdfSearchIndex, findDocumentMatches, resolvePdfMatch, type PdfSearchIndex } from './pdfSearchIndex'
 import { PageIndicator, ToolbarIconButton, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
@@ -63,6 +64,10 @@ function LazyPage({
   const ref = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  // A stable callback: react-pdf redraws the text layer when this prop changes,
+  // and the parent re-renders on every text-layer render — an inline arrow here
+  // redrew the layer in a loop and left search ranges pointing at removed spans.
+  const handleTextLayerSuccess = useCallback(() => onTextLayerReady?.(pageNumber), [onTextLayerReady, pageNumber])
 
   useEffect(() => {
     const el = ref.current
@@ -116,7 +121,7 @@ function LazyPage({
             setHasLoaded(true)
             if (onFirstPageLoad) onFirstPageLoad(page)
           }}
-          onRenderTextLayerSuccess={() => onTextLayerReady?.(pageNumber)}
+          onRenderTextLayerSuccess={handleTextLayerSuccess}
         />
       ) : (
         <div
@@ -165,12 +170,15 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
   const [indexStatus, setIndexStatus] = useState<PdfSearchStatus>('idle')
   const indexRequestedRef = useRef(false)
   const [currentMatch, setCurrentMatch] = useState(-1)
-  // Pages whose TextLayer has rendered (and so can be searched in the DOM).
-  // A ref for synchronous membership checks + a version counter so the
-  // dependent useMemo below re-runs when it changes.
-  const renderedPagesRef = useRef<Set<number>>(new Set())
+  // Bumped every time a page's TextLayer renders. react-pdf redraws a text
+  // layer on every scale change and when a page scrolls back in, replacing its
+  // spans, so ranges built earlier point at detached nodes and paint nothing:
+  // the ranges are rebuilt from the DOM on each bump.
   const [renderedVersion, setRenderedVersion] = useState(0)
   const [pinnedPage, setPinnedPage] = useState<number | null>(null)
+  // Scroll to the current match only when a search starts or the user steps —
+  // not every time a page renders while they scroll around.
+  const revealMatch = useRef(false)
   const searchRef = useRef<FindBarShellHandle>(null)
   const currentPageRef = useRef(1)
   currentPageRef.current = currentPage
@@ -180,18 +188,14 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     [searchIndex, deferredQuery]
   )
 
-  // Ranges for whichever matches sit on an already-rendered page; entries for
-  // matches on pages not yet rendered stay null until that page renders.
+  // Ranges for whichever matches sit on a page whose text layer is in the DOM
+  // now; entries for matches on pages not drawn stay null until they are.
   const matchRanges = useMemo(() => {
     const container = containerRef.current
     if (!container || !searchIndex) return []
-    return matches.map((match) => {
-      const resolved = resolvePdfMatch(searchIndex, match)
-      if (!renderedPagesRef.current.has(resolved.start.page)) return null
-      return buildMatchRange(container, resolved)
-    })
-    // renderedVersion is read only through the ref; it's a dependency purely
-    // to re-run this once new pages have rendered.
+    return matches.map((match) => buildMatchRange(container, resolvePdfMatch(searchIndex, match)))
+    // renderedVersion is not read here; it is a dependency purely to rebuild
+    // the ranges after a text layer has been (re)drawn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matches, searchIndex, renderedVersion])
 
@@ -248,10 +252,8 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     } catch (e) {
       setError('Failed to decode PDF data')
     }
-    // New (or reloaded) file: the old search index and rendered-page tracking
-    // no longer apply.
+    // New (or reloaded) file: the old search index no longer applies.
     indexRequestedRef.current = false
-    renderedPagesRef.current = new Set()
     setSearchIndex(null)
     setIndexStatus('idle')
     setCurrentMatch(-1)
@@ -344,10 +346,8 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     setCurrentPage(Math.max(1, Math.min(page, numPages)))
   }, [pageHeight, scale, numPages])
 
-  // Issue #344: a page's TextLayer just rendered — it can now be matched against.
-  const onTextLayerReady = useCallback((page: number) => {
-    if (renderedPagesRef.current.has(page)) return
-    renderedPagesRef.current.add(page)
+  // Issue #344: a page's TextLayer just (re)rendered — rebuild the ranges.
+  const onTextLayerReady = useCallback(() => {
     setRenderedVersion((v) => v + 1)
   }, [])
 
@@ -402,27 +402,31 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     const startPage = currentPageRef.current
     const first = matches.findIndex((m) => searchIndex.locations[m.start.chunk].page >= startPage)
     setCurrentMatch(Math.max(0, first))
+    revealMatch.current = true
   }, [matches, searchIndex])
 
   const stepSearch = useCallback((direction: 1 | -1) => {
+    revealMatch.current = true
     setCurrentMatch((c) => stepMatch(c, matches.length, direction))
   }, [matches.length])
 
   // Bring the current match's page into view — rendering it first (via
-  // pinnedPage) if it hasn't been drawn yet. Re-runs once that render
-  // completes (matchRanges is recomputed synchronously with renderedVersion).
+  // pinnedPage) if it hasn't been drawn yet — when a search starts or the user
+  // steps. Re-runs once that render completes (matchRanges is rebuilt with
+  // renderedVersion); once the match is in view it leaves the scroll alone.
   useEffect(() => {
-    if (!searchIndex || currentMatch < 0) return
+    if (!revealMatch.current || !searchIndex || currentMatch < 0) return
     const match = matches[currentMatch]
-    if (!match) return
+    const container = containerRef.current
+    if (!match || !container) return
     const targetPage = searchIndex.locations[match.start.chunk].page
-    if (!renderedPagesRef.current.has(targetPage)) {
+    if (!isPageTextLayerRendered(container, targetPage)) {
       setPinnedPage(targetPage)
       return
     }
-    const container = containerRef.current
     const range = matchRanges[currentMatch]
-    if (!container || !range) return
+    if (!range) return
+    revealMatch.current = false
     scrollPageIntoView(container, targetPage)
     const rect = range.getBoundingClientRect()
     const view = container.getBoundingClientRect()

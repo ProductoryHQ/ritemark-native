@@ -183,6 +183,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private readonly _runtimeSessions = new Map<string, Map<AgentId, RuntimeSession>>();
   /** Latest accepted execution per conversation; stale provider callbacks are ignored. */
   private readonly _activeRuntimeTurnTokens = new Map<string, symbol>();
+  /** Sprint 127 R6: conversations whose transcript already names a model substitution. */
+  private readonly _modelSubstitutionNamed = new Set<string>();
   private readonly _conversationCheckpointQueues = new Map<string, Promise<void>>();
   private readonly _runtimeSessionLastUsed = new Map<string, number>();
   /** ACP thought_level is discovered only after the existing lazy session opens. */
@@ -560,15 +562,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
+          // Sprint 127 R6 (S28): a saved Claude model the catalog no longer offers is
+          // replaced, and the transcript says so before the turn runs. The sidebar
+          // usually sends the replacement itself, so compare against the saved model.
+          const savedClaudeModel = agentId === 'claude-code' ? this._reconciledClaudeModelChoice() : undefined;
           const requestedModelInput = typeof model === 'string' && model
             ? model
-            : agentId === 'claude-code'
-              ? this._reconciledClaudeModel()
-              : undefined;
+            : savedClaudeModel?.id;
           const requestedClaudeModel = agentId === 'claude-code'
             ? modelCatalog.getModel('anthropic', requestedModelInput)
             : undefined;
           const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
+          const modelSubstitution = this._modelSubstitutionNamed.has(clientConversationId)
+            ? undefined
+            : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -774,12 +781,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const pinnedModel = isClaudeCode
             ? requestedModel
             : model;
+          // Sprint 127 R1: a model the bundled CLI may not know is declared to it.
+          const claudeModelDeclaration = isClaudeCode
+            ? modelCatalog.getClaudeSessionDeclaration(pinnedModel)
+            : undefined;
           const titleGeneration = ({ userPrompt, assistantResponse }: { userPrompt: string; assistantResponse: string }) =>
             this._conversationTitleGenerator.generate({
               runtimeId: agentId as AgentId,
               workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
               ...(typeof pinnedModel === 'string' && pinnedModel ? { model: pinnedModel } : {}),
               ...(anthropicApiKey ? { anthropicApiKey } : {}),
+              ...(claudeModelDeclaration ? { claudeModelDeclaration } : {}),
               byokEnv: buildByokEnv(byokKeys),
               userPrompt,
               assistantResponse,
@@ -856,6 +868,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model: pinnedModel,
             expectedResolvedModel: isClaudeCode ? requestedClaudeModel?.resolvedModel : undefined,
+            ...(claudeModelDeclaration ? { claudeModelDeclaration } : {}),
             byokEnv: buildByokEnv(byokKeys),
             excludedFolders,
             anthropicApiKey,
@@ -1186,6 +1199,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (commentTaskId && conversationTurnId) {
                 void this._commentTaskController?.applyTurnStarted(conversationId, conversationTurnId);
               }
+              if (modelSubstitution) {
+                this._modelSubstitutionNamed.add(clientConversationId);
+                sessionConfig.onProgress({
+                  type: 'init',
+                  message: modelSubstitutionNotice(modelSubstitution.from, modelSubstitution.to),
+                  timestamp: Date.now(),
+                });
+              }
               await session.prompt({
                 prompt,
                 attachments: turnAttachments,
@@ -1396,6 +1417,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // requiring a tab switch. Polling stops when the sidebar hides or disposes.
     webviewView.onDidChangeVisibility(() => {
       this._refreshBrowserContextPolling();
+      // Sprint 127 R5 (S27): a long-idle sidebar checks the model feed on show.
+      if (webviewView.visible) modelCatalog.pollFeedIfStale();
     });
     webviewView.onDidDispose(() => {
       if (this._browserContextPoll) {
@@ -2594,10 +2617,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _reconciledClaudeModel(): string {
+    return this._reconciledClaudeModelChoice().id;
+  }
+
+  private _reconciledClaudeModelChoice(): modelCatalog.RequestedModelResolution {
     const selected = vscode.workspace.getConfiguration('ritemark.ai')
       .get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
-    return modelCatalog.getModel('anthropic', selected)?.id
-      ?? modelCatalog.getDefault('anthropic', 'claude-code');
+    return modelCatalog.resolveRequestedModel('anthropic', selected, 'claude-code');
   }
 
   private _sendActiveFile() {
@@ -3013,4 +3039,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return this._continuationHostSecretPromise;
   }
 
+}
+
+/** Sprint 127 R6: one transcript line naming the requested and the used model. */
+function modelSubstitutionNotice(requested: string, usedId: string): string {
+  const used = modelCatalog.getModel('anthropic', usedId)?.label ?? usedId;
+  return `${requested} isn't available right now — using ${used}.`;
 }

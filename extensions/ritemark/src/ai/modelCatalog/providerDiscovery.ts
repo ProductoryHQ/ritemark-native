@@ -15,7 +15,13 @@ import * as os from 'os';
 import * as path from 'path';
 import { discoverClaudeModels } from '../../agent/discoverModels';
 import type { ModelEntry, ModelThinkingEffort } from './schema';
-import { isExplicitThinkingEffort } from '../../runtime/thinkingEffort';
+import { isExplicitThinkingEffort, type ExplicitThinkingEffort } from '../../runtime/thinkingEffort';
+import {
+  discoveryPickerSettings,
+  dropShadowedDeclarations,
+  NO_CLAUDE_DECLARATIONS,
+  type ClaudeRuntimeDeclarations,
+} from './runtimeDeclarations';
 
 const PROBE_TIMEOUT_MS = 8_000;
 
@@ -54,36 +60,43 @@ async function fetchJson(url: string, headers: Record<string, string>): Promise<
 }
 
 /**
- * Anthropic: `GET /v1/models` is PRIMARY when an API key is present (provider-cadence,
- * surfaces new models the day they ship). SDK `supportedModels()` is the OAuth-only
- * fallback (capped at the bundled CLI version).
+ * Anthropic (Sprint 127 R1/R2). The list must describe the account that runs
+ * the requests, so the caller passes `apiKey` only when Claude Code runs in
+ * API-key mode:
+ *  - API key: `GET /v1/models` — provider cadence, new models the day they ship;
+ *  - subscription: the runtime's own `supportedModels()`, plus every model the
+ *    catalog declares to it through `settings.modelPicker`. The runtime stays the
+ *    runnability authority: a declared model it does not echo is not listed.
  */
 export async function discoverAnthropic(opts: {
   apiKey: string | null;
   workspacePath?: string;
   binaryPath?: string;
+  declarations?: ClaudeRuntimeDeclarations;
 }): Promise<ModelEntry[] | null> {
   if (opts.apiKey) {
     const json = (await fetchJson('https://api.anthropic.com/v1/models?limit=1000', {
       'x-api-key': opts.apiKey,
       'anthropic-version': '2023-06-01',
-    })) as { data?: Array<{ id?: string; display_name?: string }> } | null;
+    })) as { data?: Array<{ id?: string; display_name?: string; capabilities?: unknown }> } | null;
     const data = json?.data;
     if (Array.isArray(data) && data.length > 0) {
       return data
-        .filter((m): m is { id: string; display_name?: string } => typeof m.id === 'string')
-        .map((m, i) => entry(m.id, m.display_name ?? m.id, i));
+        .filter((m): m is { id: string; display_name?: string; capabilities?: unknown } => typeof m.id === 'string')
+        .map((m, i) => entry(m.id, m.display_name ?? m.id, i, '', effortFromCapabilities(m.capabilities)));
     }
   }
-  // Fallback: bundled SDK supportedModels() (handles OAuth login without an API key).
   if (opts.workspacePath && opts.binaryPath) {
+    const declarations = opts.declarations ?? NO_CLAUDE_DECLARATIONS;
+    const settings = discoveryPickerSettings(declarations);
     const models = await discoverClaudeModels({
       workspacePath: opts.workspacePath,
       pathToClaudeCodeExecutable: opts.binaryPath,
       ...(opts.apiKey ? { anthropicApiKey: opts.apiKey } : {}),
+      ...(settings ? { settings } : {}),
     });
     if (models && models.length > 0) {
-      return models.map((m, i) => entry(
+      const rows = models.map((m, i) => entry(
         m.id,
         m.label,
         i,
@@ -93,9 +106,28 @@ export async function discoverAnthropic(opts: {
           : { levels: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [] },
         m.resolvedModel,
       ));
+      return dropShadowedDeclarations(rows, declarations.pickerOptions.map((option) => option.model));
     }
   }
   return null;
+}
+
+const PROVIDER_EFFORT_LEVELS: readonly ExplicitThinkingEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+/**
+ * `/v1/models` capability tree → effort levels (Sprint 127 R2). Absent tree:
+ * unknown, the catalog floor applies. `effort.supported: false`: Auto only.
+ */
+export function effortFromCapabilities(capabilities: unknown): ModelThinkingEffort | undefined {
+  if (!isRecord(capabilities) || !isRecord(capabilities.effort)) return undefined;
+  const effort = capabilities.effort;
+  if (effort.supported !== true) return { levels: [] };
+  return {
+    levels: PROVIDER_EFFORT_LEVELS.filter((level) => {
+      const leaf = effort[level];
+      return isRecord(leaf) && leaf.supported === true;
+    }),
+  };
 }
 
 /** OpenAI `models.list()` via REST, filtered to chat-suitable LLMs (mirrors the old flow filter). */

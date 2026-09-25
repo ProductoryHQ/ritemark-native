@@ -137,6 +137,18 @@ if grep -q "lastRenderedPageBreak" "extensions/ritemark/media/webview.js" 2>/dev
   echo "ERROR: webview.js contains the Word renderer; it belongs in office-preview.js only"
   ERRORS=$((ERRORS + 1))
 fi
+# Sprint 125: the same for PowerPoint. 'ritemark-pptx' is the PowerPoint viewer's root
+# class; 'data-pptx-background-image' is the renderer's own attribute.
+if [[ -f "extensions/ritemark/media/office-preview.js" ]]; then
+  if ! grep -q "ritemark-pptx" "extensions/ritemark/media/office-preview.js"; then
+    echo "ERROR: office-preview.js missing the PowerPoint viewer (ritemark-pptx) - bundle stale or stubbed"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+if grep -q "data-pptx-background-image" "extensions/ritemark/media/webview.js" 2>/dev/null; then
+  echo "ERROR: webview.js contains the PowerPoint renderer; it belongs in office-preview.js only"
+  ERRORS=$((ERRORS + 1))
+fi
 
 # Check 7: Extension compiles
 if ! cd extensions/ritemark && npm run compile --silent 2>/dev/null; then

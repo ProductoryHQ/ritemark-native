@@ -1,0 +1,289 @@
+{"cli":"2.1.270","sdk":"0.3.270","probes":[
+{
+  "picker": null,
+  "rows": [
+    {
+      "value": "default",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Default (recommended)",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "sonnet",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Sonnet",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "opus",
+      "resolvedModel": "claude-opus-5",
+      "displayName": "Opus",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "haiku",
+      "resolvedModel": "claude-haiku-4-5-20251001",
+      "displayName": "Haiku",
+      "supportedEffortLevels": null,
+      "supportsAdaptiveThinking": false
+    }
+  ]
+}
+,
+{
+  "picker": [
+    {
+      "model": "claude-opus-5-5",
+      "label": "Opus 5.5"
+    }
+  ],
+  "rows": [
+    {
+      "value": "default",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Default (recommended)",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "sonnet",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Sonnet",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "opus",
+      "resolvedModel": "claude-opus-5",
+      "displayName": "Opus",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "haiku",
+      "resolvedModel": "claude-haiku-4-5-20251001",
+      "displayName": "Haiku",
+      "supportedEffortLevels": null,
+      "supportsAdaptiveThinking": false
+    },
+    {
+      "value": "claude-opus-5-5",
+      "resolvedModel": "claude-opus-5-5",
+      "displayName": "Opus 5.5",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    }
+  ]
+}
+,
+{
+  "picker": [
+    {
+      "model": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "behavesAs": "claude-opus-5"
+    }
+  ],
+  "rows": [
+    {
+      "value": "default",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Default (recommended)",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "sonnet",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Sonnet",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "opus",
+      "resolvedModel": "claude-opus-5",
+      "displayName": "Opus",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "haiku",
+      "resolvedModel": "claude-haiku-4-5-20251001",
+      "displayName": "Haiku",
+      "supportedEffortLevels": null,
+      "supportsAdaptiveThinking": false
+    },
+    {
+      "value": "claude-opus-5-5",
+      "resolvedModel": "claude-opus-5-5",
+      "displayName": "Opus 5.5",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    }
+  ]
+}
+,
+{
+  "picker": [
+    {
+      "model": "claude-sonnet-5",
+      "label": "Sonnet 5"
+    },
+    {
+      "model": "claude-opus-5",
+      "label": "Opus 5"
+    },
+    {
+      "model": "claude-opus-5-5",
+      "label": "Opus 5.5"
+    },
+    {
+      "model": "not a model; rm -rf /",
+      "label": "Bogus"
+    }
+  ],
+  "rows": [
+    {
+      "value": "default",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Default (recommended)",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "sonnet",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Sonnet",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "opus",
+      "resolvedModel": "claude-opus-5",
+      "displayName": "Opus",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "haiku",
+      "resolvedModel": "claude-haiku-4-5-20251001",
+      "displayName": "Haiku",
+      "supportedEffortLevels": null,
+      "supportsAdaptiveThinking": false
+    },
+    {
+      "value": "claude-opus-5-5",
+      "resolvedModel": "claude-opus-5-5",
+      "displayName": "Opus 5.5",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    },
+    {
+      "value": "not a model; rm -rf /",
+      "resolvedModel": "not a model; rm -rf /",
+      "displayName": "Bogus",
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true
+    }
+  ]
+}
+]}

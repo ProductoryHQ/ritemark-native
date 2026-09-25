@@ -1,12 +1,19 @@
 /**
  * Sprint 124 (#284) R5 — look at an Office file before any of it is sent to the
- * preview: its size, its container, and its ZIP directory. Nothing is inflated.
+ * preview: its size, its container, and its ZIP directory.
  *
  * Without this the preview showed the ZIP library's raw text ("Can't find end
  * of central directory : is this a zip file ? If it is, see https://…"),
  * called a password-protected file "not a zip", and spent seconds inflating a
- * decompression bomb (renderer spike, defect 9). Pure: bytes in, verdict out.
+ * decompression bomb (renderer spike, defect 9). Bytes in, verdict out.
+ *
+ * Sprint 125 (#285) R5 — the directory's sizes are only what the file claims. A
+ * part that declares 4 KiB and inflates to 512 MiB passed every check above, and
+ * the webview's JSZip inflated all of it before noticing. So once the declared
+ * sizes pass, each part is inflated here, capped at its declared size plus one
+ * byte: a part that yields more (or less) than it declared is refused at once.
  */
+import { inflateRaw } from 'node:zlib';
 
 export const OFFICE_PREVIEW_LIMITS = {
   /** Largest file the preview opens. The webview receives it as base64, a third larger. */
@@ -34,6 +41,11 @@ export interface ZipEntry {
   name: string;
   compressedSize: number;
   uncompressedSize: number;
+  /** 0 stored, 8 deflated; Office writes nothing else. */
+  method: number;
+  /** General-purpose flags; bit 0 marks an encrypted entry. */
+  flags: number;
+  localHeaderOffset: number;
 }
 
 const CFB_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
@@ -98,16 +110,20 @@ export function readZipDirectory(bytes: Uint8Array): ZipEntry[] | null {
   const decoder = new TextDecoder();
   for (let n = 0; n < count; n++) {
     if (at + 46 > bytes.length || u32(at) !== DIRECTORY_ENTRY) return null;
+    const flags = u16(at + 8);
+    const method = u16(at + 10);
     let compressedSize = u32(at + 20);
     let uncompressedSize = u32(at + 24);
     const nameLength = u16(at + 28);
     const extraLength = u16(at + 30);
     const commentLength = u16(at + 32);
+    let localHeaderOffset = u32(at + 42);
     const nameStart = at + 46;
     if (nameStart + nameLength + extraLength > bytes.length) return null;
     const name = decoder.decode(bytes.subarray(nameStart, nameStart + nameLength));
-    if (uncompressedSize === 0xffffffff || compressedSize === 0xffffffff) {
-      // ZIP64 sizes live in the extra field (id 0x0001): uncompressed first, then compressed.
+    if (uncompressedSize === 0xffffffff || compressedSize === 0xffffffff || localHeaderOffset === 0xffffffff) {
+      // ZIP64 values live in the extra field (id 0x0001), each only if its field above is
+      // 0xffffffff, in this order: uncompressed, compressed, local header offset.
       let extra = nameStart + nameLength;
       const extraEnd = extra + extraLength;
       while (extra + 4 <= extraEnd) {
@@ -119,27 +135,65 @@ export function readZipDirectory(bytes: Uint8Array): ZipEntry[] | null {
             uncompressedSize = u64(field);
             field += 8;
           }
-          if (compressedSize === 0xffffffff) compressedSize = u64(field);
+          if (compressedSize === 0xffffffff) {
+            compressedSize = u64(field);
+            field += 8;
+          }
+          if (localHeaderOffset === 0xffffffff) localHeaderOffset = u64(field);
           break;
         }
         extra += 4 + size;
       }
     }
-    entries.push({ name, compressedSize, uncompressedSize });
+    entries.push({ name, compressedSize, uncompressedSize, method, flags, localHeaderOffset });
     at = nameStart + nameLength + extraLength + commentLength;
   }
   return entries;
 }
 
+function inflateCapped(data: Uint8Array, maxOutputLength: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    inflateRaw(data, { maxOutputLength }, (error, output) => resolve(error ? null : output.length));
+  });
+}
+
+/**
+ * Does every part hold what the directory says it holds? Each deflated part is
+ * inflated in the extension host's thread pool, capped at its declared size plus
+ * one byte, one part at a time, and the output is dropped. A part that yields a
+ * different size, cannot be inflated, is encrypted or uses another method is a
+ * package the webview must not receive.
+ */
+export async function verifyDeclaredSizes(bytes: Uint8Array, entries: readonly ZipEntry[]): Promise<boolean> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (const entry of entries) {
+    if (entry.flags & 0x1) return false;
+    const at = entry.localHeaderOffset;
+    if (at + 30 > bytes.length || view.getUint32(at, true) !== LOCAL_FILE) return false;
+    const start = at + 30 + view.getUint16(at + 26, true) + view.getUint16(at + 28, true);
+    const end = start + entry.compressedSize;
+    if (end > bytes.length) return false;
+    if (entry.method === 0) {
+      if (entry.compressedSize !== entry.uncompressedSize) return false;
+    } else if (entry.method === 8) {
+      const produced = await inflateCapped(bytes.subarray(start, end), entry.uncompressedSize + 1);
+      if (produced !== entry.uncompressedSize) return false;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Is this a package the preview may open? `partPrefix` is the folder the
- * format keeps its parts in: `word/` for .docx (and `ppt/` for .pptx, Sprint 125).
+ * format keeps its parts in: `word/` for .docx, `ppt/` for .pptx.
  */
-export function checkOfficePackage(
+export async function checkOfficePackage(
   bytes: Uint8Array,
   partPrefix: string,
   limits: typeof OFFICE_PREVIEW_LIMITS = OFFICE_PREVIEW_LIMITS,
-): PackageVerdict {
+): Promise<PackageVerdict> {
   if (bytes.length > limits.maxFileBytes) return { ok: false, reason: 'too-large', bytes: bytes.length };
   if (startsWith(bytes, CFB_SIGNATURE)) {
     return { ok: false, reason: hasEncryptedPackageStream(bytes) ? 'password-protected' : 'legacy-format' };
@@ -164,6 +218,8 @@ export function checkOfficePackage(
   const names = entries.map((e) => e.name);
   if (!names.includes('[Content_Types].xml')) return { ok: false, reason: 'not-an-office-file' };
   if (!names.some((n) => n.startsWith(partPrefix))) return { ok: false, reason: 'wrong-kind' };
+  // Last, and only now that the declared sizes are within the limits: are they true?
+  if (!(await verifyDeclaredSizes(bytes, entries))) return { ok: false, reason: 'damaged' };
   return { ok: true };
 }
 

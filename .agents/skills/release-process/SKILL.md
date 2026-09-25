@@ -39,9 +39,10 @@ gh release list --repo jarmo-productory/ritemark-public --limit 10
 node ./scripts/worktree-hygiene.mjs --check
 ./scripts/create-release-worktree.sh
 ./scripts/release-preflight.sh
+(cd extensions/ritemark && npm run check:anthropic-models)   # Sprint 127 R10
 ```
 
-Report latest existing release, next valid version, preflight status, blockers, and warnings. Never suggest or reuse a version that already exists.
+Report latest existing release, next valid version, preflight status, the model-catalog check, blockers, and warnings. Never suggest or reuse a version that already exists.
 
 `create-release-worktree.sh` is mandatory for shell releases. It creates a new detached checkout of the exact `origin/main` commit with a physical VS Code submodule. Any later source commit invalidates that worktree; remove it and create another. Never use an older RC tree, a symlinked VS Code tree, shared `node_modules`, or a pre-existing `VSCode-<target>` output.
 
@@ -49,7 +50,7 @@ Report latest existing release, next valid version, preflight status, blockers, 
 
 Use this for VS Code core changes, `patches/vscode`, branding, app bundle changes, or any app installer/DMG distribution.
 
-1. Audit worktrees, create a new release worktree from the exact `origin/main` commit, then run `./scripts/release-preflight.sh`; all must pass.
+1. Audit worktrees, create a new release worktree from the exact `origin/main` commit, then run `./scripts/release-preflight.sh` and `(cd extensions/ritemark && npm run check:anthropic-models)`; all must pass (see **Claude Code and Model Currency**).
 2. Version bump commit: update `branding/product.json` and `extensions/ritemark/package.json`, commit, push. Do not tag yet.
 3. After the version commit is on `origin/main`, discard any earlier preflight worktree, create a new release worktree, rerun preflight, and build local arm64 with `./scripts/build-prod.sh`.
 4. Sign and package arm64, but do not notarize yet:
@@ -131,6 +132,32 @@ Use only when changes are confined to `extensions/ritemark/`.
 4. Verify bundle integrity and `minimumAppVersion`.
 5. Gate 1: Jarmo tests on a current Ritemark install.
 6. GitHub release with `.vsix` and extension-only update metadata.
+
+Also run `(cd extensions/ritemark && npm run check:anthropic-models)`. An extension release cannot update the bundled Claude Code, so an `ALERT` does not block it. Report the alert to Jarmo: a Claude Code that has fallen behind needs a full release.
+
+## Claude Code and Model Currency (Sprint 127)
+
+Anthropic ties each new model to a minimum Claude Code version and publishes both in its Claude Code model catalog. The catalog is at `https://downloads.claude.ai/model-catalog/v1/catalog.json`; Anthropic has not documented it. New Claude models therefore reach Ritemark users with a bundled Claude Code that supports them. The rules are in `src/ai/modelCatalog/anthropicCatalogCheck.ts`, and the decision is in `docs/development/releases/v1.12.0/sprint-127-day-zero-models/research/anthropic-served-catalog.md`.
+
+| `npm run check:anthropic-models` output | Action |
+|---|---|
+| `OK` | Continue. |
+| `WARNING: … not in Ritemark's bundled lineup` | Add the model to `src/ai/modelConfig.ts` and `bundledCatalog.ts` in this release, or tell Jarmo why not. |
+| `ALERT: … needs Claude Code X or newer` | A full release updates the bundled Claude Code (below), or Jarmo defers explicitly. An extension release reports it. |
+| `ALERT: … could not be read` / `not in the expected format` / `expired` | Users are not affected, because the app never reads the catalog. Fix the check and its test, or Jarmo accepts shipping without it. |
+
+**Updating the bundled Claude Code** is shell-tier, so it happens only in a full release.
+- Use npm `latest` of `@anthropic-ai/claude-code` with the Agent SDK patch of the same number (`2.1.N` ↔ `0.3.N`).
+- Update the three `claude/runtime` rows in `extensions/ritemark/binaries/agents/manifest.json`, measuring every hash from the npm tarballs.
+- Update the approved snapshots in `scripts/validate-agent-runtime-manifest.mjs` and its test.
+- Run `npm install --save-exact @anthropic-ai/claude-agent-sdk@0.3.N`.
+- Verify with `fetch-agent-runtimes.mjs --agent claude --all-platforms`, `tsc`, `npm test`, and `./scripts/verify-agent-runtimes.sh` on the release Mac.
+- Record the results in `docs/development/agent-runtime-compatibility.md`. Pre-commit check 11 requires it.
+
+**Hand edits to the feed** (`feeds/model-catalog.json` in `jarmo-productory/ritemark-public`):
+- Start from `npx tsx scripts/export-bundled-model-catalog.ts --merge <feed>`. Write to a temporary file first, then bump `updatedAt`.
+- Hide a model with `"retired": true`, and keep the row.
+- A row may declare a model to Claude Code (`claudeCode.inject`) only when Anthropic's minimum Claude Code version for it is met by the bundled one.
 
 ## Platform Rules
 

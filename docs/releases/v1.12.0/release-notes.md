@@ -72,6 +72,28 @@ Sprint 124 makes a Word document look like the document you sent, not a long web
 
 **Honest about the rest.** When a document has charts, SmartArt or equations that the preview can't draw exactly, a note says so. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in Word (or Pages, or your default app). A document made by another program, such as a Google Docs export, has no saved page breaks, so it still shows fewer, longer pages.
 
+## PowerPoint presentations, as slides
+
+Sprint 125 lets you read a presentation someone sent you without leaving Ritemark.
+
+**Slides you can read.** Open a `.pptx` and its slides stack one under another, like the pages of a document, with each slide's speaker notes under it in quiet text. It is drawn on your computer; nothing is uploaded. Text, bullets, tables, pictures, shapes, layouts, backgrounds and PowerPoint's own design themes come close to PowerPoint. Charts are drawn too, approximately.
+
+**The toolbar you know.** The same quiet toolbar as the Word preview: the slide you are on, zoom with **Fit width** and **Fit slide**, and Cmd/Ctrl+F for the find bar, which searches every slide and its speaker notes. **Open in PowerPoint** takes you to PowerPoint — or Keynote, or your default app — to see the exact slides and present them. Edit the file in PowerPoint and the preview follows, on the same slide.
+
+**Honest about the rest.** Animations, transitions, audio and video are not played; a note says when a presentation has audio, video or embedded objects. A link on a slide opens in your browser after Ritemark asks, as any link does. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in PowerPoint.
+
+## Claude Opus 5.5
+
+Sprint 127 brings Claude Opus 5.5 to Ritemark.
+
+Anthropic requires Claude Code 2.1.280 or newer for Opus 5.5. Ritemark now ships Claude Code 2.1.281, so Opus 5.5 appears in the Claude Code model menu, whether you sign in with a Claude subscription or an API key. If you had chosen Opus, you move to Opus 5.5 automatically.
+
+**Your sign-in decides the list.** With a Claude subscription, the menu follows your subscription, even when an API key is also saved in Settings. With an API key, it follows what your key can use, from the first day.
+
+**No silent switches.** If the model you last used is no longer available, Ritemark says so in the chat, for example "Opus 5.5 isn't available right now — using Sonnet 5." It no longer switches quietly. If your account can't use a model, for example because your plan or organization doesn't include it, the message names the model and asks you to choose another in the model menu.
+
+The recommended default stays a deliberate choice: a new model is never made the default automatically.
+
 ## Fixes
 
 - **A year at the start of a line stays a sentence.** Typing `2026. ` at the start of a paragraph turned it into a numbered list starting at 2026, and the saved file kept the list instead of your sentence. Numbers up to 99 still start a list, which is every number anyone types to start one; 100 and above stay prose. A list can still be started at any number from the toolbar or the slash menu, and a file that already starts a list at a higher number opens exactly as before.
@@ -80,5 +102,7 @@ Sprint 124 makes a Word document look like the document you sent, not a long web
 - **Images from a parent folder no longer break on save.** Editing and saving a document with a `../images/…` image wrote an internal `vscode-resource` address into the file in place of the path, breaking the image in every other app. The original path is now kept.
 - **The Export menu works from the keyboard.** Opening it with Enter now moves focus into the menu. The arrow keys move between entries, and Escape or Tab closes the menu and returns focus to the Export button. Previously no entry could be reached without a mouse.
 - **Shift+End no longer selects the rest of the document.** Holding Shift and pressing End selected everything from the cursor to the end of the file instead of to the end of the line, so the next keystroke could wipe out paragraphs and lists further down without you noticing. Shift+End and Shift+Home now select to the end and start of the line you are on, and can never reach past the paragraph, list item or code block the cursor is in.
+- **Agent Chat's "still checking" notice is readable.** When checking an agent took longer than usual, Agent Chat showed a loud yellow box with a **Try again** button you could hardly see. It is now the same quiet card as its other notices, says the check is still running, and the button is clear.
 - **Conversation titles are in the language you wrote in.** When your own Claude setup contained text in another language, such as skills described in Estonian, an English prompt was often given a title in that language. The title now follows the language of your prompt.
 - **Menus are readable in the dark theme.** Drop-down and right-click menus, such as those in the AI sidebar, stayed white in the dark theme with near-white text on them. They now follow the theme.
+- **A file that misstates its size can no longer slow the preview down.** A Word file built to unpack to far more than it declared could make the preview use hundreds of megabytes of memory before failing with a technical error. Such a file is now refused before it is previewed, with the plain "looks damaged" message, for Word documents and presentations alike.

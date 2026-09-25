@@ -26,7 +26,7 @@ export function ActivePlanBanner({
   }
 
   return (
-    <div className="mx-3 mb-2 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]/80 px-3 py-2 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+    <div className="mx-3 mb-2 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] px-3 py-2 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
@@ -72,7 +72,7 @@ export function ActivePlanBanner({
       </div>
 
       {expanded && (
-        <div className="mt-2 space-y-1.5 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/50 px-2.5 py-2">
+        <div className="mt-2 space-y-1.5 rounded-md border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_50%,transparent)] px-2.5 py-2">
           {model.steps.map((step, index) => (
             <div
               key={`${step.label}-${index}`}

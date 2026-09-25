@@ -1084,7 +1084,7 @@ export function ChatInput() {
 
       {/* Drag overlay indicator */}
       {isDragOver && (
-        <div className="absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--vscode-focusBorder)] bg-[var(--vscode-editor-background)]/90 pointer-events-none">
+        <div className="absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--vscode-focusBorder)] bg-[color:color-mix(in_srgb,var(--vscode-editor-background)_90%,transparent)] pointer-events-none">
           <div className="flex items-center gap-2 text-sm text-[var(--r-ink-strong)]">
             <Icon name="file" size={20} />
             Drop files or folders here
@@ -1131,7 +1131,7 @@ export function ChatInput() {
         {(showActiveFileChip || showBrowserContextChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
             {showActiveFileChip && (
-              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]">
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
                 <Icon name="file-text" size={12} className="shrink-0" />
                 <span className="truncate max-w-[140px]" title={activeFilePath!}>
                   Active: {getDisplayPath(activeFilePath!)}
@@ -1150,7 +1150,7 @@ export function ChatInput() {
                 ? (
                   /* Sprint 78 (#73): annotation mode active — show screenshot preview chip
                      instead of the URL chip. Visual matches the image attachment strip. */
-                  <div className="relative group overflow-hidden rounded-md border border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-surface-muted)]/70">
+                  <div className="relative group overflow-hidden rounded-md border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-surface-muted)]">
                     <div className="w-14 h-14">
                       <img
                         src={currentBrowserContext.screenshotPreview.dataUrl}
@@ -1170,7 +1170,7 @@ export function ChatInput() {
                 )
                 : (
                   /* Normal mode or no screenshot yet — URL globe chip */
-                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]'}`}>
+                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)] text-[var(--r-ink-muted)]'}`}>
                     <Icon name="globe" size={12} className="shrink-0" />
                     <span className="truncate max-w-[180px]" title={currentBrowserContext?.url}>
                       Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
@@ -1189,7 +1189,7 @@ export function ChatInput() {
             {pathChips.map((chip) => (
               <div
                 key={chip.id}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
               >
                 <Icon name="file" size={12} className="shrink-0" />
                 <span className="truncate max-w-[140px]" title={chip.path}>
@@ -1208,7 +1208,7 @@ export function ChatInput() {
               const agent = findAgent(discoveredAgents, pinnedAgent);
               const displayName = agent?.name ?? pinnedAgent;
               return (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-indigo-300,#a5b4fc)] bg-[var(--r-indigo-50,#eef2ff)] text-[var(--r-indigo-700,#4338ca)]">
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]">
                   <Icon name="robot" size={12} className="shrink-0" />
                   <span>{displayName}</span>
                   <button
@@ -1227,7 +1227,7 @@ export function ChatInput() {
               return (
                 <div
                   key={m.start}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 text-[var(--r-ink-muted)]"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
                 >
                   <Icon name="robot" size={12} />
                   @{agent.name}
@@ -1265,7 +1265,7 @@ export function ChatInput() {
         {attachments.length > 0 && (
           <div className="flex gap-1.5 px-2.5 pb-2 flex-wrap">
             {attachments.map((att) => (
-              <div key={att.id} className="relative group overflow-hidden rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70">
+              <div key={att.id} className="relative group overflow-hidden rounded-md border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)]">
                 {att.kind === 'image' && att.thumbnail ? (
                   <div className="w-14 h-14">
                     <img

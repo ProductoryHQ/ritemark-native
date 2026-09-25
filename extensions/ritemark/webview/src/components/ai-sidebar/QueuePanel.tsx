@@ -38,7 +38,7 @@ export function QueuePanel({
 
   return (
     <div
-      className={`mx-2.5 -mb-px px-2.5 py-1.5 border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60 ${
+      className={`mx-2.5 -mb-px px-2.5 py-1.5 border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_60%,transparent)] ${
         stackedUnderSelection
           ? 'border-l border-r border-t'
           : 'rounded-t-lg border border-b-0'

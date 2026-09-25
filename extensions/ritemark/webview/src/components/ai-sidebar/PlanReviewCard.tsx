@@ -45,11 +45,11 @@ export function PlanReviewCard({
   const displayText = extractPlanDisplayText(planText);
 
   return (
-    <div className="rounded-lg border border-[var(--r-accent-fainter)] overflow-hidden bg-[var(--vscode-input-background)]/80">
+    <div className="rounded-lg border border-[var(--r-accent-fainter)] overflow-hidden bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)]">
       {/* Header — indigo tinted (theme-aware token, not a light-theme constant),
           amber pulse dot = same "blocked on you" semantic as the thread rail */}
       <div
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--r-accent)] border-b border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)]/60"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--r-accent)] border-b border-[var(--r-accent-fainter)] bg-[color:color-mix(in_srgb,var(--r-accent-soft)_60%,transparent)]"
       >
         <Icon name="clipboard-text" size={12} className="shrink-0" />
         <span className="flex-1">{title}</span>

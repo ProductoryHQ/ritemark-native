@@ -252,7 +252,7 @@ export function AgentQuestion({ turnId, question, onAnswer, providerLabel = 'Cla
 
   return (
     <div
-      className="rounded-lg border px-3 py-3 space-y-3 bg-[var(--vscode-input-background)]/80 shadow-[0_1px_2px_rgba(30,27,75,0.04)]"
+      className="rounded-lg border px-3 py-3 space-y-3 bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] shadow-[0_1px_2px_rgba(30,27,75,0.04)]"
       style={{ borderColor: 'var(--r-hairline)' }}
     >
       {/* Header */}

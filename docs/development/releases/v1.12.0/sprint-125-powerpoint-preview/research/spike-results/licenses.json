@@ -1,0 +1,279 @@
+{
+  "@aiden0z/pptx-renderer": [
+    {
+      "name": "@aiden0z/pptx-renderer",
+      "version": "1.3.0",
+      "license": "Apache-2.0",
+      "files": "LICENSE,licenses",
+      "nested": false
+    },
+    {
+      "name": "echarts",
+      "version": "6.1.0",
+      "license": "Apache-2.0",
+      "files": "LICENSE,NOTICE,licenses",
+      "nested": false
+    },
+    {
+      "name": "tslib",
+      "version": "2.3.0",
+      "license": "0BSD",
+      "files": "LICENSE.txt",
+      "nested": false
+    },
+    {
+      "name": "zrender",
+      "version": "6.1.0",
+      "license": "BSD-3-Clause",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "jszip",
+      "version": "3.10.2",
+      "license": "(MIT OR GPL-3.0-or-later)",
+      "files": "LICENSE.markdown",
+      "nested": false
+    },
+    {
+      "name": "lie",
+      "version": "3.3.0",
+      "license": "MIT",
+      "files": "license.md",
+      "nested": false
+    },
+    {
+      "name": "immediate",
+      "version": "3.0.6",
+      "license": "MIT",
+      "files": "LICENSE.txt",
+      "nested": false
+    },
+    {
+      "name": "pako",
+      "version": "1.0.11",
+      "license": "(MIT AND Zlib)",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "readable-stream",
+      "version": "2.3.8",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "core-util-is",
+      "version": "1.0.3",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "inherits",
+      "version": "2.0.4",
+      "license": "ISC",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "isarray",
+      "version": "1.0.0",
+      "license": "MIT",
+      "files": "",
+      "nested": false
+    },
+    {
+      "name": "process-nextick-args",
+      "version": "2.0.1",
+      "license": "MIT",
+      "files": "license.md",
+      "nested": false
+    },
+    {
+      "name": "safe-buffer",
+      "version": "5.1.2",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "string_decoder",
+      "version": "1.1.1",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "setimmediate",
+      "version": "1.0.5",
+      "license": "MIT",
+      "files": "LICENSE.txt",
+      "nested": false
+    },
+    {
+      "name": "mtx-decompressor",
+      "version": "1.6.0",
+      "license": "MPL-2.0",
+      "files": "LICENSE",
+      "nested": false
+    }
+  ],
+  "pptx-preview": [
+    {
+      "name": "pptx-preview",
+      "version": "1.0.7",
+      "license": "ISC",
+      "files": "",
+      "nested": false
+    },
+    {
+      "name": "jszip",
+      "version": "3.10.2",
+      "license": "(MIT OR GPL-3.0-or-later)",
+      "files": "LICENSE.markdown",
+      "nested": false
+    },
+    {
+      "name": "lie",
+      "version": "3.3.0",
+      "license": "MIT",
+      "files": "license.md",
+      "nested": false
+    },
+    {
+      "name": "immediate",
+      "version": "3.0.6",
+      "license": "MIT",
+      "files": "LICENSE.txt",
+      "nested": false
+    },
+    {
+      "name": "pako",
+      "version": "1.0.11",
+      "license": "(MIT AND Zlib)",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "readable-stream",
+      "version": "2.3.8",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "core-util-is",
+      "version": "1.0.3",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "inherits",
+      "version": "2.0.4",
+      "license": "ISC",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "isarray",
+      "version": "1.0.0",
+      "license": "MIT",
+      "files": "",
+      "nested": false
+    },
+    {
+      "name": "process-nextick-args",
+      "version": "2.0.1",
+      "license": "MIT",
+      "files": "license.md",
+      "nested": false
+    },
+    {
+      "name": "safe-buffer",
+      "version": "5.1.2",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "string_decoder",
+      "version": "1.1.1",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "setimmediate",
+      "version": "1.0.5",
+      "license": "MIT",
+      "files": "LICENSE.txt",
+      "nested": false
+    },
+    {
+      "name": "lodash",
+      "version": "4.18.1",
+      "license": "MIT",
+      "files": "LICENSE",
+      "nested": false
+    },
+    {
+      "name": "tslib",
+      "version": "2.8.1",
+      "license": "0BSD",
+      "files": "LICENSE.txt",
+      "nested": true
+    },
+    {
+      "name": "uuid",
+      "version": "10.0.0",
+      "license": "MIT",
+      "files": "LICENSE.md",
+      "nested": false
+    },
+    {
+      "name": "echarts",
+      "version": "5.6.0",
+      "license": "Apache-2.0",
+      "files": "LICENSE,NOTICE,licenses",
+      "nested": true
+    },
+    {
+      "name": "tslib",
+      "version": "2.3.0",
+      "license": "0BSD",
+      "files": "LICENSE.txt",
+      "nested": true
+    },
+    {
+      "name": "zrender",
+      "version": "5.6.1",
+      "license": "BSD-3-Clause",
+      "files": "LICENSE",
+      "nested": true
+    },
+    {
+      "name": "tslib",
+      "version": "2.3.0",
+      "license": "0BSD",
+      "files": "LICENSE.txt",
+      "nested": true
+    }
+  ]
+}

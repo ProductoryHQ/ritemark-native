@@ -273,7 +273,7 @@ function PlanCard({
   planText?: string;
 }) {
   return (
-    <div className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[var(--vscode-input-background)]/80 p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+    <div className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="mb-2 text-[11px] font-medium text-[var(--r-ink-muted)]">Codex plan</div>
       {explanation && (
         <p className="text-[12px] opacity-85 mb-2 whitespace-pre-wrap">{explanation}</p>
@@ -395,8 +395,8 @@ export function ApprovalCard({
   // warning), a provenance line naming the gate, and footer buttons that share
   // the row when wide and stack full-width when the sidebar is narrow.
   return (
-    <div className="rounded-lg border border-[var(--r-accent-fainter)] overflow-hidden bg-[var(--vscode-input-background)]/80">
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--r-accent)] border-b border-[var(--r-accent-fainter)] bg-[var(--r-accent-soft)]/60">
+    <div className="rounded-lg border border-[var(--r-accent-fainter)] overflow-hidden bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)]">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--r-accent)] border-b border-[var(--r-accent-fainter)] bg-[color:color-mix(in_srgb,var(--r-accent-soft)_60%,transparent)]">
         <Icon name="shield-check" size={12} className="shrink-0" />
         <span className="flex-1">{agentLabel ? `${agentLabel} is waiting for approval` : 'Waiting for your approval'}</span>
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-warning)] animate-pulse shrink-0" />
@@ -409,7 +409,7 @@ export function ApprovalCard({
       {/* Command preview */}
       {isCommand && approval.command && (
         <div className="px-2.5 py-1.5">
-          <code className="block rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/70 p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
+          <code className="block rounded-md border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
             {approval.command}
           </code>
           {approval.workingDir && (
@@ -469,7 +469,7 @@ export function CompatibilityNotice({
   onDismiss: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-input-background)]/80 p-3 text-left shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+    <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 text-left shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
           <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-[var(--vscode-inputValidation-warningBorder)]" />
