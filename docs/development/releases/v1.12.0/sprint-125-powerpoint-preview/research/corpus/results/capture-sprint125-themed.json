@@ -1,0 +1,17 @@
+{
+  "bundle": "office-preview.js",
+  "results": [
+    {
+      "name": "11-powerpoint-themed",
+      "status": "ok",
+      "slides": 5,
+      "firstSlideMs": 93,
+      "mostDrawnAtOnce": 5,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 198,
+      "heap": 17100000
+    }
+  ]
+}

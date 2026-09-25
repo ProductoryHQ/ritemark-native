@@ -1,0 +1,37 @@
+@aiden0z/pptx-renderer dist es.js (own code + mtx)         new Function=0 Function(=0 eval(=0 fetch(=0 Worker(=1 WebAssembly=0 createObjectURL=5 importScripts=0 XMLHttpRequest=0 import(=1 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=6 setAttribute("style"=7 FontFace(=2
+pptx-preview dist es.js (own code)                         new Function=0 Function(=0 eval(=0 fetch(=0 Worker(=0 WebAssembly=0 createObjectURL=1 importScripts=0 XMLHttpRequest=0 import(=0 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=4 setAttribute("style"=0 FontFace(=0
+harness aiden.js (min, all deps)                           new Function=1 Function(=1 eval(=0 fetch(=0 Worker(=10 WebAssembly=0 createObjectURL=5 importScripts=1 XMLHttpRequest=0 import(=1 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=17 setAttribute("style"=7 FontFace(=2
+harness preview.js (min, all deps)                         new Function=2 Function(=3 eval(=0 fetch(=0 Worker(=9 WebAssembly=0 createObjectURL=1 importScripts=1 XMLHttpRequest=0 import(=0 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=21 setAttribute("style"=0 FontFace(=0
+echarts 6 dist/echarts.js                                  new Function=1 Function(=81 eval(=0 fetch(=1 Worker(=0 WebAssembly=0 createObjectURL=0 importScripts=0 XMLHttpRequest=0 import(=0 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=15 setAttribute("style"=0 FontFace(=0
+jszip dist/jszip.js                                        new Function=1 Function(=1 eval(=0 fetch(=0 Worker(=31 WebAssembly=0 createObjectURL=0 importScripts=2 XMLHttpRequest=0 import(=0 insertRule=0 createElement("style")=0 createElement('style')=0 innerHTML=0 setAttribute("style"=0 FontFace(=0
+
+--- context: aiden own code
+## new Function
+## eval(
+## fetch(
+## Worker(
+16225:        l = new Worker(f, { type: "module" });
+## WebAssembly
+## import(
+16151:      pdfjsLib = await import(pdfjsUrl);
+## createElement("style")
+## FontFace(
+21706:  const n = e.buffer instanceof ArrayBuffer ? e : new Uint8Array(e), i = new FontFace(t.renderFamily, n, {
+21798:    e = new FontFace(
+## createObjectURL
+83:    i = URL.createObjectURL(r), n.set(t, i);
+14354:  const x = i.mediaUrlCache.get(l), S = x ?? URL.createObjectURL($), v = !x;
+16223:      const h = new Blob([ny], { type: "text/javascript" }), f = URL.createObjectURL(h);
+16252:    if (l && !(o != null && o.aborted)) return URL.createObjectURL(l);
+16786:        const f = n.mediaUrlCache.get(o) ?? URL.createObjectURL(u);
+
+--- context: harness aiden.js new Function / eval / Function(
+ction(y){setTimeout(g,0,y)},p.setImmediate=function(y){typeof y!="function"&&(y=new Function(""+y));for(var x=new Array(arguments.length-1),b=0;b<x.length;b++)x[b]=argument
+n(y){setTimeout(g,0,y)},p.setImmediate=function(y){typeof y!="function"&&(y=new Function(""+y));for(var x=new Array(arguments.length-1),b=0;b<x.length
+
+--- context: harness preview.js new Function / eval / Function(
+ction(d){setTimeout(_,0,d)},v.setImmediate=function(d){typeof d!="function"&&(d=new Function(""+d));for(var x=new Array(arguments.length-1),b=0;b<x.length;b++)x[b]=argument
+return e}function Vrt(r){return ct(r)?typeof JSON<"u"&&JSON.parse?JSON.parse(r):new Function("return ("+r+");")():r}var od=vt(),Vi={registerMap:function(r,e,t){if(e.svg){va
+n(d){setTimeout(_,0,d)},v.setImmediate=function(d){typeof d!="function"&&(d=new Function(""+d));for(var x=new Array(arguments.length-1),b=0;b<x.length
+t&&global,K6=typeof self=="object"&&self&&self.Object===Object&&self,Qr=zM||K6||Function("return this")(),k_=typeof yc=="object"&&yc&&!yc.nodeType&&yc
+rn e}function Vrt(r){return ct(r)?typeof JSON<"u"&&JSON.parse?JSON.parse(r):new Function("return ("+r+");")():r}var od=vt(),Vi={registerMap:function(r

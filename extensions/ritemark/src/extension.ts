@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { RitemarkEditorProvider } from './ritemarkEditor';
 import { ExcelEditorProvider } from './excelEditorProvider';
 import { PdfEditorProvider } from './pdfEditorProvider';
-import { DocxEditorProvider } from './docxEditorProvider';
+import { OfficePreviewProvider, POWERPOINT_FORMAT, WORD_FORMAT } from './officePreview/officePreviewProvider';
 import { DrawioEditorProvider } from './drawioEditorProvider';
 import { isEnabled } from './features';
 import { initAPIKeyManager } from './ai/apiKeyManager';
@@ -773,9 +773,12 @@ export function activate(context: vscode.ExtensionContext) {
     PdfEditorProvider.register(context)
   );
 
-  // Register DOCX viewer (read-only)
+  // Register the Office previews (read-only): Word, and PowerPoint (Sprint 125). The
+  // PowerPoint editor is registered even with its flag off, so a deck says the preview
+  // is off and offers PowerPoint instead of falling to the binary-file message.
   context.subscriptions.push(
-    DocxEditorProvider.register(context)
+    OfficePreviewProvider.register(context, WORD_FORMAT),
+    OfficePreviewProvider.register(context, POWERPOINT_FORMAT)
   );
 
   // Register draw.io diagram editor (Sprint 82)

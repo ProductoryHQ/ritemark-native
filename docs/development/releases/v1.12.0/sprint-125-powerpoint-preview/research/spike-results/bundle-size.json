@@ -1,0 +1,30 @@
+{
+  "aiden": {
+    "minified": 1249366,
+    "gzip": 389452,
+    "brotli": 324953,
+    "byPackage": {
+      "@aiden0z/pptx-renderer": 518706,
+      "echarts": 452632,
+      "zrender": 176022,
+      "jszip": 97685,
+      "harness": 1426,
+      "tslib": 456
+    }
+  },
+  "preview": {
+    "minified": 1362824,
+    "gzip": 433035,
+    "brotli": 355953,
+    "byPackage": {
+      "echarts": 827687,
+      "zrender": 214182,
+      "pptx-preview": 139431,
+      "jszip": 98718,
+      "lodash": 74895,
+      "tslib": 3250,
+      "harness": 922,
+      "uuid": 905
+    }
+  }
+}

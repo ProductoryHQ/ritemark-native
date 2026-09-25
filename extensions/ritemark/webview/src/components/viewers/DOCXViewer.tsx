@@ -8,7 +8,7 @@
  * what it cannot show, and always offers to open the file elsewhere.
  * Evidence: docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/.
  */
-import { useCallback, useDeferredValue, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
 import mammoth from 'mammoth'
 import { sendToExtension } from '../../bridge'
@@ -25,6 +25,7 @@ import { fillPageNumbers, renderedPages, textChunks } from './docx/renderedDocx'
 import { findDocumentMatches } from './documentSearch'
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import {
+  Notice,
   PageIndicator,
   SplitButton,
   ToolbarIconButton,
@@ -137,7 +138,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message = event.data
-      if (message.type === 'wordStatus') {
+      if (message.type === 'openStatus') {
         if (typeof message.openLabel === 'string') setOpenLabel(message.openLabel)
       } else if (message.type === 'saveAsMarkdownResult') {
         setIsSavingMd(false)
@@ -634,16 +635,6 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-function Notice({ icon, children, onDismiss }: { icon: 'warning' | 'info' | 'circle-notch'; children: ReactNode; onDismiss?: () => void }) {
-  return (
-    <div role="status" className="flex shrink-0 items-center gap-2 border-b border-hairline bg-surface-soft px-3 py-1.5 font-ui text-[12px] text-ink-strong">
-      <Icon name={icon} size={14} className={icon === 'circle-notch' ? 'animate-spin' : undefined} />
-      <span className="min-w-0 flex-1">{children}</span>
-      {onDismiss && <ToolbarIconButton icon="x" label="Dismiss" tooltip="Hide this notice" onClick={onDismiss} />}
     </div>
   )
 }

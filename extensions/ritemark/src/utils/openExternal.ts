@@ -34,6 +34,10 @@ export async function isAppInstalled(appName: string): Promise<boolean> {
       } else if (appName === 'Microsoft Word') {
         await execAsync('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\winword.exe" /ve');
         return true;
+      } else if (appName === 'Microsoft PowerPoint') {
+        // Sprint 125: without this, "Open in PowerPoint" showed whether or not it is installed.
+        await execAsync('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\powerpnt.exe" /ve');
+        return true;
       }
       // For unknown apps, assume file association will handle it
       return true;

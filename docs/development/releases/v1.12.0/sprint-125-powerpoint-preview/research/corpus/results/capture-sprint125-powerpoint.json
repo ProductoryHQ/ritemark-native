@@ -1,0 +1,125 @@
+{
+  "bundle": "office-preview.js",
+  "results": [
+    {
+      "name": "01-title-bullets",
+      "status": "ok",
+      "slides": 5,
+      "firstSlideMs": 83,
+      "mostDrawnAtOnce": 5,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 162,
+      "heap": 12700000
+    },
+    {
+      "name": "02-tables",
+      "status": "ok",
+      "slides": 2,
+      "firstSlideMs": 59,
+      "mostDrawnAtOnce": 2,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 202,
+      "heap": 12700000
+    },
+    {
+      "name": "03-images",
+      "status": "ok",
+      "slides": 3,
+      "firstSlideMs": 62,
+      "mostDrawnAtOnce": 3,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 85,
+      "heap": 12700000
+    },
+    {
+      "name": "04-shapes-groups",
+      "status": "ok",
+      "slides": 3,
+      "firstSlideMs": 59,
+      "mostDrawnAtOnce": 3,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 284,
+      "heap": 12700000
+    },
+    {
+      "name": "05-charts",
+      "status": "ok",
+      "slides": 3,
+      "firstSlideMs": 116,
+      "mostDrawnAtOnce": 3,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 151,
+      "heap": 12700000
+    },
+    {
+      "name": "06-fonts",
+      "status": "ok",
+      "slides": 2,
+      "firstSlideMs": 60,
+      "mostDrawnAtOnce": 2,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 236,
+      "heap": 12700000
+    },
+    {
+      "name": "07-notes",
+      "status": "ok",
+      "slides": 3,
+      "firstSlideMs": 59,
+      "mostDrawnAtOnce": 3,
+      "zoom": "Zoom: 100%",
+      "notes": 3,
+      "notice": null,
+      "domNodes": 93,
+      "heap": 12700000
+    },
+    {
+      "name": "08-long-40-slides",
+      "status": "ok",
+      "slides": 40,
+      "firstSlideMs": 62,
+      "mostDrawnAtOnce": 5,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 297,
+      "heap": 12700000
+    },
+    {
+      "name": "09-layouts-backgrounds",
+      "status": "ok",
+      "slides": 4,
+      "firstSlideMs": 57,
+      "mostDrawnAtOnce": 4,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 100,
+      "heap": 12700000
+    },
+    {
+      "name": "11-powerpoint-themed",
+      "status": "ok",
+      "slides": 5,
+      "firstSlideMs": 61,
+      "mostDrawnAtOnce": 5,
+      "zoom": "Zoom: 100%",
+      "notes": 0,
+      "notice": null,
+      "domNodes": 198,
+      "heap": 12700000
+    }
+  ]
+}
