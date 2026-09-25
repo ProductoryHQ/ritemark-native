@@ -7,6 +7,7 @@ Status: **Phase 3 (DEVELOP); scope changed by D4 on 2026-09-24.**
 - Jarmo approved the plan on 2026-09-24 ("tee sprint ja asap töösse") and D4 on the same day ("nii sobib!").
 - The client work for R1–R3 and R5–R7 is committed.
 - D4 withdraws the automatic publisher (R4). In its place: a bundled Claude Code bump (R9) and a pre-release check of Anthropic's catalog (R10).
+- Jarmo's admin merges put the work on `main`: #347 on 2026-09-24 and review follow-up #349 on 2026-09-25. Follow-up #352 is in review.
 - Phase 4 QA follows, with A1–A5 and A7.<br>
 Branch: `sprint-127-day-zero-models`, created locally on 2026-09-24 from `03076a6`. This cloud session may push only the remote ref `claude/anthropic-models-bundled-cli-gtjld9`, so the sprint branch is pushed there (Q4).<br>
 Issue: [#343](https://github.com/ProductoryHQ/ritemark-native/issues/343) under milestone `v1.12.0`<br>
