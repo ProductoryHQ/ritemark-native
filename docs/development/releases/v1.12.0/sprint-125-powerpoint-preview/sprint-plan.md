@@ -6,7 +6,7 @@ Release tier: **extension** — PowerPoint joins the Office bundle Sprint 124 bu
 (`media/office-preview.js`), which every release script already knows; no
 shell-tier path changes (v1.12.0 is a full-app release regardless)
 
-**Status:** Planning — waiting for Jarmo's approval. No code until then.<br>
+**Status:** In review — implemented and RunDev-validated 2026-09-25.<br>
 **Branch:** `sprint-125-powerpoint-preview`<br>
 **Issue:** [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285)<br>
 **Worktree:** `.claude/worktrees/sprint-125-powerpoint-preview`, branched from main `9940d086`<br>
@@ -171,16 +171,16 @@ always offers a way to open the deck in PowerPoint.
 
 ## Definition of Done
 
-- [ ] The corpus, its generator, PowerPoint's ground truth and the comparison results are committed.
-- [ ] The chart pre-pass and font handling are in, with tests; the spike's defects 1, 2, 7, 8, 9 and 13 are fixed or shown absent in the dev build.
-- [ ] A `.pptx` opens in its own read-only tab from `office-preview.js`, behind a default-on `powerpoint-preview` flag with a truthful off state.
-- [ ] The toolbar gives slide position, zoom and fit, search and Open in PowerPoint, with a tooltip on every button, one line in a narrow pane.
-- [ ] External edits re-render on the same slide; deletion shows a notice.
-- [ ] Every failure fixture, the lying bomb included, ends in a specific message before the webview sees the bytes, for `.pptx` and `.docx`.
-- [ ] Unsupported content is announced; links open only through the host; limits are documented.
-- [ ] Third-party notices ship with the bundle.
-- [ ] Open time and memory are recorded; Word, PDF and Markdown show no regression.
-- [ ] `npm test`, `./scripts/validate-qa.sh`, and RunDev validation of the corpus in a dev build pass.
+- [x] The corpus, its generator, PowerPoint's ground truth and the comparison results are committed.
+- [x] The chart pre-pass and font handling are in, with tests; the spike's defects 1, 2, 7, 8, 9 and 13 are fixed or shown absent in the dev build.
+- [x] A `.pptx` opens in its own read-only tab from `office-preview.js`, behind a default-on `powerpoint-preview` flag with a truthful off state.
+- [x] The toolbar gives slide position, zoom and fit, search and Open in PowerPoint, with a tooltip on every button, one line in a narrow pane.
+- [x] External edits re-render on the same slide; deletion shows a notice.
+- [x] Every failure fixture, the lying bomb included, ends in a specific message before the webview sees the bytes, for `.pptx` and `.docx`.
+- [x] Unsupported content is announced; links open only through the host; limits are documented.
+- [x] Third-party notices ship with the bundle.
+- [x] Open time and memory are recorded; Word, PDF and Markdown show no regression.
+- [x] `npm test`, `./scripts/validate-qa.sh`, and RunDev validation of the corpus in a dev build pass.
 
 ## Product Decisions
 
@@ -189,9 +189,14 @@ always offers a way to open the deck in PowerPoint.
 | 2026-09-24 | Sprint 125 follows Sprint 124 directly, and the renderer spike ran alongside it | Jarmo: "jah, järjest" (recorded in Sprint 124) |
 | 2026-09-24 | Candidate is `@aiden0z/pptx-renderer` 1.3.0, not the 1.2.4 the release plan named on 2026-09-13; 1.3.0 is the current release and is what the spike measured | Spike |
 | 2026-09-24 | The corpus generator stays Python (`python-pptx`), as a research script only | No maintained PPTX writer for Node; nothing ships |
+| 2026-09-24 | Decisions 1–3 accepted as proposed: slides scroll with *Slide N of M* and no thumbnail rail or arrows; speaker notes under each slide and in search; PowerPoint joins `office-preview.js` | Jarmo: "yldiselt sobib" |
+| 2026-09-24 | No real deck is available (decision 4). In its place, a deck authored in PowerPoint itself from one of its built-in design themes joins the corpus, so at least one fixture is PowerPoint-made rather than generated | Jarmo: "mul endal PPTd pole" |
+| 2026-09-25 | One Office preview provider for Word and PowerPoint (`officePreview/officePreviewProvider.ts`), configured per format, instead of a copy of the Word provider | The two differ only in view type, part folder, wording, apps and flag; one copy keeps the pre-check, file watching and CSP in one place |
+| 2026-09-25 | Every deck draws only the slides within 1.5 viewports, not "all up to a measured count" (R4) | A 5-slide deck is drawn whole anyway; one path, and the chart canvases of a long deck never all exist at once (a 40-slide deck: at most 5–8 drawn) |
+| 2026-09-25 | Search counts matches in the deck's own text and highlights the words in the slides that are drawn | Slides far from the view are not drawn, so the drawn text cannot be counted; master and layout text (repeated footers) is left out of both |
 
 ## Planning Approval
 
-- [ ] Jarmo approves this sprint plan and decisions 1–4.
+- [x] Jarmo approves this sprint plan and decisions 1–4. *("yldiselt sobib. mul endal PPTd pole", 2026-09-24)*
 - [x] GitHub issue exists. ([#285](https://github.com/ProductoryHQ/ritemark-native/issues/285))
 - [x] Worktree and branch created. (`sprint-125-powerpoint-preview`, from main `9940d086`)

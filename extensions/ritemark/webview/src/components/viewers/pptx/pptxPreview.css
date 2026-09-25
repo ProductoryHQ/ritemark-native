@@ -1,0 +1,68 @@
+/*
+ * Sprint 125 (#285) — the PowerPoint preview's surround, and the rules that keep
+ * the webview's own CSS off the drawn slides (R8).
+ */
+
+.ritemark-pptx {
+  --ritemark-pptx-surround: color-mix(in srgb, var(--r-ink-strong) 7%, var(--r-surface));
+}
+
+.ritemark-pptx .pptx-scroller {
+  background: var(--ritemark-pptx-surround);
+}
+
+/* Zoom: the stage is drawn at 100 % and scaled; the sizer takes the scaled size
+   so the scroll range follows, and centres the slides while they are narrower
+   than the window. As in the Word preview. */
+.ritemark-pptx .pptx-sizer {
+  margin: 0 auto;
+}
+
+.ritemark-pptx .pptx-stage {
+  box-sizing: border-box;
+  transform-origin: 0 0;
+}
+
+/* Each slide keeps its size while it is not drawn, so the scroll range and the
+   slide count never jump. Its own stacking context keeps shapes placed behind
+   the text above the white slide. */
+.ritemark-pptx .pptx-slide {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  isolation: isolate;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 16px rgb(0 0 0 / 0.08);
+  /* Spike defect 9: elements the renderer leaves unstyled (bullets, empty runs)
+     inherited the webview's font and line height. The slide sets the deck's own. */
+  line-height: normal;
+  color: #000;
+  text-align: left;
+}
+
+/* Tailwind's preflight sets `img { max-width: 100% }` and VS Code's webview
+   defaults add `max-height: 100%`. A cropped picture is a larger image inside a
+   clipped box; either rule would squash it (Sprint 124 found the second only in
+   the real app). */
+.ritemark-pptx .pptx-slide img,
+.ritemark-pptx .pptx-slide svg,
+.ritemark-pptx .pptx-slide canvas {
+  max-width: none;
+  max-height: none;
+}
+
+/* Speaker notes under their slide: quiet, readable at the slide's scale. */
+.ritemark-pptx .pptx-notes {
+  margin-top: 12px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--r-hairline-strong);
+  background: var(--r-surface);
+  color: var(--r-ink-body);
+  font-family: var(--ritemark-ui-font-family);
+  font-size: 18px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ritemark-pptx .pptx-notes p + p {
+  margin-top: 6px;
+}

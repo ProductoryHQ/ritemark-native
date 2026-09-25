@@ -16,7 +16,7 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
 | 124 | Word preview: Word's pages and page numbers, images behind text, font aliases; one toolbar for Word and PDF (pages, zoom, fit, Word search); plain refusals; the preview in its own bundle (`office-preview.js`) | Gate 1 (the built app carries `office-preview.js`), and **Gate 2 for the Windows Word preview** |
-| 125 | _Not started_ | — |
+| 125 | PowerPoint preview: slides that scroll with speaker notes, the Word toolbar and find bar, chart fixes, links through the usual prompt, plain refusals; the host check now unpacks each part with a cap (Word files too); `ritemark.features.powerpoint-preview` kill switch | Gate 1, and **Gate 2 for Windows**: the PowerPoint app check is new there |
 
 ## Automated checks (before handover)
 
@@ -93,6 +93,23 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 - [ ] Dark theme: the zoom menu, the Open in Word menu and the find bar are dark and readable
 - [ ] A Markdown file still opens in the editor, and its Cmd+F find bar works as before
 
+### PowerPoint preview (Sprint 125)
+
+Fixtures: `docs/development/releases/v1.12.0/sprint-125-powerpoint-preview/research/corpus/` (`ppt/` holds the PowerPoint-saved forms; `ppt/11-powerpoint-themed.pptx` was styled by PowerPoint with its Berlin theme).
+
+- [ ] `ppt/11-powerpoint-themed.pptx`: 5 slides; the orange gradient, the dark title bars and the theme font, as in PowerPoint
+- [ ] `ppt/07-notes.pptx`: each slide's speaker notes sit under it
+- [ ] `ppt/08-long-40-slides.pptx`: *Slide N of 40* follows scrolling; − / +, and the zoom menu's **Fit width**, **Fit slide** and sizes behave
+- [ ] Cmd+F or the magnifier: "notes" in `ppt/07-notes.pptx` counts 9 — titles, bullets and notes — and Enter walks them in order
+- [ ] `ppt/05-charts.pptx`: the clustered column and bar charts are coloured by series (as their legends say); the pie and doughnut are titled "Revenue mix"
+- [ ] `ppt/09-layouts-backgrounds.pptx`, slide 3: the link asks before opening example.com in the browser
+- [ ] `fixtures/f3-decompression-bomb.pptx`, `f4-bomb-lying-size.pptx`, `f5-password-protected.pptx`: each shows its reason with **Try again** and **Open in PowerPoint**
+- [ ] `fixtures/f6-docx-bomb-lying-size.docx` (a Word file): "looks damaged", and the app stays responsive
+- [ ] **Open in PowerPoint** opens the file in PowerPoint
+- [ ] Edit a deck in PowerPoint and save: the preview follows, on the same slide
+- [ ] Dark theme and a narrow editor: the toolbar and the notes are readable; the slides keep their own colours
+- [ ] A Word document and a PDF still open as before
+
 ### Regression sweep
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
@@ -112,6 +129,7 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 
 - [ ] With many files open, the tab row shrinks to fit and hovering a tab shows its full name (Sprint 123)
 - [ ] Word preview (Sprint 124): `word/05-headers-footers.docx`, `word/07-sections-landscape.docx` and `word/10-unsupported-content.docx` from the corpus — pages, page numbers, the landscape section and the notice as on macOS; Calibri is drawn as Calibri; **Open in Word** opens Word
+- [ ] PowerPoint preview (Sprint 125): `ppt/05-charts.pptx`, `ppt/07-notes.pptx` and `ppt/11-powerpoint-themed.pptx` — slides, notes and charts as on macOS; the button says **Open in PowerPoint** only where PowerPoint is installed, else **Open in default app**
 
 - [ ] Installer signed by `Productory Services OÜ`; standard-user install and clean uninstall
 - [ ] **Google Docs Connect** completes in the browser and returns to Ritemark. This is the first native Windows run of the loopback OAuth flow. Then Create and Sync

@@ -218,8 +218,18 @@ if [[ ! -f "$OFFICE_JS" ]]; then
   fail "media/office-preview.js missing from the bundled extension (Word preview)"
 elif ! grep -q "ritemark-docx" "$OFFICE_JS"; then
   fail "media/office-preview.js missing the Word viewer (stale or stubbed bundle)"
+elif ! grep -q "ritemark-pptx" "$OFFICE_JS"; then
+  fail "media/office-preview.js missing the PowerPoint viewer (stale or stubbed bundle)"
 else
-  ok "media/office-preview.js present with the Word viewer"
+  ok "media/office-preview.js present with the Word and PowerPoint viewers"
+fi
+
+# Sprint 125: the Office bundle's third-party notices (ECharts' Apache-2.0 NOTICE,
+# the MPL-2.0 font decompressor) travel with it.
+if [[ ! -s "$EXT_DIR/media/office-preview.NOTICES.txt" ]]; then
+  fail "media/office-preview.NOTICES.txt missing from the bundled extension"
+else
+  ok "media/office-preview.NOTICES.txt present"
 fi
 
 echo ""

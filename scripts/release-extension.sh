@@ -191,6 +191,7 @@ FILES="$FILES
 media/webview.js
 media/webview.js.map
 media/office-preview.js
+media/office-preview.NOTICES.txt
 package.json"
 
 # Files whose absence is legitimate and must NOT abort the release. Everything

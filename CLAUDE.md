@@ -217,7 +217,8 @@ ritemark-native/
 │   │   ├── utils/               # Binary resolution, platform utils, bundledAgentRuntime
 │   │   ├── voiceDictation/      # Whisper STT (macOS only)
 │   │   ├── export/              # PDF/DOCX export
-│   │   └── [editors]            # ritemarkEditor, docxEditorProvider, pdfEditorProvider, excelEditorProvider, drawioEditorProvider
+│   │   ├── officePreview/       # Word + PowerPoint previews: one provider, host pre-check (Sprint 124/125)
+│   │   └── [editors]            # ritemarkEditor, pdfEditorProvider, excelEditorProvider, drawioEditorProvider
 │   ├── out/                     # Compiled JS
 │   ├── webview/                 # React webview (TipTap editor + AI sidebar)
 │   ├── media/                   # webview.js bundle (~7.6 MB IIFE — see GH #107)
