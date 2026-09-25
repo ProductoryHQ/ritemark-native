@@ -55,12 +55,4 @@
   margin-bottom: 24px;
 }
 
-/* Search matches, drawn with the CSS Custom Highlight API so the document's DOM is not rewritten. */
-::highlight(ritemark-doc-search) {
-  background-color: var(--r-accent-soft);
-}
-
-::highlight(ritemark-doc-search-current) {
-  background-color: var(--r-accent);
-  color: #fff;
-}
+/* Search highlight colours: ../documentSearch.css, shared with the other previews. */

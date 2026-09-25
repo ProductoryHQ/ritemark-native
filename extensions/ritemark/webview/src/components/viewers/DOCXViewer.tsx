@@ -34,6 +34,7 @@ import {
   ZoomControls,
 } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, pageAtScroll, stepZoom, type FitMode } from './viewerLayout'
+import './documentSearch.css'
 import './docx/docxPreview.css'
 
 export interface DocxLoadError {

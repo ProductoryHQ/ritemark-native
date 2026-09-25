@@ -56,7 +56,10 @@ interface Line {
 
 const LIST_BULLET = /^[•◦‣⁃\-\*·]\s+/
 const LIST_NUMBER = /^(\d{1,3})[.)]\s+/
-const SCANNED_PDF_TEXT_THRESHOLD = 50  // total chars across all pages
+// total chars across all pages below which a PDF is treated as scanned (no
+// real text layer) — shared with the PDF viewer's search (pdfSearchIndex.ts)
+// so both features agree on what counts as "no searchable text".
+export const SCANNED_PDF_TEXT_THRESHOLD = 50
 
 export async function convertPdfToMarkdown(
   pdfjs: AnyPdfjs,
