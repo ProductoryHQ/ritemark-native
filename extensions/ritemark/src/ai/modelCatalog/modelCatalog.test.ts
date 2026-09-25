@@ -16,6 +16,7 @@ import {
   resolveAll,
   resolveRequestedModelIn,
   resolveStaticModels,
+  substitutionForTurn,
   versionLt,
   type DiscoveryResults,
 } from './resolver';
@@ -515,6 +516,44 @@ test('S127 S28: an unavailable saved model is replaced by the default and report
   assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-6', 'claude-code'), { id: 'claude-sonnet-5', substitutedFrom: 'claude-opus-6' });
   assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-5', 'claude-code'), { id: 'claude-opus-5' });
   assert.deepStrictEqual(resolveRequestedModelIn(r, undefined, 'claude-code'), { id: 'claude-sonnet-5' }, 'nothing saved: no notice');
+});
+
+test('S127: live alias rows take the curated presentation of the model they resolve to, and keep their ids', () => {
+  const live: DiscoveryResults = {
+    anthropic: [
+      { id: 'default', resolvedModel: 'claude-sonnet-5', label: 'Default (recommended)', description: '', tier: 'medium', deprecated: false, order: 0 },
+      { id: 'sonnet', resolvedModel: 'claude-sonnet-5', label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 1 },
+      { id: CLAUDE_MODEL_IDS.FABLE_5_1, resolvedModel: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable', description: '', tier: 'medium', deprecated: false, order: 2 },
+      { id: 'opus', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Opus', description: '', tier: 'medium', deprecated: false, order: 3 },
+      { id: 'opus[1m]', resolvedModel: `${CLAUDE_MODEL_IDS.OPUS_5_5}[1m]`, label: 'Opus (1M context)', description: '', tier: 'medium', deprecated: false, order: 4 },
+      { id: 'haiku', resolvedModel: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku', description: '', tier: 'medium', deprecated: false, order: 5 },
+    ],
+  };
+  const models = resolveAll(live, null, null, BUNDLED_CATALOG, APP).anthropic.models;
+  const opus = findModelEntry(models, 'opus')!;
+  assert.strictEqual(opus.id, 'opus', 'a saved alias keeps resolving');
+  assert.strictEqual(opus.label, 'Opus 5.5', 'curated label, not the CLI family name');
+  assert.strictEqual(opus.resolvedModel, CLAUDE_MODEL_IDS.OPUS_5_5);
+  assert.strictEqual(findModelEntry(models, CLAUDE_MODEL_IDS.OPUS_5_5)?.id, 'opus', 'the concrete id reconciles to the alias row');
+  assert.strictEqual(findModelEntry(models, 'opus[1m]')?.label, 'Opus (1M context)', 'a 1M variant keeps its own label');
+  assert.strictEqual(findModelEntry(models, 'sonnet')?.label, 'Sonnet 5');
+  assert.strictEqual(findModelEntry(models, 'haiku')?.label, 'Haiku 4.5');
+  assert.deepStrictEqual(
+    models.filter((model) => !model.id.endsWith('[1m]')).map((model) => model.label),
+    ['Sonnet 5', 'Opus 5.5', 'Fable 5.1', 'Haiku 4.5'],
+    'curated order',
+  );
+});
+
+test('S127 S28: a turn on the replacement of an unavailable saved model owes the notice', () => {
+  const same = (a: string, b: string) => a === b;
+  const saved = { id: 'claude-sonnet-5', substitutedFrom: 'claude-opus-4-1' };
+  assert.deepStrictEqual(substitutionForTurn(saved, 'claude-sonnet-5', same), { from: 'claude-opus-4-1', to: 'claude-sonnet-5' }, 'the sidebar already sent the replacement');
+  assert.strictEqual(substitutionForTurn(saved, 'claude-opus-5', same), undefined, 'the user chose another model');
+  assert.strictEqual(substitutionForTurn({ id: 'claude-sonnet-5' }, 'claude-sonnet-5', same), undefined, 'the saved model is available');
+  assert.strictEqual(substitutionForTurn(undefined, 'claude-sonnet-5', same), undefined, 'not a Claude turn');
+  const byIdentity = (a: string, b: string) => a.replace(/^sonnet$/, 'claude-sonnet-5') === b.replace(/^sonnet$/, 'claude-sonnet-5');
+  assert.deepStrictEqual(substitutionForTurn(saved, 'sonnet', byIdentity), { from: 'claude-opus-4-1', to: 'claude-sonnet-5' }, 'aliases compare by identity');
 });
 
 test('versionLt compares dotted-numeric versions correctly', () => {

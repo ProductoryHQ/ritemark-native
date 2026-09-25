@@ -1006,6 +1006,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 - A bundled-only row is kept.
 - A feed-only row is kept when it is automated (`provenance: 'auto'`) or when its `addedAt` is after the bundled `updatedAt`.
 - A fresher `retired: true` row is a tombstone. It hides the model everywhere, live lists included.
+- A live alias row, such as `opus` → `claude-opus-5-5`, takes the curated label, description and order of the model it resolves to, and keeps its own id so that a saved alias still resolves (PR #347 review).
 - Automated rows never become defaults.
 - `minAppVersion` keeps automated rows (`1.12.0`) away from older clients.
 
@@ -1020,7 +1021,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 **Pickup:**
 - The feed is polled every 10 minutes with `If-None-Match`, so an unchanged feed is a 304. It is also polled when a stale sidebar becomes visible.
 - Discovery is probed again only when the declaration signature changes, or every 6 hours.
-- A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.`
+- A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.` The host compares every Claude turn against the saved `ritemark.ai.selectedModel`, because the sidebar usually sends the replacement itself. It names the substitution once per conversation.
 - Model-unavailable CLI and API errors name the model and point to the model menu. They add no new `failureKind`.
 
 **Claude Code currency (D4).**

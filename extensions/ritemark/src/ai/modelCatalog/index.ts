@@ -27,6 +27,7 @@ import {
   resolveAll,
   resolveRequestedModelIn,
   resolveStaticModels,
+  substitutionForTurn as substitutionForTurnIn,
   type DiscoveryResults,
   type RequestedModelResolution,
   type ResolvedProvider,
@@ -223,6 +224,16 @@ export function getDefault(provider: Provider, surface: Surface): string {
  */
 export function resolveRequestedModel(provider: Provider, requested: string | undefined, surface: Surface): RequestedModelResolution {
   return resolveRequestedModelIn(current()[provider], requested, surface);
+}
+
+/** Sprint 127 R6 (S28): the substitution a turn on `turnModel` must name, if any. */
+export function substitutionForTurn(
+  provider: Provider,
+  saved: RequestedModelResolution | undefined,
+  turnModel: string | undefined,
+): { from: string; to: string } | undefined {
+  const identity = (id: string): string => getModel(provider, id)?.id ?? id;
+  return substitutionForTurnIn(saved, turnModel, (a, b) => identity(a) === identity(b));
 }
 
 export function getResolved(): Resolved {
