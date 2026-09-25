@@ -10,6 +10,7 @@
 
 import { traceClaude } from './agentTrace';
 import type { ModelOption } from './types';
+import type { ClaudeModelPickerSettings } from '../ai/modelCatalog/runtimeDeclarations';
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
 
@@ -17,6 +18,8 @@ interface DiscoverOptions {
   workspacePath: string;
   pathToClaudeCodeExecutable?: string;
   anthropicApiKey?: string;
+  /** Sprint 127 R1: models to declare, so the CLI lists ones it was not built with. */
+  settings?: ClaudeModelPickerSettings;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +79,8 @@ export async function discoverClaudeModels(options: DiscoverOptions): Promise<Mo
     // Sprint 103 R2: discovery never runs tools — no permission mode escalation
     // needed, and no session in Ritemark carries the dangerous bypass flag.
     permissionMode: 'default',
+    // The SDK flag-settings layer is honored even with settingSources: [].
+    ...(options.settings ? { settings: options.settings } : {}),
   };
 
   if (options.anthropicApiKey) {

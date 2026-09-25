@@ -51,10 +51,21 @@ export function ToolbarSpacer() {
   return <div className="min-w-0 flex-1" />
 }
 
-/** "Page 3 of 28" — orientation, not a control. */
-export function PageIndicator({ current, total }: { current: number; total: number }) {
+/** A one-line notice under the toolbar: a deleted file, content the preview cannot show. */
+export function Notice({ icon, children, onDismiss }: { icon: 'warning' | 'info' | 'circle-notch'; children: ReactNode; onDismiss?: () => void }) {
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-2 border-b border-hairline bg-surface-soft px-3 py-1.5 font-ui text-[12px] text-ink-strong">
+      <Icon name={icon} size={14} className={icon === 'circle-notch' ? 'animate-spin' : undefined} />
+      <span className="min-w-0 flex-1">{children}</span>
+      {onDismiss && <ToolbarIconButton icon="x" label="Dismiss" tooltip="Hide this notice" onClick={onDismiss} />}
+    </div>
+  )
+}
+
+/** "Page 3 of 28" (or "Slide 3 of 24") — orientation, not a control. */
+export function PageIndicator({ current, total, noun = 'Page' }: { current: number; total: number; noun?: string }) {
   const compact = useContext(CompactContext)
-  const text = total <= 0 ? '' : compact ? `${current + 1} / ${total}` : `Page ${current + 1} of ${total}`
+  const text = total <= 0 ? '' : compact ? `${current + 1} / ${total}` : `${noun} ${current + 1} of ${total}`
   return (
     <span className="shrink-0 whitespace-nowrap px-1 font-ui text-[12px] tabular-nums text-ink-muted" aria-live="polite">
       {text}
@@ -131,12 +142,14 @@ export interface ZoomControlsProps {
   onStep: (direction: 1 | -1) => void;
   onFit: (mode: 'width' | 'page') => void;
   onSet: (zoom: number) => void;
+  /** The whole-page fit's name: "Fit page", or "Fit slide" for a deck. */
+  fitPageLabel?: string;
 }
 
 /** − [Fit width ▾] + : the menu holds the two fits and the usual sizes. */
-export function ZoomControls({ zoom, fit, onStep, onFit, onSet }: ZoomControlsProps) {
+export function ZoomControls({ zoom, fit, onStep, onFit, onSet, fitPageLabel = 'Fit page' }: ZoomControlsProps) {
   const compact = useContext(CompactContext)
-  const current = compact ? zoomLabel(zoom) : fit === 'width' ? 'Fit width' : fit === 'page' ? 'Fit page' : zoomLabel(zoom)
+  const current = compact ? zoomLabel(zoom) : fit === 'width' ? 'Fit width' : fit === 'page' ? fitPageLabel : zoomLabel(zoom)
   const check = (on: boolean) => <Icon name="check" size={14} tone="inherit" className={on ? undefined : 'invisible'} />
   return (
     <div role="group" aria-label="Zoom" className="flex shrink-0 items-center gap-0.5">
@@ -167,7 +180,7 @@ export function ZoomControls({ zoom, fit, onStep, onFit, onSet }: ZoomControlsPr
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onFit('page')}>
             {check(fit === 'page')}
-            Fit page
+            {fitPageLabel}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {ZOOM_PRESETS.map((preset) => (

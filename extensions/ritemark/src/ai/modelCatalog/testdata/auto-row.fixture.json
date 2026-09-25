@@ -1,0 +1,28 @@
+{
+  "note": "An automated (provenance auto) feed row for a hypothetical future model, newer than the bundled lineup. Opus 5.5 played this role until Sprint 127 R9 bundled it.",
+  "publishedAt": "2026-09-24T09:10:00Z",
+  "row": {
+    "id": "claude-opus-6",
+    "label": "Opus 6",
+    "description": "Newest Opus model",
+    "tier": "high",
+    "deprecated": false,
+    "order": 0.5,
+    "minAppVersion": "1.12.0",
+    "thinkingEffort": {
+      "levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "provenance": "auto",
+    "addedAt": "2026-09-24T09:10:00Z",
+    "claudeCode": {
+      "inject": true,
+      "maxOutputTokens": 64000
+    }
+  }
+}

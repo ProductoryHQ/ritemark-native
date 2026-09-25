@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-24 (Sprint 124 Office preview bundle and Word viewer)
+**Last updated:** 2026-09-25 (Sprint 125 PowerPoint preview; one Office preview provider)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -158,7 +158,9 @@ extensions/ritemark/src/
 
 Editor provider contracts: `ritemarkEditor.ts` is a `CustomTextEditorProvider` (Markdown + CSV, editable) with multiple views per `TextDocument`; `src/editorSync/` owns their shared URI state and per-view delivery. `excelEditorProvider.ts` is a full `CustomEditorProvider<ExcelDocument>` since Sprint 81 — .xlsx is editable (dirty tracking via `CustomDocumentContentChangeEvent`, save/save-as/revert/hot-exit backup; no undo-redo stack), .xls stays read-only. `docxEditorProvider.ts` and `pdfEditorProvider.ts` are read-only (`CustomReadonlyEditorProvider`), as is `transcriptWorkbenchProvider.ts` — whose document is the AUDIO file, with the transcript held as session state beside it (Sprint 108).
 
-**Office previews (Sprint 124, #284).** `docxEditorProvider.ts` loads its own bundle, `media/office-preview.js` (`webview/src/office/`, built by `vite build --mode office`), not the shared `webview.js`; Sprint 125's PowerPoint preview joins it. Before sending a file the host runs `src/officePreview/officePackageCheck.ts` — size cap (50 MB, the file is not read whole above it), CFB container (password-protected / legacy), ZIP central directory (damaged, entry count, unpacked size and ratio) — and sends `loadError` with a plain title and detail instead of `load`. In the webview, `components/viewers/docx/prepareDocx.ts` rewrites the package's XML before docx-preview 0.4.1 renders it (`docxXml.ts`: Word's page markers honoured only where present, the marker after a manual break dropped, PAGE / NUMPAGES marked for per-page numbers, empty embedded font faces dropped, unsupported content scanned); `officeFonts.ts` aliases missing Office fonts at 88 %. The Word and PDF viewers share `viewers/ViewerToolbar.tsx` and the pure `viewerLayout.ts`; Word zoom is a transform on a stage inside a sizer (CSS `zoom` gave inconsistent geometry), search uses the CSS Custom Highlight API over `documentSearch.ts` matches, driven from `components/FindBarShell.tsx` — the floating find bar the Markdown editor's `FindBar.tsx` also renders, so the app has one search UX. Case-folded search helpers are shared with the transcript in `webview/src/utils/textSearch.ts`. The pre-commit hook, `build-prod.sh`, the extension-update file list and the bundle checks all know both bundles.
+**Office previews (Sprint 124, #284; Sprint 125, #285).** One provider, `src/officePreview/officePreviewProvider.ts` (`OfficePreviewProvider`, configured per format by `WORD_FORMAT` and `POWERPOINT_FORMAT`: view type, part folder, wording, external apps, flag), serves `ritemark.docxViewer` and `ritemark.pptxViewer` and loads their own bundle, `media/office-preview.js` (`webview/src/office/`, built by `vite build --mode office`), not the shared `webview.js`. Before sending a file the host runs `src/officePreview/officePackageCheck.ts` — size cap (50 MB, the file is not read whole above it), CFB container (password-protected / legacy), ZIP central directory (damaged, entry count, unpacked size and ratio), then every part inflated in the host capped at its declared size + 1 byte, so a part that misstates its size is refused (Sprint 125) — and sends `loadError` with a plain title and detail instead of `load`. In the webview, `components/viewers/docx/prepareDocx.ts` rewrites the package's XML before docx-preview 0.4.1 renders it (`docxXml.ts`: Word's page markers honoured only where present, the marker after a manual break dropped, PAGE / NUMPAGES marked for per-page numbers, empty embedded font faces dropped, unsupported content scanned); `officeFonts.ts` aliases missing Office fonts at 88 %. The Word and PDF viewers share `viewers/ViewerToolbar.tsx` and the pure `viewerLayout.ts`; Word zoom is a transform on a stage inside a sizer (CSS `zoom` gave inconsistent geometry), search uses the CSS Custom Highlight API over `documentSearch.ts` matches, driven from `components/FindBarShell.tsx` — the floating find bar the Markdown editor's `FindBar.tsx` also renders, so the app has one search UX. Case-folded search helpers are shared with the transcript in `webview/src/utils/textSearch.ts`. The pre-commit hook, `build-prod.sh`, the extension-update file list and the bundle checks all know both bundles.
+
+**PowerPoint (Sprint 125, #285).** `webview/src/components/viewers/PPTXViewer.tsx` draws each slide with `@aiden0z/pptx-renderer` 1.3.0's standalone `renderSlide` into its own list: slides stack in a scroller > sizer > stage transform like the Word viewer, and an IntersectionObserver draws only slides within 1.5 viewports (disposing the rest, which frees their chart canvases). `pptx/loadDeck.ts` parses with the renderer's ZIP limits, rewrites chart XML (`pptx/pptxXml.ts`: `varyColors` off on multi-series bar/line/area, the series name into an empty auto title), reads speaker notes from the notes slides (the renderer does not), aliases fonts installed nowhere (`officeFonts.installFontFallbacks`) and turns chart animation off via ECharts' `registerPreprocessor`. Search counts matches in the model's text per slide (own shapes only, not master/layout) plus the notes (`pptx/deckSearch.ts`), and highlights the words in drawn slides, whose own shapes are the last `slide.nodes.length` children (`pptx/renderedDeck.ts`). Links route through the host (`openLink` → `vscode.env.openExternal`, http(s) only). The bundle writes its third-party notices to `media/office-preview.NOTICES.txt` at build time. The `powerpoint-preview` flag is a kill switch: the editor stays registered and says the preview is off.
 
 Entry point `extension.ts` registers all providers, commands, and views.
 
@@ -692,7 +694,8 @@ interface UnifiedAttachment {
 ```
 tsc --noEmit + esbuild  extension host: 2 bundles (out/extension.js + out/browser/browserMcpAdapter.js)  [Sprint 92 #105]
 Vite → media/webview.js      editors and panels: ~8.3 MB IIFE
-Vite --mode office → media/office-preview.js   Word preview: ~1.3 MB IIFE  [Sprint 124]
+Vite --mode office → media/office-preview.js   Word + PowerPoint previews: ~2.5 MB IIFE  [Sprint 124, 125]
+                        + office-preview.NOTICES.txt (third-party notices)  [Sprint 125]
 apply-patches.sh        applies patches/vscode/001–014.patch to /vscode submodule
 gulp darwin-arm64-min   VS Code full build against submodule
 codesign                Apple Developer ID + Hardened Runtime + agent binary re-signing (JKBSC3ZDT5)
@@ -959,6 +962,8 @@ so there is one Whisper integration rather than two.
 
 ### AS IS — Model Catalog resolver (post-Sprint 89, GH #109)
 
+*Amended by Sprint 127 (next section). The live list no longer wins outright: the static layers merge per row, and feed rows can be declared to Claude Code. The layers and the public API below still hold.*
+
 The authority is the **`src/ai/modelCatalog/`** subsystem — a provenance-tracked waterfall
 resolving model lists + per-surface defaults for every runtime and view:
 
@@ -986,6 +991,56 @@ metadata. Persisted aliases reconcile at this boundary; the webview never dedupl
 by label. Claude sessions receive the request id and expected resolved identity
 separately, so init diagnostics compare like with like while genuine model drift still
 surfaces. A provider-default row uses one accessible trailing `*` in the picker.
+
+### AS IS — Existence, runnability and presentation (post-Sprint 127, #343)
+
+Before Sprint 127, a subscription user saw only the models that the bundled CLI was compiled with ("live wins"), and a stale feed was ignored as a whole. So a new Anthropic model waited for a CLI bump in a shell release. Sprint 127 splits the one authority into three (Jarmo, 2026-09-24).
+
+Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties each new model to a minimum Claude Code version** (`min_claude_code_version` in its Claude Code model catalog). So new Claude models reach users mainly through a *current bundled Claude Code*, which every release checks (below).
+
+| Question | Authority | Mechanism |
+|---|---|---|
+| Does the model exist? | Anthropic | `GET /v1/models` with the credential the runtime uses: API-key sign-in only (R2). For subscription users it is the runtime's own list plus the declared feed rows. |
+| Can the runtime run it? | The runtime | Claude Code's `supportedModels()`, extended by **declarations**. Feed rows with `claudeCode.inject` go to the SDK as `settings.modelPicker` (the flag-settings layer, honored with `settingSources: []`), and the output budget goes in as `CLAUDE_CODE_MAX_OUTPUT_TOKENS`. |
+| How is it presented? | Ritemark | A per-row merge of the bundled catalog with the remote/cache feed. |
+
+**Static merge** (`resolver.ts` `mergeStatic()`):
+- A row in both documents takes the fresher document's row.
+- A bundled-only row is kept.
+- A feed-only row is kept when it is automated (`provenance: 'auto'`) or when its `addedAt` is after the bundled `updatedAt`.
+- A fresher `retired: true` row is a tombstone. It hides the model everywhere, live lists included.
+- Automated rows never become defaults.
+- `minAppVersion` keeps automated rows (`1.12.0`) away from older clients.
+
+**Declarations** (`runtimeDeclarations.ts`, pure):
+- Discovery declares every declared row, so the probe lists them.
+- A session declares only the model it runs, and the session is rebuilt when that declaration changes (`ClaudeCodeRuntime`).
+- `behavesAs` is honored only on curated rows.
+- A declaration is dropped once the runtime knows the id natively (compared modulo `[1m]`).
+- Retired or malformed ids are never declared. The CLI accepts any id verbatim, so the client validates ids against `CLAUDE_MODEL_ID_PATTERN`.
+- With the `remote-model-catalog` flag off, there is no fetch, no injection and no declaration.
+
+**Pickup:**
+- The feed is polled every 10 minutes with `If-None-Match`, so an unchanged feed is a 304. It is also polled when a stale sidebar becomes visible.
+- Discovery is probed again only when the declaration signature changes, or every 6 hours.
+- A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.`
+- Model-unavailable CLI and API errors name the model and point to the model menu. They add no new `failureKind`.
+
+**Claude Code currency (D4).**
+- v1.12.0 bundles Claude Code 2.1.281 with SDK 0.3.281, and it lists Opus 5.5 natively.
+- Before each release, `npm run check:anthropic-models` reads Anthropic's catalog (`downloads.claude.ai/model-catalog/v1/catalog.json`, undocumented) through `anthropicCatalogCheck.ts`. That module is pure and not bundled.
+- The check raises an alert when the catalog cannot be read, has changed shape or has expired, or when a model needs a newer Claude Code than the runtime manifest bundles. It warns when a `main` model is missing from the bundled lineup.
+- The app itself never reads this catalog.
+- The feed in `ritemark-public` is edited by hand when needed. There is no publisher: the automatic one was withdrawn with D4.
+- A feed row may declare a model only when the bundled Claude Code meets Anthropic's minimum for that model.
+- Release steps are in `.claude/skills/release/SKILL.md` ## Claude Code and model currency.
+
+Open items:
+- A per-model `contextWindow` declaration waits for audit A3 (Sprint 127 Q5).
+- The signed feed is still deferred (Sprint 89).
+- Anthropic's server-served CLI catalog (`tengu_delegated_quail`) is welcome but not relied on. Anthropic keeps it off by default.
+- Delivering new models between app releases needs a Claude Code update channel outside full releases. That is a separate decision (D4).
+- A system CLI older than the flag-settings `modelPicker` cannot take declarations (S4).
 
 ### Agent Chat bootstrap boundary (v1.10.0 RC correction)
 
@@ -1072,7 +1127,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 - **Release builds are clean-room builds** — an RC starts in a new detached exact-`origin/main` worktree with a physical pristine VS Code submodule at the recorded gitlink. Dependencies come from lockfiles, patches come from Git, output starts empty, and the app carries verified provenance. A development worktree is never promoted into an RC. Full contract: `docs/development/release-process/BUILD-AND-WORKTREE-HYGIENE.md`.
 - **Extension source has one authority** — `extensions/ritemark/` is canonical. Development and local macOS builds symlink it into the same worktree's `vscode/extensions/ritemark`; CI and Windows packaging may create a same-worktree physical copy for platform/tooling constraints. A copy is derived build state, never an editable source or a cross-worktree dependency.
 - **Webview is sandboxed** — no filesystem/Node access; everything through `bridge.ts`. Never give the webview direct FS access to "simplify" things. ARCH-9 hardens this boundary; it must not dissolve it.
-- **Model IDs and catalog resolution have separate authorities** — canonical IDs and stable defaults live in `src/ai/modelConfig.ts`; `src/ai/modelCatalog/` projects them into provider/runtime lists and resolves availability through live probe → eligible remote → eligible cache → bundled floor. A remote/cache snapshot older than the bundled `updatedAt` cannot hide a newer app baseline. Never hardcode model IDs in runtimes, views, or Flow executors.
+- **Model IDs and catalog resolution have separate authorities** — canonical IDs and stable defaults live in `src/ai/modelConfig.ts`; `src/ai/modelCatalog/` projects them into provider/runtime lists and resolves availability through live probe → eligible remote → eligible cache → bundled floor. A remote/cache snapshot older than the bundled `updatedAt` cannot hide a newer app baseline. Never hardcode model IDs in runtimes, views, or Flow executors. *Sprint 127:* the static layers merge per row, not first-wins. Existence (Anthropic), runnability (the runtime, extended by feed declarations) and presentation (Ritemark) are separate authorities. Automated feed rows never become defaults.
 - **Flows are JSON + pluggable executors** — new automation capability = new node executor, not a new engine.
 - **Features ON by default, gated by flags** — never delete code to disable (broke Settings in v1.3.0). Disable only via `src/features/flags.ts` and only on explicit instruction.
 - **Layout invariants owned by patch 002** — sidebar, terminal, titlebar placement is contractual; enforced by `.claude/hooks/pre-commit-validator.sh`.
@@ -1100,6 +1155,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-25 | Sprint 125 | **PowerPoint preview (v1.12.0, #285).** `docxEditorProvider.ts` and `docxDocument.ts` become `officePreview/officePreviewProvider.ts` and `officeDocument.ts`: one provider for Word and PowerPoint, configured per format. New `PPTXViewer` and `viewers/pptx/` (renderer 1.3.0, chart XML fixes, notes, deck search, windowed drawing). `officePackageCheck` now inflates every part with a cap, closing a declared-size bypass that also affected Word. `office-preview.js` 1.3 → 2.5 MB (ECharts); `webview.js` unchanged. New flag `powerpoint-preview`; a notices file ships with the Office bundle. |
 | 2026-09-24 | Sprint 124 | **Word preview fidelity and an Office preview bundle (v1.12.0, #284).** New `media/office-preview.js` (second Vite build, `webview/src/office/`); Word code and Mammoth leave `webview.js` (8.93 → 8.35 MB). docx-preview 0.3.7 → 0.4.1 behind a pre-render XML pass (`viewers/docx/`) and a host package check (`src/officePreview/officePackageCheck.ts`, `loadError` message). Shared `ViewerToolbar` for Word and PDF. Release tooling (hook, build-prod both platforms, staging, extension-update list, preflights, notarization check) knows the new bundle — shell-tier. `getWordProcessorAppName` replaced by the provider's Word → Pages → default resolution. |
 | 2026-09-23 | Sprint 123 | **Transcript search and a fitting tab row (v1.12.0, #283).** New webview-only `workbench/transcriptSearch.ts` (pure matching and highlight splitting, tested) and `TranscriptSearchBar`; the transcript pane became a column with the search row above the scroller (`transcriptColumn` / `transcriptSearch` layout classes). Follow playback gains a visible resume. The extension defaults `workbench.editor.tabSizing` to `shrink`. No host, protocol, flag, patch or shell-tier change. |
 | 2026-09-23 | Sprint 122 | **Agent conversation clarity (v1.12.0, #282).** New `ConversationHeader` (title, ⋮ menu) over a shared `conversationActionsModel` + `ConversationDialogs` now used by History, the rail and the header. Chat link policy split at the trust boundary: webview `chatLinks.ts` classifies by syntax, host `src/views/chatLinkTargets.ts` resolves with `realpath` and gates every action; new sidebar messages `chat:link/resolve` / `chat:link/resolved`, `chat:link-action`, `chat:link-unsupported`; folders and unsupported schemes no longer fail silently; out-of-project targets are located, never opened. `ChatInput` fits its text up to Sprint 117's `composerBounds` and is resized from a top-edge handle (`ComposerResizeHandle`, `composerResize.ts`), capped by the room left in the column. New `ui/dropdown-menu.tsx`; `ui/button.tsx` forwards refs; global pointer-cursor rule. No flag, patch or shell-tier change. |
@@ -1137,4 +1193,16 @@ The decisions that define the system. Changing any of these is an architecture-l
 | 2026-07-08 | Sprint 92 | **Extension host esbuild bundling (GH #105), v1.8.2.** `tsc -p ./` (emit) replaced by `tsc --noEmit` (typecheck) + `esbuild.config.mjs` (emit). The ~130 loose `out/*.js` files collapse to two self-contained bundles: `out/extension.js` (~5 MB, first-party + inlined pure-JS deps) and the standalone `out/browser/browserMcpAdapter.js` subprocess. `external`: `vscode`, `fsevents`, `pdfkit`, and (invisibly, via `new Function` import) the two ESM agent SDKs — so `node_modules` is retained but massively reduced in relevance. Fixed two `__dirname`-depth path landmines (`bundledAgentRuntime.ts`, `BrowserToolsInjector.ts`) that assumed the old multi-level `out/` tree. Closes the Windows EMFILE class + the 0-byte tsc trap. New "bundle-safe extension code" rule added to the `vscode-development` skill. Unblocks #107/#108. |
 | 2026-07-08 | Sprint 90 | **Export Integrity (GH #127, #76), shipped in v1.8.1.** Fail-safe image export: the single chokepoint `export/v2/imageSource.ts` now returns `null` (skip) for SVG bytes and encoder-undecodable data-URLs (GIF/BMP/TIFF for pdfkit), and the IMG case in `pdfHtmlExporter.ts`/`wordHtmlExporter.ts` is wrapped in per-node try/catch — one bad image can no longer abort a whole export. SVG/draw.io rendering: new webview `lib/svgRasterExport.ts` (`inlineSvgImagesForExport` + shared `rasterizeSvgToPngDataUrl`, extracted from the mermaid path) rasterizes inline + file-referenced `.svg`/`.drawio.svg` to PNG via `<canvas>` before the HTML is posted to the host — **no new native dependency**. Atomic `saveAsMarkdown`: tracks only newly-created image paths and unlinks exactly those on failure. Shared `parseImageDataUrl` in `imageWriter.ts` accepts the compound `svg+xml` subtype (fixes `/image` SVG insert). Planned `export-svg-rasterization` flag dropped (webview flags not plumbed; graceful-skip already provides the safety). |
 
+| 2026-09-24 | Sprint 127 | **Day-zero Anthropic models (#343), v1.12.0.** Model visibility no longer depends on the bundled CLI version or an app update. Existence, runnability and presentation became separate authorities (see Model Configuration → post-Sprint 127). New in `src/ai/modelCatalog/`: `runtimeDeclarations.ts`, which turns feed rows into SDK `settings.modelPicker` and output-budget env for discovery and per session, and `feedExport.ts`, which builds the published feed from the bundled lineup and is not bundled. `resolver.ts`: `mergeStatic()` per-row merge with tombstones, and `resolveRequestedModelIn()` for honest substitution. `remoteSource.ts`: ETag, 304. `index.ts`: 10-minute feed poll and single-flight discovery refresh. Schema: `provenance`, `addedAt`, `retired`, `claudeCode`, and a Claude id pattern. `RuntimeSessionConfig.claudeModelDeclaration` flows through `ClaudeCodeRuntime` → `AgentRunner.claudeRuntimeOptions()`. `/v1/models` runs only for API-key sign-in. UnifiedViewProvider grew by 27 LOC (existing >1100 debt); the logic lives in `modelCatalog`.
+
+**D4 (same day):**
+- Claude Code 2.1.270 → 2.1.281 and SDK 0.3.270 → 0.3.281. This is shell-tier, so the change ships in v1.12.0.
+- Opus 5.5 joins the bundled lineup.
+- New `anthropicCatalogCheck.ts` plus the `check:anthropic-models` release gate.
+- The planned `ritemark-public` publisher was withdrawn before it was applied. |
+
 **Sprint 89 architecture-gate decision memo (2026-07-01, approved by Jarmo):** the Sprint 79 locked decision "Model IDs centralised in `modelConfig.ts`" is evolved — the single authority is now `src/ai/modelCatalog/` (resolver + remote catalog), not a static array. The single-place-to-look spirit is preserved; the mechanism is now dynamic and remotely updatable. Remote-catalog host: `jarmo-productory/ritemark-public`. Trust model v1: HTTPS + strict schema v1 + 512 KB cap + origin allowlist; pinned-key signature deferred to a follow-up issue.
+
+**Sprint 127 addendum to the Sprint 89 memo (2026-09-24, approved by Jarmo):** "live wins" is retired for the static layers. It assumed that the live probe was the existence authority, but for subscription users that probe is the list compiled into the bundled CLI. There are now three separate authorities. Existence is Anthropic's `/v1/models` for the credential in use; for subscription users it is the runtime list plus declared feed rows. Runnability is the runtime, which may run a model before it knows it natively through a canaried `settings.modelPicker` declaration. Presentation is Ritemark's per-row merge of bundled and feed rows. Defaults, curation and tombstones stay human, and the trust model gains client-side id validation; signing stays deferred.
+
+*D4 (2026-09-24, Jarmo):* Anthropic ties new models to a minimum Claude Code version. The existence authority for subscription users is therefore, in practice, the bundled Claude Code, and each release checks it against Anthropic's catalog. The planned automatic feed publisher was withdrawn. Declarations remain for hand-edited feed rows that the bundled Claude Code supports.

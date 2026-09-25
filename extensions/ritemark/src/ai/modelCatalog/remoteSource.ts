@@ -20,6 +20,8 @@ const FETCH_TIMEOUT_MS = 8_000;
 
 const CACHE_KEY = 'modelCatalog_v1';
 const FETCHED_AT_KEY = 'modelCatalog_v1_fetchedAt';
+/** Sprint 127 R5: validator for conditional requests (raw CDN answers 304). */
+const ETAG_KEY = 'modelCatalog_v1_etag';
 
 interface CacheEnvelope {
   catalog: unknown;
@@ -31,20 +33,40 @@ function debug(msg: string, err?: unknown): void {
   console.warn(`[modelCatalog] ${msg}${detail ? `: ${detail}` : ''}`);
 }
 
+export interface RemoteFetchResult {
+  catalog: ModelCatalog;
+  /** False when the server answered 304, or sent the cached document again. */
+  changed: boolean;
+}
+
 /**
- * Fetch + validate + cache the remote catalog. Returns null on any failure
- * (offline, bad status, oversize, schema violation) so the resolver falls back
- * to cache/bundled. Never throws.
+ * Fetch + validate + cache the remote catalog with a conditional request
+ * (Sprint 127 R5), so frequent checks cost a 304 when nothing changed. Returns
+ * null on any failure (offline, bad status, oversize, schema violation) so the
+ * resolver falls back to cache/bundled. Never throws.
  */
-export async function fetchRemoteCatalog(storage: vscode.Memento): Promise<ModelCatalog | null> {
+export async function fetchRemoteCatalog(
+  storage: vscode.Memento,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RemoteFetchResult | null> {
   if (!REMOTE_URL.startsWith(ALLOWED_PREFIX)) {
     debug('remote URL failed origin allowlist — refusing to fetch');
     return null;
   }
+  const cached = getCachedCatalog(storage);
+  const etag = cached ? storage.get<string>(ETAG_KEY) : undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(REMOTE_URL, { signal: controller.signal, redirect: 'error' });
+    const res = await fetchImpl(REMOTE_URL, {
+      signal: controller.signal,
+      redirect: 'error',
+      ...(etag ? { headers: { 'If-None-Match': etag } } : {}),
+    });
+    if (res.status === 304 && cached) {
+      void storage.update(FETCHED_AT_KEY, Date.now());
+      return { catalog: cached, changed: false };
+    }
     if (!res.ok) {
       debug(`remote fetch HTTP ${res.status}`);
       return null;
@@ -60,8 +82,10 @@ export async function fetchRemoteCatalog(storage: vscode.Memento): Promise<Model
       return null;
     }
     const catalog = validateCatalog(JSON.parse(text)); // throws on invalid schema/JSON
+    const changed = !cached || JSON.stringify(cached) !== JSON.stringify(catalog);
     saveCatalogToCache(catalog, storage);
-    return catalog;
+    void storage.update(ETAG_KEY, res.headers.get('etag') ?? undefined);
+    return { catalog, changed };
   } catch (err) {
     debug('remote fetch failed', err);
     return null;

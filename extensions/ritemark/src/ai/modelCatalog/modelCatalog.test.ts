@@ -4,19 +4,25 @@
  */
 
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
 import { validateCatalog, type ModelCatalog } from './schema';
 import { BUNDLED_CATALOG } from './bundledCatalog';
+import { CLAUDE_MODEL_IDS } from '../modelConfig';
 import {
   canonicalizeModelAliases,
   findModelEntry,
   isCatalogAtLeastAsFresh,
   resolveAll,
+  resolveRequestedModelIn,
+  resolveStaticModels,
   versionLt,
   type DiscoveryResults,
 } from './resolver';
 
 let failures = 0;
-const TEST_CATALOG_DATE = '2026-09-14T00:00:00Z';
+// One day after the bundled lineup, so a test document counts as fresher than it.
+const TEST_CATALOG_DATE = new Date(Date.parse(BUNDLED_CATALOG.updatedAt) + 24 * 60 * 60 * 1000).toISOString();
 function test(name: string, fn: () => void): void {
   try {
     fn();
@@ -367,6 +373,148 @@ test('remote/cache older than the bundled audit date cannot hide the bundled flo
   assert.strictEqual(isCatalogAtLeastAsFresh(stale, bundled), false);
   assert.strictEqual(resolveAll({}, stale, stale, bundled, APP).codex.source, 'bundled');
   assert.ok(resolveAll({}, stale, stale, bundled, APP).codex.models.some((model) => model.id === 'gpt-5.6-sol'));
+});
+
+// ── Sprint 127: feed contract and per-row static merge (R3, R7) ────────────
+
+const AUTO_ROW_FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'auto-row.fixture.json'), 'utf-8'));
+const S127_BUNDLED: ModelCatalog = { ...BUNDLED_CATALOG, updatedAt: '2026-09-13T00:00:00Z' };
+const S127_APP = '1.12.0';
+
+function feed(updatedAt: string, anthropicModels: unknown[], defaults: Record<string, string> = {}): ModelCatalog {
+  return validateCatalog({ schemaVersion: 1, updatedAt, providers: { anthropic: { models: anthropicModels, defaults } } });
+}
+
+test('S127: the automated-row fixture validates with every Sprint 127 field', () => {
+  const v = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row]);
+  const row = v.providers.anthropic!.models[0];
+  assert.strictEqual(row.provenance, 'auto');
+  assert.strictEqual(row.addedAt, '2026-09-24T09:10:00Z');
+  assert.deepStrictEqual(row.claudeCode, { inject: true, maxOutputTokens: 64000 });
+});
+
+test('S127 S30: a malformed Claude id rejects the whole feed (fail-closed)', () => {
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, id: 'not a model; rm -rf /' }]));
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, id: 'gpt-6' }]));
+  assert.doesNotThrow(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, id: 'claude-opus-6[1m]' }]));
+});
+
+test('S127: new fields are type-checked; unknown claudeCode keys are dropped', () => {
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, provenance: 'bot' }]));
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, addedAt: 'yesterday' }]));
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, retired: 'yes' }]));
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, claudeCode: { maxOutputTokens: 1.5 } }]));
+  assert.throws(() => feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, claudeCode: { behavesAs: 'opus; rm' } }]));
+  const v = feed(TEST_CATALOG_DATE, [{ ...AUTO_ROW_FIXTURE.row, claudeCode: { inject: true, contextWindow: 1000000 } }]);
+  assert.deepStrictEqual(v.providers.anthropic!.models[0].claudeCode, { inject: true });
+});
+
+test('S127: claudeCode is kept only on anthropic rows', () => {
+  const v = validateCatalog({
+    schemaVersion: 1, updatedAt: TEST_CATALOG_DATE,
+    providers: { openai: { models: [{ id: 'gpt-x', label: 'X', description: '', tier: 'high', deprecated: false, order: 0, claudeCode: { inject: true } }], defaults: {} } },
+  });
+  assert.strictEqual(v.providers.openai!.models[0].claudeCode, undefined);
+});
+
+test('S127 S10: a stale feed cannot hide a bundled model', () => {
+  const stale = validateCatalog(JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'stale-feed-2026-07-25.json'), 'utf-8')));
+  const r = resolveAll({}, stale, stale, S127_BUNDLED, S127_APP);
+  assert.ok(r.anthropic.models.some((m) => m.id === 'claude-fable-5-1'), 'bundled Fable 5.1 survives the 2026-07-25 feed');
+  assert.ok(r.codex.models.some((m) => m.id === 'gpt-6-astra'), 'bundled Astra survives');
+});
+
+test('S127 S11: a stale feed cannot resurrect a row the build dropped', () => {
+  const stale = validateCatalog(JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'stale-feed-2026-07-25.json'), 'utf-8')));
+  const r = resolveAll({}, stale, stale, S127_BUNDLED, S127_APP);
+  assert.ok(!r.codex.models.some((m) => m.id === 'gpt-5.3-codex'), 'old Codex row stays hidden');
+  assert.strictEqual(r.codex.source, 'bundled');
+});
+
+test('S127 S12: an automated row published after the build is added', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row]);
+  const r = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
+  const opus6 = r.anthropic.models.find((m) => m.id === 'claude-opus-6');
+  assert.ok(opus6, 'auto row offered');
+  assert.ok(r.anthropic.models.some((m) => m.id === 'claude-sonnet-5'), 'bundled rows kept alongside');
+  assert.strictEqual(r.anthropic.source, 'remote');
+  const ordered = r.anthropic.models.map((m) => m.id);
+  assert.ok(ordered.indexOf('claude-opus-6') < ordered.indexOf(CLAUDE_MODEL_IDS.OPUS_5_5), 'sorted just before its predecessor');
+});
+
+test('S127 S12: an automated row survives a build newer than its publish date', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row]);
+  const laterBuild: ModelCatalog = { ...BUNDLED_CATALOG, updatedAt: '2026-10-01T00:00:00Z' };
+  const r = resolveAll({}, overlay, null, laterBuild, S127_APP);
+  assert.ok(r.anthropic.models.some((m) => m.id === 'claude-opus-6'));
+});
+
+test('S127 S33: automated rows stay invisible to builds below their minAppVersion', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row]);
+  const r = resolveAll({}, overlay, null, S127_BUNDLED, '1.11.0');
+  assert.ok(!r.anthropic.models.some((m) => m.id === 'claude-opus-6'));
+});
+
+test('S127 S13: a fresher feed relabels a bundled row', () => {
+  const overlay = feed('2026-09-24T00:00:00Z', [
+    { id: 'claude-opus-5', label: 'Opus 5 (renamed)', description: '', tier: 'high', deprecated: false, order: 1 },
+  ]);
+  const r = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
+  const opus = r.anthropic.models.find((m) => m.id === 'claude-opus-5')!;
+  assert.strictEqual(opus.label, 'Opus 5 (renamed)');
+  assert.deepStrictEqual(opus.thinkingEffort?.levels, ['low', 'medium', 'high', 'xhigh', 'max'], 'bundled capability floor');
+});
+
+test('S127 S13: an older feed cannot relabel a newer bundled row', () => {
+  const overlay = feed('2026-09-01T00:00:00Z', [
+    { id: 'claude-opus-5', label: 'Stale label', description: '', tier: 'high', deprecated: false, order: 1 },
+  ]);
+  const r = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
+  assert.strictEqual(r.anthropic.models.find((m) => m.id === 'claude-opus-5')!.label, 'Opus 5');
+});
+
+test('S127 S14: a fresher tombstone removes a model from static and live lists', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [{ ...AUTO_ROW_FIXTURE.row, retired: true }]);
+  const staticOnly = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
+  assert.ok(!staticOnly.anthropic.models.some((m) => m.id === 'claude-opus-6'));
+  const live = resolveAll({
+    anthropic: [
+      { id: 'claude-opus-6', resolvedModel: 'claude-opus-6', label: 'Opus 6', description: '', tier: 'medium', deprecated: false, order: 0 },
+      { id: 'sonnet', resolvedModel: 'claude-sonnet-5', label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 1 },
+    ],
+  }, overlay, null, S127_BUNDLED, S127_APP);
+  assert.deepStrictEqual(live.anthropic.models.map((m) => m.id), ['sonnet']);
+  const bundledTombstoned = feed('2026-09-24T09:10:00Z', [
+    { id: 'claude-fable-5', label: 'Fable 5', description: '', tier: 'high', deprecated: false, order: 4, retired: true },
+  ]);
+  assert.ok(!resolveAll({}, bundledTombstoned, null, S127_BUNDLED, S127_APP).anthropic.models.some((m) => m.id === 'claude-fable-5'));
+});
+
+test('S127 S14: an older tombstone cannot hide a newer bundled row', () => {
+  const overlay = feed('2026-09-01T00:00:00Z', [
+    { id: 'claude-fable-5', label: 'Fable 5', description: '', tier: 'high', deprecated: false, order: 4, retired: true },
+  ]);
+  assert.ok(resolveAll({}, overlay, null, S127_BUNDLED, S127_APP).anthropic.models.some((m) => m.id === 'claude-fable-5'));
+});
+
+test('S127 S15: an automated row never becomes the default', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row], { 'claude-code': 'claude-opus-6' });
+  const r = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5');
+});
+
+test('S127: resolveStaticModels exposes merged rows for runtime declarations', () => {
+  const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row]);
+  const rows = resolveStaticModels('anthropic', overlay, null, S127_BUNDLED, S127_APP);
+  assert.ok(rows.some((m) => m.id === 'claude-opus-6' && m.claudeCode?.inject === true));
+  assert.ok(!resolveStaticModels('anthropic', overlay, null, S127_BUNDLED, '1.11.0').some((m) => m.id === 'claude-opus-6'));
+});
+
+test('S127 S28: an unavailable saved model is replaced by the default and reported', () => {
+  const r = resolveAll({}, null, null, S127_BUNDLED, S127_APP).anthropic;
+  assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-6', 'claude-code'), { id: 'claude-sonnet-5', substitutedFrom: 'claude-opus-6' });
+  assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-5', 'claude-code'), { id: 'claude-opus-5' });
+  assert.deepStrictEqual(resolveRequestedModelIn(r, undefined, 'claude-code'), { id: 'claude-sonnet-5' }, 'nothing saved: no notice');
 });
 
 test('versionLt compares dotted-numeric versions correctly', () => {

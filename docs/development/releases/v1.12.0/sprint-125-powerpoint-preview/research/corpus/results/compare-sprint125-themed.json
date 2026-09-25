@@ -1,0 +1,18 @@
+[
+  {
+    "name": "11-powerpoint-themed",
+    "ppt_slides": 5,
+    "sprint125": {
+      "slides": 5,
+      "mean_diff": 1.02,
+      "mean_diff640": 1.42,
+      "slide_diffs": [
+        1.3,
+        0.77,
+        0.89,
+        1.63,
+        0.52
+      ]
+    }
+  }
+]
