@@ -70,6 +70,8 @@ Sprint 124 makes a Word document look like the document you sent, not a long web
 
 **Move through it like a PDF.** Word and PDF previews now share one quiet toolbar: the page you are on, zoom, and a zoom menu with **Fit width**, **Fit page** and the usual sizes. **Open in Word** is the main button, with **Save as Markdown** behind its arrow. In a Word document, Cmd/Ctrl+F or the magnifier opens the same find bar as the Markdown editor, with a count and Enter / Shift+Enter between matches. Edit the file in Word and the preview follows, on the same page.
 
+**Search a PDF, too.** The same find bar works in PDFs. It counts matches on every page, including pages you haven't reached yet, and takes you to each one in turn. You can keep reading with the find bar open, because the view only moves when you step to a match. A scanned PDF that has no text says so, rather than reporting "No matches".
+
 **Honest about the rest.** When a document has charts, SmartArt or equations that the preview can't draw exactly, a note says so. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in Word (or Pages, or your default app). A document made by another program, such as a Google Docs export, has no saved page breaks, so it still shows fewer, longer pages.
 
 ## PowerPoint presentations, as slides
@@ -92,6 +94,8 @@ Anthropic requires Claude Code 2.1.280 or newer for Opus 5.5. Ritemark now ships
 
 **No silent switches.** If the model you last used is no longer available, Ritemark says so in the chat, for example "Opus 5.5 isn't available right now — using Sonnet 5." It no longer switches quietly. If your account can't use a model, for example because your plan or organization doesn't include it, the message names the model and asks you to choose another in the model menu.
 
+**Model list fixes without an update.** Ritemark checks its public model list every 10 minutes and applies a change without a restart. A list older than the app can no longer hide a model the app already knows, and a model marked as retired disappears everywhere.
+
 The recommended default stays a deliberate choice: a new model is never made the default automatically.
 
 ## Fixes
@@ -102,6 +106,8 @@ The recommended default stays a deliberate choice: a new model is never made the
 - **Images from a parent folder no longer break on save.** Editing and saving a document with a `../images/…` image wrote an internal `vscode-resource` address into the file in place of the path, breaking the image in every other app. The original path is now kept.
 - **The Export menu works from the keyboard.** Opening it with Enter now moves focus into the menu. The arrow keys move between entries, and Escape or Tab closes the menu and returns focus to the Export button. Previously no entry could be reached without a mouse.
 - **Shift+End no longer selects the rest of the document.** Holding Shift and pressing End selected everything from the cursor to the end of the file instead of to the end of the line, so the next keystroke could wipe out paragraphs and lists further down without you noticing. Shift+End and Shift+Home now select to the end and start of the line you are on, and can never reach past the paragraph, list item or code block the cursor is in.
+- **Strikethrough survives a save.** Text you struck through lost its line as soon as the file was saved: `~~done~~` came back as plain `done`. The strike is now written to the file, including in Save as Markdown from a Word preview.
+- **Literal tildes stay put.** Text such as `a~b~c` came back after reopening with the tildes gone and `b` struck through, and the next save made that permanent. Only tildes that would be read as strikethrough are now escaped, so `~/Downloads` and `~5 min` are saved exactly as you typed them.
 - **Agent Chat's "still checking" notice is readable.** When checking an agent took longer than usual, Agent Chat showed a loud yellow box with a **Try again** button you could hardly see. It is now the same quiet card as its other notices, says the check is still running, and the button is clear.
 - **Conversation titles are in the language you wrote in.** When your own Claude setup contained text in another language, such as skills described in Estonian, an English prompt was often given a title in that language. The title now follows the language of your prompt.
 - **Menus are readable in the dark theme.** Drop-down and right-click menus, such as those in the AI sidebar, stayed white in the dark theme with near-white text on them. They now follow the theme.

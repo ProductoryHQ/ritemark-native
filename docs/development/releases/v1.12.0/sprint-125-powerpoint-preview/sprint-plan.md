@@ -165,7 +165,8 @@ always offers a way to open the deck in PowerPoint.
 - Playing animations, transitions, audio or video; slideshow mode.
 - Fixing the renderer's approximate chart details (pie label formats, legend
   overlap, axis scale), text inside non-rectangular shapes, and hyperlink colour.
-  These are reported upstream rather than patched here.
+  These are not patched here. An upstream report was drafted
+  (`research/upstream-report.md`), but on 2026-09-25 Jarmo decided not to post it.
 - LibreOffice or cloud conversion.
 - Windows golden screenshots. The Windows gate gets a checklist line.
 

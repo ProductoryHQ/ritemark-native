@@ -1,10 +1,10 @@
 # Ritemark 1.12.0 Test Checklist
 
-> **Draft.** No candidate has been built. Each v1.12.0 sprint adds its rows when it closes; the release manager adds the candidate, automated-check and mounted-DMG sections when a candidate exists. Sprints 118 and 119 are written; 120 and 122–125 have not started.
+> **Feature complete (2026-09-25); no candidate yet.** Every sprint's rows are written: 118–120, 122–127, and the PDF search follow-up (#344). The release manager fills in the candidate, automated-check and mounted-DMG sections once a candidate exists.
 
 Release: Publish to Google Docs + Everyday UX ([release plan](../../development/releases/v1.12.0/release-plan.md)).
 
-**Shell-tier:** Sprint 119 changed `scripts/build-prod.sh`, `scripts/build-prod-windows.sh` and the build workflows, which compile the Google OAuth client in at build time. So this is a full app rebuild: Gate 1, Gate 2, notarization and the 60-minute hardening wait.
+**Shell-tier:** Sprint 119 changed `scripts/build-prod.sh`, `scripts/build-prod-windows.sh` and the build workflows, which compile the Google OAuth client in at build time. Sprint 124 changed `scripts/stage-extension-for-shell-build.sh` to carry `office-preview.js`, and Sprint 127 changed the bundled agent manifest (Claude Code 2.1.281). So this is a full app rebuild: Gate 1, Gate 2, notarization and the 60-minute hardening wait.
 
 ## What is new, and therefore what has to be exercised
 
@@ -16,6 +16,7 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 122 | Agent Chat names the current conversation (⋮ menu: rename, pin, delete); the composer grows and its top edge drags to any height; every chat link opens, reveals, locates or explains | Gate 1 |
 | 123 | Transcript search (count, next/previous, highlights, Back to playing line) and a tab row that shrinks to fit | Gate 1, and **Gate 2 for the Windows tab row** |
 | 124 | Word preview: Word's pages and page numbers, images behind text, font aliases; one toolbar for Word and PDF (pages, zoom, fit, Word search); plain refusals; the preview in its own bundle (`office-preview.js`) | Gate 1 (the built app carries `office-preview.js`), and **Gate 2 for the Windows Word preview** |
+| #344 | PDF search: the same find bar in PDFs, a count over every page, stepping that loads the page, highlights, no scroll jump while reading, a plain message for a scanned PDF | Gate 1 |
 | 125 | PowerPoint preview: slides that scroll with speaker notes, the Word toolbar and find bar, chart fixes, links through the usual prompt, plain refusals; the host check now unpacks each part with a cap (Word files too); `ritemark.features.powerpoint-preview` kill switch | Gate 1, and **Gate 2 for Windows**: the PowerPoint app check is new there |
 | 127 | Claude Code 2.1.281 with Opus 5.5; the Claude model list follows the sign-in method; a model that is not available is named instead of swapped silently | Gate 1 (Max subscription), and **Gate 2 for the new Claude Code on x64 and Windows** |
 
@@ -93,6 +94,9 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 - [ ] **Open in Word** opens the file in Word; the arrow beside it offers **Save as Markdown**
 - [ ] A narrow editor (under about 560 px): the toolbar stays on one line, and the labels become icons that keep their tooltips
 - [ ] A PDF: the same page counter and zoom; **Save as Markdown** on the right
+- [ ] PDF search (#344), in a long text PDF: Cmd+F or the magnifier opens the find bar; a word that appears only on a later page is counted before you scroll there; Enter goes to it, and every match on screen is tinted with the current one solid
+- [ ] With the find bar still open, scroll to another page and read: the view stays where you put it. Shift+Enter from the first match wraps to the last; Escape clears the highlights
+- [ ] A scanned PDF: the find bar says "This PDF has no searchable text"
 - [ ] Dark theme: the zoom menu, the Open in Word menu and the find bar are dark and readable
 - [ ] A Markdown file still opens in the editor, and its Cmd+F find bar works as before
 
@@ -128,6 +132,7 @@ Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-mod
 
 - [ ] Add recording, the library, the Transcript Workbench and Insights work as in v1.11.0
 - [ ] Typing at speed, task lists, undo/redo, and saving without conflict warnings
+- [ ] Strike through a word, save, close and reopen: still struck through. Type `~/Downloads` and `a~b~c`, save and reopen: exactly as typed
 - [ ] Dark theme: the AI sidebar's menus and the table of contents' right-click menu have a dark background (they were white with pale text)
 
 **Gate 1 verdict:** _pending_
