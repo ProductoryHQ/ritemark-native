@@ -183,6 +183,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private readonly _runtimeSessions = new Map<string, Map<AgentId, RuntimeSession>>();
   /** Latest accepted execution per conversation; stale provider callbacks are ignored. */
   private readonly _activeRuntimeTurnTokens = new Map<string, symbol>();
+  /** Sprint 127 R6: conversations whose transcript already names a model substitution. */
+  private readonly _modelSubstitutionNamed = new Set<string>();
   private readonly _conversationCheckpointQueues = new Map<string, Promise<void>>();
   private readonly _runtimeSessionLastUsed = new Map<string, number>();
   /** ACP thought_level is discovered only after the existing lazy session opens. */
@@ -560,18 +562,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
-          // Sprint 127 R6: a saved Claude model the catalog no longer offers is
-          // replaced — and the transcript says so before the turn runs.
-          const persistedClaudeModel = !(typeof model === 'string' && model) && agentId === 'claude-code'
-            ? this._reconciledClaudeModelChoice()
-            : undefined;
+          // Sprint 127 R6 (S28): a saved Claude model the catalog no longer offers is
+          // replaced, and the transcript says so before the turn runs. The sidebar
+          // usually sends the replacement itself, so compare against the saved model.
+          const savedClaudeModel = agentId === 'claude-code' ? this._reconciledClaudeModelChoice() : undefined;
           const requestedModelInput = typeof model === 'string' && model
             ? model
-            : persistedClaudeModel?.id;
+            : savedClaudeModel?.id;
           const requestedClaudeModel = agentId === 'claude-code'
             ? modelCatalog.getModel('anthropic', requestedModelInput)
             : undefined;
           const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
+          const modelSubstitution = this._modelSubstitutionNamed.has(clientConversationId)
+            ? undefined
+            : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -1195,10 +1199,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (commentTaskId && conversationTurnId) {
                 void this._commentTaskController?.applyTurnStarted(conversationId, conversationTurnId);
               }
-              if (persistedClaudeModel?.substitutedFrom) {
+              if (modelSubstitution) {
+                this._modelSubstitutionNamed.add(clientConversationId);
                 sessionConfig.onProgress({
                   type: 'init',
-                  message: modelSubstitutionNotice(persistedClaudeModel.substitutedFrom, persistedClaudeModel.id),
+                  message: modelSubstitutionNotice(modelSubstitution.from, modelSubstitution.to),
                   timestamp: Date.now(),
                 });
               }

@@ -6,7 +6,8 @@ You manage Ritemark Native releases with strict gates. Procedural commands live 
 DLC pre-release gate (before any bump/tag/package/publish): `docs/development/releases/vX.Y.Z/release-plan.md` exists; GitHub milestone `vX.Y.Z` exists; release-plan status is Feature complete or Release candidate; included-sprint tracker rows merged or explicitly deferred; no unresolved release blocker.
 
 Two HARD quality gates -- never release without BOTH:
-- Gate 1 (technical): worktree hygiene audit reviewed; RC worktree created by `./scripts/create-release-worktree.sh`; preflight (`./scripts/release-preflight.sh`) passes; arm64 DMG provenance verified, built, signed, and verified.
+- Gate 1 (technical): worktree hygiene audit reviewed; RC worktree created by `./scripts/create-release-worktree.sh`; preflight (`./scripts/release-preflight.sh`) passes; `(cd extensions/ritemark && npm run check:anthropic-models)` exits 0 (Sprint 127 R10: an ALERT that the bundled Claude Code is too old blocks until it is updated or Jarmo defers explicitly; an unreadable, changed or expired catalog blocks until the check is fixed or Jarmo accepts shipping without it; actions in the `release-process` skill, Claude Code and Model Currency); arm64 DMG provenance verified, built, signed, and verified.
+- Extension-only release: also run `npm run check:anthropic-models` and report any ALERT to Jarmo (an extension release cannot update the bundled Claude Code).
 - Gate 2 (human): Jarmo says "tested locally" / "approved for release" / "ship it".
 
 Notarization-order HARD rule: Jarmo ALWAYS tests the UN-notarized build; notarize only AFTER the gate passes AND >= 60 min have elapsed since the DMG was built (hardening window). A bug in the window -> rebuild, reset clock + gate. Apple submissions are rate-sensitive -- never spend one on an untested/unsettled build.

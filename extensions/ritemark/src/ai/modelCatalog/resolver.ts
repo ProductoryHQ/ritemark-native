@@ -295,6 +295,21 @@ export function resolveRequestedModelIn(
   return requested && requested !== fallback ? { id: fallback, substitutedFrom: requested } : { id: fallback };
 }
 
+/**
+ * Sprint 127 R6 (S28): the notice a turn owes. The notice is due when the saved
+ * model is not available and the turn runs on the model that replaced it. The
+ * sidebar may already have sent the replacement itself. `sameModel` compares
+ * two ids by catalog identity.
+ */
+export function substitutionForTurn(
+  saved: RequestedModelResolution | undefined,
+  turnModel: string | undefined,
+  sameModel: (a: string, b: string) => boolean,
+): { from: string; to: string } | undefined {
+  if (!saved?.substitutedFrom || !turnModel || !sameModel(turnModel, saved.id)) return undefined;
+  return { from: saved.substitutedFrom, to: saved.id };
+}
+
 /** Find a resolved picker row by its representative id or a retained alias. */
 export function findModelEntry(models: ModelEntry[], id: string | undefined): ModelEntry | undefined {
   if (!id) return undefined;
@@ -326,7 +341,9 @@ function enrichCatalogCapabilities(
 /**
  * Merge a successful live probe with the catalog:
  *  - each live id the catalog knows about is replaced with the curated entry
- *    (better label/description/tier/order/deprecated);
+ *    (better label/description/tier/order/deprecated). An alias row such as
+ *    `opus` matches through its `resolvedModel` and keeps its own id, so a saved
+ *    alias still resolves (Sprint 127);
  *  - live-only ids pass through unchanged (so newly-released models appear);
  *  - catalog entries marked `deprecated` that the live probe NO LONGER lists are
  *    appended, so a user who still has one selected sees it (flagged) rather than
@@ -340,14 +357,19 @@ function enrichLive(
   if (!catalog && !bundled) return live;
   const curatedById = new Map((catalog?.models ?? []).map((m) => [m.id, m]));
   const bundledById = new Map((bundled?.models ?? []).map((m) => [m.id, m]));
-  const liveIds = new Set(live.map((m) => m.id));
+  const matching = <T>(byId: Map<string, T>, m: ModelEntry): T | undefined =>
+    byId.get(m.id) ?? (m.resolvedModel ? byId.get(m.resolvedModel) : undefined);
+  const liveIds = new Set(live.flatMap((m) => (m.resolvedModel ? [m.id, m.resolvedModel] : [m.id])));
   const enriched = live.map((m) => {
-    const curated = curatedById.get(m.id);
-    const bundledEntry = bundledById.get(m.id);
+    const curated = matching(curatedById, m);
+    const bundledEntry = matching(bundledById, m);
     if (!curated && !bundledEntry) return m;
     return {
       ...m,
       ...curated,
+      // The live request id and identity stay authoritative.
+      id: m.id,
+      ...(m.resolvedModel ? { resolvedModel: m.resolvedModel } : {}),
       // Live protocol metadata wins. A remote catalog may predate this field,
       // so the exact-pin bundled capability remains the final offline floor.
       thinkingEffort: m.thinkingEffort ?? curated?.thinkingEffort ?? bundledEntry?.thinkingEffort,
