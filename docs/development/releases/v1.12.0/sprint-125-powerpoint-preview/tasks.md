@@ -61,4 +61,4 @@ on this branch behind it.
 - [x] `docs/development/architecture.md`: the PowerPoint path through the Office bundle; `CLAUDE.md`'s layout map.
 - [x] QA review finding: personal metadata in saved Office files scrubbed (`scrub-metadata.py`) — this sprint's PowerPoint copies, Sprint 124's Word copies and Sprint 81's test workbook; the ground-truth scripts scrub from now on.
 - [ ] Upstream issues for the renderer defects we accept. *(Drafted in `research/upstream-report.md`; posting to the maintainer's repository waits for Jarmo.)*
-- [ ] Release-plan tracker row, PR; close [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285).
+- [x] Release-plan tracker row, PR [#350](https://github.com/ProductoryHQ/ritemark-native/pull/350); [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) closes with the merge.
