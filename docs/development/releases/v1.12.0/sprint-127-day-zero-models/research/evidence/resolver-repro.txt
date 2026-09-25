@@ -1,0 +1,23 @@
+published feed updatedAt=2026-07-25T09:30:00Z; bundled updatedAt=2026-09-13T00:00:00Z
+published feed eligible (>= bundled)? false
+published feed lists claude-opus-5-5? false
+
+## A. OAuth user today (CLI supportedModels live + published feed)
+source=live  claude-opus-5-5 visible=false
+rows: opus[1m]→claude-opus-5[1m], claude-fable-5-1[1m]→claude-fable-5-1, sonnet→claude-sonnet-5, haiku→claude-haiku-4-5-20251001
+
+## B. OAuth user after a FRESH feed that lists Opus 5.5
+source=live  claude-opus-5-5 visible=false
+rows: opus[1m]→claude-opus-5[1m], claude-fable-5-1[1m]→claude-fable-5-1, sonnet→claude-sonnet-5, haiku→claude-haiku-4-5-20251001
+
+## C. OAuth user, live probe unavailable (no workspace / timeout) + fresh feed
+source=remote  claude-opus-5-5 visible=true
+rows: claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-opus-4-8, claude-fable-5, claude-haiku-4-5-20251001
+
+## D. OAuth user, live probe unavailable + published (stale) feed
+source=bundled  claude-opus-5-5 visible=false
+rows: claude-sonnet-5, claude-opus-5, claude-fable-5-1, claude-opus-4-8, claude-fable-5, claude-haiku-4-5-20251001
+
+## E. API-key user (/v1/models live)
+source=live  claude-opus-5-5 visible=true
+rows: claude-opus-5-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, claude-haiku-4-5-20251001

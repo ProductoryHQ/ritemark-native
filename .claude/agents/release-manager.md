@@ -123,6 +123,7 @@ No `.vsix`/`vsce` packaging — this codebase ships a per-file manifest + canoni
 | --- | --- | --- | --- |
 | 0 | Bump version in `extensions/ritemark/package.json` to `X.Y.Z-ext.N` | Agent | — |
 | 1 | `./scripts/release-extension.sh X.Y.Z-ext.N` — runs its own preflight first (clean tree, release-tier guard, `engines.vscode`, compile-clean, webview-freshness) | Agent | BLOCKING — must pass |
+| 1b | `cd extensions/ritemark && npm run check:anthropic-models` (Sprint 127 R10). An extension release cannot update Claude Code, so an `ALERT` is reported to Jarmo, not blocking | Agent | Report |
 | **2** | **Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install), on the changed surfaces only** | **Jarmo** | **Light gate — one step, not two** |
 | 3 | `gh release create` with the individual files from `release-staging/upload/` + the regenerated feed | Agent | **REQUIRES step 2 cleared** |
 
@@ -197,6 +198,7 @@ Verify the local build:
 | Timestamps show 1980 | `stat -f "%Sm" Ritemark.app` |
 | ~~Info.plist version wrong~~ | NOT a blocker — `CFBundleShortVersionString` always shows VS Code base version; Ritemark version lives in `product.json` (`ritemarkVersion`) |
 | **Agent runtime bumped without re-verification** | If `extensions/ritemark/binaries/agents/manifest.json` changed a runtime `version` since the last release tag, `docs/development/agent-runtime-compatibility.md` MUST have been re-verified for those versions — see below |
+| **Anthropic model catalog check fails** (Sprint 127 R10) | `cd extensions/ritemark && npm run check:anthropic-models` must exit 0. An `ALERT` that the bundled Claude Code is too old blocks until Claude Code is updated or Jarmo defers explicitly. An unreadable, changed or expired catalog blocks until the check is fixed or Jarmo accepts shipping without it. Actions: `release` skill ## Claude Code and model currency |
 
 **SOFT WARNINGS** (proceed but flag to Jarmo): DMG older than app build, uncommitted changes, open sprint WIP, notarization pending, release notes missing or out-of-date, previous release worktree not closed out (still `BLOCKED` for build output).
 

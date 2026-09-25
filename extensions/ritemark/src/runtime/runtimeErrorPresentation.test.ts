@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  claudeUnavailableModel,
   classifyClaudeAuthenticationError,
   isClaudeAuthenticationError,
   presentRuntimeError,
@@ -54,3 +55,29 @@ assert.deepEqual(presentRuntimeError('codex', rawOAuthError), {
 });
 
 console.log('runtimeErrorPresentation tests passed.');
+
+// Sprint 127 R6 (S29): an unavailable model is named, never a raw diagnostic.
+assert.equal(
+  claudeUnavailableModel("There's an issue with the selected model (claude-opus-5-5). It may not exist or you may not have access to it. Run /model to pick a different model."),
+  'claude-opus-5-5',
+);
+assert.equal(
+  claudeUnavailableModel('API Error: 404 {"type":"error","error":{"type":"not_found_error","message":"model: claude-opus-5-5"}}'),
+  'claude-opus-5-5',
+);
+assert.equal(claudeUnavailableModel('Opus 5.5 is not available. Your organization restricts model selection.'), 'Opus 5.5');
+assert.equal(
+  claudeUnavailableModel('Opus with 1M context is not available for your account. Learn more: https://code.claude.com/docs/en/model-config'),
+  'Opus with 1M context',
+);
+assert.equal(claudeUnavailableModel('Request timed out'), undefined);
+assert.deepEqual(
+  presentRuntimeError('claude-code', "There's an issue with the selected model (claude-opus-5-5). It may not exist or you may not have access to it."),
+  { message: "Claude can't use claude-opus-5-5 with this account. Choose another model in the model menu, then resend your message." },
+);
+assert.equal(
+  presentRuntimeError('codex', 'not_found_error model: gpt-x')?.message,
+  'not_found_error model: gpt-x',
+  'other runtimes keep their own diagnostics',
+);
+console.log('runtimeErrorPresentation: Sprint 127 model-unavailable presentation passes');

@@ -28,7 +28,7 @@ test('rejects Claude runtime and SDK patch drift', () => {
   const errors = validateMutation(({ packageJson }) => {
     packageJson.dependencies['@anthropic-ai/claude-agent-sdk'] = '0.3.269';
   });
-  assert.ok(errors.some(error => error.includes('approved snapshot 0.3.270')));
+  assert.ok(errors.some(error => error.includes('approved snapshot 0.3.281')));
   assert.ok(errors.some(error => error.includes('patch mismatch')));
 });
 
