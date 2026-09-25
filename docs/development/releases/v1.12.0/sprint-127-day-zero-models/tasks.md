@@ -100,3 +100,9 @@ Codex review of PR #347 (merged by Jarmo's admin merge on 2026-09-24) found thre
 - [x] P2 (R3): `enrichLive()` matches live alias rows by `resolvedModel`, so `opus` → `claude-opus-5-5` shows the curated "Opus 5.5" label and order and keeps its id. Test: "live alias rows take the curated presentation…".
 - [x] P2 (R6, S28): the substitution notice is reachable in the normal sidebar path. The host compares each Claude turn with the saved `ritemark.ai.selectedModel` (`substitutionForTurn()`), because the webview already sends the replacement. The notice is shown once per conversation. Test: "S28: a turn on the replacement…".
 
+## Phase 10: PR #349 review follow-up (added 2026-09-25)
+
+Codex review of PR #349 (merged by Jarmo's admin merge on 2026-09-25) found one more issue. Jarmo asked for the fix in a new PR.
+
+- [x] P2 (R6, S28): the host remembers a shown substitution notice under the accepted conversation id. Before, it used the sidebar's client id. The first turn of a new conversation replaces that id with a canonical one, so the notice came back on the second turn. Test: "S28: the provider remembers the notice under the accepted conversation id".
+

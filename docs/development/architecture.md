@@ -1024,7 +1024,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 **Pickup:**
 - The feed is polled every 10 minutes with `If-None-Match`, so an unchanged feed is a 304. It is also polled when a stale sidebar becomes visible.
 - Discovery is probed again only when the declaration signature changes, or every 6 hours.
-- A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.` The host compares every Claude turn against the saved `ritemark.ai.selectedModel`, because the sidebar usually sends the replacement itself. It names the substitution once per conversation.
+- A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.` The host compares every Claude turn against the saved `ritemark.ai.selectedModel`, because the sidebar usually sends the replacement itself. It names the substitution once per conversation, keyed by the accepted conversation id: the first turn of a new conversation replaces the sidebar's client id.
 - Model-unavailable CLI and API errors name the model and point to the model menu. They add no new `failureKind`.
 
 **Claude Code currency (D4).**

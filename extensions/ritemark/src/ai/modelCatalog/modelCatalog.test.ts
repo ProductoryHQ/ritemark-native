@@ -556,6 +556,15 @@ test('S127 S28: a turn on the replacement of an unavailable saved model owes the
   assert.deepStrictEqual(substitutionForTurn(saved, 'sonnet', byIdentity), { from: 'claude-opus-4-1', to: 'claude-sonnet-5' }, 'aliases compare by identity');
 });
 
+test('S127 S28: the provider remembers the notice under the accepted conversation id', () => {
+  // The first turn of a new conversation swaps the sidebar's client id for a
+  // canonical one, so a notice keyed by the client id was shown twice
+  // (Codex review of PR #349). No test harness runs agent-execute, so check the source.
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'UnifiedViewProvider.ts'), 'utf8');
+  const keys = [...source.matchAll(/_modelSubstitutionNamed\.(has|add)\((\w+)\)/g)].map((match) => `${match[1]}(${match[2]})`);
+  assert.deepStrictEqual(keys, ['has(conversationId)', 'add(conversationId)']);
+});
+
 test('versionLt compares dotted-numeric versions correctly', () => {
   assert.strictEqual(versionLt('1.9.0', '2.0.0'), true);
   assert.strictEqual(versionLt('2.0.0', '1.9.0'), false);
