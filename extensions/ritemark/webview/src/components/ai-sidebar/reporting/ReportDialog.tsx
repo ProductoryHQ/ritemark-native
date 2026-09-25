@@ -128,7 +128,7 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
             <h3 id="report-context" className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--r-ink-muted)]">
               {REPORT_COPY.contextLabel}
             </h3>
-            <div className="rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/50 px-3 py-2 text-[11px] text-[var(--r-ink-muted)]">
+            <div className="rounded-md border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_50%,transparent)] px-3 py-2 text-[11px] text-[var(--r-ink-muted)]">
               {contextLines.map((line) => (
                 <div key={line}>{line}</div>
               ))}

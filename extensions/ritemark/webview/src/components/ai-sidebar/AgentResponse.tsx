@@ -262,7 +262,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
       {/* Plan preview card */}
       {needsApproval && displayPlanText && (
-        <div className="mt-2 max-h-[300px] overflow-y-auto rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)]/60 px-3 py-2">
+        <div className="mt-2 max-h-[300px] overflow-y-auto rounded-md border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_60%,transparent)] px-3 py-2">
           <div className="text-[10px] font-medium text-[var(--r-ink-muted)] uppercase tracking-wide mb-1.5">Plan</div>
           <div className="text-[12px]">
             <RenderedMarkdown content={displayPlanText} />

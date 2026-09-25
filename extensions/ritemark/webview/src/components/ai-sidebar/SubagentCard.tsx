@@ -29,7 +29,7 @@ export function SubagentCard({ subagent }: SubagentCardProps) {
   const hasActivities = subagent.activities.length > 0;
 
   return (
-    <div className="ml-2 rounded-md border border-[var(--r-hairline)] border-l-[3px] border-l-[var(--r-accent-fainter)] bg-[var(--vscode-input-background)]/60 px-2 py-1.5">
+    <div className="ml-2 rounded-md border border-[var(--r-hairline)] border-l-[3px] border-l-[var(--r-accent-fainter)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_60%,transparent)] px-2 py-1.5">
       {/* Header */}
       <button
         onClick={() => hasActivities && setIsExpanded(!isExpanded)}
