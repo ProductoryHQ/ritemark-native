@@ -115,6 +115,8 @@ This list is the single source of truth — `scripts/release-extension-preflight
 
 **Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI, no repo-visibility toggle for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
 
+**Extension-tier by path does not mean an extension release delivers it.** An extension release ships only `out/**/*.js`, `media/webview.js`, `media/office-preview.js` (+ NOTICES) and `package.json`, laid over the app's bundled copy. Every other file under `extensions/ritemark/` (icons, fonts, themes, starter pack, draw.io/PDF assets, whisper binaries) and every esbuild external in `node_modules` (e.g. the Claude Agent SDK) changes for users only with a shell release. `release-extension-preflight.sh` lists such changes and stops; `--allow-unshipped` releases without them, only with Jarmo's OK.
+
 * * *
 
 ## Expert Agents (MANDATORY Routing)

@@ -6,16 +6,21 @@
 # fast (non-zero exit) with a named reason on ANY check failure.
 #
 # Usage:
-#   ./scripts/release-extension-preflight.sh [--ref <git-ref>]
+#   ./scripts/release-extension-preflight.sh [--ref <git-ref>] [--allow-unshipped]
 #
-# --ref sets the base for the release-tier diff (default: the latest vX.Y.Z
-# shell-release tag reachable from HEAD, falling back to HEAD~50 if no tag
-# exists yet).
+# --ref sets the base for the release-tier and unshipped-changes diffs
+# (default: the latest vX.Y.Z shell-release tag reachable from HEAD, falling
+# back to HEAD~50 if no tag exists yet).
+#
+# --allow-unshipped turns Check 6 into a warning: the release goes out without
+# the changes it lists, which then wait for the next shell release. Pass it only
+# after Jarmo has agreed to that.
 #
 set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,9 +28,11 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT_DIR"
 
 REF=""
+ALLOW_UNSHIPPED=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref) REF="$2"; shift 2 ;;
+    --allow-unshipped) ALLOW_UNSHIPPED=true; shift ;;
     *) echo -e "${RED}Unknown argument: $1${NC}"; exit 1 ;;
   esac
 done
@@ -37,6 +44,9 @@ fail() {
 }
 ok() {
   echo -e "${GREEN}OK${NC}: $1"
+}
+warn() {
+  echo -e "${YELLOW}WARN${NC}: $1"
 }
 
 file_size() {
@@ -191,6 +201,36 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Check 6: changes an extension release cannot deliver
+#
+# Extension-tier by path does not mean an extension release carries it. The
+# release ships out/**/*.js plus a few files, laid over the app's bundled
+# extension; any other change under extensions/ritemark/ since $REF (icons,
+# fonts, themes, the starter pack, a package loaded from node_modules) reaches
+# users only with the next shell release. Last, so the list sits right above
+# the summary. The rules live in scripts/list-unshipped-extension-changes.mjs.
+# -----------------------------------------------------------------------------
+UNSHIPPED_LOG=/tmp/release-extension-preflight-unshipped.log
+UNSHIPPED_COUNT=0
+if UNSHIPPED=$(node scripts/list-unshipped-extension-changes.mjs --ref "$REF" 2>"$UNSHIPPED_LOG"); then
+  UNSHIPPED_COUNT=$(echo "$UNSHIPPED" | sed '/^$/d' | wc -l | tr -d ' ')
+  if [[ $UNSHIPPED_COUNT -eq 0 ]]; then
+    ok "every extension change since $REF ships in an extension release"
+  elif [[ "$ALLOW_UNSHIPPED" == true ]]; then
+    warn "$UNSHIPPED_COUNT change(s) since $REF are NOT in this extension release (--allow-unshipped); they ship with the next shell release:"
+    echo "$UNSHIPPED" | sed 's/^/  /'
+  else
+    fail "$UNSHIPPED_COUNT change(s) since $REF cannot reach users through an extension release; they ship with the next shell release:"
+    echo "$UNSHIPPED" | sed 's/^/  /'
+    echo "  Deliver them: make this a shell release."
+    echo "  Release without them (only with Jarmo's OK): re-run with --allow-unshipped."
+  fi
+else
+  fail "could not list the changes an extension release cannot deliver:"
+  sed '/^$/d; s/^/  /' "$UNSHIPPED_LOG"
+fi
+
+# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 echo ""
@@ -201,5 +241,8 @@ if [[ $ERRORS -gt 0 ]]; then
   exit 1
 fi
 echo -e "${GREEN}PREFLIGHT PASSED${NC}"
+if [[ $UNSHIPPED_COUNT -gt 0 ]]; then
+  echo -e "${YELLOW}...without the $UNSHIPPED_COUNT change(s) in the WARN above (--allow-unshipped)${NC}"
+fi
 echo "========================================"
 exit 0

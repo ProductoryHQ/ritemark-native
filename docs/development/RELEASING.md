@@ -10,6 +10,8 @@ Ritemark ships two different ways, depending on what changed. You don't need to 
 
 A script (`release-extension-preflight.sh`) checks which one applies before anything ships. If it detects a shell-tier change hiding inside what looked like a small fix, it blocks and tells Claude to switch to the full shell process instead. You'll never be asked to make this call yourself.
 
+**One catch.** An extension release carries only the extension's code. A few things that live inside the extension — icons, fonts, color themes, the starter pack, the files behind the draw.io and PDF viewers, the transcription engine, and the libraries the AI agents run on — change only when the whole app is replaced. If a change like that is waiting, the same script stops and lists it. Claude then tells you it will arrive with the next full release, and asks whether the update should go out without it.
+
 ## What you do for an extension release
 
 1. Claude tells you it's ready to test.
