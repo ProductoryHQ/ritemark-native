@@ -69,9 +69,9 @@ Click the **×** on the chip to drop browser context for the next message only. 
 
 The AI can re-check a shared page **without re-navigating to it**. The `browser_snapshot` tool returns the active tab's current ARIA outline (URL, title, and full accessibility tree) — useful after the page changes from a click or a form fill, where re-navigating would lose page state.
 
-- Available to both runtimes: `mcp__ritemark_browser__browser_snapshot` (Claude Code) and `ritemark_browser_snapshot` (Codex).
+- macOS only: it ships alongside the [AI Browser Control](#ai-browser-control) tools. Claude Code sees it as `mcp__ritemark_browser__browser_snapshot`, Codex as `ritemark_browser_snapshot`, and OpenCode gets it through the `ritemark_browser` MCP adapter.
 - **Read-only and consent-aware:** it only works on tabs you've shared via "Share with Agent?". An unshared tab returns an error — no URL, title, or page content leaks.
-- It does not need control consent (see [AI Browser Control](#ai-browser-control) below): reading a page you shared is enough. Clicking, typing, and navigating also need control consent for that tab.
+- It does not need control consent: reading a page you shared is enough. Clicking, typing, and navigating also need control consent for that tab.
 
 ### Annotation mode
 
@@ -132,12 +132,13 @@ Every tool returns the updated ARIA page summary after acting, so the AI sees th
 
 ### How each runtime sees the tools
 
-Same five capabilities, two protocols:
+Same five capabilities in all three runtimes:
 
 - **Claude Code SDK** — tools appear as `mcp__ritemark_browser__browser_navigate`, `mcp__ritemark_browser__browser_click`, etc. Implemented as an in-process MCP server.
 - **Codex App Server** — tools appear as the bare names `ritemark_browser_navigate`, `ritemark_browser_click`, etc., attached via the experimental `dynamicTools` parameter on `thread/start`. Cold-start can take up to 120 seconds for Codex when dynamic tools are active.
+- **OpenCode (ACP)** — tools come from the `ritemark_browser` MCP adapter that Ritemark attaches to each OpenCode session.
 
-The consent dialog, the Playwright action layer, and the page-summary readback are identical across both runtimes.
+The consent dialog, the Playwright action layer, and the page-summary readback are identical across all three runtimes.
 
 ### What AI Browser Control is *not*
 
