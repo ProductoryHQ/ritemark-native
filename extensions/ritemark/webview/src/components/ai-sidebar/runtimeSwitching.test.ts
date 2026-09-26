@@ -481,6 +481,8 @@ function testOnboardingSelectionUsesAtomicRuntimeAndModel() {
         wingetAvailable: false,
         gitInstalled: true,
         nodeInstalled: true,
+        gitRequired: false,
+        nodeRequired: false,
         claudeCliInstalled: true,
         claudeCliAuthenticated: false,
         codexCliInstalled: true,

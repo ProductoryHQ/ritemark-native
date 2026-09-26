@@ -26,7 +26,7 @@ import {
   cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
 } from '../agent';
-import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
+import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
 
 /**
@@ -1353,7 +1353,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private async openCodexRepairTerminal(): Promise<void> {
     const codexManager = new CodexManager();
     const status = await codexManager.getBinaryStatus();
-    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+    if (!status.repairCommand) {
+      vscode.window.showInformationMessage(BUNDLED_CODEX_REPAIR_MESSAGE);
+      return;
+    }
 
     const terminal = vscode.window.createTerminal({
       name: 'Codex Repair',
@@ -1361,7 +1364,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     });
 
     terminal.show();
-    terminal.sendText(command);
+    terminal.sendText(status.repairCommand);
     emitCodexStatusInvalidated('repair-started');
 
     vscode.window.showInformationMessage(
@@ -1410,7 +1413,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           enabled: true,
           authenticated: false,
           binaryMissing: true,
-          error: 'Codex CLI not found. Install with: npm install -g @openai/codex',
+          error: binaryStatus.error ?? 'Codex runtime not found.',
           diagnostics: binaryStatus.diagnostics,
           repairCommand: binaryStatus.repairCommand,
         },

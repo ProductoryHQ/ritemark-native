@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
-import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
+import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference, readBundledRuntimeVersion, type AgentRuntimePreference } from '../utils/bundledAgentRuntime';
 import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import type {
   AgentEnvironmentStatus,
@@ -121,9 +121,26 @@ function checkCommandAvailable(command: string): boolean {
   return result.status === 0 && Boolean(result.stdout?.trim());
 }
 
+/**
+ * Whether Windows setup asks for Git for Windows and Node.js.
+ *
+ * The bundled runtimes need neither: claude.exe is self-contained and, without
+ * Git Bash, uses its PowerShell tool instead; codex-app-server.exe is a native
+ * binary. Only a runtime the user installed themselves can: an npm install runs
+ * on Node.js, and an older Claude may need Git Bash. So the checks apply with the
+ * 'system' runtime preference only.
+ */
+function systemRuntimeToolsRequired(
+  platform: NodeJS.Platform,
+  preference: AgentRuntimePreference = readAgentRuntimePreference(),
+): boolean {
+  return platform === 'win32' && preference === 'system';
+}
+
 function recommendedEnvironmentAction(input: {
-  platform: NodeJS.Platform;
+  gitRequired: boolean;
   gitInstalled: boolean;
+  nodeRequired: boolean;
   nodeInstalled: boolean;
   restartRequired: boolean;
 }): AgentEnvironmentStatus['recommendedAction'] {
@@ -131,11 +148,11 @@ function recommendedEnvironmentAction(input: {
     return 'reload';
   }
 
-  if (input.platform === 'win32' && !input.gitInstalled) {
+  if (input.gitRequired && !input.gitInstalled) {
     return 'install-git';
   }
 
-  if (input.platform === 'win32' && !input.nodeInstalled) {
+  if (input.nodeRequired && !input.nodeInstalled) {
     return 'install-node';
   }
 
@@ -207,8 +224,8 @@ function checkWindowsPrereqs(): string[] {
   }
 
   const diagnostics: string[] = [];
-  if (!checkCommandAvailable('git')) {
-    diagnostics.push('Git for Windows not detected. Claude on Windows may require Git Bash.');
+  if (systemRuntimeToolsRequired(process.platform) && !checkCommandAvailable('git')) {
+    diagnostics.push('Git for Windows not detected. A system-installed Claude may require Git Bash.');
   }
   if (!checkCommandAvailable('powershell.exe')) {
     diagnostics.push('PowerShell not detected. Ritemark cannot launch Claude install/login actions.');
@@ -536,17 +553,18 @@ export async function getAgentEnvironmentStatus(options?: {
   const setupStatus = options?.setupStatus ?? await getSetupStatus({ refresh: options?.refresh });
   const gitInstalled = checkCommandAvailable('git');
   const nodeInstalled = checkCommandAvailable('node');
+  const toolsRequired = systemRuntimeToolsRequired(platform);
   const powershellAvailable = platform === 'win32' ? checkCommandAvailable('powershell.exe') : true;
   const restartRequired = setupStatus.repairAction === 'reload';
   const diagnostics: string[] = [];
 
-  if (platform === 'win32' && !gitInstalled) {
+  if (toolsRequired && !gitInstalled) {
     diagnostics.push('Git for Windows not detected.');
   }
   if (platform === 'win32' && !powershellAvailable) {
     diagnostics.push('PowerShell not detected.');
   }
-  if (platform === 'win32' && !nodeInstalled) {
+  if (toolsRequired && !nodeInstalled) {
     diagnostics.push('Node.js not detected.');
   }
   if (restartRequired) {
@@ -557,12 +575,15 @@ export async function getAgentEnvironmentStatus(options?: {
     platform,
     gitInstalled,
     nodeInstalled,
+    gitRequired: toolsRequired,
+    nodeRequired: toolsRequired,
     powershellAvailable,
     restartRequired,
     diagnostics,
     recommendedAction: recommendedEnvironmentAction({
-      platform,
+      gitRequired: toolsRequired,
       gitInstalled,
+      nodeRequired: toolsRequired,
       nodeInstalled,
       restartRequired,
     }),
@@ -594,6 +615,7 @@ export async function getOnboardingStatus(options?: {
 
   const gitInstalled = checkCommandAvailable('git');
   const nodeInstalled = checkCommandAvailable('node');
+  const toolsRequired = systemRuntimeToolsRequired(platform);
   const wingetAvailable = platform === 'win32' ? checkCommandAvailable('winget') : false;
 
   const claudeCliInstalled = setupStatus.cliInstalled && setupStatus.runnable;
@@ -617,6 +639,8 @@ export async function getOnboardingStatus(options?: {
     wingetAvailable,
     gitInstalled,
     nodeInstalled,
+    gitRequired: toolsRequired,
+    nodeRequired: toolsRequired,
     claudeCliInstalled,
     claudeCliAuthenticated,
     codexCliInstalled,
@@ -630,5 +654,6 @@ export async function getOnboardingStatus(options?: {
 export const __testOnly = {
   deriveClaudeSetupStatus,
   recommendedEnvironmentAction,
+  systemRuntimeToolsRequired,
   parseClaudeAuthStatusJson,
 };

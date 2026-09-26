@@ -32,10 +32,6 @@ export function isClaudeInstallInProgress(): boolean {
   return installInProgress;
 }
 
-function checkWindowsGitAvailability(): boolean {
-  return checkWindowsCommandAvailability('git');
-}
-
 function checkWindowsPowerShellAvailability(): boolean {
   return checkWindowsCommandAvailability('powershell.exe');
 }
@@ -174,16 +170,8 @@ async function installClaudeInner(
   return new Promise((resolve) => {
     const platform = getCurrentPlatform();
 
-    if (platform === 'win32' && !checkWindowsGitAvailability()) {
-      resolve({
-        success: false,
-        outcome: 'install_failed',
-        error: 'Git for Windows is required before Claude can be installed on Windows 11.',
-        diagnostics: ['Install Git for Windows, then try Claude install again.'],
-      });
-      return;
-    }
-
+    // install.ps1 needs PowerShell but not Git: without Git Bash, the Claude it
+    // installs uses its PowerShell tool instead.
     if (platform === 'win32' && !checkWindowsPowerShellAvailability()) {
       resolve({
         success: false,

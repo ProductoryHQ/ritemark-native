@@ -638,14 +638,20 @@ export function RitemarkSettings() {
 
             {codexAuth.binaryMissing || codexAuth.binaryBroken ? (
               <>
-                <p className="text-xs text-ink-muted mb-3">
-                  {codexAuth.binaryMissing
-                    ? 'Codex CLI binary not found. Install it first:'
-                    : 'Codex CLI is installed but broken. Reinstall it first:'}
-                </p>
-                <code className="block text-xs p-2 rounded bg-surface-soft text-ink-strong font-mono break-all">
-                  {codexAuth.repairCommand || 'npm install -g @openai/codex@latest'}
-                </code>
+                {/* Only a system install has a repair command; for the bundled
+                    Codex the error below says to reinstall Ritemark. */}
+                {codexAuth.repairCommand && (
+                  <>
+                    <p className="text-xs text-ink-muted mb-3">
+                      {codexAuth.binaryMissing
+                        ? 'Codex CLI binary not found. Install it first:'
+                        : 'Codex CLI is installed but broken. Reinstall it first:'}
+                    </p>
+                    <code className="block text-xs p-2 rounded bg-surface-soft text-ink-strong font-mono break-all">
+                      {codexAuth.repairCommand}
+                    </code>
+                  </>
+                )}
                 {codexAuth.error && (
                   <div className="text-xs p-2 mt-2 rounded bg-ritemark-error-soft text-ritemark-error">
                     <span className="flex items-center gap-1">
@@ -680,9 +686,11 @@ export function RitemarkSettings() {
                     Refresh Status
                   </Button>
                 </div>
-                <p className="text-xs text-ink-muted mt-2">
-                  After reinstalling, use Reload Window here and then reopen Settings.
-                </p>
+                {codexAuth.repairCommand && (
+                  <p className="text-xs text-ink-muted mt-2">
+                    After reinstalling, use Reload Window here and then reopen Settings.
+                  </p>
+                )}
               </>
             ) : !codexAuth.authenticated ? (
               <>
