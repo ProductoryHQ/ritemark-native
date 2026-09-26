@@ -38,7 +38,7 @@ A native desktop app for writing, structured data, and AI automation—all in on
 ### Privacy First
 - Local-first: your files stay on your machine
 - No account required
-- No telemetry by default
+- Anonymous usage analytics are on by default; turn them off with **Opt Out** in the notice shown on first launch, or with the `ritemark.analytics.enabled` setting
 - AI calls go directly to your API provider
 
 ## Download

@@ -116,7 +116,7 @@ Writing guidance isn't typography, but it's adjacent enough to be worth stating:
 
 - **Direct.** "Ritemark doesn't have a backend," not "Ritemark has been designed without a backend."
 - **Quiet.** No "unlock", "supercharge", "seamless", "revolutionary", "game-changing."
-- **No emoji.** Icons are Lucide (see `iconography.md`).
+- **No emoji.** Icons are Phosphor (see `iconography.md`).
 - **Sparingly editorial.** One em-dash per paragraph is plenty.
 - **Plural "we" for Ritemark/Productory, second-person "you" for the user.** Never "the user."
 

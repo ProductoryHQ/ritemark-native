@@ -61,7 +61,7 @@ Then authenticate from a terminal:
 claude auth
 ```
 
-Ritemark detects globally installed Claude binaries and uses them when present.
+Ritemark keeps using the Claude that ships with the app until you set **Settings → Agent Runtime → Runtime preference** to **Use system install**. It then uses your global install when it finds one, and falls back to the bundled copy when it does not.
 
 ---
 
@@ -95,6 +95,8 @@ If you prefer to manage Codex yourself:
 ```bash
 npm install -g @openai/codex
 ```
+
+Then set **Settings → Agent Runtime → Runtime preference** to **Use system install**. Until you do, Ritemark keeps using the Codex that ships with the app.
 
 Set your API key (only needed for the standalone CLI, not for in-app sign-in):
 

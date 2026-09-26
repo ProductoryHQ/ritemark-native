@@ -85,7 +85,7 @@ Alternating patterns:
 │ 1.6, ink-body                    │                    │
 │                                  │                    │
 │ Three bulleted affordances:      │                    │
-│  • Lucide-icon + 14px inline text│                    │
+│  • Phosphor icon + 14px text     │                    │
 │  • ...                           │                    │
 │                                  │                    │
 │ [Link CTA — indigo text + arrow] │                    │
@@ -108,7 +108,7 @@ Maya, writer • macOS
 
 ### Pattern C — data / pricing / compare
 
-Dense tabular layout; rows with hairline borders between; no colored tablehead backgrounds; status via Lucide icons + color tokens (indigo for yes, faint for no).
+Dense tabular layout; rows with hairline borders between; no colored tablehead backgrounds; status via Phosphor icons + color tokens (indigo for yes, faint for no).
 
 ## Forbidden marketing patterns
 
