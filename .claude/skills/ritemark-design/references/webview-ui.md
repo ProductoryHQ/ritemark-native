@@ -140,8 +140,8 @@ Never `font-sans` in-chrome for moment surfaces; use `var(--ritemark-font-displa
 | `box-shadow: 0 4px 6px rgba(0,0,0,0.1)` on a primary button | Missed the indigo signature | `box-shadow: var(--ritemark-shadow-indigo-sm)` |
 | `rounded-xl` on a dialog (12px) | Off-grid | `rounded-[10px]` or `rounded-[var(--ritemark-radius-lg)]` |
 | `font-bold text-2xl` on a dialog title | 24px is moment-scale | `text-base font-semibold` (16px, 600) |
-| Import from `lucide-react` with `strokeWidth={1.5}` | Overrides the 1px stroke default | Let the CSS rule do it: `<Settings className="lucide" />` |
-| New emoji (✓, ★, →) in body copy | Ritemark is emoji-free | Lucide `Check`, `Star`, `ArrowRight` |
+| Importing a `Ph*` component from `@phosphor-icons/react` at a call site | Bypasses the typed wrapper, its size scale, and its tone colors | `<Icon name="gear" size={16} />` |
+| New emoji (✓, ★, →) in body copy | Ritemark is emoji-free | `<Icon>` with Phosphor `check`, `star`, `arrow-right` (add a name missing from `iconMap` first) |
 
 ## Testing the visual diff
 

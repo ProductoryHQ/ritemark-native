@@ -152,7 +152,7 @@ Slides are not the place to be coy. Ritemark decks are confident and short:
 
 - **One idea per slide.** If a slide has two topics, it's two slides.
 - **Don't pad.** "Ritemark 1.6 ships with inline headings, block-level search, and a settings page that remembers you" is a release slide. "Ritemark 1.6 — a landmark release bringing together our most requested features" is marketing fluff.
-- **No emoji, no unicode glyphs.** Lucide icons only, at 24–48px depending on the slide.
+- **No emoji, no unicode glyphs.** Phosphor icons only, at 24–48px depending on the slide.
 
 ## Animation
 

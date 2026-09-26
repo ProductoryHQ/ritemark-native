@@ -71,7 +71,7 @@ The AI can re-check a shared page **without re-navigating to it**. The `browser_
 
 - Available to both runtimes: `mcp__ritemark_browser__browser_snapshot` (Claude Code) and `ritemark_browser_snapshot` (Codex).
 - **Read-only and consent-aware:** it only works on tabs you've shared via "Share with Agent?". An unshared tab returns an error — no URL, title, or page content leaks.
-- It does not require AI Browser Control (below); reading a shared page is always available, acting on it is the opt-in feature.
+- It does not need control consent (see [AI Browser Control](#ai-browser-control) below): reading a page you shared is enough. Clicking, typing, and navigating also need control consent for that tab.
 
 ### Annotation mode
 
@@ -85,7 +85,7 @@ While annotation mode is on, the composer shows a **live screenshot thumbnail ch
 
 ### What the AI does not do (by default)
 
-- The AI reads the page. It does not click, type, or navigate on your behalf — unless you explicitly opt in to **AI Browser Control** (see below).
+- The AI reads the page. It does not click, type, or navigate on your behalf until you allow it to control that tab (see **AI Browser Control** below).
 - Context is current-tab, current-turn. Switching tabs stops sharing the previous tab's content.
 - Very long pages are summarized from the top (~12k characters normal, ~24k with annotation). For deep content, scroll to the relevant section and ask again, or use annotation to include a screenshot.
 
@@ -93,25 +93,13 @@ While annotation mode is on, the composer shows a **live screenshot thumbnail ch
 
 ## AI Browser Control
 
-> Available since v1.7.1 — **experimental, opt-in, macOS only.**
+> Available since v1.7.1 — **macOS only.**
 
 The AI sidebar can also *act* on the integrated browser, not just read it. Five tools — `browser_navigate`, `browser_click`, `browser_fill`, `browser_type`, `browser_scroll` — let the AI drive the active browser tab while you watch.
 
-This is **off by default.** The whole feature is gated by a feature flag, by a dedicated per-tab consent dialog, and by an ARIA-first action layer that always operates on the visible, focused browser tab — there is no headless mode, no off-screen browser, and no shadow tab.
+AI Browser Control is on by default on macOS; there is nothing to turn on. The AI still cannot act on a tab until you allow it in that tab's [control consent dialog](#the-control-consent-dialog). Every action goes through an ARIA-first layer that always operates on the visible, focused browser tab. There is no headless mode, no off-screen browser, and no shadow tab.
 
-### Turning it on
-
-Open Settings (Cmd+,) → **Open Settings (JSON)** and add:
-
-```json
-{
-  "ritemark.features.browser-agent-control": true
-}
-```
-
-Then restart Ritemark. The AI sidebar reads feature flags only at session creation time.
-
-The feature is currently macOS-only. Windows and Linux are not supported in v1.7.1.
+Windows and Linux are not supported.
 
 ### The control consent dialog
 
@@ -168,7 +156,7 @@ These are tracked as candidates for future sprints.
 ### When the AI cannot act
 
 - **No active browser tab** — the AI receives a typed error ("No active integrated browser tab.") and reports it to you. No crash.
-- **Feature flag off** — the tools are not registered with either runtime. The AI doesn't know they exist.
+- **Windows or Linux** — the tools are not registered, so the AI doesn't know they exist.
 - **Control consent declined** — subsequent tool calls fail with a "Browser control consent was not granted" error until you grant consent for that tab.
 - **Read consent revoked** — control consent is revoked too. The agent will be prompted again on its next action.
 
@@ -178,7 +166,7 @@ These are tracked as candidates for future sprints.
 
 - Nothing about the page reaches the AI until you accept "Share with Agent?"
 - Annotation (screenshot) is a separate, explicit opt-in — the camera icon must be toggled on.
-- **AI Browser Control** is off by default. Enabling the `browser-agent-control` flag is the first opt-in; the per-tab "Allow AI to control this browser tab?" dialog is the second.
+- **AI Browser Control** is on by default on macOS, but the AI cannot act on a tab until you choose **Allow Control** in that tab's "Allow AI to control this browser tab?" dialog.
 - Read consent and control consent are tracked separately. Revoking read consent for a tab also revokes its control consent automatically.
 - Consent is per-tab, per-session. It does not persist across Ritemark restarts.
 
