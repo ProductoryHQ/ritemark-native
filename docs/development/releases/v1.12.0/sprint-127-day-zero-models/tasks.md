@@ -94,7 +94,7 @@ The publisher was built and tested as a `ritemark-public` payload in commit `e03
 
 ## Phase 9: PR #347 review follow-ups (added 2026-09-25)
 
-Codex review of PR #347 (merged by Jarmo's admin merge on 2026-09-24) found three issues. Jarmo asked for the fixes in a new PR.
+Codex review of PR #347 (merged by Jarmo's admin merge on 2026-09-25) found three issues. Jarmo asked for the fixes in a new PR.
 
 - [x] P1: the Codex harness mirrors the R10 gate: `.agents/skills/release-process/SKILL.md` (start-of-release commands, full-release step 1, extension-only release, and "Claude Code and Model Currency") and `.codex/agents/release-manager.toml` (Gate 1, extension-only).
 - [x] P2 (R3): `enrichLive()` matches live alias rows by `resolvedModel`, so `opus` → `claude-opus-5-5` shows the curated "Opus 5.5" label and order and keeps its id. Test: "live alias rows take the curated presentation…".

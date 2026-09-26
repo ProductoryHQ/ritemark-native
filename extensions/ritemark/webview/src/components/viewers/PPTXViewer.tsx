@@ -21,6 +21,7 @@ import { fitPageZoom, fitWidthZoom, pageAtScroll, stepZoom, type FitMode } from 
 import { deckMatches, firstMatchFrom } from './pptx/deckSearch'
 import { loadDeck, type LoadedDeck } from './pptx/loadDeck'
 import { notesRanges, slideRanges } from './pptx/renderedDeck'
+import './documentSearch.css'
 import './pptx/pptxPreview.css'
 
 export interface PptxLoadError {

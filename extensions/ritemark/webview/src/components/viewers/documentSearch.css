@@ -1,0 +1,21 @@
+/*
+ * Search matches in the document previews (Word, PowerPoint, PDF), drawn with the
+ * CSS Custom Highlight API so the document's DOM is not rewritten.
+ *
+ * Every viewer that searches imports this file. The rules used to live in the
+ * Word preview's stylesheet, which ships only in office-preview.js, so the PDF
+ * viewer (in webview.js) counted its matches but drew none (#344).
+ *
+ * The colours follow the page, not the app theme: a document page is paper in
+ * both themes. Other matches get a see-through tint because a PDF's visible
+ * glyphs are on the canvas under a transparent text layer — an opaque tint hid
+ * the very words it marked. The current match draws its own white text.
+ */
+::highlight(ritemark-doc-search) {
+  background-color: color-mix(in srgb, var(--ritemark-indigo) 22%, transparent);
+}
+
+::highlight(ritemark-doc-search-current) {
+  background-color: var(--ritemark-indigo);
+  color: #fff;
+}

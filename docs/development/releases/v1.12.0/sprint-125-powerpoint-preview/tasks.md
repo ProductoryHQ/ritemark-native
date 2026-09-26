@@ -60,5 +60,5 @@ on this branch behind it.
 - [x] `docs/CHANGELOG.md`, `docs/releases/v1.12.0/release-notes.md`, and the v1.12.0 test checklist (with a Windows line).
 - [x] `docs/development/architecture.md`: the PowerPoint path through the Office bundle; `CLAUDE.md`'s layout map.
 - [x] QA review finding: personal metadata in saved Office files scrubbed (`scrub-metadata.py`) — this sprint's PowerPoint copies, Sprint 124's Word copies and Sprint 81's test workbook; the ground-truth scripts scrub from now on.
-- [ ] Upstream issues for the renderer defects we accept. *(Drafted in `research/upstream-report.md`; posting to the maintainer's repository waits for Jarmo.)*
+- [x] ~~Upstream issues for the renderer defects we accept.~~ *(Drafted in `research/upstream-report.md`. Decided 2026-09-25: not posted. Jarmo: "upstream'i ära postita". The draft stays as a record of the accepted defects.)*
 - [x] Release-plan tracker row, PR [#350](https://github.com/ProductoryHQ/ritemark-native/pull/350); [#285](https://github.com/ProductoryHQ/ritemark-native/issues/285) closes with the merge.

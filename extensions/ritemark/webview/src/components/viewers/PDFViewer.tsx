@@ -1,11 +1,17 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useDeferredValue, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import './documentSearch.css'
 import { sendToExtension } from '../../bridge'
 import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
 import { stripExt } from '../../utils/imageNaming'
-import { PageIndicator, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
+import { matchCountLabel, normalizeQuery, stepMatch } from '../../utils/textSearch'
+import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
+import { buildMatchRange, isPageTextLayerRendered, scrollPageIntoView } from './pdfSearchDom'
+import { buildPdfSearchIndex, findDocumentMatches, resolvePdfMatch, type PdfSearchIndex } from './pdfSearchIndex'
+import { PageIndicator, ToolbarIconButton, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
 
 interface PDFViewerProps {
@@ -13,6 +19,23 @@ interface PDFViewerProps {
   filename: string
   workerSrc?: string
   canSaveAsMarkdown?: boolean
+}
+
+const SEARCH_HIGHLIGHT = 'ritemark-doc-search'
+const CURRENT_HIGHLIGHT = 'ritemark-doc-search-current'
+const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
+
+function highlightsSupported(): boolean {
+  return typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined'
+}
+
+type PdfSearchStatus = 'idle' | 'loading' | 'scanned' | 'ready'
+
+/** "3 of 12", "No matches", "This PDF has no searchable text", or '' — see FindBarShell. */
+function searchStatusLabel(status: PdfSearchStatus, query: string, currentMatch: number, matchCount: number): string {
+  if (status === 'scanned') return 'This PDF has no searchable text'
+  if (status !== 'ready') return normalizeQuery(query) ? 'Searching…' : ''
+  return matchCountLabel(currentMatch, matchCount, query)
 }
 
 /**
@@ -25,16 +48,26 @@ function LazyPage({
   width,
   height,
   onFirstPageLoad,
+  forceVisible,
+  onTextLayerReady,
 }: {
   pageNumber: number
   scale: number
   width: number
   height: number
   onFirstPageLoad?: (page: { width: number; height: number; originalWidth?: number; originalHeight?: number }) => void
+  /** Issue #344: render this page now, bypassing the IntersectionObserver — a search match landed on it. */
+  forceVisible?: boolean
+  /** Issue #344: the page's TextLayer has spans in the DOM and can be searched. */
+  onTextLayerReady?: (pageNumber: number) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  // A stable callback: react-pdf redraws the text layer when this prop changes,
+  // and the parent re-renders on every text-layer render — an inline arrow here
+  // redrew the layer in a loop and left search ranges pointing at removed spans.
+  const handleTextLayerSuccess = useCallback(() => onTextLayerReady?.(pageNumber), [onTextLayerReady, pageNumber])
 
   useEffect(() => {
     const el = ref.current
@@ -58,10 +91,16 @@ function LazyPage({
 
   const scaledWidth = width * scale
   const scaledHeight = height * scale
+  // Once rendered (by intersection or forced by a search match), keep it
+  // rendered — matches the "avoid thrashing" intent of `hasLoaded` above;
+  // without it, forcing a page while off-screen would draw it once and then
+  // hide it again as soon as `forceVisible` clears.
+  const shouldRender = isVisible || forceVisible || hasLoaded
 
   return (
     <div
       ref={ref}
+      data-page-number={pageNumber}
       style={{
         width: scaledWidth,
         height: scaledHeight,
@@ -72,7 +111,7 @@ function LazyPage({
         overflow: 'hidden',
       }}
     >
-      {isVisible ? (
+      {shouldRender ? (
         <Page
           pageNumber={pageNumber}
           scale={scale}
@@ -82,6 +121,7 @@ function LazyPage({
             setHasLoaded(true)
             if (onFirstPageLoad) onFirstPageLoad(page)
           }}
+          onRenderTextLayerSuccess={handleTextLayerSuccess}
         />
       ) : (
         <div
@@ -118,6 +158,46 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     message: string
     warnings: string[]
   } | null>(null)
+
+  // Issue #344: search. The doc proxy (for eager per-page getTextContent())
+  // comes from Document's onLoadSuccess — the same parse react-pdf already
+  // does, so search doesn't reopen the file.
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
+  const [searchIndex, setSearchIndex] = useState<PdfSearchIndex | null>(null)
+  const [indexStatus, setIndexStatus] = useState<PdfSearchStatus>('idle')
+  const indexRequestedRef = useRef(false)
+  const [currentMatch, setCurrentMatch] = useState(-1)
+  // Bumped every time a page's TextLayer renders. react-pdf redraws a text
+  // layer on every scale change and when a page scrolls back in, replacing its
+  // spans, so ranges built earlier point at detached nodes and paint nothing:
+  // the ranges are rebuilt from the DOM on each bump.
+  const [renderedVersion, setRenderedVersion] = useState(0)
+  const [pinnedPage, setPinnedPage] = useState<number | null>(null)
+  // Scroll to the current match only when a search starts or the user steps —
+  // not every time a page renders while they scroll around.
+  const revealMatch = useRef(false)
+  const searchRef = useRef<FindBarShellHandle>(null)
+  const currentPageRef = useRef(1)
+  currentPageRef.current = currentPage
+
+  const matches = useMemo(
+    () => (searchIndex ? findDocumentMatches(searchIndex.chunks, deferredQuery) : []),
+    [searchIndex, deferredQuery]
+  )
+
+  // Ranges for whichever matches sit on a page whose text layer is in the DOM
+  // now; entries for matches on pages not drawn stay null until they are.
+  const matchRanges = useMemo(() => {
+    const container = containerRef.current
+    if (!container || !searchIndex) return []
+    return matches.map((match) => buildMatchRange(container, resolvePdfMatch(searchIndex, match)))
+    // renderedVersion is not read here; it is a dependency purely to rebuild
+    // the ranges after a text layer has been (re)drawn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, searchIndex, renderedVersion])
 
   // Configure PDF.js worker
   useEffect(() => {
@@ -172,10 +252,17 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     } catch (e) {
       setError('Failed to decode PDF data')
     }
+    // New (or reloaded) file: the old search index no longer applies.
+    indexRequestedRef.current = false
+    setSearchIndex(null)
+    setIndexStatus('idle')
+    setCurrentMatch(-1)
+    setPinnedPage(null)
   }, [content])
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages)
+  const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
+    pdfDocRef.current = pdf
+    setNumPages(pdf.numPages)
     setError(null)
   }, [])
 
@@ -259,6 +346,117 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     setCurrentPage(Math.max(1, Math.min(page, numPages)))
   }, [pageHeight, scale, numPages])
 
+  // Issue #344: a page's TextLayer just (re)rendered — rebuild the ranges.
+  const onTextLayerReady = useCallback(() => {
+    setRenderedVersion((v) => v + 1)
+  }, [])
+
+  // Build the search index once, the first time the find bar opens — every
+  // page's text, eagerly, independent of what's been rendered (react-pdf
+  // draws lazily). Save-as-Markdown does the equivalent fetch separately
+  // (conversion/pdfToMarkdown.ts); this reuses the already-parsed document
+  // instead of reopening the file.
+  const ensureSearchIndex = useCallback(() => {
+    const doc = pdfDocRef.current
+    if (!doc || indexRequestedRef.current) return
+    indexRequestedRef.current = true
+    setIndexStatus('loading')
+    void buildPdfSearchIndex(doc)
+      .then((index) => {
+        setSearchIndex(index)
+        setIndexStatus(index.scanned ? 'scanned' : 'ready')
+      })
+      .catch(() => {
+        indexRequestedRef.current = false
+        setIndexStatus('idle')
+      })
+  }, [])
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true)
+    ensureSearchIndex()
+    searchRef.current?.focus()
+  }, [ensureSearchIndex])
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setQuery('')
+    containerRef.current?.focus()
+  }, [])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        openSearch()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openSearch])
+
+  // Pick the first match at or after the page the reader is on.
+  useEffect(() => {
+    if (!searchIndex || matches.length === 0) {
+      setCurrentMatch(-1)
+      return
+    }
+    const startPage = currentPageRef.current
+    const first = matches.findIndex((m) => searchIndex.locations[m.start.chunk].page >= startPage)
+    setCurrentMatch(Math.max(0, first))
+    revealMatch.current = true
+  }, [matches, searchIndex])
+
+  const stepSearch = useCallback((direction: 1 | -1) => {
+    revealMatch.current = true
+    setCurrentMatch((c) => stepMatch(c, matches.length, direction))
+  }, [matches.length])
+
+  // Bring the current match's page into view — rendering it first (via
+  // pinnedPage) if it hasn't been drawn yet — when a search starts or the user
+  // steps. Re-runs once that render completes (matchRanges is rebuilt with
+  // renderedVersion); once the match is in view it leaves the scroll alone.
+  useEffect(() => {
+    if (!revealMatch.current || !searchIndex || currentMatch < 0) return
+    const match = matches[currentMatch]
+    const container = containerRef.current
+    if (!match || !container) return
+    const targetPage = searchIndex.locations[match.start.chunk].page
+    if (!isPageTextLayerRendered(container, targetPage)) {
+      setPinnedPage(targetPage)
+      return
+    }
+    const range = matchRanges[currentMatch]
+    if (!range) return
+    revealMatch.current = false
+    scrollPageIntoView(container, targetPage)
+    const rect = range.getBoundingClientRect()
+    const view = container.getBoundingClientRect()
+    if (rect.width > 0 || rect.height > 0) {
+      container.scrollTop += rect.top - (view.top + view.height / 2)
+    }
+  }, [currentMatch, matches, searchIndex, matchRanges])
+
+  // Highlight every match whose page has rendered; the current one gets its
+  // own highlight layered on top — same CSS Custom Highlight API pattern as
+  // the Word preview (DOCXViewer.tsx).
+  useEffect(() => {
+    if (!highlightsSupported()) return
+    const valid = matchRanges.filter((r): r is Range => r !== null)
+    if (valid.length) CSS.highlights.set(SEARCH_HIGHLIGHT, new Highlight(...valid))
+    else CSS.highlights.delete(SEARCH_HIGHLIGHT)
+    const current = matchRanges[currentMatch]
+    if (current) CSS.highlights.set(CURRENT_HIGHLIGHT, new Highlight(current))
+    else CSS.highlights.delete(CURRENT_HIGHLIGHT)
+  }, [matchRanges, currentMatch])
+
+  useEffect(
+    () => () => {
+      if (!highlightsSupported()) return
+      CSS.highlights.delete(SEARCH_HIGHLIGHT)
+      CSS.highlights.delete(CURRENT_HIGHLIGHT)
+    },
+    []
+  )
+
   if (error) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
@@ -294,6 +492,13 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
           }}
         />
         <ToolbarSpacer />
+        <ToolbarIconButton
+          icon="magnifying-glass"
+          label="Find in document"
+          tooltip={`Find in document (${isMac ? 'Cmd' : 'Ctrl'}+F)`}
+          pressed={searchOpen}
+          onClick={searchOpen ? closeSearch : openSearch}
+        />
         {canSaveAsMarkdown && (
           <ToolbarTextButton
             icon="file-text"
@@ -305,33 +510,50 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
         )}
       </ViewerToolbar>
 
-      {/* PDF Content */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        style={{ flex: 1, overflow: 'auto', padding: '16px 0' }}
-      >
-        <Document
-          file={fileData}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading={
-            <div style={{ padding: '2rem', color: 'var(--r-ink-muted, #888)' }}>
-              Loading PDF...
-            </div>
-          }
+      {/* PDF Content; the find bar floats over its top. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {searchOpen && (
+          <FindBarShell
+            ref={searchRef}
+            query={query}
+            onQueryChange={setQuery}
+            countLabel={searchStatusLabel(indexStatus, deferredQuery, currentMatch, matches.length)}
+            hasMatches={indexStatus === 'ready' && matches.length > 0}
+            onNext={() => stepSearch(1)}
+            onPrevious={() => stepSearch(-1)}
+            onClose={closeSearch}
+          />
+        )}
+        <div
+          ref={containerRef}
+          tabIndex={-1}
+          onScroll={handleScroll}
+          style={{ flex: 1, overflow: 'auto', padding: '16px 0' }}
         >
-          {Array.from({ length: numPages }, (_, i) => (
-            <LazyPage
-              key={i}
-              pageNumber={i + 1}
-              scale={scale}
-              width={pageWidth}
-              height={pageHeight}
-              onFirstPageLoad={i === 0 ? onFirstPageLoad : undefined}
-            />
-          ))}
-        </Document>
+          <Document
+            file={fileData}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            loading={
+              <div style={{ padding: '2rem', color: 'var(--r-ink-muted, #888)' }}>
+                Loading PDF...
+              </div>
+            }
+          >
+            {Array.from({ length: numPages }, (_, i) => (
+              <LazyPage
+                key={i}
+                pageNumber={i + 1}
+                scale={scale}
+                width={pageWidth}
+                height={pageHeight}
+                onFirstPageLoad={i === 0 ? onFirstPageLoad : undefined}
+                forceVisible={pinnedPage === i + 1}
+                onTextLayerReady={onTextLayerReady}
+              />
+            ))}
+          </Document>
+        </div>
       </div>
 
       {/* Save-as-Markdown toast */}
