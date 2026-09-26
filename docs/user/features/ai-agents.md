@@ -327,7 +327,7 @@ The detail view uses the active conversation's shared runtime/model state. It sh
 
 A check beside a context category means that category is present in the current composer state. It is not a guarantee that the agent can read only those items. Depending on the selected permission mode and approvals, an agent can read other workspace files or use tools while completing the task.
 
-The active-file chip can be removed before sending. Browser context is shown and sent only for Claude Code and Codex; OpenCode does not currently receive the integrated-browser context. Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
+The active-file chip can be removed before sending. The shared browser page is shown and sent with your messages only for Claude Code and Codex; OpenCode does not receive it. On macOS, OpenCode can still read a page you shared through its browser tools (see [In-app Browser](browser.md#re-observing-a-page--browser_snapshot)). Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
 
 AI output can be inaccurate or incomplete. Review facts, sources, calculations, commands, and file changes before relying on, publishing, or acting on the result. Approval controls reduce unintended actions; they do not verify correctness.
 
