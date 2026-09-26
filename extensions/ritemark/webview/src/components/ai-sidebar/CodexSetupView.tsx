@@ -34,7 +34,9 @@ export function CodexSetupView() {
           : 'Sign in with ChatGPT';
 
   const description = isBroken
-    ? 'Codex is installed, but it could not start correctly.'
+    ? codexStatus.binaryPath
+      ? 'Codex is installed, but it could not start correctly.'
+      : 'Ritemark could not find Codex.'
     : offlineBlocked
       ? 'Codex sign-in needs an internet connection. Reconnect, then try again.'
       : loginInProgress

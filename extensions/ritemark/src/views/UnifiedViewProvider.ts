@@ -60,7 +60,7 @@ import { BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
 import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
+import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech/activeTranscript';
@@ -2336,7 +2336,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private async _openCodexRepairTerminal(): Promise<void> {
     const codexManager = new CodexManager();
     const status = await codexManager.getBinaryStatus();
-    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+    if (!status.repairCommand) {
+      vscode.window.showInformationMessage(BUNDLED_CODEX_REPAIR_MESSAGE);
+      return;
+    }
 
     const terminal = vscode.window.createTerminal({
       name: 'Codex Repair',
@@ -2344,7 +2347,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     terminal.show();
-    terminal.sendText(command);
+    terminal.sendText(status.repairCommand);
 
     vscode.window.showInformationMessage(
       'Opened Codex repair in terminal. After it finishes, reload the window.'

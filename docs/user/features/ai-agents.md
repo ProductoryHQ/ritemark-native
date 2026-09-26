@@ -76,8 +76,8 @@ The model list is served from a live catalog feed, so newly released Claude mode
 | Requirement | Required on | Notes |
 |-------------|-------------|-------|
 | Claude Code | All platforms | Included with Ritemark; nothing to install |
-| Git | Windows | Required by the Claude Code installer |
-| PowerShell | Windows | Required for Claude installation and sign-in |
+| Git for Windows | Windows | Optional. With Git, Claude runs commands in Git Bash; without it, in PowerShell |
+| PowerShell | Windows | Built into Windows. Used for Claude installation and sign-in, and for Claude's commands when Git is not installed |
 
 ### How Ritemark Detects Claude
 
@@ -123,7 +123,7 @@ Settings reflects the truthful auth state by querying the Claude CLI directly. A
 | Problem | Solution |
 |---------|----------|
 | "Claude binary was detected but could not be started" | Click "Repair Claude" to reinstall |
-| "Git for Windows is required" | Install [Git for Windows](https://git-scm.com/download/win), then retry |
+| "Git for Windows not detected" | Appears only with **Use system install**: a Claude you installed yourself may need Git Bash. Install [Git for Windows](https://git-scm.com/download/win), or set **Runtime preference** back to **Bundled** |
 | "PowerShell not detected" | Restore `powershell.exe` on your system, then reload |
 | Install fails with file lock error | Close the Claude desktop app, then retry |
 | "spawn EINVAL" when chatting | Update Ritemark - this was a known bug with Windows `.cmd` path resolution |
@@ -175,7 +175,8 @@ Codex uses **ChatGPT OAuth** - click "Sign in with ChatGPT" to open a browser fo
 
 | Problem | Solution |
 |---------|----------|
-| "Codex CLI not found" | The copy of Codex that ships with Ritemark is missing. Reinstall Ritemark |
+| "Codex runtime not found" | The copy of Codex that ships with Ritemark is missing. Reinstall Ritemark. With **Use system install**, also check your own install (`npm install -g @openai/codex`) |
+| "The bundled Codex runtime could not start" | Reinstall Ritemark. "Repair Codex" repairs only your own install; for the bundled copy it tells you to reinstall Ritemark |
 | "spawn codex ENOENT" | Update Ritemark - this was a known bug with Windows path resolution |
 | Your own Codex install broke after a Node update | Click "Repair Codex" to open a repair terminal |
 | Node version mismatch warning | Applies to your own install only. Reinstall Codex using the same Node version as Ritemark, or set **Runtime preference** back to **Bundled** |
@@ -301,15 +302,15 @@ You can also pin a custom agent from the [Agent Library](agent-library.md) for t
 
 ## Environment Checks
 
-On Windows, Ritemark performs additional environment checks before allowing setup:
+On Windows, Ritemark checks for what the agents actually need. The Claude and Codex that ship with Ritemark need neither Git nor Node.js, so those two checks run only when **Settings → Agent Runtime → Runtime preference** is **Use system install**:
 
-| Check | Why | Recovery |
-|-------|-----|----------|
-| Git installed | Required by Claude installer | Install [Git for Windows](https://git-scm.com/download/win) |
-| PowerShell available | Required for Claude install/login scripts | Restore PowerShell on your system |
-| Node.js installed | The setup notice lists it as required to run Claude on Windows | Install [Node.js](https://nodejs.org), then reload Ritemark |
+| Check | When | Why | Recovery |
+|-------|------|-----|----------|
+| PowerShell available | Always | Built into Windows. Claude installation and sign-in use it, and Claude runs its commands in PowerShell when Git is not installed | Restore PowerShell on your system |
+| Git installed | Use system install only | A Claude you installed yourself may need Git Bash | Install [Git for Windows](https://git-scm.com/download/win), or set **Runtime preference** back to **Bundled** |
+| Node.js installed | Use system install only | A Claude or Codex installed with npm runs on Node.js | Install [Node.js](https://nodejs.org), or set **Runtime preference** back to **Bundled** |
 
-These checks appear as an "Environment checks" notice in the setup wizard. Fix the listed issues before proceeding with agent installation.
+These checks appear as an "Environment checks" notice in the setup wizard, and Git and Node.js appear in the first-run checklist only with **Use system install**. Only a missing PowerShell stops Claude installation; Git and Node.js never block it.
 
 After installing a prerequisite, you may need to **reload the window** for Ritemark to detect the change (PATH updates require a restart).
 
