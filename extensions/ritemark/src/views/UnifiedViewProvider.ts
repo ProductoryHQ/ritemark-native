@@ -70,13 +70,7 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
-import {
-  renderCapabilityContext,
-  CLAUDE_DESCRIPTOR,
-  CODEX_DESCRIPTOR,
-  ACP_DESCRIPTOR,
-  type CapabilityDescriptor,
-} from '../ai/capabilityContext';
+import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import {
@@ -953,14 +947,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             // mechanism — Claude appends it, Codex uses it as base instructions,
             // ACP injects it once per session. The old append/replace asymmetry
             // (browser hint reached Claude only) is gone; every runtime now gets
-            // materially the same capability awareness, and the browser guidance
-            // is included whenever the integrated browser is actually available.
+            // materially the same capability awareness. The browser guidance
+            // follows the same `browser-agent-control` flag that hands each
+            // runtime its browser tools (Claude: in-process MCP server, Codex:
+            // dynamic tools, OpenCode: the MCP adapter AcpRuntime attaches).
             extraSystemPrompt: renderCapabilityContext(
-              (isClaudeCode
-                ? { ...CLAUDE_DESCRIPTOR, hasBrowserTools: browserEnabled }
-                : isCodex
-                  ? { ...CODEX_DESCRIPTOR, hasBrowserTools: browserEnabled }
-                  : ACP_DESCRIPTOR) as CapabilityDescriptor
+              capabilityDescriptorFor(agentId as AgentId, browserEnabled),
             ),
             mcpServers,
             allowedTools: isClaudeCode && browserEnabled
