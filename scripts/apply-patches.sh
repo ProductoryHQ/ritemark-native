@@ -168,7 +168,17 @@ reverse_later_patches_then_check_current() {
     return "$result"
 }
 
-for patch_index in "${!PATCHES[@]}"; do
+# Apply and check first-to-last; remove last-to-first, for the same reason the
+# already-applied check above unwinds as a stack.
+PATCH_ORDER=("${!PATCHES[@]}")
+if [ "$REVERSE" = true ] && [ "$DRY_RUN" = false ]; then
+    PATCH_ORDER=()
+    for (( patch_index = ${#PATCHES[@]} - 1; patch_index >= 0; patch_index-- )); do
+        PATCH_ORDER+=("$patch_index")
+    done
+fi
+
+for patch_index in "${PATCH_ORDER[@]}"; do
     patch="${PATCHES[$patch_index]}"
     PATCH_NAME=$(basename "$patch")
 
