@@ -1440,7 +1440,8 @@ export function RitemarkSettings() {
                 >
                   Pause 7 Days
                 </Button>
-                {(settings.updateCenter.skippedVersion || settings.updateCenter.snoozeUntil) && (
+                {/* snoozeUntil is 0 when not paused; a bare number here would render "0". */}
+                {(Boolean(settings.updateCenter.skippedVersion) || settings.updateCenter.snoozeUntil > 0) && (
                   <Button
                     onClick={() => handleUpdateAction('updates:resume')}
                     variant="secondary" size="lg"
