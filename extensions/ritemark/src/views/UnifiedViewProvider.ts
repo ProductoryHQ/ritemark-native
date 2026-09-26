@@ -573,9 +573,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             ? modelCatalog.getModel('anthropic', requestedModelInput)
             : undefined;
           const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
-          const modelSubstitution = this._modelSubstitutionNamed.has(clientConversationId)
-            ? undefined
-            : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -1199,8 +1196,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (commentTaskId && conversationTurnId) {
                 void this._commentTaskController?.applyTurnStarted(conversationId, conversationTurnId);
               }
+              // Keyed by the accepted id: the first turn of a new conversation
+              // replaces the sidebar's client id with a canonical one.
+              const modelSubstitution = this._modelSubstitutionNamed.has(conversationId)
+                ? undefined
+                : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
               if (modelSubstitution) {
-                this._modelSubstitutionNamed.add(clientConversationId);
+                this._modelSubstitutionNamed.add(conversationId);
                 sessionConfig.onProgress({
                   type: 'init',
                   message: modelSubstitutionNotice(modelSubstitution.from, modelSubstitution.to),

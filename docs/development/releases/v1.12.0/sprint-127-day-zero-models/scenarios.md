@@ -181,6 +181,7 @@ Then a conditional feed check runs immediately
 Given `ritemark.ai.selectedModel` is a model the catalog no longer offers
 When the user sends a prompt
 Then the transcript says which model was requested and which one is used, before the turn runs
+And in a new conversation the notice appears once, although its first turn gives it a new id (added 2026-09-25, Codex review of #349)
 
 ### ★ S29: The account cannot use the model (refusal)
 Given a subscription plan that cannot use a published model
