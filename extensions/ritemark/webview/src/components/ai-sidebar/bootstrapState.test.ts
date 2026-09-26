@@ -59,6 +59,12 @@ function main(): void {
   const originalPostMessage = vscode.postMessage;
   vscode.postMessage = () => undefined;
   try {
+    assert.deepEqual(
+      initialState.runtimeCapabilities,
+      RUNTIME_CAPABILITIES,
+      'the store default mirrors the host capability map until bootstrap delivers it',
+    );
+
     deliver({ type: 'ai-key-status', hasKey: true });
     assert.equal(useAISidebarStore.getState().ready, false, 'credential status cannot complete bootstrap');
 
@@ -66,6 +72,7 @@ function main(): void {
     let state = useAISidebarStore.getState();
     assert.equal(state.ready, true);
     assert.equal(state.bootstrapGeneration, 4);
+    assert.deepEqual(state.runtimeCapabilities, RUNTIME_CAPABILITIES, 'bootstrap delivers the host capability map');
     assert.equal(state.models[0].id, 'claude-opus-5[1m]');
     assert.equal(state.codexModels[0].id, 'gpt-5.6-sol');
     assert.equal(state.activeConversationId !== null, true);
