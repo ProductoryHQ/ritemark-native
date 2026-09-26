@@ -7,11 +7,26 @@ import {
   NUMPAGES_FIELD_MARK,
   PAGE_FIELD_MARK,
   describeUnsupported,
+  documentFont,
   dropFontEmbeds,
   dropRedundantPageMarkers,
+  embeddedFont,
+  ensureDefaultLineSpacing,
+  ensurePageSetup,
+  fixTableGrids,
+  fontLineHeightRatio,
   hasPageMarkers,
+  hasWeightAxis,
+  impliedFontWeight,
+  knownLineHeightRatio,
+  lineHeightRatio,
+  normalizeLineSpacing,
+  weightFontFaces,
   listFontEmbedIds,
+  markPageAnchors,
   markPageFields,
+  paperForLocale,
+  splitFieldRuns,
   parseRelationships,
   scanUnsupported,
   wantsAutoHyphenation,
@@ -183,5 +198,256 @@ assert.equal(wantsAutoHyphenation('<w:settings><w:zoom w:percent="100"/></w:sett
 assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation/></w:settings>'), true);
 assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation w:val="true"/></w:settings>'), true);
 assert.equal(wantsAutoHyphenation('<w:settings><w:autoHyphenation w:val="0"/></w:settings>'), false);
+
+// v1.12.0 RC fix: a document without page setup gets Word's default paper and margins.
+assert.equal(paperForLocale('en-US'), 'Letter');
+assert.equal(paperForLocale('en_CA'), 'Letter');
+assert.equal(paperForLocale('et-EE'), 'A4');
+assert.equal(paperForLocale('en'), 'A4');
+assert.equal(paperForLocale(undefined), 'A4');
+{
+  const bodyOnly = '<w:document><w:body><w:p/></w:body></w:document>';
+  const out = ensurePageSetup(bodyOnly, 'A4');
+  assert.ok(out.includes('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440"'), out);
+  assert.ok(out.endsWith('</w:sectPr></w:body></w:document>'));
+  assert.ok(ensurePageSetup(bodyOnly, 'Letter').includes('<w:pgSz w:w="12240" w:h="15840"/>'));
+}
+{
+  // A section with headers but no size or margins: both are added, its references kept.
+  const partial = '<w:body><w:p/><w:sectPr w:rsidR="1"><w:headerReference w:type="default" r:id="rId1"/></w:sectPr></w:body>';
+  const out = ensurePageSetup(partial, 'A4');
+  assert.ok(out.includes('<w:sectPr w:rsidR="1"><w:pgSz'), out);
+  assert.ok(out.includes('<w:pgMar ') && out.includes('<w:headerReference'), out);
+  // A self-closing section, too.
+  assert.ok(ensurePageSetup('<w:body><w:sectPr/></w:body>', 'A4').includes('<w:sectPr><w:pgSz'));
+}
+{
+  // A complete section is untouched, and so is every section of a document that has them.
+  const full = '<w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="720"/></w:sectPr></w:pPr></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440"/></w:sectPr></w:body>';
+  assert.equal(ensurePageSetup(full, 'Letter'), full);
+}
+
+// v1.12.0 RC fix: pictures set against the page are marked for the viewer to place.
+{
+  const anchor = (attrs: string, h: string, v: string, wrap = '<wp:wrapNone/>') =>
+    `<w:r><w:drawing><wp:anchor ${attrs}><wp:simplePos x="0" y="0"/>${h}${v}<wp:extent cx="100" cy="100"/>${wrap}</wp:anchor></w:drawing></w:r>`;
+  const pageH = '<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>';
+  const pageV = '<wp:positionV relativeFrom="page"><wp:posOffset>-9525</wp:posOffset></wp:positionV>';
+  const rightMargin = '<wp:positionH relativeFrom="rightMargin"><wp:align>right</wp:align></wp:positionH>';
+  const paraV = '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>';
+  const colH = '<wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH>';
+  const xml = p(
+    anchor('behindDoc="1" simplePos="0"', pageH, pageV) +
+      anchor('behindDoc="0" simplePos="0"', rightMargin, paraV) +
+      anchor('behindDoc="0" simplePos="0"', colH, paraV) + // set against its paragraph and column: placed too (a real cover is laid out this way)
+      anchor('behindDoc="0" simplePos="0"', pageH, pageV, '<wp:wrapSquare wrapText="bothSides"/>'), // text wraps it: left alone
+  );
+  const out = markPageAnchors(xml, 5);
+  assert.deepEqual(
+    out.anchors.map((a) => a.name),
+    ['_rma5', '_rma6', '_rma7'],
+  );
+  assert.deepEqual(out.anchors[0], {
+    name: '_rma5',
+    h: { relativeFrom: 'page', offsetEmu: 0 },
+    v: { relativeFrom: 'page', offsetEmu: -9525 },
+    behindDoc: true,
+  });
+  assert.deepEqual(out.anchors[1].h, { relativeFrom: 'rightMargin', align: 'right' });
+  assert.equal(out.anchors[1].behindDoc, false);
+  // The bookmark sits just before the picture's run.
+  assert.ok(out.xml.includes('<w:bookmarkStart w:id="1900000005" w:name="_rma5"/><w:bookmarkEnd w:id="1900000005"/><w:r><w:drawing><wp:anchor behindDoc="1"'), out.xml);
+  assert.equal(out.xml.split('<w:bookmarkStart').length - 1, 3);
+  // Nothing to mark: unchanged.
+  assert.equal(markPageAnchors(p(r(t('x'))), 0).xml, p(r(t('x'))));
+}
+
+// v1.12.0 RC fix: field code in the same run as text (the docx npm library's footer) gets runs of its own,
+// so docx-preview shows the text, and the page number is marked.
+{
+  const footer =
+    '<w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">Page </w:t><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve">PAGE</w:instrText>' +
+    '<w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/><w:t xml:space="preserve"> of </w:t><w:fldChar w:fldCharType="begin"/>' +
+    '<w:instrText xml:space="preserve">NUMPAGES</w:instrText><w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/></w:r></w:p>';
+  const split = splitFieldRuns(footer);
+  const runs = split.match(/<w:r>[\s\S]*?<\/w:r>/g)!;
+  assert.equal(runs.length, 10, split);
+  assert.ok(runs.every((run) => run.startsWith('<w:r><w:rPr><w:sz w:val="18"/></w:rPr>')), 'every piece keeps the run properties');
+  assert.equal(runs[0], '<w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">Page </w:t></w:r>');
+  const marked = markPageFields(split);
+  assert.ok(marked.includes(PAGE_FIELD_MARK) && marked.includes(NUMPAGES_FIELD_MARK), marked);
+  assert.ok(marked.indexOf('Page ') < marked.indexOf(PAGE_FIELD_MARK) && marked.indexOf(PAGE_FIELD_MARK) < marked.indexOf(' of '), 'the number sits between "Page" and "of"');
+  // A form field's begin character with content stays one piece.
+  const form = '<w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:name w:val="Check1"/></w:ffData></w:fldChar><w:t>x</w:t></w:r>';
+  assert.equal(splitFieldRuns(form).match(/<w:r>/g)!.length, 2);
+  // Runs that are already one field part each, and text without fields, are untouched.
+  const clean = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:t>x</w:t></w:r>';
+  assert.equal(splitFieldRuns(clean), clean);
+  assert.equal(splitFieldRuns(p(r(t('plain')))), p(r(t('plain'))));
+}
+
+// ── Line spacing in the document font's line heights (v1.12.0 RC fix).
+{
+  assert.equal(knownLineHeightRatio('Calibri'), 1.2207);
+  assert.equal(knownLineHeightRatio(' calibri '), 1.2207, 'names match without case or padding');
+  assert.equal(knownLineHeightRatio('Sofia Sans Light'), null);
+  assert.equal(lineHeightRatio('Calibri', 1.5), 1.2207, 'a known font wins over its embedded copy');
+  assert.equal(lineHeightRatio('Sofia Sans Light', 1.2), 1.2, 'else the embedded font');
+  assert.equal(lineHeightRatio('Sofia Sans Light'), 1.17, 'else a typical line height');
+  assert.equal(lineHeightRatio(null), 1.17);
+
+  const styles = (defaults: string, normal = '') =>
+    `<w:styles><w:docDefaults><w:rPrDefault><w:rPr>${defaults}</w:rPr></w:rPrDefault></w:docDefaults>` +
+    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:rPr>${normal}</w:rPr></w:style></w:styles>`;
+  const theme = '<a:theme><a:fontScheme><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme></a:theme>';
+  assert.equal(documentFont(styles('<w:rFonts w:ascii="Sofia Sans Light" w:hAnsi="Sofia Sans Light"/>'), null), 'Sofia Sans Light');
+  assert.equal(documentFont(styles('<w:rFonts w:ascii="Arial"/>', '<w:rFonts w:ascii="Georgia"/>'), null), 'Georgia', 'the default paragraph style first');
+  assert.equal(documentFont(styles('<w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi"/>'), theme), 'Aptos', 'a theme font through the theme');
+  assert.equal(documentFont(styles('<w:rFonts w:asciiTheme="majorHAnsi"/>'), theme), 'Aptos Display');
+  assert.equal(documentFont(styles(''), null), 'Times New Roman', "Word's fallback");
+  assert.equal(documentFont(null, null), 'Times New Roman');
+
+  // Auto spacing is scaled; a spacing without w:lineRule is auto (docx-preview read it as exact points).
+  assert.equal(normalizeLineSpacing('<w:spacing w:after="240" w:line="276" w:lineRule="auto"/>', 1.2), '<w:spacing w:after="240" w:line="331" w:lineRule="auto"/>');
+  assert.equal(normalizeLineSpacing('<w:spacing w:line="240"/>', 1.2207), '<w:spacing w:line="293" w:lineRule="auto"/>');
+  for (const kept of ['<w:spacing w:line="300" w:lineRule="exact"/>', '<w:spacing w:line="300" w:lineRule="atLeast"/>', '<w:spacing w:after="120"/>']) {
+    assert.equal(normalizeLineSpacing(kept, 1.2), kept, kept);
+  }
+
+  // A document that sets no line spacing gets Word's single spacing in its defaults, scaled.
+  const single = '<w:spacing w:line="288" w:lineRule="auto"/>';
+  assert.equal(
+    ensureDefaultLineSpacing('<w:styles><w:docDefaults><w:pPrDefault><w:pPr><w:spacing w:after="160"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>', 1.2),
+    '<w:styles><w:docDefaults><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="288" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>',
+  );
+  const set = '<w:styles><w:docDefaults><w:pPrDefault><w:pPr><w:spacing w:line="360" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>';
+  assert.equal(ensureDefaultLineSpacing(set, 1.2), set, 'spacing the document sets is left alone');
+  assert.equal(
+    ensureDefaultLineSpacing('<w:styles><w:docDefaults><w:pPrDefault><w:pPr/></w:pPrDefault></w:docDefaults></w:styles>', 1.2),
+    `<w:styles><w:docDefaults><w:pPrDefault><w:pPr>${single}</w:pPr></w:pPrDefault></w:docDefaults></w:styles>`,
+  );
+  assert.equal(
+    ensureDefaultLineSpacing('<w:styles><w:docDefaults><w:rPrDefault/></w:docDefaults></w:styles>', 1.2),
+    `<w:styles><w:docDefaults><w:rPrDefault/><w:pPrDefault><w:pPr>${single}</w:pPr></w:pPrDefault></w:docDefaults></w:styles>`,
+  );
+  assert.equal(
+    ensureDefaultLineSpacing('<w:styles w:ignorable="w14"><w:style/></w:styles>', 1.2),
+    `<w:styles w:ignorable="w14"><w:docDefaults><w:pPrDefault><w:pPr>${single}</w:pPr></w:pPrDefault></w:docDefaults><w:style/></w:styles>`,
+  );
+}
+
+// ── A font the document embeds: its line height from its own metrics, obfuscated as Word stores it.
+{
+  // A minimal TrueType file: header, a directory of two tables, `head` (units per em) and `hhea` (vertical metrics).
+  const font = (unitsPerEm: number, ascender: number, descender: number, lineGap: number) => {
+    const bytes = new Uint8Array(12 + 2 * 16 + 54 + 36);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, 0x00010000);
+    view.setUint16(4, 2);
+    const tables: [string, number, number][] = [['head', 44, 54], ['hhea', 98, 36]];
+    tables.forEach(([tag, offset, length], k) => {
+      for (let i = 0; i < 4; i++) bytes[12 + 16 * k + i] = tag.charCodeAt(i);
+      view.setUint32(12 + 16 * k + 8, offset);
+      view.setUint32(12 + 16 * k + 12, length);
+    });
+    view.setUint16(44 + 18, unitsPerEm);
+    view.setInt16(98 + 4, ascender);
+    view.setInt16(98 + 6, descender);
+    view.setInt16(98 + 8, lineGap);
+    return bytes;
+  };
+  // Word's obfuscation (ECMA-376 Part 2, font embedding): the key's 16 bytes, last first, XORed over the first 32 bytes.
+  const obfuscate = (bytes: Uint8Array, guid: string) => {
+    const hex = guid.replace(/[{}-]/g, '');
+    const key = Array.from({ length: 16 }, (_, i) => parseInt(hex.substr(i * 2, 2), 16)).reverse();
+    const out = bytes.slice();
+    for (let i = 0; i < 32; i++) out[i] ^= key[i % 16];
+    return out;
+  };
+  const guid = '{14F231E2-1439-0542-8B56-1A7D4473AFF4}';
+  const close = (actual: number | null, expected: number) => assert.ok(actual !== null && Math.abs(actual - expected) < 1e-9, `${actual} ≠ ${expected}`);
+  close(fontLineHeightRatio(font(1000, 900, -300, 0), null), 1.2);
+  close(fontLineHeightRatio(obfuscate(font(1000, 900, -300, 0), guid), guid), 1.2);
+  close(fontLineHeightRatio(obfuscate(font(2048, 1854, -434, 67), guid), guid), 2355 / 2048);
+  assert.equal(fontLineHeightRatio(obfuscate(font(1000, 900, -300, 0), guid), null), null, 'still obfuscated: not a font');
+  assert.equal(fontLineHeightRatio(font(1000, 900, -300, 0), 'not-a-key'), null);
+  assert.equal(fontLineHeightRatio(new Uint8Array(0), null), null, 'an empty embedded face');
+  assert.equal(fontLineHeightRatio(font(0, 900, -300, 0), null), null, 'no units per em');
+  assert.equal(fontLineHeightRatio(font(1000, 9000, -300, 0), null), null, 'metrics no text font has');
+
+  const table =
+    '<w:fonts><w:font w:name="Symbol"><w:embedRegular r:id="rId1" w:fontKey="{88840AD8-5225-C542-9BC1-B5AD10EC7524}"/></w:font>' +
+    `<w:font w:name="Sofia Sans Light"><w:embedBold r:id="rId6" w:fontKey="{63E403E0-03C7-3540-834C-2094D35E98D8}"/><w:embedRegular r:id="rId5" w:fontKey="${guid}"/></w:font>` +
+    '<w:font w:name="Space Grotesk"><w:embedBold r:id="rId9" w:fontKey="{3EA7CD1B-C1A5-764C-AF09-16399733984D}"/></w:font>' +
+    '<w:font w:name="Arial"/></w:fonts>';
+  assert.deepEqual(embeddedFont(table, 'sofia sans light'), { id: 'rId5', key: guid }, 'the regular face first');
+  assert.deepEqual(embeddedFont(table, 'Space Grotesk'), { id: 'rId9', key: '{3EA7CD1B-C1A5-764C-AF09-16399733984D}' }, 'else any face');
+  assert.equal(embeddedFont(table, 'Arial'), null, 'not embedded');
+  assert.equal(embeddedFont(table, 'Calibri'), null, 'not in the table');
+}
+
+// ── Table grids: a real grid is drawn as it is; a placeholder grid lets the columns size to their content.
+{
+  const tbl = (pr: string, cols: number[]) =>
+    `<w:tbl><w:tblPr>${pr}</w:tblPr><w:tblGrid>${cols.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid><w:tr/></w:tbl>`;
+  assert.equal(fixTableGrids(tbl('<w:tblW w:w="0" w:type="auto"/>', [3000, 6000])), tbl('<w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="fixed"/>', [3000, 6000]));
+  assert.equal(fixTableGrids(tbl('<w:tblLayout w:type="autofit"/>', [3000, 6000])), tbl('<w:tblLayout w:type="autofit"/>', [3000, 6000]), 'a layout the table sets is kept');
+  assert.equal(
+    fixTableGrids(tbl('', [100, 100, 100])),
+    '<w:tbl><w:tblPr></w:tblPr><w:tblGrid><w:gridCol/><w:gridCol/><w:gridCol/></w:tblGrid><w:tr/></w:tbl>',
+    'the docx library writes 100 twips per column and leaves the rest to autofit',
+  );
+  assert.equal(fixTableGrids('<w:p/>'), '<w:p/>');
+}
+
+// ── Embedded fonts: a family named for a weight is drawn at that weight (a variable font holds them all).
+{
+  assert.equal(impliedFontWeight('Sofia Sans Light'), 300);
+  assert.equal(impliedFontWeight('Segoe UI Semibold'), 600);
+  assert.equal(impliedFontWeight('Montserrat ExtraLight'), 200);
+  assert.equal(impliedFontWeight('Inter Extra Bold'), 800);
+  assert.equal(impliedFontWeight('Arial Black'), 900);
+  assert.equal(impliedFontWeight('Roboto Thin'), 100);
+  assert.equal(impliedFontWeight('Calibri'), undefined);
+  assert.equal(impliedFontWeight('Lightfoot'), undefined, 'a name, not a weight');
+  assert.equal(impliedFontWeight('Sofia Sans'), undefined);
+
+  const css =
+    "/* docxjs Sofia Sans Light font */\n@font-face {\r\n font-family: 'Sofia Sans Light';\r\n src: url(blob:x/1);\r\n}\r\n" +
+    "@font-face {\r\n font-family: 'Sofia Sans Light';\r\n src: url(blob:x/2);\r\n font-style: italic;\r\n}\r\n" +
+    "@font-face {\r\n font-family: 'Inter Light';\r\n src: url(blob:x/3);\r\n}\r\n" +
+    "@font-face {\r\n font-family: 'Inter Light';\r\n src: url(blob:x/4);\r\n font-weight: bold;\r\n}\r\n" +
+    "@font-face {\r\n font-family: 'Calibri Light';\r\n src: url(blob:x/5);\r\n}\r\n" +
+    '@font-face { font-family: Calibri; src: url(blob:x/6); }';
+  const out = weightFontFaces(css, new Set(['sofia sans light', 'inter light']));
+  assert.ok(out.includes("font-family: 'Sofia Sans Light';\r\n src: url(blob:x/1); font-weight: 300; } @font-face {\r\n font-family: 'Sofia Sans Light';\r\n src: url(blob:x/1); font-weight: 700; }"), out);
+  assert.ok(out.includes("src: url(blob:x/2);\r\n font-style: italic; font-weight: 300; } @font-face {\r\n font-family: 'Sofia Sans Light';\r\n src: url(blob:x/2);\r\n font-style: italic; font-weight: 700; }"), 'the italic face, and a bold italic from it');
+  assert.ok(out.includes("src: url(blob:x/3); font-weight: 300; }\r\n"), 'a family with a bold face of its own');
+  assert.ok(!out.includes('blob:x/3); font-weight: 700'), '… gets no bold copy');
+  assert.ok(out.includes('src: url(blob:x/4);\r\n font-weight: bold;\r\n}'), 'and keeps its bold face');
+  assert.ok(out.includes("font-family: 'Calibri Light';\r\n src: url(blob:x/5);\r\n}"), 'a font with fixed weights is left alone: the browser still emboldens it');
+  assert.ok(out.endsWith('@font-face { font-family: Calibri; src: url(blob:x/6); }'));
+  assert.equal(weightFontFaces(css, new Set()), css);
+  assert.equal(weightFontFaces('p { color: red }', new Set(['x light'])), 'p { color: red }');
+
+  // A variable font: an fvar table with a weight axis.
+  const variable = (axis: string) => {
+    const bytes = new Uint8Array(12 + 16 + 16 + 20);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, 0x00010000);
+    view.setUint16(4, 1);
+    for (let i = 0; i < 4; i++) bytes[12 + i] = 'fvar'.charCodeAt(i);
+    view.setUint32(12 + 8, 28);
+    view.setUint32(12 + 12, 36);
+    view.setUint16(28 + 4, 16); // axes array offset
+    view.setUint16(28 + 8, 1); // axis count
+    view.setUint16(28 + 10, 20); // axis size
+    for (let i = 0; i < 4; i++) bytes[44 + i] = axis.charCodeAt(i);
+    return bytes;
+  };
+  assert.equal(hasWeightAxis(variable('wght'), null), true);
+  assert.equal(hasWeightAxis(variable('wdth'), null), false, 'a width axis only');
+  assert.equal(hasWeightAxis(new Uint8Array(100), null), false);
+}
 
 console.log('docxXml.test.ts: all passed');

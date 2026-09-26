@@ -93,6 +93,12 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 - [ ] A real Word document with a cover image: the cover shows
 - [ ] **Open in Word** opens the file in Word; the arrow beside it offers **Save as Markdown**
 - [ ] A narrow editor (under about 560 px): the toolbar stays on one line, and the labels become icons that keep their tooltips
+- [ ] RC fix — a document without Word's page breaks opens as pages: `fixtures/09-long-document.docx` (the generated form) shows 28 pages, never one long sheet, and every page is the same height
+- [ ] `fixtures/03-tables.docx`: 3 pages; the long table breaks between rows and repeats its header row on pages 2 and 3
+- [ ] A Word document with bulleted lists: the bullets are dots (not boxes or letters), and each item's text lines up with the lines under it
+- [ ] A bordered quote: the bar sits left of the text with a clear gap, runs unbroken through the quote, and stays left of a numbered item's number
+- [ ] A Word document with a full-page cover: the cover reaches the page edges, with no white strip at the top
+- [ ] A document in a light weight of an embedded font (for example Sofia Sans Light): the text is as light as in Word, and bold text is still bold
 - [ ] A PDF: the same page counter and zoom; **Save as Markdown** on the right
 - [ ] PDF search (#344), in a long text PDF: Cmd+F or the magnifier opens the find bar; a word that appears only on a later page is counted before you scroll there; Enter goes to it, and every match on screen is tinted with the current one solid
 - [ ] With the find bar still open, scroll to another page and read: the view stays where you put it. Shift+Enter from the first match wraps to the last; Escape clears the highlights

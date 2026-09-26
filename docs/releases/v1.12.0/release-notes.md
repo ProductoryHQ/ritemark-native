@@ -72,7 +72,7 @@ Sprint 124 makes a Word document look like the document you sent, not a long web
 
 **Search a PDF, too.** The same find bar works in PDFs. It counts matches on every page, including pages you haven't reached yet, and takes you to each one in turn. You can keep reading with the find bar open, because the view only moves when you step to a match. A scanned PDF that has no text says so, rather than reporting "No matches".
 
-**Honest about the rest.** When a document has charts, SmartArt or equations that the preview can't draw exactly, a note says so. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in Word (or Pages, or your default app). A document made by another program, such as a Google Docs export, has no saved page breaks, so it still shows fewer, longer pages.
+**Honest about the rest.** When a document has charts, SmartArt or equations that the preview can't draw exactly, a note says so. When a file can't be previewed — too large, password-protected, damaged — you get the reason and a way to open it in Word (or Pages, or your default app). A document made by another program, such as a Google Docs export, has no saved page breaks: the preview lays out its pages itself, the way Word would, and they come close to Word's.
 
 ## PowerPoint presentations, as slides
 

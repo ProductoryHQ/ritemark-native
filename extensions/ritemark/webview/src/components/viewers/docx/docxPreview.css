@@ -16,6 +16,13 @@
   --ritemark-docx-surround: color-mix(in srgb, var(--r-ink-strong) 7%, var(--r-surface));
 }
 
+/* v1.12.0 RC fix: the document sets its own line spacing (prepareDocx gives a
+   document without any Word's single spacing). What is left must not inherit
+   the webview's line-height of 1.5: this is single spacing in a typical font. */
+.ritemark-docx .docx-wrapper {
+  line-height: 1.17;
+}
+
 .ritemark-docx .docx-scroller {
   background: var(--ritemark-docx-surround);
 }
@@ -53,6 +60,16 @@
   isolation: isolate;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 16px rgb(0 0 0 / 0.08);
   margin-bottom: 24px;
+}
+
+/* v1.12.0 RC fix: a list item's number or bullet is followed by a tab to the
+   hanging indent, where its text starts — on the first line as on the others.
+   CSS drew the tab as a space, so the first line started early. The marker now
+   fills the hanging indent (set per paragraph by alignListMarkers). */
+.ritemark-docx section.docx p[class*="docx-num-"]::before {
+  display: inline-block;
+  min-width: var(--ritemark-hanging, auto);
+  text-indent: 0;
 }
 
 /* Search highlight colours: ../documentSearch.css, shared with the other previews. */

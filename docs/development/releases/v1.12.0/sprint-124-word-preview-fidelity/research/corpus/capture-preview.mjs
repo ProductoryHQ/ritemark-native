@@ -6,7 +6,7 @@
 //
 // The bundle is loaded as-is (`media/office-preview.js`; during the spike, `webview.js` builds),
 // behind a stub `acquireVsCodeApi`, and receives the same `load` message the
-// DOCX editor provider sends. Pages are `section.docx` elements, captured at
+// DOCX editor provider sends. Pages are the viewer's `section.docx` elements (not the off-screen layout pass's), captured at
 // 1 CSS px = 1 image px, which matches `pdftoppm -r 96` of Word's PDF.
 //
 // Chromium: $CHROME_BIN, else Playwright's cached headless shell, else Google Chrome.
@@ -123,14 +123,14 @@ for (const docxArg of docxArgs) {
   let status = 'ok'
   let renderMs = null
   try {
-    await waitFor(`!!document.querySelector('section.docx') || /Failed to load|Unsupported|can’t be read|couldn’t draw|isn’t supported/.test(document.body.innerText)`, 120000)
+    await waitFor(`!!document.querySelector('.docx-sizer section.docx') || /Failed to load|Unsupported|can’t be read|couldn’t draw|isn’t supported/.test(document.body.innerText)`, 120000)
     renderMs = Date.now() - t0 // message posted -> first page or error on screen (100 ms polling)
     await sleep(500) // images and embedded fonts settle
   } catch (e) {
     status = 'timeout'
   }
   const info = await evaluate(`(() => {
-    const pages = [...document.querySelectorAll('section.docx')]
+    const pages = [...document.querySelectorAll('.docx-sizer section.docx')]
     const err = /(Failed to load|can’t be read|couldn’t draw|isn’t supported)[^\\n]*\\n?[^\\n]*/.exec(document.body.innerText)
     return { heights: pages.map((p) => Math.round(p.getBoundingClientRect().height)), widths: pages.map((p) => Math.round(p.getBoundingClientRect().width)), error: err ? err[0] : null, heap: performance.memory ? performance.memory.usedJSHeapSize : null }
   })()`)
@@ -140,7 +140,7 @@ for (const docxArg of docxArgs) {
   await sleep(200)
   for (let i = 0; i < info.heights.length; i++) {
     const rect = await evaluate(`(() => {
-      const p = document.querySelectorAll('section.docx')[${i}]
+      const p = document.querySelectorAll('.docx-sizer section.docx')[${i}]
       p.scrollIntoView({ block: 'start' })
       const r = p.getBoundingClientRect()
       return { x: r.left, y: r.top, width: r.width, height: r.height }
