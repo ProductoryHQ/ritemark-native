@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   renderCapabilityContext,
+  capabilityDescriptorFor,
   CLAUDE_DESCRIPTOR,
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
@@ -118,16 +119,27 @@ test('instructs honest fallback', () => {
   }
 });
 
-// ── R4/R6: browser hint reaches browser-capable runtimes, not ACP (S4.3) ────
-test('browser guidance is present for Claude and Codex, absent for ACP', () => {
-  assert.ok(/integrated browser/i.test(claude), 'Claude gets the browser hint');
-  assert.ok(/integrated browser/i.test(codex), 'Codex gets the browser hint (regression guard vs. Claude-only)');
-  assert.ok(!/integrated browser/i.test(acp), 'ACP (no browser tools) omits it');
-});
-
-test('a descriptor with hasBrowserTools:false omits the browser section', () => {
-  const noBrowserClaude = renderCapabilityContext({ ...CLAUDE_DESCRIPTOR, hasBrowserTools: false });
-  assert.ok(!/integrated browser/i.test(noBrowserClaude), 'browser section gated on hasBrowserTools');
+// ── R4/R6: browser hint follows the browser tools, for every runtime (S4.3) ──
+// OpenCode has been handed the browser tools (the `ritemark_browser` stdio MCP
+// adapter) since Sprint 79, but its descriptor said it had none, so its context
+// never mentioned them. Every runtime now takes the hint from the same flag that
+// hands it the tools — including the one that used to be left out.
+test('browser guidance appears exactly when a runtime has the browser tools', () => {
+  const runtimes = [
+    ['claude-code', 'Write/Edit'],
+    ['codex', 'apply_patch'],
+    ['opencode', 'file-writing tool'],
+  ] as const;
+  for (const [runtime, editTool] of runtimes) {
+    const withTools = renderCapabilityContext(capabilityDescriptorFor(runtime, true));
+    const withoutTools = renderCapabilityContext(capabilityDescriptorFor(runtime, false));
+    assert.ok(/integrated browser/i.test(withTools), `${runtime} with browser tools gets the hint`);
+    assert.ok(!/integrated browser/i.test(withoutTools), `${runtime} without browser tools omits it`);
+    assert.ok(
+      withTools.includes(editTool) && withoutTools.includes(editTool),
+      `${runtime} keeps its own edit-tool binding`,
+    );
+  }
 });
 
 // ── R7: per-runtime edit-tool binding, not per-capability content ────────────
@@ -173,14 +185,19 @@ test('tells agents their closing message becomes the comment reply', () => {
 });
 
 // ── R7: single-source structural property (S7.2) ────────────────────────────
-// Claude and Codex renders differ ONLY in the edit-tool name; every capability
-// section flows to both from one function, so a new section reaches all runtimes.
-test('Claude and Codex share every capability section (edit-tool aside)', () => {
-  const normalize = (t: string) => t.replace(/your Write\/Edit tools|apply_patch/g, 'EDIT_TOOL');
+// The three renders differ ONLY in the edit-tool name; every capability section
+// flows to all of them from one function, so a new section reaches all runtimes.
+test('every runtime shares every capability section (edit-tool aside)', () => {
+  const normalize = (t: string) => t.replace(/your Write\/Edit tools|apply_patch|your file-writing tool/g, 'EDIT_TOOL');
   assert.strictEqual(
-    normalize(claude),
     normalize(codex),
-    'Claude and Codex capability context is identical modulo the edit-tool binding',
+    normalize(claude),
+    'Codex capability context is identical to Claude\'s modulo the edit-tool binding',
+  );
+  assert.strictEqual(
+    normalize(acp),
+    normalize(claude),
+    'OpenCode capability context is identical to Claude\'s modulo the edit-tool binding',
   );
 });
 

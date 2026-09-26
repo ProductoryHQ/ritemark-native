@@ -20,6 +20,8 @@
  * editor-UI affordance the agent cannot trigger. The renderer states which.
  */
 
+import type { AgentId } from '../agent/types';
+
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
 export const CAPABILITY_CONTEXT_VERSION = 1;
 
@@ -45,8 +47,26 @@ export const CODEX_DESCRIPTOR: CapabilityDescriptor = {
 };
 export const ACP_DESCRIPTOR: CapabilityDescriptor = {
   editTool: 'your file-writing tool',
-  hasBrowserTools: false,
+  hasBrowserTools: true,
 };
+
+const DESCRIPTORS: Record<AgentId, CapabilityDescriptor> = {
+  'claude-code': CLAUDE_DESCRIPTOR,
+  codex: CODEX_DESCRIPTOR,
+  opencode: ACP_DESCRIPTOR,
+};
+
+/**
+ * The descriptor to render for one session. Browser guidance follows
+ * `browserToolsAvailable` the same way for every runtime: pass the same
+ * `browser-agent-control` check that gives the runtime its browser tools, so the
+ * hint appears exactly when the tools do. OpenCode has had the tools since
+ * Sprint 79 (the `ritemark_browser` stdio MCP adapter) yet was the one runtime
+ * whose hint did not follow them; routing all three through here keeps it so.
+ */
+export function capabilityDescriptorFor(runtime: AgentId, browserToolsAvailable: boolean): CapabilityDescriptor {
+  return { ...DESCRIPTORS[runtime], hasBrowserTools: browserToolsAvailable };
+}
 
 interface CapabilitySection {
   id: string;

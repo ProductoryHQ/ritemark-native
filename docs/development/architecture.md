@@ -487,17 +487,22 @@ from minting or copying one. A capability the agent is told about must be kept t
 the on-disk form changes — the sprint that changes a carrier owns this text.
 
 Each runtime delivers the same context through its own native mechanism — `UnifiedViewProvider` is
-the single injection point, rendering the per-runtime descriptor into `RuntimeSessionConfig.extraSystemPrompt`:
+the single injection point, rendering `capabilityDescriptorFor(runtime, browserToolsAvailable)` into
+`RuntimeSessionConfig.extraSystemPrompt`:
 
 | Runtime | Mechanism | Notes |
 |---|---|---|
 | Claude Code | `systemPrompt.append` (after the safety prefix) | `extraSystemPrompt` → `extraSystemPromptAppend` (`ClaudeCodeRuntime.ts`) |
 | Codex | `baseInstructions` (`buildCodexBaseInstructions`) | context IS the base; the legacy `CODEX_BASE_INSTRUCTIONS` survives only as a defensive fallback |
-| OpenCode / ACP | per-turn prompt prefix, **once per session** | ACP has no system-prompt concept; `buildAcpPromptText` prepends the context on the first turn only |
+| OpenCode / ACP | per-turn prompt prefix, **once per session** | ACP has no system-prompt concept; `buildAcpPromptText` prepends the context on the first turn only. Each `AcpSession` sends it once, so a conversation sends it again after a turn that did not complete (the sidebar disposes that session) and after a resume |
 
 This replaced a documented asymmetry where `extraSystemPrompt` was APPENDED by Claude but REPLACED
-Codex's base — so only Claude received the browser hint. The browser guidance is now included for any
-runtime whose integrated browser is actually available (`descriptor.hasBrowserTools`).
+Codex's base — so only Claude received the browser hint. Browser guidance now follows the browser
+tools for every runtime: `capabilityDescriptorFor` sets `hasBrowserTools` from the same
+`browser-agent-control` flag that injects them (Claude: in-process MCP server; Codex: dynamic tools;
+OpenCode: the `ritemark_browser` stdio MCP adapter on `session/new` and `session/resume`, whose tools
+the model sees as `ritemark_browser_browser_*`). OpenCode has had the tools since Sprint 79, but its
+descriptor said it had none until 2026-09 — Sprint 101's inventory missed the ACP adapter.
 
 ### AS IS (Sprints 1–78) — Three Parallel Worlds
 
@@ -1156,6 +1161,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-26 | Bugfix | **OpenCode is told about its browser tools.** OpenCode has received the six browser tools (the `ritemark_browser` stdio MCP adapter, on `session/new` and `session/resume`) since Sprint 79, but Sprint 101 gave `ACP_DESCRIPTOR` `hasBrowserTools: false` and the sidebar passed it without the `browser-agent-control` override Claude and Codex get, so its capability context never mentioned them. New pure `capabilityDescriptorFor(runtime, browserToolsAvailable)` in `capabilityContext.ts` is now the one descriptor choice for all three runtimes. Tests cover every runtime with the flag on and off, and the text `AcpSession.prompt()` actually sends OpenCode on its first and second turns. No flag, patch, protocol or shell-tier change. |
 | 2026-09-25 | Sprint 125 | **PowerPoint preview (v1.12.0, #285).** `docxEditorProvider.ts` and `docxDocument.ts` become `officePreview/officePreviewProvider.ts` and `officeDocument.ts`: one provider for Word and PowerPoint, configured per format. New `PPTXViewer` and `viewers/pptx/` (renderer 1.3.0, chart XML fixes, notes, deck search, windowed drawing). `officePackageCheck` now inflates every part with a cap, closing a declared-size bypass that also affected Word. `office-preview.js` 1.3 → 2.5 MB (ECharts); `webview.js` unchanged. New flag `powerpoint-preview`; a notices file ships with the Office bundle. |
 | 2026-09-24 | Sprint 124 | **Word preview fidelity and an Office preview bundle (v1.12.0, #284).** New `media/office-preview.js` (second Vite build, `webview/src/office/`); Word code and Mammoth leave `webview.js` (8.93 → 8.35 MB). docx-preview 0.3.7 → 0.4.1 behind a pre-render XML pass (`viewers/docx/`) and a host package check (`src/officePreview/officePackageCheck.ts`, `loadError` message). Shared `ViewerToolbar` for Word and PDF. Release tooling (hook, build-prod both platforms, staging, extension-update list, preflights, notarization check) knows the new bundle — shell-tier. `getWordProcessorAppName` replaced by the provider's Word → Pages → default resolution. |
 | 2026-09-23 | Sprint 123 | **Transcript search and a fitting tab row (v1.12.0, #283).** New webview-only `workbench/transcriptSearch.ts` (pure matching and highlight splitting, tested) and `TranscriptSearchBar`; the transcript pane became a column with the search row above the scroller (`transcriptColumn` / `transcriptSearch` layout classes). Follow playback gains a visible resume. The extension defaults `workbench.editor.tabSizing` to `shrink`. No host, protocol, flag, patch or shell-tier change. |
