@@ -149,8 +149,13 @@ reverse_later_patches_then_check_current() {
 
     (
         cd "$tmp_dir"
-        local later_patch
-        for later_patch in "${PATCHES[@]:$((current_index + 1))}"; do
+        # Unwind the later patches last-to-first, as a stack. A later patch can
+        # edit lines another later patch added (017 edits 016's launch-check
+        # lines, which edit 001's), and that one only reverses once the patch
+        # on top of it is gone.
+        local later_index later_patch
+        for (( later_index = ${#PATCHES[@]} - 1; later_index > current_index; later_index-- )); do
+            later_patch="${PATCHES[$later_index]}"
             if git apply --check --reverse "$later_patch" 2>/dev/null; then
                 git apply --reverse "$later_patch" 2>/dev/null
             fi
@@ -163,7 +168,17 @@ reverse_later_patches_then_check_current() {
     return "$result"
 }
 
-for patch_index in "${!PATCHES[@]}"; do
+# Apply and check first-to-last; remove last-to-first, for the same reason the
+# already-applied check above unwinds as a stack.
+PATCH_ORDER=("${!PATCHES[@]}")
+if [ "$REVERSE" = true ] && [ "$DRY_RUN" = false ]; then
+    PATCH_ORDER=()
+    for (( patch_index = ${#PATCHES[@]} - 1; patch_index >= 0; patch_index-- )); do
+        PATCH_ORDER+=("$patch_index")
+    done
+fi
+
+for patch_index in "${PATCH_ORDER[@]}"; do
     patch="${PATCHES[$patch_index]}"
     PATCH_NAME=$(basename "$patch")
 
