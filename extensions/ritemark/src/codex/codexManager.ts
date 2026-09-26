@@ -571,10 +571,13 @@ export class CodexManager {
     machineArch: string
   ): string[] {
     const diagnostics: string[] = [];
+    // The bundled runtime is a native binary. Node.js versions and
+    // architectures only matter for an npm install, which runs on one.
+    const bundled = binaryPath !== null && isBundledAgentRuntimePath(binaryPath);
 
     if (binaryPath) {
       diagnostics.push(`Binary: ${binaryPath}`);
-      if (isBundledAgentRuntimePath(binaryPath)) {
+      if (bundled) {
         diagnostics.push('Runtime source: bundled with Ritemark');
       }
     }
@@ -584,11 +587,15 @@ export class CodexManager {
     }
 
     if (installNodeArch) {
-      diagnostics.push(`Global install Node architecture: ${installNodeArch}`);
+      diagnostics.push(bundled
+        ? `Binary architecture: ${installNodeArch}`
+        : `Global install Node architecture: ${installNodeArch}`);
     }
 
-    diagnostics.push(`Ritemark is running with Node v${runtimeNodeVersion}`);
-    diagnostics.push(`Ritemark runtime Node architecture: ${runtimeNodeArch}`);
+    if (!bundled) {
+      diagnostics.push(`Ritemark is running with Node v${runtimeNodeVersion}`);
+      diagnostics.push(`Ritemark runtime Node architecture: ${runtimeNodeArch}`);
+    }
 
     if (machineArch !== runtimeNodeArch) {
       diagnostics.push(`Machine architecture is ${machineArch}, but Ritemark runtime Node is ${runtimeNodeArch}`);
@@ -598,7 +605,7 @@ export class CodexManager {
       diagnostics.push(`Node mismatch detected: CLI install is under v${installNodeVersion}, but Ritemark is running v${runtimeNodeVersion}`);
     }
 
-    if (machineArch === 'arm64' && installNodeArch === 'x86_64') {
+    if (!bundled && machineArch === 'arm64' && installNodeArch === 'x86_64') {
       diagnostics.push('Rosetta/x64 Node install detected. This can install the wrong Codex binary on Apple Silicon.');
     }
 
@@ -704,7 +711,9 @@ export class CodexManager {
     const target = nodeBinary ?? binaryPath;
 
     try {
-      const result = spawnSync('/usr/bin/file', [target], {
+      // -b: leave the path out of the output, so a path such as
+      // binaries/agents/darwin-arm64/ cannot read as the architecture.
+      const result = spawnSync('/usr/bin/file', ['-b', target], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       });

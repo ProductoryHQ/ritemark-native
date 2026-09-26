@@ -166,6 +166,8 @@ async function testRuntimeSourcePolicy() {
     assert.strictEqual(status.runnable, false);
     assert.strictEqual(status.repairCommand, null, 'the bundled runtime has no repair command');
     assert.ok(status.error?.includes('Reinstall Ritemark'), `should advise reinstalling Ritemark, got: ${status.error}`);
+    // A native binary: no npm-install Node.js diagnostics.
+    assert.ok(!status.diagnostics.some(line => /Global install|Node v/.test(line)), `got: ${status.diagnostics.join(' | ')}`);
   }
 
   // A system install that cannot start keeps its npm repair command.
@@ -176,6 +178,7 @@ async function testRuntimeSourcePolicy() {
     assert.strictEqual(status.runnable, false);
     assert.ok(status.repairCommand?.includes('npm install -g @openai/codex'), `got: ${status.repairCommand}`);
     assert.ok(!status.error?.includes('Reinstall Ritemark'), `a system install is not restored by reinstalling Ritemark, got: ${status.error}`);
+    assert.ok(status.diagnostics.some(line => line.startsWith('Ritemark is running with Node v')), `got: ${status.diagnostics.join(' | ')}`);
   }
 }
 
