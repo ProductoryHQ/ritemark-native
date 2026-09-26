@@ -7,6 +7,12 @@
  * broken embedded font faces dropped) with Office-only fonts aliased. It says
  * what it cannot show, and always offers to open the file elsewhere.
  * Evidence: docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/.
+ *
+ * v1.12.0 RC fix: a document without Word's page markers (one any other
+ * program wrote) is laid out into pages here — drawn off screen, measured, and
+ * drawn again with page breaks (docx/pagination.ts). Pictures set against the
+ * page, symbol-font bullets, missing page setup and bordered list paragraphs
+ * are drawn as Word draws them.
  */
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
@@ -18,10 +24,25 @@ import { matchCountLabel, stepMatch } from '../../utils/textSearch'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { describeUnsupported } from './docx/docxXml'
+import { describeUnsupported, paperForLocale } from './docx/docxXml'
 import { installOfficeFontAliases } from './docx/officeFonts'
+import { planPageBreaks } from './docx/pagination'
 import { prepareDocx } from './docx/prepareDocx'
-import { fillPageNumbers, renderedPages, textChunks } from './docx/renderedDocx'
+import {
+  alignListMarkers,
+  alignParagraphFonts,
+  fillPageNumbers,
+  justifySplitParagraphs,
+  measureAutoTables,
+  measureOverfullPages,
+  positionPageAnchors,
+  removeCarrierParagraphs,
+  renderedPages,
+  textChunks,
+  tidyParagraphBorders,
+  trimPageEndSpacing,
+  weightEmbeddedFonts,
+} from './docx/renderedDocx'
 import { findDocumentMatches } from './documentSearch'
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import {
@@ -93,6 +114,35 @@ function renderFailure(error: unknown): DocxLoadError {
   }
   return { title: 'Ritemark couldn’t draw this document', detail: message }
 }
+
+/**
+ * v1.12.0 RC fix: an off-screen place to draw the document and measure it
+ * before it is shown (the viewer itself is hidden while loading). It carries
+ * the preview's CSS scope, so lines break exactly as they will on screen.
+ */
+function createLayoutHost(hyphenate: boolean): { host: HTMLDivElement; target: HTMLDivElement } {
+  const host = document.createElement('div')
+  host.className = `ritemark-docx${hyphenate ? ' docx-hyphenate' : ''}`
+  host.setAttribute('aria-hidden', 'true')
+  Object.assign(host.style, { position: 'fixed', left: '-100000px', top: '0', visibility: 'hidden', pointerEvents: 'none' })
+  const target = document.createElement('div')
+  target.className = 'docx-stage'
+  host.appendChild(target)
+  document.body.appendChild(host)
+  return { host, target }
+}
+
+/** Lay the drawing out and wait for its fonts, so measurements are final. */
+async function settle(el: HTMLElement): Promise<void> {
+  void el.offsetHeight
+  await document.fonts.ready
+}
+
+// A document without Word's page markers is drawn, measured and drawn again
+// with page breaks; one more round catches pages that footnotes or a taller
+// header still overfill.
+const LAYOUT_ROUNDS = 2
+const WORD_PAGE_SLACK = 0.1
 
 function highlightsSupported(): boolean {
   return typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined'
@@ -189,17 +239,56 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     }, SLOW_RENDER_MS)
 
     void (async () => {
+      let layout: HTMLDivElement | null = null
       try {
         installOfficeFontAliases()
-        const prepared = await prepareDocx(decodeBase64ToBytes(content))
-        if (cancelled) return
-        stage.innerHTML = ''
-        styles.innerHTML = ''
-        await renderAsync(prepared.data, stage, styles, {
-          ...RENDER_OPTIONS,
-          ignoreLastRenderedPageBreak: !prepared.honourPageMarkers,
+        const prepared = await prepareDocx(decodeBase64ToBytes(content), {
+          paper: paperForLocale(typeof navigator !== 'undefined' ? navigator.language : undefined),
         })
         if (cancelled) return
+        const { host, target } = createLayoutHost(prepared.autoHyphenation)
+        layout = host
+        const draw = async (data: Uint8Array) => {
+          target.innerHTML = ''
+          styles.innerHTML = ''
+          await renderAsync(data, target, styles, {
+            ...RENDER_OPTIONS,
+            ignoreLastRenderedPageBreak: !prepared.honourPageMarkers,
+          })
+          weightEmbeddedFonts(styles, prepared.variableFonts)
+          // The paragraphs that carried a break before a table have done their
+          // job once drawn; measured with them, every such page runs a point long.
+          removeCarrierParagraphs(target)
+          // Paragraph fonts, list markers and border spacing change where lines break: before measuring.
+          alignParagraphFonts(target)
+          alignListMarkers(target)
+          tidyParagraphBorders(target, prepared.markers)
+          await settle(target)
+        }
+        await draw(prepared.data)
+        if (cancelled) return
+        if (prepared.markers.size) {
+          // Tables keep the columns of the first drawing in every part a page break makes.
+          const tableWidths = measureAutoTables(target, prepared.markers)
+          // Word's own pages may run a little long in other fonts; only a page
+          // they can't break at all (a table over several pages) is laid out here.
+          const slack = prepared.honourPageMarkers ? WORD_PAGE_SLACK : 0
+          const breaks = new Set<string>()
+          for (let round = 0; round < LAYOUT_ROUNDS; round++) {
+            const planned = planPageBreaks(measureOverfullPages(target, prepared.markers, round > 0, slack))
+            const added = planned.filter((marker) => !breaks.has(marker))
+            if (!added.length) break
+            for (const marker of added) breaks.add(marker)
+            await draw(await prepared.withPageBreaks(breaks, tableWidths))
+            if (cancelled) return
+          }
+        }
+        removeCarrierParagraphs(target)
+        positionPageAnchors(target, prepared.anchors)
+        justifySplitParagraphs(target)
+        trimPageEndSpacing(target)
+        stage.innerHTML = ''
+        stage.append(...Array.from(target.childNodes))
         setPageCount(fillPageNumbers(stage))
         setUnsupportedNote(describeUnsupported(prepared.unsupported))
         setHyphenate(prepared.autoHyphenation)
@@ -211,6 +300,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         setRenderError(renderFailure(e))
         setPhase('error')
       } finally {
+        layout?.remove()
         clearTimeout(slowTimer)
         if (!cancelled) setSlow(false)
       }
