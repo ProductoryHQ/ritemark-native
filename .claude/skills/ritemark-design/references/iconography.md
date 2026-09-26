@@ -9,7 +9,7 @@ Ritemark uses **Phosphor Icons** and only Phosphor Icons. Weight 400 (regular), 
 
 ## Library
 
--   Extension / VS Code patches: Phosphor web font.
+-   Extension / VS Code patches: Phosphor web font. The product icon theme (`extensions/ritemark/producticons/ritemark-product-icon-theme.json`) declares weight 400 as `"weight": "normal"`, never `400`: VS Code's parser accepts only `normal`, `bold`, `lighter` or `bolder` there (its numeric pattern `\d{0-1000}` matches no real number), so `400` as a number or a string is ignored and logs "Invalid font weight" on every launch.
     
 -   Webview (React): `@phosphor-icons/react` via `extensions/ritemark/webview/src/components/ui/Icon.tsx`.
     
