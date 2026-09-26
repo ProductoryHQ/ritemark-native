@@ -40,6 +40,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
+import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { AcpRuntime, AcpSession, buildAcpPromptText } = require('./AcpRuntime') as typeof import('./AcpRuntime');
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
@@ -492,19 +493,35 @@ async function run() {
     console.log('✓ Test 9: buildAcpPromptText — context prefix, order, image count');
   }
 
-  // ── Test 10: capability context injected ONCE per session ──
+  // ── Test 10: capability context reaches OpenCode on the first turn only ──
+  // Drives prompt() and captures what OpenCode is actually sent. The previous
+  // version re-implemented the injected-flag ternary instead of calling
+  // prompt(), so it could not catch a regression in the real path. The context
+  // is the real OpenCode render with browser tools on, because AcpRuntime hands
+  // OpenCode the browser tools whenever `browser-agent-control` is on.
   {
-    const session = new AcpSession('conv-once', 'ses-1', {
-      ...dummyConfig,
-      extraSystemPrompt: 'RITEMARK CONTEXT once',
-    } as RuntimeSessionConfig, {} as AcpRuntime);
-    // First turn: the flag was false → context is what buildAcpPromptText receives.
-    const firstCtx = (session as any)._capabilityContextInjected ? undefined : session.config.extraSystemPrompt;
-    assert.strictEqual(firstCtx, 'RITEMARK CONTEXT once', 'first turn would inject the context');
-    (session as any)._capabilityContextInjected = true;
-    const secondCtx = (session as any)._capabilityContextInjected ? undefined : session.config.extraSystemPrompt;
-    assert.strictEqual(secondCtx, undefined, 'second turn injects nothing (once per session)');
-    console.log('✓ Test 10: capability context is once-per-session');
+    const runtime = new AcpRuntime();
+    const context = renderCapabilityContext(capabilityDescriptorFor('opencode', true));
+    const session = addSession(runtime, 'conv-once', { ...dummyConfig, extraSystemPrompt: context });
+    const sent: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = {
+      ...mockManager,
+      prompt: async (_sessionId: string, text: string) => {
+        sent.push(text);
+        return { stopReason: 'end_turn' };
+      },
+    };
+
+    await session.prompt({ prompt: 'open the release notes', activeFile: { path: 'notes.md' } });
+    await session.prompt({ prompt: 'now the next page' });
+
+    assert.strictEqual(sent.length, 2, 'both turns reach OpenCode');
+    assert.ok(sent[0].startsWith(context), 'the first turn leads with the capability context');
+    assert.ok(sent[0].includes('INTEGRATED BROWSER'), 'OpenCode is told about the browser tools it has');
+    assert.ok(sent[0].trimEnd().endsWith('open the release notes'), "the user's prompt stays last");
+    assert.strictEqual(sent[1], 'now the next page', 'the second turn carries no context (once per session)');
+    console.log('✓ Test 10: capability context, browser hint included, reaches OpenCode once per session');
   }
 
   // First provider progress/tool/final evidence advances dispatch exactly once.
