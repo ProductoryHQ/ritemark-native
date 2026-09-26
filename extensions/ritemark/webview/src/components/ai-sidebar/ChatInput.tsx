@@ -5,7 +5,9 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
+import { Tooltip } from '../ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -1136,13 +1138,18 @@ export function ChatInput() {
                 <span className="truncate max-w-[140px]" title={activeFilePath!}>
                   Active: {getDisplayPath(activeFilePath!)}
                 </span>
-                <button
-                  onClick={() => setHideActiveFile(true)}
-                  className="shrink-0 rounded hover:text-[var(--r-error)]"
-                  title="Remove from context"
-                >
-                  <Icon name="x" size={12} />
-                </button>
+                <Tooltip label="Remove from this message">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                    aria-label="Remove active file from this message"
+                    onClick={() => setHideActiveFile(true)}
+                  >
+                    <Icon name="x" size={12} />
+                  </Button>
+                </Tooltip>
               </div>
             )}
             {showBrowserContextChip && (
@@ -1159,13 +1166,18 @@ export function ChatInput() {
                         title={`Browser screenshot — ${currentBrowserContext.title || currentBrowserContext.url}`}
                       />
                     </div>
-                    <button
-                      onClick={() => setHideBrowserContext(true)}
-                      className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
-                      title="Remove browser screenshot from this turn"
-                    >
-                      <Icon name="x" size={12} />
-                    </button>
+                    <Tooltip label="Remove from this message">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="absolute top-0 right-0 size-4 rounded-[0_0_0_0.25rem] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-0 text-[var(--r-ink-body)] shadow-sm opacity-95 hover:bg-[var(--r-surface)] group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
+                        aria-label="Remove browser screenshot from this message"
+                        onClick={() => setHideBrowserContext(true)}
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </Tooltip>
                   </div>
                 )
                 : (
@@ -1176,13 +1188,18 @@ export function ChatInput() {
                       Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
                       {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
                     </span>
-                    <button
-                      onClick={() => setHideBrowserContext(true)}
-                      className="shrink-0 rounded hover:text-[var(--r-error)]"
-                      title="Remove browser context from this turn"
-                    >
-                      <Icon name="x" size={12} />
-                    </button>
+                    <Tooltip label="Remove from this message">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                        aria-label="Remove browser context from this message"
+                        onClick={() => setHideBrowserContext(true)}
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </Tooltip>
                   </div>
                 )
             )}
@@ -1195,13 +1212,18 @@ export function ChatInput() {
                 <span className="truncate max-w-[140px]" title={chip.path}>
                   {getDisplayPath(chip.path)}
                 </span>
-                <button
-                  onClick={() => removePathChip(chip.id)}
-                  className="shrink-0 rounded hover:text-[var(--r-error)]"
-                  title="Remove"
-                >
-                  <Icon name="x" size={12} />
-                </button>
+                <Tooltip label="Remove from this message">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                    aria-label={`Remove ${getDisplayPath(chip.path)} from this message`}
+                    onClick={() => removePathChip(chip.id)}
+                  >
+                    <Icon name="x" size={12} />
+                  </Button>
+                </Tooltip>
               </div>
             ))}
             {pinnedAgent && (() => {
@@ -1211,13 +1233,18 @@ export function ChatInput() {
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]">
                   <Icon name="robot" size={12} className="shrink-0" />
                   <span>{displayName}</span>
-                  <button
-                    onClick={() => setPinnedAgent(null)}
-                    className="shrink-0 rounded hover:opacity-70"
-                    title="Remove agent"
-                  >
-                    <Icon name="x" size={12} />
-                  </button>
+                  <Tooltip label="Remove from this message">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:opacity-70"
+                      aria-label={`Remove ${displayName} from this message`}
+                      onClick={() => setPinnedAgent(null)}
+                    >
+                      <Icon name="x" size={12} />
+                    </Button>
+                  </Tooltip>
                 </div>
               );
             })()}
