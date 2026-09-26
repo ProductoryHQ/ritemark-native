@@ -885,9 +885,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // Mirrors src/runtime/capabilities.ts until the first agent:config arrives.
     runtimeCapabilities: {
-      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog' },
-      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog' },
-      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live' },
+      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true },
+      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true },
+      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false },
     },
     composerThinkingEffortEnabled: true,
     thinkingEffortCapabilities: {},

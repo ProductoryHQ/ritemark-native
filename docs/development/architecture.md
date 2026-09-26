@@ -618,7 +618,7 @@ Sent as `approvalMode` + `planFirst` on `agent-execute`; the webview derives bot
 | **Manual (ask)** | SDK `default` + mutating tools gated via `canUseTool` | `approvalPolicy: untrusted` + `sandbox: read-only` | native `request_permission` prompt |
 | **Plan on** | SDK native `permissionMode: 'plan'` (enforced read-only) + `planModeInstructions`; `ExitPlanMode` → plan card; approve → `updatedPermissions setMode` to the autonomy mode, same turn continues | `collaborationMode: plan` on a **read-only sandbox** thread; approval sends the continuation turn on a write-sandbox thread | **not offered** — no enforceable plan contract (capability-gated) |
 
-Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks.
+Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`, `thinkingEffortSource`, `browserContext`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks. `browserContext` gates both the host's per-turn browser-context injection and the Composer's browser chip; the chip also requires the tab's "Share with Agent?" consent, so it shows exactly what the host sends.
 
 Mechanics & constraints:
 - `allowedTools` in the Claude SDK means *auto-allowed without prompting* and auto-allowed tools NEVER reach `canUseTool` — mutating tools **and `ExitPlanMode`** must be excluded from it (audit F7; only `AskUserQuestion` is documented as always prompting).

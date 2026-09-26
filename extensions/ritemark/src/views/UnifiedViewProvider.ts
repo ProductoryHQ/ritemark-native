@@ -711,9 +711,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
 
           // Browser context (page summary + screenshot). Consent-gated inside
-          // buildTurnContext() — returns null unless the user shared a tab. Only
-          // Claude Code + Codex received this pre-Sprint-79 (ACP did not).
-          if (browserEnabled && !skipBrowserContext && (isClaudeCode || isCodex)) {
+          // buildTurnContext() — returns null unless the user shared a tab.
+          // Runtimes opt in through the capability map (Claude Code + Codex;
+          // ACP never received it). Reading a shared page is not part of the
+          // macOS-only AI Browser Control flag, which gates only the browser
+          // tools below: Sprint 79 had put it behind that flag, and Windows
+          // stopped receiving shared pages.
+          if (!skipBrowserContext && capabilitiesFor(agentId as import('../agent/types').AgentId).browserContext) {
             const browserContext = await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
             if (browserContext) {
               prompt = `${browserContext.promptBlock}\n\n---\n\n${prompt}`;

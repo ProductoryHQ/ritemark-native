@@ -25,7 +25,7 @@ import {
   useAIInformationDisclosure,
 } from './AIInformation';
 import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
-import { resolveAIIdentity } from './aiDisclosure';
+import { includesBrowserContext, resolveAIIdentity } from './aiDisclosure';
 import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
@@ -865,10 +865,15 @@ export function ChatInput() {
   // Don't show if: no active file, user dismissed it, or it's already in manual path chips
   const showActiveFileChip = activeFilePath && !hideActiveFile &&
     !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
-  // Browser context is currently injected for Claude Code and Codex only.
-  // Hiding the chip for OpenCode prevents the composer and disclosure from
-  // implying that ACP receives context the host deliberately does not send.
-  const showBrowserContextChip = !isOpenCode && currentBrowserContext?.url && !hideBrowserContext;
+  // The chip — and the disclosure's browser row — show only when the host will
+  // send the page: the runtime takes browser context (capability map) and the
+  // person allowed "Share with Agent?" for this tab. A declined tab shows
+  // nothing; the host polls every tab, shared or not, so this check is ours.
+  const showBrowserContextChip = includesBrowserContext({
+    context: currentBrowserContext,
+    runtimeTakesBrowserContext: runtimeCapabilities[pendingRuntime.runtimeId]?.browserContext === true,
+    removedForTurn: hideBrowserContext,
+  });
 
   // Sprint 122 (#282): until the person sizes it, the composer fits its text —
   // up to 8 lines or 40% of the window, where it used to stop at 120 px. Its
@@ -1597,7 +1602,7 @@ export function ChatInput() {
           hasActiveFile: Boolean(activeFilePath && !hideActiveFile),
           hasSelection: hasSelectedContext,
           attachmentCount,
-          hasBrowserContext: Boolean(showBrowserContextChip),
+          hasBrowserContext: showBrowserContextChip,
           hasConversationContext: agentConversation.length > 0 || codexConversation.length > 0,
         }}
         open={aiInformation.open}
