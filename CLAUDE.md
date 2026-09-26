@@ -81,7 +81,7 @@ Branch name matches the sprint directory under `docs/development/sprints/`. Veri
 
 ## Release Tiers (Sprint 93)
 
-A change is **shell-tier** if it touches any of these paths (`vscode` is the submodule pointer) — everything else is **extension-tier** (default):
+A change is **shell-tier** if it touches a path that starts with one of these entries (`vscode` is the submodule pointer) — everything else is **extension-tier** (default):
 
 ```
 patches/

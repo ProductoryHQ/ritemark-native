@@ -114,14 +114,22 @@ if [[ -z "$REF" ]]; then
 fi
 
 if git rev-parse --verify "$REF" >/dev/null 2>&1; then
-  CHANGED_FILES=$(git diff --name-only "$REF"..HEAD)
+  # An entry matches a changed path that STARTS with it: a file, a folder
+  # (trailing /) or a filename prefix (.github/workflows/build-). A substring
+  # match used to flag any path merely containing an entry, such as `vscode` in
+  # extensions/ritemark/src/googleDocs/vscodeGoogleDocs.ts. --no-renames lists a
+  # shell-tier file that moved away under its old path too; quotepath=off keeps
+  # non-ASCII paths unquoted so they compare as written.
+  CHANGED_FILES=$(git -c core.quotepath=off diff --name-only --no-renames "$REF"..HEAD)
   TIER_VIOLATION=""
-  for path in "${SHELL_TIER_PATHS[@]}"; do
-    MATCH=$(echo "$CHANGED_FILES" | grep -F "$path" || true)
-    if [[ -n "$MATCH" ]]; then
-      TIER_VIOLATION="${TIER_VIOLATION}${MATCH}\n"
-    fi
-  done
+  while IFS= read -r file; do
+    for entry in "${SHELL_TIER_PATHS[@]}"; do
+      if [[ "$file" == "$entry"* ]]; then
+        TIER_VIOLATION="${TIER_VIOLATION}${file}\n"
+        break
+      fi
+    done
+  done <<< "$CHANGED_FILES"
   if [[ -n "$TIER_VIOLATION" ]]; then
     fail "shell-tier path(s) changed since $REF — this must ship as a shell release, not an extension release:"
     echo -e "$TIER_VIOLATION" | sed '/^$/d' | sed 's/^/  /'
