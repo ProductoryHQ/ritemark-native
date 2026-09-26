@@ -3,12 +3,15 @@
 # release-extension.sh - One-command extension-only release
 #
 # Runs release-extension-preflight.sh first (clean tree, release-tier guard,
-# engines.vscode check, compile-clean, webview-bundle-freshness), then
-# generates update-manifest.json and prepares files for an extension-only
-# GitHub release. Does NOT modify the app bundle.
+# engines.vscode check, compile-clean, webview-bundle-freshness, unshipped
+# changes), then generates update-manifest.json and prepares files for an
+# extension-only GitHub release. Does NOT modify the app bundle.
 #
 # Usage:
-#   ./scripts/release-extension.sh <version> [--channel canary|stable] [--skip-preflight]
+#   ./scripts/release-extension.sh <version> [--channel canary|stable] [--skip-preflight] [--allow-unshipped]
+#
+# --allow-unshipped is passed to the preflight: release without the changes it
+# lists as unable to reach users in an extension release (only with Jarmo's OK).
 #
 # Example:
 #   ./scripts/release-extension.sh 1.8.2-ext.1
@@ -32,10 +35,14 @@ SKIP_PREFLIGHT=false
 # the public feed once Jarmo has verified it. `--channel stable` exists as an
 # escape hatch, not as the normal path.
 CHANNEL="canary"
+ALLOW_UNSHIPPED_FLAG=""
 PREV_ARG=""
 for arg in "$@"; do
   if [ "$arg" == "--skip-preflight" ]; then
     SKIP_PREFLIGHT=true
+  fi
+  if [ "$arg" == "--allow-unshipped" ]; then
+    ALLOW_UNSHIPPED_FLAG="--allow-unshipped"
   fi
   if [ "$PREV_ARG" == "--channel" ]; then
     CHANNEL="$arg"
@@ -50,7 +57,8 @@ fi
 
 if [ "$SKIP_PREFLIGHT" = false ]; then
   echo "Running preflight checks..."
-  if ! "$SCRIPT_DIR_EARLY/release-extension-preflight.sh"; then
+  # Unquoted on purpose: an empty flag must expand to no argument at all.
+  if ! "$SCRIPT_DIR_EARLY/release-extension-preflight.sh" $ALLOW_UNSHIPPED_FLAG; then
     echo "Preflight failed — aborting release. Fix the errors above, or pass --skip-preflight to bypass (not recommended)."
     exit 1
   fi
@@ -186,6 +194,11 @@ EOF
 # .js.map sourcemaps under out/ are intentionally NOT shipped (internal-dev
 # artifacts, not needed by end users); media/webview.js.map is the one
 # pre-existing exception, kept as-is to match today's shipped behavior.
+#
+# Nothing outside this list reaches users: the installer lays these files over
+# the app's bundled extension. The preflight's unshipped-changes check keeps the
+# same list (SHIPPED_FILES in scripts/list-unshipped-extension-changes.mjs), and
+# scripts/list-unshipped-extension-changes.test.mjs fails if the two differ.
 FILES=$(find "$EXTENSION_DIR/out" -type f -name '*.js' -not -name '*.map' | sed "s|^$EXTENSION_DIR/||" | sort)
 FILES="$FILES
 media/webview.js
@@ -356,6 +369,11 @@ echo ""
 echo "Files ready for upload in: $OUTPUT_DIR/upload/"
 ls -la "$OUTPUT_DIR/upload/" | head -20
 echo ""
+if [ -n "$ALLOW_UNSHIPPED_FLAG" ]; then
+  echo -e "${YELLOW}Built with --allow-unshipped: the changes the preflight listed at the top are NOT in this release.${NC}"
+  echo -e "${YELLOW}They ship with the next shell release. Name them in the release report to Jarmo.${NC}"
+  echo ""
+fi
 echo "Next steps (publication is MANUAL and gated on Jarmo's approval phrase):"
 echo "  1. Create the GitHub release as a PRERELEASE — this is what keeps the public"
 echo "     'latest' feed untouched (prereleases are excluded from /releases/latest)."
