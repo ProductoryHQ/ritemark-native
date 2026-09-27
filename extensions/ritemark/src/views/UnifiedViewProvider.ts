@@ -1299,11 +1299,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // ── Onboarding wizard messages ──
 
         case 'onboarding:install-git':
-          installGit(checkWingetAvailable());
+          installGit(await checkWingetAvailable());
           break;
 
         case 'onboarding:install-node':
-          installNode(checkWingetAvailable());
+          installNode(await checkWingetAvailable());
           break;
 
         case 'onboarding:install-claude':
