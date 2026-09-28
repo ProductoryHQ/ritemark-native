@@ -7,6 +7,7 @@ import {
   AI_DISCLOSURE_STORAGE_KEY,
   acknowledgeFirstUseDisclosure,
   buildDisclosureContextRows,
+  includesBrowserContext,
   resolveAIIdentity,
   shouldShowFirstUseDisclosure,
   type DisclosureStorage,
@@ -114,6 +115,36 @@ function testContextState() {
   assert.equal(rows.find((row) => row.id === 'tool-results')?.activeNow, false);
 }
 
+function testBrowserContextFollowsShareConsent() {
+  const tab = { url: 'https://example.com/pricing', sharedWithAgent: true };
+  const included = (overrides: Partial<Parameters<typeof includesBrowserContext>[0]>) => includesBrowserContext({
+    context: tab,
+    runtimeTakesBrowserContext: true,
+    removedForTurn: false,
+    ...overrides,
+  });
+
+  assert.equal(included({}), true, 'a shared tab goes with the turn');
+  assert.equal(
+    included({ context: { ...tab, sharedWithAgent: false } }),
+    false,
+    'a tab declined in "Share with Agent?" (or still waiting for an answer) shows no chip',
+  );
+  assert.equal(
+    included({ context: { url: tab.url } }),
+    false,
+    'a tab without a share answer is not shared',
+  );
+  assert.equal(included({ context: null }), false, 'no browser tab, no chip');
+  assert.equal(included({ context: { url: '', sharedWithAgent: true } }), false, 'a tab without a URL is not sent');
+  assert.equal(
+    included({ runtimeTakesBrowserContext: false }),
+    false,
+    'a runtime that is never sent browser context (OpenCode) shows no chip',
+  );
+  assert.equal(included({ removedForTurn: true }), false, 'the × removes the page from this turn');
+}
+
 function main() {
   testFirstUseDisclosureState();
   testClaudeIdentity();
@@ -121,6 +152,7 @@ function main() {
   testRuntimeSwitchIgnoresStalePendingModel();
   testOpenCodeIdentity();
   testContextState();
+  testBrowserContextFollowsShareConsent();
   console.log('AI disclosure tests passed.');
 }
 

@@ -47,16 +47,16 @@ When a browser tab is active and the AI sidebar is open, the AI can read the pag
 
 ### Consent
 
-The first time per session that you ask a question with a browser tab in context, Ritemark shows a **"Share with Agent?"** prompt.
+When a browser tab becomes the active tab while the AI sidebar is open, Ritemark asks **"Share with Agent?"** for that tab.
 
 - **Allow** — page URL, title, and a compact ARIA outline (headings, buttons, links, form labels, visible text) flow to the AI on every turn while the tab is shared.
-- **Decline** — nothing about the page reaches the AI: not the URL, not the title, not the DOM.
+- **Deny** — nothing about the page reaches the AI: not the URL, not the title, not the DOM.
 
 Check **Don't ask again** to skip the prompt for future tabs in the same session.
 
 ### The browser chip
 
-When a browser tab is sharing context with the AI, a chip appears in the chat composer:
+The chip in the chat composer shows what goes with your next message, so it appears only while the active tab is shared with the AI. A tab you denied — or one whose prompt is still waiting for your answer — shows no chip. OpenCode never receives browser context, so no chip appears while an OpenCode model is selected.
 
 - **Gray URL chip** — the AI receives the page's text summary (ARIA outline, ~12k characters).
 - **Screenshot thumbnail chip** *(v1.7.3)* — when annotation mode is on, the composer shows a live screenshot thumbnail of the page (the same 56×56 format as a pasted image) in place of the URL chip. It previews exactly the screenshot the AI will receive and refreshes automatically as you scroll or interact with the page (≈5 s).

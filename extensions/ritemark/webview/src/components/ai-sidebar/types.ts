@@ -30,6 +30,7 @@ export interface RuntimeCapabilityFlags {
   liveModeSwitch: boolean;
   structuredPlanSteps: boolean;
   thinkingEffortSource: 'model-catalog' | 'runtime-live';
+  browserContext: boolean;
 }
 
 export interface AgentInfo {

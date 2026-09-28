@@ -39,6 +39,15 @@ export interface DisclosureContextInput {
   hasConversationContext: boolean;
 }
 
+export interface BrowserContextInclusionInput {
+  /** The active integrated-browser tab as the host last reported it. */
+  context: { url?: string; sharedWithAgent?: boolean } | null;
+  /** The selected runtime's `browserContext` capability. */
+  runtimeTakesBrowserContext: boolean;
+  /** The person removed the browser chip (×) for this turn. */
+  removedForTurn: boolean;
+}
+
 export interface DisclosureContextRow {
   id: 'prompt' | 'active-file' | 'selection' | 'attachments' | 'browser' | 'tool-results';
   label: string;
@@ -143,6 +152,21 @@ export function resolveAIIdentity(input: ResolveAIIdentityInput): AIIdentity {
     modelLabel: modelLabel(input.claudeModels, modelId, true),
     providerInformationUrl: PROVIDERS.anthropic.informationUrl,
   };
+}
+
+/**
+ * Whether the next turn carries the active browser tab — the one answer behind
+ * the Composer's browser chip and the "Shared browser context" row. It follows
+ * the host's send gate: a runtime that takes browser context, a tab the person
+ * allowed in "Share with Agent?", and not removed for this turn. A declined or
+ * still-pending tab shows nothing, because a chip means "this goes with your
+ * message" — the host sends nothing about a page that is not shared.
+ */
+export function includesBrowserContext(input: BrowserContextInclusionInput): boolean {
+  return input.runtimeTakesBrowserContext
+    && !input.removedForTurn
+    && Boolean(input.context?.url)
+    && input.context?.sharedWithAgent === true;
 }
 
 /**
