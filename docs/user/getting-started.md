@@ -24,7 +24,7 @@ Get Ritemark from GitHub:
 2. Eject the disk image
 3. Open Ritemark from Applications
 
-Ritemark is signed and notarized by Apple. The first time you open it, macOS asks whether you want to open an app downloaded from the internet. Click **Open**.
+Ritemark is signed with its Developer ID and notarized by Apple. The first time you open it, macOS asks whether you want to open an app downloaded from the internet. Click **Open**.
 
 **Windows:** run `Ritemark-Setup.exe` and follow the installer. Ritemark then appears in the Start menu.
 
