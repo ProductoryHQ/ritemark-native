@@ -159,6 +159,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * request waits for `sidebar/ready` instead of being fired blindly.
    */
   private _pendingOpenReport = false;
+  /**
+   * Set once the CURRENT webview instance has signalled `sidebar/ready`.
+   * `_view` existing only means a view object was created — its page may
+   * still be loading, so `openReportWindow` must not post to it directly
+   * until this is true (#317), the same race `_pendingOpenReport` already
+   * guards against when there is no view object at all.
+   */
+  private _sidebarReady = false;
   private _hydratedViewGeneration = 0;
   private _legacySidebarViewGeneration = 0;
   private readonly _sidebarStatusRevisions: Record<AgentId | 'discovery', number> = {
@@ -284,6 +292,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
+    this._sidebarReady = false;
     const viewGeneration = ++this._viewGeneration;
     this._legacySidebarViewGeneration = 0;
 
@@ -478,9 +487,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
           if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          // A replaced webview's late ready signal says nothing about the current
+          // one: it must neither mark it ready nor use up a held report request.
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
+          this._sidebarReady = true;
           if (this._pendingOpenReport) {
             this._pendingOpenReport = false;
-            void this._view?.webview.postMessage(this._reportOpenMessage());
+            void webviewView.webview.postMessage(this._reportOpenMessage());
           }
           break;
 
@@ -1425,6 +1438,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       }
       if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
         this._view = undefined;
+        this._sidebarReady = false;
         this._hydratedViewGeneration = 0;
         this._legacySidebarViewGeneration = 0;
         // A disposed sidebar has no open conversation. Remembering the last one
@@ -1473,7 +1487,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public async openReportWindow(): Promise<void> {
     await vscode.commands.executeCommand('ritemark.unifiedView.focus');
     this._view?.show(true);
-    if (this._view) {
+    if (this._view && this._sidebarReady) {
       void this._view.webview.postMessage(this._reportOpenMessage());
       return;
     }
