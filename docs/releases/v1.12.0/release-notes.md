@@ -112,3 +112,11 @@ The recommended default stays a deliberate choice: a new model is never made the
 - **Conversation titles are in the language you wrote in.** When your own Claude setup contained text in another language, such as skills described in Estonian, an English prompt was often given a title in that language. The title now follows the language of your prompt.
 - **Menus are readable in the dark theme.** Drop-down and right-click menus, such as those in the AI sidebar, stayed white in the dark theme with near-white text on them. They now follow the theme.
 - **A file that misstates its size can no longer slow the preview down.** A Word file built to unpack to far more than it declared could make the preview use hundreds of megabytes of memory before failing with a technical error. Such a file is now refused before it is previewed, with the plain "looks damaged" message, for Word documents and presentations alike.
+- **Ritemark no longer pauses at launch while it checks Claude.** The checks now run in the background, so the AI sidebar and your editors respond at once.
+- **No Node.js or Git advice for the bundled agents.** The Claude Code and Codex that come with Ritemark need neither. Setup no longer asks for them, and the Welcome page no longer says "Ritemark needs Node." They are asked for only on Windows, when you choose to use your own installation.
+- **The browser chip shows only a page the AI actually gets.** It used to show the active browser tab even when you hadn't shared it. Now it appears only for a shared tab, and your message sends exactly what the chip shows. On Windows, a shared page is sent with your message again.
+- **OpenCode knows about its browser tools** on macOS, as Claude Code and Codex do.
+- **The × on a composer chip says what it does** — "Remove from this message" — and screen readers announce it.
+- **Report AI issue works before an agent is set up.** During onboarding it opened the sidebar but no report window.
+- **A pinned comment's buttons work.** Clicking Edit, Delete, Mark as done or Send in a pinned comment also unpinned it, and the click was lost.
+- **No stray "0" beside Pause 7 Days** in Settings → Updates.
