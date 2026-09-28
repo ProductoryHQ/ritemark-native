@@ -4,9 +4,14 @@
  * Supported platforms in product scope:
  * - macOS (arm64, x64)
  * - Windows 11
+ *
+ * Every probe runs its child process asynchronously: the extension host has a
+ * single JS thread, and `claude --version` / `claude auth status` can take
+ * hundreds of milliseconds (seconds on a cold start). Waiting for them
+ * synchronously froze the AI sidebar, editors and commands at every launch.
  */
 
-import { spawnSync } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
@@ -28,9 +33,19 @@ let hasAnthropicKeyInSecrets = false;
 let claudeLoginInProgress = false;
 let claudePendingReload = false;
 let claudePendingReloadDiagnostics: string[] = [];
+// Async probes can overlap. Callers share the probe in flight, and a probe that
+// started before an invalidation writes nothing shared: neither the cache nor
+// the pending-reload flags (see getSetupStatus).
+let statusEpoch = 0;
+let inflightStatus: { epoch: number; promise: Promise<SetupStatus> } | null = null;
+
+function invalidateStatus(): void {
+  cachedStatus = null;
+  statusEpoch += 1;
+}
 
 onClaudeStatusInvalidated(() => {
-  cachedStatus = null;
+  invalidateStatus();
 });
 
 type SupportedPlatform = 'darwin' | 'win32';
@@ -59,6 +74,126 @@ interface ClaudeAuthStatusJson {
   authMethod?: string;
 }
 
+interface ProcessResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  error?: NodeJS.ErrnoException;
+}
+
+// spawnSync's default maxBuffer: output past it is a broken or runaway binary.
+const MAX_PROCESS_OUTPUT = 1024 * 1024;
+// How long a stopped child gets to exit before it is killed outright, and then before it is given up on.
+const KILL_GRACE_MS = 1000;
+
+/**
+ * Stop a child: on Windows its whole tree (a `.cmd` shell would leave its Node
+ * child running), elsewhere the process itself, with SIGKILL when `force`.
+ */
+function stopProcess(child: ChildProcess, force: boolean): void {
+  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => {});
+    } catch {
+      // Already gone.
+    }
+    return;
+  }
+  child.kill(force ? 'SIGKILL' : 'SIGTERM');
+}
+
+/**
+ * The async counterpart of the spawnSync calls this module used to make: same
+ * stdio, shell flag and result shape. A failed spawn (ENOENT, EINVAL, …) comes
+ * back in `error` rather than being thrown, as spawnSync reports it. On timeout
+ * (`ETIMEDOUT`), or once the output passes spawnSync's 1 MiB (`ENOBUFS`), the
+ * child is stopped — SIGTERM, then SIGKILL a second later — and the caller gets
+ * the output so far once it has exited, so repeated probes of a hung binary
+ * never pile up running processes.
+ */
+function runProcess(
+  command: string,
+  args: string[],
+  options: { timeout: number; shell?: boolean },
+): Promise<ProcessResult> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    let outputBytes = 0;
+    let settled = false;
+    let stopping: NodeJS.ErrnoException | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const settle = (result: ProcessResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(killTimer);
+      if (stopping) {
+        // A descendant may still hold the pipes open; let them go.
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      }
+      resolve(result);
+    };
+    const stop = (error: NodeJS.ErrnoException) => {
+      if (stopping || settled) return;
+      stopping = error;
+      clearTimeout(timer);
+      stopProcess(child, false);
+      killTimer = setTimeout(() => {
+        stopProcess(child, true);
+        killTimer = setTimeout(() => settle({ status: null, stdout, stderr, error }), KILL_GRACE_MS);
+      }, KILL_GRACE_MS);
+    };
+    const collect = (append: (chunk: string) => void) => (chunk: string) => {
+      if (stopping || settled) return;
+      outputBytes += Buffer.byteLength(chunk);
+      if (outputBytes > MAX_PROCESS_OUTPUT) {
+        const error: NodeJS.ErrnoException = new Error(`${command} wrote more than ${MAX_PROCESS_OUTPUT} bytes`);
+        error.code = 'ENOBUFS';
+        stop(error);
+        return;
+      }
+      append(chunk);
+    };
+
+    let child: ChildProcess;
+    try {
+      child = spawn(command, args, {
+        shell: options.shell ?? false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      // spawnSync throws only for invalid arguments; syscall failures are results.
+      if (typeof (err as NodeJS.ErrnoException).errno === 'number') {
+        settle({ status: null, stdout, stderr, error: err as NodeJS.ErrnoException });
+      } else {
+        reject(err);
+      }
+      return;
+    }
+
+    timer = setTimeout(() => {
+      const error: NodeJS.ErrnoException = new Error(`${command} timed out after ${options.timeout} ms`);
+      error.code = 'ETIMEDOUT';
+      stop(error);
+    }, options.timeout);
+
+    child.stdout?.setEncoding('utf-8');
+    child.stderr?.setEncoding('utf-8');
+    child.stdout?.on('data', collect((chunk) => { stdout += chunk; }));
+    child.stderr?.on('data', collect((chunk) => { stderr += chunk; }));
+    child.on('error', (error) => settle({ status: null, stdout, stderr, error: stopping ?? error }));
+    // A stopped child is done when it exits, even if a descendant keeps its pipes open.
+    child.on('exit', () => {
+      if (stopping) settle({ status: null, stdout, stderr, error: stopping });
+    });
+    child.on('close', (status) => settle(stopping ? { status: null, stdout, stderr, error: stopping } : { status, stdout, stderr }));
+  });
+}
+
 function isSupportedPlatform(platform: NodeJS.Platform): platform is SupportedPlatform {
   return platform === 'darwin' || platform === 'win32';
 }
@@ -70,13 +205,11 @@ function getSpawnCommand(binaryPath: string): { command: string; args: string[];
   return { command: binaryPath, args: [], shell: false };
 }
 
-function runBinary(binaryPath: string, args: string[], timeout: number) {
+function runBinary(binaryPath: string, args: string[], timeout: number): Promise<ProcessResult> {
   const launch = getSpawnCommand(binaryPath);
-  return spawnSync(launch.command, [...launch.args, ...args], {
+  return runProcess(launch.command, [...launch.args, ...args], {
     timeout,
-    encoding: 'utf-8',
     shell: launch.shell,
-    stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
 
@@ -109,14 +242,12 @@ function resolveJsEntryFromCmd(cmdPath: string): string | null {
   return null;
 }
 
-function checkCommandAvailable(command: string): boolean {
+async function checkCommandAvailable(command: string): Promise<boolean> {
   const platform = process.platform;
   const lookup = platform === 'win32' ? 'where' : 'which';
-  const result = spawnSync(lookup, [command], {
+  const result = await runProcess(lookup, [command], {
     timeout: 3000,
-    encoding: 'utf-8',
     shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
   });
   return result.status === 0 && Boolean(result.stdout?.trim());
 }
@@ -163,7 +294,7 @@ function uniquePaths(paths: Array<string | null | undefined>): string[] {
   return Array.from(new Set(paths.filter((value): value is string => Boolean(value))));
 }
 
-function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
+async function getCandidateClaudePaths(platform: SupportedPlatform): Promise<string[]> {
   const home = homedir();
   const candidates: string[] = [];
   const bundledRuntime = findBundledAgentRuntime('claude', { platform });
@@ -173,11 +304,9 @@ function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
     candidates.push(bundledRuntime.path);
   }
 
-  const lookup = spawnSync(platform === 'win32' ? 'where' : 'which', ['claude'], {
+  const lookup = await runProcess(platform === 'win32' ? 'where' : 'which', ['claude'], {
     timeout: 3000,
-    encoding: 'utf-8',
     shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   if (lookup.status === 0 && lookup.stdout) {
@@ -218,28 +347,28 @@ function getCandidateClaudePaths(platform: SupportedPlatform): string[] {
   return uniquePaths(candidates);
 }
 
-function checkWindowsPrereqs(): string[] {
+async function checkWindowsPrereqs(): Promise<string[]> {
   if (process.platform !== 'win32') {
     return [];
   }
 
   const diagnostics: string[] = [];
-  if (systemRuntimeToolsRequired(process.platform) && !checkCommandAvailable('git')) {
+  if (systemRuntimeToolsRequired(process.platform) && !(await checkCommandAvailable('git'))) {
     diagnostics.push('Git for Windows not detected. A system-installed Claude may require Git Bash.');
   }
-  if (!checkCommandAvailable('powershell.exe')) {
+  if (!(await checkCommandAvailable('powershell.exe'))) {
     diagnostics.push('PowerShell not detected. Ritemark cannot launch Claude install/login actions.');
   }
 
   return diagnostics;
 }
 
-function getClaudeVersion(binaryPath: string): string | undefined {
+async function getClaudeVersion(binaryPath: string): Promise<string | undefined> {
   try {
     // 15s allows for cold-start of the 217MB bundled Mach-O on first launch
     // (macOS Gatekeeper signature verification can spike on the very first
     // execution; subsequent runs cache and return in < 1s).
-    const result = runBinary(binaryPath, ['--version'], 15000);
+    const result = await runBinary(binaryPath, ['--version'], 15000);
     const stdout = result.stdout?.trim();
     if (!stdout) return undefined;
     // Happy path: clean exit + non-empty stdout.
@@ -257,7 +386,7 @@ function getClaudeVersion(binaryPath: string): string | undefined {
   return undefined;
 }
 
-function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): ClaudeBinaryInspection {
+async function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): Promise<ClaudeBinaryInspection> {
   if (!isSupportedPlatform(platform)) {
     return {
       installed: false,
@@ -266,15 +395,15 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
     };
   }
 
-  const diagnostics = checkWindowsPrereqs();
-  const candidatePaths = getCandidateClaudePaths(platform);
+  const diagnostics = await checkWindowsPrereqs();
+  const candidatePaths = await getCandidateClaudePaths(platform);
 
   for (const candidate of candidatePaths) {
     if (!existsSync(candidate)) {
       continue;
     }
 
-    const version = getClaudeVersion(candidate);
+    const version = await getClaudeVersion(candidate);
     if (version) {
       // For the SDK's pathToClaudeCodeExecutable, we need the JS entry point,
       // not the .cmd wrapper (the SDK runs `node <path>`, not `shell .cmd`).
@@ -305,7 +434,7 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
     let error: string | undefined;
     let isSpawnFailure = false;
     try {
-      const result = runBinary(candidate, ['--version'], 5000);
+      const result = await runBinary(candidate, ['--version'], 5000);
       if (result.error && 'code' in result.error && (result.error as NodeJS.ErrnoException).code === 'ENOENT') {
         // Binary file exists but Node.js cannot spawn it (e.g. Unix shim on Windows).
         // Skip and try the next candidate.
@@ -343,12 +472,10 @@ function inspectClaudeBinary(platform: NodeJS.Platform = getCurrentPlatform()): 
   };
 }
 
-function checkKeychainAuth(): boolean {
+async function checkKeychainAuth(): Promise<boolean> {
   try {
-    const result = spawnSync('security', ['find-generic-password', '-s', 'Claude Code-credentials'], {
+    const result = await runProcess('security', ['find-generic-password', '-s', 'Claude Code-credentials'], {
       timeout: 3000,
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
     return result.status === 0;
   } catch {
@@ -356,13 +483,11 @@ function checkKeychainAuth(): boolean {
   }
 }
 
-function checkWindowsAuth(): boolean {
+async function checkWindowsAuth(): Promise<boolean> {
   try {
-    const result = spawnSync('cmdkey', ['/list:Claude*'], {
+    const result = await runProcess('cmdkey', ['/list:Claude*'], {
       timeout: 3000,
-      encoding: 'utf-8',
       shell: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
     return result.status === 0 && (result.stdout?.includes('Claude') ?? false);
   } catch {
@@ -388,9 +513,9 @@ function parseClaudeAuthStatusJson(output: string): ClaudeAuthMethod | undefined
   return undefined;
 }
 
-function checkClaudeAuthStatus(binaryPath: string): ClaudeAuthMethod | undefined {
+async function checkClaudeAuthStatus(binaryPath: string): Promise<ClaudeAuthMethod | undefined> {
   try {
-    const result = runBinary(binaryPath, ['auth', 'status', '--json'], 5000);
+    const result = await runBinary(binaryPath, ['auth', 'status', '--json'], 5000);
     const parsed = parseClaudeAuthStatusJson(result.stdout ?? '');
     if (parsed !== undefined) {
       return parsed;
@@ -406,13 +531,13 @@ function checkClaudeAuthStatus(binaryPath: string): ClaudeAuthMethod | undefined
   return undefined;
 }
 
-function detectClaudeAuthMethod(
+async function detectClaudeAuthMethod(
   platform: NodeJS.Platform = getCurrentPlatform(),
   binaryPath?: string
-): ClaudeAuthMethod {
+): Promise<ClaudeAuthMethod> {
   // 1. Primary source of truth: ask the CLI directly. Returns null after `claude logout`.
   if (binaryPath) {
-    const cliStatus = checkClaudeAuthStatus(binaryPath);
+    const cliStatus = await checkClaudeAuthStatus(binaryPath);
     if (cliStatus !== undefined) {
       return cliStatus;
     }
@@ -424,11 +549,11 @@ function detectClaudeAuthMethod(
   }
 
   // 3. Platform credential stores.
-  if (platform === 'darwin' && checkKeychainAuth()) {
+  if (platform === 'darwin' && await checkKeychainAuth()) {
     return 'claude-oauth';
   }
 
-  if (platform === 'win32' && checkWindowsAuth()) {
+  if (platform === 'win32' && await checkWindowsAuth()) {
     return 'claude-oauth';
   }
 
@@ -493,8 +618,8 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
   };
 }
 
-export function hasCliOAuth(): boolean {
-  return detectClaudeAuthMethod() === 'claude-oauth';
+export async function hasCliOAuth(): Promise<boolean> {
+  return (await detectClaudeAuthMethod()) === 'claude-oauth';
 }
 
 export function setAnthropicKeyAvailable(hasKey: boolean): void {
@@ -503,23 +628,62 @@ export function setAnthropicKeyAvailable(hasKey: boolean): void {
 
 export function setClaudeLoginInProgress(inProgress: boolean): void {
   claudeLoginInProgress = inProgress;
-  cachedStatus = null;
+  invalidateStatus();
 }
 
 export function setClaudePendingReload(diagnostics: string[] = []): void {
   claudePendingReload = true;
   claudePendingReloadDiagnostics = diagnostics;
-  cachedStatus = null;
+  invalidateStatus();
 }
 
 export function clearClaudePendingReload(): void {
   claudePendingReload = false;
   claudePendingReloadDiagnostics = [];
-  cachedStatus = null;
+  invalidateStatus();
 }
 
 export function clearSetupCache(): void {
-  cachedStatus = null;
+  invalidateStatus();
+}
+
+async function probeSetupStatus(epoch: number): Promise<SetupStatus> {
+  const binary = await inspectClaudeBinary();
+  // Not clearClaudePendingReload(): that would invalidate this very probe. A
+  // probe overtaken by an invalidation leaves the flags to the newer one.
+  if (binary.runnable && epoch === statusEpoch) {
+    claudePendingReload = false;
+    claudePendingReloadDiagnostics = [];
+  }
+
+  const authMethod = binary.runnable ? await detectClaudeAuthMethod(getCurrentPlatform(), binary.authCheckPath ?? binary.path) : null;
+  return deriveClaudeSetupStatus({
+    binary,
+    authMethod,
+    loginInProgress: claudeLoginInProgress,
+    pendingReload: claudePendingReload,
+    pendingReloadDiagnostics: claudePendingReloadDiagnostics,
+  });
+}
+
+function startSetupStatusProbe(): Promise<SetupStatus> {
+  const epoch = statusEpoch;
+  const promise = probeSetupStatus(epoch).then((status) => {
+    // A probe that started before an invalidation must not replace newer state.
+    if (epoch === statusEpoch) {
+      cachedStatus = status;
+    }
+    return status;
+  });
+  const inflight = { epoch, promise };
+  inflightStatus = inflight;
+  const release = () => {
+    if (inflightStatus === inflight) {
+      inflightStatus = null;
+    }
+  };
+  promise.then(release, release);
+  return promise;
 }
 
 export async function getSetupStatus(options?: { refresh?: boolean }): Promise<SetupStatus> {
@@ -527,22 +691,13 @@ export async function getSetupStatus(options?: { refresh?: boolean }): Promise<S
     return cachedStatus;
   }
 
-  const binary = inspectClaudeBinary();
-  if (binary.runnable) {
-    clearClaudePendingReload();
+  // A call made while a probe runs shares it, `refresh` included, unless the
+  // status was invalidated after that probe started.
+  if (inflightStatus && inflightStatus.epoch === statusEpoch) {
+    return inflightStatus.promise;
   }
 
-  const authMethod = binary.runnable ? detectClaudeAuthMethod(getCurrentPlatform(), binary.authCheckPath ?? binary.path) : null;
-  const status = deriveClaudeSetupStatus({
-    binary,
-    authMethod,
-    loginInProgress: claudeLoginInProgress,
-    pendingReload: claudePendingReload,
-    pendingReloadDiagnostics: claudePendingReloadDiagnostics,
-  });
-
-  cachedStatus = status;
-  return status;
+  return startSetupStatusProbe();
 }
 
 export async function getAgentEnvironmentStatus(options?: {
@@ -551,10 +706,10 @@ export async function getAgentEnvironmentStatus(options?: {
 }): Promise<AgentEnvironmentStatus> {
   const platform = getCurrentPlatform();
   const setupStatus = options?.setupStatus ?? await getSetupStatus({ refresh: options?.refresh });
-  const gitInstalled = checkCommandAvailable('git');
-  const nodeInstalled = checkCommandAvailable('node');
+  const gitInstalled = await checkCommandAvailable('git');
+  const nodeInstalled = await checkCommandAvailable('node');
   const toolsRequired = systemRuntimeToolsRequired(platform);
-  const powershellAvailable = platform === 'win32' ? checkCommandAvailable('powershell.exe') : true;
+  const powershellAvailable = platform === 'win32' ? await checkCommandAvailable('powershell.exe') : true;
   const restartRequired = setupStatus.repairAction === 'reload';
   const diagnostics: string[] = [];
 
@@ -594,7 +749,7 @@ export async function getAgentEnvironmentStatus(options?: {
  * Check whether `winget` is available (Windows 11 ships with it).
  * Used to decide whether we can automate Git/Node installs.
  */
-export function checkWingetAvailable(): boolean {
+export async function checkWingetAvailable(): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   return checkCommandAvailable('winget');
 }
@@ -613,10 +768,10 @@ export async function getOnboardingStatus(options?: {
   const platform = getCurrentPlatform() as 'win32' | 'darwin';
   const setupStatus = options?.setupStatus ?? await getSetupStatus({ refresh: true });
 
-  const gitInstalled = checkCommandAvailable('git');
-  const nodeInstalled = checkCommandAvailable('node');
+  const gitInstalled = await checkCommandAvailable('git');
+  const nodeInstalled = await checkCommandAvailable('node');
   const toolsRequired = systemRuntimeToolsRequired(platform);
-  const wingetAvailable = platform === 'win32' ? checkCommandAvailable('winget') : false;
+  const wingetAvailable = platform === 'win32' ? await checkCommandAvailable('winget') : false;
 
   const claudeCliInstalled = setupStatus.cliInstalled && setupStatus.runnable;
   const claudeCliAuthenticated = claudeCliInstalled && setupStatus.authenticated;
@@ -656,4 +811,5 @@ export const __testOnly = {
   recommendedEnvironmentAction,
   systemRuntimeToolsRequired,
   parseClaudeAuthStatusJson,
+  runProcess,
 };
