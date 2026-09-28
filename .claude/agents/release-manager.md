@@ -122,7 +122,8 @@ No `.vsix`/`vsce` packaging — this codebase ships a per-file manifest + canoni
 | # | Step | Owner | Gate |
 | --- | --- | --- | --- |
 | 0 | Bump version in `extensions/ritemark/package.json` to `X.Y.Z-ext.N` | Agent | — |
-| 1 | `./scripts/release-extension.sh X.Y.Z-ext.N` — runs its own preflight first (clean tree, release-tier guard, `engines.vscode`, compile-clean, webview-freshness) | Agent | BLOCKING — must pass |
+| 1 | `./scripts/release-extension.sh X.Y.Z-ext.N` — runs its own preflight first (clean tree, release-tier guard, `engines.vscode`, compile-clean, webview-freshness, unshipped changes) | Agent | BLOCKING — must pass |
+| 1a | If the preflight lists changes an extension release cannot deliver: ask Jarmo whether to ship without them (they arrive with the next shell release). Re-run with `--allow-unshipped` only after his yes, and name them in the release report | **Jarmo** | Decision |
 | 1b | `cd extensions/ritemark && npm run check:anthropic-models` (Sprint 127 R10). An extension release cannot update Claude Code, so an `ALERT` is reported to Jarmo, not blocking | Agent | Report |
 | **2** | **Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install), on the changed surfaces only** | **Jarmo** | **Light gate — one step, not two** |
 | 3 | `gh release create` with the individual files from `release-staging/upload/` + the regenerated feed | Agent | **REQUIRES step 2 cleared** |
