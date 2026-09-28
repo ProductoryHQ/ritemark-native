@@ -148,7 +148,7 @@ extensions/ritemark/src/
 ├── ai/              Shared AI utilities — modelConfig.ts, connectivity, analytics
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
-├── utils/           Binary resolution, platform utils, bundledAgentRuntime
+├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
 ├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export

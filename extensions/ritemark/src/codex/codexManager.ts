@@ -6,12 +6,17 @@
  * - Version verification
  * - Process spawning and stdio management
  * - Graceful shutdown
+ *
+ * Every probe runs its child process asynchronously (runProcess): the
+ * extension host has a single JS thread, and an npm-installed Codex takes
+ * seconds to generate its protocol types. Waiting for that synchronously froze
+ * the AI sidebar, editors and commands at every launch.
  */
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { spawn, spawnSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { isEnabled } from '../features/featureGate';
 import {
   findBundledAgentRuntime,
@@ -20,6 +25,7 @@ import {
   isBundledAgentRuntimePath,
   readAgentRuntimePreference,
 } from '../utils/bundledAgentRuntime';
+import { runProcess, type ProcessResult } from '../utils/runProcess';
 
 /**
  * Shown when the user asks to repair the Codex that ships with Ritemark. It has
@@ -76,7 +82,9 @@ interface CodexResolvedBinary {
 }
 
 export class CodexManager {
-  private static readonly compatibilityCache = new Map<string, CodexCompatibilityStatus>();
+  // One protocol probe per binary and version. The promise is cached, not its
+  // result, so a call that arrives while the probe runs shares it.
+  private static readonly compatibilityCache = new Map<string, Promise<CodexCompatibilityStatus>>();
   private process: ChildProcess | null = null;
   private config: CodexManagerConfig;
   private isShuttingDown = false;
@@ -252,7 +260,7 @@ export class CodexManager {
     const binary = await this.findBinary();
     const runtimeNodeVersion = process.version.replace(/^v/, '');
     const runtimeNodeArch = process.arch;
-    const machineArch = this.getMachineArch();
+    const machineArch = await this.getMachineArch();
 
     if (!binary) {
       // Not even the bundled runtime resolved. With the default preference that
@@ -284,7 +292,7 @@ export class CodexManager {
 
     const binaryPath = binary.binaryPath;
     const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
-    const installNodeArch = this.getBinaryArchitecture(binaryPath);
+    const installNodeArch = await this.getBinaryArchitecture(binaryPath);
     // Only a system install has a repair command. The bundled runtime ships
     // inside Ritemark, so reinstalling Ritemark is its only repair.
     const repairCommand = binary.runtimeSource === 'system'
@@ -301,14 +309,10 @@ export class CodexManager {
     // manifest, so a silent fallback to manifest never hides upgrade drift.
     if (binary.launchMode === 'codex-app-server') {
       const manifestVersion = readBundledRuntimeVersion(binaryPath);
-      const versionProbe = this.spawnResolvedBinarySync(binaryPath, ['--version'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 3000,
-      });
+      const versionProbe = await this.runResolvedBinary(binaryPath, ['--version'], 3000);
       let runtimeVersion: string | null = null;
       if (versionProbe.status === 0) {
-        const match = String(versionProbe.stdout || '').match(/codex(?:-app-server|-cli)?\s+([\d.]+)/i);
+        const match = versionProbe.stdout.match(/codex(?:-app-server|-cli)?\s+([\d.]+)/i);
         runtimeVersion = match ? match[1] : null;
       }
 
@@ -319,16 +323,12 @@ export class CodexManager {
         probeError = null;
       } else {
         // Fallback for older bundled binaries that reject `--version`.
-        const helpProbe = this.spawnResolvedBinarySync(binaryPath, ['--help'], {
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 3000,
-        });
+        const helpProbe = await this.runResolvedBinary(binaryPath, ['--help'], 3000);
         probeOk = helpProbe.status === 0;
         probeError = probeOk
           ? null
           : this.summarizeFailure(
-              String(helpProbe.stderr || helpProbe.stdout || `app-server --help exited ${helpProbe.status ?? 'null'}`),
+              helpProbe.stderr || helpProbe.stdout || `app-server --help exited ${helpProbe.status ?? 'null'}`,
             );
       }
 
@@ -353,88 +353,56 @@ export class CodexManager {
         installNodeArch,
         runtimeNodeArch,
         machineArch,
-        compatibility: probeOk ? this.inspectCompatibility(binaryPath, reportedVersion, binary.launchMode) : null,
+        compatibility: probeOk ? await this.inspectCompatibility(binaryPath, reportedVersion, binary.launchMode) : null,
         runtimeSource: binary.runtimeSource,
         launchMode: binary.launchMode,
       };
     }
 
-    return new Promise((resolve) => {
-      const versionProcess = this.spawnResolvedBinary(binaryPath, ['--version']);
-      let stdout = '';
-      let stderr = '';
+    const versionProbe = await this.runResolvedBinary(binaryPath, ['--version']);
+    if (versionProbe.status === 0) {
+      const match = versionProbe.stdout.match(/codex(?:-cli)?\s+([\d.]+)/i);
+      return {
+        available: true,
+        runnable: true,
+        version: match ? match[1] : null,
+        error: null,
+        binaryPath,
+        installNodeVersion,
+        runtimeNodeVersion,
+        diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
+        repairCommand,
+        installNodeArch,
+        runtimeNodeArch,
+        machineArch,
+        compatibility: await this.inspectCompatibility(binaryPath, match ? match[1] : null, binary.launchMode),
+        runtimeSource: binary.runtimeSource,
+        launchMode: binary.launchMode,
+      };
+    }
 
-      versionProcess.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      versionProcess.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      versionProcess.on('exit', (code) => {
-        if (code === 0) {
-          const match = stdout.match(/codex(?:-cli)?\s+([\d.]+)/i);
-          resolve({
-            available: true,
-            runnable: true,
-            version: match ? match[1] : null,
-            error: null,
-            binaryPath,
-            installNodeVersion,
-            runtimeNodeVersion,
-            diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-            repairCommand,
-            installNodeArch,
-            runtimeNodeArch,
-            machineArch,
-            compatibility: this.inspectCompatibility(binaryPath, match ? match[1] : null, binary.launchMode),
-            runtimeSource: binary.runtimeSource,
-            launchMode: binary.launchMode,
-          });
-          return;
-        }
-
-        const error = this.summarizeFailure(stderr || stdout || `Codex CLI exited with code ${code}`);
-        resolve({
-          available: true,
-          runnable: false,
-          version: null,
-          error: this.describeLaunchFailure(binary.runtimeSource, error),
-          binaryPath,
-          installNodeVersion,
-          runtimeNodeVersion,
-          diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand,
-          installNodeArch,
-          runtimeNodeArch,
-          machineArch,
-          compatibility: null,
-          runtimeSource: binary.runtimeSource,
-          launchMode: binary.launchMode,
-        });
-      });
-
-      versionProcess.on('error', (error) => {
-        resolve({
-          available: true,
-          runnable: false,
-          version: null,
-          error: this.describeLaunchFailure(binary.runtimeSource, error.message),
-          binaryPath,
-          installNodeVersion,
-          runtimeNodeVersion,
-          diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand,
-          installNodeArch,
-          runtimeNodeArch,
-          machineArch,
-          compatibility: null,
-          runtimeSource: binary.runtimeSource,
-          launchMode: binary.launchMode,
-        });
-      });
-    });
+    // A failed spawn (ENOENT, EACCES, …) reports its own message; a failed run
+    // reports what the CLI printed.
+    const error = versionProbe.error
+      ? versionProbe.error.message
+      : this.summarizeFailure(versionProbe.stderr || versionProbe.stdout || `Codex CLI exited with code ${versionProbe.status}`);
+    return {
+      available: true,
+      runnable: false,
+      version: null,
+      error: this.describeLaunchFailure(binary.runtimeSource, error),
+      binaryPath,
+      installNodeVersion,
+      runtimeNodeVersion,
+      diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
+      repairCommand,
+      installNodeArch,
+      runtimeNodeArch,
+      machineArch,
+      compatibility: null,
+      runtimeSource: binary.runtimeSource,
+      launchMode: binary.launchMode,
+    };
   }
 
   /**
@@ -680,16 +648,13 @@ export class CodexManager {
     return `npm install -g ${pkg}`;
   }
 
-  private getMachineArch(): string {
+  private async getMachineArch(): Promise<string> {
     if (process.platform !== 'darwin') {
       return process.arch;
     }
 
     try {
-      const result = spawnSync('/usr/bin/uname', ['-m'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
+      const result = await runProcess('/usr/bin/uname', ['-m']);
       return result.status === 0 && result.stdout.trim()
         ? result.stdout.trim()
         : process.arch;
@@ -698,7 +663,7 @@ export class CodexManager {
     }
   }
 
-  private getBinaryArchitecture(binaryPath: string): string | null {
+  private async getBinaryArchitecture(binaryPath: string): Promise<string | null> {
     if (process.platform !== 'darwin') {
       return null;
     }
@@ -713,11 +678,8 @@ export class CodexManager {
     try {
       // -b: leave the path out of the output, so a path such as
       // binaries/agents/darwin-arm64/ cannot read as the architecture.
-      const result = spawnSync('/usr/bin/file', ['-b', target], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
-      const output = result.stdout ?? '';
+      const result = await runProcess('/usr/bin/file', ['-b', target]);
+      const output = result.stdout;
 
       return output.includes('x86_64')
         ? 'x86_64'
@@ -747,13 +709,18 @@ export class CodexManager {
       : failure;
   }
 
-  private inspectCompatibility(binaryPath: string, version: string | null, launchMode: CodexLaunchMode): CodexCompatibilityStatus {
+  private inspectCompatibility(binaryPath: string, version: string | null, launchMode: CodexLaunchMode): Promise<CodexCompatibilityStatus> {
     const cacheKey = `${binaryPath}:${version ?? 'unknown'}`;
-    const cached = CodexManager.compatibilityCache.get(cacheKey);
-    if (cached) {
-      return cached;
+    let status = CodexManager.compatibilityCache.get(cacheKey);
+    if (!status) {
+      status = this.probeCompatibility(binaryPath, launchMode);
+      CodexManager.compatibilityCache.set(cacheKey, status);
     }
+    return status;
+  }
 
+  /** Never rejects: its promise stays in the cache for the life of the process. */
+  private async probeCompatibility(binaryPath: string, launchMode: CodexLaunchMode): Promise<CodexCompatibilityStatus> {
     // Optimistic fail-safe: when the protocol probe cannot run with either argv shape
     // (legacy `codex app-server generate-ts` vs new `codex-app-server generate-ts`),
     // we assume the binary is a modern Codex and keep capability flags ON. The
@@ -766,19 +733,18 @@ export class CodexManager {
       requestUserInput: true,
       planUpdates: true,
     };
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
+    let tempDir: string | null = null;
 
     try {
+      tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ritemark-codex-protocol-'));
       // Try the argv form matching the detected launchMode first, then fall back to
       // the other form. inferCodexRuntimeLaunchMode() classifies on basename, which
       // is wrong for a system-installed Rust `codex` that is actually the new
       // app-server shape. Trying both shapes detects the real binary at runtime.
-      const probeOutcome = this.runGenerateTypesProbe(binaryPath, launchMode, tempDir);
+      const probeOutcome = await this.runGenerateTypesProbe(binaryPath, launchMode, tempDir);
 
       if (!probeOutcome.success) {
-        const status = this.buildCompatibilityStatus(optimisticCapabilities, []);
-        CodexManager.compatibilityCache.set(cacheKey, status);
-        return status;
+        return this.buildCompatibilityStatus(optimisticCapabilities, []);
       }
 
       const requestText = this.readGeneratedProtocolFile(tempDir, 'ServerRequest.ts');
@@ -802,23 +768,23 @@ export class CodexManager {
         limitations.push('Structured plan update notifications were not detected in the current Codex app-server protocol.');
       }
 
-      const status = this.buildCompatibilityStatus(capabilities, limitations);
-      CodexManager.compatibilityCache.set(cacheKey, status);
-      return status;
+      return this.buildCompatibilityStatus(capabilities, limitations);
     } catch {
-      const status = this.buildCompatibilityStatus(optimisticCapabilities, []);
-      CodexManager.compatibilityCache.set(cacheKey, status);
-      return status;
+      return this.buildCompatibilityStatus(optimisticCapabilities, []);
     } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      // Best effort: an npm Codex writes ~550 files here. A folder that cannot
+      // be removed must not turn the answer into an error.
+      if (tempDir) {
+        await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      }
     }
   }
 
-  private runGenerateTypesProbe(
+  private async runGenerateTypesProbe(
     binaryPath: string,
     launchMode: CodexLaunchMode,
     tempDir: string,
-  ): { success: boolean } {
+  ): Promise<{ success: boolean }> {
     const tried = new Set<string>();
     const orderedModes: CodexLaunchMode[] = [launchMode, launchMode === 'codex-app-server' ? 'codex-cli' : 'codex-app-server'];
 
@@ -828,11 +794,7 @@ export class CodexManager {
       if (tried.has(key)) continue;
       tried.add(key);
 
-      const result = this.spawnResolvedBinarySync(binaryPath, args, {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 8000,
-      });
+      const result = await this.runResolvedBinary(binaryPath, args, 8000);
 
       if (result.status === 0) {
         return { success: true };
@@ -907,17 +869,20 @@ export class CodexManager {
     });
   }
 
-  private spawnResolvedBinarySync(
+  /**
+   * Run a resolved binary to completion without blocking the extension host,
+   * with the same PATH and shell handling as spawnResolvedBinary.
+   */
+  private runResolvedBinary(
     binaryPath: string,
     args: string[],
-    options: Parameters<typeof spawnSync>[2] = {}
-  ): ReturnType<typeof spawnSync> {
+    timeout?: number,
+  ): Promise<ProcessResult> {
     const isWindowsScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binaryPath);
-    const env = this.buildSpawnEnv(binaryPath, options.env as Record<string, string> | undefined);
-    return spawnSync(binaryPath, args, {
-      ...options,
-      env,
-      shell: options.shell ?? isWindowsScript,
+    return runProcess(binaryPath, args, {
+      timeout,
+      shell: isWindowsScript,
+      env: this.buildSpawnEnv(binaryPath),
     });
   }
 
