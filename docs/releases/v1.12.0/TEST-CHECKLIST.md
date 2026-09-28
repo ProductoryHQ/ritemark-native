@@ -108,7 +108,7 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 
 ### RC3 fixes (2026-09-28)
 
-- [ ] Launch Ritemark with the AI sidebar open: it responds at once, with no pause while Claude is checked (#366)
+- [ ] Launch Ritemark with the AI sidebar open: it responds at once, with no pause while Claude and Codex are checked (#366, #367) — also with **Use system install** and a Codex installed through npm
 - [ ] The Welcome page's launch check has no "Ritemark needs Node." line (macOS; Windows with the bundled runtimes) (#363)
 - [ ] Windows, bundled runtimes, a machine without Node.js or Git: no Node or Git advice in the setup notice or the first-run checklist, and Claude installs and runs (#359 — this was not tried on Windows before RC3)
 - [ ] Open a page in the browser and answer **Deny** on "Share with Agent?": no Browser chip in the composer, and the ⓘ dialog lists no shared page. Share it: the chip appears and the page is sent (#358)
