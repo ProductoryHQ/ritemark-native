@@ -26,8 +26,9 @@ import {
   cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
 } from '../agent';
-import { CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
+import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
+import { runProcess } from '../utils/runProcess';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -815,6 +816,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     claudeAvailable: boolean;
     claudeAuthenticated: boolean;
     nodeInstalled: boolean;
+    /** The Welcome page shows its Node line only when true (patch 017). */
+    nodeRequired: boolean;
     nodeVersion: string | null;
     gitInstalled: boolean;
     gitVersion: string | null;
@@ -826,20 +829,17 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       this.codexAuth?.getStatus() ?? Promise.resolve(null),
     ]);
 
-    // Check system dependencies
-    const { execSync } = require('child_process');
+    // Check system dependencies. The Welcome page asks for this at every launch
+    // into an empty window, so the version checks run without blocking the
+    // extension host; same shell and timeout as the execSync calls they replace.
     let nodeInstalled = environmentStatus.nodeInstalled;
-    let nodeVersion: string | null = null;
     let gitInstalled = environmentStatus.gitInstalled;
-    let gitVersion: string | null = null;
-
-    try {
-      nodeVersion = execSync('node --version', { timeout: 5000 }).toString().trim();
-    } catch { /* not installed */ }
-
-    try {
-      gitVersion = execSync('git --version', { timeout: 5000 }).toString().trim().replace('git version ', '');
-    } catch { /* not installed */ }
+    const [nodeProbe, gitProbe] = await Promise.all([
+      runProcess('node', ['--version'], { shell: true, timeout: 5000 }),
+      runProcess('git', ['--version'], { shell: true, timeout: 5000 }),
+    ]);
+    const nodeVersion = nodeProbe.status === 0 ? nodeProbe.stdout.trim() : null;
+    const gitVersion = gitProbe.status === 0 ? gitProbe.stdout.trim().replace('git version ', '') : null;
 
     return {
       codexAvailable: codexStatus.available && codexStatus.runnable,
@@ -847,6 +847,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       claudeAvailable: claudeStatus.runnable,
       claudeAuthenticated: claudeStatus.authenticated,
       nodeInstalled,
+      nodeRequired: environmentStatus.nodeRequired,
       nodeVersion,
       gitInstalled,
       gitVersion,
@@ -1353,7 +1354,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private async openCodexRepairTerminal(): Promise<void> {
     const codexManager = new CodexManager();
     const status = await codexManager.getBinaryStatus();
-    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+    if (!status.repairCommand) {
+      vscode.window.showInformationMessage(BUNDLED_CODEX_REPAIR_MESSAGE);
+      return;
+    }
 
     const terminal = vscode.window.createTerminal({
       name: 'Codex Repair',
@@ -1361,7 +1365,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     });
 
     terminal.show();
-    terminal.sendText(command);
+    terminal.sendText(status.repairCommand);
     emitCodexStatusInvalidated('repair-started');
 
     vscode.window.showInformationMessage(
@@ -1410,7 +1414,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           enabled: true,
           authenticated: false,
           binaryMissing: true,
-          error: 'Codex CLI not found. Install with: npm install -g @openai/codex',
+          error: binaryStatus.error ?? 'Codex runtime not found.',
           diagnostics: binaryStatus.diagnostics,
           repairCommand: binaryStatus.repairCommand,
         },

@@ -23,12 +23,19 @@ export interface RuntimeCapabilities {
   structuredPlanSteps: boolean;
   /** Where the Composer gets model/session-specific effort choices. */
   thinkingEffortSource: 'model-catalog' | 'runtime-live';
+  /**
+   * The host sends the shared browser tab (URL, title, page summary, and the
+   * annotation screenshot) with this runtime's turns. Claude and Codex: yes.
+   * OpenCode: no — ACP has never been sent browser context. The Composer's
+   * browser chip and the AI information dialog read this same flag.
+   */
+  browserContext: boolean;
 }
 
 export const RUNTIME_CAPABILITIES: Record<AgentId, RuntimeCapabilities> = {
-  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog' },
-  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog' },
-  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live' },
+  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true },
+  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true },
+  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false },
 };
 
 export function capabilitiesFor(agentId: AgentId): RuntimeCapabilities {
@@ -37,5 +44,6 @@ export function capabilitiesFor(agentId: AgentId): RuntimeCapabilities {
     liveModeSwitch: false,
     structuredPlanSteps: false,
     thinkingEffortSource: 'runtime-live',
+    browserContext: false,
   };
 }

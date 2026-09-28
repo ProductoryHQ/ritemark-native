@@ -60,7 +60,7 @@ import { BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
 import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
-import { CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
+import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech/activeTranscript';
@@ -159,6 +159,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * request waits for `sidebar/ready` instead of being fired blindly.
    */
   private _pendingOpenReport = false;
+  /**
+   * Set once the CURRENT webview instance has signalled `sidebar/ready`.
+   * `_view` existing only means a view object was created — its page may
+   * still be loading, so `openReportWindow` must not post to it directly
+   * until this is true (#317), the same race `_pendingOpenReport` already
+   * guards against when there is no view object at all.
+   */
+  private _sidebarReady = false;
   private _hydratedViewGeneration = 0;
   private _legacySidebarViewGeneration = 0;
   private readonly _sidebarStatusRevisions: Record<AgentId | 'discovery', number> = {
@@ -284,6 +292,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
+    this._sidebarReady = false;
     const viewGeneration = ++this._viewGeneration;
     this._legacySidebarViewGeneration = 0;
 
@@ -478,9 +487,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
           if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          // A replaced webview's late ready signal says nothing about the current
+          // one: it must neither mark it ready nor use up a held report request.
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
+          this._sidebarReady = true;
           if (this._pendingOpenReport) {
             this._pendingOpenReport = false;
-            void this._view?.webview.postMessage(this._reportOpenMessage());
+            void webviewView.webview.postMessage(this._reportOpenMessage());
           }
           break;
 
@@ -705,9 +718,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
 
           // Browser context (page summary + screenshot). Consent-gated inside
-          // buildTurnContext() — returns null unless the user shared a tab. Only
-          // Claude Code + Codex received this pre-Sprint-79 (ACP did not).
-          if (browserEnabled && !skipBrowserContext && (isClaudeCode || isCodex)) {
+          // buildTurnContext() — returns null unless the user shared a tab.
+          // Runtimes opt in through the capability map (Claude Code + Codex;
+          // ACP never received it). Reading a shared page is not part of the
+          // macOS-only AI Browser Control flag, which gates only the browser
+          // tools below: Sprint 79 had put it behind that flag, and Windows
+          // stopped receiving shared pages.
+          if (!skipBrowserContext && capabilitiesFor(agentId as import('../agent/types').AgentId).browserContext) {
             const browserContext = await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
             if (browserContext) {
               prompt = `${browserContext.promptBlock}\n\n---\n\n${prompt}`;
@@ -1299,11 +1316,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // ── Onboarding wizard messages ──
 
         case 'onboarding:install-git':
-          installGit(checkWingetAvailable());
+          installGit(await checkWingetAvailable());
           break;
 
         case 'onboarding:install-node':
-          installNode(checkWingetAvailable());
+          installNode(await checkWingetAvailable());
           break;
 
         case 'onboarding:install-claude':
@@ -1421,6 +1438,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       }
       if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
         this._view = undefined;
+        this._sidebarReady = false;
         this._hydratedViewGeneration = 0;
         this._legacySidebarViewGeneration = 0;
         // A disposed sidebar has no open conversation. Remembering the last one
@@ -1469,7 +1487,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public async openReportWindow(): Promise<void> {
     await vscode.commands.executeCommand('ritemark.unifiedView.focus');
     this._view?.show(true);
-    if (this._view) {
+    if (this._view && this._sidebarReady) {
       void this._view.webview.postMessage(this._reportOpenMessage());
       return;
     }
@@ -2328,7 +2346,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private async _openCodexRepairTerminal(): Promise<void> {
     const codexManager = new CodexManager();
     const status = await codexManager.getBinaryStatus();
-    const command = status.repairCommand ?? 'npm install -g @openai/codex@latest';
+    if (!status.repairCommand) {
+      vscode.window.showInformationMessage(BUNDLED_CODEX_REPAIR_MESSAGE);
+      return;
+    }
 
     const terminal = vscode.window.createTerminal({
       name: 'Codex Repair',
@@ -2336,7 +2357,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
 
     terminal.show();
-    terminal.sendText(command);
+    terminal.sendText(status.repairCommand);
 
     vscode.window.showInformationMessage(
       'Opened Codex repair in terminal. After it finishes, reload the window.'

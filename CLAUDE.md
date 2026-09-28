@@ -81,7 +81,7 @@ Branch name matches the sprint directory under `docs/development/sprints/`. Veri
 
 ## Release Tiers (Sprint 93)
 
-A change is **shell-tier** if it touches any of these paths (`vscode` is the submodule pointer) — everything else is **extension-tier** (default):
+A change is **shell-tier** if it touches a path that starts with one of these entries (`vscode` is the submodule pointer) — everything else is **extension-tier** (default):
 
 ```
 patches/
@@ -114,6 +114,8 @@ scripts/codesign-windows.sh
 This list is the single source of truth — `scripts/release-extension-preflight.sh`'s denylist array must stay copy-paste identical to it (edit both in the same commit, never one without the other).
 
 **Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI, no repo-visibility toggle for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
+
+**Extension-tier by path does not mean an extension release delivers it.** An extension release ships only `out/**/*.js`, `media/webview.js`, `media/office-preview.js` (+ NOTICES) and `package.json`, laid over the app's bundled copy. Every other file under `extensions/ritemark/` (icons, fonts, themes, starter pack, draw.io/PDF assets, whisper binaries) and every esbuild external in `node_modules` (e.g. the Claude Agent SDK) changes for users only with a shell release. `release-extension-preflight.sh` lists such changes and stops; `--allow-unshipped` releases without them, only with Jarmo's OK.
 
 * * *
 
@@ -171,7 +173,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (16)
+### Current patches (17)
 
 | Patch | Purpose |
 | --- | --- |
@@ -191,6 +193,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `014-ritemark-save-receipts.patch` | Text-file save receipts through the extension-host document protocol, so a save is acknowledged against the exact written snapshot |
 | `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries |
 | `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion — the Git download button in Source Control and the Git/Node "Click here to install" actions on the welcome page (Microsoft Store policy 10.1.5) |
+| `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when `ritemark.getHealthStatus` reports `nodeRequired` (a system-installed runtime on Windows); the bundled runtimes need no Node.js |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

@@ -12,6 +12,7 @@
  */
 
 export {
+  BUNDLED_CODEX_REPAIR_MESSAGE,
   CodexManager,
   type CodexBinaryStatus,
   type CodexCapabilityFlags,

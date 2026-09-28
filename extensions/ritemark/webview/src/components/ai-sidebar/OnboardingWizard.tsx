@@ -93,44 +93,53 @@ function ChecklistStep({
       </div>
 
       <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 space-y-3">
-        <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
+        {/* Git and Node.js are only needed by a system-installed runtime; the bundled ones need neither. */}
+        {(status.gitRequired || status.nodeRequired) && (
+          <>
+            <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
 
-        <DependencyRow
-          label="Git"
-          installed={status.gitInstalled}
-          installState={installStates.git}
-          onInstall={() => onInstall('git')}
+            {status.gitRequired && (
+              <DependencyRow
+                label="Git"
+                installed={status.gitInstalled}
+                installState={installStates.git}
+                onInstall={() => onInstall('git')}
 
-        />
-        <DependencyRow
-          label="Node.js"
-          installed={status.nodeInstalled}
-          installState={installStates.node}
-          onInstall={() => onInstall('node')}
-          disabled={nodeBlocked}
-          disabledHint="Install Git first"
+              />
+            )}
+            {status.nodeRequired && (
+              <DependencyRow
+                label="Node.js"
+                installed={status.nodeInstalled}
+                installState={installStates.node}
+                onInstall={() => onInstall('node')}
+                disabled={nodeBlocked}
+                disabledHint="Install Git first"
 
-        />
+              />
+            )}
 
-        <div className="border-t border-[var(--r-hairline)] my-2" />
+            <div className="border-t border-[var(--r-hairline)] my-2" />
+          </>
+        )}
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">AI Assistants</div>
 
+        {/* Claude's installer needs no Node.js. */}
         <DependencyRow
           label="Claude"
           installed={status.claudeCliInstalled}
           installState={installStates['claude-cli']}
           onInstall={() => onInstall('claude-cli')}
-          disabled={!status.nodeInstalled}
-          disabledHint="Install Node.js first"
 
         />
+        {/* This install runs npm. Without Node.js, the bundled Codex is restored by reinstalling Ritemark. */}
         <DependencyRow
           label="Codex"
           installed={status.codexCliInstalled}
           installState={installStates['codex-cli']}
           onInstall={() => onInstall('codex-cli')}
           disabled={!status.nodeInstalled}
-          disabledHint="Install Node.js first"
+          disabledHint={status.nodeRequired ? 'Install Node.js first' : 'Reinstall Ritemark'}
 
         />
       </div>
@@ -181,11 +190,15 @@ function AuthenticateStep({
 
       {/* Compact checklist showing current state */}
       <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 space-y-2">
-        <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
-        <CompactRow label="Git" installed={status.gitInstalled} />
-        <CompactRow label="Node.js" installed={status.nodeInstalled} />
+        {(status.gitRequired || status.nodeRequired) && (
+          <>
+            <div className="text-xs font-medium opacity-60 uppercase tracking-wide">Requirements</div>
+            {status.gitRequired && <CompactRow label="Git" installed={status.gitInstalled} />}
+            {status.nodeRequired && <CompactRow label="Node.js" installed={status.nodeInstalled} />}
 
-        <div className="border-t border-[var(--r-hairline)] my-2" />
+            <div className="border-t border-[var(--r-hairline)] my-2" />
+          </>
+        )}
         <div className="text-xs font-medium opacity-60 uppercase tracking-wide">AI Assistants</div>
         <CompactRow
           label="Claude"

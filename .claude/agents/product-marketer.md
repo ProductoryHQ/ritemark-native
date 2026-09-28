@@ -324,7 +324,7 @@ Need: [what's required to proceed]
 - Feature docs: `/docs/user/features/`
 - Release/sprint docs: `/docs/development/releases/vX.Y.Z/`
 - Existing releases: `/docs/releases/`
-- Style guide: `/docs/STYLE-GUIDE.md`
+- Voice and style: `/.claude/skills/ritemark-design/references/` — `philosophy.md` (calm, credible, writerly; no emoji, no exclamation points), `typography.md` ("Voice, briefly"), `marketing.md` (marketing surfaces), `release-assets.md` (release notes and release graphics)
 
 ---
 

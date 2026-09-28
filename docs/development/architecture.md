@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-25 (Sprint 125 PowerPoint preview; one Office preview provider; PDF search, #344)
+**Last updated:** 2026-09-28 (v1.12.0 RC3: shared `utils/runProcess` for non-blocking Claude and Codex probes; `browserContext` capability)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -148,7 +148,7 @@ extensions/ritemark/src/
 ├── ai/              Shared AI utilities — modelConfig.ts, connectivity, analytics
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
-├── utils/           Binary resolution, platform utils, bundledAgentRuntime
+├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
 ├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export
@@ -623,7 +623,7 @@ Sent as `approvalMode` + `planFirst` on `agent-execute`; the webview derives bot
 | **Manual (ask)** | SDK `default` + mutating tools gated via `canUseTool` | `approvalPolicy: untrusted` + `sandbox: read-only` | native `request_permission` prompt |
 | **Plan on** | SDK native `permissionMode: 'plan'` (enforced read-only) + `planModeInstructions`; `ExitPlanMode` → plan card; approve → `updatedPermissions setMode` to the autonomy mode, same turn continues | `collaborationMode: plan` on a **read-only sandbox** thread; approval sends the continuation turn on a write-sandbox thread | **not offered** — no enforceable plan contract (capability-gated) |
 
-Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks.
+Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`, `thinkingEffortSource`, `browserContext`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks. `browserContext` gates both the host's per-turn browser-context injection and the Composer's browser chip; the chip also requires the tab's "Share with Agent?" consent, so it shows exactly what the host sends.
 
 Mechanics & constraints:
 - `allowedTools` in the Claude SDK means *auto-allowed without prompting* and auto-allowed tools NEVER reach `canUseTool` — mutating tools **and `ExitPlanMode`** must be excluded from it (audit F7; only `AskUserQuestion` is documented as always prompting).
@@ -1161,6 +1161,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-09-28 | v1.12.0 RC3 | **Probes off the extension host's thread; a browser-context capability (#366, #367, #358).** New `utils/runProcess.ts`, the async stand-in for `spawnSync`, runs the Claude (`agent/setup.ts`) and Codex (`codex/codexManager.ts`) setup probes and the Welcome page's Node and Git checks; a timed-out or runaway child is stopped (SIGTERM, then SIGKILL; on Windows the whole tree) before the caller gets its answer, and output is capped at 1 MiB. `runtime/capabilities.ts` gains `browserContext`: the composer chip, the AI information dialog and the per-turn page context follow it instead of runtime ids, and per-turn page context no longer needs the macOS-only `browser-agent-control` flag (that flag still gates the browser tools). |
 | 2026-09-26 | Bugfix | **OpenCode is told about its browser tools.** OpenCode has received the six browser tools (the `ritemark_browser` stdio MCP adapter, on `session/new` and `session/resume`) since Sprint 79, but Sprint 101 gave `ACP_DESCRIPTOR` `hasBrowserTools: false` and the sidebar passed it without the `browser-agent-control` override Claude and Codex get, so its capability context never mentioned them. New pure `capabilityDescriptorFor(runtime, browserToolsAvailable)` in `capabilityContext.ts` is now the one descriptor choice for all three runtimes. Tests cover every runtime with the flag on and off, and the text `AcpSession.prompt()` actually sends OpenCode on its first and second turns. No flag, patch, protocol or shell-tier change. |
 | 2026-09-25 | Sprint 125 | **PowerPoint preview (v1.12.0, #285).** `docxEditorProvider.ts` and `docxDocument.ts` become `officePreview/officePreviewProvider.ts` and `officeDocument.ts`: one provider for Word and PowerPoint, configured per format. New `PPTXViewer` and `viewers/pptx/` (renderer 1.3.0, chart XML fixes, notes, deck search, windowed drawing). `officePackageCheck` now inflates every part with a cap, closing a declared-size bypass that also affected Word. `office-preview.js` 1.3 → 2.5 MB (ECharts); `webview.js` unchanged. New flag `powerpoint-preview`; a notices file ships with the Office bundle. |
 | 2026-09-24 | Sprint 124 | **Word preview fidelity and an Office preview bundle (v1.12.0, #284).** New `media/office-preview.js` (second Vite build, `webview/src/office/`); Word code and Mammoth leave `webview.js` (8.93 → 8.35 MB). docx-preview 0.3.7 → 0.4.1 behind a pre-render XML pass (`viewers/docx/`) and a host package check (`src/officePreview/officePackageCheck.ts`, `loadError` message). Shared `ViewerToolbar` for Word and PDF. Release tooling (hook, build-prod both platforms, staging, extension-update list, preflights, notarization check) knows the new bundle — shell-tier. `getWordProcessorAppName` replaced by the provider's Word → Pages → default resolution. |

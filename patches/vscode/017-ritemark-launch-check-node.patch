@@ -1,0 +1,68 @@
+Ritemark Launch Check: the Node line only where a runtime needs Node.js
+The Welcome page's launch check said "Ritemark needs Node." on any
+machine without `node` on PATH, on macOS and Windows alike, whatever the
+Runtime preference. The agent runtimes Ritemark bundles need no system
+Node.js: Claude Code 2.1.281 is a self-contained binary the Agent SDK
+spawns directly, and the Codex 0.154.0 app server is a native Rust
+binary (checked 2026-09-26 against the shipped packages, PR #359).
+Node.js matters only when the user's own Claude or Codex came from npm.
+
+The extension already decides when that is: Windows with Runtime
+preference "Use system install" (setup.ts systemRuntimeToolsRequired).
+ritemark.getHealthStatus now sends it as nodeRequired, and the Node line
+renders only when it is true. An extension older than the field sends
+nothing, so the line stays hidden, which is the right answer for the
+bundled runtimes.
+
+The Git line is unchanged: Source Control needs Git. No install link
+comes back (016, Microsoft Store policy 10.1.5).
+
+Applies after 016, whose comment and launch-check lines it builds on;
+001 owns the launch-check list itself.
+---
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+index 30a2920dcc4..57ab9550776 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -1099,6 +1099,7 @@ export class GettingStartedPage extends EditorPane {
+ 					claudeAvailable: boolean;
+ 					claudeAuthenticated: boolean;
+ 					nodeInstalled: boolean;
++					nodeRequired?: boolean;
+ 					nodeVersion: string | null;
+ 					gitInstalled: boolean;
+ 					gitVersion: string | null;
+@@ -1112,6 +1113,7 @@ export class GettingStartedPage extends EditorPane {
+ 						claudeAvailable: boolean;
+ 						claudeAuthenticated: boolean;
+ 						nodeInstalled: boolean;
++						nodeRequired?: boolean;
+ 						nodeVersion: string | null;
+ 						gitInstalled: boolean;
+ 						gitVersion: string | null;
+@@ -1198,12 +1200,19 @@ export class GettingStartedPage extends EditorPane {
+ 			// Same rule as the Git check above. Not flagged by the report, but
+ 			// the identical construct — fixing only what was reported would
+ 			// leave the same exposure for the next certification round.
+-			container.appendChild(renderLaunchCheckItem(
+-				status.nodeInstalled
+-					? localize('ritemark.nodeReady', "Ritemark found Node.")
+-					: localize('ritemark.nodeMissing', "Ritemark needs Node."),
+-				status.nodeInstalled
+-			));
++			//
++			// The bundled agent runtimes do not need Node.js, so this line
++			// appears only when the extension reports that one of the user's
++			// own runtimes does (nodeRequired). An extension older than that
++			// field sends nothing, and the line stays hidden.
++			if (status.nodeRequired) {
++				container.appendChild(renderLaunchCheckItem(
++					status.nodeInstalled
++						? localize('ritemark.nodeReady', "Ritemark found Node.")
++						: localize('ritemark.nodeMissing', "Ritemark needs Node."),
++					status.nodeInstalled
++				));
++			}
+ 		} catch {
+ 			container.textContent = '';
+ 			container.appendChild(renderLaunchCheckItem(localize('ritemark.healthError', "Could not check status."), false));

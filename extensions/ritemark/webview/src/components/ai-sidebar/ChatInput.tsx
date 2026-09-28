@@ -5,7 +5,9 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
+import { Tooltip } from '../ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -24,8 +26,7 @@ import {
   AIInformationDialog,
   useAIInformationDisclosure,
 } from './AIInformation';
-import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
-import { resolveAIIdentity } from './aiDisclosure';
+import { includesBrowserContext, resolveAIIdentity } from './aiDisclosure';
 import { modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
@@ -142,7 +143,16 @@ function getDisplayPath(fullPath: string): string {
   return fullPath;
 }
 
-export function ChatInput() {
+interface ChatInputProps {
+  /**
+   * Requests the host to open the report window (#317). Owned by AISidebar,
+   * which mounts the one ReportDialog instance outside the view switch so it
+   * survives onboarding/setup states where ChatInput itself isn't rendered.
+   */
+  onReport: () => void;
+}
+
+export function ChatInput({ onReport }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
@@ -258,6 +268,18 @@ export function ChatInput() {
     : 'auto';
   // R6: the Plan chip renders only for runtimes with an enforceable plan contract.
   const planCapable = runtimeCapabilities[pendingRuntime.runtimeId]?.planFirst === true;
+  // The chip — and the disclosure's browser row — show only when the host will
+  // send the page: the runtime takes browser context (capability map) and the
+  // person allowed "Share with Agent?" for this tab. A declined tab shows
+  // nothing; the host polls every tab, shared or not, so this check is ours.
+  // Sends and queued prompts skip browser context whenever the chip is not
+  // shown: the host re-reads the tab at send time, and a consent answered
+  // since the last 1.5 s poll must not send a page the composer did not show.
+  const showBrowserContextChip = includesBrowserContext({
+    context: currentBrowserContext,
+    runtimeTakesBrowserContext: runtimeCapabilities[pendingRuntime.runtimeId]?.browserContext === true,
+    removedForTurn: hideBrowserContext,
+  });
   // OpenCode zero-key check: all four provider booleans are false
   const openCodeHasNoKeys = isOpenCode && acpProviders
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
@@ -319,7 +341,7 @@ export function ChatInput() {
       source: 'composer',
       attachments: attachments.length > 0 ? attachments : undefined,
       skipActiveFile: hideActiveFile,
-      skipBrowserContext: hideBrowserContext,
+      skipBrowserContext: !showBrowserContextChip,
       mentionedAgentPaths,
     });
     if (outcome === 'full') {
@@ -327,7 +349,7 @@ export function ChatInput() {
       setTimeout(() => setQueueFullNotice(false), 4000);
     }
     return outcome;
-  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, hideBrowserContext, enqueuePrompt]);
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, showBrowserContextChip, enqueuePrompt]);
 
 
   // Build final message with path chips and pinned agent prepended
@@ -408,11 +430,11 @@ export function ChatInput() {
         prompt,
         attachments.length > 0 ? attachments : undefined,
         pendingRuntime.mode,
-        hideBrowserContext,
+        !showBrowserContextChip,
         hideActiveFile,
       );
     } else {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: hideBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: !showBrowserContextChip, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     }
     setValue('');
     setAttachments([]);
@@ -425,7 +447,7 @@ export function ChatInput() {
     clearPinnedAgentDismissal();
     // The composer height follows `value` (layout effect below), so clearing
     // the text is what shrinks it back.
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, hideBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, showBrowserContextChip, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -865,10 +887,6 @@ export function ChatInput() {
   // Don't show if: no active file, user dismissed it, or it's already in manual path chips
   const showActiveFileChip = activeFilePath && !hideActiveFile &&
     !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
-  // Browser context is currently injected for Claude Code and Codex only.
-  // Hiding the chip for OpenCode prevents the composer and disclosure from
-  // implying that ACP receives context the host deliberately does not send.
-  const showBrowserContextChip = !isOpenCode && currentBrowserContext?.url && !hideBrowserContext;
 
   // Sprint 122 (#282): until the person sizes it, the composer fits its text —
   // up to 8 lines or 40% of the window, where it used to stop at 120 px. Its
@@ -1026,7 +1044,6 @@ export function ChatInput() {
     byokProviderModels,
   });
   const aiInformation = useAIInformationDisclosure();
-  const reportDialog = useReportDialog();
 
   const applyRuntimeChange = useCallback((value: string) => {
     if (value.startsWith('claude-code:')) {
@@ -1136,13 +1153,18 @@ export function ChatInput() {
                 <span className="truncate max-w-[140px]" title={activeFilePath!}>
                   Active: {getDisplayPath(activeFilePath!)}
                 </span>
-                <button
-                  onClick={() => setHideActiveFile(true)}
-                  className="shrink-0 rounded hover:text-[var(--r-error)]"
-                  title="Remove from context"
-                >
-                  <Icon name="x" size={12} />
-                </button>
+                <Tooltip label="Remove from this message">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                    aria-label="Remove active file from this message"
+                    onClick={() => setHideActiveFile(true)}
+                  >
+                    <Icon name="x" size={12} />
+                  </Button>
+                </Tooltip>
               </div>
             )}
             {showBrowserContextChip && (
@@ -1159,13 +1181,19 @@ export function ChatInput() {
                         title={`Browser screenshot — ${currentBrowserContext.title || currentBrowserContext.url}`}
                       />
                     </div>
-                    <button
-                      onClick={() => setHideBrowserContext(true)}
-                      className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
-                      title="Remove browser screenshot from this turn"
-                    >
-                      <Icon name="x" size={12} />
-                    </button>
+                    {/* The tooltip's trigger is the positioned box, so the tooltip points at the button. */}
+                    <Tooltip label="Remove from this message" className="absolute top-0 right-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-4 rounded-[0_0_0_0.25rem] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-0 text-[var(--r-ink-body)] shadow-sm opacity-95 hover:bg-[var(--r-surface)] group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
+                        aria-label="Remove browser screenshot from this message"
+                        onClick={() => setHideBrowserContext(true)}
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </Tooltip>
                   </div>
                 )
                 : (
@@ -1176,13 +1204,18 @@ export function ChatInput() {
                       Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
                       {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
                     </span>
-                    <button
-                      onClick={() => setHideBrowserContext(true)}
-                      className="shrink-0 rounded hover:text-[var(--r-error)]"
-                      title="Remove browser context from this turn"
-                    >
-                      <Icon name="x" size={12} />
-                    </button>
+                    <Tooltip label="Remove from this message">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                        aria-label="Remove browser context from this message"
+                        onClick={() => setHideBrowserContext(true)}
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </Tooltip>
                   </div>
                 )
             )}
@@ -1195,13 +1228,18 @@ export function ChatInput() {
                 <span className="truncate max-w-[140px]" title={chip.path}>
                   {getDisplayPath(chip.path)}
                 </span>
-                <button
-                  onClick={() => removePathChip(chip.id)}
-                  className="shrink-0 rounded hover:text-[var(--r-error)]"
-                  title="Remove"
-                >
-                  <Icon name="x" size={12} />
-                </button>
+                <Tooltip label="Remove from this message">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:text-[var(--r-error)]"
+                    aria-label={`Remove ${getDisplayPath(chip.path)} from this message`}
+                    onClick={() => removePathChip(chip.id)}
+                  >
+                    <Icon name="x" size={12} />
+                  </Button>
+                </Tooltip>
               </div>
             ))}
             {pinnedAgent && (() => {
@@ -1211,13 +1249,18 @@ export function ChatInput() {
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]">
                   <Icon name="robot" size={12} className="shrink-0" />
                   <span>{displayName}</span>
-                  <button
-                    onClick={() => setPinnedAgent(null)}
-                    className="shrink-0 rounded hover:opacity-70"
-                    title="Remove agent"
-                  >
-                    <Icon name="x" size={12} />
-                  </button>
+                  <Tooltip label="Remove from this message">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-5 shrink-0 rounded p-0 hover:bg-transparent hover:opacity-70"
+                      aria-label={`Remove ${displayName} from this message`}
+                      onClick={() => setPinnedAgent(null)}
+                    >
+                      <Icon name="x" size={12} />
+                    </Button>
+                  </Tooltip>
                 </div>
               );
             })()}
@@ -1585,11 +1628,6 @@ export function ChatInput() {
           </div>
         </div>
       </div>
-      <ReportDialog
-        open={reportDialog.open}
-        context={reportDialog.context}
-        onOpenChange={reportDialog.setOpen}
-      />
       <AIInformationDialog
         identity={aiIdentity}
         context={{
@@ -1597,14 +1635,14 @@ export function ChatInput() {
           hasActiveFile: Boolean(activeFilePath && !hideActiveFile),
           hasSelection: hasSelectedContext,
           attachmentCount,
-          hasBrowserContext: Boolean(showBrowserContextChip),
+          hasBrowserContext: showBrowserContextChip,
           hasConversationContext: agentConversation.length > 0 || codexConversation.length > 0,
         }}
         open={aiInformation.open}
         showFirstUse={aiInformation.showFirstUse}
         onOpenChange={aiInformation.setOpen}
         onAcknowledge={aiInformation.acknowledge}
-        onReport={reportDialog.request}
+        onReport={onReport}
       />
     </div>
     </>

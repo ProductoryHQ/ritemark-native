@@ -29,14 +29,15 @@ export function EnvironmentStatusNotice({
               <div key={line} className="break-words">{line}</div>
             ))}
           </div>
+          {/* Git and Node.js are only checked with Runtime preference: system — the bundled runtimes need neither. */}
           {environmentStatus.recommendedAction === 'install-git' && (
             <div className="mt-2 text-xs opacity-80">
-              Install Git for Windows first, then retry setup.
+              Your own Claude install may need Git for Windows. Install Git and reload Ritemark, or switch Runtime preference to Bundled in Settings.
             </div>
           )}
           {environmentStatus.recommendedAction === 'install-node' && (
             <div className="mt-2 text-xs opacity-80">
-              Node.js is required to run Claude on Windows. Install it, then reload Ritemark.
+              Claude or Codex installed with npm runs on Node.js. Install Node.js and reload Ritemark, or switch Runtime preference to Bundled in Settings.
             </div>
           )}
           {environmentStatus.recommendedAction === 'reload' && (

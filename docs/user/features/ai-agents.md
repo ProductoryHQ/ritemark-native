@@ -75,13 +75,13 @@ The model list is served from a live catalog feed, so newly released Claude mode
 
 | Requirement | Required on | Notes |
 |-------------|-------------|-------|
-| Claude Code CLI | All platforms | Installed automatically via "Install Claude" button |
-| Git | Windows | Required by the Claude Code installer |
-| PowerShell | Windows | Required for Claude installation and sign-in |
+| Claude Code | All platforms | Included with Ritemark; nothing to install |
+| Git for Windows | Windows | Optional. With Git, Claude runs commands in Git Bash; without it, in PowerShell |
+| PowerShell | Windows | Built into Windows. Used for Claude installation and sign-in, and for Claude's commands when Git is not installed |
 
 ### How Ritemark Detects Claude
 
-Ritemark searches for the Claude binary in these locations:
+Ritemark uses the copy of Claude Code that ships with the app. If you set **Settings → Agent Runtime → Runtime preference** to **Use system install**, Ritemark looks for your own install first, in these locations, and falls back to the bundled copy if it finds none:
 
 **Windows:**
 1. System PATH (via `where claude`) - filters for `.cmd` / `.exe` files
@@ -123,7 +123,7 @@ Settings reflects the truthful auth state by querying the Claude CLI directly. A
 | Problem | Solution |
 |---------|----------|
 | "Claude binary was detected but could not be started" | Click "Repair Claude" to reinstall |
-| "Git for Windows is required" | Install [Git for Windows](https://git-scm.com/download/win), then retry |
+| "Git for Windows not detected" | Appears only with **Use system install**: a Claude you installed yourself may need Git Bash. Install [Git for Windows](https://git-scm.com/download/win), or set **Runtime preference** back to **Bundled** |
 | "PowerShell not detected" | Restore `powershell.exe` on your system, then reload |
 | Install fails with file lock error | Close the Claude desktop app, then retry |
 | "spawn EINVAL" when chatting | Update Ritemark - this was a known bug with Windows `.cmd` path resolution |
@@ -141,19 +141,18 @@ OpenAI's autonomous coding agent, powered by ChatGPT. Codex uses ChatGPT OAuth a
 - Code generation and refactoring
 - Works with ChatGPT subscription (Plus, Pro, Team, or Business)
 
-**Status:** Experimental - enable in Settings > Features > Codex Integration.
+**Status:** Experimental. It is on by default; there is nothing to enable.
 
 ### Prerequisites
 
 | Requirement | Required on | Notes |
 |-------------|-------------|-------|
-| Codex CLI | All platforms | Install via `npm install -g @openai/codex` |
-| Node.js | All platforms | Required for npm installation |
+| Codex | All platforms | Included with Ritemark; nothing to install |
 | ChatGPT account | All platforms | Plus, Pro, Team, or Business subscription |
 
 ### How Ritemark Detects Codex
 
-Ritemark searches for the Codex binary via system PATH:
+Ritemark uses the copy of Codex that ships with the app. If you set **Settings → Agent Runtime → Runtime preference** to **Use system install**, Ritemark looks for your own Codex on the system PATH first, and falls back to the bundled copy if it finds none:
 
 **Windows:**
 - Runs `where codex` and selects the first `.exe` or `.cmd` result
@@ -162,9 +161,11 @@ Ritemark searches for the Codex binary via system PATH:
 **macOS:**
 - Runs `which codex` and uses the first result
 
-After finding the binary, Ritemark runs `codex --version` to verify. It also checks:
+For your own install, Ritemark runs `codex --version` to verify it. It also checks:
 - Node.js version used during installation vs. Ritemark's runtime version
 - Architecture match (detects Rosetta/x64 installs on Apple Silicon)
+
+The Claude and Codex cards in Settings show which copy is in use: **Bundled with app** or **System installation**.
 
 ### Authentication
 
@@ -174,10 +175,11 @@ Codex uses **ChatGPT OAuth** - click "Sign in with ChatGPT" to open a browser fo
 
 | Problem | Solution |
 |---------|----------|
-| "Codex CLI not found" | Run `npm install -g @openai/codex@latest` in a terminal |
+| "Codex runtime not found" | The copy of Codex that ships with Ritemark is missing. Reinstall Ritemark. With **Use system install**, also check your own install (`npm install -g @openai/codex`) |
+| "The bundled Codex runtime could not start" | Reinstall Ritemark. "Repair Codex" repairs only your own install; for the bundled copy it tells you to reinstall Ritemark |
 | "spawn codex ENOENT" | Update Ritemark - this was a known bug with Windows path resolution |
-| Binary broken after Node update | Click "Repair Codex" to open a repair terminal |
-| Node version mismatch warning | Reinstall Codex using the same Node version as Ritemark |
+| Your own Codex install broke after a Node update | Click "Repair Codex" to open a repair terminal |
+| Node version mismatch warning | Applies to your own install only. Reinstall Codex using the same Node version as Ritemark, or set **Runtime preference** back to **Bundled** |
 
 ---
 
@@ -300,15 +302,15 @@ You can also pin a custom agent from the [Agent Library](agent-library.md) for t
 
 ## Environment Checks
 
-On Windows, Ritemark performs additional environment checks before allowing setup:
+On Windows, Ritemark checks for what the agents actually need. The Claude and Codex that ship with Ritemark need neither Git nor Node.js, so those two checks run only when **Settings → Agent Runtime → Runtime preference** is **Use system install**:
 
-| Check | Why | Recovery |
-|-------|-----|----------|
-| Git installed | Required by Claude installer | Install [Git for Windows](https://git-scm.com/download/win) |
-| PowerShell available | Required for Claude install/login scripts | Restore PowerShell on your system |
-| Node.js installed | Required for Codex npm install | Install [Node.js](https://nodejs.org) |
+| Check | When | Why | Recovery |
+|-------|------|-----|----------|
+| PowerShell available | Always | Built into Windows. Claude installation and sign-in use it, and Claude runs its commands in PowerShell when Git is not installed | Restore PowerShell on your system |
+| Git installed | Use system install only | A Claude you installed yourself may need Git Bash | Install [Git for Windows](https://git-scm.com/download/win), or set **Runtime preference** back to **Bundled** |
+| Node.js installed | Use system install only | A Claude or Codex installed with npm runs on Node.js | Install [Node.js](https://nodejs.org), or set **Runtime preference** back to **Bundled** |
 
-These checks appear as an "Environment checks" notice in the setup wizard. Fix the listed issues before proceeding with agent installation.
+These checks appear as an "Environment checks" notice in the setup wizard, and Git and Node.js appear in the first-run checklist only with **Use system install**. Only a missing PowerShell stops Claude installation; Git and Node.js never block it.
 
 After installing a prerequisite, you may need to **reload the window** for Ritemark to detect the change (PATH updates require a restart).
 
@@ -327,7 +329,7 @@ The detail view uses the active conversation's shared runtime/model state. It sh
 
 A check beside a context category means that category is present in the current composer state. It is not a guarantee that the agent can read only those items. Depending on the selected permission mode and approvals, an agent can read other workspace files or use tools while completing the task.
 
-The active-file chip can be removed before sending. Browser context is shown and sent only for Claude Code and Codex; OpenCode does not currently receive the integrated-browser context. Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
+The active-file chip can be removed before sending. The shared browser page is shown and sent with your messages only for Claude Code and Codex; OpenCode does not receive it. On macOS, OpenCode can still read a page you shared through its browser tools (see [In-app Browser](browser.md#re-observing-a-page--browser_snapshot)). Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
 
 AI output can be inaccurate or incomplete. Review facts, sources, calculations, commands, and file changes before relying on, publishing, or acting on the result. Approval controls reduce unintended actions; they do not verify correctness.
 
@@ -374,7 +376,7 @@ If no email appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue
 
 Credentials are stored locally using the operating system's secure storage and the installed runtime. AI sidebar requests are not proxied through a Productory server; the selected runtime connects to its provider using your account or key. Files stay on your computer as files, but prompts and relevant file, selection, attachment, browser, conversation, and tool context can be transmitted when you invoke cloud-connected AI.
 
-Separately, Ritemark sends anonymous product-usage events to PostHog when analytics is enabled (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents. If you explicitly submit written feedback, the feedback text you enter is sent with that event. You can disable analytics in Ritemark settings.
+Separately, Ritemark sends anonymous product-usage events to PostHog when analytics is enabled (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents. If you explicitly submit written feedback, the feedback text you enter is sent with that event. To turn analytics off, choose **Opt Out** in the notice Ritemark shows on first launch, or turn off `ritemark.analytics.enabled` in Settings (Cmd+, on macOS, Ctrl+, on Windows).
 
 ---
 

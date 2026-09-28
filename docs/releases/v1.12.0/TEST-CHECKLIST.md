@@ -106,6 +106,20 @@ Fixtures: `docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/re
 - [ ] Dark theme: the zoom menu, the Open in Word menu and the find bar are dark and readable
 - [ ] A Markdown file still opens in the editor, and its Cmd+F find bar works as before
 
+### RC3 fixes (2026-09-28)
+
+- [ ] Launch Ritemark with the AI sidebar open: it responds at once, with no pause while Claude and Codex are checked (#366, #367) — also with **Use system install** and a Codex installed through npm
+- [ ] The Welcome page's launch check has no "Ritemark needs Node." line (macOS; Windows with the bundled runtimes) (#363)
+- [ ] Windows, bundled runtimes, a machine without Node.js or Git: no Node or Git advice in the setup notice or the first-run checklist, and Claude installs and runs (#359 — this was not tried on Windows before RC3)
+- [ ] Open a page in the browser and answer **Deny** on "Share with Agent?": no Browser chip in the composer, and the ⓘ dialog lists no shared page. Share it: the chip appears and the page is sent (#358)
+- [ ] Windows: a shared browser page reaches Claude with your message (#358)
+- [ ] macOS, OpenCode: ask it to read a shared page; it uses its browser tools (#357)
+- [ ] Hover the × on each composer chip: "Remove from this message" (#355)
+- [ ] A fresh profile, before any agent is set up: **Report AI issue** in the status bar opens the report window (#317)
+- [ ] A pinned comment: Edit, Delete, Mark as done and Send each do their action, and the comment stays pinned (#318)
+- [ ] Settings → Updates with an update available: no "0" beside **Pause 7 Days** (#360)
+- [ ] Codex: sign in and chat; no repeated keychain prompts (Codex probe change)
+
 ### PowerPoint preview (Sprint 125)
 
 Fixtures: `docs/development/releases/v1.12.0/sprint-125-powerpoint-preview/research/corpus/` (`ppt/` holds the PowerPoint-saved forms; `ppt/11-powerpoint-themed.pptx` was styled by PowerPoint with its Berlin theme).

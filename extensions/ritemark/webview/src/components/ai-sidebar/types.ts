@@ -30,6 +30,7 @@ export interface RuntimeCapabilityFlags {
   liveModeSwitch: boolean;
   structuredPlanSteps: boolean;
   thinkingEffortSource: 'model-catalog' | 'runtime-live';
+  browserContext: boolean;
 }
 
 export interface AgentInfo {
@@ -177,6 +178,9 @@ export interface AgentEnvironmentStatus {
   platform: string;
   gitInstalled: boolean;
   nodeInstalled: boolean;
+  /** Only a system-installed runtime on Windows needs Git / Node.js; the bundled ones do not. */
+  gitRequired: boolean;
+  nodeRequired: boolean;
   powershellAvailable: boolean;
   restartRequired: boolean;
   diagnostics: string[];
@@ -193,6 +197,8 @@ export interface OnboardingStatus {
   wingetAvailable: boolean;
   gitInstalled: boolean;
   nodeInstalled: boolean;
+  gitRequired: boolean;
+  nodeRequired: boolean;
   claudeCliInstalled: boolean;
   claudeCliAuthenticated: boolean;
   codexCliInstalled: boolean;
