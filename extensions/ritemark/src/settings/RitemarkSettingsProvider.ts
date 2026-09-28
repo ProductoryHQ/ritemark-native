@@ -28,6 +28,7 @@ import {
 } from '../agent';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
+import { runProcess } from '../utils/runProcess';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -828,20 +829,17 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       this.codexAuth?.getStatus() ?? Promise.resolve(null),
     ]);
 
-    // Check system dependencies
-    const { execSync } = require('child_process');
+    // Check system dependencies. The Welcome page asks for this at every launch
+    // into an empty window, so the version checks run without blocking the
+    // extension host; same shell and timeout as the execSync calls they replace.
     let nodeInstalled = environmentStatus.nodeInstalled;
-    let nodeVersion: string | null = null;
     let gitInstalled = environmentStatus.gitInstalled;
-    let gitVersion: string | null = null;
-
-    try {
-      nodeVersion = execSync('node --version', { timeout: 5000 }).toString().trim();
-    } catch { /* not installed */ }
-
-    try {
-      gitVersion = execSync('git --version', { timeout: 5000 }).toString().trim().replace('git version ', '');
-    } catch { /* not installed */ }
+    const [nodeProbe, gitProbe] = await Promise.all([
+      runProcess('node', ['--version'], { shell: true, timeout: 5000 }),
+      runProcess('git', ['--version'], { shell: true, timeout: 5000 }),
+    ]);
+    const nodeVersion = nodeProbe.status === 0 ? nodeProbe.stdout.trim() : null;
+    const gitVersion = gitProbe.status === 0 ? gitProbe.stdout.trim().replace('git version ', '') : null;
 
     return {
       codexAvailable: codexStatus.available && codexStatus.runnable,

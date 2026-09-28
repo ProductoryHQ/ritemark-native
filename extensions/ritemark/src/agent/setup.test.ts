@@ -316,8 +316,7 @@ async function testOnboardingStatus() {
 }
 
 // ── Probes run asynchronously ──
-// The extension host has one JS thread; a probe must never hold it while Claude
-// starts. runProcess stands in for spawnSync with the same result shape.
+// (utils/runProcess is tested on its own; these tests watch a probe in flight.)
 
 async function waitFor(condition: () => boolean, message: string): Promise<void> {
   const deadline = Date.now() + 5000;
@@ -325,90 +324,6 @@ async function waitFor(condition: () => boolean, message: string): Promise<void>
     assert.ok(Date.now() < deadline, message);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function testRunProcess() {
-  const { runProcess } = __testOnly;
-
-  // Output and exit code come back as spawnSync reported them.
-  {
-    const result = await runProcess(
-      process.execPath,
-      ['-e', 'process.stdout.write("out"); process.stderr.write("err"); process.exitCode = 3'],
-      { timeout: 10_000 },
-    );
-    assert.deepStrictEqual(result, { status: 3, stdout: 'out', stderr: 'err' });
-  }
-
-  // A missing binary is a result, not an exception.
-  {
-    const result = await runProcess(join(tmpdir(), 'ritemark-no-such-claude'), ['--version'], { timeout: 10_000 });
-    assert.strictEqual(result.status, null);
-    assert.strictEqual(result.error?.code, 'ENOENT');
-    assert.strictEqual(result.stdout, '');
-  }
-
-  // On timeout the child is killed and the output so far is kept: getClaudeVersion
-  // accepts a version printed by a run that did not end cleanly.
-  {
-    const dir = mkdtempSync(join(tmpdir(), 'ritemark-setup-test-'));
-    const pidFile = join(dir, 'pid');
-    const script = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`
-      + ` process.stdout.write('2.1.0 (Claude Code)\\n'); setInterval(() => {}, 1000);`;
-    try {
-      const result = await runProcess(process.execPath, ['-e', script], { timeout: 2000 });
-      assert.strictEqual(result.status, null);
-      assert.strictEqual(result.error?.code, 'ETIMEDOUT');
-      assert.strictEqual(result.stdout, '2.1.0 (Claude Code)\n');
-      const pid = Number(readFileSync(pidFile, 'utf-8'));
-      await waitFor(() => !isAlive(pid), 'the timed-out child is still running');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }
-
-  // A child that ignores SIGTERM is killed outright, and the answer comes only
-  // once it has exited: repeated probes of a hung binary never pile up processes.
-  if (process.platform !== 'win32') {
-    const dir = mkdtempSync(join(tmpdir(), 'ritemark-setup-test-'));
-    const pidFile = join(dir, 'pid');
-    const script = `process.on('SIGTERM', () => {}); require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`
-      + ` setInterval(() => {}, 1000);`;
-    try {
-      const started = Date.now();
-      const result = await runProcess(process.execPath, ['-e', script], { timeout: 1000 });
-      assert.strictEqual(result.error?.code, 'ETIMEDOUT');
-      const pid = Number(readFileSync(pidFile, 'utf-8'));
-      assert.strictEqual(isAlive(pid), false, 'the answer came while the child was still running');
-      assert.ok(Date.now() - started < 5000, 'the answer came within the timeout and the kill grace');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }
-
-  // Output is capped at spawnSync's 1 MiB: past it the child is stopped (ENOBUFS)
-  // and the output kept stays within the cap.
-  {
-    const result = await runProcess(
-      process.execPath,
-      ['-e', 'const line = "x".repeat(64 * 1024); setInterval(() => { process.stdout.write(line); }, 1);'],
-      { timeout: 10_000 },
-    );
-    assert.strictEqual(result.status, null);
-    assert.strictEqual(result.error?.code, 'ENOBUFS');
-    assert.ok(result.stdout.length <= 1024 * 1024, `kept ${result.stdout.length} bytes`);
-  }
-
-  console.log('runProcess tests passed');
 }
 
 // A fake Claude CLI. Each run reads its answers before logging itself, so the
@@ -571,7 +486,6 @@ async function testSetupStatusProbe() {
 
 async function main() {
   await testOnboardingStatus();
-  await testRunProcess();
   await testSetupStatusProbe();
   console.log('setup.test.ts passed');
 }
