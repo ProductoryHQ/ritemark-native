@@ -88,7 +88,7 @@ A dialog title is chrome. A welcome screen title is a moment. Never confuse them
 - **The Productory gradient.** The pink → lavender → blue gradient belongs to the parent brand. It doesn't appear in Ritemark chrome, Ritemark marketing, or Ritemark slides. Full stop.
 - **Dashboard multi-color.** No orange CTAs, no teal secondary accents, no purple tags, no color-coded "status" beyond the semantic green/amber/red for genuinely semantic states.
 - **shadcn defaults.** shadcn/ui is the component library, but the defaults are the developer-friendly-modern-SaaS look. Ritemark overrides the focus ring, the CTA shadow, the radii, and the muted tones. If a new component looks like it came out of a shadcn example, it isn't done yet.
-- **Emoji.** No emoji in UI copy, in marketing, in slides. Icons are Lucide, 16px in dense UI, 20px in comfortable UI, stroke 1px (already set in `webview/src/index.css`).
+- **Emoji.** No emoji in UI copy, in marketing, in slides. Icons are Phosphor at regular weight, 12/14/16/20px only, always through the `Icon` wrapper (see `iconography.md`).
 - **Decorative dark mode.** No purple gradients, no neon accents, no glow effects in dark. Dark mode is structurally the same as light — Deep Space surface, indigo accent, ivory ink — the palette just inverts.
 
 ## The test

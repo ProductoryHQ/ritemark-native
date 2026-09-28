@@ -19,21 +19,16 @@ Get Ritemark from GitHub:
 
 ## 2. Install
 
+**macOS:**
 1. Drag **Ritemark** to your **Applications** folder
 2. Eject the disk image
+3. Open Ritemark from Applications
 
-### First Launch
+Ritemark is signed and notarized by Apple. The first time you open it, macOS asks whether you want to open an app downloaded from the internet. Click **Open**.
 
-When you first open Ritemark, macOS may show a security warning:
+**Windows:** run `Ritemark-Setup.exe` and follow the installer. Ritemark then appears in the Start menu.
 
-> "Ritemark" cannot be opened because Apple cannot check it for malicious software.
-
-**To open anyway:**
-1. **Right-click** (or Control-click) on Ritemark in Applications
-2. Select **Open** from the menu
-3. Click **Open** in the dialog
-
-You only need to do this once. After that, Ritemark opens normally.
+System requirements and uninstall steps are in [Installing Ritemark](installation.md).
 
 ---
 

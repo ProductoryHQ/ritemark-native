@@ -21,6 +21,13 @@ import {
   readAgentRuntimePreference,
 } from '../utils/bundledAgentRuntime';
 
+/**
+ * Shown when the user asks to repair the Codex that ships with Ritemark. It has
+ * no install of its own to repair; reinstalling Ritemark restores it.
+ */
+export const BUNDLED_CODEX_REPAIR_MESSAGE =
+  'Codex ships with Ritemark and cannot be repaired on its own. If it does not work, reinstall Ritemark to restore it.';
+
 export interface CodexManagerConfig {
   onStdout?: (data: string) => void;
   onStderr?: (data: string) => void;
@@ -36,6 +43,7 @@ export interface CodexBinaryStatus {
   installNodeVersion: string | null;
   runtimeNodeVersion: string;
   diagnostics: string[];
+  /** npm command that repairs a system install; null for the bundled runtime. */
   repairCommand: string | null;
   installNodeArch: string | null;
   runtimeNodeArch: string;
@@ -247,16 +255,24 @@ export class CodexManager {
     const machineArch = this.getMachineArch();
 
     if (!binary) {
+      // Not even the bundled runtime resolved. With the default preference that
+      // means the copy inside Ritemark is missing, and only reinstalling
+      // Ritemark restores it; npm advice applies to the user's own install only.
+      const preferSystem = readAgentRuntimePreference() === 'system';
       return {
         available: false,
         runnable: false,
         version: null,
-        error: 'Codex CLI not found.',
+        error: preferSystem
+          ? 'Codex runtime not found. Check your own Codex install (npm install -g @openai/codex), or reinstall Ritemark to restore the bundled agent.'
+          : 'Codex runtime not found. Reinstall Ritemark to restore the bundled agent.',
         binaryPath: null,
         installNodeVersion: null,
         runtimeNodeVersion,
         diagnostics: [],
-        repairCommand: this.buildRepairCommand(null, runtimeNodeVersion, machineArch, null),
+        repairCommand: preferSystem
+          ? this.buildRepairCommand(null, runtimeNodeVersion, machineArch, null)
+          : null,
         installNodeArch: null,
         runtimeNodeArch,
         machineArch,
@@ -269,6 +285,11 @@ export class CodexManager {
     const binaryPath = binary.binaryPath;
     const installNodeVersion = this.extractNvmNodeVersion(binaryPath);
     const installNodeArch = this.getBinaryArchitecture(binaryPath);
+    // Only a system install has a repair command. The bundled runtime ships
+    // inside Ritemark, so reinstalling Ritemark is its only repair.
+    const repairCommand = binary.runtimeSource === 'system'
+      ? this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch)
+      : null;
 
     // `codex-app-server` supports `--version` from 0.135.0 onwards (output:
     // `codex-app-server <semver>`). Older bundled releases (≤ 0.130.0) rejected
@@ -323,12 +344,12 @@ export class CodexManager {
         available: true,
         runnable: probeOk,
         version: reportedVersion,
-        error: probeError,
+        error: probeError ? this.describeLaunchFailure(binary.runtimeSource, probeError) : null,
         binaryPath,
         installNodeVersion,
         runtimeNodeVersion,
         diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-        repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+        repairCommand,
         installNodeArch,
         runtimeNodeArch,
         machineArch,
@@ -363,7 +384,7 @@ export class CodexManager {
             installNodeVersion,
             runtimeNodeVersion,
             diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-            repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+            repairCommand,
             installNodeArch,
             runtimeNodeArch,
             machineArch,
@@ -379,12 +400,12 @@ export class CodexManager {
           available: true,
           runnable: false,
           version: null,
-          error,
+          error: this.describeLaunchFailure(binary.runtimeSource, error),
           binaryPath,
           installNodeVersion,
           runtimeNodeVersion,
           diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+          repairCommand,
           installNodeArch,
           runtimeNodeArch,
           machineArch,
@@ -399,12 +420,12 @@ export class CodexManager {
           available: true,
           runnable: false,
           version: null,
-          error: error.message,
+          error: this.describeLaunchFailure(binary.runtimeSource, error.message),
           binaryPath,
           installNodeVersion,
           runtimeNodeVersion,
           diagnostics: this.buildDiagnostics(binaryPath, installNodeVersion, runtimeNodeVersion, installNodeArch, runtimeNodeArch, machineArch),
-          repairCommand: this.buildRepairCommand(installNodeVersion, runtimeNodeVersion, machineArch, installNodeArch),
+          repairCommand,
           installNodeArch,
           runtimeNodeArch,
           machineArch,
@@ -458,9 +479,7 @@ export class CodexManager {
     // Check if binary is installed
     const status = await this.getBinaryStatus();
     if (!status.available) {
-      throw new Error(
-        'Codex runtime is not available. Bundle a Codex runtime with Ritemark or install Codex manually.'
-      );
+      throw new Error(status.error ?? 'Codex runtime not found.');
     }
     if (!status.runnable) {
       throw new Error(status.error || 'Codex CLI is installed but could not be started.');
@@ -552,10 +571,13 @@ export class CodexManager {
     machineArch: string
   ): string[] {
     const diagnostics: string[] = [];
+    // The bundled runtime is a native binary. Node.js versions and
+    // architectures only matter for an npm install, which runs on one.
+    const bundled = binaryPath !== null && isBundledAgentRuntimePath(binaryPath);
 
     if (binaryPath) {
       diagnostics.push(`Binary: ${binaryPath}`);
-      if (isBundledAgentRuntimePath(binaryPath)) {
+      if (bundled) {
         diagnostics.push('Runtime source: bundled with Ritemark');
       }
     }
@@ -565,11 +587,15 @@ export class CodexManager {
     }
 
     if (installNodeArch) {
-      diagnostics.push(`Global install Node architecture: ${installNodeArch}`);
+      diagnostics.push(bundled
+        ? `Binary architecture: ${installNodeArch}`
+        : `Global install Node architecture: ${installNodeArch}`);
     }
 
-    diagnostics.push(`Ritemark is running with Node v${runtimeNodeVersion}`);
-    diagnostics.push(`Ritemark runtime Node architecture: ${runtimeNodeArch}`);
+    if (!bundled) {
+      diagnostics.push(`Ritemark is running with Node v${runtimeNodeVersion}`);
+      diagnostics.push(`Ritemark runtime Node architecture: ${runtimeNodeArch}`);
+    }
 
     if (machineArch !== runtimeNodeArch) {
       diagnostics.push(`Machine architecture is ${machineArch}, but Ritemark runtime Node is ${runtimeNodeArch}`);
@@ -579,7 +605,7 @@ export class CodexManager {
       diagnostics.push(`Node mismatch detected: CLI install is under v${installNodeVersion}, but Ritemark is running v${runtimeNodeVersion}`);
     }
 
-    if (machineArch === 'arm64' && installNodeArch === 'x86_64') {
+    if (!bundled && machineArch === 'arm64' && installNodeArch === 'x86_64') {
       diagnostics.push('Rosetta/x64 Node install detected. This can install the wrong Codex binary on Apple Silicon.');
     }
 
@@ -685,7 +711,9 @@ export class CodexManager {
     const target = nodeBinary ?? binaryPath;
 
     try {
-      const result = spawnSync('/usr/bin/file', [target], {
+      // -b: leave the path out of the output, so a path such as
+      // binaries/agents/darwin-arm64/ cannot read as the architecture.
+      const result = spawnSync('/usr/bin/file', ['-b', target], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       });
@@ -710,6 +738,13 @@ export class CodexManager {
 
     const firstLine = trimmed.split(/\r?\n/).map(line => line.trim()).find(Boolean);
     return firstLine ?? 'Codex CLI failed to start.';
+  }
+
+  /** A system install is repaired with its npm command; the bundled runtime by reinstalling Ritemark. */
+  private describeLaunchFailure(runtimeSource: CodexRuntimeSource, failure: string): string {
+    return runtimeSource === 'bundled'
+      ? `The bundled Codex runtime could not start (${failure}). Reinstall Ritemark to restore it.`
+      : failure;
   }
 
   private inspectCompatibility(binaryPath: string, version: string | null, launchMode: CodexLaunchMode): CodexCompatibilityStatus {

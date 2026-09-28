@@ -296,7 +296,7 @@ Used in dense power-user UIs (Library filter rail, Agents filter bar, Search sco
 Optional affordances:
 
 - **Count suffix**: `<span class="ritemark-filter-chip__count">12</span>` — `font-variant-numeric: tabular-nums`, `color: var(--r-ink-muted)` in idle state, `color: var(--r-accent-deep)` when selected. Never bold; the count is secondary.
-- **Dismiss X**: when the chip represents an applied filter (not a picker), include a trailing `×` button that removes it. `14px` lucide `x` icon, ghost-colored.
+- **Dismiss X**: when the chip represents an applied filter (not a picker), include a trailing `×` button that removes it. `14px` Phosphor `x` icon, ghost-colored.
 - **Leading dot**: for status facets (broken/stale/duplicated), a 6px colored dot can precede the label — reuse `.ritemark-dot` sizing but inline.
 
 Non-negotiables:

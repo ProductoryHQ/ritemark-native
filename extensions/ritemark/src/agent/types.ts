@@ -192,6 +192,12 @@ export interface AgentEnvironmentStatus {
   platform: NodeJS.Platform;
   gitInstalled: boolean;
   nodeInstalled: boolean;
+  /**
+   * Whether setup asks for Git for Windows / Node.js. The bundled runtimes need
+   * neither, so only a system-installed runtime on Windows does (see setup.ts).
+   */
+  gitRequired: boolean;
+  nodeRequired: boolean;
   powershellAvailable: boolean;
   restartRequired: boolean;
   diagnostics: string[];
@@ -209,9 +215,11 @@ export interface OnboardingStatus {
   platform: 'win32' | 'darwin';
   // Package manager (Windows only)
   wingetAvailable: boolean;
-  // System-level dependencies
+  // System-level dependencies (required only for a system-installed runtime on Windows)
   gitInstalled: boolean;
   nodeInstalled: boolean;
+  gitRequired: boolean;
+  nodeRequired: boolean;
   // CLI agents
   claudeCliInstalled: boolean;
   claudeCliAuthenticated: boolean;

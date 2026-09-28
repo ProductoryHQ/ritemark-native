@@ -5,7 +5,7 @@
 import assert from 'assert';
 import { __testOnly } from './setup';
 
-const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthStatusJson } = __testOnly;
+const { deriveClaudeSetupStatus, recommendedEnvironmentAction, systemRuntimeToolsRequired, parseClaudeAuthStatusJson } = __testOnly;
 
 {
   const status = deriveClaudeSetupStatus({
@@ -144,10 +144,18 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthSt
   assert.strictEqual(parseClaudeAuthStatusJson('not json'), undefined);
 }
 
+// Git and Node.js are asked for only with a system-installed runtime on Windows:
+// the bundled claude.exe and codex-app-server.exe need neither.
+assert.strictEqual(systemRuntimeToolsRequired('win32', 'system'), true);
+assert.strictEqual(systemRuntimeToolsRequired('win32', 'bundled'), false);
+assert.strictEqual(systemRuntimeToolsRequired('darwin', 'system'), false);
+assert.strictEqual(systemRuntimeToolsRequired('darwin', 'bundled'), false);
+
 {
   const action = recommendedEnvironmentAction({
-    platform: 'win32',
+    gitRequired: true,
     gitInstalled: false,
+    nodeRequired: true,
     nodeInstalled: true,
     restartRequired: false,
   });
@@ -157,8 +165,9 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthSt
 
 {
   const action = recommendedEnvironmentAction({
-    platform: 'win32',
+    gitRequired: true,
     gitInstalled: true,
+    nodeRequired: true,
     nodeInstalled: false,
     restartRequired: false,
   });
@@ -168,8 +177,9 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthSt
 
 {
   const action = recommendedEnvironmentAction({
-    platform: 'win32',
+    gitRequired: true,
     gitInstalled: false,
+    nodeRequired: true,
     nodeInstalled: false,
     restartRequired: true,
   });
@@ -177,10 +187,12 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction, parseClaudeAuthSt
   assert.strictEqual(action, 'reload');
 }
 
+// Bundled runtimes: missing Git and Node.js recommend nothing.
 {
   const action = recommendedEnvironmentAction({
-    platform: 'darwin',
-    gitInstalled: true,
+    gitRequired: false,
+    gitInstalled: false,
+    nodeRequired: false,
     nodeInstalled: false,
     restartRequired: false,
   });
@@ -218,6 +230,9 @@ async function testOnboardingStatus() {
     assert.strictEqual(status.claudeCliInstalled, true);
     assert.strictEqual(status.claudeCliAuthenticated, true);
     assert.strictEqual(status.anyAgentReady, true);
+    // Outside VS Code the preference reads as 'bundled', so onboarding lists no Git or Node.js.
+    assert.strictEqual(status.gitRequired, false);
+    assert.strictEqual(status.nodeRequired, false);
   }
 
   // When nothing is ready, anyAgentReady should be false

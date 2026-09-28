@@ -23,11 +23,12 @@ export function SetupWizard() {
   const needsInstall = setupStatus.state === 'not-installed';
   const needsAuth = setupStatus.state === 'needs-auth';
   const loginInProgress = setupStatus.state === 'auth-in-progress';
-  const missingGit = environmentStatus?.platform === 'win32' && !environmentStatus?.gitInstalled;
-  const missingNode = environmentStatus?.platform === 'win32' && !environmentStatus?.nodeInstalled;
+  const missingGit = Boolean(environmentStatus?.gitRequired) && !environmentStatus?.gitInstalled;
+  const missingNode = Boolean(environmentStatus?.nodeRequired) && !environmentStatus?.nodeInstalled;
   const missingPowerShell = environmentStatus?.platform === 'win32' && !environmentStatus?.powershellAvailable;
   const installOrRepairStep = needsInstall || (isBroken && setupStatus.repairAction !== 'reload');
-  const installBlockedByEnvironment = installOrRepairStep && (missingGit || missingNode || missingPowerShell);
+  // Claude's installer runs in PowerShell and needs neither Git nor Node.js.
+  const installBlockedByEnvironment = installOrRepairStep && missingPowerShell;
   const loginBlockedByEnvironment = needsAuth && missingPowerShell;
   const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
