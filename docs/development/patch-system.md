@@ -25,6 +25,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `013-ritemark-configuration-defaults.patch` | Product configuration defaults |
 | `014-ritemark-save-receipts.patch` | Exact successful-save identity for editor–disk synchronization |
 | `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars |
+| `016-ritemark-store-acquisition-policy.patch` | No external software-acquisition promotion: no Git download button in Source Control, no install links in the welcome page launch check (Microsoft Store policy 10.1.5) |
+| `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when a runtime needs Node.js (`nodeRequired` from `ritemark.getHealthStatus`) |
 
 ## Commands
 

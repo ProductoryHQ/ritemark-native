@@ -815,6 +815,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     claudeAvailable: boolean;
     claudeAuthenticated: boolean;
     nodeInstalled: boolean;
+    /** The Welcome page shows its Node line only when true (patch 017). */
+    nodeRequired: boolean;
     nodeVersion: string | null;
     gitInstalled: boolean;
     gitVersion: string | null;
@@ -847,6 +849,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       claudeAvailable: claudeStatus.runnable,
       claudeAuthenticated: claudeStatus.authenticated,
       nodeInstalled,
+      nodeRequired: environmentStatus.nodeRequired,
       nodeVersion,
       gitInstalled,
       gitVersion,
