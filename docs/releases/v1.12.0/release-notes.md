@@ -1,7 +1,5 @@
 # Ritemark 1.12.0 Release Notes
 
-> Draft. Each v1.12.0 sprint adds its section here; the release manager edits the whole file before publishing.
-
 ## Publish to Google Docs
 
 Sprint 119 lets you hand a document to people who live in Google Docs without giving up Markdown.

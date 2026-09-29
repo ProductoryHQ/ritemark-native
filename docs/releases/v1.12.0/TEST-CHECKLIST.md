@@ -1,6 +1,6 @@
 # Ritemark 1.12.0 Test Checklist
 
-> **Feature complete (2026-09-25); no candidate yet.** Every sprint's rows are written: 118–120, 122–127, and the PDF search follow-up (#344). The release manager fills in the candidate, automated-check and mounted-DMG sections once a candidate exists.
+> **Released 2026-09-29 as v1.12.0 (RC3).** Source commit `e5739a32a67bc2ceba480792ea736ffbf196183b` (tag `v1.12.0`). The first candidate failed on the Word preview (2026-09-26) and RC2 (`53b40354`) was superseded after passing Gate 1; both are recorded in the [release plan](../../development/releases/v1.12.0/release-plan.md)'s decisions log.
 
 Release: Publish to Google Docs + Everyday UX ([release plan](../../development/releases/v1.12.0/release-plan.md)).
 
@@ -20,13 +20,27 @@ Release: Publish to Google Docs + Everyday UX ([release plan](../../development/
 | 125 | PowerPoint preview: slides that scroll with speaker notes, the Word toolbar and find bar, chart fixes, links through the usual prompt, plain refusals; the host check now unpacks each part with a cap (Word files too); `ritemark.features.powerpoint-preview` kill switch | Gate 1, and **Gate 2 for Windows**: the PowerPoint app check is new there |
 | 127 | Claude Code 2.1.281 with Opus 5.5; the Claude model list follows the sign-in method; a model that is not available is named instead of swapped silently | Gate 1 (Max subscription), and **Gate 2 for the new Claude Code on x64 and Windows** |
 
+## RC3 — 2026-09-28 (released)
+
+Built in `.worktrees/release-e5739a32a67b-4`, a clean-room release worktree at `origin/main`.
+
+| Platform | Built | Signed | Notarization | Published asset |
+| --- | --- | --- | --- | --- |
+| macOS arm64 | locally, DMG 2026-09-28 14:57 EEST | `JKBSC3ZDT5`, hardened runtime; `codesign --verify --deep --strict` passes | `9edc82a0-d49c-4d5f-ab78-9be715d1325e`, Accepted, stapled | `Ritemark-arm64.dmg`, 638,310,551 bytes, SHA-256 `f697c59f55c853b7c3ceb4225a888c59abe617b8adf4c75cc46a83550ba32f78` |
+| macOS x64 | CI run `36412574103`, signed here against `RITEMARK_RELEASE_COMMIT`, DMG 2026-09-28 19:52 EEST | 50 components, 0 failures; `JKBSC3ZDT5`, hardened runtime | `8601ded7-0f8b-43b8-97a0-3873877186f1`, Accepted, stapled | `Ritemark-x64.dmg`, 678,591,258 bytes, SHA-256 `17217f96ab226cf6cc714f523629eb22e637ae90197fb03455f70e8fc0876129` |
+| Windows x64 | CI run `36412578323` | Productory Services OÜ; standard-user roundtrip `passed` | not applicable | `Ritemark-Setup.exe`, 455,544,200 bytes, SHA-256 `9a9f1f178fb06e9e8d0b98069f5a5102c33b5803c71597a7c9f04af3042ce5dc` |
+
+Published 2026-09-29T17:16:16Z as Latest on `jarmo-productory/ritemark-public`, with `update-feed.json` (22 releases, v1.11.0 retained). The same Windows installer is at `https://getritemark.com/windows/v1.12.0/Ritemark-Setup.exe` (uploaded 2026-09-29; a fresh anonymous download matched size and SHA-256). Closeout evidence is in [`evidence/`](evidence/closeout.md).
+
 ## Automated checks (before handover)
 
-_To be filled for the candidate: `validate-qa.sh`, preflight, `build-prod.sh`, byte-identical `media/webview.js`, provenance, `ritemarkVersion` 1.12.0._
-
-- [ ] `scripts/check-google-oauth-build.mjs` passes on the built extension for every platform (the client ID and secret compiled in from the CI secrets or `~/.config/ritemark/release.env`)
-- [ ] `(cd extensions/ritemark && npm run check:anthropic-models)` passes on the release source (Sprint 127 R10)
-- [ ] `./scripts/verify-agent-runtimes.sh` passes on the release Mac for Claude Code 2.1.281, and the runtime matrix gets its **Last verified** line (release-manager Step 2b)
+- [x] `validate-qa.sh` exits 0 on the release source plus the closeout docs (2026-09-29)
+- [x] `build-prod.sh` passed its source gate and built clean from `e5739a32`
+- [x] `media/webview.js` and `media/office-preview.js` in the built app are byte-identical to the release source; 0 zero-byte `.js` under `out/`
+- [x] Embedded provenance records `sourceCommit=e5739a32`; `ritemarkVersion` is `1.12.0`; patch 017 is in the built workbench
+- [x] `scripts/check-google-oauth-build.mjs` passes on the built extension for every platform: re-run on the darwin-arm64 and darwin-x64 apps on 2026-09-29; the macOS x64 and Windows CI builds run the same check
+- [x] `(cd extensions/ritemark && npm run check:anthropic-models)` passes on the release source (catalog v1371, 2026-09-29). It warns that Sonnet 5.5 (`claude-sonnet-5-5`) is in Anthropic's main list but not in the bundled lineup; the bundled Claude Code supports it. See the release plan's decisions log
+- [x] `./scripts/verify-agent-runtimes.sh` on the release Mac: Claude Code 2.1.281, OpenCode 1.18.30, its ripgrep 15.1.0 and Codex app-server 0.154.0 match the manifest. Its OpenCode rows failed twice because the first free model the probe picks, `opencode/ling-3.0-flash-fin-free`, answered "Endpoint is unavailable". With the next free model that answered, `opencode/longcat-2.5-preview-free`, the same probe against the same binary passed all four rows. Recorded in the runtime matrix
 
 ## ⛔ Gate 1 — Jarmo, on the installed arm64 DMG (un-notarized)
 
@@ -155,7 +169,7 @@ Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-mod
 - [ ] Strike through a word, save, close and reopen: still struck through. Type `~/Downloads` and `a~b~c`, save and reopen: exactly as typed
 - [ ] Dark theme: the AI sidebar's menus and the table of contents' right-click menu have a dark background (they were white with pale text)
 
-**Gate 1 verdict:** _pending_
+**Gate 1 verdict:** passed. RC2: Jarmo, *"Gate 1 Approved!"*, then superseded (release plan, 2026-09-28). RC3: Jarmo, 2026-09-29, *"Gate 1 approved"*, on the arm64 DMG with SHA-256 `ad974b0389c5507acdd217fb0251717a9ef14a7e062fdbfb0f7ad60382b9a5a3` before stapling. The verdict was given for the gate as a whole; individual items above were not reported separately.
 
 ## ⛔ Gate 2 — Jarmo, on the x64 DMG (un-notarized) + Windows installer
 
@@ -179,7 +193,7 @@ Full scenario matrix: `docs/development/releases/v1.12.0/sprint-127-day-zero-mod
 - [ ] With the microphone blocked in Settings → Privacy & security → Microphone, Record explains it, and **Microphone Settings** opens that page
 - [ ] Quit mid-recording and reopen: **Recording interrupted** is offered and saves a playable file
 
-**Gate 2 verdict:** _pending_
+**Gate 2 verdict:** passed. Jarmo, 2026-09-29, *"windowsis ha x64 testitud ja kõik on OK!"*, on the x64 DMG with SHA-256 `52141303bb311c0e25d6a464921d2e82ee24327fc42661bb079ecf8d25d5a3cd` before stapling and the Windows installer above. The verdict was given for the gate as a whole; individual items above were not reported separately.
 
 ## Not verifiable before the gates
 
