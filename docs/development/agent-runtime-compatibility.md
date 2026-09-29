@@ -21,7 +21,11 @@ Evidence: [Sprint 127 served-catalog audit](./releases/v1.12.0/sprint-127-day-ze
 | Native execution (darwin-arm64, darwin-x64, win32-x64) | **not proven here.** This session ran on linux-x64. `verify-agent-runtimes.sh` refuses unsupported hosts, and its OpenCode checks are unchanged by this bump. The proof comes from Gate 1 (arm64 DMG), Gate 2 (x64 DMG and Windows installer), and PR CI. |
 | Authenticated turn on Opus 5.5 | **not proven here.** No credentials were used. A Max subscription session is QA scenario S35. |
 
-Release-manager Step 2b runs `./scripts/verify-agent-runtimes.sh` on the release Mac and adds the **Last verified** line for 2.1.281 here.
+**Last verified:** 2026-09-29, on the release Mac (darwin-arm64) against the v1.12.0 release worktree at `e5739a32`.
+- **Version discovery:** passes. `claude` 2.1.281, `opencode` 1.18.30, its ripgrep 15.1.0 and `codex-app-server` 0.154.0 match the manifest, and the Codex code-mode host starts.
+- **OpenCode rows:** `verify-agent-runtimes.sh` exited 1 twice, and the cause was the probe's model, not the gate. The probe takes the first free model on offer, `opencode/ling-3.0-flash-fin-free`, and both runs errored with "Upstream request failed: Endpoint is unavailable" before the agent tried to write, so `gate-pauses` could not pass.
+- **Same probe, next free model:** run with `opencode/longcat-2.5-preview-free`, the next free model that answered, against the same binary and ACP SDK. All four rows passed: a write pauses for approval, denial blocks it, approval writes, and cancel settles `cancelled` with the process alive.
+- **Rest of the evidence:** native x64 and Windows execution, and an authenticated Opus 5.5 turn on all three platforms, came from Gate 1 and Gate 2 (Jarmo, 2026-09-29).
 
 Probe evidence: [cli-2.1.281-probes.json](./releases/v1.12.0/sprint-127-day-zero-models/research/evidence/cli-2.1.281-probes.json) and [canary-smoke-2026-09-24.json](./releases/v1.12.0/sprint-127-day-zero-models/research/evidence/canary-smoke-2026-09-24.json).
 

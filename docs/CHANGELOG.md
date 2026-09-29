@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — v1.12.0
+## [1.12.0] — 2026-09-29
 
 ### Added
 - **Claude Opus 5.5 (Sprint 127, #343).** Ritemark now bundles Claude Code 2.1.281, the version Anthropic requires for Opus 5.5, so Opus 5.5 appears in the Claude Code model menu for subscription and API-key users alike. If you had chosen Opus, you move to Opus 5.5 automatically. Sonnet 5 stays the recommended default.
