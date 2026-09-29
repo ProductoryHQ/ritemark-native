@@ -42,4 +42,16 @@ Left out on purpose:
 
 ## 10.3 Clear the build output and re-audit
 
-Pending: recorded after this evidence is on `origin`.
+This evidence was pushed first (PR #372). The auto-mode classifier then refused the deletion of `dist/`, `VSCode-darwin-arm64/` and `VSCode-darwin-x64/` from the agent session, as it did for v1.10.1 and v1.11.0, so clearing the output is Jarmo's step.
+
+Audit on 2026-09-29, before clearing:
+
+```
+BLOCKED  .worktrees/release-e5739a32a67b-4 — build output present: VSCode-darwin-arm64/ (2 entries), VSCode-darwin-x64/ (2 entries), dist/ (11 entries)
+```
+
+## 10.4 Removal
+
+Removal is Jarmo's call.
+
+The same audit lists `.worktrees/store-v1120` (branch `codex/store-v1120`, the Store update's Codex worktree) as `REVIEW`. So `--clean` would remove it too. Do not run `--clean` while that work is in progress.
