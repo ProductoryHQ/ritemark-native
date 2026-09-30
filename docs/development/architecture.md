@@ -145,7 +145,7 @@ extensions/ritemark/src/
 ├── commentTasks/    Comment→agent tasks — durable store, typed protocol, controller, prompt builder
 ├── googleDocs/      Publish to Google Docs — OAuth, account, link store, Docs API mapper, publisher, controller
 ├── editorSync/      Markdown/CSV disk-model-view coordinator, typed protocol, retry and three-way state
-├── ai/              Shared AI utilities — modelConfig.ts, connectivity, analytics
+├── ai/              Shared AI utilities — modelConfig.ts (model IDs), modelCatalog/ (model lists), connectivity
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
@@ -1091,10 +1091,14 @@ global-to-workspace copy migration. Quota, corrupt JSON, or unavailable webview
 storage may degrade History but can neither throw out of bootstrap nor hide the
 model selector, and original legacy records remain untouched for rollback.
 
-`src/ai/modelConfig.ts` is **retained but narrowed** — only OpenAI/Gemini image arrays,
-`DEFAULT_MODELS` (image defaults), and the `ModelConfig` types remain. Deleted: `CLAUDE_MODELS`,
+`src/ai/modelConfig.ts` is the model-ID registry: every canonical model ID lives in its
+per-provider `*_MODEL_IDS` constants, which `bundledCatalog.ts` imports. It also keeps the
+OpenAI/Gemini LLM `ModelConfig` arrays (the Flow LLM executor reads API type and reasoning effort
+from the OpenAI one), the image-model arrays, `DEFAULT_MODELS` (Flow and assistant defaults) and
+the `ModelConfig` types. LLM model lists for pickers and runtimes come from `modelCatalog`; the
+Flow editor's image pickers read the image arrays here. Sprint 89 deleted `CLAUDE_MODELS`,
 `DEFAULT_MODEL`, `BYOK_PROVIDER_MODELS`, `ClaudeModelOption`, `ByokProvider`/`ByokModelOption`/
-`toOpenCodeModelValue`; deleted files `src/agent/claudeModels.ts` + `src/codex/codexModels.ts`.
+`toOpenCodeModelValue`, and the files `src/agent/claudeModels.ts` + `src/codex/codexModels.ts`.
 
 ---
 
