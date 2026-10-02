@@ -143,6 +143,13 @@ function getDisplayPath(fullPath: string): string {
   return fullPath;
 }
 
+// The model and permission menus open inside the conversation column — it is
+// their collision boundary — and are no wider than the room it gives them, so
+// the thread rail beside the column covers nothing. A menu is never narrower
+// than 8rem, though: in a side bar under about 195 px it runs on over the rail,
+// which is why it sits one layer above it (rail z-60, menus z-70).
+const COMPOSER_MENU = 'z-[70] max-w-[var(--radix-select-content-available-width)]';
+
 interface ChatInputProps {
   /**
    * Requests the host to open the report window (#317). Owned by AISidebar,
@@ -150,9 +157,14 @@ interface ChatInputProps {
    * survives onboarding/setup states where ChatInput itself isn't rendered.
    */
   onReport: () => void;
+  /**
+   * The conversation column this composer sits in. The model and permission
+   * menus open inside it, so the thread rail beside it never covers them.
+   */
+  menuBoundary: HTMLElement | null;
 }
 
-export function ChatInput({ onReport }: ChatInputProps) {
+export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
@@ -1343,19 +1355,27 @@ export function ChatInput({ onReport }: ChatInputProps) {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[360px]:gap-1 max-[360px]:px-1">
+        {/* Two layouts. The labelled row is 450 px at its widest ("Plan only" and
+            "Effort · Medium" beside the 144 px model button) and the composer is
+            82 px narrower than the webview (thread rail 56, padding 24, border 2),
+            so the labels show from a 532 px webview. Below that the row is
+            compact — the model name, with mode and effort as icons — so no label
+            is cut short and the row keeps its shape when a setting changes. */}
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[531px]:gap-1 max-[531px]:px-1">
           <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
             <SelectTrigger
-              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[360px]:w-auto max-[360px]:max-w-none max-[360px]:flex-1 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
               title={runtimeFooterLabel}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
-                <span className="max-[360px]:hidden">{runtimeFooterLabel}</span>
-                <span className="hidden max-[360px]:inline">{runtimeModelLabel}</span>
+                <span className="max-[531px]:hidden">{runtimeFooterLabel}</span>
+                <span className="hidden max-[531px]:inline">{runtimeModelLabel}</span>
               </div>
             </SelectTrigger>
             <SelectContent
+              collisionBoundary={menuBoundary}
               className={[
+                COMPOSER_MENU,
                 'max-h-[min(72vh,28rem)]',
                 '[&_[data-radix-select-viewport]]:max-h-[min(72vh,28rem)]',
                 '[&_[data-radix-select-viewport]]:overflow-y-scroll',
@@ -1492,7 +1512,7 @@ export function ChatInput({ onReport }: ChatInputProps) {
             }}
           >
             <SelectTrigger
-              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[360px]:w-6 max-[360px]:justify-center max-[360px]:gap-0 max-[360px]:px-1 max-[360px]:[&>svg]:hidden"
+              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[531px]:w-6 max-[531px]:justify-center max-[531px]:gap-0 max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
               aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
               title={composerPolicy.planFirst && planCapable
                 ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'
@@ -1507,19 +1527,19 @@ export function ChatInput({ onReport }: ChatInputProps) {
                   name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
                   size={12}
                 />
-                <span className="max-[360px]:sr-only">
+                <span className="max-[531px]:sr-only">
                   {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
                 </span>
               </div>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent collisionBoundary={menuBoundary} className={COMPOSER_MENU}>
               <SelectItem value="ask">
                 <div className="flex flex-col">
                   <span className="flex items-center gap-1.5 text-[13px]">
                     <Icon name="shield-check" size={14} />
                     Manual
                   </span>
-                  <span className="text-[11px] text-[var(--r-ink-muted)]">Approves each file change and command with you.</span>
+                  <span className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">Approves each file change and command with you.</span>
                 </div>
               </SelectItem>
               <SelectItem value="auto">
@@ -1528,7 +1548,7 @@ export function ChatInput({ onReport }: ChatInputProps) {
                     <Icon name="lightning" size={14} />
                     Auto
                   </span>
-                  <span className="text-[11px] text-[var(--r-ink-muted)]">Makes changes without asking. You review the result.</span>
+                  <span className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">Makes changes without asking. You review the result.</span>
                 </div>
               </SelectItem>
               {planCapable && (
@@ -1538,7 +1558,7 @@ export function ChatInput({ onReport }: ChatInputProps) {
                       <Icon name="clipboard-text" size={14} />
                       Plan only
                     </span>
-                    <span className="text-[11px] text-[var(--r-ink-muted)]">Plans and waits for your approval. Resets after a plan is approved.</span>
+                    <span className="text-[11px] text-[var(--r-ink-muted)] leading-snug mt-0.5">Plans and waits for your approval. Resets after a plan is approved.</span>
                   </div>
                 </SelectItem>
               )}
@@ -1579,7 +1599,7 @@ export function ChatInput({ onReport }: ChatInputProps) {
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5 max-[360px]:gap-1 max-[360px]:[&>button]:h-6 max-[360px]:[&>button]:w-6">
+          <div className="ml-auto flex items-center gap-1.5 max-[531px]:gap-1 max-[531px]:[&>button]:h-6 max-[531px]:[&>button]:w-6">
             <AIInformationButton onOpen={() => aiInformation.setOpen(true)} />
             {isAgentMode && (
               <>
