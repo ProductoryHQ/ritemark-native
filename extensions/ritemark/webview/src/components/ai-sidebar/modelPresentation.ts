@@ -29,3 +29,8 @@ export function modelDisplayName(
     : null;
   return versionLine || model.label || model.id;
 }
+
+/** The model a fresh Codex conversation starts on: the declared default, else the first row. */
+export function defaultCodexModelId(models: ModelOption[]): string | undefined {
+  return (models.find((m) => m.isDefault) ?? models[0])?.id;
+}

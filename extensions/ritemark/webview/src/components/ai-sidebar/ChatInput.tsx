@@ -27,7 +27,7 @@ import {
   useAIInformationDisclosure,
 } from './AIInformation';
 import { includesBrowserContext, resolveAIIdentity } from './aiDisclosure';
-import { modelDisplayName, parseModelDescription } from './modelPresentation';
+import { defaultCodexModelId, modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
 import { QueuePanel } from './QueuePanel';
@@ -965,7 +965,7 @@ export function ChatInput({ onReport }: ChatInputProps) {
   const canUseClaude = visibleAgents.some((a) => a.id === 'claude-code');
   const canUseCodex = visibleAgents.some((a) => a.id === 'codex');
   const currentClaudeModel = models.find((m) => m.id === selectedModel) || models[0];
-  const currentCodexModel = codexModels.find((m) => m.id === codexSelectedModel) || codexModels[0];
+  const currentCodexModel = codexModels.find((m) => m.id === codexSelectedModel) || codexModels.find((m) => m.id === defaultCodexModelId(codexModels));
   // Sprint 76 R6: OpenCode model picker — only providers whose key is configured.
   const openCodeModels: { compositeValue: string; label: string; description: string }[] = [];
   if (opencodeEnabled && byokProviderModels) {

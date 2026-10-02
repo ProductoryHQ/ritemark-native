@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { defaultCodexModelId } from './modelPresentation';
 import { vscode } from '../../lib/vscode';
 import {
   listConversations,
@@ -1867,7 +1868,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         } else if (status.codexCliAuthenticated && conversation) {
           const modelId = get().codexModels.some((model) => model.id === conversation.codexSelectedModel)
             ? conversation.codexSelectedModel
-            : get().codexModels[0]?.id;
+            : defaultCodexModelId(get().codexModels);
           if (modelId) get().selectRuntimeModel('codex', modelId);
         }
       }
@@ -2421,7 +2422,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           for (const conversation of Object.values(get().conversations)) {
             const codexSelectedModel = newCodexModels.some((m: { id: string }) => m.id === conversation.codexSelectedModel)
               ? conversation.codexSelectedModel
-              : (newCodexModels[0]?.id || conversation.codexSelectedModel);
+              : (defaultCodexModelId(newCodexModels) || conversation.codexSelectedModel);
             const candidateClaude = conversation.id === activeId
               ? (message.selectedModel || conversation.selectedModel)
               : conversation.selectedModel;
