@@ -2008,7 +2008,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         defaultClaudeModel: modelCatalog.getDefault('anthropic', 'claude-code'),
         agents: visibleAgents,
         claudeModels: modelCatalog.getModels('anthropic'),
-        codexModels: modelCatalog.getModels('codex'),
+        // The declared Codex default rides on the entry so a fresh conversation
+        // starts on it instead of whichever row the list happens to open with.
+        codexModels: (() => {
+          const defaultId = modelCatalog.getDefault('codex', 'codex');
+          return modelCatalog.getModels('codex').map((m) => (m.id === defaultId ? { ...m, isDefault: true } : m));
+        })(),
         byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
         hasSeenWelcome: config.get<boolean>('hasSeenClaudeWelcome', false),
         workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,

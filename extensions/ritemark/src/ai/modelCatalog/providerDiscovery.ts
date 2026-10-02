@@ -167,11 +167,18 @@ export async function discoverGemini(apiKey: string | null): Promise<ModelEntry[
   return out.length > 0 ? out : null;
 }
 
-/** Codex: read the CLI-maintained cache (`~/.codex/models_cache.json`). */
-export async function discoverCodex(): Promise<ModelEntry[] | null> {
+/**
+ * Codex: read the CLI-maintained cache (`~/.codex/models_cache.json`), but only
+ * when it was written by the Codex version Ritemark runs. Every Codex app on the
+ * machine rewrites this file with the list OpenAI serves to *its* version, so a
+ * cache from another version lists models Ritemark's Codex cannot run. An unknown
+ * runtime version also yields null, so the bundled/feed catalog serves.
+ */
+export async function discoverCodex(runtimeVersion: string | null): Promise<ModelEntry[] | null> {
+  if (!runtimeVersion) return null;
   try {
     const cachePath = path.join(os.homedir(), '.codex', 'models_cache.json');
-    return parseCodexModelsCache(JSON.parse(fs.readFileSync(cachePath, 'utf-8')));
+    return parseCodexModelsCache(JSON.parse(fs.readFileSync(cachePath, 'utf-8')), runtimeVersion);
   } catch {
     return null;
   }
@@ -182,8 +189,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Normalize the current object-valued effort schema and the legacy string schema. */
-export function parseCodexModelsCache(raw: unknown): ModelEntry[] | null {
+export function parseCodexModelsCache(raw: unknown, runtimeVersion?: string): ModelEntry[] | null {
   if (!isRecord(raw) || !Array.isArray(raw.models)) return null;
+  // Codex itself rejects a cache written by another client version.
+  if (runtimeVersion !== undefined && raw.client_version !== runtimeVersion) return null;
 
   const visible = raw.models
     .filter((model): model is Record<string, unknown> => (
