@@ -91,10 +91,10 @@ export function ThinkingEffortControl({
           onClick={(event) => {
             if (!supported) event.preventDefault();
           }}
-          className="flex h-6 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-transparent px-1.5 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)] aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:bg-transparent max-[360px]:w-6 max-[360px]:px-1"
+          className="flex h-6 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-transparent px-1.5 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)] aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:bg-transparent max-[531px]:w-6 max-[531px]:px-1"
         >
-          <span className="max-[360px]:hidden">{triggerLabel}</span>
-          <Icon name={COMPACT_ICONS[value]} size={14} tone="inherit" className="hidden max-[360px]:block" />
+          <span className="max-[531px]:hidden">{triggerLabel}</span>
+          <Icon name={COMPACT_ICONS[value]} size={14} tone="inherit" className="hidden max-[531px]:block" />
         </button>
       </Popover.Trigger>
 
