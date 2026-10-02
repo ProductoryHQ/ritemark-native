@@ -42,6 +42,7 @@ import {
   type DocumentRenderPayload,
 } from '../../src/editorSync/protocol'
 import { canonicalJson } from '../../src/editorSync/state'
+import { onDocChanged } from './lib/docChange'
 
 // Word documents open in the Office preview bundle (Sprint 124), not here.
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf'
@@ -756,8 +757,7 @@ function App() {
     const editor = editorRef.current
     const refresh = () => setHeadings(getHeadings(editor))
     refresh()
-    editor.on('update', refresh)
-    return () => { editor.off('update', refresh) }
+    return onDocChanged(editor, refresh)
   }, [editorReady])
 
   if (!isReady) {
