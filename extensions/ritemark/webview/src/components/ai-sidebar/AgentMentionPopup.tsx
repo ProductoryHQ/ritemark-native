@@ -6,6 +6,10 @@
  *
  * Keyboard handling is driven by the parent (ChatInput) via imperative ref,
  * not by window-level listeners — this avoids event ordering races.
+ *
+ * Like SlashCommandPopup, the popup is as wide as the composer (left and right
+ * are both set), so the conversation column never cuts it off at the thread
+ * rail; a long name or description is shortened with an ellipsis.
  */
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
@@ -79,8 +83,8 @@ export const AgentMentionPopup = forwardRef<AgentMentionPopupHandle, AgentMentio
     if (agents.length === 0) {
       return (
         <div
-          className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[240px]"
-          style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
+          className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 mx-3"
+          style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4 }}
         >
           <div className="px-3 py-2 text-xs text-[var(--r-ink-muted)]">
             No agents found
@@ -91,8 +95,8 @@ export const AgentMentionPopup = forwardRef<AgentMentionPopupHandle, AgentMentio
 
     return (
       <div
-        className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[280px] max-h-[240px] overflow-y-auto"
-        style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
+        className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 mx-3 max-h-[240px] overflow-y-auto"
+        style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4 }}
         ref={listRef}
       >
         {agents.map((agent, index) => (

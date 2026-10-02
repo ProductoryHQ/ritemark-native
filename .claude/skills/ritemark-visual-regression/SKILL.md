@@ -48,7 +48,7 @@ Complete these tests in order, adapting document names and copy to the user's pr
 6. Insert and fill a 3x3 table using Tab navigation.
 7. Save explicitly; confirm no disk-conflict or stale-file warning appears.
 8. Create a second document, use multiple tabs, then close and reopen the first document.
-9. Inspect model, permission, and effort controls; when AI access is available, run one read-only active-document request and confirm completion without file edits. A disabled effort control carrying the tooltip "This model chooses its own thinking effort." is correct, not a failure. When the release touches agent runtimes or editor sync, add one write task on the open document: the change must appear in that editor without reopening, with no conflict or "changed on disk" warning, and only that file may change.
+9. Inspect model, permission, and effort controls; when AI access is available, run one read-only active-document request and confirm completion without file edits. Open the menus with the AI side bar at its default 300 px, not only widened: every option's text and the check mark must be whole, with nothing under the conversation rail (`scripts/composer-menus-check.mjs`, below, measures it). A disabled effort control carrying the tooltip "This model chooses its own thinking effort." is correct, not a failure. When the release touches agent runtimes or editor sync, add one write task on the open document: the change must appear in that editor without reopening, with no conflict or "changed on disk" warning, and only that file may change.
 10. Execute the round-trip gate below and compare both UI and disk state.
 
 If a product area is unavailable, replace it with a comparable real-user action and record the substitution. Do not count a planned or partially executed case as completed.
@@ -139,6 +139,22 @@ exists because the v1.10.1 candidate canary paused one to two seconds between st
 exercised the host echo window; typing at tool speed with autosave on is what exposed the
 regression. Add a `window.__rmSyncTrace` probe (see the automation skill) when a result needs
 explaining, not as a release gate.
+
+## Scripted composer menu check
+
+`node scripts/composer-menus-check.mjs --port <cdp port> --profile <part of its --user-data-dir> [--width 300] [--shots <dir>]`
+drives an instance launched with its own debugging port and profile (RUNDEV or a packaged
+build) with real mouse input. It drags the AI side bar to 300 px, opens the model menu and
+the permission mode menu, and types `/` and `@` into an empty message box, then prints one
+PASS/FAIL line per check: every line of menu text and the check mark visible (inside the
+webview and not under the conversation rail), each popup inside the conversation column, the
+footer's buttons clear of the rail. It sends no prompt and empties the message box again. Exit
+1 on a failure, 2 when the side bar shows no message box (no usable agent). Needs Node 22.
+
+It exists because v1.12.0 shipped with both menus partly under the rail at the default width
+— descriptions cut mid-word, the check mark gone — after test 9 had been run at a wider side
+bar. `--width` checks another width; narrower than 223 px the footer check fails on a known
+defect (Send is under the rail), so run the gate at 300.
 
 ## Stop conditions
 

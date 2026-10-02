@@ -120,6 +120,9 @@ export function AISidebar() {
   const loadConversationList = useAISidebarStore((s) => s.loadConversationList);
   const chatFontSize = useAISidebarStore((s) => s.chatFontSize);
   const historyWasOpen = useRef(showHistoryPanel);
+  // The transcript-and-composer column. The composer's menus are kept inside
+  // it, clear of the thread rail beside it.
+  const [conversationColumn, setConversationColumn] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const wasOpen = historyWasOpen.current;
@@ -341,13 +344,13 @@ export function AISidebar() {
               flows where there's no chat input to anchor to. */}
 
           {/*
-            Sprint 99 (R6): messages + thread rail share ONE row; the composer
-            below is a sibling of that row, so it spans the full sidebar width
-            and the rail stops at the composer boundary. Do not nest ChatInput
-            inside this flex row — that was the explicit correction from Jarmo.
+            Sprint 109: header, transcript and composer share ONE column, and
+            the permanent 56 px thread rail runs the full height beside it. The
+            composer is therefore 56 px narrower than the sidebar: whatever
+            opens from it has to fit this column or be drawn above the rail.
           */}
           <div className="flex-1 min-h-0 flex overflow-hidden border-t border-[var(--r-hairline)]">
-            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <div ref={setConversationColumn} className="flex-1 min-w-0 flex flex-col overflow-hidden">
               {/* Sprint 122 (#282): the conversation you are in, named, with History's actions. */}
               <ConversationHeader />
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -374,7 +377,7 @@ export function AISidebar() {
                   alternativeRuntime={readyAlternatives[0] ?? null}
                 />
               )}
-              <ChatInput onReport={reportDialog.request} />
+              <ChatInput onReport={reportDialog.request} menuBoundary={conversationColumn} />
             </div>
             <ThreadRail />
           </div>
