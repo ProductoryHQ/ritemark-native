@@ -39,6 +39,7 @@ import {
 } from '../comment/commentTaskCopy'
 import { ALIAS_LABEL, type CommentAgentAlias } from '../../extensions/comment/commentModel'
 import type { CommentTaskError } from '../../../../src/commentTasks/protocol'
+import { onDocChanged } from '../../lib/docChange'
 
 type GroupStates = Partial<Record<CommentAgentAlias, GroupSendState>>
 
@@ -63,6 +64,7 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
   useEffect(() => {
     let timer: number | undefined
     let disposed = false
+    let offDocChanged: (() => void) | undefined
     const attach = () => {
       const editor = getEditor()
       if (!editor) { if (!disposed) window.setTimeout(attach, 300); return }
@@ -71,10 +73,10 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
         window.clearTimeout(timer)
         timer = window.setTimeout(recompute, 250)
       }
-      editor.on('update', onUpdate)
+      offDocChanged = onDocChanged(editor, onUpdate)
     }
     attach()
-    return () => { disposed = true; window.clearTimeout(timer) }
+    return () => { disposed = true; window.clearTimeout(timer); offDocChanged?.() }
   }, [getEditor, recompute])
 
   // Click-away closes the popover.
