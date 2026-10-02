@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { countWords, onDocChanged } from '../lib/docChange'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
 import { Fragment } from '@tiptap/pm/model'
@@ -851,9 +852,7 @@ export function Editor({
     if (!editor) return
 
     const updateWordCount = () => {
-      const text = editor.state.doc.textContent
-      const words = text.trim().split(/\s+/).filter(Boolean)
-      const count = words.length
+      const count = countWords(editor.state.doc)
       setWordCount(count)
       // Send word count to extension for status bar display
       sendToExtension('wordCountChanged', { wordCount: count })
@@ -862,12 +861,8 @@ export function Editor({
     // Initial count
     updateWordCount()
 
-    // Listen for updates
-    editor.on('update', updateWordCount)
-
-    return () => {
-      editor.off('update', updateWordCount)
-    }
+    // Listen for every document change, including host-applied revisions
+    return onDocChanged(editor, updateWordCount)
   }, [editor])
 
   // Create and manage the + button alongside the drag handle

@@ -56,6 +56,7 @@ import { ResizableComposer } from './comment/ResizableComposer'
 import { Button } from './ui/button'
 import { sendToExtension } from '../bridge'
 import type { CommentTaskError } from '../../../src/commentTasks/protocol'
+import { onDocChanged } from '../lib/docChange'
 
 interface RailMarker {
   key: string
@@ -720,13 +721,13 @@ export function MarginCommentRail({
     const on = () => rescan()
     // Positions only change on content edits / scroll / resize — NOT on cursor
     // moves, so we intentionally do not listen to `selectionUpdate` (audit L-C).
-    editor.on('update', on)
+    const offDocChanged = onDocChanged(editor, on)
     container.addEventListener('scroll', on, { passive: true })
     window.addEventListener('resize', on)
     const ro = new ResizeObserver(on)
     ro.observe(container)
     return () => {
-      editor.off('update', on)
+      offDocChanged()
       container.removeEventListener('scroll', on)
       window.removeEventListener('resize', on)
       ro.disconnect()

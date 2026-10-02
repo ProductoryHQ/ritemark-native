@@ -120,6 +120,28 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
+  /** Last word count reported by each Markdown panel (GH #378). */
+  private static readonly _wordCounts = new Map<vscode.WebviewPanel, number>();
+  private static _activeMarkdownPanel: vscode.WebviewPanel | null = null;
+
+  /**
+   * One status bar item serves the whole window, so it follows the active
+   * Markdown panel: it shows that panel's last count and hides when the active
+   * editor is anything else. A hidden panel keeps its webview and sends nothing
+   * on return, hence the per-panel memory.
+   */
+  private static refreshWordCountStatusBar(): void {
+    const item = RitemarkEditorProvider._wordCountStatusBar;
+    if (!item) { return; }
+    const panel = RitemarkEditorProvider._activeMarkdownPanel;
+    const count = panel ? RitemarkEditorProvider._wordCounts.get(panel) : undefined;
+    if (count === undefined) {
+      item.hide();
+      return;
+    }
+    item.text = `${count} ${count === 1 ? 'word' : 'words'}`;
+    item.show();
+  }
 
   private readonly documentSync: DocumentSyncCoordinator;
 
@@ -668,7 +690,19 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Show word count status bar only for markdown files
     const fileType = this.getFileType(document.uri.fsPath);
     if (fileType === 'markdown') {
-      RitemarkEditorProvider._wordCountStatusBar?.show();
+      if (webviewPanel.active) {
+        RitemarkEditorProvider._activeMarkdownPanel = webviewPanel;
+      }
+      webviewPanel.onDidChangeViewState((e) => {
+        const panel = e.webviewPanel;
+        if (panel.active) {
+          RitemarkEditorProvider._activeMarkdownPanel = panel;
+        } else if (RitemarkEditorProvider._activeMarkdownPanel === panel) {
+          RitemarkEditorProvider._activeMarkdownPanel = null;
+        }
+        RitemarkEditorProvider.refreshWordCountStatusBar();
+      }, undefined, this.context.subscriptions);
+      RitemarkEditorProvider.refreshWordCountStatusBar();
     }
 
     // Sprint 82 polish: when an image file the document embeds changes on disk
@@ -870,10 +904,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'wordCountChanged':
             // Update word count in status bar
-            if (RitemarkEditorProvider._wordCountStatusBar) {
-              const count = message.wordCount || 0;
-              RitemarkEditorProvider._wordCountStatusBar.text = `${count} ${count === 1 ? 'word' : 'words'}`;
-            }
+            RitemarkEditorProvider._wordCounts.set(webviewPanel, message.wordCount || 0);
+            RitemarkEditorProvider.refreshWordCountStatusBar();
             return;
 
           case 'exportPDF':
@@ -1015,10 +1047,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       imageWatcher.dispose();
       this.documentSync.disposeView(document, webview);
 
-      // Hide word count if no more Ritemark editors are open
-      if (RitemarkEditorProvider.activeWebviews.size === 0) {
-        RitemarkEditorProvider._wordCountStatusBar?.hide();
+      RitemarkEditorProvider._wordCounts.delete(webviewPanel);
+      if (RitemarkEditorProvider._activeMarkdownPanel === webviewPanel) {
+        RitemarkEditorProvider._activeMarkdownPanel = null;
       }
+      RitemarkEditorProvider.refreshWordCountStatusBar();
     });
   }
 
