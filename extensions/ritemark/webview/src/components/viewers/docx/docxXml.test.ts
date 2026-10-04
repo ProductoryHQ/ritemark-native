@@ -402,7 +402,7 @@ assert.equal(paperForLocale(undefined), 'A4');
   assert.equal(fixTableGrids('<w:p/>'), '<w:p/>');
 }
 
-// ── Default table style's cell margins (v1.12.5 fix, #369): a table with no style of its own is padded like Word's.
+// ── Default table style's cell margins (v1.13.0 fix, #369): a table with no style of its own is padded like Word's.
 {
   const cellMar = '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar>';
   const styles =
@@ -412,6 +412,9 @@ assert.equal(paperForLocale(undefined), 'A4');
   assert.equal(defaultTableCellMargin(styles), cellMar);
   assert.equal(defaultTableCellMargin('<w:styles><w:style w:type="paragraph" w:default="1"/></w:styles>'), null, 'no default table style');
   assert.equal(defaultTableCellMargin(null), null);
+  const reordered = styles.replace('w:type="table" w:default="1"', 'w:default="1" w:type="table"');
+  assert.equal(defaultTableCellMargin(reordered), cellMar, 'w:default before w:type');
+  assert.equal(defaultTableCellMargin(`<w:styles><w:style w:type="table" w:default="1"/>${styles.slice('<w:styles>'.length)}`), cellMar, 'a self-closing style is skipped');
 
   const tbl = (pr: string) => `<w:tbl><w:tblPr>${pr}</w:tblPr><w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid><w:tr/></w:tbl>`;
   const unstyled = tbl('<w:tblW w:w="0" w:type="auto"/>');

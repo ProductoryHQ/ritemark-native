@@ -403,7 +403,7 @@ export function fixTableGrids(xml: string): string {
 }
 
 /**
- * v1.12.5 fix (#369): the document's default table style ("Normal Table",
+ * v1.13.0 fix (#369): the document's default table style ("Normal Table",
  * `w:default="1"`) carries the cell margins (108 twips left/right) Word
  * applies to a table that names no style. docx-preview applies a named
  * style's margins and a table's own `w:tblCellMar`, but not the default
@@ -411,10 +411,13 @@ export function fixTableGrids(xml: string): string {
  */
 export function defaultTableCellMargin(stylesXml: string | null): string | null {
   if (!stylesXml) return null;
-  const style = /<w:style\b[^>]*\bw:type="table"[^>]*\bw:default="(?:1|true|on)"[^>]*>([\s\S]*?)<\/w:style>/.exec(stylesXml);
-  if (!style) return null;
-  const mar = /<w:tblCellMar\b[^>]*>[\s\S]*?<\/w:tblCellMar>/.exec(style[1]);
-  return mar ? mar[0] : null;
+  // Attributes may come in any order; a self-closing style has no margins to give.
+  for (const [, attrs, inner] of stylesXml.matchAll(/<w:style\b((?:[^>/]|\/(?!>))*)>([\s\S]*?)<\/w:style>/g)) {
+    if (!/\bw:type="table"/.test(attrs) || !/\bw:default="(?:1|true|on)"/.test(attrs)) continue;
+    const mar = /<w:tblCellMar\b[^>]*>[\s\S]*?<\/w:tblCellMar>/.exec(inner);
+    return mar ? mar[0] : null;
+  }
+  return null;
 }
 
 /** Give a table with neither its own style nor its own cell margins the default table style's. */

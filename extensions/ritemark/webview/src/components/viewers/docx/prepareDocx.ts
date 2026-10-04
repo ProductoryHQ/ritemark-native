@@ -157,13 +157,13 @@ export async function prepareDocx(bytes: Uint8Array, options: PrepareOptions = {
   const scanned = [documentXml];
   for (const path of Object.keys(zip.files).filter((p) => HEADER_OR_FOOTER.test(p))) {
     const xml = await zip.file(path)!.async('string');
-    const marked = markEmpty(markAnchors(mapRunSymbols(normalizeLineSpacing(markPageFields(splitFieldRuns(xml)), lineRatio))));
+    const marked = markEmpty(markAnchors(mapRunSymbols(normalizeLineSpacing(markPageFields(splitFieldRuns(applyDefaultTableCellMargin(xml, tableCellMargin))), lineRatio))));
     write(path, xml, marked);
     scanned.push(marked);
   }
   for (const path of Object.keys(zip.files).filter((p) => NOTES.test(p))) {
     const xml = await zip.file(path)!.async('string');
-    write(path, xml, markEmpty(mapRunSymbols(normalizeLineSpacing(xml, lineRatio))));
+    write(path, xml, markEmpty(mapRunSymbols(normalizeLineSpacing(applyDefaultTableCellMargin(xml, tableCellMargin), lineRatio))));
   }
   const numbering = zip.file('word/numbering.xml');
   if (numbering) {

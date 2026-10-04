@@ -111,6 +111,23 @@ async function read(data: Uint8Array, path: string): Promise<string> {
   assert.ok((await read(out.data, 'word/document.xml')).includes('NUMPAGES'));
 }
 
+// v1.13.0 fix (#369): unstyled tables in the body, a header and the footnotes get the default
+// table style's cell margins, whatever order the style's attributes come in.
+{
+  const cellMar = '<w:tblCellMar><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar>';
+  const styles = `<w:styles ${W}><w:style w:default="1" w:type="table" w:styleId="TableNormal"><w:tblPr>${cellMar}</w:tblPr></w:style></w:styles>`;
+  const table = '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>';
+  const out = await prepareDocx(await pkg({
+    'word/document.xml': body(table),
+    'word/header1.xml': `<w:hdr ${W}>${table}</w:hdr>`,
+    'word/footnotes.xml': `<w:footnotes ${W}><w:footnote w:id="1">${table}</w:footnote></w:footnotes>`,
+    'word/styles.xml': styles,
+  }));
+  for (const part of ['word/document.xml', 'word/header1.xml', 'word/footnotes.xml']) {
+    assert.ok((await read(out.data, part)).includes(cellMar), `${part} gets the default margin`);
+  }
+}
+
 // A package with no Word document in it.
 await assert.rejects(prepareDocx(await pkg({ 'ppt/presentation.xml': '<p/>' })), /no Word document/);
 
