@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
+import { AGENTS, type AgentId } from '../../../../src/agent/types';
+import { RUNTIME_CAPABILITIES } from '../../../../src/runtime/capabilities';
 import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
 import {
   createConversationState,
   isRuntimeHandoff,
   type ConversationState,
 } from './conversationState';
+import { resolveAIIdentity } from './aiDisclosure';
 import { vscode } from '../../lib/vscode';
-import type { AgentConversationTurn, CodexConversationTurn } from './types';
+import type { AgentConversationTurn, CodexConversationTurn, ExtensionMessage } from './types';
 
 const initialState = useAISidebarStore.getState();
 
@@ -511,6 +514,149 @@ function testOnboardingSelectionUsesAtomicRuntimeAndModel() {
   }
 }
 
+// ── The host's model echo (seen 2026-10-02) ───────────────────────────────────
+//
+// The bootstrap carries `ritemark.ai.selectedModel`: ONE app-wide value, the last
+// Claude model picked in any thread or window. It can lag the pick being made:
+// a Codex → Claude pick posts `ai-select-agent` and then `ai-select-model`, and
+// the host answers the first with a bootstrap before it has saved the second.
+// That echo used to replace the thread's Claude model: the button and the menu's
+// check mark showed the old model, the AI disclosure the picked one, and an idle
+// send carried the old one.
+
+const CLAUDE_CATALOG = [
+  { id: 'opus[1m]', label: 'Opus 5 with 1M context', description: 'Best for everyday, complex tasks', tier: 'high' as const, deprecated: false, order: 0, isDefault: true },
+  { id: 'sonnet', label: 'Sonnet 5', description: 'Fast & capable', tier: 'medium' as const, deprecated: false, order: 1 },
+  { id: 'haiku', label: 'Haiku 4.5', description: 'Quick & light', tier: 'low' as const, deprecated: false, order: 2 },
+];
+const CODEX_CATALOG = [
+  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Reliable agentic workhorse', tier: 'high' as const, deprecated: false, order: 0 },
+];
+
+function hostBootstrap(
+  selectedAgent: AgentId,
+  selectedModel: string,
+  models = CLAUDE_CATALOG,
+): Extract<ExtensionMessage, { type: 'agent:bootstrap' }> {
+  return {
+    type: 'agent:bootstrap',
+    generation: 1,
+    agenticEnabled: true,
+    parallelChatsEnabled: true,
+    durableAgentConversations: true,
+    composerThinkingEffortEnabled: true,
+    codexEnabled: true,
+    opencodeEnabled: false,
+    selectedAgent,
+    selectedModel,
+    agents: Object.values(AGENTS),
+    models,
+    codexModels: CODEX_CATALOG,
+    hasSeenWelcome: true,
+    claudeSdkVersion: null,
+    runtimeCapabilities: RUNTIME_CAPABILITIES,
+  };
+}
+
+function deliver(message: ExtensionMessage): void {
+  useAISidebarStore.getState().handleExtensionMessage(message);
+}
+
+/**
+ * The Claude model each composer surface uses, read the way ChatInput reads it:
+ * the model button and the menu's check mark (`selectedModel`), the AI
+ * disclosure (`resolveAIIdentity`), a prompt queued while a turn runs
+ * (`pendingRuntime.modelId`), and an idle send (the store's `agent-execute`).
+ */
+function claudeModelOnEverySurface(posted: unknown[]) {
+  const state = useAISidebarStore.getState();
+  const active = selectActiveConversation(state);
+  const button = (state.models.find((model) => model.id === active.selectedModel) ?? state.models[0]).id;
+  const disclosure = resolveAIIdentity({
+    runtimeId: active.pendingRuntime.runtimeId,
+    pendingModelId: active.pendingRuntime.modelId,
+    claudeModelId: button,
+    claudeModels: state.models,
+    codexModels: state.codexModels,
+  }).modelId;
+  const queued = active.pendingRuntime.modelId ?? active.selectedModel;
+  state.sendAgentMessage('Which model answers?');
+  const execute = posted.find((message) => (message as { type?: string }).type === 'agent-execute') as { model?: string } | undefined;
+  return { button, disclosure, queued, sent: execute?.model };
+}
+
+function testClaudePickAfterCodexSurvivesTheHostsLateEcho() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    deliver(hostBootstrap('claude-code', 'sonnet'));
+    useAISidebarStore.getState().selectRuntimeModel('codex', 'gpt-5.6-sol');
+    deliver(hostBootstrap('codex', 'sonnet'));
+    posted.length = 0;
+
+    useAISidebarStore.getState().selectRuntimeModel('claude-code', 'opus[1m]');
+    assert.deepEqual(
+      posted.map((message) => (message as { type: string }).type),
+      ['ai-select-agent', 'ai-select-model'],
+    );
+    // The host answers `ai-select-agent` before `ai-select-model` is saved.
+    deliver(hostBootstrap('claude-code', 'sonnet'));
+
+    assert.deepEqual(
+      claudeModelOnEverySurface(posted),
+      { button: 'opus[1m]', disclosure: 'opus[1m]', queued: 'opus[1m]', sent: 'opus[1m]' },
+      'the late echo of the previous model must not replace the Claude model just picked',
+    );
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testALaterBootstrapKeepsTheThreadsOwnClaudeModel() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    deliver(hostBootstrap('claude-code', 'sonnet'));
+    useAISidebarStore.getState().selectRuntimeModel('claude-code', 'haiku');
+    // Another window or thread picked Opus since; a catalog refresh, a sign-in
+    // or a Settings change re-sends the bootstrap with that app-wide value.
+    deliver(hostBootstrap('claude-code', 'opus[1m]'));
+
+    assert.deepEqual(
+      claudeModelOnEverySurface(posted),
+      { button: 'haiku', disclosure: 'haiku', queued: 'haiku', sent: 'haiku' },
+      'a bootstrap refresh must not replace the open thread’s own Claude model',
+    );
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
+function testACatalogFallbackMovesEveryComposerSurfaceTogether() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    deliver(hostBootstrap('claude-code', 'sonnet'));
+    useAISidebarStore.getState().selectRuntimeModel('claude-code', 'haiku');
+    // The catalog no longer offers Haiku: the thread falls back to the host's
+    // model, and the model the next turn runs follows the button.
+    deliver(hostBootstrap('claude-code', 'sonnet', CLAUDE_CATALOG.filter((model) => model.id !== 'haiku')));
+
+    assert.deepEqual(
+      claudeModelOnEverySurface(posted),
+      { button: 'sonnet', disclosure: 'sonnet', queued: 'sonnet', sent: 'sonnet' },
+    );
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
+
 
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
@@ -527,6 +673,9 @@ function main() {
   testSelectingCodexEmitsOnlyTheSelectionIntent();
   testRuntimeAndModelSelectionIsAtomic();
   testOnboardingSelectionUsesAtomicRuntimeAndModel();
+  testClaudePickAfterCodexSurvivesTheHostsLateEcho();
+  testALaterBootstrapKeepsTheThreadsOwnClaudeModel();
+  testACatalogFallbackMovesEveryComposerSurfaceTogether();
   console.log('Runtime switching tests passed.');
 }
 
