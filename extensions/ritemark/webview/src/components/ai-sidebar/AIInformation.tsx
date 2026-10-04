@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { openExternalUrl } from '../../bridge';
+import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
+import { Tooltip } from '../ui/tooltip';
 import {
   Dialog,
   DialogBody,
@@ -110,17 +112,33 @@ export function AIFirstUseDisclosure({ identity, onOpen, onDismiss }: AIFirstUse
   );
 }
 
-export function AIInformationButton({ onOpen }: { onOpen: () => void }) {
+/**
+ * The composer's persistent AI information entry. `className` places the
+ * tooltip's wrapper (the composer hides it where the entry folds into its
+ * "…" menu); `buttonClassName` sizes the button to the row it sits in.
+ */
+export function AIInformationButton({
+  onOpen,
+  className,
+  buttonClassName,
+}: {
+  onOpen: () => void;
+  className?: string;
+  buttonClassName?: string;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
-      title="AI information"
-      aria-label="AI information"
-    >
-      <Icon name="info" size={14} />
-    </button>
+    <Tooltip label="AI information" side="top" className={className}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className={`size-7 rounded p-0 text-[var(--r-ink-muted)] ${buttonClassName ?? ''}`}
+        aria-label="AI information"
+        onClick={onOpen}
+      >
+        <Icon name="info" size={14} className="size-3.5" />
+      </Button>
+    </Tooltip>
   );
 }
 

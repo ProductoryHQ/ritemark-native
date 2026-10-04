@@ -85,23 +85,118 @@ const DEFAULT_SIDE_BAR = 300;
 const columnAtDefault = DEFAULT_SIDE_BAR - 1 - railWidth;
 assert.ok(columnAtDefault - 2 * 10 >= 128, 'At the default 300 px side bar a composer menu fits inside the conversation column');
 
-// ── Footer row: one breakpoint, where the labelled layout fits in every state ──
+// ── Footer row: labelled, compact, folded, two rows ──
+//
+// A `max-[N px]` rule holds up to and including an N px webview, and the
+// webview is the side bar's width less 1 px.
 
-const breakpoints = new Set(
-  [...chatInput.matchAll(/max-\[(\d+)px\]:/g), ...effortControl.matchAll(/max-\[(\d+)px\]:/g)].map((match) => Number(match[1])),
+const breakpoints = [
+  ...new Set([...chatInput.matchAll(/max-\[(\d+)px\]:/g)].map((match) => Number(match[1]))),
+].sort((a, b) => b - a);
+assert.deepEqual(
+  breakpoints,
+  [531, 298, 238],
+  'The footer has three steps: compact up to a 531 px webview, folded up to 298 px, two rows up to 238 px',
 );
 assert.deepEqual(
-  [...breakpoints],
+  [...new Set([...effortControl.matchAll(/max-\[(\d+)px\]:/g)].map((match) => Number(match[1])))],
   [531],
-  'The footer is compact up to a 531 px webview in ChatInput and ThinkingEffortControl alike: its labelled layout is 450 px at its widest ("Plan only", "Effort · Medium") and the composer is 82 px narrower than the webview',
+  'The effort control turns into an icon at the same width as the rest of the footer: its labelled layout is 450 px at its widest ("Plan only", "Effort · Medium") and the composer is 82 px narrower than the webview',
+);
+assert.ok(
+  DEFAULT_SIDE_BAR - 1 > 298,
+  'The default 300 px side bar (a 299 px webview) still shows AI information and attach as buttons',
+);
+
+const classesNear = (marker: string, what: string): string[] => {
+  const at = chatInput.indexOf(marker);
+  assert.ok(at >= 0, `ChatInput has ${what}`);
+  return chatInput.slice(at, at + marker.length + 400).match(/className="([^"]*)"/)?.[1].split(' ') ?? [];
+};
+
+// Narrower than the default side bar, AI information and attach fold into one
+// "…" menu (Jarmo, 2026-10-04): the row stays one row and the model name gets
+// their room.
+assert.ok(
+  chatInput.includes(`className={isAgentMode ? 'max-[298px]:hidden' : undefined}`),
+  'AI information folds away below the default side bar width, while there is an attach button to fold with it',
+);
+assert.ok(
+  classesNear(`<Tooltip label={isLoading ? 'Attach files when the current reply has finished' : 'Attach files'}`, 'an attach button').includes('max-[298px]:hidden'),
+  'Attach folds away below the default side bar width',
+);
+const moreTrigger = classesNear('<Tooltip label="Attach files, AI information"', 'a "…" menu');
+assert.ok(
+  moreTrigger.includes('hidden') && moreTrigger.includes('max-[298px]:inline-flex'),
+  'The "…" menu shows only where the two buttons fold into it',
+);
+const moreMenu = chatInput.slice(chatInput.indexOf('<DropdownMenuContent'), chatInput.indexOf('</DropdownMenuContent>'));
+assert.ok(
+  moreMenu.includes('onSelect={() => fileInputRef.current?.click()}') && moreMenu.includes('Attach files…'),
+  'The "…" menu attaches files with the same file picker as the attach button',
+);
+assert.ok(
+  moreMenu.includes('onSelect={() => aiInformation.setOpen(true)}') && moreMenu.includes('AI information'),
+  'The "…" menu opens AI information',
+);
+assert.ok(moreMenu.includes('collisionBoundary={menuBoundary}'), 'The "…" menu collides against the conversation column, like the other composer menus');
+
+// Below a 240 px side bar even the folded row would leave the model a few
+// letters, so "…" and Send take a second row in the same corner, and the
+// model, mode and effort keep the first.
+const footerRow = classesNear('<div className="flex items-center gap-1.5 px-2 py-1.5 border-t', 'the footer row');
+assert.ok(footerRow.includes('max-[238px]:flex-wrap'), 'Below a 240 px side bar the footer may take a second row');
+const actionGroup = classesNear('<div className="ml-auto flex items-center', 'the footer action group');
+assert.ok(
+  actionGroup.includes('max-[238px]:basis-full') && actionGroup.includes('max-[238px]:justify-end'),
+  'On two rows, "…" and Send fill the second row from its right end, where Send always is',
 );
 const modelButton = chatInput.match(/<SelectTrigger\s+className="([^"]*)"\s+title=\{runtimeFooterLabel\}/)?.[1].split(' ') ?? [];
+assert.ok(
+  ['max-[238px]:basis-0', 'max-[238px]:grow', 'max-[238px]:max-w-max'].every((name) => modelButton.includes(name)),
+  'On two rows the model button takes the first row\'s free room, up to the length of its name, so the mode and effort icons stay beside it',
+);
 assert.ok(modelButton.includes('max-[531px]:w-auto'), 'The compact model button is as wide as the model name');
 // (Spelled as a suffix on purpose: Tailwind scans this file too, and a literal
 // class name here would put the very rule being ruled out into the bundle.)
 assert.ok(
   !modelButton.some((name) => name.endsWith(':flex-1')),
   'The compact model button does not stretch over the free part of the row, which would push the mode and effort icons against Send',
+);
+
+// "Plan off" (175 px, unbreakable) pushed Send off the card at the default
+// width, and the 5-second effort note was cut to "…": both sit on their own
+// line above the controls row, where they wrap.
+const rowStart = chatInput.indexOf('<div className="flex items-center gap-1.5 px-2 py-1.5 border-t');
+const planOff = chatInput.lastIndexOf('Plan off — not supported by this runtime');
+const effortNote = chatInput.indexOf('{thinkingEffortNotice || localEffortNotice}');
+assert.ok(planOff >= 0 && planOff < rowStart, '"Plan off" is not an item of the controls row');
+assert.ok(effortNote >= 0 && effortNote < rowStart, 'The effort note is not an item of the controls row');
+assert.ok(
+  !chatInput.slice(planOff - 120, planOff).includes('whitespace-nowrap'),
+  '"Plan off" wraps instead of holding the row open',
+);
+
+// ── Context chips: a narrow side bar shortens the name, never the × ──
+
+const chipClasses = [...chatInput.matchAll(/className=[{"`]+(inline-flex[^"`]*rounded-md text-\[10px\][^"`]*)/g)].map((match) => match[1].split(' '));
+assert.equal(chipClasses.length, 5, 'The composer has five kinds of context chip: active file, browser, path, pinned agent, @ mention');
+for (const classes of chipClasses) {
+  assert.ok(
+    classes.includes('min-w-0') && classes.includes('max-w-full'),
+    'A context chip is never wider than the card, so its name is shortened before its remove button is cut off',
+  );
+}
+
+// ── Message box ──
+
+assert.ok(
+  chatInput.includes("${value ? 'overflow-y-auto' : 'overflow-y-hidden'}"),
+  'An empty message box shows no scrollbar: one that appeared in a narrow side bar used to keep itself after widening',
+);
+assert.ok(
+  chatInput.includes("el.style.height = value ? `${el.scrollHeight}px` : '';") && chatInput.includes('}, [value, userHeight, composerWidth]);'),
+  'The message box fits its text again when the side bar is resized, and an empty box keeps its two-row height instead of fitting the wrapped placeholder',
 );
 
 // ── `/` and `@` popups ──
@@ -140,6 +235,15 @@ for (const [popup, markup] of popups) {
   assert.ok(/(?:^|;)left:0/.test(style) && /(?:^|;)right:0/.test(style), `${popup} is held between the composer's left and right edges`);
   assert.ok(classes.includes('mx-3'), `${popup} lines up with the composer's card, 12 px in from each edge`);
   assert.ok(!classes.some((name) => name.startsWith('min-w-')), `${popup} has no minimum width that could push it past the conversation column`);
+}
+// With the first-use AI notice in a 170 px side bar a 280 px list ran 99 px past
+// the top of the panel: a popup is never taller than the room above the composer.
+for (const [popup, render, ceiling] of [
+  ['The slash command popup', (maxHeight: number) => renderToStaticMarkup(createElement(SlashCommandPopup, { query: '', onSelect: noop, onClose: noop, position, maxHeight })), 280],
+  ['The @ mention popup', (maxHeight: number) => renderToStaticMarkup(createElement(AgentMentionPopup, { query: '', onSelect: noop, onClose: noop, position, maxHeight })), 240],
+] as const) {
+  assert.ok(/max-height:143px/.test(render(143)), `${popup} is no taller than the room above the composer`);
+  assert.ok(new RegExp(`max-height:${ceiling}px`).test(render(900)), `${popup} keeps its ${ceiling} px ceiling where there is more room`);
 }
 const [, commandsMarkup] = popups[0];
 const [, agentsMarkup] = popups[2];

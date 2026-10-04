@@ -11,14 +11,20 @@
 //      and the check mark are inside the visible part of the menu — not outside the webview,
 //      and not under the conversation rail when the rail paints above the menu;
 //   3. types "/" and "@" into an empty message box and checks that each popup lies inside
-//      the conversation column, then empties the box again;
-//   4. checks that the footer's buttons (info, attach, send) are not under the rail.
-// It never sends a prompt. One PASS/FAIL line per check; exit 0 when all pass, 1 on a
-// failure, 2 when the side bar has no message box to check (no usable agent, or hidden).
+//      the conversation column and below the top of the panel, then empties the box again;
+//   4. checks that the footer's buttons on show (info, attach or "…", send) are inside the
+//      conversation column and the message box, and prints the footer's rows and how much
+//      of the model name shows;
+//   5. where AI information and attach fold into the "…" menu (narrower than 300 px), opens
+//      it and checks that both items can be read.
+// It never sends a prompt or picks a menu item. One PASS/FAIL line per check; exit 0 when
+// all pass, 1 on a failure, 2 when the side bar has no message box to check (no usable
+// agent, or hidden).
 //
 // Why it exists: v1.12.0 shipped with both menus partly under the rail at the default
 // width — the descriptions cut mid-word, the check mark gone — and the "/" popup cut off at
 // the column's edge. The controls were inspected in the release pass, but at a wider side bar.
+// Below a 223 px side bar Send itself was under the rail; run it at 170, 200, 223, 250, 300.
 //
 // Needs Node 22 (global fetch and WebSocket). No dependencies.
 
@@ -292,7 +298,7 @@ const MEASURE_POPUP = `
   if (!popup) return { value: box.value, popup: null };
   const column = d.querySelector('aside[aria-label="Conversations"]').getBoundingClientRect().left;
   const b = popup.getBoundingClientRect();
-  return { value: box.value, popup: { left: +b.left.toFixed(1), right: +b.right.toFixed(1), width: +b.width.toFixed(1) }, column: +column.toFixed(1), cut: +Math.max(0, b.right - column, -b.left).toFixed(1), sideways: popup.scrollWidth > popup.clientWidth + 1 };
+  return { value: box.value, popup: { left: +b.left.toFixed(1), right: +b.right.toFixed(1), width: +b.width.toFixed(1), top: +b.top.toFixed(1) }, column: +column.toFixed(1), cut: +Math.max(0, b.right - column, -b.left).toFixed(1), sideways: popup.scrollWidth > popup.clientWidth + 1 };
 `;
 
 const messageBox = await inSidebar(`const t = d.querySelector('textarea[aria-label="Message"]'); const b = t.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, value: t.value, disabled: t.disabled };`);
@@ -314,7 +320,11 @@ if (messageBox.value || messageBox.disabled) {
     }
     await screenshot(`${name.replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '')}-popup`);
     if (!state.popup) report(false, `${name} popup`, `typing "${character}" opened no popup`);
-    else report(state.cut === 0 && !state.sideways, `${name} popup: inside the conversation column`, state.cut ? `popup ${state.popup.left}–${state.popup.right} px (${state.popup.width} px wide), column ends at ${state.column} px: ${state.cut} px cut off` : state.sideways ? 'scrolls sideways' : `popup ${state.popup.left}–${state.popup.right} px, column ends at ${state.column} px`);
+    else {
+      report(state.cut === 0 && !state.sideways, `${name} popup: inside the conversation column`, state.cut ? `popup ${state.popup.left}–${state.popup.right} px (${state.popup.width} px wide), column ends at ${state.column} px: ${state.cut} px cut off` : state.sideways ? 'scrolls sideways' : `popup ${state.popup.left}–${state.popup.right} px, column ends at ${state.column} px`);
+      // The popup opens upward; with the first-use AI notice in a narrow side bar it used to run past the top.
+      report(state.popup.top >= 0, `${name} popup: its top is inside the panel`, state.popup.top < 0 ? `${-state.popup.top} px above the top` : `top at ${state.popup.top} px`);
+    }
     // Empty the message box again and prove it.
     await inSidebar(`const t = d.querySelector('textarea[aria-label="Message"]'); t.focus(); t.select(); return true;`);
     for (const type of ['keyDown', 'keyUp']) {
@@ -331,15 +341,67 @@ if (messageBox.value || messageBox.disabled) {
 
 // ── 4. The footer's buttons ──
 
+// Narrower than the default side bar, AI information and attach fold into a "…" menu, and
+// below a 240 px side bar "…" and Send take a second row. Only the buttons on show count.
 const footer = await inSidebar(`
   const model = ${TRIGGERS.model};
   if (!model) return null;
+  const row = model.parentElement;
+  const card = row.parentElement;
   const column = d.querySelector('aside[aria-label="Conversations"]').getBoundingClientRect().left;
-  const buttons = [...model.parentElement.querySelectorAll('button')].map((b) => ({ name: b.getAttribute('aria-label') || b.getAttribute('title') || b.innerText.trim(), right: b.getBoundingClientRect().right }));
+  const cardRight = card.getBoundingClientRect().right - parseFloat(w.getComputedStyle(card).borderRightWidth);
+  const buttons = [...row.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => ({ name: b.getAttribute('aria-label') || b.getAttribute('title') || b.innerText.trim(), right: b.getBoundingClientRect().right, top: Math.round(b.getBoundingClientRect().top) }));
   const worst = buttons.reduce((a, b) => (b.right > a.right ? b : a), buttons[0]);
-  return { column: +column.toFixed(1), count: buttons.length, worst: worst.name.slice(0, 40), over: +Math.max(0, worst.right - column).toFixed(1) };
+  const text = model.querySelector('div');
+  const shown = [...text.querySelectorAll('span')].find((s) => w.getComputedStyle(s).display !== 'none') || text;
+  const range = d.createRange();
+  range.selectNodeContents(shown);
+  return {
+    column: +column.toFixed(1), count: buttons.length, worst: worst.name.slice(0, 40),
+    over: +Math.max(0, worst.right - column).toFixed(1), outOfCard: +Math.max(0, worst.right - cardRight).toFixed(1),
+    rows: new Set(buttons.map((b) => b.top)).size, names: buttons.map((b) => b.name.split(/[:,]/)[0].slice(0, 16)),
+    model: shown.textContent, modelShown: +Math.min(text.clientWidth, range.getBoundingClientRect().width).toFixed(1), modelWidth: +range.getBoundingClientRect().width.toFixed(1),
+  };
 `);
-if (footer) report(footer.over === 0, `footer: all ${footer.count} buttons are inside the conversation column`, footer.over ? `"${footer.worst}" is ${footer.over} px under the rail` : '');
+if (footer) {
+  console.log(`INFO footer: ${footer.rows} row(s) — ${footer.names.join(' | ')}; model "${footer.model}" shows ${footer.modelShown} of ${footer.modelWidth} px`);
+  report(footer.over === 0, `footer: all ${footer.count} buttons are inside the conversation column`, footer.over ? `"${footer.worst}" is ${footer.over} px under the rail` : '');
+  report(footer.outOfCard === 0, `footer: all ${footer.count} buttons are inside the message box`, footer.outOfCard ? `"${footer.worst}" sticks out ${footer.outOfCard} px` : '');
+}
+
+// ── 5. The "…" menu, where AI information and attach fold into it ──
+
+const more = await inSidebar(`const t = d.querySelector('button[aria-label^="More: attach"]'); if (!t || !t.getBoundingClientRect().width) return null; const b = t.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 };`);
+if (!more) {
+  console.log(`INFO "…" menu: not shown at ${WIDTH} px (AI information and attach are buttons)`);
+} else {
+  const MEASURE_MORE = `
+    const menu = d.querySelector('[role="menu"]');
+    if (!menu) return { open: false };
+    const rail = d.querySelector('aside[aria-label="Conversations"]');
+    const wrapper = menu.closest('[data-radix-popper-content-wrapper]') || menu;
+    const layer = (el) => Number(w.getComputedStyle(el).zIndex) || 0;
+    const visibleRight = Math.min(w.innerWidth, layer(rail) >= layer(wrapper) ? rail.getBoundingClientRect().left : Infinity);
+    const box = menu.getBoundingClientRect();
+    const items = [...menu.querySelectorAll('[role="menuitem"]')].map((item) => { const range = d.createRange(); range.selectNodeContents(item); const r = range.getBoundingClientRect(); return { text: item.textContent.trim(), cut: +Math.max(0, r.right - visibleRight, -r.left, -r.top).toFixed(1) }; });
+    return { open: true, items, top: +box.top.toFixed(1) };
+  `;
+  let state = { open: false };
+  for (let attempt = 0; attempt < 2 && !state.open; attempt++) {
+    await click(g.frame.x + more.x, g.frame.y + more.y);
+    await sleep(400);
+    state = await inSidebar(MEASURE_MORE);
+  }
+  await screenshot('more-menu');
+  if (!state.open) report(false, '"…" menu', 'did not open');
+  else {
+    const texts = state.items.map((item) => item.text).join(', ');
+    report(/Attach files/.test(texts) && /AI information/.test(texts), '"…" menu: holds Attach files and AI information', texts);
+    const cut = state.items.filter((item) => item.cut > 0.5);
+    report(cut.length === 0, '"…" menu: every item can be read', cut.map((item) => `${item.text} (${item.cut} px)`).join('; '));
+  }
+  await escape();
+}
 
 workbench.close();
 sidebar.close();
