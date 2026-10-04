@@ -214,7 +214,7 @@ ritemark-native/
 │   │   ├── browser/             # Integrated browser — CDP panel, MCP server, action tools
 │   │   ├── flows/               # Flow engine — scheduler, executor, storage
 │   │   ├── features/            # Feature flags (flags.ts registry)
-│   │   ├── ai/                  # Shared AI — modelConfig.ts, connectivity, analytics
+│   │   ├── ai/                  # Shared AI — modelConfig.ts (model IDs), modelCatalog/ (model lists), connectivity
 │   │   ├── views/               # UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 │   │   ├── settings/            # Settings page bridge
 │   │   ├── utils/               # Binary resolution, platform utils, bundledAgentRuntime
@@ -226,7 +226,7 @@ ritemark-native/
 │   ├── webview/                 # React webview (TipTap editor + AI sidebar)
 │   ├── media/                   # webview.js bundle (~7.6 MB IIFE — see GH #107)
 │   └── binaries/agents/         # Bundled agent binaries (gitignored) + manifest.json
-├── patches/vscode/              # Numbered patch files (001-*.patch … 010-*.patch)
+├── patches/vscode/              # Numbered patch files (listed under "Current patches" above)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output (macOS)
@@ -251,17 +251,14 @@ New issues are auto-triaged by a scheduled cloud routine (2×/day): small extens
 
 ## AI Model Configuration
 
-All AI model identifiers must live in `extensions/ritemark/src/ai/modelConfig.ts`. Never hardcode model IDs anywhere else.
+Model data lives in two places. Read the files for their current exports.
 
-**Current state (pre-Sprint 79):** Three locations exist — `modelConfig.ts` (OpenAI/BYOK models), `src/agent/types.ts` (`CLAUDE_MODELS`), `src/codex/codexModels.ts` (Codex dynamic list). Sprint 79 consolidates all into `modelConfig.ts`.
+- **`extensions/ritemark/src/ai/modelConfig.ts`** — every model ID, plus the image-model lists, the Flow defaults and per-model API settings.
+- **`extensions/ritemark/src/ai/modelCatalog/`** — the LLM model lists and defaults that agent runtimes, model pickers and Flow LLM nodes use, resolved at runtime from live probes, the remote feed and a bundled baseline. Public API: `index.ts`; bundled baseline: `bundledCatalog.ts`.
 
-**After Sprint 79:** The single-source rule is strictly true. Import from:
+Never hardcode a model ID outside `modelConfig.ts`; the catalog imports its IDs from there too. Code that needs an LLM model list asks the catalog rather than keeping its own.
 
-```typescript
-import { CLAUDE_MODELS, OPENAI_LLM_MODELS, BYOK_PROVIDER_MODELS } from '../ai/modelConfig';
-```
-
-For webview code, the extension sends model config via the `flow:modelConfig` message into `webview/src/config/modelConfig.ts`.
+The webview imports neither file; the extension sends it the lists. The AI sidebar gets them in the `agent:bootstrap` message (`src/views/agentSidebarProtocol.ts`), the Flow editor in `flow:modelConfig` (`webview/src/config/modelConfig.ts`).
 
 * * *
 
