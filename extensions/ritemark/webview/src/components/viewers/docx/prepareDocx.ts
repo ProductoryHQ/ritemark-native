@@ -4,6 +4,8 @@
  */
 import JSZip from 'jszip';
 import {
+  applyDefaultTableCellMargin,
+  defaultTableCellMargin,
   documentFont,
   dropFontEmbeds,
   dropRedundantPageMarkers,
@@ -139,6 +141,7 @@ export async function prepareDocx(bytes: Uint8Array, options: PrepareOptions = {
   const stylesFile = zip.file('word/styles.xml');
   const stylesXml = stylesFile ? await stylesFile.async('string') : null;
   const flowStyles = paragraphStyles(stylesXml);
+  const tableCellMargin = defaultTableCellMargin(stylesXml);
   const themeFile = zip.file('word/theme/theme1.xml');
   const font = documentFont(stylesXml, themeFile ? await themeFile.async('string') : null);
   // A font Word's installation may not have (a brand font) is often embedded: its own metrics then.
@@ -148,19 +151,19 @@ export async function prepareDocx(bytes: Uint8Array, options: PrepareOptions = {
   const honourPageMarkers = hasPageMarkers(original);
   let documentXml = honourPageMarkers ? dropRedundantPageMarkers(original) : original;
   documentXml = markPageFields(splitFieldRuns(documentXml));
-  documentXml = fixTableGrids(ensurePageSetup(documentXml, options.paper));
+  documentXml = applyDefaultTableCellMargin(fixTableGrids(ensurePageSetup(documentXml, options.paper)), tableCellMargin);
   documentXml = markEmpty(markAnchors(mapRunSymbols(normalizeLineSpacing(documentXml, lineRatio))));
 
   const scanned = [documentXml];
   for (const path of Object.keys(zip.files).filter((p) => HEADER_OR_FOOTER.test(p))) {
     const xml = await zip.file(path)!.async('string');
-    const marked = markEmpty(markAnchors(mapRunSymbols(normalizeLineSpacing(markPageFields(splitFieldRuns(xml)), lineRatio))));
+    const marked = markEmpty(markAnchors(mapRunSymbols(normalizeLineSpacing(markPageFields(splitFieldRuns(applyDefaultTableCellMargin(xml, tableCellMargin))), lineRatio))));
     write(path, xml, marked);
     scanned.push(marked);
   }
   for (const path of Object.keys(zip.files).filter((p) => NOTES.test(p))) {
     const xml = await zip.file(path)!.async('string');
-    write(path, xml, markEmpty(mapRunSymbols(normalizeLineSpacing(xml, lineRatio))));
+    write(path, xml, markEmpty(mapRunSymbols(normalizeLineSpacing(applyDefaultTableCellMargin(xml, tableCellMargin), lineRatio))));
   }
   const numbering = zip.file('word/numbering.xml');
   if (numbering) {

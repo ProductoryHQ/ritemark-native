@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import {
   NUMPAGES_FIELD_MARK,
   PAGE_FIELD_MARK,
+  applyDefaultTableCellMargin,
+  defaultTableCellMargin,
   describeUnsupported,
   documentFont,
   dropFontEmbeds,
@@ -398,6 +400,37 @@ assert.equal(paperForLocale(undefined), 'A4');
     'the docx library writes 100 twips per column and leaves the rest to autofit',
   );
   assert.equal(fixTableGrids('<w:p/>'), '<w:p/>');
+}
+
+// ── Default table style's cell margins (v1.13.0 fix, #369): a table with no style of its own is padded like Word's.
+{
+  const cellMar = '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar>';
+  const styles =
+    `<w:styles><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/>` +
+    `<w:tblPr><w:tblInd w:w="0" w:type="dxa"/>${cellMar}</w:tblPr></w:style>` +
+    `<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/></w:style></w:styles>`;
+  assert.equal(defaultTableCellMargin(styles), cellMar);
+  assert.equal(defaultTableCellMargin('<w:styles><w:style w:type="paragraph" w:default="1"/></w:styles>'), null, 'no default table style');
+  assert.equal(defaultTableCellMargin(null), null);
+  const reordered = styles.replace('w:type="table" w:default="1"', 'w:default="1" w:type="table"');
+  assert.equal(defaultTableCellMargin(reordered), cellMar, 'w:default before w:type');
+  assert.equal(defaultTableCellMargin(`<w:styles><w:style w:type="table" w:default="1"/>${styles.slice('<w:styles>'.length)}`), cellMar, 'a self-closing style is skipped');
+
+  const tbl = (pr: string) => `<w:tbl><w:tblPr>${pr}</w:tblPr><w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid><w:tr/></w:tbl>`;
+  const unstyled = tbl('<w:tblW w:w="0" w:type="auto"/>');
+  assert.equal(applyDefaultTableCellMargin(unstyled, cellMar), tbl(`<w:tblW w:w="0" w:type="auto"/>${cellMar}`), 'the default margin is added');
+  const styled = tbl('<w:tblStyle w:val="TableGrid"/>');
+  assert.equal(applyDefaultTableCellMargin(styled, cellMar), styled, 'a table naming a style is left alone');
+  const ownMargin = tbl('<w:tblCellMar><w:left w:w="0" w:type="dxa"/></w:tblCellMar>');
+  assert.equal(applyDefaultTableCellMargin(ownMargin, cellMar), ownMargin, "a table's own margin is kept");
+  assert.equal(applyDefaultTableCellMargin(unstyled, null), unstyled, 'no default margin: unchanged');
+  // A self-closing tblPr, and a nested table each get their own check.
+  const selfClosing = '<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid><w:tr/></w:tbl>';
+  assert.equal(applyDefaultTableCellMargin(selfClosing, cellMar), `<w:tbl><w:tblPr>${cellMar}</w:tblPr><w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid><w:tr/></w:tbl>`);
+  const nested = tbl('<w:tblStyle w:val="TableGrid"/>').replace('<w:tr/>', `<w:tr><w:tc>${unstyled}</w:tc></w:tr>`);
+  const nestedOut = applyDefaultTableCellMargin(nested, cellMar);
+  assert.ok(nestedOut.includes(`<w:tblW w:w="0" w:type="auto"/>${cellMar}`), 'the inner table gets it');
+  assert.ok(nestedOut.startsWith('<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr>'), 'the outer table (its own style) is untouched');
 }
 
 // ── Embedded fonts: a family named for a weight is drawn at that weight (a variable font holds them all).
