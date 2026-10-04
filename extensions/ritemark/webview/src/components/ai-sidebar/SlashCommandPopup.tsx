@@ -7,6 +7,11 @@
  *
  * Keyboard handling is driven by the parent (ChatInput) via imperative ref,
  * not by window-level listeners — this avoids event ordering races.
+ *
+ * The popup is as wide as the composer (left and right are both set). The
+ * composer sits in the conversation column beside the thread rail, and the
+ * column cuts off anything wider — so a long name or description is shortened
+ * with an ellipsis rather than widening the popup.
  */
 
 import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
@@ -105,8 +110,8 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
     if (commands.length === 0) {
       return (
         <div
-          className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[240px]"
-          style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
+          className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 mx-3"
+          style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4 }}
         >
           <div className="px-3 py-2 text-xs text-[var(--r-ink-muted)]">
             No commands found
@@ -120,8 +125,8 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
 
     return (
       <div
-        className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 min-w-[280px] max-h-[280px] overflow-y-auto"
-        style={{ bottom: '100%', left: position.left, marginBottom: 4 }}
+        className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 mx-3 max-h-[280px] overflow-y-auto"
+        style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4 }}
         ref={listRef}
       >
         {builtinCommands.length > 0 && (
@@ -150,7 +155,7 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
                     className="mt-0.5 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium">/{cmd.id}</span>
+                    <span className="block truncate text-sm font-medium">/{cmd.id}</span>
                     <div className="text-xs text-[var(--r-ink-muted)] truncate">
                       {cmd.description}
                     </div>
@@ -186,7 +191,7 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
                     className="mt-0.5 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium">/{cmd.id}</span>
+                    <span className="block truncate text-sm font-medium">/{cmd.id}</span>
                     <div className="text-xs text-[var(--r-ink-muted)] truncate">
                       {cmd.description}
                     </div>
