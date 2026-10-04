@@ -40,7 +40,9 @@ const ROW_TITLE = 'line-clamp-2 break-words text-[13px] font-medium text-[var(--
 const ROW_ICON = 'h-[19.5px] items-center';
 // The hover actions hold no width of their own. They sit on the status line at the row's right
 // end, and in a row narrower than they are the buttons narrow to 24px instead of spilling out.
-const ROW_ACTIONS = 'absolute bottom-1 right-2 z-10 flex max-w-[calc(100%-0.5rem)] items-center justify-between gap-0.5 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100 [&>button]:min-w-6';
+// They are 24px tall and 2px above the row's bottom, so their hit area reaches 26px up: short of
+// the title's last line (28.5px up), which always opens the conversation.
+const ROW_ACTIONS = 'absolute bottom-0.5 right-2 z-10 flex max-w-[calc(100%-0.5rem)] items-center justify-between gap-0.5 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100 [&>button]:min-w-6';
 // While the actions show, the status text fades out beneath them. They cover the text column by
 // their width less the 4px they stand in the row's padding: 88px for three buttons, 56px for two.
 const STATUS_UNDER_THREE_ACTIONS = 'group-hover:[mask-image:linear-gradient(to_left,transparent_88px,#000_104px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_88px,#000_104px)]';
@@ -75,17 +77,17 @@ export function ConversationRow({
       </div>
       <div className={`${ROW_ACTIONS} w-[92px]`}>
         <ConversationTooltip label={renameLabel} side="top">
-          <button type="button" onClick={onRename} aria-label={renameLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+          <button type="button" onClick={onRename} aria-label={renameLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
             <Icon name="pencil-simple" size={14} />
           </button>
         </ConversationTooltip>
         <ConversationTooltip label={pin.label} side="top">
-          <button type="button" onClick={() => { if (!pin.atCapacity) onPin(); }} aria-label={pin.label} aria-disabled={pin.atCapacity || undefined} className={`flex h-7 w-7 items-center justify-center rounded-[7px] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${pin.atCapacity ? 'cursor-not-allowed opacity-50' : 'hover:bg-[var(--r-surface)]'}`}>
+          <button type="button" onClick={() => { if (!pin.atCapacity) onPin(); }} aria-label={pin.label} aria-disabled={pin.atCapacity || undefined} className={`flex h-6 w-7 items-center justify-center rounded-[7px] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${pin.atCapacity ? 'cursor-not-allowed opacity-50' : 'hover:bg-[var(--r-surface)]'}`}>
             <Icon name={pin.icon} size={14} />
           </button>
         </ConversationTooltip>
         <ConversationTooltip label={deleteLabel} side="top">
-          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
             <Icon name="trash" size={14} tone="inherit" />
           </button>
         </ConversationTooltip>
@@ -114,12 +116,12 @@ export function EarlierConversationRow({
       </div>
       <div className={`${ROW_ACTIONS} w-[60px]`}>
         <ConversationTooltip label={moveLabel} side="top">
-          <button type="button" onClick={onMove} aria-label={moveLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+          <button type="button" onClick={onMove} aria-label={moveLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
             <Icon name="folder-open" size={14} />
           </button>
         </ConversationTooltip>
         <ConversationTooltip label={deleteLabel} side="top">
-          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
+          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
             <Icon name="trash" size={14} tone="inherit" />
           </button>
         </ConversationTooltip>
