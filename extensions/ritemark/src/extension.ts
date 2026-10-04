@@ -14,6 +14,7 @@ import { initConnectivity } from './ai/connectivity';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
 import { getSetupStatus } from './agent/setup';
+import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
@@ -425,7 +426,7 @@ export function activate(context: vscode.ExtensionContext) {
   modelCatalog.setDiscoveryProvider(async () => {
     const results: modelCatalog.DiscoveryResults = {};
     const claudeSetup = await getSetupStatus();
-    results.codex = await discoverCodex();
+    results.codex = await discoverCodex(await new CodexManager().getVersion());
     // Sprint 127 R2: the Claude list describes the account that runs requests —
     // /v1/models only when Claude Code itself runs on Ritemark's API key
     // (same rule as UnifiedViewProvider's session setup); otherwise the

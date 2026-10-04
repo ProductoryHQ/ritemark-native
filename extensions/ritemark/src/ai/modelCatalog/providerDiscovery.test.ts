@@ -33,3 +33,15 @@ assert.deepStrictEqual(effortFromCapabilities({ effort: { supported: false } }),
 assert.strictEqual(effortFromCapabilities(undefined), undefined);
 assert.strictEqual(effortFromCapabilities({ image_input: { supported: true } }), undefined);
 console.log('providerDiscovery: current and legacy Codex cache schemas and provider effort capabilities pass');
+
+// GH #375: a cache written by another Codex version is not Ritemark's list.
+{
+  const cache = (clientVersion: string) => ({
+    client_version: clientVersion,
+    models: [{ slug: 'gpt-6.1-sol', visibility: 'list', priority: 1 }],
+  });
+  assert.strictEqual(parseCodexModelsCache(cache('0.159.0'), '0.154.0'), null);
+  assert.strictEqual(parseCodexModelsCache({ models: cache('0.154.0').models }, '0.154.0'), null);
+  assert.strictEqual(parseCodexModelsCache(cache('0.154.0'), '0.154.0')?.[0].id, 'gpt-6.1-sol');
+  assert.strictEqual(parseCodexModelsCache(cache('0.159.0'))?.[0].id, 'gpt-6.1-sol');
+}
