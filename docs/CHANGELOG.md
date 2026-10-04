@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.13.0] — unreleased
+<!-- TBD: release date — replace "unreleased" with YYYY-MM-DD at publish -->
+
+<!-- TBD: bundled runtime updates. Jarmo has not decided yet. If they ship, add a "### Changed" section here, e.g.:
+### Changed
+- **Updated bundled agents.** Claude Code 2.1.281 → 2.1.289, Codex 0.154.0 → 0.160.0, OpenCode 1.18.30 → 1.18.34.
+- (If decided) **Sonnet 5.5 in the Claude model menu.**
+Note: a bundled agent update makes this a full app release, not an extension-only one. -->
+
+### Fixed
+- **A new Codex conversation no longer fails on its first prompt (#379, #375).** Ritemark read its list of Codex models from a file that every Codex app on your computer shares. When another Codex app, such as the Codex desktop app, had written that list for a different Codex version, Ritemark could offer and pick a model its own Codex can't run, and the first prompt failed. A list written by another Codex version is now ignored, and a new Codex conversation starts on Ritemark's default Codex model, GPT-5.6 Sol.
+- **Word count, Contents and comment markers follow every change to the document (#380, #378).** When an agent edited the file, or it changed on disk, the word count, the Contents list and the comment markers kept showing the old text until you typed. They now update with every change, wherever it comes from.
+- **The word count counts every word (#380).** The count dropped one word for each paragraph, heading or list item. It now matches the text.
+- **The status bar shows the count for the tab you are in (#380).** With several documents open, the word count could belong to another tab. It now follows the active tab, and it is hidden when the active tab is not a Markdown document.
+- **Conversation titles in the list are readable (#381).** In the **Conversations** list, every title was cut after about ten characters at the default side bar width, because the row's hidden buttons still kept their space. A title now uses the whole row and wraps to two lines. The buttons that appear on hover sit on the status line below it, so they never cover the title.
+- **Message box menus are no longer hidden (#382).** At the default side bar width, the permission mode and model menus opened partly under the strip of conversation buttons beside the message box, and the `/` and `@` pop-ups were cut off at its edge. They now open within the conversation column and fit beside the strip.
+- **Word tables have space inside their cells (#370, #369).** In a Word document whose tables use no table style, the text sat right against the cell borders. The preview now leaves the same space inside cells as Word does, including in tables in headers, footers and notes.
+
 ## [1.12.0] — 2026-09-29
 
 ### Added
