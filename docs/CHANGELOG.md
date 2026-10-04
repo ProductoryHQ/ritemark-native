@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.13.0] — unreleased
 <!-- TBD: release date — replace "unreleased" with YYYY-MM-DD at publish -->
 
-<!-- TBD: bundled runtime updates. Jarmo has not decided yet. If they ship, add a "### Changed" section here, e.g.:
+### Added
+- **Sonnet 5.5 (#386).** Anthropic's newest Sonnet is the recommended model in the Claude Code model menu. Sonnet 5 stays in the menu as the previous Sonnet.
+- **GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna in Codex (#386).** Ritemark's built-in Codex can now run them, and they appear in the Codex model menu once Codex has listed them for your account. New Codex conversations still start on GPT-5.6 Sol.
+
 ### Changed
-- **Updated bundled agents.** Claude Code 2.1.281 → 2.1.289, Codex 0.154.0 → 0.160.0, OpenCode 1.18.30 → 1.18.34.
-- (If decided) **Sonnet 5.5 in the Claude model menu.**
-Note: a bundled agent update makes this a full app release, not an extension-only one. -->
+- **Updated built-in agents (#386).** Claude Code 2.1.281 → 2.1.289, Codex 0.154.0 → 0.160.0, OpenCode 1.18.30 → 1.18.34.
 
 ### Fixed
 - **A new Codex conversation no longer fails on its first prompt (#379, #375).** Ritemark read its list of Codex models from a file that every Codex app on your computer shares. When another Codex app, such as the Codex desktop app, had written that list for a different Codex version, Ritemark could offer and pick a model its own Codex can't run, and the first prompt failed. A list written by another Codex version is now ignored, and a new Codex conversation starts on Ritemark's default Codex model, GPT-5.6 Sol.

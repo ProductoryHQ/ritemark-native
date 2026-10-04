@@ -2,15 +2,13 @@
 
 <!-- TBD: release date -->
 
-Ritemark 1.13.0 is a small release. It adds no new features and fixes things you may have run into in everyday use of 1.12.0.
+Ritemark 1.13.0 is a small release. It brings Claude Sonnet 5.5, newer versions of the three AI agents built into Ritemark, and fixes for things you may have run into in everyday use of 1.12.0.
 
-<!-- TBD: bundled runtime updates. Jarmo has not decided yet. If they ship, add a section here, e.g.:
+## Sonnet 5.5 and newer agents
 
-## Updated bundled agents
-
-Ritemark now ships Claude Code 2.1.289, Codex 0.160.0 and OpenCode 1.18.34.
-(If decided) Sonnet 5.5 appears in the Claude Code model menu.
--->
+- **Sonnet 5.5 in the Claude model menu.** Anthropic's newest Sonnet is now the recommended model for Claude Code conversations. Sonnet 5 is still in the menu as the previous Sonnet.
+- **Newer GPT models in Codex.** Ritemark's built-in Codex can now run GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna. They appear in the Codex model menu once Codex has listed them for your account. New Codex conversations still start on GPT-5.6 Sol.
+- **Updated built-in agents.** Ritemark now ships Claude Code 2.1.289, Codex 0.160.0 and OpenCode 1.18.34.
 
 ## Fixes
 
