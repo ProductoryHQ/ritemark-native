@@ -33,6 +33,7 @@ export const CODEX_MODEL_IDS = {
 } as const;
 
 export const CLAUDE_MODEL_IDS = {
+  SONNET_5_5: 'claude-sonnet-5-5',
   SONNET_5: 'claude-sonnet-5',
   OPUS_5_5: 'claude-opus-5-5',
   OPUS_5: 'claude-opus-5',

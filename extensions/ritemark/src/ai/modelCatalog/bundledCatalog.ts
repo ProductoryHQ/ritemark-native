@@ -13,7 +13,8 @@
  * Keep this seed in sync with the published catalog at publish time (Phase 4).
  * Model ids frozen from the Sprint 116 provider/runtime audit on 2026-09-13.
  * Sprint 127 R9 (2026-09-24): the Anthropic lineup follows the bundled Claude
- * Code 2.1.281, which supports every model in Anthropic's Claude Code catalog.
+ * Code (2.1.289 since v1.13.0), which supports every model in Anthropic's Claude Code catalog.
+ * v1.13.0 (2026-10-04): Sonnet 5.5 joins as the recommended default; Sonnet 5 stays as the previous one.
  * `npm run check:anthropic-models` re-checks that before each release (R10).
  */
 
@@ -29,18 +30,19 @@ import {
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-09-24T00:00:00Z',
+  updatedAt: '2026-10-04T00:00:00Z',
   providers: {
     anthropic: {
-      defaults: { 'claude-code': CLAUDE_MODEL_IDS.SONNET_5 },
+      defaults: { 'claude-code': CLAUDE_MODEL_IDS.SONNET_5_5 },
       models: [
-        { id: CLAUDE_MODEL_IDS.SONNET_5, label: 'Sonnet 5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.SONNET_5_5, label: 'Sonnet 5.5', description: 'Fast & capable (recommended)', tier: 'medium', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Opus 5.5', description: 'Most capable Opus model', tier: 'high', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.OPUS_5, label: 'Opus 5', description: 'Previous Opus model', tier: 'high', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable 5.1', description: 'Current long-horizon model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.OPUS_4_8, label: 'Opus 4.8', description: 'Older Opus generation', tier: 'high', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.FABLE_5, label: 'Fable 5', description: 'Previous Fable generation', tier: 'high', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 6 },
+        { id: CLAUDE_MODEL_IDS.SONNET_5, label: 'Sonnet 5', description: 'Previous Sonnet model', tier: 'medium', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.OPUS_5, label: 'Opus 5', description: 'Previous Opus model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable 5.1', description: 'Current long-horizon model', tier: 'high', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.OPUS_4_8, label: 'Opus 4.8', description: 'Older Opus generation', tier: 'high', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.FABLE_5, label: 'Fable 5', description: 'Previous Fable generation', tier: 'high', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 7 },
       ],
     },
     openai: {

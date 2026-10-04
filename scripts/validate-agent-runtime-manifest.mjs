@@ -9,38 +9,38 @@ const REPO_ROOT = path.dirname(SCRIPT_DIR);
 const TARGETS = ['darwin-arm64', 'darwin-x64', 'win32-x64'];
 
 const APPROVED_COMPONENTS = {
-  'codex/package': { vendor: 'openai', version: '0.154.0', targets: TARGETS, license: 'Apache-2.0', notice: '/openai/codex/' },
-  'claude/runtime': { vendor: 'anthropic', version: '2.1.281', targets: TARGETS, license: 'LicenseRef-Anthropic-Proprietary', notice: 'code.claude.com/' },
-  'opencode/runtime': { vendor: 'anomalyco', version: '1.18.30', targets: TARGETS, license: 'MIT', notice: '/anomalyco/opencode/' },
+  'codex/package': { vendor: 'openai', version: '0.160.0', targets: TARGETS, license: 'Apache-2.0', notice: '/openai/codex/' },
+  'claude/runtime': { vendor: 'anthropic', version: '2.1.289', targets: TARGETS, license: 'LicenseRef-Anthropic-Proprietary', notice: 'code.claude.com/' },
+  'opencode/runtime': { vendor: 'anomalyco', version: '1.18.34', targets: TARGETS, license: 'MIT', notice: '/anomalyco/opencode/' },
   'opencode/ripgrep': { vendor: 'BurntSushi', version: '15.1.0', targets: TARGETS, license: 'MIT OR Unlicense', notice: '/BurntSushi/ripgrep/' },
 };
 
 const CODEX_MEMBERS = {
   'darwin-arm64': {
-    'app-server': ['bin/codex-app-server', '0.154.0', '--version'],
-    'code-mode-host': ['bin/codex-code-mode-host', '0.154.0', '--help'],
-    'package-metadata': ['codex-package.json', '0.154.0', null],
+    'app-server': ['bin/codex-app-server', '0.160.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host', '0.160.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.160.0', null],
     ripgrep: ['codex-path/rg', '15.2.0', '--version'],
     zsh: ['codex-resources/zsh/bin/zsh', '5.9.0.3-test', '--version'],
   },
   'darwin-x64': {
-    'app-server': ['bin/codex-app-server', '0.154.0', '--version'],
-    'code-mode-host': ['bin/codex-code-mode-host', '0.154.0', '--help'],
-    'package-metadata': ['codex-package.json', '0.154.0', null],
+    'app-server': ['bin/codex-app-server', '0.160.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host', '0.160.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.160.0', null],
     ripgrep: ['codex-path/rg', '15.2.0', '--version'],
     zsh: ['codex-resources/zsh/bin/zsh', '5.9.0.3-test', '--version'],
   },
   'win32-x64': {
-    'app-server': ['bin/codex-app-server.exe', '0.154.0', '--version'],
-    'code-mode-host': ['bin/codex-code-mode-host.exe', '0.154.0', '--help'],
-    'package-metadata': ['codex-package.json', '0.154.0', null],
+    'app-server': ['bin/codex-app-server.exe', '0.160.0', '--version'],
+    'code-mode-host': ['bin/codex-code-mode-host.exe', '0.160.0', '--help'],
+    'package-metadata': ['codex-package.json', '0.160.0', null],
     ripgrep: ['codex-path/rg.exe', '15.2.0', '--version'],
-    'command-runner': ['codex-resources/codex-command-runner.exe', '0.154.0', null],
-    'windows-sandbox-setup': ['codex-resources/codex-windows-sandbox-setup.exe', '0.154.0', null],
+    'command-runner': ['codex-resources/codex-command-runner.exe', '0.160.0', null],
+    'windows-sandbox-setup': ['codex-resources/codex-windows-sandbox-setup.exe', '0.160.0', null],
   },
 };
 
-const APPROVED_SDKS = { claude: '0.3.281', acp: '1.4.0' };
+const APPROVED_SDKS = { claude: '0.3.289', acp: '1.4.0' };
 const CLAUDE_OPTIONAL_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk-darwin-arm64',
   '@anthropic-ai/claude-agent-sdk-darwin-x64',

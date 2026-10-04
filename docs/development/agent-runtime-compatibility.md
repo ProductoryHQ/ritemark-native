@@ -1,5 +1,25 @@
 # Agent Runtime Compatibility Matrix
 
+## v1.13.0 — Claude Code 2.1.289 / SDK 0.3.289, Codex 0.160.0, OpenCode 1.18.34 — 2026-10-04
+
+**Change:** Claude Code `2.1.281` → `2.1.289` with Claude Agent SDK `0.3.281` → `0.3.289` in lockstep; Codex `0.154.0` → `0.160.0`; OpenCode `1.18.30` → `1.18.34`. OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and zsh `5.9.0.3-test`, and ACP SDK `1.4.0` are unchanged (Codex's macOS ripgrep and zsh have new hashes because the package was re-signed; `--version` reports the same versions).
+
+**Why:** the per-release runtime review (Jarmo, 2026-10-04). Each was npm `latest` / the latest Codex GitHub release on that day.
+- **Codex:** 0.154.0 cannot run GPT-6 Sol, GPT-6 Luna or GPT-6.1 Sol, which other Codex apps on the same machine already use (root cause of #375; #379 only hides those models).
+- **Claude Code:** Anthropic's catalog lists Sonnet 5.5 in its main section. 2.1.289 resolves the `sonnet` alias to `claude-sonnet-5-5` (2.1.281 resolved it to `claude-sonnet-5`), and Ritemark's lineup adds Sonnet 5.5 as the recommended default in the same change.
+
+| Check | Result |
+|---|---|
+| Manifest rows (darwin-arm64, darwin-x64, win32-x64) | pass. Every archive SHA-256, member/installed SHA-256 and npm integrity was measured from the published artifacts by script, and each npm integrity matched the registry's `dist.integrity`. The Codex archives hold exactly the listed members. `fetch-agent-runtimes.mjs --all-platforms` gives PASS for all twelve rows. |
+| Lockstep pins | pass. `validate-agent-runtime-manifest.mjs` approves `2.1.289` / `0.3.289`, `0.160.0` and `1.18.34`; its tests pass (11/11). |
+| SDK type surface | pass. `tsc --noEmit` is clean for the extension and webview against 0.3.289, and the full `npm test` passes. |
+| Claude model listing (2.1.289, unauthenticated) | pass. `supportedModels()`: `default` → `claude-opus-5-5`, `opus` → `claude-opus-5-5`, `fable` → `claude-fable-5-1`, **`sonnet` → `claude-sonnet-5-5`**, `haiku` → `claude-haiku-4-5-20251001`. `claude-sonnet-5` is no longer listed live, so a saved Sonnet 5 selection on a subscription moves to the default with the existing substitution notice. `check:anthropic-models`: OK, no warnings. |
+| Codex model list (0.160.0, isolated `CODEX_HOME`, unauthenticated) | `model/list` returns `gpt-6.1-sol` (default), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`. Ritemark's catalog default stays GPT-5.6 Sol. |
+| Version discovery on darwin-arm64 | pass. `verify-agent-runtimes.sh`: `claude` 2.1.289, `opencode` 1.18.34, its ripgrep 15.1.0, `codex-app-server` 0.160.0; the Codex code-mode host starts. |
+| OpenCode permission gate (HARD GATE) | pass, with a named model. The first free model on offer failed upstream ("Endpoint is unavailable", "not available in your country") before the agent tried to write, as in v1.12.0. `scripts/lib/verify-opencode.mjs` now logs the free models on offer and takes `RITEMARK_VERIFY_OPENCODE_MODEL`. With `opencode/longcat-2.5-preview-free` and with `opencode/ling-3.1-flash-free`, all four rows passed: a write pauses, denial blocks, approval writes, cancel settles with the process alive. |
+| Native execution (darwin-x64, win32-x64) | **not proven here.** Comes from Gate 2 (x64 DMG, Windows installer) and PR CI. |
+| Authenticated turns (Claude Sonnet 5.5, Codex GPT-6.x) | **not proven here.** No credentials were used, and a real Codex run writes to the user's `config.toml`. Release test checklist. |
+
 ## v1.12.0 Sprint 127 — Claude Code 2.1.281 / SDK 0.3.281 — 2026-09-24
 
 **Change:** Claude Code `2.1.270` → `2.1.281` with Claude Agent SDK `0.3.270` → `0.3.281`, in lockstep. Codex, OpenCode, ripgrep and ACP are unchanged.
