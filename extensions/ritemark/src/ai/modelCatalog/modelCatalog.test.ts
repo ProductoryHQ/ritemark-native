@@ -122,8 +122,8 @@ const APP = '1.9.0';
 test('bundled-only resolves every provider from the bundled floor', () => {
   const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.anthropic.source, 'bundled');
-  assert.strictEqual(r.anthropic.models[0].id, 'claude-sonnet-5'); // order 0
-  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5');
+  assert.strictEqual(r.anthropic.models[0].id, 'claude-sonnet-5-5'); // order 0
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5-5');
 });
 
 test('live probe wins and is enriched with curated metadata', () => {
@@ -140,7 +140,7 @@ test('live probe wins and is enriched with curated metadata', () => {
   assert.deepStrictEqual(sonnet.thinkingEffort?.levels, ['low', 'medium', 'high', 'xhigh', 'max'], 'catalog effort is the offline floor');
   const future = r.anthropic.models.find((m) => m.id === 'claude-future-6')!;
   assert.strictEqual(future.label, 'Future', 'live-only id preserved');
-  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5', 'defaults from catalog');
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5-5', 'defaults from catalog');
 });
 
 test('live aliases with one resolved identity collapse to one explicit default-marked row', () => {
@@ -286,7 +286,7 @@ test('empty remote/cache providers cannot erase the bundled selectable floor', (
   const r = resolveAll({}, emptyRemote, emptyCache, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.anthropic.source, 'bundled');
   assert.ok(r.anthropic.models.length > 0);
-  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5');
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5-5');
 });
 
 test('a source containing only future-gated models falls back to this build bundled floor', () => {
@@ -501,7 +501,7 @@ test('S127 S14: an older tombstone cannot hide a newer bundled row', () => {
 test('S127 S15: an automated row never becomes the default', () => {
   const overlay = feed('2026-09-24T09:10:00Z', [AUTO_ROW_FIXTURE.row], { 'claude-code': 'claude-opus-6' });
   const r = resolveAll({}, overlay, null, S127_BUNDLED, S127_APP);
-  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5');
+  assert.strictEqual(r.anthropic.defaults['claude-code'], 'claude-sonnet-5-5');
 });
 
 test('S127: resolveStaticModels exposes merged rows for runtime declarations', () => {
@@ -513,16 +513,16 @@ test('S127: resolveStaticModels exposes merged rows for runtime declarations', (
 
 test('S127 S28: an unavailable saved model is replaced by the default and reported', () => {
   const r = resolveAll({}, null, null, S127_BUNDLED, S127_APP).anthropic;
-  assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-6', 'claude-code'), { id: 'claude-sonnet-5', substitutedFrom: 'claude-opus-6' });
+  assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-6', 'claude-code'), { id: 'claude-sonnet-5-5', substitutedFrom: 'claude-opus-6' });
   assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-5', 'claude-code'), { id: 'claude-opus-5' });
-  assert.deepStrictEqual(resolveRequestedModelIn(r, undefined, 'claude-code'), { id: 'claude-sonnet-5' }, 'nothing saved: no notice');
+  assert.deepStrictEqual(resolveRequestedModelIn(r, undefined, 'claude-code'), { id: 'claude-sonnet-5-5' }, 'nothing saved: no notice');
 });
 
 test('S127: live alias rows take the curated presentation of the model they resolve to, and keep their ids', () => {
   const live: DiscoveryResults = {
     anthropic: [
-      { id: 'default', resolvedModel: 'claude-sonnet-5', label: 'Default (recommended)', description: '', tier: 'medium', deprecated: false, order: 0 },
-      { id: 'sonnet', resolvedModel: 'claude-sonnet-5', label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 1 },
+      { id: 'default', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Default (recommended)', description: '', tier: 'medium', deprecated: false, order: 0 },
+      { id: 'sonnet', resolvedModel: CLAUDE_MODEL_IDS.SONNET_5_5, label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 1 },
       { id: CLAUDE_MODEL_IDS.FABLE_5_1, resolvedModel: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable', description: '', tier: 'medium', deprecated: false, order: 2 },
       { id: 'opus', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Opus', description: '', tier: 'medium', deprecated: false, order: 3 },
       { id: 'opus[1m]', resolvedModel: `${CLAUDE_MODEL_IDS.OPUS_5_5}[1m]`, label: 'Opus (1M context)', description: '', tier: 'medium', deprecated: false, order: 4 },
@@ -536,11 +536,11 @@ test('S127: live alias rows take the curated presentation of the model they reso
   assert.strictEqual(opus.resolvedModel, CLAUDE_MODEL_IDS.OPUS_5_5);
   assert.strictEqual(findModelEntry(models, CLAUDE_MODEL_IDS.OPUS_5_5)?.id, 'opus', 'the concrete id reconciles to the alias row');
   assert.strictEqual(findModelEntry(models, 'opus[1m]')?.label, 'Opus (1M context)', 'a 1M variant keeps its own label');
-  assert.strictEqual(findModelEntry(models, 'sonnet')?.label, 'Sonnet 5');
+  assert.strictEqual(findModelEntry(models, 'sonnet')?.label, 'Sonnet 5.5');
   assert.strictEqual(findModelEntry(models, 'haiku')?.label, 'Haiku 4.5');
   assert.deepStrictEqual(
     models.filter((model) => !model.id.endsWith('[1m]')).map((model) => model.label),
-    ['Sonnet 5', 'Opus 5.5', 'Fable 5.1', 'Haiku 4.5'],
+    ['Sonnet 5.5', 'Opus 5.5', 'Fable 5.1', 'Haiku 4.5'],
     'curated order',
   );
 });

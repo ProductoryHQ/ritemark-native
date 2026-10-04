@@ -28,7 +28,7 @@ test('rejects Claude runtime and SDK patch drift', () => {
   const errors = validateMutation(({ packageJson }) => {
     packageJson.dependencies['@anthropic-ai/claude-agent-sdk'] = '0.3.269';
   });
-  assert.ok(errors.some(error => error.includes('approved snapshot 0.3.281')));
+  assert.ok(errors.some(error => error.includes('approved snapshot 0.3.289')));
   assert.ok(errors.some(error => error.includes('patch mismatch')));
 });
 
@@ -36,7 +36,7 @@ test('rejects an unapproved runtime snapshot across all targets', () => {
   const errors = validateMutation(({ manifest }) => {
     for (const row of manifest.runtimes.filter(entry => entry.agent === 'opencode' && entry.component === 'runtime')) row.version = '1.18.29';
   });
-  assert.ok(errors.some(error => error.includes('approved snapshot 1.18.30')));
+  assert.ok(errors.some(error => error.includes('approved snapshot 1.18.34')));
 });
 
 test('requires every Claude SDK optional platform package at the exact SDK pin', () => {

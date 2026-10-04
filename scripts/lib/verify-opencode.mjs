@@ -90,12 +90,23 @@ async function connect(ws) {
   return { proc, conn, state };
 }
 
-/** First free model on offer. OpenCode ships no default — prompting without one fails. */
+/**
+ * First free model on offer. OpenCode ships no default — prompting without one fails.
+ * Free models come and go upstream ("Endpoint is unavailable", region blocks), so
+ * RITEMARK_VERIFY_OPENCODE_MODEL names one explicitly; the free ones on offer are logged.
+ */
 async function openSession(conn, ws) {
   const s = await conn.newSession({ cwd: ws, mcpServers: [] });
   const modelOpt = (s.configOptions ?? []).find((o) => (o.id ?? o.configId) === 'model');
   const values = modelOpt?.options ?? modelOpt?.values ?? [];
-  const free = values.find((v) => String(v.value).includes('free')) ?? values[0];
+  if (!openSession.listed) {
+    openSession.listed = true;
+    console.log(`  free models on offer: ${values.filter((v) => String(v.value).includes('free')).map((v) => v.value).join(', ') || 'none'}`);
+  }
+  const wanted = process.env.RITEMARK_VERIFY_OPENCODE_MODEL;
+  const free = wanted
+    ? values.find((v) => v.value === wanted)
+    : values.find((v) => String(v.value).includes('free')) ?? values[0];
   if (!free) return { sessionId: s.sessionId, model: null };
   await conn.setSessionConfigOption({ sessionId: s.sessionId, configId: 'model', value: free.value });
   return { sessionId: s.sessionId, model: free.value };

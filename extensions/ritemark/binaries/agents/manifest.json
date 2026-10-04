@@ -1,30 +1,30 @@
 {
   "schemaVersion": "3",
-  "generated": "2026-09-13",
+  "generated": "2026-10-04",
   "description": "Source-of-truth manifest for complete bundled agent runtime packages and dependencies. Payloads install under binaries/agents/<platform>-<arch> while preserving vendor package layouts.",
   "runtimes": [
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.154.0",
+      "version": "0.160.0",
       "platform": "darwin",
       "arch": "arm64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
       "archiveFilename": "codex-app-server-package-aarch64-apple-darwin.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "7bf20c1843bdcff086c89a294299833f20146ebbdba03e7f49f020b7adbfff7b",
+      "sha256": "69bc92d4c731d68cbd4b879b84b49afbf7803639916a5930654e242fabfb177a",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-app-server",
           "installPath": "bin/codex-app-server",
-          "sha256": "2fc485696e5df06fc492fb310599752775fde726585149eaa7aeadb9117d235a",
+          "sha256": "985200dd237f1025546e28a768377ecf9d2403b1d27f9ae7ccc8b5d1c97e0716",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -33,10 +33,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-code-mode-host",
           "installPath": "bin/codex-code-mode-host",
-          "sha256": "3eae1653e89fa1b4703ccbfb0ac16d4fd3423b99ccd90dc95a8aabf9fa4e25c8",
+          "sha256": "ddd937b6a2b316a1d8fc794c70a5e61c0305f067f3673b922b32cdde38ca4e9a",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -45,10 +45,10 @@
         },
         {
           "component": "package-metadata",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "d811f124d4aa726cd5a92e094612f474e7b2d56d8f72949683a582d5cb6da1d0",
+          "sha256": "b3ec9362891d0466590fb3e1454b5a21d006c024a880b66c7b9ec51c51600f3c",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -58,7 +58,7 @@
           "version": "15.2.0",
           "archivePath": "codex-path/rg",
           "installPath": "codex-path/rg",
-          "sha256": "6bbb665c5a40785e74c7ccf1c2e606efa7e70b09540c1e00787c3f88827e668d",
+          "sha256": "7c7d5b09c3a57de864500c65dc2e9c4d2a5e96a3fc7b7d5318480c19887a739b",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -70,7 +70,7 @@
           "version": "5.9.0.3-test",
           "archivePath": "codex-resources/zsh/bin/zsh",
           "installPath": "codex-resources/zsh/bin/zsh",
-          "sha256": "25649b16e12a7b1b26686a9553d8a141866ee445319fddb5263d57784f0fd10b",
+          "sha256": "d715e06edcf1661edb2e7767d65fbd1b44af505edfb217281b701f0a6ae93b15",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -81,31 +81,31 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.154.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.160.0/LICENSE"
       }
     },
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.154.0",
+      "version": "0.160.0",
       "platform": "darwin",
       "arch": "x64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
       "archiveFilename": "codex-app-server-package-x86_64-apple-darwin.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "4fddde3689d2aa0058c06138a84b05f87bdbff8cd556fba5816a97ac0469a4d4",
+      "sha256": "d884de5f36f8f32d997e17923eb0baf613d061379d35cecf8979473bdeb2b242",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-app-server",
           "installPath": "bin/codex-app-server",
-          "sha256": "41bb0e094ec7b21758dffe08681a00d43334bb33e81a32eacdfce9d9db9861e6",
+          "sha256": "3a30d87cdce89e21891a95968d0ac3b68ee72bbdee5d52cbf61ef065b74ef866",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -114,10 +114,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-code-mode-host",
           "installPath": "bin/codex-code-mode-host",
-          "sha256": "506caee46bb1b5e651c974b4783e3211f908bd37d1468ce94d02687e661926c8",
+          "sha256": "7d25135d40ee33979b3786cf7ba66643915db61d17118162448b8f52fb1ef2c0",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -126,10 +126,10 @@
         },
         {
           "component": "package-metadata",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "024804a9cf46bdb4670bc6eb2c870d63a90b1e711be79af32cab81db39e425f7",
+          "sha256": "66b118bb4dd8a7bf5074bdc2cb5d931c643be4c9589cf6ba1332c7507c7557ad",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -139,7 +139,7 @@
           "version": "15.2.0",
           "archivePath": "codex-path/rg",
           "installPath": "codex-path/rg",
-          "sha256": "58e0c7beb529788590a5fbff13f04ed58bb92633735a4ebedea0e5ae0fd51be7",
+          "sha256": "752ed62687b44ffd417352d444db825a7b75ca7b859c7a9f1f4edec77ba5e01d",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -151,7 +151,7 @@
           "version": "5.9.0.3-test",
           "archivePath": "codex-resources/zsh/bin/zsh",
           "installPath": "codex-resources/zsh/bin/zsh",
-          "sha256": "dc1ab818a9519d34a119fba373db9538067d76527cf8faa4ae739d0556493754",
+          "sha256": "edccc65dcc5202dfac5c271611d71ec812b468fd6e5a3bab029c8535e8618032",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -162,31 +162,31 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.154.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.160.0/LICENSE"
       }
     },
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.154.0",
+      "version": "0.160.0",
       "platform": "win32",
       "arch": "x64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.154.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
       "archiveFilename": "codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "5f8b43e030c0aeeb7bdb3d5e03fff4c68ba94fa2df0ae437c490811f54660d74",
+      "sha256": "b65bd931a163b9d6d281fd3bedba80886a289462c15328adc9c3f89e98638331",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-app-server.exe",
           "installPath": "bin/codex-app-server.exe",
-          "sha256": "6fe58c486f793629317d73e66f804dcfad6561aa8ed9b2c9ff647f7843b4b350",
+          "sha256": "5cbc46199b17ecb509b58400d65e0de3f9e4d7aa049423024a6da0c62b3fa526",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -195,10 +195,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "bin/codex-code-mode-host.exe",
           "installPath": "bin/codex-code-mode-host.exe",
-          "sha256": "7b4987007702973dfeb49ec9a0c11f737488890e208ccb04f7a147769c4bb1f1",
+          "sha256": "1d448bfde19e7a280d600d8d0bcddf77afbe9feaec1e804905becc5f39bc9db6",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -207,10 +207,10 @@
         },
         {
           "component": "package-metadata",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "a3299f10a82a8a354e8b8c75f5db97940acc40f6e83ee95a05af257827fc176a",
+          "sha256": "9a28161a3943c4ef69f429e82983bf4128c88c33d8f7dff4fd7861f45f29aa43",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -229,20 +229,20 @@
         },
         {
           "component": "command-runner",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "codex-resources/codex-command-runner.exe",
           "installPath": "codex-resources/codex-command-runner.exe",
-          "sha256": "a57ca8beb786a05f36c97309e8a716610c70ced9946dc1437bbbaf4566c0c403",
+          "sha256": "dd13f8e95faba5cf539d870dd3b64c226b00d062a5b523e7e08c44fdc8235224",
           "executable": true,
           "validationArgs": [],
           "expectedFileArchPattern": "PE32+ executable (GUI) x86-64, for MS Windows"
         },
         {
           "component": "windows-sandbox-setup",
-          "version": "0.154.0",
+          "version": "0.160.0",
           "archivePath": "codex-resources/codex-windows-sandbox-setup.exe",
           "installPath": "codex-resources/codex-windows-sandbox-setup.exe",
-          "sha256": "ea27f90a0746e2464a829cd6e1de0dcafb77c8be603de899661e8c006ef33937",
+          "sha256": "8f91d62aca2aca87b0ebf446848b817720415dd3080905ffc3085c17b70bd57a",
           "executable": true,
           "validationArgs": [],
           "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows"
@@ -251,20 +251,20 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.154.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.160.0/LICENSE"
       }
     },
     {
       "agent": "claude",
       "component": "runtime",
       "vendor": "anthropic",
-      "version": "2.1.281",
+      "version": "2.1.289",
       "platform": "darwin",
       "arch": "arm64",
       "sourceType": "npm-optional-package",
       "npmPackage": "@anthropic-ai/claude-code-darwin-arm64",
-      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.281.tgz",
-      "archiveFilename": "claude-code-darwin-arm64-2.1.281.tgz",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.289.tgz",
+      "archiveFilename": "claude-code-darwin-arm64-2.1.289.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/claude",
       "installName": "claude",
@@ -277,22 +277,22 @@
         "redistribution": "permitted-by-vendor-confirmation",
         "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
       },
-      "npmIntegrity": "sha512-rEI/YGBDX4YTfdq5w1B86NicoLgpFHGp4IrKM6sDrmUemruePSXF7ybICthHClIsRY8a/Kp7PQ6UJah1VWTbSA==",
-      "sha256": "9e623d329e0ead19284549fe099cc71f3a7ad06c2e26b5264fe3a12fc687cd1b",
+      "npmIntegrity": "sha512-jhZQ4BdBt2E9oiHdgpwu/HIgRDlyUazDfXIbIerUFDAPcb6c7Tl1QtMvLz3KxXkZXigYv0q4U6xSHHd78TQdHA==",
+      "sha256": "0aa86cf337ede6041513a72e814e703a5d94c1e75e983f0e5b0e3f2ed1e0b700",
       "installPath": "claude",
-      "installedSha256": "a922981f6f3b55a251ef9f9dbaa0621a5f99cbcb5ca67f8a797476ccfc83f626"
+      "installedSha256": "03d66745e3bb69ec727d66023696f3820bc0a00a8a5ba725eb6706d0c67cbe69"
     },
     {
       "agent": "claude",
       "component": "runtime",
       "vendor": "anthropic",
-      "version": "2.1.281",
+      "version": "2.1.289",
       "platform": "darwin",
       "arch": "x64",
       "sourceType": "npm-optional-package",
       "npmPackage": "@anthropic-ai/claude-code-darwin-x64",
-      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.281.tgz",
-      "archiveFilename": "claude-code-darwin-x64-2.1.281.tgz",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.289.tgz",
+      "archiveFilename": "claude-code-darwin-x64-2.1.289.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/claude",
       "installName": "claude",
@@ -305,22 +305,22 @@
         "redistribution": "permitted-by-vendor-confirmation",
         "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
       },
-      "npmIntegrity": "sha512-nGJBmWAMlyHAlf0i/vwBzjvTfEC86KcGZT4VNlpInL03jufnBztZr8+ILcXcwg5h94McpmvI/tu8lgHJtHKLVQ==",
-      "sha256": "9aa04355e15cfccb033fd761b7f38b81ddda3431e8fbc252e0731927e49925dd",
+      "npmIntegrity": "sha512-KErKulmExUbnAqXDz75FGfph+fslAHL0UqIW9rYlGwNFlPJAP5UTXIKcKp6Jh1bgVQjdJJEqg79kUjuriVUDDw==",
+      "sha256": "514aebc4d4d2d87983b528e53459abc248581776e9e421126e13556e46919308",
       "installPath": "claude",
-      "installedSha256": "a9355cbb0d291ce948efcf61a6ef397401672f64fa5e5e67bca092fed6cd9088"
+      "installedSha256": "358aa0e31666c48b2340ad9fa4003436105086ca12e1ecd4c5266d18598c2f7f"
     },
     {
       "agent": "claude",
       "component": "runtime",
       "vendor": "anthropic",
-      "version": "2.1.281",
+      "version": "2.1.289",
       "platform": "win32",
       "arch": "x64",
       "sourceType": "npm-optional-package",
       "npmPackage": "@anthropic-ai/claude-code-win32-x64",
-      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.281.tgz",
-      "archiveFilename": "claude-code-win32-x64-2.1.281.tgz",
+      "sourceUrl": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.289.tgz",
+      "archiveFilename": "claude-code-win32-x64-2.1.289.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/claude.exe",
       "installName": "claude.exe",
@@ -333,22 +333,22 @@
         "redistribution": "permitted-by-vendor-confirmation",
         "noticeUrl": "https://code.claude.com/docs/en/legal-and-compliance"
       },
-      "npmIntegrity": "sha512-IP2nJlr02d9BRQCTf2ErZD78pemjcQ3h0tg16AY+e8i5+42FGZELUdB1wzf4066QJQvpU7BgFpSt0KiHq3SQZA==",
-      "sha256": "bf500780f813f793b8631cdd03c861653e34311066a7a236140c179b06ed12af",
+      "npmIntegrity": "sha512-t6PwcRoMIeuNPbnkf9bFxdUv3xBgUSnk1yRU3r8b5CjovwzV1zUY/talE4rgGAvcTwmndirtWOny/3LPf6Ju+w==",
+      "sha256": "15746671878a870b8e894bf3394cdf2d74a8d8a8c9ae9909feb3cadc063f7297",
       "installPath": "claude.exe",
-      "installedSha256": "39be063c2512b43347fe7b0ab18c46f1596141701c9c5fc895ddfca9a051067c"
+      "installedSha256": "bcc6d9117aec30ad9414490302a25414359c871f5647e32e49b055c92bf84e0b"
     },
     {
       "agent": "opencode",
       "component": "runtime",
       "vendor": "anomalyco",
-      "version": "1.18.30",
+      "version": "1.18.34",
       "platform": "darwin",
       "arch": "arm64",
       "sourceType": "npm-optional-package",
       "npmPackage": "opencode-darwin-arm64",
-      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.18.30.tgz",
-      "archiveFilename": "opencode-darwin-arm64-1.18.30.tgz",
+      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.18.34.tgz",
+      "archiveFilename": "opencode-darwin-arm64-1.18.34.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/bin/opencode",
       "installName": "opencode",
@@ -360,24 +360,24 @@
       "license": {
         "spdx": "MIT",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.30/LICENSE"
+        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.34/LICENSE"
       },
-      "npmIntegrity": "sha512-KO4FJGZpgmSz+NNQ6PizynT5qAzVfoZI5HJLpyD0tYNqePPu87g2/UgVmNW663Bock2r75koLZFjR5waZiFiqw==",
-      "sha256": "25b722fcdc8c46aebcb6501e1156dc1dc5a392492cc278c65b7775311674e7f8",
+      "npmIntegrity": "sha512-ioBEvc3nUA64waDIVsphh92LgJgyTbq+uRd0OurdqqT9WEI9rp4J7NrA24NfL6epCa1Xr06TnRx5+th9W3T/sA==",
+      "sha256": "9a336191ee84c8f54364b5d1990ec87abb2acbb00dea189f11dda5e968d7bf05",
       "installPath": "opencode",
-      "installedSha256": "2d0c9c339bb91046c6ea951c97664bc2f8a8eaca707f31fbfbb7bc73c4eddc62"
+      "installedSha256": "7b63b34fafabded7d9231f6a9032755d0cdeaf8b9d2b70df8e25535471469eea"
     },
     {
       "agent": "opencode",
       "component": "runtime",
       "vendor": "anomalyco",
-      "version": "1.18.30",
+      "version": "1.18.34",
       "platform": "darwin",
       "arch": "x64",
       "sourceType": "npm-optional-package",
       "npmPackage": "opencode-darwin-x64",
-      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.18.30.tgz",
-      "archiveFilename": "opencode-darwin-x64-1.18.30.tgz",
+      "sourceUrl": "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.18.34.tgz",
+      "archiveFilename": "opencode-darwin-x64-1.18.34.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/bin/opencode",
       "installName": "opencode",
@@ -389,24 +389,24 @@
       "license": {
         "spdx": "MIT",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.30/LICENSE"
+        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.34/LICENSE"
       },
-      "npmIntegrity": "sha512-VW9LBLU1Y8GQICT2gAIzL1syK8ac5/BFaSHB6vtVetQuwBE/NKZkAKq4VBVn/87cdkFA645AVnZrUy3SLqdkwA==",
-      "sha256": "d7119bd0adbacf86c1176f07b35d429909d1d702ca0c90dcd31415e66220f590",
+      "npmIntegrity": "sha512-o8KXQ4jP5zfEHJAYpCz5Ifs0aa5dX+26wyLbxHEvfyGJu8hrBoNiJed3PE0uiPIlHCrj5yzF0b6k5aWonaPcTw==",
+      "sha256": "bda35c563697ca66b2b5c5b51f6f731376de4b007d9134a52cfe6b8216acba0a",
       "installPath": "opencode",
-      "installedSha256": "a0db851dd5c9538896aeecce1cd13af510d62a6873d2eb5030955548e5779156"
+      "installedSha256": "f97abb1fb2e701b4a4bcc06361e41c81d1837d9e60c3e7d65dfaca9827422ac3"
     },
     {
       "agent": "opencode",
       "component": "runtime",
       "vendor": "anomalyco",
-      "version": "1.18.30",
+      "version": "1.18.34",
       "platform": "win32",
       "arch": "x64",
       "sourceType": "npm-optional-package",
       "npmPackage": "opencode-windows-x64",
-      "sourceUrl": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.18.30.tgz",
-      "archiveFilename": "opencode-windows-x64-1.18.30.tgz",
+      "sourceUrl": "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.18.34.tgz",
+      "archiveFilename": "opencode-windows-x64-1.18.34.tgz",
       "archiveFormat": "tar.gz",
       "archivePath": "package/bin/opencode.exe",
       "installName": "opencode.exe",
@@ -418,12 +418,12 @@
       "license": {
         "spdx": "MIT",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.30/LICENSE"
+        "noticeUrl": "https://github.com/anomalyco/opencode/blob/v1.18.34/LICENSE"
       },
-      "npmIntegrity": "sha512-E00yRyUDQvdmf8AYQNYDYgZuLkWW0mBqBrACHPwfCCBZdyC8Sa4nUtQq27nAIOPAp2jfyrpH3WJBxT2GVpT42w==",
-      "sha256": "1a5cc50f529cf359fbb6d1a1750c6ae521799f463d00a0215e6eff579a08b036",
+      "npmIntegrity": "sha512-Nbw1JUHcMd+6Zab97tvhiR/wzMBrtFbHMog3w+HssBqt0068BLdpPadLmo72+vPtBu+ZxXIZzqNB9R3qtca7qg==",
+      "sha256": "b4f4ae37a9ecbd6eceecf3a452573a5abdeab88ba50f93a9ad40762d7a10bae9",
       "installPath": "opencode.exe",
-      "installedSha256": "c1bdbb18767048e1853af4238311b3f7e16ff2f91b68fb4c7ced3c5175347eea"
+      "installedSha256": "5283c2cd5b4285855daa97e6f7d17bf48146227cdf2a940e79e0f2b7869fd06e"
     },
     {
       "agent": "opencode",
