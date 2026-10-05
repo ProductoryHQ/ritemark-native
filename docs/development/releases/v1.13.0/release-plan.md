@@ -1,6 +1,6 @@
 # Release Plan — v1.13.0 Minor Improvements
 
-**Status:** Open. **All six candidate PRs merged 2026-10-04** (`main` at `bc8904c5`); `npm test` and both typechecks pass on `main`. Issues #369, #375 and #378 are closed. [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) (runtimes + Sonnet 5.5) is open. Two fixes still in progress may join (below); Jarmo decides when to cut the release candidate<br>
+**Status:** Open — **all scoped work merged** (2026-10-05, `main` at `ad2b9535`): eight fix PRs, the runtime update and Sonnet 5.5 ([#386](https://github.com/ProductoryHQ/ritemark-native/pull/386)). Full `npm test` and the extension typecheck pass on `main`. Issues #369, #375 and #378 are closed. Next: Jarmo decides when to cut the release candidate<br>
 **Target:** v1.13.0<br>
 **GitHub milestone:** [v1.13.0](https://github.com/ProductoryHQ/ritemark-native/milestone/12)<br>
 **Release type:** **Shell-tier** (set 2026-10-04). Jarmo approved updating every bundled agent runtime in this release ([#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) changes `extensions/ritemark/binaries/agents/`), so v1.13.0 is a full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI. The six merged PRs are extension-tier on their own<br>
@@ -23,6 +23,9 @@ Small release. v1.13.0 brings Sonnet 5.5 and current agent runtimes, and fixes t
 | [#381](https://github.com/ProductoryHQ/ritemark-native/pull/381) | `f712b91b` | Conversation list titles use the whole row and wrap to two lines | Hover buttons made 24 px tall and moved 2 px lower so they no longer cover the title's last line (was 3.5 px). Checked by measurement only — **check with the mouse in the release test** |
 | [#382](https://github.com/ProductoryHQ/ritemark-native/pull/382) | `aab8731e` | Composer menus and `/` `@` popups fit beside the conversation rail | `composerMenus.test.ts` kept in `npm test` after the merge conflict. Codex skill mirror left to the harness equalizer |
 | [#370](https://github.com/ProductoryHQ/ritemark-native/pull/370) | `bc8904c5` | Word preview pads unstyled table cells like Word (#369) | `office-preview.js` rebuilt (the PR had source only); default table style found in any attribute order; margins applied in headers, footers and notes, with tests |
+| [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) | `5ce57983` | Claude Code 2.1.289, Codex 0.160.0, OpenCode 1.18.34; Sonnet 5.5 as the recommended Claude model (shell-tier) | Every hash measured from the published artifacts; OpenCode gate 4/4 with two free models; darwin-x64 and win32-x64 native runtime CI passed |
+| [#387](https://github.com/ProductoryHQ/ritemark-native/pull/387) | `5c681cb9` | Narrow AI side bar: info and attach fold into a … menu, controls take a second row below 240 px; chip ×, popup height, empty-box fixes | Rebased on #382; composer-menus-check at 300/250/223/200/170 px |
+| [#385](https://github.com/ProductoryHQ/ritemark-native/pull/385) | `ad2b9535` | The model button and Send keep the picked Claude model after a switch from Codex (Send used the old model) | Rebased after #387, bundle rebuilt, validator passed |
 
 Each PR was rebased on `main`, its bundles rebuilt and the pre-commit validator passed before it was merged.
 
@@ -42,11 +45,10 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 
 **After publish:** refresh `feeds/model-catalog.json` in `ritemark-public` from the bundled lineup (`release` skill, step 3); the feed still names Sonnet 5 as the Claude default.
 
-## Work in progress that may join
+## Not in this release
 
-- **Composer footer in a narrow AI side bar** — running session, no PR yet. Overlaps #382 (footer breakpoint). Told on 2026-10-04 that #382 is merged and to rebase before opening a PR.
-- **Model button shows the previous Claude model** — running session, no PR yet.
-- **#376 Codex errors shown as raw JSON** — issue with a proposed card design, no PR. Pairs well with #379.
+- **#376 Codex errors shown as raw JSON**: an issue with a proposed card design and no PR yet. It goes to a later release unless Jarmo pulls it in.
+- **Codex default model**: Ritemark's Codex default stays GPT-5.6 Sol. Codex 0.160.0's own default is GPT-6.1 Sol, and Jarmo has not decided whether to switch.
 
 ## Out of scope
 

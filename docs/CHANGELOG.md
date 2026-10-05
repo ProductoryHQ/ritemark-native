@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated built-in agents (#386).** Claude Code 2.1.281 → 2.1.289, Codex 0.154.0 → 0.160.0, OpenCode 1.18.30 → 1.18.34.
 
 ### Fixed
+- **Send uses the Claude model you picked (#385).** After switching from Claude to Codex and then to a different Claude model, the model button and its check mark stayed on the old Claude model, and Send ran the prompt on that old model. The button and Send now follow your pick.
+- **The message box fits a narrow AI side bar (#387).** Below the default width, AI information and attach move into a **…** menu so Send stays in view, and at the narrowest widths the controls take a second row. Context chips keep their ×, and the `/` and `@` pop-ups fit the room above the message box.
 - **A new Codex conversation no longer fails on its first prompt (#379, #375).** Ritemark read its list of Codex models from a file that every Codex app on your computer shares. When another Codex app, such as the Codex desktop app, had written that list for a different Codex version, Ritemark could offer and pick a model its own Codex can't run, and the first prompt failed. A list written by another Codex version is now ignored, and a new Codex conversation starts on Ritemark's default Codex model, GPT-5.6 Sol.
 - **Word count, Contents and comment markers follow every change to the document (#380, #378).** When an agent edited the file, or it changed on disk, the word count, the Contents list and the comment markers kept showing the old text until you typed. They now update with every change, wherever it comes from.
 - **The word count counts every word (#380).** The count dropped one word for each paragraph, heading or list item. It now matches the text.
