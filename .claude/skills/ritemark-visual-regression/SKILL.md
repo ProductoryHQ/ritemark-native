@@ -147,14 +147,18 @@ drives an instance launched with its own debugging port and profile (RUNDEV or a
 build) with real mouse input. It drags the AI side bar to 300 px, opens the model menu and
 the permission mode menu, and types `/` and `@` into an empty message box, then prints one
 PASS/FAIL line per check: every line of menu text and the check mark visible (inside the
-webview and not under the conversation rail), each popup inside the conversation column, the
-footer's buttons clear of the rail. It sends no prompt and empties the message box again. Exit
+webview and not under the conversation rail), each popup inside the conversation column and
+below the top of the panel, the footer's buttons on show inside the column and the message
+box, and — narrower than 300 px, where AI information and attach fold into a "…" menu — both
+of that menu's items readable. An INFO line gives the footer's rows and how much of the model
+name shows. It sends no prompt, picks no menu item and empties the message box again. Exit
 1 on a failure, 2 when the side bar shows no message box (no usable agent). Needs Node 22.
 
 It exists because v1.12.0 shipped with both menus partly under the rail at the default width
 — descriptions cut mid-word, the check mark gone — after test 9 had been run at a wider side
-bar. `--width` checks another width; narrower than 223 px the footer check fails on a known
-defect (Send is under the rail), so run the gate at 300.
+bar, and because below a 223 px side bar Send itself was under the rail. Run the gate at 300
+and `--width` 170, 200, 223 and 250 as well: the footer has a step at 299 (the "…" menu) and
+at 239 (a second row).
 
 ## Stop conditions
 

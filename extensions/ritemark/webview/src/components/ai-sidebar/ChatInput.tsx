@@ -17,6 +17,7 @@ import {
   SelectSeparator,
   SelectTrigger,
 } from '../ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { policyOf } from './conversationState';
 import { SelectedContextTab } from './SelectedContextTab';
@@ -149,6 +150,9 @@ function getDisplayPath(fullPath: string): string {
 // than 8rem, though: in a side bar under about 195 px it runs on over the rail,
 // which is why it sits one layer above it (rail z-60, menus z-70).
 const COMPOSER_MENU = 'z-[70] max-w-[var(--radix-select-content-available-width)]';
+// The footer's icon buttons: 28 px, 24 px in the compact footer (the smallest
+// target the composer allows).
+const FOOTER_ICON_BUTTON = 'size-7 rounded p-0 focus-visible:ring-2 max-[531px]:size-6';
 
 interface ChatInputProps {
   /**
@@ -916,6 +920,9 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   // a short window this is what keeps Send on screen.
   const [roomPx, setRoomPx] = useState<number | null>(null);
   const [fieldMetrics, setFieldMetrics] = useState({ floorPx: 62, linePx: 21 });
+  // The composer's width: when the side bar is resized the text wraps
+  // differently, so the fitted height is measured again.
+  const [composerWidth, setComposerWidth] = useState(0);
   useEffect(() => {
     const root = containerRef.current;
     const column = root?.parentElement;
@@ -929,6 +936,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
       }
       const chrome = root.getBoundingClientRect().height - el.getBoundingClientRect().height;
       setRoomPx(Math.max(0, Math.floor(column.clientHeight - others - chrome)));
+      setComposerWidth(Math.round(root.getBoundingClientRect().width));
       const style = getComputedStyle(el);
       const floorPx = Math.round(parseFloat(style.minHeight)) || 62;
       const linePx = Math.round(parseFloat(style.lineHeight)) || 21;
@@ -949,8 +957,21 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
       return;
     }
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value, userHeight]);
+    // An empty box keeps its two-row height: its scroll height would count the
+    // placeholder, which wraps onto 6–8 lines in a narrow side bar.
+    el.style.height = value ? `${el.scrollHeight}px` : '';
+  }, [value, userHeight, composerWidth]);
+
+  // The `/` and `@` popups open upward from the composer. With the first-use
+  // AI notice showing in a narrow side bar the composer is tall, and at 170 px
+  // a 280 px list ran 99 px past the top of the panel: it is never taller than
+  // the room above the composer (4 px gap below it, 8 px clear of the top).
+  const [popupRoomPx, setPopupRoomPx] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!showCommandPopup && !showMentionPopup) return;
+    const top = containerRef.current?.getBoundingClientRect().top;
+    if (top !== undefined) setPopupRoomPx(Math.max(0, Math.floor(top - 12)));
+  }, [showCommandPopup, showMentionPopup, value]);
 
   const composerHeightBounds = {
     min: fieldMetrics.floorPx,
@@ -1129,6 +1150,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           onSelect={handleAgentSelect}
           onClose={handleMentionClose}
           position={mentionPosition}
+          maxHeight={popupRoomPx}
         />
       )}
 
@@ -1140,6 +1162,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           onSelect={handleCommandSelect}
           onClose={handleCommandClose}
           position={commandPosition}
+          maxHeight={popupRoomPx}
         />
       )}
 
@@ -1160,9 +1183,9 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
         {(showActiveFileChip || showBrowserContextChip || pathChips.length > 0 || mentions.length > 0 || pinnedAgent) && (
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
             {showActiveFileChip && (
-              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
+              <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
                 <Icon name="file-text" size={12} className="shrink-0" />
-                <span className="truncate max-w-[140px]" title={activeFilePath!}>
+                <span className="min-w-0 truncate max-w-[140px]" title={activeFilePath!}>
                   Active: {getDisplayPath(activeFilePath!)}
                 </span>
                 <Tooltip label="Remove from this message">
@@ -1210,9 +1233,9 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
                 )
                 : (
                   /* Normal mode or no screenshot yet — URL globe chip */
-                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)] text-[var(--r-ink-muted)]'}`}>
+                  <div className={`inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border ${currentBrowserContext?.annotationMode ? 'border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]' : 'border-[var(--r-hairline)] bg-[var(--r-surface-muted)] text-[var(--r-ink-muted)]'}`}>
                     <Icon name="globe" size={12} className="shrink-0" />
-                    <span className="truncate max-w-[180px]" title={currentBrowserContext?.url}>
+                    <span className="min-w-0 truncate max-w-[180px]" title={currentBrowserContext?.url}>
                       Browser: {currentBrowserContext?.title || currentBrowserContext?.url}
                       {currentBrowserContext?.annotationMode ? ' · Annotation' : ''}
                     </span>
@@ -1234,10 +1257,10 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
             {pathChips.map((chip) => (
               <div
                 key={chip.id}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
+                className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
               >
                 <Icon name="file" size={12} className="shrink-0" />
-                <span className="truncate max-w-[140px]" title={chip.path}>
+                <span className="min-w-0 truncate max-w-[140px]" title={chip.path}>
                   {getDisplayPath(chip.path)}
                 </span>
                 <Tooltip label="Remove from this message">
@@ -1258,9 +1281,9 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               const agent = findAgent(discoveredAgents, pinnedAgent);
               const displayName = agent?.name ?? pinnedAgent;
               return (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]">
+                <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[color:color-mix(in_srgb,var(--r-accent)_35%,transparent)] bg-[var(--r-accent-soft)] text-[var(--r-accent)]">
                   <Icon name="robot" size={12} className="shrink-0" />
-                  <span>{displayName}</span>
+                  <span className="min-w-0 truncate">{displayName}</span>
                   <Tooltip label="Remove from this message">
                     <Button
                       type="button"
@@ -1282,10 +1305,10 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               return (
                 <div
                   key={m.start}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
+                  className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]"
                 >
-                  <Icon name="robot" size={12} />
-                  @{agent.name}
+                  <Icon name="robot" size={12} className="shrink-0" />
+                  <span className="min-w-0 truncate">@{agent.name}</span>
                 </div>
               );
             })}
@@ -1294,7 +1317,10 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
 
         {/* Sprint 74 R2 (#82): textarea stays unlocked during agent runs so the
             user can draft + queue the next prompt. It is disabled only while a
-            prompt is already queued (one queued prompt at a time). */}
+            prompt is already queued (one queued prompt at a time). An empty box
+            holds only the placeholder, which never needs a scrollbar: one that
+            appeared in a narrow side bar used to keep itself after widening and
+            wrap the placeholder onto a line that was cut off. */}
         <textarea
           ref={textareaRef}
           aria-label="Message"
@@ -1304,7 +1330,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           onPaste={handlePaste}
           placeholder={placeholder}
           rows={CHAT_COMPOSER_BOUNDS_ROWS}
-          className="block w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`block w-full resize-none ${value ? 'overflow-y-auto' : 'overflow-y-hidden'} bg-transparent px-3 py-2.5 leading-relaxed text-[var(--vscode-input-foreground)] placeholder:text-[var(--r-ink-faint)] outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
           style={{
             fontSize: 'var(--chat-font-size, 13px)',
             minHeight: CHAT_COMPOSER_BOUNDS.min,
@@ -1355,16 +1381,45 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           </div>
         )}
 
-        {/* Two layouts. The labelled row is 450 px at its widest ("Plan only" and
-            "Effort · Medium" beside the 144 px model button) and the composer is
-            82 px narrower than the webview (thread rail 56, padding 24, border 2),
-            so the labels show from a 532 px webview. Below that the row is
-            compact — the model name, with mode and effort as icons — so no label
-            is cut short and the row keeps its shape when a setting changes. */}
-        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[531px]:gap-1 max-[531px]:px-1">
+        {/* What the icons below cannot say themselves: "Plan off" while Plan only
+            is on for a runtime without plans (R6: deactivate visibly, never
+            pretend), and the 5-second note when the chosen effort is not
+            available for the new model. They used to sit in the controls row,
+            where at the default 300 px side bar "Plan off" (175 px, unbreakable)
+            pushed Send off the card and the effort note was cut to "…". */}
+        {(!planCapable && composerPolicy.planFirst) || thinkingEffortNotice || localEffortNotice ? (
+          <div className="flex flex-col gap-0.5 px-3.5 pt-1 text-[10px] leading-snug max-[531px]:px-2">
+            {!planCapable && composerPolicy.planFirst ? (
+              <p className="text-[var(--r-ink-faint)]">Plan off — not supported by this runtime</p>
+            ) : null}
+            {thinkingEffortNotice || localEffortNotice ? (
+              <p role="status" aria-live="polite" className="text-[var(--r-ink-muted)]">
+                {thinkingEffortNotice || localEffortNotice}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Four layouts, by the webview's width, which is the side bar's width
+            less 1 px. The composer is 82 px narrower than the webview (thread
+            rail 56, padding 24, border 2). A `max-[Npx]` rule holds up to and
+            including N px, so the default 300 px side bar (a 299 px webview)
+            stays clear of `max-[298px]`.
+            - 532 px and wider: labelled. The row is 450 px at its widest ("Plan
+              only" and "Effort · Medium" beside the 144 px model button).
+            - Narrower: compact — the model name, with mode and effort as icons —
+              so no label is cut short and the row keeps its shape when a setting
+              changes. The default 300 px side bar still shows every button.
+            - Narrower than the default side bar: AI information and attach fold
+              into one "…" menu (Jarmo, 2026-10-04), and the model name gets their
+              28 px.
+            - Below a 240 px side bar even the folded row would leave the model
+              less than four letters, so "…" and Send take a second row, in the
+              same corner; the model, mode and effort keep the first. */}
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[531px]:gap-1 max-[531px]:px-1 max-[238px]:flex-wrap">
           <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
             <SelectTrigger
-              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden max-[238px]:basis-0 max-[238px]:grow max-[238px]:max-w-max"
               title={runtimeFooterLabel}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
@@ -1580,27 +1635,19 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
             />
           ) : null}
 
-          {!planCapable && composerPolicy.planFirst ? (
-            /* R6: runtime without a plan contract — deactivate visibly, never pretend. */
-            <span className="text-[10px] text-[var(--r-ink-faint)] whitespace-nowrap">
-              Plan off — not supported by this runtime
-            </span>
-          ) : null}
-
-          {(thinkingEffortNotice || localEffortNotice) ? (
-            <span role="status" aria-live="polite" className="min-w-0 truncate text-[10px] text-[var(--r-ink-muted)]">
-              {thinkingEffortNotice || localEffortNotice}
-            </span>
-          ) : null}
-
           {contextSummary && (
             <span className="min-w-0 truncate text-[10px] text-[var(--r-ink-faint)]">
               {contextSummary}
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5 max-[531px]:gap-1 max-[531px]:[&>button]:h-6 max-[531px]:[&>button]:w-6">
-            <AIInformationButton onOpen={() => aiInformation.setOpen(true)} />
+          <div className="ml-auto flex items-center gap-1.5 max-[531px]:gap-1 max-[238px]:basis-full max-[238px]:justify-end">
+            {/* Without an agent there is nothing to attach, so nothing to fold. */}
+            <AIInformationButton
+              onOpen={() => aiInformation.setOpen(true)}
+              className={isAgentMode ? 'max-[298px]:hidden' : undefined}
+              buttonClassName={FOOTER_ICON_BUTTON}
+            />
             {isAgentMode && (
               <>
                 <input
@@ -1611,39 +1658,87 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
                   onChange={handleFileSelect}
                   className="hidden"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="flex h-7 w-7 items-center justify-center rounded text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                  title="Attach files"
-                >
-                  <Icon name="paperclip" size={14} />
-                </button>
+                <Tooltip label={isLoading ? 'Attach files when the current reply has finished' : 'Attach files'} side="top" className="max-[298px]:hidden">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className={`${FOOTER_ICON_BUTTON} text-[var(--r-ink-muted)]`}
+                    aria-label="Attach files"
+                    disabled={isLoading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Icon name="paperclip" size={14} className="size-3.5" />
+                  </Button>
+                </Tooltip>
+                <DropdownMenu modal={false}>
+                  <Tooltip label="Attach files, AI information" side="top" className="hidden max-[298px]:inline-flex">
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className={`${FOOTER_ICON_BUTTON} text-[var(--r-ink-muted)]`}
+                        aria-label="More: attach files, AI information"
+                      >
+                        <Icon name="dots-three" size={14} className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </Tooltip>
+                  <DropdownMenuContent side="top" align="end" collisionBoundary={menuBoundary} className="min-w-0">
+                    {/* As wide as its two items: the 10rem default is wider than a 170 px side bar allows. */}
+                    <DropdownMenuItem disabled={isLoading} onSelect={() => fileInputRef.current?.click()}>
+                      <Icon name="paperclip" size={14} />
+                      Attach files…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => aiInformation.setOpen(true)}>
+                      <Icon name="info" size={14} />
+                      AI information
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
             {isLoading ? (
-              <button
-                onClick={cancelRequest}
-                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] shrink-0"
-                title="Stop"
-              >
-                <Icon name="square" size={14} />
-              </button>
+              <Tooltip label="Stop" side="top">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={`${FOOTER_ICON_BUTTON} border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-body)]`}
+                  aria-label="Stop"
+                  onClick={cancelRequest}
+                >
+                  <Icon name="square" size={14} className="size-3.5" />
+                </Button>
+              </Tooltip>
             ) : (
-              <button
-                onClick={() => handleSend()}
-                disabled={!value.trim() || !isOnline || !isRuntimeOperational}
-                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
-                title={isRuntimeChecking
+              <Tooltip
+                side="top"
+                label={isRuntimeChecking
                   ? 'Checking runtime status…'
                   : isRuntimeError
                     ? 'Runtime check failed — try again above'
                     : !isRuntimeOperational
                       ? `${runtimeLabel} is not ready — choose another model or use the action above`
-                      : sendTitle}
+                      : !isOnline
+                        ? 'You are offline'
+                        : !value.trim()
+                          ? 'Type a message to send'
+                          : sendTitle}
               >
-                <Icon name="paper-plane-right" size={14} />
-              </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={`${FOOTER_ICON_BUTTON} border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45`}
+                  aria-label="Send"
+                  disabled={!value.trim() || !isOnline || !isRuntimeOperational}
+                  onClick={() => handleSend()}
+                >
+                  <Icon name="paper-plane-right" size={14} className="size-3.5" />
+                </Button>
+              </Tooltip>
             )}
           </div>
         </div>

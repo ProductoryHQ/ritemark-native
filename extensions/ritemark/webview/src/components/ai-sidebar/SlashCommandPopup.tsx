@@ -43,10 +43,12 @@ interface SlashCommandPopupProps {
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
   position: { top: number; left: number };
+  /** Room above the composer, in px: the list is never taller, so it cannot run past the top of the panel. */
+  maxHeight?: number;
 }
 
 export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashCommandPopupProps>(
-  function SlashCommandPopup({ query, onSelect, onClose, position }, ref) {
+  function SlashCommandPopup({ query, onSelect, onClose, position, maxHeight }, ref) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
     const discoveredCommands = useAISidebarStore((s) => s.discoveredCommands);
@@ -126,7 +128,7 @@ export const SlashCommandPopup = forwardRef<SlashCommandPopupHandle, SlashComman
     return (
       <div
         className="absolute z-50 bg-[var(--vscode-editorWidget-background)] border border-[var(--vscode-editorWidget-border)] rounded-md shadow-lg py-1 mx-3 max-h-[280px] overflow-y-auto"
-        style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4 }}
+        style={{ bottom: '100%', left: position.left, right: 0, marginBottom: 4, ...(maxHeight === undefined ? {} : { maxHeight: Math.min(280, maxHeight) }) }}
         ref={listRef}
       >
         {builtinCommands.length > 0 && (
