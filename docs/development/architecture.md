@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-09-28 (v1.12.0 RC3: shared `utils/runProcess` for non-blocking Claude and Codex probes; `browserContext` capability)
+**Last updated:** 2026-10-05 (Sprint 128: Claude background work — live hooks, turns the runtime opens itself, per-task stop, `backgroundWork` capability)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -388,6 +388,53 @@ Per-runtime session mapping, and the shared thing each keeps:
 | Claude Code | one `AgentSession` (`AgentRunner.ts`) | nothing — the SDK is per-session |
 | Codex | one app-server **thread** | ONE `codex-app-server` process, one listener registration; events route by `params.threadId` |
 | OpenCode / ACP | one ACP **session** | ONE subprocess (measured: 339 MB for 5 sessions vs 1291 MB for 5 processes) |
+
+### Background work and runtime-initiated turns (Sprint 128)
+
+Claude Code runs subagents (and Bash) as **tasks**, by default in the background. A background task
+outlives the turn that started it; when it finishes, Claude opens a **new turn itself** to report
+(the SDK closes that turn's `result` with `origin.kind: 'task-notification'`). Per-turn callbacks
+cannot carry either — they are cleared at the human turn's `result` and gated by the host's per-turn
+token — so this sprint adds a conversation-scoped channel.
+
+```ts
+interface RuntimeSessionConfig { …; live?: AgentLiveHooks }          // Claude Code only
+interface RuntimeSession { …; stopBackgroundTask?(taskId): Promise<void>; backgroundTaskCount?(): number }
+interface AgentLiveHooks {                                            // src/agent/types.ts
+  onTaskProgress(p); onBackgroundTasks(tasks); onTasksEndedWithSession(n);
+  onRuntimeTurnStart(); onRuntimeTurnProgress(p); onRuntimeTurnComplete(result);
+  onToolApproval?(req); onQuestion?(q);                               // outside a human turn
+}
+```
+
+- **`src/agent/backgroundTasks.ts`** (pure) reduces `task_started` / `task_updated` /
+  `task_progress` / `task_notification` / `background_tasks_changed` into card events and the live set
+  (replace semantics, ambient tasks dropped). A card's id is the Agent **tool_use id**; the SDK's
+  `task_id` is only a fallback. A subagent's own Bash (`owned_by_subagent`) is never a card but counts
+  in the live set.
+- **`AgentSession`** sends prompts with `origin: { kind: 'human' }`, declares
+  `perTaskStopAffordance: true` (Stop ends the turn only; tasks are stopped one by one through
+  `Query.stopTask`), and tracks a runtime-initiated turn: a fresh `system:init` or a top-level assistant
+  message after a `result`, with no turn open. Results are matched by `origin`. A human prompt sent
+  during that turn waits for its result. The inactivity timer runs only while a turn is open.
+  An `'ask'`-mode approval or a question outside a human turn goes through `live` to the same gate
+  (it used to fail open).
+- **Host** (`UnifiedViewProvider._claudeLiveHooks`): hooks close over the conversation, not a turn
+  token. A runtime-initiated turn is recorded by `ConversationController.beginRuntimeInitiatedTurn`
+  as a `user-message` with a host-written header and the additive field `origin: 'background-task'`
+  (older clients ignore it), completed through `completeRuntimeTurn` (no title generation). Context
+  packs never send that header; the follow-up answer continues the user turn before it.
+- **Webview messages:** `agent-task-progress` (card update in any turn), `agent-background-tasks`
+  (live set; `endedCount` when the session ended with work running), `agent-turn-started`
+  (`origin: 'background-task'`); webview→host `agent-stop-task`. Activity states gain
+  `done-background` / `stopped-background` ("Done — 1 task still running in the background").
+  A model or runtime switch that would end live tasks asks first.
+- **`runtime/capabilities.ts`** gains `backgroundWork` (Claude Code only). Codex and ACP define none
+  of the new members and are unchanged.
+- **SDK facts** (Phase 0, Claude Code 2.1.289 / SDK 0.3.289): `session_state_changed` is not emitted
+  unless the CLI gets `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS`, so "all finished" is a `result` with an
+  empty live set; `task_started` (`is_backgrounded`) precedes the launch tool_result; a task can start
+  again under the same id. Evidence: `docs/development/releases/v1.13.0/sprint-128-background-agent-turns/research/`.
 
 ### Recoverable runtime failures (v1.10.0 RC correction)
 
@@ -1165,6 +1212,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-05 | Sprint 128 | **Claude background work (v1.13.0, #393).** New conversation-scoped `AgentLiveHooks` on `RuntimeSessionConfig.live` (Claude only) and optional `RuntimeSession.stopBackgroundTask` / `backgroundTaskCount`; new pure `agent/backgroundTasks.ts`; `AgentSession` declares `perTaskStopAffordance`, tags prompts `origin: human`, tracks the turn Claude opens itself after background work and matches results by origin; the inactivity timer no longer runs with no turn open; Ask-mode approvals outside a human turn reach the gate instead of failing open. `ConversationController.beginRuntimeInitiatedTurn` + optional `UserMessageEventV1.origin`; context packs skip it. Webview: `agent-task-progress`, `agent-background-tasks`, `agent-turn-started`, `agent-stop-task`; cards keyed by tool_use id and updated across turns; `done-background` / `stopped-background` states; switch confirmation. Capability `backgroundWork`. No patch, flag or shell-tier change. |
 | 2026-09-28 | v1.12.0 RC3 | **Probes off the extension host's thread; a browser-context capability (#366, #367, #358).** New `utils/runProcess.ts`, the async stand-in for `spawnSync`, runs the Claude (`agent/setup.ts`) and Codex (`codex/codexManager.ts`) setup probes and the Welcome page's Node and Git checks; a timed-out or runaway child is stopped (SIGTERM, then SIGKILL; on Windows the whole tree) before the caller gets its answer, and output is capped at 1 MiB. `runtime/capabilities.ts` gains `browserContext`: the composer chip, the AI information dialog and the per-turn page context follow it instead of runtime ids, and per-turn page context no longer needs the macOS-only `browser-agent-control` flag (that flag still gates the browser tools). |
 | 2026-09-26 | Bugfix | **OpenCode is told about its browser tools.** OpenCode has received the six browser tools (the `ritemark_browser` stdio MCP adapter, on `session/new` and `session/resume`) since Sprint 79, but Sprint 101 gave `ACP_DESCRIPTOR` `hasBrowserTools: false` and the sidebar passed it without the `browser-agent-control` override Claude and Codex get, so its capability context never mentioned them. New pure `capabilityDescriptorFor(runtime, browserToolsAvailable)` in `capabilityContext.ts` is now the one descriptor choice for all three runtimes. Tests cover every runtime with the flag on and off, and the text `AcpSession.prompt()` actually sends OpenCode on its first and second turns. No flag, patch, protocol or shell-tier change. |
 | 2026-09-25 | Sprint 125 | **PowerPoint preview (v1.12.0, #285).** `docxEditorProvider.ts` and `docxDocument.ts` become `officePreview/officePreviewProvider.ts` and `officeDocument.ts`: one provider for Word and PowerPoint, configured per format. New `PPTXViewer` and `viewers/pptx/` (renderer 1.3.0, chart XML fixes, notes, deck search, windowed drawing). `officePackageCheck` now inflates every part with a cap, closing a declared-size bypass that also affected Word. `office-preview.js` 1.3 → 2.5 MB (ECharts); `webview.js` unchanged. New flag `powerpoint-preview`; a notices file ships with the Office bundle. |

@@ -202,7 +202,23 @@ async function testStrayNotificationResultIgnored(): Promise<void> {
   assert.equal(log.runtimeResults.length, 0);
 }
 
+// Ask mode outside a human turn (a background subagent, or Claude's own turn):
+// the approval reaches the gate through the live channel — it used to fail open.
+async function testAskModeOutsideATurnAsksFirst(): Promise<void> {
+  const { session } = liveSession();
+  const asked: Array<{ toolUseId: string; kind: string }> = [];
+  session.setLiveHooks({ ...session._live, onToolApproval: (r: { toolUseId: string; kind: string }) => asked.push(r) });
+  session.setApprovalMode('ask');
+  assert.equal(session._turnResolve, null, 'no human turn is open');
+  const decision = session._handleCanUseTool('Write', { file_path: '/tmp/x.md' }, { signal: new AbortController().signal, toolUseID: 'toolu_bg_write' });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(asked.map((r) => [r.toolUseId, r.kind]), [['toolu_bg_write', 'file-write']], 'the write waits for approval');
+  assert.equal(session.answerToolApproval('toolu_bg_write', false), true);
+  assert.equal((await decision).behavior, 'deny', 'a rejected background write does not run');
+}
+
 (async () => {
+  await testAskModeOutsideATurnAsksFirst();
   await testObservedSequence();
   await testHumanPromptWaitsForRuntimeTurn();
   await testNoTimerAfterResult();

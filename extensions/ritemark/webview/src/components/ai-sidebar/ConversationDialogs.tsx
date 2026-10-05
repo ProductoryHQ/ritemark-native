@@ -82,12 +82,19 @@ function DeleteConversationDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  // Sprint 128 (R9): deleting ends the conversation's session and any work it
+  // still runs in the background — say so where the user already confirms.
+  const backgroundCount = useAISidebarStore((state) =>
+    target ? state.conversations[target.summary.conversationId]?.backgroundTasks.length ?? 0 : 0);
   return (
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
         <DialogHeader><DialogTitle>Delete conversation?</DialogTitle></DialogHeader>
         <DialogBody className="min-w-0">
-          <DialogDescription className="break-words">“{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.</DialogDescription>
+          <DialogDescription className="break-words">
+            “{target?.summary.title}” will be removed from {target?.recovery ? 'earlier conversations' : 'this project'}.
+            {backgroundCount > 0 && ` Its ${backgroundCount === 1 ? 'running background task ends' : `${backgroundCount} running background tasks end`} too.`}
+          </DialogDescription>
         </DialogBody>
         <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
           <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={onClose}>Cancel</DialogButton>

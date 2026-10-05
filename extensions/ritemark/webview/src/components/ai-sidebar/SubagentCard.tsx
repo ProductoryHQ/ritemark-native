@@ -52,7 +52,7 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
           variant="ghost"
           onClick={() => hasActivities && setIsExpanded(!isExpanded)}
           aria-expanded={hasActivities ? isExpanded : undefined}
-          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 py-1 text-left font-normal ${
+          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 py-1 text-left font-normal has-[>svg]:px-1.5 ${
             hasActivities ? '' : 'cursor-default hover:bg-transparent'
           }`}
         >
