@@ -50,7 +50,7 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 
 | Sprint | Scope | Status |
 |---|---|---|
-| [128 — Background agent turns](sprint-128-background-agent-turns/sprint-plan.md) | Honest status for Claude's background subagents, visible automatic follow-up turns, per-task stop (extension-tier by path, ships in this shell release) | Plan written 2026-10-05, awaiting Jarmo's approval; not started |
+| [128 — Background agent turns](sprint-128-background-agent-turns/sprint-plan.md) | Honest status for Claude's background subagents, visible automatic follow-up turns, per-task stop (extension-tier by path, ships in this shell release) | In development on `sprint-128-background-agent-turns` ([#393](https://github.com/ProductoryHQ/ritemark-native/issues/393)); plan approved 2026-10-05; Phase 0 done |
 
 ## Not in this release
 
