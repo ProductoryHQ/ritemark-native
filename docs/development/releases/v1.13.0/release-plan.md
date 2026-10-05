@@ -1,6 +1,6 @@
 # Release Plan — v1.13.0 Minor Improvements
 
-**Status:** Open (2026-10-05). Fix PRs, the runtime update and Sonnet 5.5 are merged (`main` at `9975c828`). **Sprint 128** (background agent turns) is planned and waits for Jarmo's plan approval; the release candidate follows it<br>
+**Status:** **Release candidate** (2026-10-05). All scoped work is merged, including Sprint 128 ([#394](https://github.com/ProductoryHQ/ritemark-native/pull/394), `580bf85a`). Version 1.13.0 is set in all six version files. **`main` is frozen** from this commit until publish: the RC is built from it in a clean release worktree, the macOS x64 and Windows builds come from CI on the same commit, and every other PR waits<br>
 **Target:** v1.13.0<br>
 **GitHub milestone:** [v1.13.0](https://github.com/ProductoryHQ/ritemark-native/milestone/12)<br>
 **Release type:** **Shell-tier** (set 2026-10-04). Jarmo approved updating every bundled agent runtime in this release ([#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) changes `extensions/ritemark/binaries/agents/`), so v1.13.0 is a full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI. The six merged PRs are extension-tier on their own<br>
@@ -50,7 +50,7 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 
 | Sprint | Scope | Status |
 |---|---|---|
-| [128 — Background agent turns](sprint-128-background-agent-turns/sprint-plan.md) | Honest status for Claude's background subagents, visible automatic follow-up turns, per-task stop (extension-tier by path, ships in this shell release) | Implemented and verified on a dev instance on `sprint-128-background-agent-turns` ([#393](https://github.com/ProductoryHQ/ritemark-native/issues/393)); PR [#394](https://github.com/ProductoryHQ/ritemark-native/pull/394) waits for Jarmo's review |
+| [128 — Background agent turns](sprint-128-background-agent-turns/sprint-plan.md) | Honest status for Claude's background subagents, visible automatic follow-up turns, per-task stop (extension-tier by path, ships in this shell release) | Merged 2026-10-05 ([#394](https://github.com/ProductoryHQ/ritemark-native/pull/394), `580bf85a`; issue [#393](https://github.com/ProductoryHQ/ritemark-native/issues/393) closed) |
 
 ## Not in this release
 
