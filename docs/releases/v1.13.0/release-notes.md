@@ -12,6 +12,8 @@ Ritemark 1.13.0 is a small release. It brings Claude Sonnet 5.5, newer versions 
 
 ## Fixes
 
+- **Send uses the Claude model you picked.** After switching from Claude to Codex and then to another Claude model, the model button showed the old Claude model and Send used it. Both now follow your pick.
+- **The message box fits a narrow AI side bar.** Below the default width, AI information and attach move into a **…** menu so Send stays in view; at the narrowest widths the controls take a second row.
 - **A new Codex conversation no longer fails on its first prompt.** Ritemark read its list of Codex models from a file that every Codex app on your computer shares. When another Codex app, such as the Codex desktop app, had written that list for a different Codex version, Ritemark could pick a model its own Codex can't run, and the first prompt failed. Ritemark now ignores a list written by another Codex version, and a new Codex conversation starts on Ritemark's default Codex model, GPT-5.6 Sol.
 - **Word count, Contents and comment markers follow every change.** When an agent edited your document, or the file changed on disk, they kept showing the old text until you typed. They now update straight away.
 - **The word count counts every word.** It dropped one word for each paragraph, heading or list item.
