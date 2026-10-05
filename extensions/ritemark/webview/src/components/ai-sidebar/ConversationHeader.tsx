@@ -13,8 +13,7 @@
  * title and no menu. A long title truncates on screen; the heading keeps the
  * whole string, so a screen reader reads it in full, and the tooltip shows it.
  */
-import { Button } from '../ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu';
 import { Icon } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
 import { useConversationDialogs } from './ConversationDialogs';
@@ -37,7 +36,7 @@ export function ConversationHeader() {
   const title = summary?.title ?? (activeConversation ? deriveThreadTitle(activeConversation) : NEW_THREAD_TITLE);
   const status = summary ? conversationStatusLabel(summary) : null;
   const pinState = summary ? conversationPinState(summary.conversationId, title, pinnedIds) : null;
-  const menuLabel = `Actions for ${title}`;
+  const menuLabel = `More actions for ${title}`;
 
   return (
     <header
@@ -58,17 +57,11 @@ export function ConversationHeader() {
 
       {summary && pinState && (
         <DropdownMenu modal={false}>
-          <Tooltip label="Conversation actions">
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="size-7 rounded-[7px] text-[var(--r-ink-muted)]" aria-label={menuLabel}>
-                <Icon name="dots-three-vertical" size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-          </Tooltip>
+          <MoreActionsTrigger label={menuLabel} density="header" />
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => requestRename(summary)}>
               <Icon name="pencil-simple" size={14} />
-              Rename
+              Rename…
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={pinState.atCapacity}

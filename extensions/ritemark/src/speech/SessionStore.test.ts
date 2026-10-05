@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { SessionStore, sessionIdForPath, fingerprintFile } from './SessionStore';
+import { SessionStore, sessionIdForPath, fingerprintFile, recordingRenameTarget } from './SessionStore';
 import type { TranscriptSession } from './types';
 
 function session(audioPath: string, overrides: Partial<TranscriptSession> = {}): TranscriptSession {
@@ -164,6 +164,41 @@ async function run(): Promise<void> {
     await store.delete(sessionIdForPath(audioPath));
     assert.equal(await store.getForAudio(audioPath), null, 'the session is gone');
     assert.ok(fs.existsSync(audioPath), 'deleting a session must never delete the recording');
+
+    // v1.13.0 (#371): renaming a recording renames the file, keeps its extension
+    // and carries the session (speaker names, saved document) to the new path.
+    {
+      const from = path.join(audioDir, 'Recording 2026-09-28 10.01.m4a');
+      fs.writeFileSync(from, 'audio');
+      await store.save(session(from, { speakers: [{ id: 'A', label: 'Mari' }], exportPath: '/docs/rec.md' } as Partial<TranscriptSession>));
+
+      assert.deepEqual(recordingRenameTarget(from, '  Team workshop  '), { path: path.join(audioDir, 'Team workshop.m4a') }, 'the extension is kept');
+      assert.deepEqual(recordingRenameTarget(from, 'Team workshop.M4A'), { path: path.join(audioDir, 'Team workshop.m4a') }, 'a typed extension is not doubled');
+      assert.deepEqual(recordingRenameTarget(from, 'notes.txt'), { path: path.join(audioDir, 'notes.txt.m4a') }, 'another extension cannot replace it');
+      for (const bad of ['', '   ', 'a/b', 'a\\b', 'what?', '.hidden', 'trailing.', 'CON', 'x'.repeat(260)]) {
+        assert.ok('error' in recordingRenameTarget(from, bad), `rejected: ${JSON.stringify(bad)}`);
+      }
+
+      const to = path.join(audioDir, 'Team workshop.m4a');
+      const renamed = await store.renameRecording(from, to);
+      assert.ok(!fs.existsSync(from) && fs.existsSync(to), 'the file itself is renamed');
+      assert.equal(renamed?.audioPath, to);
+      assert.equal(await store.get(sessionIdForPath(from)), null, 'the old session id is gone');
+      const moved = await store.get(sessionIdForPath(to));
+      assert.equal(moved?.speakers[0].label, 'Mari', 'speaker names travel with it');
+      assert.equal(moved?.exportPath, '/docs/rec.md', 'the saved document stays linked');
+
+      const other = path.join(audioDir, 'Other.m4a');
+      fs.writeFileSync(other, 'other audio');
+      await assert.rejects(store.renameRecording(to, other), /already exists/, 'never overwrites another file');
+      assert.equal(fs.readFileSync(other, 'utf8'), 'other audio');
+
+      const loose = path.join(audioDir, 'Not transcribed.wav');
+      fs.writeFileSync(loose, 'wav');
+      assert.equal(await store.renameRecording(loose, path.join(audioDir, 'Interview.wav')), null, 'a file with no session still renames');
+      assert.ok(fs.existsSync(path.join(audioDir, 'Interview.wav')));
+      await store.delete(sessionIdForPath(to));
+    }
 
     await store.clear();
     assert.deepEqual(await store.list(), [], 'clear empties the store');

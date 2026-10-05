@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
-import { Icon } from '../ui/Icon';
+import { Icon, type PhosphorIconName } from '../ui/Icon';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../ui/context-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu';
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { useConversationDialogs } from './ConversationDialogs';
-import { ConversationTooltip } from './ConversationTooltip';
 import { conversationPinState, conversationStatusLabel, type ConversationPinState } from './conversationActionsModel';
 import { useAISidebarStore } from './store';
 
@@ -34,19 +35,75 @@ interface ConversationRowProps {
 // Row frame. The gap beside the icon is 12px and tightens towards 8px only in a row narrower than
 // about 195px, so the longest status word still fits at the narrowest side bar.
 const ROW = 'group relative flex items-start gap-[clamp(0.5rem,7%,0.75rem)] rounded-[10px] px-3 py-2.5';
-// A title takes the row's full width and wraps to a second line before it is cut.
+// A title wraps to a second line before it is cut.
 const ROW_TITLE = 'line-clamp-2 break-words text-[13px] font-medium text-[var(--r-ink-strong)]';
 // The icon stands beside the title's first line (13px at 1.5), however many lines follow.
 const ROW_ICON = 'h-[19.5px] items-center';
-// The hover actions hold no width of their own. They sit on the status line at the row's right
-// end, and in a row narrower than they are the buttons narrow to 24px instead of spilling out.
-// They are 24px tall and 2px above the row's bottom, so their hit area reaches 26px up: short of
-// the title's last line (28.5px up), which always opens the conversation.
-const ROW_ACTIONS = 'absolute bottom-0.5 right-2 z-10 flex max-w-[calc(100%-0.5rem)] items-center justify-between gap-0.5 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100 [&>button]:min-w-6';
-// While the actions show, the status text fades out beneath them. They cover the text column by
-// their width less the 4px they stand in the row's padding: 88px for three buttons, 56px for two.
-const STATUS_UNDER_THREE_ACTIONS = 'group-hover:[mask-image:linear-gradient(to_left,transparent_88px,#000_104px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_88px,#000_104px)]';
-const STATUS_UNDER_TWO_ACTIONS = 'group-hover:[mask-image:linear-gradient(to_left,transparent_56px,#000_72px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_56px,#000_72px)]';
+// The row's More actions (…) button: top right, level with the title's first line, shown on hover,
+// keyboard focus and while its menu is open (ritemark-design: webview-ui.md § More actions menus).
+const ROW_MORE = 'relative z-10 -mr-1.5 -mt-[2.25px] opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100';
+
+interface RowAction { label: string; icon: PhosphorIconName; danger?: boolean; disabled?: boolean; run: () => void }
+
+/** A row's actions, in its More actions menu and its right-click menu alike. */
+function RowMenus({ className, title, actions, children }: { className: string; title: string; actions: RowAction[]; children: ReactNode }) {
+  const safe = actions.filter((action) => !action.danger);
+  const danger = actions.filter((action) => action.danger);
+  const itemClass = 'gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current';
+  const dangerClass = 'text-[var(--r-error)] focus:text-[var(--r-error)]';
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className={className}>
+          {children}
+          <DropdownMenu modal={false}>
+            <MoreActionsTrigger label={`More actions for ${title}`} className={ROW_MORE} />
+            <DropdownMenuContent align="end">
+              {safe.map((action) => (
+                <DropdownMenuItem key={action.label} disabled={action.disabled} onSelect={action.run}>
+                  <Icon name={action.icon} size={14} />
+                  {action.label}
+                </DropdownMenuItem>
+              ))}
+              {danger.length > 0 && safe.length > 0 && <DropdownMenuSeparator />}
+              {danger.map((action) => (
+                <DropdownMenuItem key={action.label} tone="danger" onSelect={action.run}>
+                  <Icon name={action.icon} size={14} />
+                  {action.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {safe.map((action) => (
+          <ContextMenuItem key={action.label} disabled={action.disabled} className={itemClass} onSelect={action.run}>
+            <Icon name={action.icon} size={14} />
+            {action.label}
+          </ContextMenuItem>
+        ))}
+        {danger.length > 0 && safe.length > 0 && <ContextMenuSeparator />}
+        {danger.map((action) => (
+          <ContextMenuItem key={action.label} className={`${itemClass} ${dangerClass}`} onSelect={action.run}>
+            <Icon name={action.icon} size={14} />
+            {action.label}
+          </ContextMenuItem>
+        ))}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+interface ConversationRowProps {
+  summary: ConversationSummaryV1;
+  pin: ConversationPinState;
+  current: boolean;
+  onOpen: () => void;
+  onRename: () => void;
+  onPin: () => void;
+  onDelete: () => void;
+}
 
 export function ConversationRow({
   summary,
@@ -57,10 +114,13 @@ export function ConversationRow({
   onPin,
   onDelete,
 }: ConversationRowProps) {
-  const renameLabel = `Rename ${summary.title}`;
-  const deleteLabel = `Delete ${summary.title}`;
+  const actions: RowAction[] = [
+    { label: 'Rename…', icon: 'pencil-simple', run: onRename },
+    { label: pin.atCapacity ? pin.label : pin.action, icon: pin.icon as PhosphorIconName, disabled: pin.atCapacity, run: onPin },
+    { label: 'Delete', icon: 'trash', danger: true, run: onDelete },
+  ];
   return (
-    <div className={`${ROW} ${current ? 'bg-[var(--r-accent-soft)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
+    <RowMenus className={`${ROW} ${current ? 'bg-[var(--r-accent-soft)]' : 'hover:bg-[var(--r-surface-soft)]'}`} title={summary.title} actions={actions}>
       <button
         type="button"
         onClick={onOpen}
@@ -70,29 +130,12 @@ export function ConversationRow({
       <ConversationBubbleIcon identityColorSlot={summary.identityColorSlot} className={ROW_ICON} />
       <div className="pointer-events-none relative min-w-0 flex-1">
         <div className={ROW_TITLE}>{summary.title}</div>
-        <div className={`mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--r-ink-muted)] ${STATUS_UNDER_THREE_ACTIONS}`}>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--r-ink-muted)]">
           <span className="whitespace-nowrap">{lifecycleCopy(summary)}</span>
           {current && <span className="flex items-center gap-1.5 whitespace-nowrap"><span aria-hidden="true">·</span><span>Current</span></span>}
         </div>
       </div>
-      <div className={`${ROW_ACTIONS} w-[92px]`}>
-        <ConversationTooltip label={renameLabel} side="top">
-          <button type="button" onClick={onRename} aria-label={renameLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-            <Icon name="pencil-simple" size={14} />
-          </button>
-        </ConversationTooltip>
-        <ConversationTooltip label={pin.label} side="top">
-          <button type="button" onClick={() => { if (!pin.atCapacity) onPin(); }} aria-label={pin.label} aria-disabled={pin.atCapacity || undefined} className={`flex h-6 w-7 items-center justify-center rounded-[7px] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${pin.atCapacity ? 'cursor-not-allowed opacity-50' : 'hover:bg-[var(--r-surface)]'}`}>
-            <Icon name={pin.icon} size={14} />
-          </button>
-        </ConversationTooltip>
-        <ConversationTooltip label={deleteLabel} side="top">
-          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-            <Icon name="trash" size={14} tone="inherit" />
-          </button>
-        </ConversationTooltip>
-      </div>
-    </div>
+    </RowMenus>
   );
 }
 
@@ -105,28 +148,18 @@ export function EarlierConversationRow({
   onMove: () => void;
   onDelete: () => void;
 }) {
-  const moveLabel = `Move ${summary.title} to this project`;
-  const deleteLabel = `Delete ${summary.title}`;
+  const actions: RowAction[] = [
+    { label: 'Move to this project', icon: 'folder-open', run: onMove },
+    { label: 'Delete', icon: 'trash', danger: true, run: onDelete },
+  ];
   return (
-    <div className={`${ROW} hover:bg-[var(--r-surface-soft)]`}>
+    <RowMenus className={`${ROW} hover:bg-[var(--r-surface-soft)]`} title={summary.title} actions={actions}>
       <ConversationBubbleIcon identityColorSlot={summary.identityColorSlot} className={ROW_ICON} />
       <div className="min-w-0 flex-1">
         <div className={ROW_TITLE}>{summary.title}</div>
-        <div className={`mt-0.5 text-[11px] text-[var(--r-ink-muted)] ${STATUS_UNDER_TWO_ACTIONS}`}>Project unknown</div>
+        <div className="mt-0.5 text-[11px] text-[var(--r-ink-muted)]">Project unknown</div>
       </div>
-      <div className={`${ROW_ACTIONS} w-[60px]`}>
-        <ConversationTooltip label={moveLabel} side="top">
-          <button type="button" onClick={onMove} aria-label={moveLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] hover:bg-[var(--r-surface)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-            <Icon name="folder-open" size={14} />
-          </button>
-        </ConversationTooltip>
-        <ConversationTooltip label={deleteLabel} side="top">
-          <button type="button" onClick={onDelete} aria-label={deleteLabel} className="flex h-6 w-7 items-center justify-center rounded-[7px] text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]">
-            <Icon name="trash" size={14} tone="inherit" />
-          </button>
-        </ConversationTooltip>
-      </div>
-    </div>
+    </RowMenus>
   );
 }
 

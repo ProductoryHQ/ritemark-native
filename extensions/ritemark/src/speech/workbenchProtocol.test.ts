@@ -27,5 +27,7 @@ assert.throws(
   WorkbenchProtocolError,
 );
 assert.throws(() => parseTranscriptWorkbenchRequest({ type: 'workbench:save', overwrite: true }), WorkbenchProtocolError);
+assert.deepEqual(parseTranscriptWorkbenchRequest({ type: 'workbench:renameRecording' }), { type: 'workbench:renameRecording' });
+assert.throws(() => parseTranscriptWorkbenchRequest({ type: 'workbench:renameRecording', name: 'x' }), WorkbenchProtocolError, 'the host asks for the name itself');
 
 console.log('workbenchProtocol.test.ts: all tests passed');

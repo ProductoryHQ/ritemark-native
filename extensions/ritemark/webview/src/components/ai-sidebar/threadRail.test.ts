@@ -71,9 +71,9 @@ assert.doesNotMatch(
   'An empty rail does not double the gap with adjacent button margins',
 );
 
-// The rows of the rail's panel (ConversationsPanel). A title has the row's whole width and two
-// lines before it is cut; the hover actions are laid over the status line, so they hold none of
-// that width. With the actions in the row's flow a title got 59 of 191px at the default width.
+// The rows of the rail's panel (ConversationsPanel). A title wraps to two lines before it is cut,
+// and the row's actions sit in one More actions (…) menu instead of hover buttons that took the
+// title's width (ritemark-design: webview-ui.md § More actions menus).
 const { ConversationRow, EarlierConversationRow } = await import('./ConversationsPanel');
 const { conversationPinState } = await import('./conversationActionsModel');
 const rowTitle = 'Check the price list against my launch notes.';
@@ -115,12 +115,8 @@ for (const [row, markup] of [['A project row', projectRowMarkup], ['A "Project u
   const title = classesOf(markup, /<div class="([^"]*)">Check the price list against my launch notes\.<\/div>/, 'its title');
   assert.ok(title.includes('line-clamp-2'), `${row}'s title wraps to a second line before it is cut`);
   assert.ok(!title.includes('truncate'), `${row}'s title is not held to a single line`);
-  const actions = classesOf(markup, /<div class="([^"]*)"><button type="button" aria-label="(?:Rename|Move) /, 'its hover actions');
-  assert.ok(actions.includes('absolute'), `${row}'s hover actions are laid over the row`);
-  assert.ok(
-    !actions.includes('relative') && !actions.includes('shrink-0'),
-    `${row}'s hover actions hold no width in the row's flow, visible or not`,
-  );
+  assert.match(markup, /aria-label="More actions for Check the price list against my launch notes\."/, `${row} has one More actions button`);
+  assert.doesNotMatch(markup, /aria-label="(?:Rename|Pin|Delete|Move) /, `${row} has no separate action buttons`);
 }
 assert.match(
   projectRowMarkup,

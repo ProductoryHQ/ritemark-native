@@ -18,7 +18,7 @@ import * as vscode from 'vscode';
 import type { EngineRegistry } from './speech/engineRegistry';
 import type { JobManager } from './speech/JobManager';
 import type { SessionStore } from './speech/SessionStore';
-import { sessionIdForPath } from './speech/SessionStore';
+import { recordingRenameTarget, sessionIdForPath } from './speech/SessionStore';
 import { probeDurationSec } from './speech/durationProbe';
 import type { EngineId, TranscriptionJob } from './speech/types';
 import { trackEvent } from './analytics/posthog';
@@ -62,6 +62,9 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
   private readonly _jobSubscription: () => void;
   /** In-flight insight runs, so a second click cancels rather than stacks. */
   private readonly _insightRuns = new Map<string, AbortController>();
+  private readonly _onDidRenameRecording = new vscode.EventEmitter<void>();
+  /** Fires after a recording is renamed, so the Transcribe library shows the new name. */
+  readonly onDidRenameRecording = this._onDidRenameRecording.event;
 
   constructor(
     private readonly _context: vscode.ExtensionContext,
@@ -80,6 +83,7 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
 
   dispose(): void {
     this._jobSubscription();
+    this._onDidRenameRecording.dispose();
   }
 
   openCustomDocument(uri: vscode.Uri): AudioDocument {
@@ -142,12 +146,77 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
         case 'workbench:openSettings':
           await vscode.commands.executeCommand('ritemark.aiSettings');
           break;
+        case 'workbench:renameRecording':
+          await this.renameRecording(fsPath);
+          break;
       }
     });
 
     panel.onDidDispose(() => {
       this._panels.delete(fsPath);
     });
+  }
+
+  /**
+   * v1.13.0 (#371): rename a recording's file, from the Transcribe library or
+   * this tab. The extension stays. Waits out a transcription or insight run,
+   * which write to the session under the old path. An open tab on the file is
+   * closed and reopened on the new one in the same place.
+   */
+  async renameRecording(audioPath: string): Promise<void> {
+    const busy =
+      this._insightRuns.has(audioPath) ||
+      this._jobs.list().some((job) => job.audioPath === audioPath && isActive(job));
+    if (busy) {
+      void vscode.window.showInformationMessage('Wait until this recording has finished transcribing, then rename it.');
+      return;
+    }
+    if (!fs.existsSync(audioPath)) {
+      void vscode.window.showWarningMessage(`${path.basename(audioPath)} is no longer at its recorded location, so it cannot be renamed.`);
+      return;
+    }
+
+    const ext = path.extname(audioPath);
+    const current = path.basename(audioPath, ext);
+    const requested = await vscode.window.showInputBox({
+      title: 'Rename recording',
+      prompt: ext ? `The file keeps its ${ext} extension.` : undefined,
+      value: current,
+      valueSelection: [0, current.length],
+      validateInput: (value) => {
+        const target = recordingRenameTarget(audioPath, value);
+        if ('error' in target) return target.error;
+        const clash = fs.existsSync(target.path) && path.resolve(target.path).toLowerCase() !== path.resolve(audioPath).toLowerCase();
+        return clash ? `${path.basename(target.path)} already exists in this folder.` : undefined;
+      },
+    });
+    if (requested === undefined) return;
+    const target = recordingRenameTarget(audioPath, requested);
+    if ('error' in target || target.path === audioPath) return;
+
+    const tabs = vscode.window.tabGroups.all.flatMap((group) => group.tabs).filter(
+      (tab) =>
+        tab.input instanceof vscode.TabInputCustom &&
+        tab.input.viewType === TranscriptWorkbenchProvider.viewType &&
+        tab.input.uri.fsPath === audioPath,
+    );
+    const column = tabs[0]?.group.viewColumn;
+
+    try {
+      await this._store.renameRecording(audioPath, target.path);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Could not rename ${path.basename(audioPath)}: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    this._onDidRenameRecording.fire();
+
+    if (tabs.length > 0) {
+      await vscode.window.tabGroups.close(tabs);
+      await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(target.path), TranscriptWorkbenchProvider.viewType, {
+        viewColumn: column,
+        preview: false,
+      });
+    }
   }
 
   /**

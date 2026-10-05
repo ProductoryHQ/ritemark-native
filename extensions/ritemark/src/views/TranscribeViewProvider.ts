@@ -70,7 +70,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     private readonly _jobs: JobManager,
     private readonly _store: SessionStore,
     private readonly _memento: vscode.Memento,
+    /** The Transcript Workbench renames a recording (#371), since its open tab moves with the file. */
+    private readonly _workbench: { renameRecording(audioPath: string): Promise<void>; onDidRenameRecording: vscode.Event<void> },
   ) {
+    this._disposables.push(this._workbench.onDidRenameRecording(() => void this._pushState()));
     // Jobs outlive the panel (R2), so the provider subscribes once and pushes
     // whatever the webview happens to be there to receive.
     this._disposables.push({
@@ -200,6 +203,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'transcribe:relinkSession':
           void this._relinkSession(message.sessionId);
+          break;
+        case 'transcribe:renameSession':
+          void this._store.get(message.sessionId).then((session) => session && this._workbench.renameRecording(session.audioPath));
           break;
         case 'transcribe:openExport':
           void this._openExport(message.sessionId);

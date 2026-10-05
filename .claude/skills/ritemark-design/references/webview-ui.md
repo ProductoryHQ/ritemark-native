@@ -130,6 +130,29 @@ Never `font-sans` in-chrome for moment surfaces; use `var(--ritemark-font-displa
 - The token CSS must load **before** any component CSS. Import `tokens.css` at the top of `index.css` (or import it directly from `main.tsx` at module-init time), not lazily.
 - When adding a new CSS file, put `@import url("./tokens.css")` at the top if it runs standalone (e.g., a dev-time preview). Never duplicate token values.
 
+## More actions menus
+
+Every "more actions" menu — on a list row, beside a title, in a toolbar — is built the same way from
+the primitives we already have. Agreed with Jarmo on 2026-10-05 (#371).
+
+- **Trigger:** `MoreActionsTrigger` from `components/ui/dropdown-menu.tsx`, inside
+  `<DropdownMenu modal={false}>`. It is a shadcn ghost `Button` with the Phosphor `dots-three`
+  icon at 14px, the tooltip "More actions" and an aria-label that names the target ("More actions
+  for <title>"). `density="row"` (24px) in list rows, `density="header"` (28px) beside a title.
+  Never `dots-three-vertical`, an inline SVG, a hand-rolled `<button>` or a native `title`.
+- **Menu:** `DropdownMenuContent align="end"`. Each `DropdownMenuItem` has a 14px Phosphor icon
+  and a label. An item that opens a dialog ends in "…" (Rename…). A destructive item goes last,
+  after a `DropdownMenuSeparator`, with `tone="danger"`. A disabled item says why in its label.
+- **List rows:** the row's actions live only in this menu — no row of hover icon buttons. The
+  trigger stands at the top right, level with the title's first line, and shows on hover,
+  keyboard focus and while its menu is open. The title takes the rest of the width and wraps to
+  two lines before it is cut.
+- **Right-click:** a row also opens the same actions in a `ContextMenu` (`ui/context-menu.tsx`),
+  built from the same action list as the More actions menu, so the two never drift.
+
+Examples: `transcribe/TranscribePanel.tsx` (RecordingRow), `ai-sidebar/ConversationsPanel.tsx`
+(RowMenus), `ai-sidebar/ConversationHeader.tsx` and `transcribe/workbench/Workbench.tsx` (header).
+
 ## Anti-patterns — catch these in review
 
 | Anti-pattern | Why bad | Fix |
@@ -142,6 +165,7 @@ Never `font-sans` in-chrome for moment surfaces; use `var(--ritemark-font-displa
 | `font-bold text-2xl` on a dialog title | 24px is moment-scale | `text-base font-semibold` (16px, 600) |
 | Importing a `Ph*` component from `@phosphor-icons/react` at a call site | Bypasses the typed wrapper, its size scale, and its tone colors | `<Icon name="gear" size={16} />` |
 | New emoji (✓, ★, →) in body copy | Ritemark is emoji-free | `<Icon>` with Phosphor `check`, `star`, `arrow-right` (add a name missing from `iconMap` first) |
+| A "more actions" button built by hand: `dots-three-vertical`, an inline SVG, a row of hover icon buttons | Every list grows its own look and behaviour | `MoreActionsTrigger` + `DropdownMenu`, see **More actions menus** |
 
 ## Testing the visual diff
 

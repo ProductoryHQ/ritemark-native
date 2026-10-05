@@ -13,7 +13,8 @@ export type TranscriptWorkbenchRequest =
   | { type: 'workbench:generateInsights'; language: InsightsLanguageSelection }
   | { type: 'workbench:cancelInsights' }
   | { type: 'workbench:createInsightsDocument' }
-  | { type: 'workbench:openSettings' };
+  | { type: 'workbench:openSettings' }
+  | { type: 'workbench:renameRecording' };
 
 export type InsightsDocumentResult = {
   type: 'workbench:insightsDocumentResult';
@@ -41,7 +42,8 @@ export function parseTranscriptWorkbenchRequest(value: unknown): TranscriptWorkb
     type === 'workbench:openDocument' ||
     type === 'workbench:cancelInsights' ||
     type === 'workbench:createInsightsDocument' ||
-    type === 'workbench:openSettings'
+    type === 'workbench:openSettings' ||
+    type === 'workbench:renameRecording'
   ) {
     exactKeys(input, ['type']);
     return { type };
