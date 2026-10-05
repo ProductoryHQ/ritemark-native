@@ -44,6 +44,33 @@ export function sessionIdForPath(filePath: string): string {
   return `${base}-${(hash >>> 0).toString(36)}`;
 }
 
+/** Characters no file name may hold on macOS or Windows, and control characters. */
+const FORBIDDEN_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/;
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/**
+ * v1.13.0 (#371): the file a recording is renamed to, or why the name cannot be
+ * used. Only the name is the user's to change: the extension is kept, so the
+ * file still opens as audio. A name typed with that extension is not doubled.
+ */
+export function recordingRenameTarget(audioPath: string, requested: string): { path: string } | { error: string } {
+  const ext = path.extname(audioPath);
+  let name = requested.trim();
+  if (ext && name.toLowerCase().endsWith(ext.toLowerCase())) name = name.slice(0, -ext.length).trimEnd();
+  if (!name) return { error: 'Enter a name.' };
+  if (FORBIDDEN_NAME_CHARS.test(name)) return { error: 'A name cannot contain < > : " / \\ | ? or *.' };
+  if (name.startsWith('.')) return { error: 'A name cannot start with a dot.' };
+  if (/[. ]$/.test(name)) return { error: 'A name cannot end with a dot or a space.' };
+  if (WINDOWS_RESERVED_NAME.test(name)) return { error: `${name} is a name Windows reserves.` };
+  if (Buffer.byteLength(name + ext, 'utf8') > 255) return { error: 'That name is too long.' };
+  return { path: path.join(path.dirname(audioPath), name + ext) };
+}
+
+/** Two paths name the same file when they differ only in case (macOS and Windows file systems). */
+function sameFileIgnoringCase(a: string, b: string): boolean {
+  return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+}
+
 export class SessionStore {
   constructor(private readonly baseDir: string) {}
 
@@ -169,6 +196,24 @@ export class SessionStore {
     await this.save(relinked);
     if (newId !== sessionId) await this.delete(sessionId);
     return relinked;
+  }
+
+  /**
+   * v1.13.0 (#371): rename the recording on disk and move its session with it.
+   *
+   * The session id comes from the path, so the session is relinked to the new
+   * path, the same way a moved file is (R12): speaker names, corrections and
+   * the saved document stay attached. Refuses to overwrite another file.
+   */
+  async renameRecording(audioPath: string, newAudioPath: string): Promise<TranscriptSession | null> {
+    if (path.resolve(audioPath) === path.resolve(newAudioPath)) return this.get(sessionIdForPath(audioPath));
+    if (fs.existsSync(newAudioPath) && !sameFileIgnoringCase(audioPath, newAudioPath)) {
+      throw new Error(`${path.basename(newAudioPath)} already exists in this folder.`);
+    }
+    await fsp.rename(audioPath, newAudioPath);
+    const sessionId = sessionIdForPath(audioPath);
+    if (!(await this.get(sessionId))) return null;
+    return this.relink(sessionId, newAudioPath);
   }
 
   /** Removes stored transcript data only — never the audio or an export (R12). */

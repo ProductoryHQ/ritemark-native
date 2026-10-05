@@ -507,6 +507,7 @@ export function activate(context: vscode.ExtensionContext) {
       speech.jobs,
       speech.store,
       context.globalState,
+      workbenchProvider,
     );
     transcribeView = transcribeViewProvider;
     context.subscriptions.push(

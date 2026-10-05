@@ -16,7 +16,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Icon } from '../ui/Icon';
+import { Icon, type PhosphorIconName as IconName } from '../ui/Icon';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../ui/context-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { vscode } from '../../lib/vscode';
@@ -33,7 +35,7 @@ import {
 import { useTranscribeRecording } from './recording/useTranscribeRecording';
 import {
   formatDuration,
-  formatRelativeDate,
+  formatRecordingDate,
   isActiveJob,
   phaseLabel,
   type EngineStatus,
@@ -589,93 +591,100 @@ function AttentionRow({ job }: { job: TranscriptionJob }) {
   );
 }
 
+type RecordingAction = { label: string; icon: IconName; danger?: boolean; disabled?: boolean; run: () => void };
+
+/** One list of actions for the row's ⋮ menu and its right-click menu (#371). */
+function recordingActions(recording: RecordingSummary): RecordingAction[] {
+  const post = (type: string) => () => vscode.postMessage({ type, sessionId: recording.sessionId });
+  return [
+    ...(recording.exportPath
+      ? [{ label: 'Open saved document', icon: 'file-text' as IconName, run: post('transcribe:openExport') }]
+      : []),
+    { label: 'Rename…', icon: 'pencil-simple', disabled: recording.audioMissing, run: post('transcribe:renameSession') },
+    { label: 'Remove transcript', icon: 'trash', danger: true, run: post('transcribe:deleteSession') },
+  ];
+}
+
+// v1.13.0 (#371): the title takes the row's full width and wraps to two lines; the second line is
+// the date and length; a third line appears only for a row from another project or a moved file.
+// The More actions (…) button stands at the top right, level with the title's first line, and shows on hover,
+// on keyboard focus and while its menu is open.
 function RecordingRow({ recording }: { recording: RecordingSummary }) {
+  const actions = recordingActions(recording);
+  const title = recording.audioName;
   return (
-    <div
-      className="group flex cursor-pointer items-center gap-2.5 px-4 py-2 hover:bg-surface-soft"
-      onClick={() => vscode.postMessage({ type: 'transcribe:openSession', sessionId: recording.sessionId })}
-    >
-      <Icon name="microphone" size={16} className="shrink-0 text-ink-muted" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-medium" title={recording.audioName}>
-          {recording.audioName}
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="group relative flex items-start gap-2.5 px-4 py-2.5 hover:bg-surface-soft">
+          <button
+            type="button"
+            aria-label={`Open ${title}`}
+            className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+            onClick={() => vscode.postMessage({ type: 'transcribe:openSession', sessionId: recording.sessionId })}
+          />
+          {/* Beside the title's first line (13px at 1.5), however many lines follow. */}
+          <Icon name="microphone" size={16} className="mt-[1.75px] shrink-0 text-ink-muted" />
+          <div className="pointer-events-none relative min-w-0 flex-1">
+            <div className="line-clamp-2 break-words text-[13px] font-medium text-ink-strong">{title}</div>
+            <div className="mt-0.5 truncate text-[11px] text-ink-muted">
+              {[formatRecordingDate(recording.createdAt), formatDuration(recording.durationSec)].filter(Boolean).join(' · ')}
+            </div>
+            {recording.projectName && (
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-ink-faint">
+                <Icon name="folder-open" size={12} className="shrink-0" />
+                <span className="truncate">Transcribed in {recording.projectName}</span>
+              </div>
+            )}
+            {recording.audioMissing && (
+              // R12: the transcript is intact — only the path went stale. Offer to
+              // find the file rather than implying anything was lost.
+              <div className="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px]">
+                <span className="truncate text-ritemark-warning">Recording moved or deleted</span>
+                <Tooltip label="Choose where the recording is now. The transcript is kept.">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="pointer-events-auto relative z-10 h-auto shrink-0 p-0 text-[11px] font-semibold"
+                    onClick={() => vscode.postMessage({ type: 'transcribe:relinkSession', sessionId: recording.sessionId })}
+                  >
+                    Find it
+                  </Button>
+                </Tooltip>
+              </div>
+            )}
+          </div>
+          <DropdownMenu modal={false}>
+            <MoreActionsTrigger
+              label={`More actions for ${title}`}
+              className="relative z-10 -mr-1.5 -mt-[2.25px] opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+            />
+            <DropdownMenuContent align="end">
+              {actions.map((action) => [
+                action.danger && <DropdownMenuSeparator key={`${action.label}-separator`} />,
+                <DropdownMenuItem key={action.label} tone={action.danger ? 'danger' : 'default'} disabled={action.disabled} onSelect={action.run}>
+                  <Icon name={action.icon} size={14} />
+                  {action.label}
+                </DropdownMenuItem>,
+              ])}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-ink-muted">
-          <span
-            className={[
-              'rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide',
-              recording.engine === 'elevenlabs'
-                ? 'bg-accent-soft text-accent-deep'
-                : 'bg-ritemark-success-soft text-ritemark-success',
-            ].join(' ')}
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {actions.map((action) => [
+          action.danger && <ContextMenuSeparator key={`${action.label}-separator`} />,
+          <ContextMenuItem
+            key={action.label}
+            disabled={action.disabled}
+            // Matches DropdownMenuItem, so the right-click menu and the More actions menu read as one.
+            className={`gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current${action.danger ? ' text-[var(--r-error)] focus:text-[var(--r-error)]' : ''}`}
+            onSelect={action.run}
           >
-            {recording.engine === 'elevenlabs' ? 'ElevenLabs' : 'On-device'}
-          </span>
-          <span className="truncate">
-            {formatDuration(recording.durationSec)}
-            {recording.speakerSeparation === 'diarized' && recording.speakerCount > 0
-              ? ` · ${recording.speakerCount} speakers`
-              : ''}
-            {` · ${formatRelativeDate(recording.createdAt)}`}
-          </span>
-        </div>
-        {/* Its own line, not inline with the metadata: the sidebar is narrow and
-            competing for that row truncated the duration. Only set for rows from
-            elsewhere, so the list never leaves you guessing where one is from. */}
-        {recording.projectName && (
-          <div className="mt-1 flex items-center gap-1 text-[10px] text-ink-faint">
-            <Icon name="folder-open" size={12} className="shrink-0" />
-            <span className="truncate" title={`Transcribed in ${recording.projectName}`}>
-              {recording.projectName}
-            </span>
-          </div>
-        )}
-        {recording.audioMissing && (
-          <div className="mt-1 flex items-center gap-2">
-            {/* R12: the transcript is intact — only the path went stale. Offer
-                to find the file rather than implying anything was lost. */}
-            <span className="text-[10px] text-ritemark-warning">Recording moved or deleted</span>
-            <button
-              type="button"
-              className="text-[10px] font-semibold text-accent hover:underline"
-              onClick={(event) => {
-                event.stopPropagation();
-                vscode.postMessage({ type: 'transcribe:relinkSession', sessionId: recording.sessionId });
-              }}
-            >
-              Find it
-            </button>
-          </div>
-        )}
-      </div>
-      <Tooltip className="shrink-0" label="Open saved document">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-          aria-label="Open saved document"
-          onClick={(event) => {
-            event.stopPropagation();
-            vscode.postMessage({ type: 'transcribe:openExport', sessionId: recording.sessionId });
-          }}
-        >
-          <Icon name="file-text" size={14} />
-        </Button>
-      </Tooltip>
-      <Tooltip className="shrink-0" label="Remove transcript. The recording is kept.">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-          aria-label="Remove transcript"
-          onClick={(event) => {
-            event.stopPropagation();
-            vscode.postMessage({ type: 'transcribe:deleteSession', sessionId: recording.sessionId });
-          }}
-        >
-          <Icon name="trash" size={14} />
-        </Button>
-      </Tooltip>
-    </div>
+            <Icon name={action.icon} size={14} />
+            {action.label}
+          </ContextMenuItem>,
+        ])}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

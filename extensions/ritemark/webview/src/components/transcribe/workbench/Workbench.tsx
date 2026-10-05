@@ -13,6 +13,8 @@
 import { forwardRef, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, MoreActionsTrigger } from '../../ui/dropdown-menu';
+import { formatSpeakerCount } from '../types';
 import { vscode } from '../../../lib/vscode';
 import { Waveform } from './Waveform';
 import { InsightsRail, type Insights, type InsightsState } from './InsightsRail';
@@ -266,12 +268,15 @@ export function Workbench() {
       <header className="min-w-0 shrink-0 border-b border-hairline bg-surface-muted px-3 py-3 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold tracking-tight">{state.audioName}</h1>
+            <div className="flex min-w-0 items-center gap-1">
+              <h1 className="truncate text-base font-semibold tracking-tight">{state.audioName}</h1>
+              <RecordingMenu />
+            </div>
             <div className="mt-0.5 text-[11px] text-ink-muted">
               {session.engine === 'elevenlabs' ? 'ElevenLabs Scribe' : 'On-device · Whisper'}
               {session.language ? ` · ${session.language}` : ''}
               {session.speakerSeparation === 'diarized'
-                ? ` · ${session.speakers.length} speakers`
+                ? ` · ${formatSpeakerCount(session.speakers.length)}`
                 : ' · no speaker separation'}
               {session.costUsd ? ` · $${session.costUsd.toFixed(2)}` : ''}
             </div>
@@ -415,6 +420,21 @@ export function Workbench() {
         />
       </div>
     </div>
+  );
+}
+
+/** v1.13.0 (#371): the recording's actions beside its title. Renaming renames the file; the extension stays. */
+function RecordingMenu() {
+  return (
+    <DropdownMenu modal={false}>
+      <MoreActionsTrigger label="More actions for this recording" density="header" />
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onSelect={() => vscode.postMessage({ type: 'workbench:renameRecording' })}>
+          <Icon name="pencil-simple" size={14} />
+          Rename…
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

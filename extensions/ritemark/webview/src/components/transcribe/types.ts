@@ -122,14 +122,16 @@ export function formatDuration(seconds: number | null): string {
   return `${total} s`;
 }
 
-export function formatRelativeDate(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '';
-  const days = Math.floor((Date.now() - then) / 86_400_000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days} days ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+/** v1.13.0 (#371): the library shows when a recording was transcribed as a date: "30 Sep 2026". */
+export function formatRecordingDate(iso: string): string {
+  const then = new Date(iso);
+  if (!Number.isFinite(then.getTime())) return '';
+  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** "1 speaker", "3 speakers". */
+export function formatSpeakerCount(count: number): string {
+  return `${count} ${count === 1 ? 'speaker' : 'speakers'}`;
 }
 
 /** What the user is waiting for, in words rather than a state name. */

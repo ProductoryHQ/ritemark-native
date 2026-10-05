@@ -74,7 +74,7 @@ Concrete uses that must stay consistent across webview and VS Code patches.
 | --- | --- |
 | Navigation tree (sidebar, file tree) | `sidebar-simple`, `folder`, `folder-open`, `caret-right`, `caret-down`, `file-text`, `file-csv`, `file-doc`, `file-pdf`, `file-png`, `file-ts`, `file-plus`, `folder-plus` |
 | Search / filter | `magnifying-glass`, `x`, `funnel`, `file-text` |
-| Toolbar / actions | `plus`, `download`, `gear`, `dots-three`, `arrows-clockwise`, `arrows-counter-clockwise`, `arrows-out` |
+| Toolbar / actions | `plus`, `download`, `gear`, `dots-three` (More actions — always horizontal, via `MoreActionsTrigger`), `arrows-clockwise`, `arrows-counter-clockwise`, `arrows-out` |
 | AI sidebar / agent input | `robot`, `paperclip`, `at`, `star-four`, `arrow-up`, `microphone`, `divide`, `x-circle`, `play`, `play-circle`, `git-branch`, `bezier-curve`, `warning` |
 | Titlebar | `sidebar-simple`, `sidebar`, `gear` |
 | Activity bar | `folder-open`, `magnifying-glass`, `robot`, `flow-arrow`, `git-branch`, `puzzle-piece`, `gear`, `user-circle` |

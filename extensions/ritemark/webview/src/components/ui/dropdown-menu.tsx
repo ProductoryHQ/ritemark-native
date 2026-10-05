@@ -13,7 +13,10 @@
  */
 import * as React from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
-import { cn } from '@/lib/utils'
+import { cn } from '../../lib/utils'
+import { Button } from './button'
+import { Icon } from './Icon'
+import { Tooltip } from './tooltip'
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -65,4 +68,37 @@ const DropdownMenuSeparator = React.forwardRef<
 ))
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
 
-export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator }
+/**
+ * The one "More actions" (…) button that opens a menu of a row's or a header's
+ * actions. Convention (ritemark-design: references/webview-ui.md § More actions
+ * menus): Phosphor `dots-three` at 14px, a ghost Button, the tooltip "More
+ * actions", an aria-label that names the target. `density="row"` (24px) in list
+ * rows, `"header"` (28px) beside a title. Put it inside <DropdownMenu modal={false}>;
+ * `className` positions it or makes it hover-only in a row.
+ */
+const MoreActionsTrigger = React.forwardRef<
+  HTMLButtonElement,
+  { label?: string; density?: 'row' | 'header'; className?: string }
+>(({ label = 'More actions', density = 'row', className }, ref) => (
+  <Tooltip label="More actions">
+    <DropdownMenuPrimitive.Trigger asChild>
+      <Button
+        ref={ref}
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        className={cn(
+          'shrink-0 text-ink-muted data-[state=open]:bg-surface-soft data-[state=open]:text-ink-strong',
+          density === 'row' ? 'size-6 rounded-[6px]' : 'size-7 rounded-[7px]',
+          className
+        )}
+      >
+        <Icon name="dots-three" size={14} />
+      </Button>
+    </DropdownMenuPrimitive.Trigger>
+  </Tooltip>
+))
+MoreActionsTrigger.displayName = 'MoreActionsTrigger'
+
+export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger }

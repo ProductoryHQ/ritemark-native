@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 
-import { cn } from '@/lib/utils'
+import { cn } from '../../lib/utils'
 
 const filterChipVariants = cva(
   'inline-flex h-7 items-center gap-1.5 rounded-sm border px-2.5 text-[12px] font-medium leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0',
