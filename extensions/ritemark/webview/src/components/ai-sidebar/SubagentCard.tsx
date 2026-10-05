@@ -47,12 +47,13 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
     <div className="ml-2 rounded-md border border-[var(--r-hairline)] border-l-[3px] border-l-[var(--r-accent-fainter)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_60%,transparent)] px-2 py-1.5">
       <div className="flex items-center gap-1">
         {/* Header */}
+        <Tooltip className="min-w-0 flex-1" label={subagent.task}>
         <Button
           type="button"
           variant="ghost"
           onClick={() => hasActivities && setIsExpanded(!isExpanded)}
           aria-expanded={hasActivities ? isExpanded : undefined}
-          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 py-1 text-left font-normal has-[>svg]:px-1.5 ${
+          className={`h-auto w-full min-w-0 justify-start gap-2 rounded-md px-1.5 py-1 text-left font-normal has-[>svg]:px-1.5 ${
             hasActivities ? '' : 'cursor-default hover:bg-transparent'
           }`}
         >
@@ -78,6 +79,7 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
           {/* Status icon */}
           <span className="shrink-0">{statusIcon}</span>
         </Button>
+        </Tooltip>
 
         {canStop && (
           <Tooltip label={subagent.status === 'stopping' ? 'Stopping this task…' : 'Stop this task'}>

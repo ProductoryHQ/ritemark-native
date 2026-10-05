@@ -599,6 +599,12 @@ export class AgentSession {
   private _runtimeTurn: RuntimeTurnState | null = null;
   /** Human prompts held until that turn's result (Phase 0 D3, Jarmo's default). */
   private _runtimeTurnWaiters: Array<() => void> = [];
+  /**
+   * A human prompt was sent and its result has not arrived yet. Stays set when
+   * the turn is resolved early (Stop, timeout): the interrupted turn's last
+   * messages must never be mistaken for a turn Claude opened itself.
+   */
+  private _humanResultPending = false;
   private _planModeActive = false;
   // Pending user decisions, keyed by toolUseId.
   //
@@ -834,6 +840,7 @@ export class AgentSession {
     this._turnTimeoutMs = timeoutMinutes * 60 * 1000;
     this._resetTurnTimeout();
 
+    this._humanResultPending = true;
     if (!this._queryStream) {
       // First turn — start session with warm process
       await this._startSession(userMsg, thinkingEffort);
@@ -1373,6 +1380,7 @@ export class AgentSession {
         if (
           !this._turnResolve
           && !this._runtimeTurn
+          && !this._humanResultPending
           && this._resultsSeen > 0
           && this._live
           && ((message.type === 'system' && message.subtype === 'init')
@@ -1475,9 +1483,15 @@ export class AgentSession {
           // follow-up turn Claude opened itself closes here; so does an empty
           // notification turn (no messages, nothing to show).
           const originKind = message.origin?.kind;
+          if (!originKind || originKind === 'human') this._humanResultPending = false;
           if (this._runtimeTurn && originKind !== 'human') {
             this._completeRuntimeTurn(message);
             continue;
+          }
+          if (this._runtimeTurn && !this._turnResolve) {
+            // Defensive: a human-origin result closes any runtime turn still
+            // open with no human turn waiting, so no prompt can wait forever.
+            this._completeRuntimeTurn(null, 'Execution cancelled');
           }
           if (originKind && originKind !== 'human') {
             traceClaude('sdk', 'result for a turn Ritemark did not open', { originKind });

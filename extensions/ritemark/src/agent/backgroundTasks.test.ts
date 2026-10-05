@@ -217,7 +217,32 @@ async function testAskModeOutsideATurnAsksFirst(): Promise<void> {
   assert.equal((await decision).behavior, 'deny', 'a rejected background write does not run');
 }
 
+// QA finding: after Stop, the interrupted turn's trailing messages and its own
+// human-origin result must not open (or leave open) a turn Claude "opened itself".
+async function testInterruptedTurnTailIsNotARuntimeTurn(): Promise<void> {
+  const { session, log } = liveSession();
+  session._resultsSeen = 1;
+  session._humanResultPending = true; // a human prompt was sent; Stop resolved it early
+  session._queryStream = streamOf([
+    { type: 'system', subtype: 'init' },
+    { type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'text', text: 'partial' }] } },
+    { type: 'result', subtype: 'success', result: '', origin: { kind: 'human' } },
+  ]);
+  await session._consumeLoop();
+  assert.equal(log.starts, 0, 'no runtime turn opens for an interrupted turn');
+  assert.equal(session._runtimeTurn, null);
+  assert.equal(session._humanResultPending, false);
+  // And if one had been opened, a human-origin result closes it.
+  const second = liveSession();
+  second.session._resultsSeen = 1;
+  second.session._openRuntimeTurn();
+  second.session._queryStream = streamOf([{ type: 'result', subtype: 'success', result: '', origin: { kind: 'human' } }]);
+  await second.session._consumeLoop();
+  assert.equal(second.session._runtimeTurn, null, 'never left open');
+}
+
 (async () => {
+  await testInterruptedTurnTailIsNotARuntimeTurn();
   await testAskModeOutsideATurnAsksFirst();
   await testObservedSequence();
   await testHumanPromptWaitsForRuntimeTurn();

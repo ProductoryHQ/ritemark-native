@@ -3024,6 +3024,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       onRuntimeTurnComplete: (result) => {
         const turnId = runtimeTurnId ?? undefined;
         runtimeTurnId = null;
+        if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
+          this._activeConversationTurnIds.delete(conversationId);
+        }
         const errorPresentation = presentRuntimeError(agentId, result.error, undefined);
         const error = errorPresentation?.message;
         const failureKind = errorPresentation?.failureKind;
