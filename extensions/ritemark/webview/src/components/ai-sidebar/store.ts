@@ -2416,6 +2416,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // Runtime binding (selectedAgent / pendingRuntime.runtimeId) is applied only
           // to the ACTIVE thread — the host's "selected agent" is a single value and
           // must not re-bind background threads to a different runtime.
+          //
+          // The host's Claude model is likewise one app-wide value: the last pick in
+          // any thread or window. It only fills the active thread when that thread
+          // has no catalog model of its own. It is never a newer choice for the
+          // thread: the host answers `ai-select-agent` with this bootstrap before
+          // `ai-select-model` is saved, so a Codex → Claude pick used to come back
+          // as the previous model (2026-10-02).
           const activeId = get().activeConversationId;
           const applyHostDefault = !get().ready;
           const conversations: Record<string, ConversationState> = {};
@@ -2423,11 +2430,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             const codexSelectedModel = newCodexModels.some((m: { id: string }) => m.id === conversation.codexSelectedModel)
               ? conversation.codexSelectedModel
               : (defaultCodexModelId(newCodexModels) || conversation.codexSelectedModel);
-            const candidateClaude = conversation.id === activeId
-              ? (message.selectedModel || conversation.selectedModel)
-              : conversation.selectedModel;
-            const selectedModel = reconciledModelId(newClaudeModels, candidateClaude)
-              ?? (newClaudeModels[0]?.id || candidateClaude);
+            const hostClaudeModel = conversation.id === activeId && message.selectedModel
+              ? reconciledModelId(newClaudeModels, message.selectedModel)
+              : undefined;
+            const selectedModel = reconciledModelId(newClaudeModels, conversation.selectedModel)
+              ?? hostClaudeModel
+              ?? (newClaudeModels[0]?.id || conversation.selectedModel);
             const isActiveBlankConversation = applyHostDefault
               && conversation.id === activeId
               && isConversationEmpty(conversation);
@@ -2451,6 +2459,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 acpProviders,
                 byokProviderModels,
               ),
+              // A thread bound to Claude runs the model its button shows: a queued
+              // prompt and the AI disclosure read `pendingRuntime.modelId`.
+              ...(conversation.pendingRuntime.runtimeId === 'claude-code'
+                && conversation.pendingRuntime.modelId !== selectedModel
+                ? { pendingRuntime: { ...conversation.pendingRuntime, modelId: selectedModel } }
+                : {}),
               ...(isActiveBlankConversation
                 ? {
                     selectedAgent: incomingAgent,
