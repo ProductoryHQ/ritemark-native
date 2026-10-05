@@ -23,6 +23,7 @@ import { ReportDialog, useReportDialog } from './reporting/ReportDialog';
 import { SelectionIndicator } from './SelectionIndicator';
 import { ConversationsPanel } from './ConversationsPanel';
 import { ConversationHeader } from './ConversationHeader';
+import { BackgroundSwitchDialog } from './ConversationDialogs';
 import { ThreadRail } from './ThreadRail';
 import { ActivePlanBanner } from './ActivePlanBanner';
 import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
@@ -380,6 +381,7 @@ export function AISidebar() {
               <ChatInput onReport={reportDialog.request} menuBoundary={conversationColumn} />
             </div>
             <ThreadRail />
+            <BackgroundSwitchDialog />
           </div>
         </>
       )}

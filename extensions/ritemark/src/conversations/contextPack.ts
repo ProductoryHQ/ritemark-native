@@ -82,8 +82,25 @@ function normalizeTurns(events: ConversationEventV1[]): ContextTurn[] {
       assistants.set(event.turnId, event);
     }
   }
+  // Sprint 128: a turn Claude opened itself (after background work) carries a
+  // host-written header, not words of the user's, so it is never a user entry.
+  // Its answer is still context: it continues the user turn before it.
+  let ownerTurnId: string | null = null;
+  for (const event of events) {
+    if (event.kind !== 'user-message') continue;
+    if (!event.origin) {
+      ownerTurnId = event.turnId;
+      continue;
+    }
+    const followUp = assistants.get(event.turnId);
+    if (!followUp || !ownerTurnId) continue;
+    const owner = assistants.get(ownerTurnId);
+    assistants.set(ownerTurnId, owner
+      ? { ...owner, content: `${owner.content}\n\n${followUp.content}` }
+      : { ...followUp, turnId: ownerTurnId });
+  }
   return events
-    .filter((event): event is UserMessageEventV1 => event.kind === 'user-message' && Boolean(event.text.trim()))
+    .filter((event): event is UserMessageEventV1 => event.kind === 'user-message' && !event.origin && Boolean(event.text.trim()))
     .map((user) => {
       const assistant = assistants.get(user.turnId);
       const unanswered = !assistant;

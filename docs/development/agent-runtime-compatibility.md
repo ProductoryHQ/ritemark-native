@@ -1,5 +1,15 @@
 # Agent Runtime Compatibility Matrix
 
+## Sprint 128 — Claude background work: re-check on every Claude Code bump — 2026-10-05
+
+Ritemark now depends on these Claude Code behaviours (Phase 0 on 2.1.289 / SDK 0.3.289; evidence in `releases/v1.13.0/sprint-128-background-agent-turns/research/`). A Claude Code bump re-runs `research/probes/background-probe.mjs --mode p1` and `--mode p6stop` and compares with `src/agent/fixtures/background-subagents/`:
+
+- A follow-up turn after background work opens with a fresh `system/init` and closes with `result.origin.kind === 'task-notification'`; no user message with that origin reaches the SDK consumer.
+- `task_started` (with `is_backgrounded`, `tool_use_id`) precedes the Agent launch `tool_result`; `task_notification` carries `tool_use_id` and a terminal status.
+- `background_tasks_changed` is the live set (replace semantics).
+- `perTaskStopAffordance: true` makes `interrupt()` spare background tasks; `Query.stopTask` stops one (`status: 'stopped'`).
+- `session_state_changed` is emitted only with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS` (not used).
+
 ## v1.13.0 — Claude Code 2.1.289 / SDK 0.3.289, Codex 0.160.0, OpenCode 1.18.34 — 2026-10-04
 
 **Change:** Claude Code `2.1.281` → `2.1.289` with Claude Agent SDK `0.3.281` → `0.3.289` in lockstep; Codex `0.154.0` → `0.160.0`; OpenCode `1.18.30` → `1.18.34`. OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and zsh `5.9.0.3-test`, and ACP SDK `1.4.0` are unchanged (Codex's macOS ripgrep and zsh have new hashes because the package was re-signed; `--version` reports the same versions).

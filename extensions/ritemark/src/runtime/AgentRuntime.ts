@@ -1,4 +1,4 @@
-import type { AgentId, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext, ClaudeModelDeclaration } from '../agent/types';
+import type { AgentId, AgentLiveHooks, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext, ClaudeModelDeclaration } from '../agent/types';
 import type {
   RuntimeContinuationDescriptorV1,
   RuntimeContinuationRequest,
@@ -88,6 +88,13 @@ export interface RuntimeSession {
 
   /** Tear down only this conversation's session; siblings keep running. */
   dispose(): void;
+
+  /**
+   * Sprint 128 (runtimes with `backgroundWork` only; Codex and ACP never define
+   * these): stop one background task, and the work still running.
+   */
+  stopBackgroundTask?(taskId: string): Promise<void>;
+  backgroundTaskCount?(): number;
 }
 
 export interface RuntimeSessionConfig {
@@ -138,6 +145,13 @@ export interface RuntimeSessionConfig {
   planFirst?: boolean;
   onProgress: (p: AgentProgress) => void;
   onApprovalRequest: (req: UnifiedApprovalRequest) => void;
+  /**
+   * Sprint 128 (Claude Code only): conversation-scoped reports that outlive a
+   * turn — background task cards, the live set, and the turn Claude opens
+   * itself when background work finishes. Built once per conversation by the
+   * host; never tied to one human turn.
+   */
+  live?: AgentLiveHooks;
   /** Called when a turn completes with its final result (Claude Code) */
   onComplete?: (result: RuntimeTurnResult) => void;
   /** Called when a Codex turn completes with its status and optional error */

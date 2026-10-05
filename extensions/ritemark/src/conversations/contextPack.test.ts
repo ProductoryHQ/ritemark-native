@@ -52,7 +52,22 @@ function fixture(): ConversationRecordV1 {
   ]);
 }
 
+function testRuntimeInitiatedTurn(): void {
+  // Sprint 128: the header of a turn Claude opened itself is never a user
+  // entry; its answer continues the user turn before it.
+  const record = base([
+    event('user-message', 0, { turnId: 'turn-ask', runtimeId: 'claude-code', text: 'Verify the facts', mode: null, attachments: [] }),
+    event('assistant-message', 1, { turnId: 'turn-ask', runtimeId: 'claude-code', content: 'launched', terminalStatus: 'completed' }),
+    event('user-message', 2, { turnId: 'turn-bg', runtimeId: 'claude-code', text: 'A background task finished — Claude is continuing', mode: null, attachments: [], origin: 'background-task' }),
+    event('assistant-message', 3, { turnId: 'turn-bg', runtimeId: 'claude-code', content: 'final: all facts checked', terminalStatus: 'completed' }),
+  ]);
+  const pack = buildNormalizedContextPack(record);
+  assert.ok(!pack.text.includes('A background task finished'), 'the header never reaches a model');
+  assert.ok(pack.text.includes('launched\n\nfinal: all facts checked'), 'the follow-up answer continues the user turn');
+}
+
 function run(): void {
+  testRuntimeInitiatedTurn();
   const record = fixture();
   const pack = buildNormalizedContextPack(record, { beforeEventId: 'event-9' });
   assert.ok(pack);

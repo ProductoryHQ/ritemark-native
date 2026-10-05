@@ -81,7 +81,7 @@ export interface ModelOption {
 /**
  * Progress event types from agent execution
  */
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 /**
  * Progress event emitted during agent execution
@@ -98,6 +98,45 @@ export interface AgentProgress {
   subagentTask?: string;
   /** For subagent events, the parent tool_use_id for correlation */
   parentToolUseId?: string;
+  /** Sprint 128: the SDK task behind a subagent card. */
+  taskId?: string;
+  /** Sprint 128: a subagent card's state, from the SDK task messages. */
+  subagentStatus?: 'running' | 'completed' | 'failed' | 'stopped' | 'ended';
+  /** Sprint 128: the task runs in the background (the turn may end before it). */
+  backgrounded?: boolean;
+}
+
+/** Sprint 128: one entry of the work still running in the background. */
+export interface BackgroundTaskSummary {
+  taskId: string;
+  taskType?: string;
+  description?: string;
+}
+
+/**
+ * Sprint 128: reports that outlive a turn. Background tasks keep running after
+ * a turn's `result`, and when they finish Claude continues on its own in a new
+ * turn the user did not start. The per-turn callbacks cannot carry either, so
+ * the host gives the session these conversation-scoped hooks.
+ */
+export interface AgentLiveHooks {
+  /** A subagent card changed (or its activity), in whichever turn it lives. */
+  onTaskProgress(progress: AgentProgress): void;
+  /** The work still running, replace semantics. */
+  onBackgroundTasks(tasks: BackgroundTaskSummary[]): void;
+  /** Claude opened a turn of its own after background work finished. */
+  onRuntimeTurnStart(): void;
+  onRuntimeTurnProgress(progress: AgentProgress): void;
+  onRuntimeTurnComplete(result: AgentResult): void;
+  /** The session ended with this many tasks still running; they ended with it. */
+  onTasksEndedWithSession(count: number): void;
+  /**
+   * An 'ask'-mode approval or a question raised outside a human turn (by a
+   * background subagent, or in a turn Claude opened itself). Without these
+   * the gate had no UI and failed open; they reach the same approval gate.
+   */
+  onToolApproval?(request: AgentToolApprovalRequest): void;
+  onQuestion?(question: AgentQuestion): void;
 }
 
 export interface AgentQuestionOption {
@@ -388,6 +427,8 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   setPermissionMode?(mode: string): Promise<void>;
   /** Change the effort of a warm Claude query without rebuilding its context. */
   applyFlagSettings?(settings: { effortLevel: ExplicitThinkingEffort | null }): Promise<void>;
+  /** Sprint 128: stop one background task; a `task_notification` with status `stopped` follows. */
+  stopTask?(taskId: string): Promise<void>;
 }
 
 /**
@@ -428,4 +469,6 @@ export interface SDKMessage {
   is_error?: boolean;
   result?: string;
   errors?: string[];
+  /** Sprint 128: who opened the turn a `result` closes (`human`, `task-notification`, …). */
+  origin?: { kind: string };
 }

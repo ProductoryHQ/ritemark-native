@@ -63,6 +63,7 @@ import {
   type QueueItem,
 } from './promptQueue';
 import { deriveActivityState } from './activityState';
+import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation } from './conversationProjection';
@@ -87,6 +88,7 @@ import type {
   ExtensionMessage,
   SubagentProgress,
   AgentProgress,
+  BackgroundTaskSummary,
   OnboardingStatus,
   OnboardingDependency,
   OnboardingInstallState,
@@ -396,12 +398,21 @@ interface AISidebarState {
   selectAgent: (agentId: AgentId) => void;
   selectModel: (modelId: string) => void;
   /** Atomically apply the runtime + its model to the active conversation. */
-  selectRuntimeModel: (runtimeId: AgentId, modelId: string) => void;
+  selectRuntimeModel: (runtimeId: AgentId, modelId: string, options?: { confirmed?: boolean }) => void;
+  /**
+   * Sprint 128 (R9): a model or runtime switch that would end Claude's running
+   * background work waits here for the user's answer in a dialog.
+   */
+  backgroundSwitch: { conversationId: string; runtimeId: AgentId; modelId: string; taskCount: number } | null;
+  confirmBackgroundSwitch: () => void;
+  cancelBackgroundSwitch: () => void;
   setPendingRuntime: (partial: Partial<PendingRuntimeSelection>) => void;
   setThinkingEffort: (effort: ThinkingEffort) => void;
   clearThinkingEffortNotice: () => void;
   sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
   cancelRequest: () => void;
+  /** Sprint 128: stop one background task (its card's stop button). */
+  stopBackgroundTask: (conversationId: string, subagent: SubagentProgress) => void;
   /**
    * Detach the editor selection from the chat input context. Does NOT clear
    * the editor's actual selection — only the chat-side reference. Sprint 62
@@ -886,9 +897,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // Mirrors src/runtime/capabilities.ts until the first agent:config arrives.
     runtimeCapabilities: {
-      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true },
-      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true },
-      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false },
+      'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true, backgroundWork: true },
+      'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true, backgroundWork: false },
+      'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false, backgroundWork: false },
     },
     composerThinkingEffortEnabled: true,
     thinkingEffortCapabilities: {},
@@ -1096,9 +1107,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: get().activeConversationId });
     },
 
-    selectRuntimeModel: (runtimeId, modelId) => {
+    selectRuntimeModel: (runtimeId, modelId, options) => {
       const conversation = activeConversation();
       if (!conversation || !modelId) return;
+
+      // Sprint 128 (R9): Claude's session is rebuilt for another model and
+      // closed for another runtime, which ends its background work. Ask first.
+      const taskCount = conversation.backgroundTasks.length;
+      const endsClaudeSession = conversation.selectedAgent === 'claude-code'
+        && (runtimeId !== 'claude-code' || modelId !== conversation.selectedModel);
+      if (taskCount > 0 && endsClaudeSession && !options?.confirmed) {
+        set({ backgroundSwitch: { conversationId: conversation.id, runtimeId, modelId, taskCount } });
+        return;
+      }
 
       if (isRuntimeHandoff(conversation, runtimeId)) get().cancelRequest();
 
@@ -1128,6 +1149,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: conversation.id });
       }
     },
+
+    backgroundSwitch: null,
+    confirmBackgroundSwitch: () => {
+      const pending = get().backgroundSwitch;
+      set({ backgroundSwitch: null });
+      if (pending && pending.conversationId === get().activeConversationId) {
+        get().selectRuntimeModel(pending.runtimeId, pending.modelId, { confirmed: true });
+      }
+    },
+    cancelBackgroundSwitch: () => set({ backgroundSwitch: null }),
 
     setPendingRuntime: (partial) => {
       patchConversation(get().activeConversationId, (c) => ({
@@ -1341,6 +1372,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         '',
         'User request:',
       ].join('\n');
+    },
+
+    stopBackgroundTask: (conversationId, subagent) => {
+      if (!subagent.taskId) return;
+      vscode.postMessage({ type: 'agent-stop-task', conversationId, agentId: 'claude-code', taskId: subagent.taskId, cardId: subagent.id });
+      patchConversation(conversationId, (c) => ({ agentConversation: markCardStopping(c.agentConversation, subagent.id) }));
     },
 
     cancelRequest: () => {
@@ -1914,7 +1951,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
       // Handle legacy saves: Codex conversations were stored in agentConversation
       // before the codexConversation field was added
-      let agentConv = data.agentConversation || [];
+      // Sprint 128: a card saved while its background task ran has no live
+      // session behind it any more — show it as ended, not spinning forever.
+      let agentConv = endRunningCards(data.agentConversation || []);
       let codexConv = data.codexConversation || [];
       if (data.agentId === 'codex' && codexConv.length === 0 && agentConv.length > 0) {
         codexConv = agentConv as unknown as typeof codexConv;
@@ -2799,10 +2838,68 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         }
 
+        // Sprint 128: a background subagent's card changed — in whichever turn
+        // holds it, also after that turn ended.
+        case 'agent-task-progress': {
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          const progress = message.progress as AgentProgress;
+          patchConversation(targetId, (c) => {
+            const agentConversation = applyTaskProgress(c.agentConversation, progress);
+            return agentConversation === c.agentConversation ? null : { agentConversation };
+          });
+          break;
+        }
+
+        // Sprint 128: the work still running in the background (replace
+        // semantics). With endedCount, the session ended and took it with it.
+        case 'agent-background-tasks': {
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          const tasks = Array.isArray(message.tasks) ? message.tasks as BackgroundTaskSummary[] : [];
+          const endedCount = typeof message.endedCount === 'number' ? message.endedCount : 0;
+          const before = get().conversations[targetId]?.backgroundTasks.length ?? 0;
+          patchConversation(targetId, (c) => {
+            if (!endedCount) return { backgroundTasks: tasks };
+            const agentConversation = endRunningCards(c.agentConversation);
+            const last = agentConversation[agentConversation.length - 1];
+            const line: AgentProgress = { type: 'session_reset', message: tasksEndedLine(endedCount), timestamp: Date.now() };
+            return {
+              backgroundTasks: tasks,
+              agentConversation: last
+                ? [...agentConversation.slice(0, -1), { ...last, activities: [...last.activities, line] }]
+                : agentConversation,
+            };
+          });
+          // The final card states are worth keeping once the work is over.
+          if (before > 0 && tasks.length === 0) setTimeout(() => persistConversation(targetId), 100);
+          break;
+        }
+
+        // Sprint 128: Claude opened a turn itself after background work.
+        case 'agent-turn-started': {
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          const turn: AgentConversationTurn = {
+            id: typeof message.turnId === 'string' ? message.turnId : `runtime-${Date.now()}`,
+            conversationId: targetId,
+            origin: 'background-task',
+            userPrompt: '',
+            activities: [],
+            isRunning: true,
+            isPlan: false,
+            planHandled: false,
+            timestamp: Date.now(),
+          };
+          patchConversation(targetId, (c) => ({ agentConversation: [...c.agentConversation, turn] }));
+          break;
+        }
+
         case 'agent-question': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastAgentTurn(targetId, (lastTurn) => ({ ...lastTurn, pendingQuestion: message.question }));
+          // Sprint 128: a background subagent may ask after its turn ended.
+          patchLastAgentTurn(targetId, (lastTurn) => ({ ...lastTurn, pendingQuestion: message.question }), { requireRunning: false });
           break;
         }
 
@@ -3063,7 +3160,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   fileChanges: buildFileChanges(),
                 },
               };
-            });
+            }, { requireRunning: false }); // Sprint 128: a background subagent may ask after its turn ended.
           } else {
             // File-write / shell-command / permission approval for Codex + ACP
             patchLastCodexTurn(targetId, (lastTurn) => ({

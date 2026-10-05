@@ -12,6 +12,8 @@ Ritemark 1.13.0 is a small release. It brings Claude Sonnet 5.5, newer versions 
 
 ## Fixes
 
+- **Claude's background work shows its real state.** When Claude hands work to a subagent running in the background, the status line now says so ("Done — 1 task still running in the background"), each card shows when its task is really finished, stopped or ended, and you can stop one task without stopping Claude. When the work finishes, Claude's follow-up appears in the conversation as a new turn instead of being lost. Switching model or agent while work runs asks first.
+- **Ask mode covers background work.** File changes and commands from a background subagent, or from Claude's follow-up turn, now ask for approval in Ask mode. Before, they went through without asking.
 - **Send uses the Claude model you picked.** After switching from Claude to Codex and then to another Claude model, the model button showed the old Claude model and Send used it. Both now follow your pick.
 - **The message box fits a narrow AI side bar.** Below the default width, AI information and attach move into a **…** menu so Send stays in view; at the narrowest widths the controls take a second row.
 - **A new Codex conversation no longer fails on its first prompt.** Ritemark read its list of Codex models from a file that every Codex app on your computer shares. When another Codex app, such as the Codex desktop app, had written that list for a different Codex version, Ritemark could pick a model its own Codex can't run, and the first prompt failed. Ritemark now ignores a list written by another Codex version, and a new Codex conversation starts on Ritemark's default Codex model, GPT-5.6 Sol.

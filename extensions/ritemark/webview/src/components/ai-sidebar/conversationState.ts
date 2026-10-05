@@ -17,6 +17,7 @@
 import type {
   AgentConversationTurn,
   AgentId,
+  BackgroundTaskSummary,
   ChatMessage,
   CodexConversationTurn,
   ConversationEntry,
@@ -113,6 +114,11 @@ export interface ConversationState {
   continuationNotice: ConversationContinuationNotice | null;
   /** Canonical transcript-restoration boundaries survive close/reopen and restart. */
   transcriptBoundaries: ConversationTranscriptBoundary[];
+  /**
+   * Sprint 128: Claude's work still running in the background in this
+   * conversation, replace semantics. Session-only; never persisted.
+   */
+  backgroundTasks: BackgroundTaskSummary[];
 }
 
 export function createConversationState(
@@ -141,6 +147,7 @@ export function createConversationState(
     showContextWarning: false,
     continuationNotice: null,
     transcriptBoundaries: [],
+    backgroundTasks: [],
   };
   // `id` is the storage key — never let an override desync it from the map key.
   return { ...base, ...overrides, id };

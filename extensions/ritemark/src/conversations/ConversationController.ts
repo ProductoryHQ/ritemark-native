@@ -545,6 +545,44 @@ export class ConversationController {
     return record;
   }
 
+  /**
+   * Sprint 128 (R4): Claude opened a turn itself after background work
+   * finished. Records it like an accepted turn — a user-message event with a
+   * host-written line and `origin: 'background-task'` — so the answer can be
+   * completed, projected and reloaded through the same paths as any turn.
+   * Does nothing while another turn is active (the host serialises turns).
+   */
+  async beginRuntimeInitiatedTurn(input: {
+    conversationId: string;
+    bindingGeneration: number;
+    runtimeId: AgentId;
+    turnId: string;
+    text: string;
+  }): Promise<ConversationRecordV1> {
+    const occurredAt = this.now().toISOString();
+    const record = await this.mutateLatest(input.conversationId, input.bindingGeneration, (current) => {
+      if (current.lifecycle.state === 'working' || current.lifecycle.state === 'needs-user') return null;
+      const sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;
+      return {
+        lifecycle: { state: 'working' as const, activeTurnId: input.turnId },
+        appendEvents: [{
+          kind: 'user-message' as const,
+          eventId: this.randomId(),
+          turnId: input.turnId,
+          sequence,
+          occurredAt,
+          runtimeId: input.runtimeId,
+          text: input.text,
+          mode: null,
+          attachments: [],
+          origin: 'background-task' as const,
+        }],
+      };
+    });
+    this.emitChanged(record);
+    return record;
+  }
+
   async attentionRuntimeTurn(input: {
     conversationId: string;
     bindingGeneration: number;

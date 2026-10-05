@@ -611,11 +611,62 @@ async function run(): Promise<void> {
     }
     assert.equal(interruptedAtShutdown?.events[interruptedAtShutdown.events.length - 1]?.kind, 'boundary');
 
+    // Sprint 128 (R4): Claude opens a turn itself after background work. It is
+    // recorded like a turn (a host-written header with origin) so its answer
+    // is completed and reloaded through the same paths; no title is generated.
+    {
+      const accepted = await controller.acceptRuntimeTurn({ agentId: 'claude-code', text: 'Verify the desktop facts' });
+      const launched = await controller.completeRuntimeTurn({
+        conversationId: accepted.conversationId,
+        bindingGeneration: accepted.bindingGeneration,
+        runtimeId: 'claude-code',
+        text: 'launched',
+        status: 'completed',
+      });
+      const header = 'A background task finished — Claude is continuing';
+      const begun = await controller.beginRuntimeInitiatedTurn({
+        conversationId: launched.conversationId,
+        bindingGeneration: launched.bindingGeneration,
+        runtimeId: 'claude-code',
+        turnId: '00000000-0000-4000-8000-0000000001ff',
+        text: header,
+      });
+      assert.deepEqual(begun.lifecycle, { state: 'working', activeTurnId: '00000000-0000-4000-8000-0000000001ff' });
+      const headerEvent = begun.events.at(-1);
+      assert.equal(headerEvent?.kind, 'user-message');
+      assert.equal(headerEvent?.kind === 'user-message' ? headerEvent.origin : undefined, 'background-task');
+      const answered = await controller.completeRuntimeTurn({
+        conversationId: begun.conversationId,
+        bindingGeneration: begun.bindingGeneration,
+        runtimeId: 'claude-code',
+        turnId: '00000000-0000-4000-8000-0000000001ff',
+        text: 'final: all facts checked',
+        status: 'completed',
+        generateTitle: async () => { throw new Error('no title for a turn Claude opened itself'); },
+      });
+      assert.equal(answered.lifecycle.state, 'idle');
+      assert.equal(answered.events.at(-1)?.kind === 'assistant-message' ? answered.events.at(-1)?.kind : null, 'assistant-message');
+      assert.equal(answered.title, launched.title, 'the title is unchanged');
+      // A reload reads the origin back.
+      const reloaded = await store.get(answered.conversationId);
+      assert.equal(reloaded?.events.some((event) => event.kind === 'user-message' && event.origin === 'background-task'), true);
+      // While a turn is active, Claude's turn is not recorded over it.
+      const busy = await controller.acceptRuntimeTurn({ conversationId: answered.conversationId, agentId: 'claude-code', text: 'Next question' });
+      const ignored = await controller.beginRuntimeInitiatedTurn({
+        conversationId: busy.conversationId,
+        bindingGeneration: busy.bindingGeneration,
+        runtimeId: 'claude-code',
+        turnId: '00000000-0000-4000-8000-000000000200',
+        text: header,
+      });
+      assert.equal(ignored.events.length, busy.events.length, 'no header appended over an active turn');
+    }
+
     assert.ok(emitted.some((event) => event.type === 'conversation/changed'));
     controller.dispose();
     const afterDispose = await controller.handle({ type: 'conversation/list', requestId: 'disposed' });
     assert.equal(afterDispose.ok, false);
-    assert.equal((await store.list(scope.scopeId)).length, 6, 'controller disposal does not delete durable conversations');
+    assert.equal((await store.list(scope.scopeId)).length, 7, 'controller disposal does not delete durable conversations');
 
     console.log('ConversationController.test.ts: all tests passed');
   } finally {

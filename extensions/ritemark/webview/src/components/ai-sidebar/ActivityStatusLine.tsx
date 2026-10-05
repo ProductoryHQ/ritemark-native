@@ -39,8 +39,11 @@ export function ActivityStatusLine() {
   const runningSubagents = last?.isRunning && 'subagents' in last
     ? ((last as { subagents?: Array<{ status: string }> }).subagents?.filter((x) => x.status === 'running').length ?? 0)
     : 0;
+  // Sprint 128: the work still running, from the SDK's live set.
+  const backgroundCount = conversation.backgroundTasks?.length ?? 0;
+  const chipCount = Math.max(runningSubagents, backgroundCount);
 
-  const presentation = presentActivityState(state, { activeSeconds, waitedSeconds, errorFirstLine, liveActivity });
+  const presentation = presentActivityState(state, { activeSeconds, waitedSeconds, errorFirstLine, liveActivity, backgroundCount });
   if (!presentation) return null;
 
   // AgentResponse already renders recoverable Claude auth failures as an
@@ -60,7 +63,7 @@ export function ActivityStatusLine() {
 
   return (
     <div
-      className={`flex h-6 items-center gap-1.5 px-1 text-[12px] ${TONE_CLASS[presentation.tone]}`}
+      className={`flex min-h-6 items-center gap-1.5 px-1 text-[12px] ${TONE_CLASS[presentation.tone]}`}
       title={title}
       data-activity-state={state}
     >
@@ -69,11 +72,12 @@ export function ActivityStatusLine() {
         size={14}
         className={presentation.spin ? 'animate-spin' : undefined}
       />
-      <span className="min-w-0 truncate">{presentation.label}</span>
-      {runningSubagents > 0 && (
+      {/* Sprint 128: "Done — 1 task still running in the background" may take two lines in a narrow side bar. */}
+      <span className="min-w-0 line-clamp-2">{presentation.label}</span>
+      {chipCount > 0 && state === 'running' && (
         <span className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--r-accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--r-accent-deep)]">
           <Icon name="robot" size={12} />
-          {runningSubagents}
+          {chipCount}
         </span>
       )}
     </div>

@@ -30,12 +30,18 @@ export interface RuntimeCapabilities {
    * browser chip and the AI information dialog read this same flag.
    */
   browserContext: boolean;
+  /**
+   * Sprint 128: the runtime reports work that keeps running after a turn's
+   * result (background subagents and commands), can stop one such task, and
+   * may open a turn of its own when that work finishes. Claude Code only.
+   */
+  backgroundWork: boolean;
 }
 
 export const RUNTIME_CAPABILITIES: Record<AgentId, RuntimeCapabilities> = {
-  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true },
-  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true },
-  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false },
+  'claude-code': { planFirst: true, liveModeSwitch: true, structuredPlanSteps: false, thinkingEffortSource: 'model-catalog', browserContext: true, backgroundWork: true },
+  'codex': { planFirst: true, liveModeSwitch: false, structuredPlanSteps: true, thinkingEffortSource: 'model-catalog', browserContext: true, backgroundWork: false },
+  'opencode': { planFirst: false, liveModeSwitch: false, structuredPlanSteps: false, thinkingEffortSource: 'runtime-live', browserContext: false, backgroundWork: false },
 };
 
 export function capabilitiesFor(agentId: AgentId): RuntimeCapabilities {
@@ -45,5 +51,6 @@ export function capabilitiesFor(agentId: AgentId): RuntimeCapabilities {
     structuredPlanSteps: false,
     thinkingEffortSource: 'runtime-live',
     browserContext: false,
+    backgroundWork: false,
   };
 }

@@ -145,10 +145,11 @@ export function nextDispatchable(queues: PromptQueues, conversationId: string): 
  * they pause the queue for an explicit user resume.
  */
 export function isReadyToDrain(state: ConversationActivityState): boolean {
-  return state === 'idle' || state === 'done';
+  // Sprint 128: background work does not block a new prompt.
+  return state === 'idle' || state === 'done' || state === 'done-background';
 }
 
 /** Paused = something is queued but the last turn ended failed/cancelled. */
 export function isQueuePaused(state: ConversationActivityState, queueLength: number): boolean {
-  return queueLength > 0 && (state === 'failed' || state === 'cancelled');
+  return queueLength > 0 && (state === 'failed' || state === 'cancelled' || state === 'stopped-background');
 }

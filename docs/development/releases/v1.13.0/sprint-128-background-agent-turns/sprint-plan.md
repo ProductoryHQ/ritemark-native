@@ -103,3 +103,19 @@ Plain-language decisions only. The plan proposes a default for each, so none blo
 ## Approval
 
 - [ ] Jarmo approved this sprint plan
+
+## Sprint close (2026-10-05)
+
+**Branch:** `sprint-128-background-agent-turns` · **Issue:** #393 · Jarmo approved the plan with the default answers to the five open questions.
+
+**Phase 0:** all seven decisions settled on the bundled CLI ([research/phase0-findings.md](research/phase0-findings.md)). D1 and D2 changed the design: the follow-up turn opens with `system:init`, and "all finished" is an empty live set (no `session_state_changed` by default). D6 passed, so per-task stop shipped.
+
+**Found and fixed during the sprint (not in the original plan):**
+- Ask mode failed open outside a human turn: a background subagent's or a follow-up turn's file change or command ran without approval. Approvals and questions now go through the live channel to the same gate.
+- `task_updated` and `task_notification` both completed a card; only the notification does now.
+- shadcn Button's `has-[>svg]:px-3` widened the card header padding; fixed on the card.
+
+**Verified on a dev instance with real Claude (Sonnet 5.5, then Opus 5.5):** a background subagent shows "Running in the background" with its own stop button; the status line reads "Done — 2 tasks still running in the background" on two lines at 300 px; Claude's follow-up turns appear with the header line and the final answer; the card ends ✓ with its result; the card's stop ends the task as "Stopped" and Claude explains in a follow-up; the model-switch dialog appears with live work; after "Switch", "1 background task ended with the session." is shown.
+
+**Not run:** the main Stop with tasks still running (S27), widths 250 and 223 px, Windows, a multi-minute task against the 15-minute timer (covered by a unit test with a short timeout), and an 'ask'-mode approval raised live by a background subagent (covered by a unit test: the write waits for the gate and a rejection blocks it).
+

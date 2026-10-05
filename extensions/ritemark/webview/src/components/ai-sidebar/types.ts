@@ -31,6 +31,8 @@ export interface RuntimeCapabilityFlags {
   structuredPlanSteps: boolean;
   thinkingEffortSource: 'model-catalog' | 'runtime-live';
   browserContext: boolean;
+  /** Sprint 128: background work that outlives a turn, stoppable per task (Claude Code). */
+  backgroundWork: boolean;
 }
 
 export interface AgentInfo {
@@ -51,7 +53,7 @@ export interface ModelOption {
   thinkingEffort?: ModelThinkingEffort;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -65,6 +67,19 @@ export interface AgentProgress {
   subagentTask?: string;
   /** For subagent events, the parent tool_use_id for correlation */
   parentToolUseId?: string;
+  /** Sprint 128: the SDK task behind a subagent card. */
+  taskId?: string;
+  /** Sprint 128: a subagent card's state, from the SDK task messages. */
+  subagentStatus?: 'running' | 'completed' | 'failed' | 'stopped' | 'ended';
+  /** Sprint 128: the task runs in the background. */
+  backgrounded?: boolean;
+}
+
+/** Sprint 128: one entry of the work still running in the background. */
+export interface BackgroundTaskSummary {
+  taskId: string;
+  taskType?: string;
+  description?: string;
 }
 
 export interface AgentQuestionOption {
@@ -100,10 +115,16 @@ export interface SubagentProgress {
   id: string;
   parentTurnId: string;
   task: string;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'stopping' | 'stopped' | 'ended';
   activities: AgentProgress[];
   result?: string;
   timestamp: number;
+  /** Sprint 128: the SDK task id (needed to stop it). */
+  taskId?: string;
+  /** Sprint 128: runs in the background — the turn may have ended before it. */
+  backgrounded?: boolean;
+  /** Sprint 128: one line of progress, or why a stop failed. */
+  detail?: string;
 }
 
 export interface AgentMetrics {
@@ -231,6 +252,12 @@ export interface InstallProgress {
 
 export interface AgentConversationTurn {
   id: string;
+  /**
+   * Sprint 128: 'background-task' when Claude opened this turn itself after
+   * background work finished. It has no user prompt; the transcript shows a
+   * muted header line instead of a user bubble.
+   */
+  origin?: 'human' | 'background-task';
   /**
    * Sprint 99 (R5): the conversation this turn belongs to. Optional so
    * pre-Sprint-99 saved conversations still load; the store stamps it on
@@ -434,6 +461,10 @@ export type ExtensionMessage =
   | { type: 'ai-stopped' }
   | { type: 'clear-chat' }
   | ({ type: 'agent-progress'; progress: AgentProgress } & ConversationScopedMessage)
+  // Sprint 128: background work and the turn Claude opens itself.
+  | ({ type: 'agent-task-progress'; progress: AgentProgress } & ConversationScopedMessage)
+  | ({ type: 'agent-background-tasks'; tasks: BackgroundTaskSummary[]; endedCount?: number } & ConversationScopedMessage)
+  | ({ type: 'agent-turn-started'; turnId: string; origin: 'background-task' } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
   | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind } & ConversationScopedMessage)
