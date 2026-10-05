@@ -22,6 +22,8 @@ import type {
   AgentProgress,
   AgentResult,
   AgentMetrics,
+  AgentLiveHooks,
+  BackgroundTaskSummary,
   ClaudeModelDeclaration,
   FileAttachment,
   ModelOption,
@@ -33,6 +35,21 @@ import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { standaloneClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
+import {
+  createBackgroundTaskState,
+  isBackgroundedCard,
+  isTaskMessage,
+  reduceTaskMessage,
+  type BackgroundTaskState,
+} from './backgroundTasks';
+
+/** Sprint 128: a turn Claude opened itself after background work finished. */
+interface RuntimeTurnState {
+  filesModified: string[];
+  structuredAssistantError: string | undefined;
+  sawRegularAssistant: boolean;
+  planModeActive: boolean;
+}
 
 // Dynamic import for ES Module SDK (VS Code extensions use CommonJS)
 // Using Function constructor to bypass TypeScript's import() → require() transformation
@@ -89,6 +106,9 @@ function buildUserMessage(text: string, attachments?: FileAttachment[]): Record<
       message: { role: 'user', content },
       parent_tool_use_id: null,
       session_id: '',
+      // Sprint 128: results are matched to turns by origin; a follow-up turn
+      // Claude opens itself after background work closes with another origin.
+      origin: { kind: 'human' },
     };
   }
   return {
@@ -96,6 +116,7 @@ function buildUserMessage(text: string, attachments?: FileAttachment[]): Record<
     message: { role: 'user', content: text },
     parent_tool_use_id: null,
     session_id: '',
+    origin: { kind: 'human' },
   };
 }
 
@@ -567,6 +588,17 @@ export class AgentSession {
   private _emitDispatchAccepted: (() => void) | null = null;
   private _turnTimeout: ReturnType<typeof setTimeout> | null = null;
   private _turnTimeoutMs = 0;  // Stored so we can reset on activity
+  // Sprint 128: background work and the turns Claude opens itself.
+  private _live: AgentLiveHooks | null = null;
+  private _tasks: BackgroundTaskState = createBackgroundTaskState();
+  /** Agent/Task tool_use ids of this session's subagent cards. */
+  private _agentToolUses = new Set<string>();
+  /** Results seen; a turn Claude opens itself can only follow one. */
+  private _resultsSeen = 0;
+  /** The follow-up turn Claude opened after background work, while it runs. */
+  private _runtimeTurn: RuntimeTurnState | null = null;
+  /** Human prompts held until that turn's result (Phase 0 D3, Jarmo's default). */
+  private _runtimeTurnWaiters: Array<() => void> = [];
   private _planModeActive = false;
   // Pending user decisions, keyed by toolUseId.
   //
@@ -724,6 +756,15 @@ export class AgentSession {
       throw new Error('Agent prompt is empty');
     }
 
+    // Sprint 128 (D3): Claude is answering a turn it opened itself. The CLI
+    // would queue this prompt behind it; holding it here keeps one open turn
+    // at a time, so every message lands in the turn it belongs to.
+    if (this._runtimeTurn) {
+      traceClaude('lifecycle', 'human prompt waits for runtime turn');
+      await new Promise<void>((resolve) => this._runtimeTurnWaiters.push(resolve));
+      if (this._closed) throw new Error('Session closed');
+    }
+
     // Build prompt with active file context (skip if already referenced in path chips)
     let fullPrompt = buildClaudeTurnPrompt(prompt);
     if (activeFile) {
@@ -834,7 +875,15 @@ export class AgentSession {
    */
   interrupt(): void {
     const turnId = this._turnId;
-    traceClaude('lifecycle', 'interrupt', { turnId });
+    traceClaude('lifecycle', 'interrupt', { turnId, runtimeTurn: Boolean(this._runtimeTurn) });
+    if (this._runtimeTurn && !this._turnResolve) {
+      // Stop pressed while Claude answers a turn it opened itself. With
+      // perTaskStopAffordance the interrupt ends that turn only; background
+      // tasks keep running and are stopped one by one.
+      this._queryStream?.interrupt().catch(() => {});
+      this._completeRuntimeTurn(null, 'Execution cancelled');
+      return;
+    }
     this._queryStream?.interrupt().catch(() => {});
     this._clearPendingQuestion('Execution cancelled');
     this._clearPendingPlanApproval('Execution cancelled');
@@ -856,7 +905,15 @@ export class AgentSession {
       currentTurnId: this._turnId,
     });
     this._closed = true;
+    const endedTasks = this._tasks.live.length;
     try { this._queryStream?.close(); } catch {}
+    if (endedTasks > 0) {
+      this._tasks.live = [];
+      this._live?.onBackgroundTasks([]);
+      this._live?.onTasksEndedWithSession(endedTasks);
+    }
+    if (this._runtimeTurn) this._completeRuntimeTurn(null, 'Session closed');
+    this._releaseRuntimeTurnWaiters();
     this._queryStream = null;
     this._model = null;
     this._clearPendingQuestion('Session closed');
@@ -872,6 +929,172 @@ export class AgentSession {
     this._inputWaiter?.({} as Record<string, unknown>);
     this._inputWaiter = null;
     this._inputQueue = [];
+  }
+
+  // ── Background work (Sprint 128) ─────────────────────────────────────
+
+  /** Conversation-scoped reports that outlive a turn. Replaced on every turn. */
+  setLiveHooks(hooks: AgentLiveHooks | null): void {
+    this._live = hooks;
+  }
+
+  /** Work still running in the background, as the SDK last reported it. */
+  get backgroundTasks(): BackgroundTaskSummary[] {
+    return this._tasks.live.map((task) => ({ ...task }));
+  }
+
+  /** Stop one background task. A `stopped` task notification follows. */
+  async stopBackgroundTask(taskId: string): Promise<void> {
+    traceClaude('lifecycle', 'stopTask', { taskId });
+    const stopTask = this._queryStream?.stopTask;
+    if (!stopTask) throw new Error('This Claude session cannot stop a single task.');
+    await stopTask.call(this._queryStream, taskId);
+  }
+
+  private _progressEmitter(deliver: (progress: AgentProgress) => void): ExtendedProgressEmitter {
+    return (type, message, tool, file, subagentInfo) => deliver({
+      type,
+      message,
+      tool,
+      file,
+      timestamp: Date.now(),
+      subagentId: subagentInfo?.subagentId,
+      subagentTask: subagentInfo?.subagentTask,
+      parentToolUseId: subagentInfo?.parentToolUseId,
+    });
+  }
+
+  /**
+   * Where a message's progress goes. During a human turn: that turn, as
+   * before. Outside one, a subagent's activity goes to its card (in whichever
+   * turn it lives) and the rest to the turn Claude opened itself, if any.
+   */
+  private _emitterFor(parentToolUseId: string | null | undefined): ExtendedProgressEmitter {
+    if (this._turnResolve) return this._emitProgress || (() => {});
+    const live = this._live;
+    if (!live) return () => {};
+    if (parentToolUseId) return this._progressEmitter((p) => live.onTaskProgress(p));
+    if (this._runtimeTurn) return this._progressEmitter((p) => live.onRuntimeTurnProgress(p));
+    return () => {};
+  }
+
+  private _turnEmitter(): ExtendedProgressEmitter {
+    return this._emitterFor(null);
+  }
+
+  private _deliverTaskProgress(progress: AgentProgress): void {
+    if (this._live) {
+      this._live.onTaskProgress(progress);
+    } else if (progress.type === 'subagent_done') {
+      this._emitProgress?.('subagent_done', progress.message, 'Task', undefined, { subagentId: progress.subagentId });
+    }
+  }
+
+  private _handleTaskMessage(message: SDKMessage): void {
+    traceClaude('sdk', 'task message', {
+      subtype: message.subtype,
+      taskId: message.task_id ?? null,
+      toolUseId: message.tool_use_id ?? null,
+      status: message.status ?? null,
+    });
+    for (const event of reduceTaskMessage(this._tasks, message)) {
+      if (event.kind === 'live-set') {
+        this._live?.onBackgroundTasks(event.tasks.map((task) => ({ ...task })));
+        continue;
+      }
+      const done = event.status !== 'running';
+      this._deliverTaskProgress({
+        type: done ? 'subagent_done' : 'subagent_update',
+        message: event.detail ?? (event.status === 'stopped' ? 'Stopped' : event.status === 'failed' ? 'Failed' : done ? 'Task completed' : ''),
+        tool: 'Task',
+        timestamp: Date.now(),
+        subagentId: event.cardId,
+        taskId: event.taskId,
+        subagentStatus: event.status,
+        backgrounded: event.backgrounded,
+      });
+    }
+  }
+
+  /**
+   * A foreground subagent hands its answer back as the Agent tool_result; a
+   * background one's tool_result is only the launch (task_started with
+   * is_backgrounded arrives first — Phase 0 D4), so that card stays running.
+   */
+  private _handleUserMessage(message: SDKMessage): void {
+    const content = (message.message as { content?: unknown } | undefined)?.content;
+    if (!Array.isArray(content)) return;
+    for (const block of content as Array<{ type?: string; tool_use_id?: string; is_error?: boolean }>) {
+      if (block.type !== 'tool_result' || !block.tool_use_id || !this._agentToolUses.has(block.tool_use_id)) continue;
+      if (isBackgroundedCard(this._tasks, block.tool_use_id)) continue;
+      this._deliverTaskProgress({
+        type: 'subagent_done',
+        message: block.is_error ? 'Failed' : 'Task completed',
+        tool: 'Task',
+        timestamp: Date.now(),
+        subagentId: block.tool_use_id,
+        subagentStatus: block.is_error ? 'failed' : 'completed',
+        backgrounded: false,
+      });
+    }
+  }
+
+  private _openRuntimeTurn(): void {
+    traceClaude('lifecycle', 'runtime turn opened');
+    this._runtimeTurn = {
+      filesModified: [],
+      structuredAssistantError: undefined,
+      sawRegularAssistant: false,
+      planModeActive: false,
+    };
+    this._live?.onRuntimeTurnStart();
+  }
+
+  private _completeRuntimeTurn(message: SDKMessage | null, error?: string): void {
+    const turn = this._runtimeTurn;
+    if (!turn) return;
+    this._runtimeTurn = null;
+    if (this._turnTimeout && !this._turnResolve) {
+      clearTimeout(this._turnTimeout);
+      this._turnTimeout = null;
+    }
+    const metrics: AgentMetrics = {
+      durationMs: message?.duration_ms || 0,
+      costUsd: message?.total_cost_usd ?? null,
+      model: this._model,
+    };
+    let result: AgentResult;
+    if (message && message.subtype === 'success') {
+      const normalized = normalizeClaudeSdkSuccessResult({
+        result: message.result,
+        resultIsError: message.is_error,
+        structuredAssistantError: turn.structuredAssistantError,
+        sawRegularAssistant: turn.sawRegularAssistant,
+      });
+      result = normalized.error
+        ? { text: '', filesModified: [], metrics, error: normalized.error }
+        : { text: normalized.text, filesModified: this._workspaceFilesModified(turn.filesModified), metrics };
+    } else {
+      const errorText = error ?? ((message?.errors || []).join('; ') || 'Execution failed');
+      result = { text: '', filesModified: this._workspaceFilesModified(turn.filesModified), metrics, error: errorText };
+    }
+    traceClaude('lifecycle', 'runtime turn completed', { error: result.error ?? null });
+    const live = this._live;
+    if (live) {
+      if (result.error) {
+        live.onRuntimeTurnProgress({ type: 'error', message: result.error, timestamp: Date.now() });
+      } else {
+        live.onRuntimeTurnProgress({ type: 'done', message: `Completed in ${(metrics.durationMs / 1000).toFixed(1)}s`, timestamp: Date.now() });
+      }
+      live.onRuntimeTurnComplete(result);
+    }
+    this._releaseRuntimeTurnWaiters();
+  }
+
+  private _releaseRuntimeTurnWaiters(): void {
+    const waiters = this._runtimeTurnWaiters;
+    this._runtimeTurnWaiters = [];
+    for (const release of waiters) release();
   }
 
   // ── Model discovery ────────────────────────────────────────────────
@@ -917,8 +1140,19 @@ export class AgentSession {
       clearTimeout(this._turnTimeout);
       this._turnTimeout = null;
     }
+    // Sprint 128 (R3): the timer runs only while a turn is open. A message that
+    // arrives after a result (a background task's report) must not start it,
+    // or it would interrupt an idle session and its background work.
+    if (!this._turnResolve && !this._runtimeTurn) return;
     if (this._turnTimeoutMs > 0) {
       const turnId = this._turnId;
+      if (this._runtimeTurn && !this._turnResolve) {
+        this._turnTimeout = setTimeout(() => {
+          this._queryStream?.interrupt().catch(() => {});
+          this._completeRuntimeTurn(null, 'Turn timed out');
+        }, this._turnTimeoutMs);
+        return;
+      }
       this._turnTimeout = setTimeout(() => {
         this._emitProgress?.('error', 'Turn timed out');
         this._forceResolveTurn(turnId, {
@@ -1086,6 +1320,10 @@ export class AgentSession {
       ...(this._mcpServers ? { mcpServers: this._mcpServers } : {}),
       ...(this._resumeSessionId ? { resume: this._resumeSessionId } : {}),
       ...(thinkingEffort && thinkingEffort !== 'auto' ? { effort: thinkingEffort } : {}),
+      // Sprint 128 (R7, Phase 0 D6): Stop ends the current turn only; each
+      // background task is stopped on its own through stopTask. Without this
+      // declaration an interrupt kills every background task.
+      perTaskStopAffordance: true,
     };
 
     if (this._modelId) {
@@ -1128,6 +1366,21 @@ export class AgentSession {
         this._emitDispatchAccepted?.();
         this._emitDispatchAccepted = null;
 
+        // Sprint 128 (Phase 0 D1): after a result, a fresh `system:init` or a
+        // top-level assistant message with no turn open means Claude opened a
+        // turn of its own (a background task finished). A subagent's messages
+        // carry a parent_tool_use_id and never open one.
+        if (
+          !this._turnResolve
+          && !this._runtimeTurn
+          && this._resultsSeen > 0
+          && this._live
+          && ((message.type === 'system' && message.subtype === 'init')
+            || (message.type === 'assistant' && !message.parent_tool_use_id))
+        ) {
+          this._openRuntimeTurn();
+        }
+
         // Reset inactivity timeout on any activity from the agent
         if (message.type !== 'result') {
           this._resetTurnTimeout();
@@ -1150,13 +1403,17 @@ export class AgentSession {
             this._expectedResolvedModel,
             actualModel,
           )) {
-            this._emitProgress?.('init',
+            this._turnEmitter()('init',
               `Model mismatch — running on ${actualModel}, but ${this._modelId} was requested. The runtime could not apply the requested model.`);
-          } else {
+          } else if (!this._runtimeTurn) {
             this._emitProgress?.('init', `Starting Claude (${actualModel || 'claude'})`);
           }
           // Fetch supported models from the SDK session
           this._fetchSupportedModels();
+        } else if (isTaskMessage(message)) {
+          this._handleTaskMessage(message);
+        } else if (message.type === 'user') {
+          this._handleUserMessage(message);
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
           traceClaude('sdk', 'system:status', { status: (message as any).status });
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
@@ -1170,32 +1427,42 @@ export class AgentSession {
               errorCode: message.error ?? null,
               synthetic: message.message?.model === '<synthetic>',
             });
-            if (this._consumerTurnId === this._turnId) {
+            if (this._runtimeTurn && !message.parent_tool_use_id) {
+              this._runtimeTurn.structuredAssistantError = sdkError;
+            } else if (this._consumerTurnId === this._turnId) {
               this._turnStructuredAssistantError = sdkError;
             }
           } else {
             traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
-            if (this._consumerTurnId === this._turnId) {
+            for (const block of message.message?.content ?? []) {
+              if (block.type === 'tool_use' && block.id && (block.name === 'Agent' || block.name === 'Task')) {
+                this._agentToolUses.add(block.id);
+              }
+            }
+            const runtimeTurn = this._runtimeTurn;
+            if (runtimeTurn && !message.parent_tool_use_id) {
+              runtimeTurn.sawRegularAssistant = true;
+            } else if (this._consumerTurnId === this._turnId) {
               this._turnSawRegularAssistant = true;
             }
+            const planModeActive = runtimeTurn ? runtimeTurn.planModeActive : this._planModeActive;
             processAssistantMessage(
               message,
-              this._turnFilesModified,
-              this._emitProgress || (() => {}),
+              runtimeTurn ? runtimeTurn.filesModified : this._turnFilesModified,
+              this._emitterFor(message.parent_tool_use_id),
               message.parent_tool_use_id,
-              this._planModeActive,
+              planModeActive,
               this._planFirst
             );
-            this._planModeActive = updatePlanModeState(message, this._planModeActive);
+            if (runtimeTurn) runtimeTurn.planModeActive = updatePlanModeState(message, planModeActive);
+            else this._planModeActive = updatePlanModeState(message, this._planModeActive);
           }
-        } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
-          traceClaude('sdk', 'tool/system progress', {
-            type: message.type,
-            subtype: message.subtype,
+        } else if (message.type === 'tool_progress') {
+          traceClaude('sdk', 'tool progress', {
             toolName: message.tool_name ?? null,
-            status: message.status ?? null,
+            parentToolUseId: message.parent_tool_use_id ?? null,
           });
-          processSystemMessage(message, this._emitProgress || (() => {}));
+          processSystemMessage(message, this._emitterFor(message.parent_tool_use_id));
         } else if (message.type === 'result') {
           traceClaude('sdk', 'result', {
             subtype: message.subtype,
@@ -1203,6 +1470,19 @@ export class AgentSession {
             durationMs: message.duration_ms ?? null,
             errors: message.errors ?? [],
           });
+          this._resultsSeen += 1;
+          // Sprint 128 (R5): a result is matched to its turn by origin. The
+          // follow-up turn Claude opened itself closes here; so does an empty
+          // notification turn (no messages, nothing to show).
+          const originKind = message.origin?.kind;
+          if (this._runtimeTurn && originKind !== 'human') {
+            this._completeRuntimeTurn(message);
+            continue;
+          }
+          if (originKind && originKind !== 'human') {
+            traceClaude('sdk', 'result for a turn Ritemark did not open', { originKind });
+            continue;
+          }
           // Only resolve if this result matches the current turn
           // (after interrupt + new turn, stale results are ignored)
           if (this._consumerTurnId === this._turnId) {
@@ -1372,7 +1652,12 @@ export class AgentSession {
     // Unified 'ask' approval: gate mutating tools before they run. Read/Glob/Grep
     // and everything else stay auto-allowed. 'auto' mode skips this gate.
     if (this._approvalMode === 'ask' && MUTATING_TOOLS.has(toolName)) {
-      if (!this._emitToolApproval) {
+      // Sprint 128: outside a human turn (a background subagent, or a turn
+      // Claude opened itself) the approval goes through the live channel to
+      // the same gate — Ask must never be skipped because the turn ended.
+      const emitToolApproval = this._emitToolApproval
+        ?? (this._live?.onToolApproval ? (request: AgentToolApprovalRequest) => this._live?.onToolApproval?.(request) : null);
+      if (!emitToolApproval) {
         return { behavior: 'allow' }; // No approval UI wired — fail open, don't freeze the turn.
       }
       const kind: AgentToolApprovalRequest['kind'] = toolName === 'Bash' ? 'shell-command' : 'file-write';
@@ -1382,7 +1667,7 @@ export class AgentSession {
       try {
         const approved = await new Promise<boolean>((resolve, reject) => {
           this._pendingToolApprovals.set(options.toolUseID, { resolve, reject });
-          this._emitToolApproval?.({ toolUseId: options.toolUseID, kind, filePath, command });
+          emitToolApproval({ toolUseId: options.toolUseID, kind, filePath, command });
           options.signal.addEventListener('abort', () => {
             this._pendingToolApprovals.delete(options.toolUseID);
             reject(new Error('Tool approval cancelled'));
@@ -1417,7 +1702,9 @@ export class AgentSession {
       };
     }
 
-    if (!this._emitQuestion) {
+    const emitQuestion = this._emitQuestion
+      ?? (this._live?.onQuestion ? (q: AgentQuestion) => this._live?.onQuestion?.(q) : null);
+    if (!emitQuestion) {
       return {
         behavior: 'deny',
         message: 'Question UI is unavailable for this session.',
@@ -1430,7 +1717,7 @@ export class AgentSession {
       const answers = await new Promise<Record<string, string>>((resolve, reject) => {
         this._pendingQuestions.set(options.toolUseID, { resolve, reject });
 
-        this._emitQuestion?.(question);
+        emitQuestion(question);
         traceClaude('tool', 'AskUserQuestion emitted question', {
           toolUseId: options.toolUseID,
           questionHeaders: question.questions.map((item) => item.header),
@@ -1473,13 +1760,13 @@ export class AgentSession {
    * on macOS `/tmp` (and some user dirs) are symlinks, and the model may
    * report either form.
    */
-  private _workspaceFilesModified(): string[] {
+  private _workspaceFilesModified(files: string[] = this._turnFilesModified): string[] {
     const roots = new Set<string>([this._workspacePath]);
     try {
       roots.add(require('fs').realpathSync(this._workspacePath));
     } catch { /* workspace gone — keep the raw root */ }
     const prefixes = Array.from(roots).map((r) => (r.endsWith(path.sep) ? r : r + path.sep));
-    return Array.from(new Set(this._turnFilesModified))
+    return Array.from(new Set(files))
       .filter((f) => prefixes.some((p) => f.startsWith(p)));
   }
 
@@ -1664,15 +1951,6 @@ function processSystemMessage(
       });
     }
   }
-
-  // Handle task_notification messages (subagent completion)
-  if (message.type === 'system' && message.subtype === 'task_notification') {
-    const taskId = message.task_id || '';
-    const status = message.status || 'completed';
-    const summary = message.summary || 'Task completed';
-
-    emitProgress('subagent_done', summary, 'Task', undefined, {
-      subagentId: taskId,
-    });
-  }
+  // Task messages (task_started … task_notification) are reduced in
+  // backgroundTasks.ts and reach the cards through AgentSession (Sprint 128).
 }

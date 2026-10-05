@@ -13,6 +13,7 @@
 
 import type { ConversationState } from './conversationState';
 import { isConversationRunning } from './conversationState';
+import { backgroundStatusLabel } from './backgroundWork';
 
 export type ConversationActivityState =
   | 'idle'
@@ -21,8 +22,12 @@ export type ConversationActivityState =
   | 'waiting-input'
   | 'plan-review'
   | 'done'
+  /** Sprint 128: the turn is done, but Claude's background work still runs. */
+  | 'done-background'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  /** Sprint 128: the turn was stopped; background work still runs. */
+  | 'stopped-background';
 
 /**
  * Derive the activity state. Waiting states outrank running (the urgent
@@ -62,12 +67,18 @@ export function deriveActivityState(c: ConversationState): ConversationActivityS
   const last = !lastAgent ? lastCodex
     : !lastCodex ? lastAgent
     : (lastAgent.timestamp >= lastCodex.timestamp ? lastAgent : lastCodex);
-  if (!last?.result) return 'idle';
+  if (!last?.result) return c.backgroundTasks?.length ? 'done-background' : 'idle';
 
+  // Sprint 128: Claude's background work outlives the turn. Done or Stopped
+  // must say so — never a plain "Done" while work still runs. (Live set from
+  // the SDK; waiting states above still outrank this.)
+  const backgroundRunning = (c.backgroundTasks?.length ?? 0) > 0;
   const error = last.result.error;
   if (error) {
-    return /cancel/i.test(error) ? 'cancelled' : 'failed';
+    if (/cancel/i.test(error)) return backgroundRunning ? 'stopped-background' : 'cancelled';
+    return 'failed';
   }
+  if (backgroundRunning) return 'done-background';
   // Codex results carry a status string; 'interrupted' is a cancel.
   const status = (last.result as { status?: string }).status;
   if (status === 'interrupted') return 'cancelled';
@@ -86,7 +97,7 @@ export interface ActivityStatusPresentation {
 
 export function presentActivityState(
   state: ConversationActivityState,
-  opts?: { activeSeconds?: number; waitedSeconds?: number; errorFirstLine?: string; liveActivity?: string }
+  opts?: { activeSeconds?: number; waitedSeconds?: number; errorFirstLine?: string; liveActivity?: string; backgroundCount?: number }
 ): ActivityStatusPresentation | null {
   switch (state) {
     case 'running':
@@ -112,6 +123,10 @@ export function presentActivityState(
       };
     case 'cancelled':
       return { icon: 'x', tone: 'faint', label: 'Stopped' };
+    case 'done-background':
+      return { icon: 'robot', tone: 'accent', label: backgroundStatusLabel('Done', Math.max(1, opts?.backgroundCount ?? 1)) };
+    case 'stopped-background':
+      return { icon: 'robot', tone: 'faint', label: backgroundStatusLabel('Stopped', Math.max(1, opts?.backgroundCount ?? 1)) };
     case 'idle':
     default:
       return null;

@@ -74,6 +74,13 @@ export interface UserMessageEventV1 extends ConversationEventBaseV1 {
   attachments: ConversationAttachmentMetadataV1[];
   /** Immutable accepted-turn snapshot. Missing in pre-Sprint-112 records = Auto. */
   thinkingEffort?: ThinkingEffort;
+  /**
+   * Sprint 128: set when the runtime opened this turn itself (Claude continuing
+   * after background work finished). The text is a host-written line, not
+   * something the user said: it is shown as the turn's header and never sent
+   * to a model as context. Older clients ignore the field (Phase 0 D7).
+   */
+  origin?: 'background-task';
 }
 
 export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
@@ -394,6 +401,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
         };
       }),
       thinkingEffort,
+      ...(input.origin === 'background-task' ? { origin: 'background-task' as const } : {}),
     };
   }
   if (kind === 'assistant-message') {

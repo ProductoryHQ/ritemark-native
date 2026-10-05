@@ -98,6 +98,38 @@ function DeleteConversationDialog({
   );
 }
 
+/**
+ * Sprint 128 (R9): switching model or runtime would end Claude's background
+ * work (the session is rebuilt). Asks first; "Keep current model" changes
+ * nothing.
+ */
+export function BackgroundSwitchDialog() {
+  const pending = useAISidebarStore((state) => state.backgroundSwitch);
+  const confirm = useAISidebarStore((state) => state.confirmBackgroundSwitch);
+  const cancel = useAISidebarStore((state) => state.cancelBackgroundSwitch);
+  const count = pending?.taskCount ?? 1;
+  const tasks = `${count} running background ${count === 1 ? 'task' : 'tasks'}`;
+  const switchingRuntime = pending?.runtimeId !== undefined && pending.runtimeId !== 'claude-code';
+  return (
+    <Dialog open={pending !== null} onOpenChange={(open) => { if (!open) cancel(); }}>
+      <DialogContent className={CONVERSATION_DIALOG_LAYOUT}>
+        <DialogHeader><DialogTitle>End background work?</DialogTitle></DialogHeader>
+        <DialogBody className="min-w-0">
+          <DialogDescription className="break-words">
+            Switching to this {switchingRuntime ? 'agent' : 'model'} ends {tasks}. Switch anyway?
+          </DialogDescription>
+        </DialogBody>
+        <DialogFooter className={CONVERSATION_DIALOG_FOOTER_LAYOUT}>
+          <DialogButton type="button" variant="secondary" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={cancel}>
+            {switchingRuntime ? 'Keep Claude' : 'Keep current model'}
+          </DialogButton>
+          <DialogButton type="button" className={CONVERSATION_DIALOG_ACTION_LAYOUT} onClick={confirm}>Switch</DialogButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function useConversationDialogs(): {
   requestRename: (summary: ConversationSummaryV1) => void;
   requestDelete: (summary: ConversationSummaryV1, recovery?: boolean) => void;

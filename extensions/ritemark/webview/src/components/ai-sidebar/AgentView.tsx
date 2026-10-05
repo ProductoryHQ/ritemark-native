@@ -13,6 +13,7 @@ import { ApprovalCard } from './CodexView';
 import { SubagentCard } from './SubagentCard';
 import { UserPromptBubble } from './ChatBubbles';
 import type { AgentConversationTurn, AgentProgress } from './types';
+import { RUNTIME_TURN_HEADER } from './backgroundWork';
 
 // ── Per-turn block ─────────────────────────────────────────────────────────────
 
@@ -35,18 +36,21 @@ export function AgentTurnBlock({
   // Sprint 103 R4: model-initiated planning is a first-class labeled event.
   const autonomousPlanEvent = turn.activities.find((a: AgentProgress) => a.type === 'plan_autonomous');
   // Sprint 103 R3: a genuine session rebuild is announced, never silent.
-  const sessionResetEvent = turn.activities.find((a: AgentProgress) => a.type === 'session_reset');
+  // Sprint 128: so is background work that ended with it — every line shows.
+  const sessionResetEvents = turn.activities.filter((a: AgentProgress) => a.type === 'session_reset');
+  const stopBackgroundTask = useAISidebarStore((state) => state.stopBackgroundTask);
+  const canStopTasks = useAISidebarStore((state) => state.runtimeCapabilities['claude-code']?.backgroundWork === true);
 
   return (
     <div className="space-y-2">
       {/* Session reset divider (R3) */}
-      {sessionResetEvent && (
-        <div className="flex items-center gap-2 select-none text-[11px] text-[var(--r-ink-faint)]">
+      {sessionResetEvents.map((event, index) => (
+        <div key={`${event.timestamp}-${index}`} className="flex items-center gap-2 select-none text-[11px] text-[var(--r-ink-faint)]">
           <span className="h-px flex-1 bg-[var(--r-hairline)]" />
-          <span>{sessionResetEvent.message}</span>
+          <span>{event.message}</span>
           <span className="h-px flex-1 bg-[var(--r-hairline)]" />
         </div>
-      )}
+      ))}
 
       {/* Compaction banner — shown above the turn where compaction happened */}
       {compactedEvent && (
@@ -66,16 +70,27 @@ export function AgentTurnBlock({
         </div>
       )}
 
-      {/* User prompt */}
-      <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>
-        {turn.userPrompt}
-      </UserPromptBubble>
+      {/* User prompt — or, for a turn Claude opened itself (Sprint 128), a muted header */}
+      {turn.origin === 'background-task' ? (
+        <div className="flex items-center gap-1.5 select-none text-[11px] text-[var(--r-ink-muted)]">
+          <Icon name="robot" size={12} />
+          <span>{RUNTIME_TURN_HEADER}</span>
+        </div>
+      ) : (
+        <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>
+          {turn.userPrompt}
+        </UserPromptBubble>
+      )}
 
       {/* Subagents (rendered during running and after) */}
       {turn.subagents && turn.subagents.length > 0 && (
         <div className="space-y-1">
           {turn.subagents.map((subagent) => (
-            <SubagentCard key={subagent.id} subagent={subagent} />
+            <SubagentCard
+              key={subagent.id}
+              subagent={subagent}
+              onStop={canStopTasks && turn.conversationId ? (card) => stopBackgroundTask(turn.conversationId!, card) : undefined}
+            />
           ))}
         </div>
       )}

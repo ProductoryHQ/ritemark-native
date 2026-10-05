@@ -63,7 +63,7 @@ export async function executeClaudeCodeNode(
           // Map unsupported types to 'done' since flow ProgressCallback has a limited set
           const type = (progress.type === 'error' || progress.type === 'context_overflow' || progress.type === 'plan_ready' || progress.type === 'plan_text'
             || progress.type === 'plan_autonomous' || progress.type === 'session_reset'
-            || progress.type === 'subagent_start' || progress.type === 'subagent_progress' || progress.type === 'subagent_done'
+            || progress.type === 'subagent_start' || progress.type === 'subagent_progress' || progress.type === 'subagent_done' || progress.type === 'subagent_update'
             || progress.type === 'compacting' || progress.type === 'compacted')
             ? 'done' as const
             : progress.type;

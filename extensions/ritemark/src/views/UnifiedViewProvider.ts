@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
 import { openReportMail } from '../reporting/reportTransport';
 import { getCurrentAppVersion } from '../update/versionService';
@@ -140,6 +140,9 @@ const _browserToolsInjector = new BrowserToolsInjector();
  * // Sprint 99 Phase 1: remove once every webview path sends conversationId.
  */
 const DEFAULT_CONVERSATION_ID = 'default';
+
+/** Sprint 128: the header line of a turn Claude opened itself (Design G). */
+const RUNTIME_TURN_HEADER = 'A background task finished — Claude is continuing';
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -975,6 +978,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             allowedTools: isClaudeCode && browserEnabled
               ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]
               : undefined,
+            live: isClaudeCode
+              ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled)
+              : undefined,
             onProgress: (progress) => {
               if (!isCurrentRuntimeTurn()) return;
               if (isClaudeCode) {
@@ -1237,6 +1243,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             } else {
               sessionConfig.onCodexComplete?.({ status: 'error', error: errMsg });
             }
+          }
+          break;
+        }
+
+        case 'agent-stop-task': {
+          // Sprint 128 (R7): stop one background task. The SDK answers with a
+          // `stopped` task notification, which updates the card.
+          const taskId = typeof message.taskId === 'string' ? message.taskId : '';
+          const cardId = typeof message.cardId === 'string' ? message.cardId : taskId;
+          const session = this._findRuntimeSession(message.conversationId, 'claude-code');
+          try {
+            if (!taskId || !session?.stopBackgroundTask) throw new Error('no session');
+            await session.stopBackgroundTask(taskId);
+          } catch {
+            this._view?.webview.postMessage({
+              type: 'agent-task-progress',
+              conversationId: message.conversationId,
+              agentId: 'claude-code',
+              progress: { type: 'subagent_update', message: "Couldn't stop this task", subagentId: cardId, taskId, subagentStatus: 'running', timestamp: Date.now() },
+            });
           }
           break;
         }
@@ -2941,6 +2967,95 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const session = this._runtimeSessions.get(resolvedConversationId)?.get(agentId);
     if (session) this._runtimeSessionLastUsed.set(resolvedConversationId, Date.now());
     return session;
+  }
+
+  /**
+   * Sprint 128: reports from Claude that outlive a turn. Background task cards
+   * and the live set, and the turn Claude opens itself when background work
+   * finishes. These hooks close over the conversation only — never over a
+   * human turn's token — so they stay valid between human turns.
+   */
+  private _claudeLiveHooks(
+    conversationId: string,
+    agentId: AgentId,
+    bindingGeneration: number,
+    hostConversationEnabled: boolean,
+  ): import('../agent/types').AgentLiveHooks {
+    const post = (message: Record<string, unknown>) => this._view?.webview.postMessage({ conversationId, agentId, ...message });
+    let runtimeTurnId: string | null = null;
+    return {
+      onTaskProgress: (progress) => post({ type: 'agent-task-progress', progress }),
+      onBackgroundTasks: (tasks) => post({ type: 'agent-background-tasks', tasks }),
+      onTasksEndedWithSession: (count) => post({ type: 'agent-background-tasks', tasks: [], endedCount: count }),
+      onRuntimeTurnStart: () => {
+        const turnId = randomUUID();
+        runtimeTurnId = turnId;
+        this._activeConversationTurnIds.set(conversationId, turnId);
+        post({ type: 'agent-turn-started', turnId, origin: 'background-task' });
+        this._runConversationCheckpoint(conversationId, () => this._conversationController.beginRuntimeInitiatedTurn({
+          conversationId,
+          bindingGeneration,
+          runtimeId: agentId,
+          turnId,
+          text: RUNTIME_TURN_HEADER,
+        }), hostConversationEnabled);
+      },
+      onRuntimeTurnProgress: (progress) => post({ type: 'agent-progress', progress }),
+      // Outside a human turn (a background subagent, or Claude's own turn) an
+      // 'ask'-mode approval or a question reaches the same gate and cards.
+      onToolApproval: (request) => {
+        this._runConversationCheckpoint(conversationId, () => this._conversationController.attentionRuntimeTurn({
+          conversationId,
+          bindingGeneration,
+          runtimeId: agentId,
+          attentionKind: 'approval',
+          prompt: request.kind === 'shell-command' ? (request.command ?? 'Command approval') : (request.filePath ?? 'Approval required'),
+        }), hostConversationEnabled);
+        void this._approvalGate.request({
+          requestId: request.toolUseId,
+          agentId,
+          kind: request.kind,
+          filePath: request.filePath,
+          command: request.command,
+          conversationId,
+        });
+      },
+      onQuestion: (question) => post({ type: 'agent-question', question }),
+      onRuntimeTurnComplete: (result) => {
+        const turnId = runtimeTurnId ?? undefined;
+        runtimeTurnId = null;
+        const errorPresentation = presentRuntimeError(agentId, result.error, undefined);
+        const error = errorPresentation?.message;
+        const failureKind = errorPresentation?.failureKind;
+        post({
+          type: 'agent-result',
+          text: result.text ?? '',
+          filesModified: result.filesModified ?? [],
+          metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
+          error,
+          failureKind,
+        });
+        this._refreshExplorerForAgentWrites(result.filesModified);
+        const cancelled = this._consumeCancelIntent(conversationId, turnId);
+        const status: 'completed' | 'failed' | 'cancelled' = cancelled ? 'cancelled' : error ? 'failed' : 'completed';
+        // No title generation: the conversation already has its title.
+        this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
+          conversationId,
+          bindingGeneration,
+          runtimeId: agentId,
+          turnId,
+          text: result.text ?? '',
+          status,
+          error,
+          failureKind,
+        }), hostConversationEnabled);
+        if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
+          this._disposeRuntimeSessionsForAgent('claude-code');
+          clearSetupCache();
+          emitClaudeStatusInvalidated('authentication-failed');
+        }
+      },
+    };
   }
 
   /** Tear down one conversation's sessions, leaving every other conversation alone. */

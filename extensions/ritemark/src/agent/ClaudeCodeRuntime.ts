@@ -70,6 +70,17 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._activeResolvedModel = config.expectedResolvedModel;
     this._activeDeclarationKey = declarationKey(config);
     this._session = ClaudeCodeSession._build(config, binaryPath);
+    this._session.setLiveHooks(config.live ?? null);
+  }
+
+  /** Sprint 128 (R7): stop one background task of this conversation. */
+  async stopBackgroundTask(taskId: string): Promise<void> {
+    await this._session.stopBackgroundTask(taskId);
+  }
+
+  /** Sprint 128: the work still running in the background. */
+  backgroundTaskCount(): number {
+    return this._session.backgroundTasks.length;
   }
 
   private static _build(config: RuntimeSessionConfig, binaryPath: string | undefined): AgentSession {
@@ -133,6 +144,7 @@ export class ClaudeCodeSession implements RuntimeSession {
       && this._activeResolvedModel === config.expectedResolvedModel
       && this._activeDeclarationKey === declarationKey(config)) {
       this._session.setApprovalMode(config.approvalMode ?? 'auto', config.planFirst === true);
+      this._session.setLiveHooks(config.live ?? null);
       return;
     }
 
@@ -143,6 +155,7 @@ export class ClaudeCodeSession implements RuntimeSession {
     this._activeResolvedModel = config.expectedResolvedModel;
     this._activeDeclarationKey = declarationKey(config);
     this._session = ClaudeCodeSession._build(config, binaryPath);
+    this._session.setLiveHooks(config.live ?? null);
     if (hadLiveSession) {
       config.onProgress({
         type: 'session_reset',
