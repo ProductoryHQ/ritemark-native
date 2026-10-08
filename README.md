@@ -4,6 +4,8 @@
 
 A native desktop app for writing, structured data, and AI automation—all in one place.
 
+**Website and downloads:** [ritemark.app](https://ritemark.app)
+
 ## The Three Modes
 
 | Mode | What It Does |
