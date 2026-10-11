@@ -1,0 +1,148 @@
+# Sprint 129 Spec — On-device Whisper on Windows
+
+## Purpose
+
+Windows users have no on-device dictation at all, and Transcribe on Windows works only through ElevenLabs. This sprint ships whisper.cpp for Windows so that dictation and Transcribe's private on-device engine work there as they do on an Apple silicon Mac. Every failure is explained in words a non-technical user can act on. The same pipeline also produces the Intel Mac binary (#203).
+
+## Principles
+
+- **One binary, two callers.** Dictation and Transcribe resolve and check the same bundled `whisper-cli` through one function.
+- **Ask before the 1.5 GB download only when it can work.** Ritemark never offers the model on a machine where the engine cannot start.
+- **Never lose speech silently.** If transcription is slower than speech, words arrive later; they are never dropped.
+- **Product bytes come from the source commit (D1).** Binaries are built in CI from a pinned whisper.cpp tag, recorded with SHA-256 in a tracked manifest, and committed. Release builds only stage, sign and verify them.
+- **Apple silicon stays as it is.** Same binary, same flags. The only behaviour change there is that busy audio is no longer dropped (R8).
+- **Features stay on (HARD RULE #2).** Windows is added to the existing flag's platform list; no code is deleted or stubbed.
+
+## Requirements
+
+### R1: Windows whisper engine is built, bundled and signed
+
+As a Windows user, I want Ritemark to include a speech engine built for my computer, so that dictation and on-device transcription work without installing anything else.
+
+Acceptance criteria:
+- `extensions/ritemark/binaries/win32-x64/` contains `whisper-cli.exe` and the DLLs it loads, built by `.github/workflows/build-whisper.yml` from whisper.cpp tag `v1.8.3` (commit `2eeeba56`), the version already shipped on Apple silicon.
+- The build does not depend on the build machine's CPU: `GGML_NATIVE=OFF`, and either runtime CPU variants (`GGML_BACKEND_DL` + `GGML_CPU_ALL_VARIANTS`) or a fixed AVX2 baseline, chosen in A1.
+- It needs no Visual C++ Redistributable on the user's machine: either the CRT is statically linked, or the Microsoft-signed VC++ runtime DLLs sit beside the exe. `dumpbin /dependents` shows only Windows system DLLs and files in the same folder.
+- It embeds an application manifest with the UTF-8 active code page, so model, audio and output paths with any Unicode characters work.
+- `extensions/ritemark/binaries/whisper-manifest.json` records, per target: whisper.cpp tag and commit, build workflow run URL, build flags, and every file's path and SHA-256.
+- The Windows release build signs every whisper PE through the existing content-based signing step, and `verify-windows-signatures.ps1 -Mode Verify` passes (Productory Services OÜ, timestamped). No signing script change.
+- `scripts/validate-build-output.sh <target>` fails when the target's whisper files are missing, differ from the manifest, or have the wrong architecture, or when another target's whisper folder is present.
+- No change to `patches/vscode/`, the `vscode` submodule, or patch 008.
+
+### R2: Intel Mac engine from the same pipeline (#203, if Jarmo approves the ride-along)
+
+As an Intel Mac user, I want on-device dictation and transcription too, so that I am not limited to ElevenLabs.
+
+Acceptance criteria:
+- `binaries/darwin-x64/` is built by the same workflow on the `macos-15-intel` runner from the same tag: CPU with Accelerate, no Metal, AVX2 baseline (every Intel Mac that runs a supported macOS has AVX2).
+- `codesign-app.sh` signs it with the existing `whisper-cli` and `.dylib` rules, and notarization accepts it.
+- The CI contract test (R1) passes natively on `macos-15-intel`.
+- If Jarmo declines the ride-along, R3 still makes Intel Macs say plainly that on-device speech needs Apple silicon, and no download is offered.
+
+### R3: One resolver and a readiness check before the download
+
+As a user, I want Ritemark to know whether the speech engine can run before it asks me to download 1.5 GB.
+
+Acceptance criteria:
+- `getWhisperBinaryPath()` returns `binaries/<platform>-<arch>/whisper-cli` (`whisper-cli.exe` on win32) and never throws. `speech/index.ts` uses it, and its duplicate resolver is removed.
+- A readiness probe runs the binary once per session (cached) and returns one of `ready | missing | blocked | cpu-unsupported | failed`. Dictation's prepare step and `WhisperLocalEngine.isReady()` both use it.
+- Dictation's prepare step checks readiness **before** the model. When the engine is not ready, no download is offered and the user sees the R6 message.
+- When the engine is ready but the model is absent, both callers behave as today (dictation offers the download; Transcribe shows "Model not downloaded — 1.5 GB, one time").
+
+### R4: Flag and engine platforms
+
+As a Windows user, I want the dictation button and the on-device Transcribe engine to appear.
+
+Acceptance criteria:
+- `voice-dictation`: `platforms: ['darwin', 'win32']`, `status: 'stable'`, description no longer says "macOS only".
+- `WhisperLocalEngine.platforms` is `['darwin', 'win32']`. The hard-coded "not available on Windows yet" branch is replaced by the R3 readiness result.
+- The stale `ritemark.features.voice-dictation` setting description in `package.json` ("experimental, macOS only … ~75MB") is corrected.
+- Linux stays excluded (not a build target).
+- Kill switch: removing `'win32'` from the platform list turns Windows off. `status: 'disabled'` turns dictation off everywhere. No code is deleted either way.
+
+### R5: Windows microphone problems in plain words
+
+As a non-technical Windows user, I want to be told exactly what to change when Windows blocks the microphone, and to get there in one click.
+
+Acceptance criteria:
+- Dictation classifies `getUserMedia` failures with the shared `classifyCaptureError` (the one Transcribe Record uses) instead of its own string matching.
+- Every message names the platform's own settings. On Windows: **Settings → Privacy & security → Microphone**, turn on **Microphone access** and **Let desktop apps access your microphone**. On macOS: unchanged (System Settings → Privacy & Security → Microphone → Ritemark).
+- The microphone dialog is rebuilt on `ui/dialog.tsx` with shadcn `Button`s and tooltips. The primary button reads **Open Microphone Settings** and opens `ms-settings:privacy-microphone` on Windows.
+- Copy for each state (`os-denied`, `no-device`, `device-busy`, `internal-config`) matches what A3 observes on Windows. If Windows reports a privacy block as `NotReadableError` (busy), the busy message also mentions the privacy setting and offers the settings button.
+- No message shows a raw error name or exception text.
+
+### R6: Engine problems in plain words
+
+As a user whose computer cannot run the engine, I want a reason and an alternative instead of a button that does nothing.
+
+Acceptance criteria (draft copy; final wording reviewed with `ux-expert` in Phase 3):
+- `missing`: "Ritemark's speech engine is missing from this installation. Reinstall Ritemark to restore it."
+- `blocked` (the operating system refused to start it): "Your computer's security settings stopped Ritemark's speech engine from starting."
+- `cpu-unsupported` (Windows `0xC000001D`, illegal instruction): "On-device speech recognition needs a newer processor than this computer has." Transcribe adds: "You can transcribe with ElevenLabs instead."
+- `failed` (any other crash or non-zero exit): "On-device speech recognition stopped unexpectedly. Please try again. If it keeps happening, please report the problem."
+- Intel Mac without a binary (R2 declined): "On-device speech recognition needs a Mac with Apple silicon." Transcribe adds the ElevenLabs alternative.
+- Dictation stops listening and shows the message on `missing`, `blocked`, `cpu-unsupported` and `failed`. It no longer keeps "listening" while every chunk fails.
+- The technical cause (exit code, errno, stderr tail) goes to the log only.
+
+### R7: Model storage on Windows
+
+As a Windows user, I want the 1.5 GB model to download, resume and remove reliably.
+
+Acceptance criteria:
+- The model stays at `~/.ritemark/models/` on every platform (`C:\Users\<name>\.ritemark\models\` on Windows), through one `getModelPath()`. The duplicate in `whisperCpp.ts` is removed.
+- The final `.partial` → `.bin` rename retries for up to 10 s on `EPERM`/`EBUSY`/`EACCES` before reporting failure.
+- Download, resume after interruption, and **Remove model** work on Windows.
+- Paths under a user folder with non-ASCII characters work (R1 manifest; covered by the CI contract test).
+
+### R8: Dictation keeps every word when the computer is slower than speech
+
+As a dictating user on a slower computer, I want every word I say to end up in the document, even if it appears a little later.
+
+Acceptance criteria:
+- An audio chunk that arrives while a transcription is running is held. When the running call finishes, the held audio is transcribed next, joined into one call of up to 28 s (below Whisper's 30 s window).
+- Audio beyond 28 s waits as a further segment. Nothing is dropped.
+- If the waiting audio exceeds 60 s, dictation stops listening. The transcription of everything already captured still finishes and is inserted, and the user sees: "Dictation can't keep up on this computer. Everything you said so far has been added."
+- On **Stop**, audio already captured, including the final chunk, is transcribed and inserted before the button returns to idle.
+- Text is inserted in the order it was spoken.
+- Temporary WAV files are deleted only after their process has exited (Windows cannot delete a file another process holds open).
+
+### R9: Speed settings for computers without Apple GPU acceleration
+
+As a Windows or Intel Mac user, I want dictation tuned to my computer, so that text keeps up with my speech where the hardware allows it.
+
+Acceptance criteria:
+- A2 measures, on Jarmo's Windows machine: model load, per-call time for 5 s and 10 s chunks, thread counts, beam sizes, and a 10-minute file in Transcribe. The numbers are recorded in `research/windows-performance-audit.md`.
+- Settings are chosen by the rule in [technical-plan.md](./technical-plan.md#w6-speed-settings-for-cpu-only-targets-r9) and apply only to win32 and darwin-x64. Apple silicon arguments stay as they are.
+- If the pre-approved levers cannot reach the target, work stops and the numbers go to Jarmo with the options (GPU build, or shipping with a "slower on this computer" note). No GPU backend is added without his decision.
+- `docs/user` states what to expect on Windows (dictation delay, minutes per hour of audio).
+
+### R10: Docs, tiers and release notes
+
+Acceptance criteria:
+- `docs/user/features/transcribe.md` platform table and timings cover Windows (and Intel Macs if R2). A dictation section covering macOS and Windows, including the microphone settings, is added to the user docs (none exists today).
+- `docs/development/architecture.md` describes the single resolver, the readiness states, binary provenance (manifest + workflow), and removes "macOS only" for on-device Whisper.
+- The shell-tier list (`CLAUDE.md`), `scripts/release-extension-preflight.sh` and `scripts/list-unshipped-extension-changes.mjs` treat `extensions/ritemark/binaries/` as shell-tier (all three edited in one commit, with `release-tier-paths.test.mjs`). The patch 008 description in `CLAUDE.md` is corrected.
+- `docs/CHANGELOG.md` and the v1.14.0 release notes are drafted. #133 (and #203) close when v1.14.0 publishes.
+
+## Non-Requirements
+
+- No GPU acceleration on Windows (Vulkan/CUDA) unless A2 forces a scope change that Jarmo approves.
+- No on-device m4a/aac on Windows. It needs a converter; the existing honest message stays and ElevenLabs handles those files. Follow-up issue.
+- No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8.
+- No whisper.cpp upgrade, and no rebuild of the Apple silicon binary.
+- No Windows on ARM native build. On ARM, Windows runs the x64 build under emulation (not tested). No Linux binary.
+- No change to the model location, the model itself, or the language list.
+- No VS Code patch or submodule change.
+
+## Resolved Questions
+
+- **Where the binary comes from:** our own CI build from a pinned tag, not upstream's prebuilt zip. Upstream's zip is built with defaults we do not control (CPU baseline, C runtime) and has no Unicode-path manifest. Not fetched at build time either: committing the output, as with darwin-arm64, keeps release pipelines unchanged and product bytes in the source commit.
+- **Which version:** v1.8.3 on every target, so all platforms share the CLI contract that Sprint 108 measured (flags, exit codes, JSON shape).
+- **Model location:** unchanged (`~/.ritemark/models`). It is where Ritemark already keeps per-user data on Windows, and it needs no migration. Known limitation: on Windows domain accounts with roaming profiles, the 1.5 GB file would roam.
+- **Patch 008:** not involved (see the audit, §9).
+
+## Open Questions
+
+- **A1:** runtime CPU variants with app-local VC++ runtime, or a single static AVX2 exe? The rule is in the technical plan.
+- **A3:** which `getUserMedia` error does Windows raise for each microphone state?
+- **For Jarmo:** Intel Mac ride-along yes/no; is an Intel Mac available for Gate 2?
