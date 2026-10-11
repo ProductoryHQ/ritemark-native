@@ -110,7 +110,8 @@ function Get-Dependents {
   param([Parameter(Mandatory)][string]$Path)
   $lines = & $dumpbin.FullName /nologo /dependents $Path
   if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $Path" }
-  @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '\.dll$' })
+  # Bare DLL names only: the "Dump of file <path>" header also ends in .dll.
+  @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^[\w.-]+\.dll$' })
 }
 
 # Config V: copy each VC++ runtime DLL the payload links, from the newest redist folder.

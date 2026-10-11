@@ -106,7 +106,7 @@ export function describeWhisperFailure(input:
 
 ## W4 — Model storage (R7)
 
-- `voiceDictation/modelManager.ts`: export the single `getModelPath()`. `whisperCpp.ts` and `controller.ts` import it from there.
+- One `getModelDirectory()`/`getModelPath()`, in `voiceDictation/whisperCpp.ts` (it must stay free of `vscode` imports for the contract and unit tests); `modelManager.ts` re-exports them for its existing callers. *(Revised 2026-10-11: the plan first put the single copy in `modelManager.ts`, which imports `vscode`.)*
 - Replace `fs.renameSync(partial, final)` with `renameWithRetry()`: on `EPERM`/`EBUSY`/`EACCES`, retry with back-off up to 10 s total, then fail with the existing "Download failed" message. The same helper serves the model-removal unlink. Unit test with an injected `fs`.
 
 ## W5 — Dictation coalescing (R8)
@@ -152,6 +152,7 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - Copy table `dictationMicCopy(code, platform)` in a small pure module beside the hook (`hooks/dictationMicCopy.ts`), unit-tested per platform. After A3, Windows `device-busy` copy says: "Ritemark couldn't start the microphone. Another app may be using it, or Windows may be blocking access."
 - Rebuild the permission modal in `VoiceDictationButton.tsx` on `DialogContent`/`DialogHeader`/`DialogBody`/`DialogFooter`, with `Button` + `Tooltip` (house rules: shadcn buttons, single-line labels, tooltips, no native `title`). Primary: **Open Microphone Settings** (posts the existing `system:openMicSettings`). Secondary: **Close**. The dialog opens on `os-denied`, and on Windows also on `device-busy`.
 - `ux-expert` reviews the dialog states before code (Phase 3 entry).
+- *(Added 2026-10-11, audit §12)* The same dialog shows host-side problems: R6 engine messages, model missing, and the R8 backlog notice. `useVoiceDictation` must stop capture on `dictation:error` **without** clearing the error; today `stopDictation()` clears it at once, so host errors never show.
 
 ## W8 — Verification path, no full Windows build before merge (R1–R9)
 

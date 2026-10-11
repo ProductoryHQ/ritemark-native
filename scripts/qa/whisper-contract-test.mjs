@@ -123,7 +123,8 @@ function foreignDependencies(binary, options) {
     if (process.platform === 'win32') {
       if (!options.dumpbin) throw new Error('--dumpbin is required on Windows');
       const out = spawnSync(options.dumpbin, ['/nologo', '/dependents', file], { encoding: 'utf8' }).stdout ?? '';
-      const deps = out.split(/\r?\n/).map(line => line.trim()).filter(line => /\.dll$/i.test(line));
+      // Bare DLL names only: the "Dump of file <path>" header also ends in .dll.
+      const deps = out.split(/\r?\n/).map(line => line.trim()).filter(line => /^[\w.-]+\.dll$/i.test(line));
       for (const dep of deps) {
         const lower = dep.toLowerCase();
         if (besides.has(lower)) continue;

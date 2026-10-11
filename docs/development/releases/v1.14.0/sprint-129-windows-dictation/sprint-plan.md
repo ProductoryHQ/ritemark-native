@@ -55,6 +55,11 @@ Proposed 2026-10-11 and approved with the plan:
 - **Model stays in `~/.ritemark/models`** on Windows too, where Ritemark already keeps its per-user data. No migration.
 - **No Windows GPU acceleration in this sprint.** If the speed measurement on Jarmo's machine misses the target after the three pre-approved settings (threads, beam size, chunk length), I stop and bring him the numbers before adding anything bigger.
 
+## Open decisions for Jarmo (raised 2026-10-11, after approval)
+
+- **Apple silicon engine for macOS 12–14 (scope change, proposed).** The engine shipped since v1.0.3 is built for macOS 15.0 and later, but Ritemark runs on macOS 12. So on macOS 12–14, dictation and on-device Transcribe fail today. The same pipeline produces a macOS 12 build that passes every check, including a run on macOS 14, at the same speed. Shipping it replaces the Apple silicon binary, which the plan excluded, and adds an Apple silicon dictation check to Gate 2. If approved, it becomes R11 in the spec.
+- **Shorter audio window on CPU-only computers (pending A2).** Whisper can process a 5 s chunk with a shorter window than its default 30 s, which may be the biggest speed-up on Windows. It is not one of the pre-approved settings. The bench measures it, and I will bring the numbers.
+
 ## Feature Flag Check
 
 - [x] No new flag. `voice-dictation` (stable, default on) gains `win32`; the on-device engine's own platform list gains `win32` too. Kill switches stay code-level: drop `win32` from the list, or set `status: 'disabled'`. No code is removed.

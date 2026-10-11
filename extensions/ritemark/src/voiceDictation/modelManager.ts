@@ -5,10 +5,12 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import * as os from 'os';
+import { DEFAULT_MODEL_FILE, getModelDirectory, getModelPath, withFileRetry } from './whisperCpp';
+
+// Sprint 129 R7: one model location for dictation, Transcribe and Settings.
+export { getModelDirectory, getModelPath };
 
 export interface ModelInfo {
   name: string;
@@ -34,28 +36,13 @@ export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
 };
 
 // Use large-v3-turbo for best multilingual support
-const DEFAULT_MODEL = 'ggml-large-v3-turbo.bin';
+const DEFAULT_MODEL = DEFAULT_MODEL_FILE;
 
 // Maximum redirects to follow
 const MAX_REDIRECTS = 5;
 
 // Download timeout (15 minutes for large files)
 const DOWNLOAD_TIMEOUT = 15 * 60 * 1000;
-
-/**
- * Get the directory where models are stored
- */
-export function getModelDirectory(): string {
-  const homeDir = os.homedir();
-  return path.join(homeDir, '.ritemark', 'models');
-}
-
-/**
- * Get the full path to a model file
- */
-export function getModelPath(modelName: string = DEFAULT_MODEL): string {
-  return path.join(getModelDirectory(), modelName);
-}
 
 /**
  * Get path for partial download
@@ -274,12 +261,16 @@ export async function downloadModel(
               const minExpected = modelInfo.size * 0.9;
 
               if (stats.size >= minExpected) {
-                // Rename partial to final
-                if (fs.existsSync(modelPath)) {
-                  fs.unlinkSync(modelPath);
-                }
-                fs.renameSync(partialPath, modelPath);
-                resolve({ success: true });
+                // Rename partial to final, waiting out an antivirus scan (Windows)
+                withFileRetry(() => {
+                  if (fs.existsSync(modelPath)) {
+                    fs.unlinkSync(modelPath);
+                  }
+                  fs.renameSync(partialPath, modelPath);
+                }).then(
+                  () => resolve({ success: true }),
+                  (error: Error) => resolve({ success: false, error: `Could not save the voice model: ${error.message}` })
+                );
               } else {
                 console.error(`[ModelManager] Downloaded file too small: ${stats.size} bytes, expected ~${modelInfo.size}`);
                 // Keep partial file for resume

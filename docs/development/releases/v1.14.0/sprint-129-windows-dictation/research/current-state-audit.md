@@ -76,3 +76,11 @@ Windows would hit the same class of failure for any error that is not "binary no
 ## 11. Performance
 
 There is no Windows data. Apple silicon reference (Sprint 108 A2): 60 min of audio in ~154 s (23.5× realtime), ~2.5 GB peak RSS, with Metal. Windows and Intel Macs run on the CPU only (Accelerate BLAS on Intel Macs). A2 measures before any speed setting is chosen.
+
+## 12. Found after approval (2026-10-11, Phase 0)
+
+- **The shipped Apple silicon engine needs macOS 15.0** (`otool -l`: `minos 15.0` on `whisper-cli` and every dylib), while Ritemark runs on macOS 12.0+ (`LSMinimumSystemVersion` 12.0; `docs/user/installation.md` says "macOS 12 Monterey or later"). On macOS 12–14, dyld refuses to start it, so dictation and on-device Transcribe fail there today. A candidate built for 12.0 passes the contract test on macOS 14 (A1). Shipping it is outside the approved scope; it is put to Jarmo.
+- **Intel Mac silent failure reproduced** (§4): the v1.13.0 controller, run with `process.arch = 'x64'`, logged `Unsupported platform: darwin-x64` for every chunk, showed the user nothing, and left the button on "processing". Script: `scratchpad/old-controller/repro.ts` (session-local). The new `controller.test.ts` covers the case.
+- **Host-side dictation errors never show.** On `dictation:error`, `useVoiceDictation` sets the error and then calls `stopDictation()`, which clears it in the same render. Even uncleared, the only display is the button's native `title`. R6's messages therefore need the W7 dialog. Fixed in Phase 3.
+- **Dictated sentences containing "processing" vanished.** The stdout filter dropped any line containing the word. It now drops status lines by prefix only (`parseDictationStdout`, unit-tested).
+- The dictation timeout (30 s) never cleared its timer and deleted the temp WAV while a killed process could still hold it. Now: 120 s, cleared on exit, and resolved only after the process is gone.

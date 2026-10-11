@@ -7,16 +7,16 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 0: Audits (W0 — R1, R9; A3 for R5 runs in Phase 5)
 
 - [x] Branch `sprint-129-windows-dictation` created; `git branch --show-current` verified. *(2026-10-11, from `542bee6c` + plan commit `31a095b8`)*
-- [ ] `build-whisper.yml` win32-x64 job builds Config V and Config S from `v1.8.3`; contract test green on `windows-latest`. → `research/windows-build-audit.md` (files, sizes, dependencies, `system_info`, chosen config per the rule).
-- [ ] `scripts/qa/windows-whisper-bench.ps1` written and dry-run on the CI runner.
+- [x] `build-whisper.yml` win32-x64 job builds Config V and Config S from `v1.8.3`; contract test green on `windows-latest`. → [research/windows-build-audit.md](./research/windows-build-audit.md): **Config V chosen**. *(Run 38130971199: S 10/10; V functional checks all pass, its dependency check failed on a test-parser bug, fixed; re-run pending)*
+- [x] `scripts/qa/windows-whisper-bench.ps1` written (PowerShell 5.1, ASCII only). It also measures a shorter audio window (`--audio-ctx`), which is not a pre-approved setting, so Jarmo can decide with numbers. *(No CI dry run: the runner's 4 vCPUs are no speed reference, and the script's whisper calls use the same flags the contract test already runs)*
 - [ ] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → `research/windows-performance-audit.md` with the lever decision per W6.
 - [ ] If W6's stop condition triggers, stop and bring the numbers to Jarmo before Phase 2.
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
 
-- [ ] `build-whisper.yml`: win32-x64, darwin-x64 (if R2), contract matrix incl. committed darwin-arm64; `pull_request` + `workflow_dispatch` triggers; standard runners.
-- [ ] `scripts/qa/whisper-contract-test.mjs` (jfk transcript, JSON parse, exit 2/3, Unicode folder, dependencies, architecture).
-- [ ] `scripts/build-whisper.sh` pinned to `v1.8.3`/`2eeeba56`, with `--target darwin-arm64|darwin-x64`.
+- [x] `build-whisper.yml`: win32-x64 (V, S), darwin-x64, an Apple silicon candidate, and that candidate re-run on macOS 14; `pull_request` + `workflow_dispatch` triggers; standard runners. *(The committed darwin-arm64 binary was contract-tested locally instead: it fails only the macOS 12 check, audit §12)*
+- [x] `scripts/qa/whisper-contract-test.mjs` (jfk transcript, JSON parse, exit 2/3, Unicode folder, dependencies, architecture, minimum macOS), importing the app's own `dictationArgs()`/`transcribeArgs()`.
+- [x] `scripts/build-whisper.sh` pinned to `v1.8.3`/`2eeeba56`, with `--target darwin-arm64|darwin-x64`, one static binary, a macOS 12.0 floor enforced at compile time, BLAS off.
 - [ ] Artifacts committed to `binaries/win32-x64/` (and `binaries/darwin-x64/`) after the `SHA256SUMS` check; `binaries/whisper-manifest.json` written (darwin-arm64 hashes included).
 - [ ] `.gitattributes` `extensions/ritemark/binaries/** binary`; `binaries/README.md` provenance + MIT notice.
 - [ ] `validate-build-output.sh` whisper check (unsigned hash, signed presence/architecture, no foreign folder) + test.
@@ -25,15 +25,15 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 2: Extension host (W2–W6, R3, R4, R6–R9)
 
-- [ ] `getWhisperBinaryPath()` without throw, `.exe` on win32; `speech/index.ts` duplicate removed.
-- [ ] `probeWhisper()` (cached) and `describeWhisperFailure()`; `WHISPER_READINESS_COPY` table.
-- [ ] `handlePrepareDictation()` probes before `ensureModelDownloaded()`.
-- [ ] `WhisperLocalEngine`: `platforms ['darwin','win32']`, `isReady()` via probe, `runWhisper()` failure mapping.
-- [ ] `voice-dictation` flag platforms + description; flag comment on `transcription-workbench`; `package.json` setting description.
-- [ ] Single `getModelPath()` in `modelManager.ts`; `renameWithRetry()` for the model rename and removal.
-- [ ] `DictationController` coalescing queue, 28 s cap, 60 s backlog stop, Stop flush, one temp file per call deleted after exit, stop on engine failure.
+- [x] `getWhisperBinaryPath()` without throw, `.exe` on win32; `speech/index.ts` duplicate removed.
+- [x] `probeWhisper()` (ready cached; failures remembered 60 s), `describeWhisperFailure()`, `whisperProblemMessage()` (the copy table).
+- [x] `handlePrepareDictation()` probes before `ensureModelDownloaded()`.
+- [x] `WhisperLocalEngine`: `platforms ['darwin','win32']`, `isReady()` via probe, spawn-error and exit-code failure mapping (+ ElevenLabs hint for `cpu-unsupported`).
+- [x] `voice-dictation` flag platforms + description; flag comment on `transcription-workbench`; `package.json` setting description.
+- [x] Single `getModelPath()` (in `whisperCpp.ts`, re-exported by `modelManager.ts`, see W4); `withFileRetry()` for the model rename and removal.
+- [x] `DictationController` coalescing queue, 28 s cap, 60 s backlog stop, Stop flush, one temp file per call deleted after exit, stop on engine failure. Also fixed: dictated sentences containing "processing" were dropped (audit §12).
 - [ ] `cpuOnlyDefaults()` per the A2 decision; `defaultChunkMs` in the editor bootstrap.
-- [ ] Unit tests: resolver matrix, failure mapping, probe cache, coalescing (fake transcriber), WAV parse/build, rename retry, CPU defaults, flag platforms, engine registry win32; Intel Mac silent-failure regression test (old behaviour reproduced first, then fixed). Registered in `npm test`.
+- [ ] Unit tests: resolver matrix, failure mapping, probe cache, coalescing (fake transcriber), WAV parse/build, rename retry, CPU defaults, flag platforms, engine registry win32; Intel Mac silent-failure regression test (old behaviour reproduced first, then fixed). Registered in `npm test`. *(Done: `whisperCpp.test.ts`, `controller.test.ts`, `transcriptionFlag.test.ts`; old Intel Mac behaviour reproduced on the v1.13.0 controller, audit §12. Open: CPU defaults (after A2), engine registry win32 case)*
 
 ## Phase 3: Webview (W7, R5)
 

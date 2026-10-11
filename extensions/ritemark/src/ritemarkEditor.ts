@@ -1525,6 +1525,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
    */
   private async handlePrepareDictation(webview: vscode.Webview, language: string): Promise<void> {
     try {
+      // Sprint 129 R3: never offer the 1.5 GB model on a computer where the
+      // engine cannot run; say why instead.
+      const { getWhisperBinaryPath, probeWhisper, whisperProblemMessage } = await import('./voiceDictation/whisperCpp');
+      const engine = await probeWhisper(getWhisperBinaryPath(this.context));
+      if (engine !== 'ready') {
+        webview.postMessage({ type: 'dictation:error', error: whisperProblemMessage(engine) });
+        return;
+      }
+
       const { isModelDownloaded, ensureModelDownloaded } = await import('./voiceDictation/modelManager');
 
       // Check if model needs download
@@ -1642,18 +1651,19 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
    */
   private async removeModel(webview: vscode.Webview): Promise<void> {
     try {
-      const { getModelPath } = await import('./voiceDictation/modelManager');
+      const { getModelPath, withFileRetry } = await import('./voiceDictation/whisperCpp');
       const modelPath = getModelPath();
 
       if (fs.existsSync(modelPath)) {
-        fs.unlinkSync(modelPath);
+        // Windows refuses to delete a file another process (antivirus) holds
+        await withFileRetry(() => fs.unlinkSync(modelPath));
         vscode.window.showInformationMessage('Voice model removed successfully.');
       }
 
       // Also remove partial download if exists
       const partialPath = modelPath + '.partial';
       if (fs.existsSync(partialPath)) {
-        fs.unlinkSync(partialPath);
+        await withFileRetry(() => fs.unlinkSync(partialPath));
       }
 
       webview.postMessage({

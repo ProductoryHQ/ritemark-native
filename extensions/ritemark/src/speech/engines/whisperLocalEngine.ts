@@ -23,6 +23,8 @@ import type {
   TranscriptionEngine,
 } from '../TranscriptionEngine';
 import { TranscriptionError } from '../types';
+import { describeWhisperFailure, probeWhisper, whisperProblemMessage, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
+import type { WhisperReadiness } from '../../voiceDictation/whisperCpp';
 import type { SpeakerSeparation, TranscriptSegment, TranscriptWord, TranscriptionResult } from '../types';
 
 /** whisper.cpp decodes these itself — verified in A1. */
@@ -179,8 +181,8 @@ export class WhisperLocalEngine implements TranscriptionEngine {
   readonly id = 'whisper-local';
   readonly label = 'On-device · Whisper';
   readonly isLocal = true;
-  /** #133: no Windows build of whisper-cli ships yet. */
-  readonly platforms: Platform[] = ['darwin'];
+  /** Sprint 129 (#133): Windows ships whisper-cli too. Linux is not a build target. */
+  readonly platforms: Platform[] = ['darwin', 'win32'];
   readonly capabilities: EngineCapabilities = {
     // D3: whisper.cpp offers only English-only tinydiarize or a stereo split.
     // Neither is real diarization, and we do not guess.
@@ -194,15 +196,10 @@ export class WhisperLocalEngine implements TranscriptionEngine {
   constructor(private readonly deps: WhisperLocalEngineDeps) {}
 
   async isReady(): Promise<EngineReadiness> {
-    if (process.platform !== 'darwin') {
-      return {
-        ready: false,
-        reason: 'On-device transcription is not available on Windows yet.',
-        action: 'none',
-      };
-    }
-    if (!fs.existsSync(this.deps.binaryPath)) {
-      return { ready: false, reason: 'The on-device transcription engine is missing from this build.', action: 'none' };
+    // Sprint 129 R3: the same check dictation runs before offering the model.
+    const engine = await probeWhisper(this.deps.binaryPath);
+    if (engine !== 'ready') {
+      return { ready: false, reason: transcribeProblemMessage(engine), action: 'none' };
     }
     if (!fs.existsSync(this.deps.modelPath)) {
       return { ready: false, reason: 'Model not downloaded — 1.5 GB, one time.', action: 'download-model' };
@@ -272,9 +269,10 @@ export class WhisperLocalEngine implements TranscriptionEngine {
         }
       });
 
-      child.on('error', (error) => {
+      child.on('error', (error: NodeJS.ErrnoException) => {
         options.signal.removeEventListener('abort', onAbort);
-        reject(new TranscriptionError('engine-unavailable', `Transcription could not start: ${error.message}`));
+        console.error('[Transcribe] whisper-cli could not start:', error);
+        reject(new TranscriptionError('engine-unavailable', transcribeProblemMessage(describeWhisperFailure({ spawnErrorCode: error.code ?? 'UNKNOWN' }))));
       });
 
       child.on('exit', (code, signal) => {
@@ -293,9 +291,10 @@ export class WhisperLocalEngine implements TranscriptionEngine {
           return;
         }
         if (code !== 0) {
-          reject(
-            new TranscriptionError('unknown', `Transcription failed (exit ${code}). ${firstErrorLine(stderrTail)}`, true),
-          );
+          // R6: crashes and refusals get words, the details go to the log.
+          console.error(`[Transcribe] whisper-cli exited ${code}${signal ? ` (${signal})` : ''}. ${firstErrorLine(stderrTail)}`);
+          const failure = describeWhisperFailure({ exitCode: code, signal });
+          reject(new TranscriptionError(failure === 'failed' ? 'unknown' : 'engine-unavailable', transcribeProblemMessage(failure), failure === 'failed'));
           return;
         }
         resolve();
@@ -327,6 +326,14 @@ export class WhisperLocalEngine implements TranscriptionEngine {
 
     return { segments, language, speakerSeparation: 'none' };
   }
+}
+
+/** Sprint 129 R6: the engine message, plus the cloud alternative where it helps. */
+function transcribeProblemMessage(readiness: Exclude<WhisperReadiness, 'ready'>): string {
+  const message = whisperProblemMessage(readiness);
+  const noLocalEngine = readiness === 'cpu-unsupported'
+    || (readiness === 'missing' && !WHISPER_TARGETS.includes(`${process.platform}-${process.arch}`));
+  return noLocalEngine ? `${message} You can transcribe with ElevenLabs instead.` : message;
 }
 
 function firstErrorLine(stderr: string): string {
