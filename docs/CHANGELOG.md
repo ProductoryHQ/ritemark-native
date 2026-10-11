@@ -7,14 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.13.0] — unreleased
-<!-- TBD: release date — replace "unreleased" with YYYY-MM-DD at publish -->
+## [1.13.0] — 2026-10-11
 
 ### Added
 - **Sonnet 5.5 (#386).** Anthropic's newest Sonnet is the recommended model in the Claude Code model menu. Sonnet 5 stays in the menu as the previous Sonnet.
 - **GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna in Codex (#386).** Ritemark's built-in Codex can now run them, and they appear in the Codex model menu once Codex has listed them for your account. New Codex conversations still start on GPT-5.6 Sol.
 
 ### Changed
+- **Transcribe library rows and renaming recordings (#389, #371).** A recording's title uses the whole row and wraps to two lines, with its date and length below. Each recording's actions sit in one **…** menu, also on right-click: open the saved document, **Rename…** and remove. **Rename…**, in the library or the transcript's header, renames the audio file on disk; its transcript, speaker names and corrections move with it, and another file is never overwritten. The conversation list and the conversation header use the same **…** menu.
 - **Updated built-in agents (#386).** Claude Code 2.1.281 → 2.1.289, Codex 0.154.0 → 0.160.0, OpenCode 1.18.30 → 1.18.34.
 
 ### Fixed
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Word count, Contents and comment markers follow every change to the document (#380, #378).** When an agent edited the file, or it changed on disk, the word count, the Contents list and the comment markers kept showing the old text until you typed. They now update with every change, wherever it comes from.
 - **The word count counts every word (#380).** The count dropped one word for each paragraph, heading or list item. It now matches the text.
 - **The status bar shows the count for the tab you are in (#380).** With several documents open, the word count could belong to another tab. It now follows the active tab, and it is hidden when the active tab is not a Markdown document.
-- **Conversation titles in the list are readable (#381).** In the **Conversations** list, every title was cut after about ten characters at the default side bar width, because the row's hidden buttons still kept their space. A title now uses the whole row and wraps to two lines. The buttons that appear on hover sit on the status line below it, so they never cover the title.
+- **Conversation titles in the list are readable (#381).** In the **Conversations** list, every title was cut after about ten characters at the default side bar width, because the row's hidden buttons still kept their space. A title now uses the whole row and wraps to two lines, and the row's actions sit in one **…** menu (#389), so they never cover the title.
 - **Message box menus are no longer hidden (#382).** At the default side bar width, the permission mode and model menus opened partly under the strip of conversation buttons beside the message box, and the `/` and `@` pop-ups were cut off at its edge. They now open within the conversation column and fit beside the strip.
 - **Word tables have space inside their cells (#370, #369).** In a Word document whose tables use no table style, the text sat right against the cell borders. The preview now leaves the same space inside cells as Word does, including in tables in headers, footers and notes.
 
