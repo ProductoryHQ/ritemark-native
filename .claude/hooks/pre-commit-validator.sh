@@ -247,6 +247,15 @@ if [[ -n "$STAGED_BUILD_GUARDS" ]]; then
   fi
 fi
 
+# Check 13: notarize-dmg.sh must exit non-zero on every Apple refusal or failed
+# verification. Stubbed Apple tools — no submission is made.
+if git diff --cached --name-only | grep -qE '^scripts/(notarize-dmg|test-notarize-dmg)\.sh$'; then
+  if ! ./scripts/test-notarize-dmg.sh; then
+    echo "ERROR: notarize-dmg.sh exit-status tests failed"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
