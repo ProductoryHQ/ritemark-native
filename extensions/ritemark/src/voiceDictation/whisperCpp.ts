@@ -98,6 +98,23 @@ export function parseDictationStdout(stdout: string): string {
 }
 
 /**
+ * How many CPU threads whisper-cli gets.
+ *
+ * Sprint 129 R9 (A2, Ryzen 7 5825U, 8 cores / 16 threads): without a GPU the
+ * encoder is the whole cost, and all logical threads were fastest (46 s at 4
+ * threads, 29 s at 8, 23 s at 16 per call). Apple silicon runs the model on
+ * Metal, where the thread count barely matters; it keeps 4.
+ */
+export function whisperThreads(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+  logicalCpus: number = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
+): number {
+  if (platform === 'darwin' && arch === 'arm64') return 4;
+  return Math.max(1, logicalCpus);
+}
+
+/**
  * The whisper-cli arguments for one dictation chunk, with anti-hallucination settings.
  *
  * Sprint 129: exported so the CI contract test (`scripts/qa/whisper-contract-test.mjs`)
@@ -111,7 +128,7 @@ export function dictationArgs(options: {
 }): string[] {
   const args = [
     '--model', options.modelPath,
-    '--threads', String(options.threads || 4),
+    '--threads', String(options.threads || whisperThreads()),
     '--no-timestamps',
     '--no-fallback',        // Prevent temperature fallback loops
     '--beam-size', '8',     // Larger beam = more accurate

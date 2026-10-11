@@ -14,6 +14,10 @@
   powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip"
 
 .EXAMPLE
+  # Round 2: the full model against the q8_0 model on real 5/10/20 s clips (+ your Estonian WAV in 10 s pieces)
+  powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Round 2 -Audio "$HOME\Desktop\eesti.wav"
+
+.EXAMPLE
   # also an Estonian recording of your own (wav, mp3, flac or ogg)
   powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Audio "$HOME\Desktop\eesti.wav"
 #>
@@ -22,7 +26,8 @@
 param(
   [Parameter(Mandatory)][string]$Zip,
   [string]$Audio,
-  [string]$Language = 'et'
+  [string]$Language = 'et',
+  [ValidateSet(1, 2)][int]$Round = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,13 +39,22 @@ $ModelUrl = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e95
 $ModelSha256 = '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69'
 $ModelBytes = 1624555275
 $SampleUrl = "https://raw.githubusercontent.com/ggml-org/whisper.cpp/$WhisperCommit/samples/jfk.wav"
+# Round 2: the 8-bit quantized model, 1.9x faster on a CPU in the Sprint 129 Mac test.
+$Q8Url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q8_0.bin'
+$Q8Sha256 = '317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1'
+$Q8Bytes = 874188075
 
 function Get-Sha256([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
 function Get-Download([string]$Url, [string]$Path, [switch]$Progress) {
+  # Resumes and retries: the model CDN can drop a 1.6 GB transfer more than once.
   $quiet = if ($Progress) { '--progress-bar' } else { '--silent' }
-  & curl.exe --fail --location $quiet --show-error --output $Path $Url
-  if ($LASTEXITCODE -ne 0) { throw "Download failed: $Url" }
+  for ($try = 1; $try -le 5; $try++) {
+    & curl.exe --fail --location $quiet --show-error --continue-at - --retry 10 --retry-all-errors --retry-delay 5 --output $Path $Url
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host "Download interrupted (curl exit $LASTEXITCODE); resuming, attempt $($try + 1) of 5..."
+  }
+  throw "Download failed after 5 attempts: $Url"
 }
 
 $work = Join-Path $env:TEMP 'rm-whisper-bench'
@@ -131,6 +145,106 @@ function Get-DictationArgs([string]$File, [string]$Lang, [int]$Threads, [int]$Be
   # Not a pre-approved setting: measured so Jarmo can decide with numbers (Sprint 129 W6).
   if ($AudioCtx -gt 0) { $list += @('--audio-ctx', "$AudioCtx") }
   $list + @($File)
+}
+
+function Write-PcmWav([string]$Path, [byte[]]$Pcm) {
+  $s = [System.IO.File]::Create($Path)
+  $w = New-Object System.IO.BinaryWriter($s)
+  $w.Write([Text.Encoding]::ASCII.GetBytes('RIFF')); $w.Write([int](36 + $Pcm.Length))
+  $w.Write([Text.Encoding]::ASCII.GetBytes('WAVEfmt ')); $w.Write([int]16); $w.Write([int16]1); $w.Write([int16]1)
+  $w.Write([int]16000); $w.Write([int]32000); $w.Write([int16]2); $w.Write([int16]16)
+  $w.Write([Text.Encoding]::ASCII.GetBytes('data')); $w.Write([int]$Pcm.Length); $w.Write($Pcm)
+  $w.Close()
+}
+
+function Get-Slice([byte[]]$Bytes, [int]$Start, [int]$Length) {
+  $out = New-Object byte[] $Length
+  [Array]::Copy($Bytes, $Start, $out, 0, $Length)
+  , $out
+}
+
+# The PCM of a 16 kHz mono 16-bit WAV (what Ritemark's Record saves), or $null.
+function Read-PcmWav([string]$Path) {
+  $b = [System.IO.File]::ReadAllBytes($Path)
+  if ([Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'RIFF') { return $null }
+  $o = 12; $ok = $false
+  while ($o + 8 -le $b.Length) {
+    $id = [Text.Encoding]::ASCII.GetString($b, $o, 4); $size = [BitConverter]::ToInt32($b, $o + 4)
+    if ($id -eq 'fmt ') {
+      $ok = ([BitConverter]::ToInt16($b, $o + 8) -eq 1) -and ([BitConverter]::ToInt16($b, $o + 10) -eq 1) -and
+        ([BitConverter]::ToInt32($b, $o + 12) -eq 16000) -and ([BitConverter]::ToInt16($b, $o + 22) -eq 16)
+    } elseif ($id -eq 'data') {
+      if (-not $ok) { return $null }
+      return , (Get-Slice $b ($o + 8) ([Math]::Min($size, $b.Length - $o - 8)))
+    }
+    $o += 8 + $size + ($size % 2)
+  }
+  $null
+}
+
+if ($Round -eq 2) {
+  $q8 = Join-Path $modelDir 'ggml-large-v3-turbo-q8_0.bin'
+  if (-not ((Test-Path -LiteralPath $q8) -and ((Get-Item -LiteralPath $q8).Length -eq $Q8Bytes))) {
+    Write-Host 'Downloading the q8_0 model (870 MB, once)...'
+    Get-Download $Q8Url "$q8.partial" -Progress
+    Move-Item -LiteralPath "$q8.partial" -Destination $q8 -Force
+  }
+  if ((Get-Sha256 $q8) -ne $Q8Sha256) { throw "The model at $q8 is damaged. Delete it and run this again." }
+
+  # Real clips: --duration does not shorten what the encoder sees, so cut the audio itself.
+  $clips = @()
+  foreach ($sec in 5, 10) {
+    $f = Join-Path $work "jfk-$sec.wav"; Write-PcmWav $f (Get-Slice $pcm 0 ($sec * 32000)); $clips += , @("jfk ${sec}s", $f, 'en')
+  }
+  $f20 = Join-Path $work 'jfk-20.wav'
+  Write-PcmWav $f20 ([byte[]]($pcm + (New-Object byte[] 32000) + (Get-Slice $pcm 0 (8 * 32000)))); $clips += , @('jfk 20s', $f20, 'en')
+  if ($Audio) {
+    $mine = Read-PcmWav (Resolve-Path -LiteralPath $Audio).Path
+    if ($mine) {
+      $pieces = [Math]::Min(6, [int][Math]::Floor($mine.Length / 320000))
+      for ($i = 0; $i -lt $pieces; $i++) {
+        $f = Join-Path $work "yours-$i.wav"; Write-PcmWav $f (Get-Slice $mine ($i * 320000) 320000); $clips += , @("yours $($i * 10)-$($i * 10 + 10)s", $f, $Language)
+      }
+    } else {
+      Write-Host 'Your recording is not a 16 kHz mono WAV, so it runs whole (record it with Ritemark Transcribe to get 10 s pieces).'
+      $clips += , @('yours (whole)', (Resolve-Path -LiteralPath $Audio).Path, $Language)
+    }
+  }
+
+  $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+  $threads = [int]$cpu.NumberOfLogicalProcessors
+  Write-Host ''
+  Write-Host "CPU: $($cpu.Name.Trim()), $threads threads. Dictation settings: $threads threads, beam 8, default window."
+  $results = New-Object System.Collections.Generic.List[object]
+  foreach ($m in @(@('full', $model), @('q8_0', $q8))) {
+    Write-Host "Model $($m[0]): warming up..."
+    $null = Invoke-Whisper @('--model', $m[1], '--language', 'en', '--threads', "$threads", $jfk)
+    foreach ($c in $clips) {
+      $args2 = @('--model', $m[1], '--language', $c[2], '--threads', "$threads", '--no-timestamps', '--no-fallback',
+        '--beam-size', '8', '--entropy-thold', '2.4', '--logprob-thold', '-1.0', '--max-len', '0', $c[1])
+      $r = Invoke-Whisper $args2
+      $results.Add([pscustomobject]@{ model = $m[0]; clip = $c[0]; exit = $r.exit; wallMs = $r.wallMs; loadMs = $r.loadMs; encodeMs = $r.encodeMs; decodeMs = $r.decodeMs; text = $r.text })
+      Write-Host ('  {0,-5} {1,-16} wall {2,7:N0} ms  load {3,6:N0}  encode {4,7:N0}  decode {5,6:N0}  exit {6}' -f $m[0], $c[0], $r.wallMs, $r.loadMs, $r.encodeMs, $r.decodeMs, $r.exit)
+    }
+  }
+  Write-Host ''
+  Write-Host "Transcribe with q8_0: ten minutes of audio, $threads threads (takes a while)"
+  $tq = Invoke-Whisper @('-m', $q8, '-f', $long, '-ojf', '-of', (Join-Path $work 'q8'), '-pp', '-t', "$threads", '-l', 'en')
+  $results.Add([pscustomobject]@{ model = 'q8_0'; clip = 'transcribe 10 min'; exit = $tq.exit; wallMs = $tq.wallMs; loadMs = $tq.loadMs; encodeMs = $tq.encodeMs; decodeMs = $tq.decodeMs; text = '' })
+  Write-Host ('  q8_0  transcribe 10 min wall {0,7:N0} ms  exit {1}' -f $tq.wallMs, $tq.exit)
+
+  Write-Host ''
+  Write-Host 'Text, full model then q8_0, per clip:'
+  foreach ($c in $clips) {
+    Write-Host "  $($c[0]):"
+    $results | Where-Object { $_.clip -eq $c[0] } | ForEach-Object { Write-Host ('    {0,-5} {1}' -f $_.model, $_.text) }
+  }
+  $reportPath = Join-Path (Get-Location) "whisper-bench-round2-$($env:COMPUTERNAME).json"
+  [ordered]@{ computer = $env:COMPUTERNAME; cpu = $cpu.Name.Trim(); threads = $threads; build = $buildInfo.runId; rows = $results } |
+    ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+  Write-Host ''
+  Write-Host "Done. Please send the output above, or this file: $reportPath"
+  return
 }
 
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1

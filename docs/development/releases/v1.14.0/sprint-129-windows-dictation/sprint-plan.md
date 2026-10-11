@@ -58,7 +58,7 @@ Proposed 2026-10-11 and approved with the plan:
 ## Open decisions for Jarmo (raised 2026-10-11, after approval)
 
 - **Apple silicon engine for macOS 12–14 (scope change, proposed).** The engine shipped since v1.0.3 is built for macOS 15.0 and later, but Ritemark runs on macOS 12. So on macOS 12–14, dictation and on-device Transcribe fail today. The same pipeline produces a macOS 12 build that passes every check, including a run on macOS 14, at the same speed. Shipping it replaces the Apple silicon binary, which the plan excluded, and adds an Apple silicon dictation check to Gate 2. If approved, it becomes R11 in the spec.
-- **Shorter audio window on CPU-only computers (pending A2).** Whisper can process a 5 s chunk with a shorter window than its default 30 s, which may be the biggest speed-up on Windows. It is not one of the pre-approved settings. The bench measures it, and I will bring the numbers.
+- **Windows dictation speed (W6 stop condition reached, A2).** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
 
 ## Feature Flag Check
 

@@ -7,11 +7,13 @@ import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import {
   describeWhisperFailure,
+  dictationArgs,
   getWhisperBinaryPath,
   parseDictationStdout,
   probeWhisper,
   resetWhisperProbeCache,
   whisperProblemMessage,
+  whisperThreads,
   withFileRetry,
 } from './whisperCpp';
 
@@ -39,6 +41,15 @@ async function run(): Promise<void> {
   assert.equal(getWhisperBinaryPath(ext, 'darwin', 'x64'), path.join(ext.extensionPath, 'binaries', 'darwin-x64', 'whisper-cli'));
   assert.equal(getWhisperBinaryPath(ext, 'win32', 'x64'), path.join(ext.extensionPath, 'binaries', 'win32-x64', 'whisper-cli.exe'));
   assert.doesNotThrow(() => getWhisperBinaryPath(ext, 'linux', 'x64'), 'a platform without a build gets a path, not an exception');
+
+  // R9: all logical threads without a GPU (A2); Apple silicon keeps 4.
+  assert.equal(whisperThreads('win32', 'x64', 16), 16);
+  assert.equal(whisperThreads('darwin', 'x64', 8), 8);
+  assert.equal(whisperThreads('darwin', 'arm64', 14), 4);
+  assert.equal(whisperThreads('win32', 'x64', 0), 1);
+  const args = dictationArgs({ modelPath: 'm', audioPath: 'a.wav', language: 'et', threads: 6 });
+  assert.deepEqual(args.slice(0, 6), ['--model', 'm', '--language', 'et', '--threads', '6']);
+  assert.equal(args.at(-1), 'a.wav');
 
   // R6: failures by how they happened.
   assert.equal(describeWhisperFailure({ spawnErrorCode: 'ENOENT' }), 'missing');

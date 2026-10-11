@@ -94,6 +94,11 @@ Acceptance criteria:
 - Download, resume after interruption, and **Remove model** work on Windows.
 - Paths under a user folder with non-ASCII characters work (R1 manifest; covered by the CI contract test).
 
+**R7 (revised 2026-10-11, after A2):** the Hugging Face CDN dropped the 1.6 GB download twice on Jarmo's Windows network, and the old size check (≥ 90%) would have installed a file cut short. Added acceptance criteria:
+- A dropped or stalled connection (no data for 60 s) resumes on its own from where it stopped, up to five times with growing waits, before asking the user to click Download again.
+- The model is installed only at its exact size and SHA-256. The download URL is pinned to the Hugging Face revision those values come from, and a damaged download is deleted with "The download was damaged. Click Download to try again."
+- `isModelDownloaded()` requires the exact size.
+
 ### R8: Dictation keeps every word when the computer is slower than speech
 
 As a dictating user on a slower computer, I want every word I say to end up in the document, even if it appears a little later.

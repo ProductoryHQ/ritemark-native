@@ -23,7 +23,7 @@ import type {
   TranscriptionEngine,
 } from '../TranscriptionEngine';
 import { TranscriptionError } from '../types';
-import { describeWhisperFailure, probeWhisper, whisperProblemMessage, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
+import { describeWhisperFailure, probeWhisper, whisperProblemMessage, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
 import type { WhisperReadiness } from '../../voiceDictation/whisperCpp';
 import type { SpeakerSeparation, TranscriptSegment, TranscriptWord, TranscriptionResult } from '../types';
 
@@ -162,7 +162,7 @@ export function transcribeArgs(options: {
     '-ojf',                       // segments + per-token probability + ms offsets
     '-of', options.outBase,
     '-pp',                        // progress on stderr, 5% steps
-    '-t', String(options.threads ?? 4),
+    '-t', String(options.threads ?? whisperThreads()),
     '-l', options.language ?? 'auto',
   ];
 }

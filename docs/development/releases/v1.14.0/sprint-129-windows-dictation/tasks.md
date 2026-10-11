@@ -9,8 +9,9 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Branch `sprint-129-windows-dictation` created; `git branch --show-current` verified. *(2026-10-11, from `542bee6c` + plan commit `31a095b8`)*
 - [x] `build-whisper.yml` win32-x64 job builds Config V and Config S from `v1.8.3`; contract test green on `windows-latest`. → [research/windows-build-audit.md](./research/windows-build-audit.md): **Config V chosen**. *(Run 38130971199: S 10/10; V functional checks all pass, its dependency check failed on a test-parser bug, fixed; re-run pending)*
 - [x] `scripts/qa/windows-whisper-bench.ps1` written (PowerShell 5.1, ASCII only). It also measures a shorter audio window (`--audio-ctx`), which is not a pre-approved setting, so Jarmo can decide with numbers. *(No CI dry run: the runner's 4 vCPUs are no speed reference, and the script's whisper calls use the same flags the contract test already runs)*
-- [ ] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → `research/windows-performance-audit.md` with the lever decision per W6.
-- [ ] If W6's stop condition triggers, stop and bring the numbers to Jarmo before Phase 2.
+- [x] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → [research/windows-performance-audit.md](./research/windows-performance-audit.md). *(2026-10-11, Ryzen 7 5825U: ~22 s per call; threads adopted, beam and chunk length do nothing)*
+- [x] W6's stop condition triggered: numbers and options taken to Jarmo. *(The speed decision is pending; host work that does not depend on it continued)*
+- [ ] Bench round 2 (full vs q8_0 on real clips + Estonian), if Jarmo chooses the q8_0 option.
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
 
