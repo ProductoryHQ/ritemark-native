@@ -1,6 +1,6 @@
 # Release Plan — v1.13.0 Minor Improvements
 
-**Status:** **Release candidate** (2026-10-05). All scoped work is merged, including Sprint 128 ([#394](https://github.com/ProductoryHQ/ritemark-native/pull/394), `580bf85a`). Version 1.13.0 is set in all six version files. **`main` is frozen** from this commit until publish: the RC is built from it in a clean release worktree, the macOS x64 and Windows builds come from CI on the same commit, and every other PR waits<br>
+**Status:** **Released** 2026-10-11 ([v1.13.0](https://github.com/jarmo-productory/ritemark-public/releases/tag/v1.13.0), tag `v1.13.0` on `1abac303`). Built from the first candidate; Gate 1 passed 2026-10-07, Gate 2 passed 2026-10-11, both DMGs notarized and stapled. Verdicts and hashes: [`TEST-CHECKLIST.md`](../../../releases/v1.13.0/TEST-CHECKLIST.md); closeout: [`evidence/closeout.md`](../../../releases/v1.13.0/evidence/closeout.md). `main` is open again<br>
 **Target:** v1.13.0<br>
 **GitHub milestone:** [v1.13.0](https://github.com/ProductoryHQ/ritemark-native/milestone/12)<br>
 **Release type:** **Shell-tier** (set 2026-10-04). Jarmo approved updating every bundled agent runtime in this release ([#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) changes `extensions/ritemark/binaries/agents/`), so v1.13.0 is a full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI. The six merged PRs are extension-tier on their own<br>
@@ -44,7 +44,7 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 
 **Open choice:** Codex 0.160.0's own default is GPT-6.1 Sol; Ritemark's Codex default stays GPT-5.6 Sol unless Jarmo decides otherwise.
 
-**After publish:** refresh `feeds/model-catalog.json` in `ritemark-public` from the bundled lineup (`release` skill, step 3); the feed still names Sonnet 5 as the Claude default.
+**After publish:** the plan called for refreshing `feeds/model-catalog.json` in `ritemark-public`. It was not refreshed: the `release` skill refreshes the feed only after a hand edit, and there has been none since v1.12.0 (feed `updatedAt` 2026-09-29). v1.13.0 uses its own lineup with Sonnet 5.5, because its bundled catalog (2026-10-04) is newer than the feed. A refresh would change only what v1.12.0 apps show, whose bundled Claude Code is 2.1.281.
 
 ## Sprints
 
@@ -54,7 +54,7 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 
 ## Not in this release
 
-- **#376 Codex errors shown as raw JSON**: an issue with a proposed card design and no PR yet. It goes to a later release unless Jarmo pulls it in.
+- **#376 Codex errors shown as raw JSON**: an issue with a proposed card design and no PR yet. Removed from the v1.13.0 milestone at publish and back in the backlog (`triage:product`).
 - **Codex default model**: Ritemark's Codex default stays GPT-5.6 Sol. Codex 0.160.0's own default is GPT-6.1 Sol, and Jarmo has not decided whether to switch.
 
 ## Out of scope
@@ -67,3 +67,12 @@ Reviewed 2026-10-04 against npm `latest` and the latest Codex GitHub release. Ev
 - **Shell-tier:** clean-room release worktree from exact `origin/main`, Gate 1 + Gate 2, notarization after the 60-minute hardening window, Windows CI (see `release-manager`).
 - **Release test must cover:** an authenticated Claude turn on Sonnet 5.5; a Codex turn on GPT-6.1 Sol; the OpenCode permission gate on x64 and Windows; the #381 row buttons with the mouse.
 - `main` is frozen from the first release-candidate build until publish.
+
+## Release record
+
+| Date | Event |
+|---|---|
+| 2026-10-05 | RC built from `1abac303` (arm64 locally; macOS x64 and Windows CI runs `37299068682`, `37299072290`). A full release, not extension-only: #386 changes bundled binaries and the Agent SDK, which only a shell release delivers. Store: unless Jarmo decides otherwise, 1.13.0 is submitted after Microsoft approves 1.12.0 |
+| 2026-10-07 | Gate 1 passed (Jarmo). First arm64 notarization refused with HTTP 403: Apple's updated Developer Program License Agreement was not yet accepted. `notarize-dmg.sh` exited 0 on the refusal (script defect, fix after the release) |
+| 2026-10-08 | Jarmo accepted the agreement; arm64 notarized (`df9d4177`) |
+| 2026-10-11 | Gate 2 passed (Jarmo); x64 notarized (`bbdd8041`); Jarmo's word to publish; published with the update feed (23 releases); tag `v1.13.0`; milestone closed |
