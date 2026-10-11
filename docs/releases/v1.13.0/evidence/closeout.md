@@ -48,6 +48,14 @@ Audit on 2026-10-11, before clearing:
 BLOCKED  .worktrees/release-1abac303d4bb — build output present: VSCode-darwin-arm64/ (2 entries), VSCode-darwin-x64/ (2 entries), dist/ (10 entries) — publish or move it before removing ((detached))
 ```
 
+This evidence was pushed first (PR #400). Then `dist/`, `VSCode-darwin-arm64/` and `VSCode-darwin-x64/` were deleted by name inside the release worktree, about 7.8 GB. Audit after clearing:
+
+```
+REVIEW   .worktrees/release-1abac303d4bb — verified disposable release worktree ((detached))
+```
+
+The physical `vscode/` submodule (6.6 GB) stays until the worktree is removed.
+
 ## 10.4 Removal
 
 Removal is Jarmo's call.
