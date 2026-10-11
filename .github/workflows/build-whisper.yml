@@ -1,0 +1,201 @@
+name: Build whisper.cpp
+
+# Sprint 129 (#133, #203): builds the on-device speech engine Ritemark ships in
+# extensions/ritemark/binaries/<target>/ (voice dictation + Transcribe on-device)
+# from the whisper.cpp commit pinned in scripts/build-whisper.sh and
+# scripts/build-whisper-windows.ps1, and runs the contract test the app relies on
+# (scripts/qa/whisper-contract-test.mjs) on each result. Release builds never
+# compile whisper: they stage, sign and verify the committed output.
+#
+# Free standard runners only, so no repo visibility toggle. No secrets.
+# pull_request as well as workflow_dispatch: workflow_dispatch works only once
+# this file is on main.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-whisper.yml'
+      - 'scripts/build-whisper*'
+      - 'scripts/qa/whisper-contract-test.mjs'
+      - 'extensions/ritemark/src/voiceDictation/whisperCpp.ts'
+      - 'extensions/ritemark/src/speech/engines/whisperLocalEngine.ts'
+      - 'extensions/ritemark/binaries/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-whisper-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # whisper.cpp v1.8.3. The build scripts refuse any other commit.
+  WHISPER_CPP_COMMIT: 2eeeba56e9edd762b4b38467bab96c2517163158
+  NODE_VERSION: '22.22.1'
+  TSX: tsx@4.21.0
+  # Test model for the contract test (ggml-tiny.bin, checksum pinned in the script).
+  MODEL_CACHE_KEY: whisper-contract-model-ggml-tiny-be07e048
+
+jobs:
+  win32-x64:
+    name: win32-x64 (config ${{ matrix.config }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [V, S]
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build
+        id: build
+        shell: pwsh
+        run: ./r/scripts/build-whisper-windows.ps1 -Config ${{ matrix.config }} -Source whisper.cpp -Out out/win32-x64 -Info out/info
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        shell: pwsh
+        run: |
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs `
+            --binary out/win32-x64/whisper-cli.exe `
+            --sample whisper.cpp/samples/jfk.wav `
+            --model-cache model-cache `
+            --arch x64 `
+            --dumpbin '${{ steps.build.outputs.dumpbin }}' `
+            --report out/info/contract-report.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload payload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-win32-x64-${{ matrix.config }}
+          path: out/
+          if-no-files-found: warn
+
+  darwin:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-x64
+            runner: macos-15-intel
+            arch: x64
+          - target: darwin-arm64
+            runner: macos-15
+            arch: arm64
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build
+        run: ./r/scripts/build-whisper.sh --target ${{ matrix.target }} --source whisper.cpp --out out/${{ matrix.target }} --info out/info
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        run: |
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary out/${{ matrix.target }}/whisper-cli \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch ${{ matrix.arch }} \
+            --min-macos 12.0 \
+            --report out/info/contract-report.json
+
+      - name: Upload payload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-${{ matrix.target }}
+          path: out/
+          if-no-files-found: warn
+
+  # The Apple silicon build asks for macOS 12.0; this runs it on an older macOS
+  # than the one it was built on. (GitHub has no macOS 12 or 13 runner left.)
+  darwin-arm64-on-macos-14:
+    name: darwin-arm64 on macOS 14
+    needs: darwin
+    runs-on: macos-14
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp sample
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+          sparse-checkout: samples
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download the darwin-arm64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: whisper-darwin-arm64
+          path: out
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        run: |
+          chmod +x out/darwin-arm64/whisper-cli   # artifacts drop the executable bit
+          sw_vers
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary out/darwin-arm64/whisper-cli \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch arm64 \
+            --min-macos 12.0

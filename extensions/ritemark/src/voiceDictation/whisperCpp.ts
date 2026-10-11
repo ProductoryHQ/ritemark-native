@@ -52,6 +52,39 @@ function filterHallucinations(text: string): string {
 }
 
 /**
+ * The whisper-cli arguments for one dictation chunk, with anti-hallucination settings.
+ *
+ * Sprint 129: exported so the CI contract test (`scripts/qa/whisper-contract-test.mjs`)
+ * runs every bundled binary with exactly what dictation sends.
+ */
+export function dictationArgs(options: {
+  modelPath: string;
+  audioPath: string;
+  language?: string;
+  threads?: number;
+}): string[] {
+  const args = [
+    '--model', options.modelPath,
+    '--threads', String(options.threads || 4),
+    '--no-timestamps',
+    '--no-fallback',        // Prevent temperature fallback loops
+    '--beam-size', '8',     // Larger beam = more accurate
+    '--entropy-thold', '2.4', // Detect hallucination via entropy
+    '--logprob-thold', '-1.0', // Log probability threshold
+    '--max-len', '0',       // No max segment length limit
+    '--output-txt',
+    options.audioPath
+  ];
+
+  // Only specify language if explicitly provided, otherwise let Whisper auto-detect
+  if (options.language) {
+    args.splice(2, 0, '--language', options.language);
+  }
+
+  return args;
+}
+
+/**
  * Transcribe a WAV audio buffer using whisper-cli
  *
  * @param wavBuffer - WAV audio data (16kHz, mono, 16-bit PCM)
@@ -90,24 +123,12 @@ export async function transcribeWav(
     // Get directory containing the binary (for DYLD_LIBRARY_PATH)
     const binaryDir = path.dirname(options.binaryPath);
 
-    // Build command arguments with anti-hallucination settings
-    const args = [
-      '--model', options.modelPath,
-      '--threads', String(options.threads || 4),
-      '--no-timestamps',
-      '--no-fallback',        // Prevent temperature fallback loops
-      '--beam-size', '8',     // Larger beam = more accurate
-      '--entropy-thold', '2.4', // Detect hallucination via entropy
-      '--logprob-thold', '-1.0', // Log probability threshold
-      '--max-len', '0',       // No max segment length limit
-      '--output-txt',
-      tempFile
-    ];
-
-    // Only specify language if explicitly provided, otherwise let Whisper auto-detect
-    if (options.language) {
-      args.splice(2, 0, '--language', options.language);
-    }
+    const args = dictationArgs({
+      modelPath: options.modelPath,
+      audioPath: tempFile,
+      language: options.language,
+      threads: options.threads
+    });
 
     // Execute whisper-cli
     const result = await new Promise<TranscriptionResult>((resolve) => {

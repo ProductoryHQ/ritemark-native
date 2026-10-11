@@ -2,7 +2,7 @@
 
 Track: SDD (auto-detected: cross-platform path handling, webview ↔ host ↔ external binary flow, three linked issues)<br>
 Release tier: shell (new native binaries under `extensions/ritemark/binaries/win32-x64/` and `darwin-x64/`, and `.github/workflows/build-whisper.yml`)<br>
-**Status:** Phase 2 (PLAN), awaiting Jarmo's approval. No branch and no code yet.<br>
+**Status:** Phase 3 (DEVELOP), starting with the Phase 0 audits. Plan approved by Jarmo on 2026-10-11.<br>
 **Branch after approval:** `sprint-129-windows-dictation`, cut from this worktree's tip, which must be `origin/main` plus the plan commit only (`git log origin/main..HEAD` shows one commit; rebase onto the then-current `origin/main` first)<br>
 **Worktree:** `.claude/worktrees/vibrant-lewin-74cd1d` (plan only; the sprint branch is cut from `main` after approval)<br>
 **Release:** [v1.14.0](../release-plan.md) (milestone 13). Nothing merges before v1.13.0 is published.
@@ -42,7 +42,12 @@ Windows users can dictate into documents and transcribe recordings on their own 
 5. **Signing:** the Windows release workflow already signs **every** unsigned `.exe`/`.dll` it finds with Productory's Azure certificate and verifies each one. macOS `codesign-app.sh` already signs files named `whisper-cli` and every `.dylib`. No signing script changes.
 6. **In the app:** one function finds the engine for both dictation and Transcribe and tests it once before anything is downloaded. Engine and microphone failures map to plain-language messages. `voice-dictation` gains `win32` in its platform list.
 
-## Product Decisions (proposed 2026-10-11, part of this approval)
+## Product Decisions
+
+- **2026-10-11 (Jarmo):** "approved, no Intel Mac — use the CI runner". The plan and the five decisions below stand. Intel Mac evidence is the contract test on the `macos-15-intel` runner; Gate 2 has no Intel Mac hands-on, and the release report says so.
+
+Proposed 2026-10-11 and approved with the plan:
+
 
 - **Intel Mac binary (#203) rides along.** It is one more CI job on the existing `macos-15-intel` runner, and the existing signing rules already cover it. Without it, the Intel Mac dictation defect needs its own fix anyway. Declining it still leaves Intel Macs with an honest "needs Apple silicon" message (R3/R6).
 - **Dictation stops dropping speech when busy (R8)**, on Mac too. It matters most on Windows, where transcription runs on the CPU only.
@@ -63,7 +68,7 @@ Windows users can dictate into documents and transcribe recordings on their own 
 - [ ] Whisper files in the signed Windows installer carry Productory's timestamped signature; the release build fails if they are missing or changed.
 - [ ] CI contract test is green for win32-x64, darwin-x64 and the committed darwin-arm64 binary, including the Unicode-folder case.
 - [ ] Apple silicon dictation and Transcribe on-device behave as in v1.13.0, apart from no longer dropping speech.
-- [ ] Intel Mac (if approved): binary signed and notarized, contract test green; hands-on if hardware is available.
+- [ ] Intel Mac: binary signed and notarized, contract test green on `macos-15-intel` (no hands-on: no Intel Mac available).
 - [ ] User docs, architecture doc, tier lists, changelog and release notes updated.
 
 ## How Windows gets verified (Jarmo tests)
@@ -92,8 +97,8 @@ Conformance check by `sprint-manager` on 2026-10-11 (sprint number, template, R-
 
 ## Status
 
-**Track:** SDD · **Current phase:** 2 (PLAN) · **Approval required:** yes
+**Track:** SDD · **Current phase:** 3 (DEVELOP), Phase 0 audits · **Branch:** `sprint-129-windows-dictation`
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan (and the Product Decisions above)
+- [x] Jarmo approved this sprint plan (and the Product Decisions above), 2026-10-11

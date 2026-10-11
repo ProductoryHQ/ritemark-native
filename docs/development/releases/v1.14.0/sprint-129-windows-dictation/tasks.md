@@ -6,7 +6,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 0: Audits (W0 — R1, R9; A3 for R5 runs in Phase 5)
 
-- [ ] Branch `sprint-129-windows-dictation` created; `git branch --show-current` verified.
+- [x] Branch `sprint-129-windows-dictation` created; `git branch --show-current` verified. *(2026-10-11, from `542bee6c` + plan commit `31a095b8`)*
 - [ ] `build-whisper.yml` win32-x64 job builds Config V and Config S from `v1.8.3`; contract test green on `windows-latest`. → `research/windows-build-audit.md` (files, sizes, dependencies, `system_info`, chosen config per the rule).
 - [ ] `scripts/qa/windows-whisper-bench.ps1` written and dry-run on the CI runner.
 - [ ] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → `research/windows-performance-audit.md` with the lever decision per W6.
@@ -53,7 +53,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 - [ ] `scripts/qa/make-windows-test-overlay.sh` and `scripts/qa/windows-branch-test.ps1` written; overlay zip built from the branch.
 - [ ] **Jarmo:** runs the branch test on his Windows machine through the scenarios marked **B**. A3 errors recorded in `research/windows-mic-audit.md`; Windows copy adjusted if A3 requires it.
-- [ ] Intel Mac branch check, if Jarmo has an Intel Mac.
+- [x] ~~Intel Mac branch check~~: no Intel Mac available (Jarmo, 2026-10-11). Evidence = CI contract test on `macos-15-intel`.
 
 ## Phase 6: Docs, tiers and PR (W9 — R10)
 
@@ -72,5 +72,5 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 - [ ] Signed installer: whisper files signed by Productory Services OÜ and timestamped (scenario R1).
 - [ ] Scenarios marked **C** on the signed installer; Smart App Control state recorded.
-- [ ] Intel Mac RC (if R2 and hardware available), otherwise the gap is stated in the release report.
+- [ ] Release report states that Intel Mac evidence is the CI contract test only (no hardware).
 - [ ] #133 (and #203) closed on publish.

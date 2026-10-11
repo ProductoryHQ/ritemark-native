@@ -141,6 +141,30 @@ export function parseProgressLine(line: string): number | null {
   return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : null;
 }
 
+/**
+ * The whisper-cli arguments for one file transcription.
+ *
+ * Sprint 129: exported so the CI contract test (`scripts/qa/whisper-contract-test.mjs`)
+ * runs every bundled binary with exactly what this engine sends.
+ */
+export function transcribeArgs(options: {
+  modelPath: string;
+  audioPath: string;
+  outBase: string;
+  threads?: number;
+  language?: string | null;
+}): string[] {
+  return [
+    '-m', options.modelPath,
+    '-f', options.audioPath,
+    '-ojf',                       // segments + per-token probability + ms offsets
+    '-of', options.outBase,
+    '-pp',                        // progress on stderr, 5% steps
+    '-t', String(options.threads ?? 4),
+    '-l', options.language ?? 'auto',
+  ];
+}
+
 export interface WhisperLocalEngineDeps {
   /** Absolute path to the bundled `whisper-cli`. */
   binaryPath: string;
@@ -200,15 +224,13 @@ export class WhisperLocalEngine implements TranscriptionEngine {
     const outBase = path.join(this.deps.workDir, `ritemark-transcript-${Date.now()}`);
     const jsonPath = `${outBase}.json`;
 
-    const args = [
-      '-m', this.deps.modelPath,
-      '-f', options.audioPath,
-      '-ojf',                       // segments + per-token probability + ms offsets
-      '-of', outBase,
-      '-pp',                        // progress on stderr, 5% steps
-      '-t', String(this.deps.threads ?? 4),
-      '-l', options.language ?? 'auto',
-    ];
+    const args = transcribeArgs({
+      modelPath: this.deps.modelPath,
+      audioPath: options.audioPath,
+      outBase,
+      threads: this.deps.threads,
+      language: options.language,
+    });
 
     options.onProgress({ phase: 'transcribing', percent: 0 });
 

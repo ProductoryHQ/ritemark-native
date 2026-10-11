@@ -1,167 +1,157 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Build whisper.cpp binary for RiteMark voice dictation
-# This script clones whisper.cpp, builds it with Metal support for arm64, and copies the binary
+# Build the whisper.cpp speech engine that ships in
+# extensions/ritemark/binaries/<target>/ (voice dictation + Transcribe on-device).
 #
-# IMPORTANT: This script forces arm64 architecture even when run from x86_64 tools
-# This is necessary because some dev environments run CMake under Rosetta
+# Sprint 129 (#133, #203):
+# - pinned to one whisper.cpp commit (v1.8.3, the version Sprint 108 measured);
+#   the earlier script cloned HEAD, so the shipped build's commit was unrecorded
+# - one static whisper-cli per target: no dylibs beside it
+# - minimum macOS 12.0, Ritemark's own floor (the 2026-01 build asked for 15.0).
+#   Any call to an API newer than that fails the build, and ggml's BLAS backend is
+#   off because Accelerate's new BLAS interface needs macOS 13.3. Matrix work runs
+#   on Metal (Apple silicon) or ggml's own CPU kernels (Intel, as on Windows).
+#
+# .github/workflows/build-whisper.yml runs this on the matching runner and the
+# contract test (scripts/qa/whisper-contract-test.mjs) on its output. Windows is
+# scripts/build-whisper-windows.ps1. Release builds never compile whisper.
+#
+# Usage:
+#   scripts/build-whisper.sh --target darwin-arm64|darwin-x64 [--source DIR] [--out DIR] [--info DIR]
+#     --source  a whisper.cpp checkout at the pinned commit (CI); default: clone it
+#     --out     where whisper-cli goes; default: extensions/ritemark/binaries/<target>
+#     --info    also write build-info.json and SHA256SUMS there
+
+WHISPER_CPP_REPO="https://github.com/ggml-org/whisper.cpp.git"
+WHISPER_CPP_TAG="v1.8.3"
+WHISPER_CPP_COMMIT="2eeeba56e9edd762b4b38467bab96c2517163158"
+MACOS_MIN="12.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TEMP_DIR="/tmp/ritemark-whisper-build"
-BINARY_DEST="$PROJECT_ROOT/extensions/ritemark/binaries/darwin-arm64"
 
-echo "======================================"
-echo "Building whisper.cpp for RiteMark"
-echo "Target: darwin-arm64 (Apple Silicon)"
-echo "======================================"
-echo ""
+TARGET=""
+SOURCE=""
+OUT=""
+INFO=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target) TARGET="$2"; shift 2 ;;
+    --source) SOURCE="$2"; shift 2 ;;
+    --out) OUT="$2"; shift 2 ;;
+    --info) INFO="$2"; shift 2 ;;
+    -h|--help) sed -n '3,24p' "$0"; exit 0 ;;
+    *) echo "Error: unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
 
-# Check platform
+AVAILABILITY_FLAGS="-Werror=unguarded-availability-new"
+
+case "$TARGET" in
+  darwin-arm64)
+    ARCH_FLAGS=(
+      -DCMAKE_OSX_ARCHITECTURES=arm64
+      "-DCMAKE_C_FLAGS=-mcpu=apple-m1 $AVAILABILITY_FLAGS"
+      "-DCMAKE_CXX_FLAGS=-mcpu=apple-m1 $AVAILABILITY_FLAGS"
+      -DGGML_METAL=ON
+      -DGGML_METAL_EMBED_LIBRARY=ON
+    )
+    EXPECT_ARCH="arm64"
+    ;;
+  darwin-x64)
+    # Every Intel Mac that runs macOS 12 has AVX2. No Metal: Accelerate on the CPU.
+    ARCH_FLAGS=(
+      -DCMAKE_OSX_ARCHITECTURES=x86_64
+      "-DCMAKE_C_FLAGS=$AVAILABILITY_FLAGS"
+      "-DCMAKE_CXX_FLAGS=$AVAILABILITY_FLAGS"
+      -DGGML_METAL=OFF
+      -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
+    )
+    EXPECT_ARCH="x86_64"
+    ;;
+  *)
+    echo "Error: --target must be darwin-arm64 or darwin-x64" >&2
+    exit 2
+    ;;
+esac
+
 if [[ "$OSTYPE" != "darwin"* ]]; then
-  echo "Error: This script only supports macOS (darwin)"
+  echo "Error: macOS targets build on macOS (Windows: scripts/build-whisper-windows.ps1)" >&2
+  exit 1
+fi
+command -v cmake >/dev/null || { echo "Error: cmake not found (brew install cmake)" >&2; exit 1; }
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/ritemark-whisper-build.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+
+if [[ -z "$SOURCE" ]]; then
+  echo "Cloning whisper.cpp $WHISPER_CPP_TAG..."
+  git clone --quiet --depth 1 --branch "$WHISPER_CPP_TAG" "$WHISPER_CPP_REPO" "$WORK/whisper.cpp"
+  SOURCE="$WORK/whisper.cpp"
+fi
+HEAD_COMMIT="$(git -C "$SOURCE" rev-parse HEAD)"
+if [[ "$HEAD_COMMIT" != "$WHISPER_CPP_COMMIT" ]]; then
+  echo "Error: whisper.cpp source is at $HEAD_COMMIT, expected $WHISPER_CPP_COMMIT ($WHISPER_CPP_TAG)" >&2
   exit 1
 fi
 
-# Warn about architecture but continue (we force arm64 via cmake)
-ARCH=$(uname -m)
-if [[ "$ARCH" != "arm64" ]]; then
-  echo "Note: Shell reports $ARCH but we'll cross-compile for arm64"
-fi
-
-# Check for cmake
-if ! command -v cmake &> /dev/null; then
-  echo "Error: cmake not found. Install with: brew install cmake"
-  exit 1
-fi
-
-# Clean up previous build
-if [ -d "$TEMP_DIR" ]; then
-  echo "Cleaning up previous build..."
-  rm -rf "$TEMP_DIR"
-fi
-
-# Create temp directory
-mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
-
-# Clone whisper.cpp
-echo ""
-echo "Cloning whisper.cpp repository..."
-git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
-cd whisper.cpp
-
-# Build with Metal support, forcing arm64 architecture
-echo ""
-echo "Configuring whisper.cpp with arm64 + Metal GPU support..."
-cmake -B build \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_C_FLAGS="-mcpu=apple-m1" \
-  -DCMAKE_CXX_FLAGS="-mcpu=apple-m1" \
-  -DGGML_METAL=ON \
-  -DGGML_NATIVE=OFF \
+CMAKE_FLAGS=(
   -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN"
+  -DBUILD_SHARED_LIBS=OFF
+  -DGGML_NATIVE=OFF
+  -DGGML_BLAS=OFF
+  -DWHISPER_BUILD_TESTS=OFF
+  -DWHISPER_BUILD_SERVER=OFF
+  "${ARCH_FLAGS[@]}"
+)
 
-echo ""
-echo "Building whisper.cpp (this may take 2-3 minutes)..."
-cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+echo "Building whisper-cli for $TARGET (whisper.cpp $WHISPER_CPP_TAG, macOS $MACOS_MIN+)..."
+cmake -S "$SOURCE" -B "$WORK/build" "${CMAKE_FLAGS[@]}"
+cmake --build "$WORK/build" --config Release --target whisper-cli -j "$(sysctl -n hw.ncpu)"
 
-# Verify binary was created
-WHISPER_BIN="./build/bin/whisper-cli"
-if [ ! -f "$WHISPER_BIN" ]; then
-  echo ""
-  echo "Error: Build failed - binary not found at $WHISPER_BIN"
+BIN="$WORK/build/bin/whisper-cli"
+[[ -f "$BIN" ]] || { echo "Error: build produced no $BIN" >&2; exit 1; }
+
+BINARY_ARCH="$(lipo -archs "$BIN")"
+if [[ "$BINARY_ARCH" != "$EXPECT_ARCH" ]]; then
+  echo "Error: whisper-cli is '$BINARY_ARCH', expected $EXPECT_ARCH" >&2
+  exit 1
+fi
+NON_SYSTEM="$(otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep -v -E '^/usr/lib/|^/System/Library/' || true)"
+if [[ -n "$NON_SYSTEM" ]]; then
+  echo "Error: whisper-cli links libraries outside the OS:" >&2
+  echo "$NON_SYSTEM" >&2
   exit 1
 fi
 
-# Verify architecture
-BINARY_ARCH=$(file "$WHISPER_BIN" | grep -o 'arm64\|x86_64')
-if [[ "$BINARY_ARCH" != "arm64" ]]; then
-  echo ""
-  echo "Error: Binary is $BINARY_ARCH but should be arm64"
-  exit 1
+if [[ -z "$OUT" ]]; then
+  OUT="$PROJECT_ROOT/extensions/ritemark/binaries/$TARGET"
 fi
-
-# Check binary size
-BINARY_SIZE=$(du -h "$WHISPER_BIN" | cut -f1)
-echo ""
-echo "Build successful!"
-echo "Binary: $WHISPER_BIN"
-echo "Architecture: $BINARY_ARCH"
-echo "Size: $BINARY_SIZE"
-
-# Backup existing binaries if present
-if [ -d "$BINARY_DEST" ] && [ "$(ls -A $BINARY_DEST 2>/dev/null)" ]; then
-  BACKUP_DIR="${BINARY_DEST}.backup-$(date +%Y%m%d-%H%M%S)"
-  echo ""
-  echo "Backing up existing binaries to: $BACKUP_DIR"
-  mv "$BINARY_DEST" "$BACKUP_DIR"
+if [[ -d "$OUT" ]] && [[ -n "$(ls -A "$OUT" 2>/dev/null)" ]]; then
+  BACKUP="${TMPDIR:-/tmp}/ritemark-whisper-$TARGET.backup-$(date +%Y%m%d-%H%M%S)"
+  echo "Moving the existing $OUT to $BACKUP"
+  mv "$OUT" "$BACKUP"
 fi
+mkdir -p "$OUT"
+cp "$BIN" "$OUT/whisper-cli"
+chmod +x "$OUT/whisper-cli"
 
-# Create destination directory
-mkdir -p "$BINARY_DEST"
-
-# Copy binary
-echo ""
-echo "Installing binary to: $BINARY_DEST/"
-cp "$WHISPER_BIN" "$BINARY_DEST/whisper-cli"
-chmod +x "$BINARY_DEST/whisper-cli"
-
-# Copy shared libraries with proper versioned names
-echo "Copying shared libraries..."
-
-# Find and copy libraries
-copy_lib() {
-  local name=$1
-  local src=$(find ./build -name "lib${name}*.dylib" -type f | grep -v ".0.dylib$" | grep -v ".1.dylib$" | head -1)
-  if [ -n "$src" ] && [ -f "$src" ]; then
-    cp "$src" "$BINARY_DEST/lib${name}.dylib"
-    # Create symlinks for versioned names
-    ln -sf "lib${name}.dylib" "$BINARY_DEST/lib${name}.0.dylib"
-    ln -sf "lib${name}.dylib" "$BINARY_DEST/lib${name}.1.dylib"
-    echo "  - lib${name}.dylib ($(du -h "$src" | cut -f1))"
-  else
-    echo "  - WARNING: lib${name}.dylib not found"
-  fi
+if [[ -n "$INFO" ]]; then
+  mkdir -p "$INFO"
+  (cd "$OUT" && shasum -a 256 whisper-cli) > "$INFO/SHA256SUMS"
+  cat > "$INFO/build-info.json" <<EOF
+{
+  "target": "$TARGET",
+  "whisperCpp": { "tag": "$WHISPER_CPP_TAG", "commit": "$WHISPER_CPP_COMMIT" },
+  "cmakeFlags": "$(printf '%s ' "${CMAKE_FLAGS[@]}" | sed 's/ $//')",
+  "cmake": "$(cmake --version | head -1)",
+  "compiler": "$(cc --version | head -1)",
+  "macosMin": "$MACOS_MIN",
+  "runId": "${GITHUB_RUN_ID:-local}"
 }
-
-copy_lib "whisper"
-copy_lib "ggml"
-copy_lib "ggml-base"
-copy_lib "ggml-cpu"
-copy_lib "ggml-metal"
-copy_lib "ggml-blas"
-
-# Verify installation
-echo ""
-echo "======================================"
-echo "Installation complete!"
-echo "======================================"
-echo ""
-echo "Contents of $BINARY_DEST:"
-ls -lh "$BINARY_DEST/"
-echo ""
-echo "Total size: $(du -sh "$BINARY_DEST" | cut -f1)"
-echo ""
-
-# Verify binary runs
-echo "Verifying binary..."
-if DYLD_LIBRARY_PATH="$BINARY_DEST" "$BINARY_DEST/whisper-cli" --help > /dev/null 2>&1; then
-  echo "Binary verified - runs successfully"
-else
-  echo "WARNING: Binary may have issues - test manually"
+EOF
 fi
 
-# Clean up
-echo ""
-echo "Cleaning up build directory..."
-rm -rf "$TEMP_DIR"
-
-echo ""
-echo "Done!"
-echo ""
-echo "Next steps:"
-echo "1. Test: DYLD_LIBRARY_PATH='$BINARY_DEST' $BINARY_DEST/whisper-cli --help"
-echo "2. Copy to production app if needed"
-echo "3. Rebuild extension"
+echo "Done: $OUT/whisper-cli ($(du -h "$OUT/whisper-cli" | cut -f1), $BINARY_ARCH)"

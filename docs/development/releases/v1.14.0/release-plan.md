@@ -17,7 +17,7 @@ To be written once the scope is settled. Current candidate: Windows users get on
 
 | Sprint | Scope | Status |
 |---|---|---|
-| [129 — Windows dictation](sprint-129-windows-dictation/sprint-plan.md) | On-device Whisper on Windows: voice dictation and Transcribe's on-device engine ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)); Intel Mac binary from the same pipeline ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203)) if approved | Plan awaiting Jarmo's approval |
+| [129 — Windows dictation](sprint-129-windows-dictation/sprint-plan.md) | On-device Whisper on Windows: voice dictation and Transcribe's on-device engine ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)); Intel Mac binary from the same pipeline ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203)) if approved | Approved 2026-10-11; in development on `sprint-129-windows-dictation` (Intel Mac: CI runner evidence only) |
 
 ## Milestone items without a sprint yet
 
