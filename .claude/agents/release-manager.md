@@ -51,7 +51,7 @@ Minimum rule:
 
 1. Regenerate canonical update feed / release metadata.
 2. Verify it matches the assets being published.
-3. Publish it together with the release.
+3. Publish it together with the release. For a full release that means: create the GitHub release as a **draft**, upload the binaries **and** the feed to it, check GitHub's asset digests against local `dist/`, and only then publish with `gh release edit vX.Y.Z --draft=false`. Never pass the binaries to `gh release create` — it publishes as soon as the last one uploads, and `latest` is then public without a feed (v1.13.0: 16 seconds). Commands: `release` skill, Step 8.
 
 If binaries are uploaded but the feed/metadata is stale or missing, the release is BLOCKED.
 
@@ -105,7 +105,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 6 | Download x64 from CI, sign, DMG — **NO notarization yet** | Agent | — |
 | **7** | **Jarmo tests the UN-notarized x64 DMG + Windows installer** | **Jarmo** | **Gate 2** |
 | 7b | Hardening period (**≥60 min since x64 DMG build, no new bugs**) → notarize + staple x64 | Agent | **REQUIRES Gate 2 cleared + 60-min window** |
-| 8 | GitHub Release + canonical update-feed publication | Agent | — |
+| 8 | Generate the canonical update feed → GitHub Release as a **draft** → upload binaries + feed → GitHub digests match `dist/` → publish (`--draft=false`) | Agent | **Digest check BLOCKS publish** |
 | 9 | Switch repo public; recommend `product-marketer` for changelog/notes | Agent | — |
 | 9b | Post-release issue sweep — close what the release resolved, citing the version; partial or reputation-dependent issues go to Jarmo | Agent | — |
 | 10 | Release closeout — verify every published asset against local `dist/` (size + SHA-256 vs GitHub digests and the canonical feed) → archive the local-only evidence to `docs/releases/vX.Y.Z/evidence/` → clear `dist/` + `VSCode-<target>/` → `worktree-hygiene.mjs --check` reports `REVIEW` | Agent | **Closeout gate — clear only after verification passes and the evidence is pushed** |
