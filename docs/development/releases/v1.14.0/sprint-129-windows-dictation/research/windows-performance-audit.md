@@ -147,11 +147,12 @@ The FLEURS clips are single sentences of up to 25 s, so cutting them at 20–28 
 
 - **On a slow computer, R8 already behaves like "record, then transcribe".** When a call takes ~22 s, the audio that waited meanwhile is joined into the next call, so calls are ~22–28 s long and accuracy lands at 17.5–20.7%, near the 16.6% of transcribing the whole recording. R8 does that work while the user speaks: after Stop, the wait is one call (~22 s on the 5825U), not the whole recording again. A separate "record, then transcribe" mode would add nothing on CPU, so it is not proposed.
 - **The cost on CPU is delay, not accuracy:** text arrives ~25–50 s after the speech on the 5825U. A slower PC falls behind and stops with the "can't keep up" notice after a minute of backlog.
-- **Apple silicon dictation** (5 s timer, calls faster than real time) scores 29% on this stream. Cutting at pauses (voice activity detection, a #117 item) is the fix for every platform; follow-up, not in this sprint.
+- **Apple silicon dictation** (5 s timer, calls faster than real time) scores 29% on this stream. Cutting at pauses (voice activity detection) is the fix for every platform: [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411), not in this sprint. `asr-wer.mjs` on the joined stream is the accuracy baseline to beat (29.0% at 5 s, 16.6% whole).
 
 ## The Vulkan engine (config VK, run 38252509147, head `2d82ca4f`)
 
 - **Builds and passes the contract test** on `windows-latest`. That runner has no GPU, so the run proves the CPU fallback when the Vulkan loader is present but finds no device.
 - **Size:** 62 MB on disk against 9.2 MB for config V; `ggml-vulkan.dll` alone is 55.6 MB (artifact zip 19.8 MB against 3.4 MB). Committed like the other engines, each engine update would add ~56 MB to the repository's history.
 - **New dependency:** `ggml-vulkan.dll` imports `vulkan-1.dll`, which graphics drivers install. With `GGML_BACKEND_DL` the engine loads `ggml-vulkan.dll` only when it can and otherwise runs on the CPU. A PC with no `vulkan-1.dll` at all is not proven yet (needed before shipping).
+- **Status (2026-10-12):** Jarmo put GPU aside ("unustame selle graafikaardi testi hetkel"), replacing his earlier "if it can be done, yes"; the GPU round did not run. For when he reopens it, from the Windows session: Jarmo's PC has an AMD Radeon integrated GPU, driver 31.0.21924.61 (2025-12-11), and `vulkan-1.dll` is present.
 - **Speed on a real GPU: unmeasured.** Bench round 3 (`windows-whisper-bench.ps1 -Round 3`) checks that whisper-cli picks the Vulkan GPU, that `--no-gpu` still works with the same files, then runs the 20 clips with q8_0 and f16 on the GPU and ten minutes of Transcribe.

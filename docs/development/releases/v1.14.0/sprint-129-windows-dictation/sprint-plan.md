@@ -60,8 +60,8 @@ Windows users can dictate into documents and transcribe recordings on their own 
 - **2026-10-12 (Jarmo, in the "Ritemark on Windows" session, relayed by the Development manager), after round 3:** "1. Nõus! 2. ok 3. ok 4. unustame selle graafikaardi testi hetkel".
   1. **Windows dictation is "speak, then text"** (R12). The user records and presses Stop; Ritemark then transcribes with the full 30 s window (~14% WER on his laptop). The wait is about 20 s for a short phrase. The UI says it is processing and does not suggest live text. The shorter window (`--audio-ctx`) does not ship.
   2. **q8_0 is the default model on Windows** (R13).
-  3. **Cutting at pauses (VAD) is separate work for every platform**, in its own issue. whisper-cli 1.8.3 already has `--vad`, `--vad-model` and `--vad-max-speech-duration-s`.
-  4. **No GPU in v1.14.0.** The GPU round does not run. Config VK stays in `build-whisper.yml` as a harness option, built only on request (W12); nothing Vulkan ships.
+  3. **Cutting at pauses (VAD) is separate work for every platform**: [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411). whisper-cli 1.8.3 already has `--vad`, `--vad-model` and `--vad-max-speech-duration-s`.
+  4. **No GPU in v1.14.0.** The GPU round does not run; this replaces his earlier "if it can be done, yes". Config VK stays in `build-whisper.yml` as a harness option, built only on request (W12); nothing Vulkan ships.
   - **How R12 does the work (engineering, told to Jarmo):** the audio is transcribed in the background in pieces of up to 28 s while the user is still talking, and the text is held until Stop. A long dictation then waits ~20 s after Stop instead of about as long as it lasted. Accuracy is the same within measurement noise (17.5% against 16.6% WER on 255 s of continuous Estonian; 3 words in 338). The user sees exactly "record, press Stop, then the text".
 
 Proposed 2026-10-11 and approved with the plan:

@@ -14,7 +14,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Bench round 2 (Jarmo 2026-10-12: "mõõda kõiki"; W11): FLEURS-et WER for all candidates on the Mac → `research/asr-candidates-audit.md` *(done)*; CI clip pack *(done)*; run instructions to the Development manager *(done)*. Then Jarmo cut Parakeet and the Zipformer (2026-10-12), so the Windows run is Whisper q8_0 vs f16 *(script trimmed to match)*. Windows results folded in *(2026-10-12: q8_0 ≈ f16 on Estonian, only 1.13× faster on the Ryzen; the shorter window rejected on real speech, 59–73% WER)*. Open: Jarmo's ship-or-hold decision.
 - [x] Round 3 (Jarmo 2026-10-12: shorter window + resident model, q8_0 only if quality holds) folded in, with the Mac cross-check on the same chunking. *(2026-10-12: the shorter window doubles errors at 10 s and loops at 5 s on both machines; the resident model saves 1.3–2.4 s per call; q8_0 ≈ f16 in the full window. Continuous-speech check: R8's long calls on slow PCs score near "record, then transcribe")*
 - [ ] Vulkan (Jarmo 2026-10-12: "kui saab siis jah"): config VK in `build-whisper.yml` *(added, 100d0e09; green in run 38252509147: 62 MB, imports `vulkan-1.dll`)*; bench on Jarmo's PC *(`windows-whisper-bench.ps1 -Round 3`, sent to the Development manager)*; what it changes (size, driver dependency, fallback) put to Jarmo before shipping; a PC without `vulkan-1.dll` checked before shipping.
-- [x] Jarmo's decisions after round 3 recorded (2026-10-12): "speak, then text" on Windows (R12), q8_0 on Windows (R13), VAD separate, no GPU in v1.14.0. Config VK built only on request.
+- [x] Jarmo's decisions after round 3 recorded (2026-10-12): "speak, then text" on Windows (R12), q8_0 on Windows (R13), VAD separate ([#411](https://github.com/ProductoryHQ/ritemark-native/issues/411)), no GPU in v1.14.0. Config VK built only on request.
 - [ ] Jarmo: the "speak, then text" wording, and whether Intel Macs follow Windows (asked through the Development manager, 2026-10-12).
 - [x] R11 (added 2026-10-12): the CI-built darwin-arm64 static engine is committed with the other payloads (W10); the `committed` CI job runs it on macOS 14. *(The Apple silicon dictation check is listed under Gate 2)*
 
@@ -75,7 +75,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] `docs/development/architecture.md` (single resolver, readiness states, provenance, no more "macOS only").
 - [ ] `docs/CHANGELOG.md` and v1.14.0 release-notes draft; v1.14.0 release plan tracker updated.
 - [ ] PR opened (not merged); "PR ready" message names the PR number for Jarmo's admin-merge yes after v1.13.0 publishes.
-- [ ] Follow-up issues: on-device m4a/aac on Windows; whisper.cpp upgrade across all targets; GPU acceleration on Windows (only if A2 showed the need).
+- [ ] Follow-up issues: on-device m4a/aac on Windows; whisper.cpp upgrade across all targets. *(Filed: cutting at pauses, [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411). GPU on Windows: Jarmo put it aside on 2026-10-12; no issue unless he reopens it)*
 
 ## Phase 7: QA and Closeout (v1.14.0 Gate 2, stage C)
 

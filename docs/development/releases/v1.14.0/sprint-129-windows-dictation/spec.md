@@ -179,7 +179,7 @@ Acceptance criteria:
 
 - No GPU acceleration on Windows (Vulkan/CUDA). Measured as far as a build (config VK); Jarmo took it out of v1.14.0 on 2026-10-12.
 - No on-device m4a/aac on Windows. It needs a converter; the existing honest message stays and ElevenLabs handles those files. Follow-up issue.
-- No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8. Cutting at pauses (VAD) is separate work for every platform (Jarmo, 2026-10-12).
+- No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8. Cutting at pauses (VAD) is separate work for every platform: [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411) (Jarmo, 2026-10-12).
 - No shorter audio window (`--audio-ctx`) anywhere: it doubles the errors at 10 s and loops at 5 s in Estonian.
 - No whisper.cpp upgrade. (The Apple silicon binary *is* rebuilt from the same version: R11, added 2026-10-12.)
 - No Windows on ARM native build. On ARM, Windows runs the x64 build under emulation (not tested). No Linux binary.
