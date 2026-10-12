@@ -8,7 +8,7 @@
  * The whisper fixtures below are the real shapes recorded in audit A2.
  */
 import assert from 'node:assert/strict';
-import { parseWhisperJson, parseProgressLine, tokensToWords } from './engines/whisperLocalEngine';
+import { parseWhisperJson, parseProgressLine, tokensToWords, transcribeProblemMessage, transcribeArgs } from './engines/whisperLocalEngine';
 import { scribeWordsToTranscriptWords, extractApiMessage, mapHttpError } from './engines/elevenLabsEngine';
 
 async function run(): Promise<void> {
@@ -127,6 +127,24 @@ async function run(): Promise<void> {
     assert.ok(!message.includes('{'), `message for ${status} leaked a JSON body`);
     assert.ok(!message.includes(String(status)), `message for ${status} leaked the status code`);
   }
+
+  // Sprint 129 R6: on-device engine problems in words, never codes.
+  for (const readiness of ['missing', 'blocked', 'cpu-unsupported', 'failed'] as const) {
+    for (const platform of ['win32', 'darwin'] as const) {
+      const message = transcribeProblemMessage(readiness, platform, platform === 'win32' ? 'x64' : 'arm64');
+      assert.ok(message.length > 20 && !/\d{3,}|0x|ENOENT|EPERM|SIG|engine|installation/i.test(message), `${readiness}/${platform}: plain words`);
+    }
+  }
+  assert.match(transcribeProblemMessage('blocked', 'win32', 'x64'), /Windows Security or your antivirus/);
+  assert.match(transcribeProblemMessage('missing', 'win32', 'x64'), /Reinstalling Ritemark/);
+  assert.match(transcribeProblemMessage('missing', 'linux', 'x64'), /ElevenLabs/, 'no build here: offer the cloud engine');
+  assert.match(transcribeProblemMessage('cpu-unsupported', 'win32', 'x64'), /newer processor.*ElevenLabs/);
+
+  // Sprint 129: the arguments the CI contract test also runs.
+  assert.deepEqual(
+    transcribeArgs({ modelPath: 'm.bin', audioPath: 'a.wav', outBase: 'out', threads: 8, language: null }),
+    ['-m', 'm.bin', '-f', 'a.wav', '-ojf', '-of', 'out', '-pp', '-t', '8', '-l', 'auto'],
+  );
 
   console.log('engineParsing.test.ts: all tests passed');
 }

@@ -51,9 +51,9 @@ import {
   openInIntegratedBrowser,
   openIntegratedBrowserUrlExternally,
   reloadIntegratedBrowser,
-  setBrowserHistoryStore,
 } from './browser/IntegratedBrowser';
 import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
+import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/browserNavigationRecorder';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
@@ -482,9 +482,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
-  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too — only the
-  // on-device engine is macOS-only, and the registry says so rather than the
-  // whole view disappearing). Jobs live in the subsystem, not the view, so a
+  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the
+  // on-device engine can't run, the registry says so rather than the whole view
+  // disappearing (Sprint 129: it runs on Windows and Intel Macs as well). Jobs live in the subsystem, not the view, so a
   // running transcription survives the panel being closed.
   if (isEnabled('transcription-workbench')) {
     const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');
@@ -821,8 +821,10 @@ export function activate(context: vscode.ExtensionContext) {
   // layer so the text editor never opens in the first place.
 
   // Browser history store + Activity Bar panel (Indigo-Editorial webview).
+  // Sprint 131 (#195): patch 009 reports every navigation of a shown browser tab
+  // to DID_NAVIGATE_COMMAND; the recorder decides what counts as a visit.
   const browserHistoryStore = new BrowserHistoryStore(context.globalState);
-  setBrowserHistoryStore(browserHistoryStore);
+  const browserNavigationRecorder = new BrowserNavigationRecorder(browserHistoryStore);
   const browserPanelProvider = new BrowserPanelProvider(browserHistoryStore, context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -830,9 +832,12 @@ export function activate(context: vscode.ExtensionContext) {
       browserPanelProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     ),
+    vscode.commands.registerCommand(DID_NAVIGATE_COMMAND, (event: unknown) =>
+      browserNavigationRecorder.handle(event)
+    ),
     browserPanelProvider,
-    browserHistoryStore,
-    { dispose: () => setBrowserHistoryStore(undefined) }
+    browserNavigationRecorder,
+    browserHistoryStore
   );
 
   context.subscriptions.push(

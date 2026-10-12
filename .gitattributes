@@ -19,3 +19,9 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.sh text eol=lf
+
+# Sprint 129: native payloads (whisper engine). Never rewrite line endings or
+# diff them as text, whatever core.autocrlf says.
+extensions/ritemark/binaries/darwin-arm64/** binary
+extensions/ritemark/binaries/darwin-x64/** binary
+extensions/ritemark/binaries/win32-x64/** binary

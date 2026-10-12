@@ -23,6 +23,8 @@ import type {
   TranscriptionEngine,
 } from '../TranscriptionEngine';
 import { TranscriptionError } from '../types';
+import { AVAILABLE_MODELS, describeWhisperFailure, probeWhisper, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
+import type { WhisperReadiness } from '../../voiceDictation/whisperCpp';
 import type { SpeakerSeparation, TranscriptSegment, TranscriptWord, TranscriptionResult } from '../types';
 
 /** whisper.cpp decodes these itself — verified in A1. */
@@ -141,6 +143,30 @@ export function parseProgressLine(line: string): number | null {
   return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : null;
 }
 
+/**
+ * The whisper-cli arguments for one file transcription.
+ *
+ * Sprint 129: exported so the CI contract test (`scripts/qa/whisper-contract-test.mjs`)
+ * runs every bundled binary with exactly what this engine sends.
+ */
+export function transcribeArgs(options: {
+  modelPath: string;
+  audioPath: string;
+  outBase: string;
+  threads?: number;
+  language?: string | null;
+}): string[] {
+  return [
+    '-m', options.modelPath,
+    '-f', options.audioPath,
+    '-ojf',                       // segments + per-token probability + ms offsets
+    '-of', options.outBase,
+    '-pp',                        // progress on stderr, 5% steps
+    '-t', String(options.threads ?? whisperThreads()),
+    '-l', options.language ?? 'auto',
+  ];
+}
+
 export interface WhisperLocalEngineDeps {
   /** Absolute path to the bundled `whisper-cli`. */
   binaryPath: string;
@@ -155,8 +181,8 @@ export class WhisperLocalEngine implements TranscriptionEngine {
   readonly id = 'whisper-local';
   readonly label = 'On-device · Whisper';
   readonly isLocal = true;
-  /** #133: no Windows build of whisper-cli ships yet. */
-  readonly platforms: Platform[] = ['darwin'];
+  /** Sprint 129 (#133): Windows ships whisper-cli too. Linux is not a build target. */
+  readonly platforms: Platform[] = ['darwin', 'win32'];
   readonly capabilities: EngineCapabilities = {
     // D3: whisper.cpp offers only English-only tinydiarize or a stereo split.
     // Neither is real diarization, and we do not guess.
@@ -170,18 +196,14 @@ export class WhisperLocalEngine implements TranscriptionEngine {
   constructor(private readonly deps: WhisperLocalEngineDeps) {}
 
   async isReady(): Promise<EngineReadiness> {
-    if (process.platform !== 'darwin') {
-      return {
-        ready: false,
-        reason: 'On-device transcription is not available on Windows yet.',
-        action: 'none',
-      };
-    }
-    if (!fs.existsSync(this.deps.binaryPath)) {
-      return { ready: false, reason: 'The on-device transcription engine is missing from this build.', action: 'none' };
+    // Sprint 129 R3: the same check dictation runs before offering the model.
+    const engine = await probeWhisper(this.deps.binaryPath);
+    if (engine !== 'ready') {
+      return { ready: false, reason: transcribeProblemMessage(engine), action: 'none' };
     }
     if (!fs.existsSync(this.deps.modelPath)) {
-      return { ready: false, reason: 'Model not downloaded — 1.5 GB, one time.', action: 'download-model' };
+      const size = AVAILABLE_MODELS[path.basename(this.deps.modelPath)]?.sizeDisplay;
+      return { ready: false, reason: size ? `Model not downloaded — ${size}, one time.` : 'Model not downloaded.', action: 'download-model' };
     }
     return { ready: true };
   }
@@ -200,15 +222,13 @@ export class WhisperLocalEngine implements TranscriptionEngine {
     const outBase = path.join(this.deps.workDir, `ritemark-transcript-${Date.now()}`);
     const jsonPath = `${outBase}.json`;
 
-    const args = [
-      '-m', this.deps.modelPath,
-      '-f', options.audioPath,
-      '-ojf',                       // segments + per-token probability + ms offsets
-      '-of', outBase,
-      '-pp',                        // progress on stderr, 5% steps
-      '-t', String(this.deps.threads ?? 4),
-      '-l', options.language ?? 'auto',
-    ];
+    const args = transcribeArgs({
+      modelPath: this.deps.modelPath,
+      audioPath: options.audioPath,
+      outBase,
+      threads: this.deps.threads,
+      language: options.language,
+    });
 
     options.onProgress({ phase: 'transcribing', percent: 0 });
 
@@ -250,9 +270,10 @@ export class WhisperLocalEngine implements TranscriptionEngine {
         }
       });
 
-      child.on('error', (error) => {
+      child.on('error', (error: NodeJS.ErrnoException) => {
         options.signal.removeEventListener('abort', onAbort);
-        reject(new TranscriptionError('engine-unavailable', `Transcription could not start: ${error.message}`));
+        console.error('[Transcribe] whisper-cli could not start:', error);
+        reject(new TranscriptionError('engine-unavailable', transcribeProblemMessage(describeWhisperFailure({ spawnErrorCode: error.code ?? 'UNKNOWN' }))));
       });
 
       child.on('exit', (code, signal) => {
@@ -271,9 +292,10 @@ export class WhisperLocalEngine implements TranscriptionEngine {
           return;
         }
         if (code !== 0) {
-          reject(
-            new TranscriptionError('unknown', `Transcription failed (exit ${code}). ${firstErrorLine(stderrTail)}`, true),
-          );
+          // R6: crashes and refusals get words, the details go to the log.
+          console.error(`[Transcribe] whisper-cli exited ${code}${signal ? ` (${signal})` : ''}. ${firstErrorLine(stderrTail)}`);
+          const failure = describeWhisperFailure({ exitCode: code, signal });
+          reject(new TranscriptionError(failure === 'failed' ? 'unknown' : 'engine-unavailable', transcribeProblemMessage(failure), failure === 'failed'));
           return;
         }
         resolve();
@@ -304,6 +326,33 @@ export class WhisperLocalEngine implements TranscriptionEngine {
     }
 
     return { segments, language, speakerSeparation: 'none' };
+  }
+}
+
+/**
+ * Sprint 129 R6: why on-device transcription cannot run, in plain words, with
+ * the cloud alternative where no local fix exists. Wording reviewed with
+ * ux-expert on 2026-10-12: no "engine" or "installation", and name where to look.
+ */
+export function transcribeProblemMessage(
+  readiness: Exclude<WhisperReadiness, 'ready'>,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string {
+  const elevenLabs = ' You can transcribe with ElevenLabs instead.';
+  switch (readiness) {
+    case 'missing':
+      return WHISPER_TARGETS.includes(`${platform}-${arch}`)
+        ? 'A part of Ritemark that on-device transcription needs is missing. Reinstalling Ritemark will restore it.'
+        : `On-device transcription isn't available on this computer.${elevenLabs}`;
+    case 'blocked':
+      return platform === 'win32'
+        ? 'Windows Security or your antivirus stopped on-device transcription from starting. Allow Ritemark in it, then try again.'
+        : "Your Mac's security settings stopped on-device transcription from starting.";
+    case 'cpu-unsupported':
+      return `On-device transcription needs a newer processor than this computer has.${elevenLabs}`;
+    case 'failed':
+      return 'On-device transcription stopped unexpectedly. Please try again.';
   }
 }
 

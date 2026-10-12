@@ -1,0 +1,51 @@
+name: Windows test overlay
+
+# Builds the zip that scripts/qa/windows-branch-test.ps1 lays over an INSTALLED
+# Windows Ritemark, so a pull request can be tried on a real Windows PC before it
+# merges (build-windows.yml builds only the exact main commit). The zip holds the
+# PR's compiled extension, webview bundles and Windows whisper engine; see
+# scripts/qa/make-windows-test-overlay.sh. Sprint 129 (W8 stage B).
+#
+# Opt-in: runs for pull requests labelled "windows" (and on demand once on main).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-test-overlay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  overlay:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'windows')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.1'
+
+      - name: Install extension and webview dependencies
+        run: |
+          (cd extensions/ritemark && npm ci --legacy-peer-deps --no-audit --progress=false)
+          (cd extensions/ritemark/webview && npm ci --legacy-peer-deps --no-audit --progress=false)
+
+      - name: Build the overlay
+        run: ./scripts/qa/make-windows-test-overlay.sh --out overlay
+
+      - name: Upload overlay
+        uses: actions/upload-artifact@v4
+        with:
+          name: ritemark-windows-test-overlay
+          path: overlay/*.zip
+          if-no-files-found: error

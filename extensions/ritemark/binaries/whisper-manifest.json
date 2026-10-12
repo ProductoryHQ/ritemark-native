@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "about": "Sprint 129: the whisper.cpp speech engine bundled for voice dictation and Transcribe. Built by .github/workflows/build-whisper.yml; checked by scripts/validate-build-output.sh (Check 5b). See README.md.",
+  "whisperCpp": {
+    "repository": "https://github.com/ggml-org/whisper.cpp",
+    "tag": "v1.8.3",
+    "commit": "2eeeba56e9edd762b4b38467bab96c2517163158"
+  },
+  "targets": {
+    "darwin-arm64": {
+      "origin": "https://github.com/ProductoryHQ/ritemark-native/actions/runs/38225663013 (artifact whisper-darwin-arm64)",
+      "cmakeFlags": "-DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_BLAS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_C_FLAGS=-mcpu=apple-m1 -Werror=unguarded-availability-new -DCMAKE_CXX_FLAGS=-mcpu=apple-m1 -Werror=unguarded-availability-new -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON",
+      "files": [
+        {
+          "path": "whisper-cli",
+          "sha256": "12f2699a113d68bbe19484ef5b3e510013b6cbb51166b1b55dcfc225a0e44136",
+          "bytes": 2902872
+        }
+      ],
+      "macosMin": "12.0"
+    },
+    "darwin-x64": {
+      "origin": "https://github.com/ProductoryHQ/ritemark-native/actions/runs/38225663013 (artifact whisper-darwin-x64)",
+      "cmakeFlags": "-DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_BLAS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_C_FLAGS=-Werror=unguarded-availability-new -DCMAKE_CXX_FLAGS=-Werror=unguarded-availability-new -DGGML_METAL=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON",
+      "files": [
+        {
+          "path": "whisper-cli",
+          "sha256": "3749cfd2049cdf3601aa2c26841ee4a656acb30e85c6155b95594a675fac3c6d",
+          "bytes": 2615472
+        }
+      ],
+      "macosMin": "12.0"
+    },
+    "win32-x64": {
+      "origin": "https://github.com/ProductoryHQ/ritemark-native/actions/runs/38225663013 (artifact whisper-win32-x64-V)",
+      "cmakeFlags": "-A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DWHISPER_SDL2=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DBUILD_SHARED_LIBS=ON -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
+      "files": [
+        {
+          "path": "ggml-base.dll",
+          "sha256": "b666abf2589c514dccdb29f2fff768dd3f1937409830c66abfe9b8a073d2a4c6",
+          "bytes": 551936
+        },
+        {
+          "path": "ggml-cpu-alderlake.dll",
+          "sha256": "f7056dcbe3af2e7a4f19bf0d217bcb2ff40546ed26d4450e553ad3cc2eabba22",
+          "bytes": 680960
+        },
+        {
+          "path": "ggml-cpu-cannonlake.dll",
+          "sha256": "72bb8c6aaa0450bdc32ca71c7c05c2db553c47a83105961c58d683e315462c99",
+          "bytes": 716800
+        },
+        {
+          "path": "ggml-cpu-cascadelake.dll",
+          "sha256": "a1cb797fb089ede23a580c66f2eca28c03785c860f23f26c3a72f328638bb2b1",
+          "bytes": 715776
+        },
+        {
+          "path": "ggml-cpu-haswell.dll",
+          "sha256": "67666acbbcd81e820eff968788aff10ac373680b06c6aa500b7460afa5ac7169",
+          "bytes": 681472
+        },
+        {
+          "path": "ggml-cpu-icelake.dll",
+          "sha256": "40125009cb8d251474400cb5a53f41ec0ddf7ffe60e2cb0a2a8f64146f59d614",
+          "bytes": 715776
+        },
+        {
+          "path": "ggml-cpu-sandybridge.dll",
+          "sha256": "1b8f3f9dd289b4ed51e78a8d15342ff76d4a0b159e06ccc60a629490e62eb8db",
+          "bytes": 674816
+        },
+        {
+          "path": "ggml-cpu-skylakex.dll",
+          "sha256": "16ce8cb46569023d190a2e517cc0ce967fa077b7da868a2625968e40aa430ebc",
+          "bytes": 716800
+        },
+        {
+          "path": "ggml-cpu-sse42.dll",
+          "sha256": "3001ecd9ad649c8a15d5b16c5d741df6c28fbbd433f5ed1a73b1b29759b4252e",
+          "bytes": 667648
+        },
+        {
+          "path": "ggml-cpu-x64.dll",
+          "sha256": "10be613d46cc46b00b37f35f2005d7f6adbb9ba9b4f8a1f113671d30598c2f48",
+          "bytes": 671744
+        },
+        {
+          "path": "ggml.dll",
+          "sha256": "b0d732734d459c04d0059d626083959c8887249ed86bd446ba3fe95dd80a272c",
+          "bytes": 68096
+        },
+        {
+          "path": "MSVCP140.dll",
+          "sha256": "7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca",
+          "bytes": 643512
+        },
+        {
+          "path": "VCRUNTIME140.dll",
+          "sha256": "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7",
+          "bytes": 178616
+        },
+        {
+          "path": "VCRUNTIME140_1.dll",
+          "sha256": "a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e",
+          "bytes": 50112
+        },
+        {
+          "path": "whisper-cli.exe",
+          "sha256": "ad0f594c5d30285c5e448a1f6f3d3c4b6e4f6dd636a99115c9bd23811164d286",
+          "bytes": 471552
+        },
+        {
+          "path": "whisper.dll",
+          "sha256": "ba3472c9ce8ae905c9d1dd7a6646c2900171b969d110402ac7383d8aa0e472de",
+          "bytes": 1364480
+        }
+      ],
+      "config": "V: CPU variants chosen at run time; Microsoft VC++ runtime DLLs beside the exe (app-local); UTF-8 code-page manifest"
+    }
+  }
+}

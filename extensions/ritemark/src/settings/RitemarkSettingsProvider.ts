@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import { isEnabled } from '../features/featureGate';
 import { CodexAppServer, CodexAuth, emitCodexStatusInvalidated, onCodexStatusInvalidated } from '../codex';
 import { UpdateService } from '../update';
-import { AVAILABLE_MODELS, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
+import { AVAILABLE_MODELS, defaultModelFile as voiceModelFile, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
 import { SessionStore } from '../speech/SessionStore';
 import { sessionStoreDir } from '../speech/paths';
 import {
@@ -588,8 +588,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       : {
           voiceModel: {
             installed: false,
-            modelName: 'large-v3-turbo',
-            filename: 'ggml-large-v3-turbo.bin',
+            modelName: AVAILABLE_MODELS[voiceModelFile()]?.name ?? 'large-v3-turbo',
+            filename: voiceModelFile(),
             managedBy: 'ritemark' as const,
             sizeBytes: 0,
             sizeDisplay: 'Unknown',
@@ -722,7 +722,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       runtimeStatus: RuntimeStatusModel;
     };
   }> {
-    const defaultModelFile = 'ggml-large-v3-turbo.bin';
+    // Sprint 129 R13: the 8-bit model on Windows (and Intel Macs).
+    const defaultModelFile = voiceModelFile();
     const modelInfo = AVAILABLE_MODELS[defaultModelFile];
     const modelPath = getModelPath(defaultModelFile);
     const voiceInstalled = isModelDownloaded(defaultModelFile);

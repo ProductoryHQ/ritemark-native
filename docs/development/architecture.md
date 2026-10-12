@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-05 (Sprint 128: Claude background work — live hooks, turns the runtime opens itself, per-task stop, `backgroundWork` capability)
+**Last updated:** 2026-10-12 (Sprint 131: Browser Recent — the browser bridge's first workbench→extension push)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -149,7 +149,7 @@ extensions/ritemark/src/
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
-├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
+├── voiceDictation/  On-device dictation (Whisper): engine resolver + readiness, model download, controller (macOS and Windows)
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
@@ -337,6 +337,26 @@ Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermai
 `ui/button.tsx` forwards its ref (so a Button can be a Radix trigger), and `index.css` has one zero-specificity rule giving every clickable element the pointer cursor.
 
 ---
+
+### Browser Recent (Sprint 131, #195)
+
+The Browser container's **Recent** list (`browser/BrowserPanelProvider.ts`, store `browser/BrowserHistoryStore.ts` in `globalState`, MRU 25) is fed by the browser bridge's only **push from the workbench into the extension**. Every other bridge command, in patches 009 and 010, is a pull: the extension calls a `workbench.action.browser.*` command.
+
+```
+patch 009  RitemarkBrowserHistoryContribution (a BrowserEditorContribution, one per editor pane)
+  onDidNavigate / onDidChangeTitle of the shown tab, plus once when a tab is first shown
+  → ICommandService.executeCommand('ritemark.browser.didNavigate', { kind, pageId, url, title, failed, ephemeral })
+extension  browser/browserNavigationRecorder.ts (no vscode import; every rule unit-tested)
+  validate → drop private sessions, failed loads, non-http/https/file, > 8,192 chars
+  → same document in that tab (reload, tab switch, #anchor) = title update only
+  → otherwise wait 1 s (a redirect hop or a page left at once is dropped) → store.record(url, title)
+  → titles taken for 10 s after the navigation; Chromium's fallback titles ignored
+```
+
+- **Rules live in the extension, the patch is a pipe.** The patch sends only what the workbench alone knows (`failed` from `model.error`, `ephemeral` from `model.storageScope`). Filtering can change in an extension release.
+- **Version skew.** A missing listener is a caught `executeCommand` rejection, logged at trace level. The extension never runs without the bridge: extension updates require their own app version (`minimumAppVersion`), and the extension preflight refuses any diff that touches `patches/`.
+- **One entry per page.** `historyKey` = normalized address without its `#fragment`; entries saved by earlier versions merge on the next visit. `openInIntegratedBrowser()` no longer writes to the store; the page is recorded when it loads, at the address it ends on.
+- **Pages loading in hidden tabs** are recorded when the tab is first shown, not while hidden. Deleted `file:` entries are pruned when Recent is shown (only `FileNotFound` removes one).
 
 ## Agent Runtime Architecture
 
@@ -847,7 +867,7 @@ src/speech/
 ├── TranscriptionEngine.ts   the interface (capabilities, readiness, cost, transcribe)
 ├── engineRegistry.ts        registration + platform filtering + local-first preference
 ├── engines/
-│   ├── whisperLocalEngine.ts   bundled whisper.cpp, macOS only (#133)
+│   ├── whisperLocalEngine.ts   bundled whisper.cpp (darwin-arm64, darwin-x64, win32-x64)
 │   └── elevenLabsEngine.ts     Scribe v2, diarized, one request per file
 ├── JobManager.ts            single-flight queue, progress, cancel, restart recovery
 ├── SessionStore.ts          file-backed sessions in globalStorage (D5)
@@ -872,9 +892,11 @@ src/speech/
    English-only turn markers (`-tdrz`) or a stereo split. Real diarization means
    ElevenLabs. So "private" and "knows who spoke" are mutually exclusive, and the
    UI states the trade at the point of choice rather than hiding it.
-2. **On-device Whisper is macOS-only** (`binaries/darwin-arm64/`, #133). Transcribe
-   still ships on Windows with ElevenLabs; the registry reports the gap so the UI
-   can explain it rather than the feature silently shrinking.
+2. **On-device Whisper runs where Ritemark ships an engine:** darwin-arm64,
+   darwin-x64 and win32-x64 since Sprint 129 (#133, #203). The registry still
+   reports a computer without one (or one whose engine cannot start, see below),
+   so the UI can explain it rather than the feature silently shrinking. m4a/aac
+   need `afconvert`, so on Windows those files say to use ElevenLabs.
 
 **Insights output contract (Sprint 113).** The sandboxed workbench sends a
 validated discriminated choice: Auto, a known catalog code, or an explicitly
@@ -1003,10 +1025,47 @@ Radix tooltip. Its trigger is a wrapping span because `Button` does not forward
 refs (React 18) and a disabled button gets no pointer events; every Transcribe
 panel button uses it instead of a native `title`.
 
-**Open debt:** live dictation (`voiceDictation/`) still has its own whisper
-integration with a 30 s timeout and `--no-timestamps`, deliberately untouched by
-Sprint 108. A later sprint can collapse both callers onto `speech/engines/whisperLocalEngine`
-so there is one Whisper integration rather than two.
+**Open debt (partly paid, Sprint 129):** dictation and Transcribe share one engine
+resolver (`getWhisperBinaryPath`), one readiness check (`probeWhisper`), one model
+table and path (`AVAILABLE_MODELS`, `getModelPath`) and one failure mapping, all in
+`voiceDictation/whisperCpp.ts`. The two call paths remain: dictation runs
+`--no-timestamps` calls of up to 28 s (`transcribeWav`), and Transcribe runs whole
+files with JSON output (`whisperLocalEngine`).
+
+### On-device Whisper engine (Sprint 129)
+
+- **Provenance.** `.github/workflows/build-whisper.yml` builds whisper.cpp v1.8.3
+  (pinned commit) per target and runs `scripts/qa/whisper-contract-test.mjs` with the
+  app's own argument builders. The output is committed to
+  `extensions/ritemark/binaries/<target>/` (shell-tier) and recorded with SHA-256 in
+  `binaries/whisper-manifest.json`. `validate-build-output.sh` Check 5b fails a release
+  build when an engine is missing, changed (until signing), the wrong architecture, or
+  from another platform.
+  - win32-x64 is config V: CPU variants chosen at run time (`GGML_BACKEND_DL`), an
+    app-local VC++ runtime, and a UTF-8 code-page manifest.
+  - macOS builds are one static binary for macOS 12+, with Metal on arm64.
+  - Config VK (Vulkan) builds only on request and does not ship.
+- **Readiness before download.** `probeWhisper` runs `whisper-cli --help` once.
+  - Ready is cached; a failure is remembered for 60 s.
+  - The result maps to `missing`, `blocked` (EACCES/EPERM, e.g. Smart App Control),
+    `cpu-unsupported` (SIGILL / 0xC000001D) or `failed`.
+  - Dictation checks it before offering the model, and the webview's problem dialog
+    explains each case per platform (`webview/src/components/dictationProblems.ts`).
+- **Two dictation modes** (`dictationModeFor`).
+  - `live` on Apple silicon: text is inserted while the user speaks.
+  - `deferred` ("speak, then text") on win32-x64 and darwin-x64, where one CPU call
+    takes ~20 s whatever its length (Whisper pads every call to a 30 s window).
+  - `DictationController` joins audio that waits while a call runs, up to 28 s per
+    call (R8). In deferred mode it transcribes full 28 s pieces in the background
+    and posts all text once after Stop.
+  - Stop always gets `finishing` (when work remains) and then `idle`. Deferred
+    `finishing` carries a wait estimate from the last call's duration (globalState).
+- **Model per platform** (`defaultModelFile`): `ggml-large-v3-turbo.bin` on Apple
+  silicon, `…-q8_0.bin` on win32-x64/darwin-x64. q8_0 has the same Estonian accuracy
+  and half the download. The pinned Hugging Face revision is checked by exact size
+  and SHA-256.
+- **The dictation note is a decoration** (`webview/src/extensions/DictationPlaceholder.ts`),
+  not document text, so autosave (1 s) never writes it into the file.
 
 ---
 
@@ -1212,6 +1271,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-12 | Sprint 131 | **Browser Recent records in-panel browsing (v1.14.0, #195).** Patch 009 gains `RitemarkBrowserHistoryContribution`, the browser bridge's first workbench→extension push (`ritemark.browser.didNavigate`), with no new hunk in upstream VS Code files. New `browser/browserNavigationRecorder.ts` owns every rule (validation, private sessions, failed loads, schemes, 1 s settle for client redirects, 10 s title window, fallback titles). `BrowserHistoryStore` gains titles, `historyKey` dedupe (case, slash, default port, fragment), `setTitle` and `pruneMissingFiles`. `openInIntegratedBrowser()` stops writing to the store. See *Browser Recent* under the subsystem map. |
 | 2026-10-05 | Sprint 128 | **Claude background work (v1.13.0, #393).** New conversation-scoped `AgentLiveHooks` on `RuntimeSessionConfig.live` (Claude only) and optional `RuntimeSession.stopBackgroundTask` / `backgroundTaskCount`; new pure `agent/backgroundTasks.ts`; `AgentSession` declares `perTaskStopAffordance`, tags prompts `origin: human`, tracks the turn Claude opens itself after background work and matches results by origin; the inactivity timer no longer runs with no turn open; Ask-mode approvals outside a human turn reach the gate instead of failing open. `ConversationController.beginRuntimeInitiatedTurn` + optional `UserMessageEventV1.origin`; context packs skip it. Webview: `agent-task-progress`, `agent-background-tasks`, `agent-turn-started`, `agent-stop-task`; cards keyed by tool_use id and updated across turns; `done-background` / `stopped-background` states; switch confirmation. Capability `backgroundWork`. No patch, flag or shell-tier change. |
 | 2026-09-28 | v1.12.0 RC3 | **Probes off the extension host's thread; a browser-context capability (#366, #367, #358).** New `utils/runProcess.ts`, the async stand-in for `spawnSync`, runs the Claude (`agent/setup.ts`) and Codex (`codex/codexManager.ts`) setup probes and the Welcome page's Node and Git checks; a timed-out or runaway child is stopped (SIGTERM, then SIGKILL; on Windows the whole tree) before the caller gets its answer, and output is capped at 1 MiB. `runtime/capabilities.ts` gains `browserContext`: the composer chip, the AI information dialog and the per-turn page context follow it instead of runtime ids, and per-turn page context no longer needs the macOS-only `browser-agent-control` flag (that flag still gates the browser tools). |
 | 2026-09-26 | Bugfix | **OpenCode is told about its browser tools.** OpenCode has received the six browser tools (the `ritemark_browser` stdio MCP adapter, on `session/new` and `session/resume`) since Sprint 79, but Sprint 101 gave `ACP_DESCRIPTOR` `hasBrowserTools: false` and the sidebar passed it without the `browser-agent-control` override Claude and Codex get, so its capability context never mentioned them. New pure `capabilityDescriptorFor(runtime, browserToolsAvailable)` in `capabilityContext.ts` is now the one descriptor choice for all three runtimes. Tests cover every runtime with the flag on and off, and the text `AcpSession.prompt()` actually sends OpenCode on its first and second turns. No flag, patch, protocol or shell-tier change. |

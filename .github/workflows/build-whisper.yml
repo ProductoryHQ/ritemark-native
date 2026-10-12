@@ -1,0 +1,339 @@
+name: Build whisper.cpp
+
+# Sprint 129 (#133, #203): builds the on-device speech engine Ritemark ships in
+# extensions/ritemark/binaries/<target>/ (voice dictation + Transcribe on-device)
+# from the whisper.cpp commit pinned in scripts/build-whisper.sh and
+# scripts/build-whisper-windows.ps1, and runs the contract test the app relies on
+# (scripts/qa/whisper-contract-test.mjs) on each result. Release builds never
+# compile whisper: they stage, sign and verify the committed output.
+#
+# Free standard runners only, so no repo visibility toggle. No secrets.
+# pull_request as well as workflow_dispatch: workflow_dispatch works only once
+# this file is on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      vulkan:
+        description: 'Also build config VK (Vulkan GPU backend; harness only, not shipped)'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/build-whisper.yml'
+      - 'scripts/build-whisper*'
+      - 'scripts/qa/whisper-contract-test.mjs'
+      - 'scripts/qa/fleurs-clip-pack.mjs'
+      - 'extensions/ritemark/src/voiceDictation/whisperCpp.ts'
+      - 'extensions/ritemark/src/speech/engines/whisperLocalEngine.ts'
+      - 'extensions/ritemark/binaries/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-whisper-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # whisper.cpp v1.8.3. The build scripts refuse any other commit.
+  WHISPER_CPP_COMMIT: 2eeeba56e9edd762b4b38467bab96c2517163158
+  NODE_VERSION: '22.22.1'
+  TSX: tsx@4.21.0
+  # Test model for the contract test (ggml-tiny.bin, checksum pinned in the script).
+  MODEL_CACHE_KEY: whisper-contract-model-ggml-tiny-be07e048
+
+jobs:
+  win32-x64:
+    name: win32-x64 (config ${{ matrix.config }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # VK = V + the Vulkan GPU backend. Built for measuring (2026-10-12); Jarmo took
+        # GPU out of v1.14.0, so it stays a harness option, built only on request.
+        config: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.vulkan && '["V","S","VK"]' || '["V","S"]') }}
+    env:
+      VULKAN_VERSION: 1.4.357.0
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install the Vulkan SDK (LunarG, config VK only)
+        if: matrix.config == 'VK'
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK install failed ($LASTEXITCODE)" }
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+
+      - name: Build
+        id: build
+        shell: pwsh
+        run: ./r/scripts/build-whisper-windows.ps1 -Config ${{ matrix.config }} -Source whisper.cpp -Out out/win32-x64 -Info out/info
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        shell: pwsh
+        run: |
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs `
+            --binary out/win32-x64/whisper-cli.exe `
+            --sample whisper.cpp/samples/jfk.wav `
+            --model-cache model-cache `
+            --arch x64 `
+            --dumpbin '${{ steps.build.outputs.dumpbin }}' `
+            --driver-dll vulkan-1.dll `
+            --report out/info/contract-report.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload payload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-win32-x64-${{ matrix.config }}
+          path: out/
+          if-no-files-found: warn
+
+  darwin:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-x64
+            runner: macos-15-intel
+            arch: x64
+          - target: darwin-arm64
+            runner: macos-15
+            arch: arm64
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build
+        run: ./r/scripts/build-whisper.sh --target ${{ matrix.target }} --source whisper.cpp --out out/${{ matrix.target }} --info out/info
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        run: |
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary out/${{ matrix.target }}/whisper-cli \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch ${{ matrix.arch }} \
+            --min-macos 12.0 \
+            --report out/info/contract-report.json
+
+      - name: Upload payload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-${{ matrix.target }}
+          path: out/
+          if-no-files-found: warn
+
+  # The engines committed under extensions/ritemark/binaries/ — what the app
+  # actually ships — on each platform. darwin-arm64 runs on macOS 14 (R11:
+  # it must start on macOS 12+; GitHub has no 12 or 13 runner).
+  committed:
+    name: committed ${{ matrix.target }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win32-x64
+            runner: windows-latest
+            arch: x64
+            binary: whisper-cli.exe
+          - target: darwin-x64
+            runner: macos-15-intel
+            arch: x64
+            binary: whisper-cli
+          - target: darwin-arm64
+            runner: macos-14
+            arch: arm64
+            binary: whisper-cli
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp sample
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+          sparse-checkout: samples
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Find dumpbin
+        id: tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $d = Get-ChildItem -LiteralPath (Join-Path $vs 'VC\Tools\MSVC') -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -match '\\bin\\Hostx64\\x64\\dumpbin\.exe$' } | Sort-Object FullName | Select-Object -Last 1
+          if (-not $d) { throw 'dumpbin.exe was not found.' }
+          "dumpbin=$($d.FullName)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Contract test (committed binary)
+        shell: bash
+        run: |
+          extra=()
+          if [[ "${{ runner.os }}" == "Windows" ]]; then extra=(--dumpbin "${{ steps.tools.outputs.dumpbin }}"); else extra=(--min-macos 12.0); fi
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary "r/extensions/ritemark/binaries/${{ matrix.target }}/${{ matrix.binary }}" \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch ${{ matrix.arch }} \
+            "${extra[@]}"
+
+  # Sprint 129 W11: Estonian test clips with reference text for the speed and
+  # accuracy bench (scripts/qa/windows-whisper-bench.ps1 -Round 2), so the
+  # Windows PC downloads a few MB instead of FLEURS' 507 MB audio archive.
+  bench-audio:
+    name: Estonian clip pack (FLEURS)
+    runs-on: ubuntu-latest
+    env:
+      FLEURS: https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/et_ee
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache FLEURS Estonian test split
+        uses: actions/cache@v4
+        with:
+          path: fleurs
+          key: fleurs-et-test-70bb2e84
+
+      - name: Fetch FLEURS Estonian test split (CC BY 4.0)
+        run: |
+          mkdir -p fleurs
+          [ -f fleurs/test.tsv ] || curl -sfL --retry 5 -o fleurs/test.tsv "$FLEURS/test.tsv"
+          echo "2d37ae07a737c74cee0a2e173612fbc91114877aee298d36a4d9197d3a93c672  fleurs/test.tsv" | sha256sum -c -
+          if [ ! -d fleurs/test ]; then
+            curl -sfL --retry 5 -o fleurs.tar.gz "$FLEURS/audio/test.tar.gz"
+            echo "cdece29c50357790dc87f034242d54066fcacbc694cd057e75a29f2f56c14cbf  fleurs.tar.gz" | sha256sum -c -
+            tar -xzf fleurs.tar.gz -C fleurs
+            rm fleurs.tar.gz
+          fi
+
+      - name: Build the clip pack
+        run: node r/scripts/qa/fleurs-clip-pack.mjs --tsv fleurs/test.tsv --audio-dir fleurs/test --out bench-audio-et --count 20 --stride 5
+
+      - name: Upload clip pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-bench-audio-et
+          path: bench-audio-et/
+          if-no-files-found: error
+
+  # The Apple silicon build asks for macOS 12.0; this runs it on an older macOS
+  # than the one it was built on. (GitHub has no macOS 12 or 13 runner left.)
+  darwin-arm64-on-macos-14:
+    name: darwin-arm64 on macOS 14
+    needs: darwin
+    runs-on: macos-14
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp sample
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+          sparse-checkout: samples
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download the darwin-arm64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: whisper-darwin-arm64
+          path: out
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Contract test
+        run: |
+          chmod +x out/darwin-arm64/whisper-cli   # artifacts drop the executable bit
+          sw_vers
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary out/darwin-arm64/whisper-cli \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch arm64 \
+            --min-macos 12.0

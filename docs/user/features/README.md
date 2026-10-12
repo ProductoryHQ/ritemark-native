@@ -26,6 +26,7 @@ Write and edit markdown with a visual editor.
 | [Text Formatting](formatting.md) | Bold, italic, links, and inline styles |
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
 | [Comments](comments.md) | Margin notes on any passage, and handing one to an agent |
+| [Voice Dictation](dictation.md) | Speak into your document; speech is turned into text on your computer |
 | [AI Agents](ai-agents.md) | Built-in Claude, Codex, and OpenCode agents in the sidebar |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 

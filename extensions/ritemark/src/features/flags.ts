@@ -164,17 +164,20 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
+  // Sprint 129 (#133): Windows ships the whisper engine too. Linux is not a
+  // build target. Kill switches: drop 'win32' here for Windows only, or set
+  // status 'disabled' everywhere; no code is removed either way.
   'voice-dictation': {
     id: 'voice-dictation',
     label: 'Voice Dictation',
-    description: 'Speech-to-text using Whisper (macOS only)',
+    description: 'Speech-to-text on this computer with Whisper',
     status: 'stable',
-    platforms: ['darwin'],
+    platforms: ['darwin', 'win32'],
   },
-  // Sprint 108: the Transcribe app + Transcript Workbench. Ships on Windows
-  // too, unlike voice-dictation — the on-device engine is macOS-only (#133) but
-  // ElevenLabs works everywhere, and the engine registry reports the difference
-  // rather than hiding the feature (D4/R13).
+  // Sprint 108: the Transcribe app + Transcript Workbench. ElevenLabs works
+  // everywhere; the on-device engine runs on macOS and Windows (Sprint 129), and
+  // the engine registry reports a computer it cannot run on rather than hiding
+  // the feature (D4/R13).
   'transcription-workbench': {
     id: 'transcription-workbench',
     label: 'Transcription Workbench',
@@ -183,7 +186,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     // All three: the `customEditors` contribution claims audio extensions
     // unconditionally, so gating the provider off on Linux would leave the
     // manifest promising an editor that does not exist. ElevenLabs is plain
-    // HTTP and works there anyway; only the on-device engine is macOS-only.
+    // HTTP and works there anyway; the on-device engine has no Linux build.
     platforms: ['darwin', 'win32', 'linux'],
   },
   'markdown-export': {
