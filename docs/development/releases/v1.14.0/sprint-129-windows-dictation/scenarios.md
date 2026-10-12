@@ -138,7 +138,7 @@ Then that sentence is inserted before the button returns to idle
 
 ### Scenario: Computer far too slow (U)
 Given the waiting audio passes 60 s
-Then dictation stops listening, inserts everything captured, and says "Dictation can't keep up on this computer. Everything you said so far has been added."
+Then dictation stops listening, inserts everything captured, and says "Dictation can't keep up on this computer, so it stopped listening. The rest of what you said will appear in a moment." (live dictation only; R12 has no such stop)
 
 ## Feature: Speed (R9)
 
@@ -146,10 +146,13 @@ Then dictation stops listening, inserts everything captured, and says "Dictation
 When Jarmo runs `windows-whisper-bench.ps1`
 Then the table shows load/encode/decode/total per configuration, and the chosen settings follow the rule
 
-### Scenario: Dictation keeps up (B)
-Given the chosen settings
-When I dictate for two minutes at a normal pace
-Then text appears within about one chunk length after I pause (measured in A2 terms: the median call stays under the chunk length)
+### ~~Scenario: Dictation keeps up (B)~~
+Superseded on 2026-10-12 by R12 ("speak, then text" on Windows; see that feature). On a CPU-only laptop no setting kept live text both prompt and accurate (research/windows-performance-audit.md).
+
+### Scenario: Recording does not glitch on a busy CPU (B)
+Given "speak, then text" on Jarmo's Windows PC, where whisper uses every logical CPU in the background while recording
+When I dictate for two minutes in Estonian
+Then the text after Stop has no gaps or garbled stretches that a quiet recording wouldn't have
 
 ## Feature: Apple silicon engine on macOS 12+ (R11, added 2026-10-12)
 
