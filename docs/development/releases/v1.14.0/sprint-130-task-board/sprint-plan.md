@@ -54,6 +54,9 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - **2026-10-11, D6 — Ideas:** reviewed only when the user presses Review; Drop hides an idea, Delete deletes it.
 - **2026-10-11, D7 — Position:** the Tasks button right after Home. **Revised 2026-10-12:** first of Ritemark's own tools, just above Transcribe. The real app lists VS Code's built-in entries between Home and every extension container, so right after Home would need a VS Code patch (shell-tier).
 - **2026-10-11, D8 — Words:** Home's "New AI task" becomes "New AI conversation", so "task" means a board card.
+- **2026-10-12, D10 — Agent choice everywhere:** every action that starts agent work has a dropdown with Claude Code, Codex and OpenCode (Jarmo, on the prototype).
+- **2026-10-12, D11 — Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority (Next up); **Done when**, **Check these** and the **conflict guard** (with Wait for it) are in this sprint (Jarmo: "võta need kolm sprinti 130").
+- **2026-10-12, D12 — Autopilot later:** agents taking the next card by themselves within a user-set limit is its own later sprint (Jarmo: "autopilot hiljem").
 - **2026-10-11, D9 — Review step:** a finished card waits in Doing as "Ready to review" until the user presses Mark done; no Review column.
 
 ## Success criteria
@@ -63,7 +66,8 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - [ ] Cards can be added, edited, moved (drag, Move to…, Stage), ticked off, reopened, opened as a document and deleted to the trash (R3).
 - [ ] Each card is one Markdown file in `.ritemark/tasks/`; outside edits show within a second; a broken file is never overwritten (R4).
 - [ ] Give to agent works with Claude Code, Codex and OpenCode: a new conversation per card, focus unchanged, honest live state, the result with changed files back on the card, review and follow-ups in the same conversation (R5, R6).
-- [ ] Your calls lists every card that waits on the user, in the designed order, each answered with a button (R7).
+- [ ] Your calls lists every card that waits on the user, in the designed order, each answered with a button, with wait times and blocked agents visible on both surfaces (R1, R7).
+- [ ] Cards have Done when; agent reports carry Check these; two agents never start on the same file without the user's say, and Wait for it starts the second one by itself (R3, R5, R6).
 - [ ] All three runtimes get the same seven board tools from one definition; browser tools are unchanged for the model (R8).
 - [ ] Ideas: one-line capture, review on request, Make it a task, Drop and Bring back (R9); Log by day (R10).
 - [ ] Comment tasks behave as before, plus the shared fixes (R12); Home says "New AI conversation" (R14).

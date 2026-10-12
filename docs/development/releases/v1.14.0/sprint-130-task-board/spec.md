@@ -11,6 +11,7 @@ A writer, trainer or consultant keeps the work of one project in one place: what
 - **One handoff path.** A card reaches an agent the same way a comment does (Sprint 117): host-owned task record, shared availability check, the AI sidebar's queue, results by turn identity. No second agent pipeline.
 - **One tool definition per tool.** Board tools reach all three runtimes from one definition, as browser tools will after this sprint.
 - **The user picks the agent, everywhere** (Jarmo, 2026-10-12). Every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode.
+- **The user's attention is the scarce resource** (Jarmo, 2026-10-12). Agents can do many things at once; what limits a project is how fast its owner decides and reviews. The board shows what waits on the user before anything else, makes each call cheap, and keeps agents from producing more than the user can review or from working against each other.
 - **Glanceable first.** The side bar answers "what waits on me, what is running" at 280 px; planning happens in the editor-area board.
 - **Nothing silent.** Every state has words and a glyph; no colour-only signals; no success before the agent's queue accepted the task.
 
@@ -24,6 +25,7 @@ Acceptance criteria:
 - The activity bar shows **Tasks** with the Phosphor `kanban` icon as the first of Ritemark's own tools, just above Transcribe (D7), in a fresh profile.
 - Its side-bar view has an "Add a task…" field with an **Open board** icon button beside it, then Your calls (when any), Doing, To do, Ideas (collapsed) and Done (collapsed, latest 5), as in [design.md §3](./design.md#3-the-side-bar-daily-surface). A card shows once, under the first section that applies.
 - The activity-bar icon carries a badge with the number of Your calls ("3 tasks need you"); no badge when there are none.
+- **Your calls stands out**: in the side bar it is a panel of its own on the surface colour, its header says how long the oldest call has waited ("oldest 2h"), and when an agent is blocked mid-turn a line says so ("1 agent can’t continue until you answer"). Every call shows how long it has waited.
 - The command **Tasks: Add a Task…** asks for one line in VS Code's input box and returns focus to where it was.
 - With no folder open the view says so and offers **Open folder**; nothing is written anywhere.
 - With the `task-board` flag off the view shows a one-line notice and nothing else.
@@ -43,10 +45,12 @@ Acceptance criteria:
 As a user, I want to add, edit, move and remove cards, so the board says what is true.
 
 Acceptance criteria:
-- A card has a title (one line), a description (Markdown), the files it names, a stage, a short history and, when an agent worked on it, a result.
+- A card has a title (one line), **Done when** (one line: what done looks like), a description (Markdown), the files it names, a stage, a short history and, when an agent worked on it, a result.
+- A card without Done when can still be given to an agent; its detail says "Add what done looks like below. Agents finish better with it."
 - **Stages are fixed:** Idea, To do, Doing, Done (D2).
 - Adding takes one line (Enter to add): the side bar's field and the command add to To do; `+` on the board's Idea and To do columns adds there. **A new card goes to the top of its stage.**
 - A card is moved by drag and drop on the board, by **Move to…** in its More actions menu (side bar and board, the keyboard path) and by the Stage field in its detail.
+- **The order of To do is the priority.** The top card that can start reads "Next up" on both surfaces.
 - The leading circle of a To do row marks it done in one click. **Reopen** on a Done card moves it back to To do.
 - While an agent is working on a card or waiting for the user in its conversation, the card cannot leave Doing or be marked done; the disabled action says why.
 - Clicking a card opens its detail as designed in [design.md §5](./design.md#5-card-detail): a dialog on the board, the same content filling the side bar; every field is editable there.
@@ -76,13 +80,14 @@ Acceptance criteria:
 - Every card that is not Done has **Give to {agent}**: a split button whose menu offers Claude Code, Codex and OpenCode with their availability ("Sign in required", "Not set up"). The default is the agent last used on this board, otherwise the agent of the conversation open in the AI sidebar.
 - The availability check is the same as the AI sidebar's and comment tasks' (`deriveRuntimeAvailabilities`); an unavailable agent shows its recovery action (Sign in, Settings) and starts nothing.
 - **The first handoff of a card starts a new conversation** in the AI sidebar for the chosen agent, titled with the card's title (D3). Later handoffs of that card (Give to agent again, Ask for changes, answering its question) continue that conversation.
-- The conversation's first message reads as the user's own request: the card's title, description and the paths of its files. No machine instructions appear in it; how to report back is in the agent's standing Ritemark context (R8), and the prompt sent to the runtime adds only one line naming the card.
+- The conversation's first message reads as the user's own request: the card's title, Done when, description and the paths of its files. No machine instructions appear in it; how to report back is in the agent's standing Ritemark context (R8), and the prompt sent to the runtime adds only one line naming the card.
 - The card moves to Doing. Its state reads Sending to {agent}… → Queued for {agent} → Working · {agent} on both surfaces; Queued appears only after the sidebar accepted the task.
 - **Focus stays where it was.** The AI sidebar keeps the conversation the user had open; the card's conversation appears in its rail as Working. If the AI sidebar is hidden it is shown without taking focus, because the agent runs there.
 - **Open conversation** on the card opens and focuses that conversation in the AI sidebar.
 - **Stop** on a working card stops that turn; the card says "Stopped" and offers **Give to {agent}** again.
 - If Ritemark quits while a card is working, the card says "Interrupted when Ritemark closed" on the next start and offers **Retry**.
 - If the card's conversation was deleted, the card says "Conversation no longer available" and **Retry** starts a new one.
+- **Conflict guard.** When another card that names the same file is with an agent (sending, queued, working or waiting for the user), Give to does not start. The card says which task works on which file and offers **Wait for it**, **Start now** and Cancel. **Wait for it** shows "Starts after “…”" on the card and starts it with the chosen agent by itself when that other task's turn ends; **Start now** starts at once.
 
 ### R6: The result comes back to the card
 
@@ -90,6 +95,7 @@ As a user, I want to see what the agent did on the card itself, so I can review 
 
 Acceptance criteria:
 - When the turn ends, the card shows the result: the agent's own report if it called `report_result` in that turn, otherwise a summary of its last message (at most 280 characters, Sprint 117's bound and fallback), plus the project files the turn changed and how long it took.
+- **Check these.** The agent's report can name up to three things the user should check (an assumption it made, a gap it left). They show under the result as "Check these", their count shows on the call ("2 to check"), and they are written into the card file.
 - The result is written into the card file (it travels with the folder) with a history line "Finished: …".
 - A finished card stays in Doing as **Ready to review**: **Mark done** moves it to Done; **Ask for changes…** opens a note box on the card and **Send to {agent} ▾** sends the user's words to the card's conversation, with the agent the user picks.
 - **Retry with {agent} ▾** on a failed or interrupted card lets the user pick the agent too.
@@ -101,9 +107,10 @@ Acceptance criteria:
 As a user, I want one list of what waits on me, each answered with a button, so a glance tells me whether I am the bottleneck.
 
 Acceptance criteria:
-- Your calls lists, in this order and newest first within each: agents waiting in a conversation (**Open conversation**), decisions an agent left on a card ("Decision for you": one button per option and **Something else…**), results to review (**Mark done**, **Ask for changes…**) and failed handoffs (**Retry**, **Open conversation**). A stopped card is not a call.
+- Your calls lists, in this order and longest-waiting first within each: agents waiting in a conversation (**Open conversation**), decisions an agent left on a card ("Decision for you": one button per option and **Something else…**), results to review (**Mark done**, **Ask for changes…**) and failed handoffs (**Retry**, **Open conversation**). A stopped card is not a call.
 - Answering a decision (a button or the user's own words) records "You chose: …" on the card and sends it to the card's conversation as a new turn; the call disappears at once.
 - The same calls appear at the top of the side bar and in the Your calls tab, and their count is the activity-bar badge.
+- On the Board tab, a card that waits on the user has an accent bar on its left edge and a "Your move" tag (amber when an agent is blocked), and the header shows "3 wait on you · oldest 2h" (with "1 agent blocked" when one is), which opens Your calls.
 
 ### R8: Agents read and change the board through tools, the same in all three runtimes
 
@@ -113,7 +120,7 @@ Acceptance criteria:
 - With the flag on and a folder open, Claude Code, Codex and OpenCode each get the seven `ritemark_board` tools in [technical-plan.md](./technical-plan.md#w5--agent-tools-in-all-three-runtimes), from one definition.
 - Agents cannot mark a card Done, delete a card or edit its history; trying to move a card to Done returns "Only the user marks a card done."
 - Board tools need no approval in any autonomy mode; every change they make is a history line on the card.
-- Every runtime is told about the board and its tools through the capability context, once (Sprint 101).
+- Every runtime is told about the board and its tools through the capability context, once (Sprint 101). It also asks agents to put the decisions that would change the result to the user **before** starting long work, and to name in their report what the user should check.
 - Browser tools keep their names and behaviour; their three hand-written copies are replaced by the same single definition.
 
 ### R9: Ideas
@@ -167,6 +174,7 @@ Acceptance criteria:
 - Several boards per folder; boards for the second and later folders of a multi-root workspace (the board belongs to the first folder, as the AI sidebar does).
 - Showing comment tasks or document checkboxes on the board; creating cards from a comment or a checkbox.
 - Running a card in the background without the AI sidebar (the scheduled-agents daemon), or several agents on one card at once.
+- **Autopilot**: agents picking the next card by themselves within a limit the user sets (Jarmo, 2026-10-12: later, its own sprint).
 - Notifications outside Ritemark when a card finishes (the multi-window toast idea stays its own item).
 - Telling apart several people who share a folder: every person's change reads as "You".
 
@@ -180,6 +188,8 @@ Acceptance criteria:
 - **D6 Idea review:** on request, never automatic (it uses the user's agent and its quota). Drop hides an idea; Delete deletes it.
 - **D7 Position:** the Tasks button first among Ritemark's own tools, just above Transcribe. (Revised 2026-10-12: the real app lists VS Code's built-in entries between Home and every extension container; right after Home would need a patch 002 change and make the sprint shell-tier.) Declaration order in `package.json`, no patch.
 - **D8 Words:** Home's "New AI task" becomes "New AI conversation".
+- **D10 Agent choice:** every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode (Jarmo, 2026-10-12).
+- **D11 Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority; Done when, Check these and the conflict guard are in this sprint; autopilot is later (Jarmo, 2026-10-12).
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 
 ## Open questions
