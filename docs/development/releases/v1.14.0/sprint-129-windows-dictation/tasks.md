@@ -71,9 +71,9 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 6: Docs, tiers and PR (W9 — R10)
 
-- [ ] `docs/user/features/transcribe.md` (platform table, Windows/Intel timing, m4a note); dictation section in the user docs.
-- [ ] `docs/development/architecture.md` (single resolver, readiness states, provenance, no more "macOS only").
-- [ ] `docs/CHANGELOG.md` and v1.14.0 release-notes draft; v1.14.0 release plan tracker updated.
+- [x] `docs/user/features/transcribe.md` (platform table, Windows/Intel timing, m4a note); new `docs/user/features/dictation.md` (linked from the features index and Transcribe); README feature line; setting description.
+- [x] `docs/development/architecture.md` (single resolver, readiness states, provenance, no more "macOS only"; new "On-device Whisper engine (Sprint 129)" section; debt marked partly paid).
+- [x] `docs/CHANGELOG.md` ([1.14.0] — Unreleased) and `docs/releases/v1.14.0/release-notes.md` (draft, Sprint 129's part); v1.14.0 release plan row updated (after merging #410). *(Wording follows the defaults sent to Jarmo; adjust if he changes it)*
 - [ ] PR opened (not merged); "PR ready" message names the PR number for Jarmo's admin-merge yes after v1.13.0 publishes.
 - [ ] Follow-up issues: on-device m4a/aac on Windows; whisper.cpp upgrade across all targets. *(Filed: cutting at pauses, [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411). GPU on Windows: Jarmo put it aside on 2026-10-12; no issue unless he reopens it)*
 

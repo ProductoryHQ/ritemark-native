@@ -235,7 +235,7 @@
           "ritemark.features.voice-dictation": {
             "type": "boolean",
             "default": false,
-            "description": "Voice dictation with Whisper on this computer (macOS and Windows). The first use downloads a 1.5 GB speech model. Always on in current versions; this setting has no effect.",
+            "description": "Voice dictation with Whisper on this computer (macOS and Windows). The first use downloads the speech model: 1.5 GB on Apple silicon, 834 MB on Windows and Intel Macs. Always on in current versions; this setting has no effect.",
             "scope": "application"
           },
           "ritemark.features.agentic-assistant": {
