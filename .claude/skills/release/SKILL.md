@@ -246,7 +246,11 @@ Only once **(a)** Gate 1 has passed AND **(b)** ≥60 min have elapsed since the
 ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
 ```
 
-This notarizes AND staples. Verify staple + Gatekeeper acceptance before proceeding.
+This notarizes, staples and verifies. It exits 1 on any refusal (an expired Apple
+agreement is HTTP 403), on status Invalid/Rejected, on a timed-out wait, and on a
+failed staple, `stapler validate` or Gatekeeper check; exit 0 means all of them
+passed. Run it unpiped — through `tee` or `tail` the exit status is that
+command's, not the script's.
 
 ### Step 5 — Dispatch CI builds (Windows + macOS x64)
 
@@ -331,23 +335,28 @@ Apply the same ⛔ **60-min hardening rule** as Step 4. Only after Gate 2 passes
 ./scripts/notarize-dmg.sh dist/Ritemark-X.Y.Z-darwin-x64.dmg
 ```
 
-Notarizes + staples. Verify before proceeding to Step 8.
+Notarizes, staples and verifies, with the same exit status as Step 4. Exit 0 before proceeding to Step 8.
 
 ### Step 8 — GitHub Release + update feed
+
+⛔ **The release stays a draft until the feed is attached and every digest
+matches.** Publishing makes the release `latest` at once, and the app reads
+`releases/latest/download/update-feed.json`. Never pass the binaries to
+`gh release create`: with files, gh publishes the release the moment the last
+file has uploaded. v1.13.0 did that and uploaded the feed afterwards, so for 16
+seconds `latest` had no feed. The order is: generate the feed → create a draft
+→ upload the binaries and the feed → compare GitHub's digests with `dist/` →
+publish.
+
+#### 8.1 Stage the binaries under their published names
 
 ```bash
 cp dist/Ritemark-X.Y.Z-darwin-arm64.dmg dist/Ritemark-arm64.dmg
 cp dist/Ritemark-X.Y.Z-darwin-x64.dmg   dist/Ritemark-x64.dmg
-
-gh release create vX.Y.Z --repo jarmo-productory/ritemark-public \
-  --title "Ritemark vX.Y.Z" \
-  --notes-file <prepared body> \
-  dist/Ritemark-arm64.dmg \
-  dist/Ritemark-x64.dmg \
-  installer/windows/Ritemark-X.Y.Z-win32-x64-setup.exe
+# dist/Ritemark-Setup.exe was staged from the Windows CI artifact at Gate 2
 ```
 
-**Preparing the body — two traps, both hit in v1.10.0:**
+#### 8.2 Prepare the body — two traps, both hit in v1.10.0
 
 1. **Take the notes from `origin/main`, not from the release worktree.** The
    release worktree is pinned to the frozen product source commit, so any notes
@@ -365,17 +374,22 @@ sed -E 's#\]\(screenshots/#](https://raw.githubusercontent.com/jarmo-productory/
   /tmp/body.md > /tmp/release-body.md
 ```
 
-Afterwards, verify against the live release: every image reports
+After 8.6, verify against the published release: every image reports
 `complete && naturalWidth > 0`, every URL returns 200, and the body differs
 from `origin/main`'s notes only by the image rewrite.
 
-**Update feed (MANDATORY):** regenerate canonical update metadata, verify it matches the published assets, publish to canonical location.
+#### 8.3 Generate the update feed (MANDATORY)
 
-⛔ **Always pass `--existing-feed-url` naming the PREVIOUS release.** The
-generator seeds from `releases/latest/download/update-feed.json`, but the
-release you just published *is* `latest` and has no feed attached yet, so that
-URL 404s, the seed comes back empty, and the generated feed silently contains
-only the new version — wiping every older per-platform entry:
+The feed is built from the local files before the release exists; the
+generator only fetches the previous feed. Contract:
+`docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
+
+⛔ **Always pass `--existing-feed-url` naming the PREVIOUS release.** Without
+it the generator seeds from `releases/latest/download/update-feed.json`. That
+happens to work while the new release is still a draft, but the moment it is
+public it *is* `latest`, and a regenerated feed then seeds from the new
+release's own feed, or from nothing if none is attached: the generated feed
+silently contains only the new version, wiping every older per-platform entry:
 
 ```bash
 node ./scripts/generate-update-feed.mjs --mode full --version X.Y.Z \
@@ -387,12 +401,78 @@ node ./scripts/generate-update-feed.mjs --mode full --version X.Y.Z \
   --asset "dist/Ritemark-Setup.exe|win32|x64|Ritemark-Setup.exe"
 ```
 
-Before uploading, confirm `fullReleases` grew by exactly one and that each
-platform SHA-256 matches the published asset. After uploading, the
-`latest/download/` URL needs ~20-40 s of CDN propagation before it returns 200 —
-retry rather than assuming the upload failed. Contract: `docs/development/sprints/sprint-42-unified-update-platform/research/update-feed-contract.md`.
+Confirm `fullReleases` grew by exactly one; 8.5 checks the new entry's hashes.
 
-If feed/metadata is stale or missing, the release is BLOCKED — even if binaries are uploaded.
+#### 8.4 Create the draft, then upload the binaries and the feed
+
+```bash
+V=X.Y.Z; TAG=v$V; REPO=jarmo-productory/ritemark-public
+gh release create $TAG --repo $REPO --draft \
+  --title "Ritemark v$V" \
+  --notes-file /tmp/release-body.md
+gh release upload $TAG --repo $REPO \
+  dist/Ritemark-arm64.dmg \
+  dist/Ritemark-x64.dmg \
+  dist/Ritemark-Setup.exe \
+  dist/update-feed.json
+```
+
+A draft has no tag yet; GitHub creates it on publish. `gh release upload` and
+`gh release edit` find a draft by its pending tag name. If an upload fails,
+rerun the same `gh release upload` with `--clobber`. Nobody but repo
+collaborators can see a draft, so fixing one in place is safe.
+
+#### 8.5 Verify the draft's assets against local `dist/` (BLOCKING)
+
+`releases/tags/$TAG` returns 404 for a draft, so read the draft from the
+release list:
+
+```bash
+T=$(mktemp -d)
+
+# On the draft: GitHub's own digest + size per asset
+gh api "repos/$REPO/releases?per_page=10" \
+  --jq ".[] | select(.tag_name == \"$TAG\" and .draft) | .assets[] | \"\(.digest | ltrimstr(\"sha256:\"))  \(.size)  \(.name)\"" \
+  | sort -k3 > "$T/draft.txt"
+
+# Local: recomputed from the bytes in dist/
+for f in Ritemark-arm64.dmg Ritemark-x64.dmg Ritemark-Setup.exe update-feed.json; do
+  printf '%s  %s  %s\n' "$(shasum -a 256 "dist/$f" | cut -d' ' -f1)" "$(stat -f%z "dist/$f")" "$f"
+done | sort -k3 > "$T/local.txt"
+
+diff "$T/draft.txt" "$T/local.txt"        # must print nothing
+
+# The feed's new entry must name exactly these hashes and sizes
+node -e 'const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+  const r=f.fullReleases.find(x=>x.version===process.argv[2]);
+  if(!r){console.error("version missing from feed");process.exit(1)}
+  for(const p of r.platforms)console.log(`${p.sha256}  ${p.size}  ${p.assetName}`)' \
+  dist/update-feed.json "$V" | sort -k3 > "$T/feed.txt"
+diff "$T/feed.txt" <(grep -v ' update-feed.json$' "$T/local.txt")   # must print nothing
+```
+
+Both diffs must be empty. A `null` digest means GitHub has not computed one
+yet: re-run after a minute, or download that asset with
+`gh release download $TAG --repo $REPO --pattern <name>` and hash it. Rows that
+appear twice mean a second draft carries the same tag: delete the stale one in
+the GitHub UI and re-run. Any other difference: fix the draft (8.3/8.4) and
+re-run 8.5. Never publish a draft that fails this step.
+
+#### 8.6 Publish
+
+Only once every 8.5 diff is empty:
+
+```bash
+gh release edit $TAG --repo $REPO --draft=false
+gh api repos/$REPO/releases/latest --jq .tag_name     # must print $TAG
+curl -fsSL "https://github.com/$REPO/releases/latest/download/update-feed.json" | cmp - dist/update-feed.json
+```
+
+The `latest/download/` URL can take ~20-40 s of CDN propagation to serve the
+new feed; retry the `cmp` rather than assuming the upload failed. Step 10.1
+re-checks the published release.
+
+If the feed is stale or missing, the release is BLOCKED — even if the binaries are uploaded.
 
 ### Step 9 — Post-release
 

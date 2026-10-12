@@ -37,11 +37,15 @@ That is the whole job.
 
 ## What the report means
 
-- **Safe to remove** — fully pushed, already merged into `origin/main`, and no
-  build output. Any `vscode/` changes are only what `apply-patches.sh`
-  regenerates.
+- **Safe to remove** — fully pushed, already in `origin/main` (merged, or
+  squash-merged: GitHub reports every commit ahead of `origin/main` in a merged
+  pull request), and no build output. Any `vscode/` changes are only what
+  `apply-patches.sh` regenerates.
 - **Held back** — uncommitted work, unpushed commits on an unmerged branch, an
-  unreadable Git status, a `vscode/` path nothing regenerates, or build output.
+  unreadable Git status, a `vscode/` path nothing regenerates or a commit made
+  inside `vscode/`, or build output. A line ending in "squash merge not
+  checked: GitHub unavailable" means `gh` was offline or signed out; rerun once
+  it works.
   Build output is the important one: `dist/` and `VSCode-<target>/` are ignored
   by Git, so a release worktree holding signed, notarized artifacts looks
   pristine to `git status`. Those artifacts can represent hours of compute and

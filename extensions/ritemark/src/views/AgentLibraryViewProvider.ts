@@ -688,10 +688,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     .item:hover .item-more-btn,
     .item.selected .item-more-btn,
     .item-more-btn.menu-open { opacity: 1; }
-    .item-more-btn:hover {
-      background: var(--r-accent-soft);
-      color: var(--r-accent);
+    .item-more-btn:hover,
+    .item-more-btn.menu-open {
+      background: var(--r-surface-soft, rgba(148,163,184,0.10));
+      color: var(--r-ink-strong, var(--r-ink-muted));
     }
+    .item-more-btn:focus-visible { opacity: 1; outline: 1px solid var(--r-accent); }
     .item-more-btn svg { width: 14px; height: 14px; display: block; }
     .item-hint {
       font-size: 10px; line-height: 1.3;
@@ -1342,8 +1344,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         }
         html += '</div>';
         html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />' +
+          '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">' +
+          '<circle cx="64" cy="128" r="12" /><circle cx="128" cy="128" r="12" /><circle cx="192" cy="128" r="12" />' +
           '</svg></button>';
         html += '</div>';
       }
@@ -1495,8 +1497,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           html += '<span class="item-icon warning" title="Missing or empty description field in frontmatter.">\\u26A0</span>';
         }
         html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />' +
+          '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">' +
+          '<circle cx="64" cy="128" r="12" /><circle cx="128" cy="128" r="12" /><circle cx="192" cy="128" r="12" />' +
           '</svg></button>';
         html += '</div>';
       }

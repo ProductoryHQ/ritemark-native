@@ -150,13 +150,39 @@ if grep -q "data-pptx-background-image" "extensions/ritemark/media/webview.js" 2
   ERRORS=$((ERRORS + 1))
 fi
 
-# Check 7: Extension compiles
-if ! cd extensions/ritemark && npm run compile --silent 2>/dev/null; then
-  echo "ERROR: Extension TypeScript compilation failed"
-  ERRORS=$((ERRORS + 1))
-  cd "$PROJECT_DIR"
+# Check 7: Extension compiles (npm run compile = tsc --noEmit, then the esbuild bundle)
+# Runs in a subshell, like 7b. From Sprint 08 until 2026-10 this read
+# `if ! cd extensions/ritemark && npm run compile`, which bash parses as
+# `(! cd ...) && npm run compile`: the compile never ran and the check always passed.
+# Without node_modules (a light worktree, a fresh clone) the compile cannot run. That
+# blocks the commit when extension sources differ from HEAD, and is reported as
+# not proven otherwise -- never a silent pass.
+if [[ -d "extensions/ritemark/node_modules" ]]; then
+  EXT_COMPILE_LOG=$(mktemp)
+  if ! (cd extensions/ritemark && npm run compile --silent > "$EXT_COMPILE_LOG" 2>&1); then
+    echo "ERROR: Extension compile failed (tsc --noEmit + esbuild)"
+    head -20 "$EXT_COMPILE_LOG"
+    echo "  Reproduce with: cd extensions/ritemark && npm run compile"
+    ERRORS=$((ERRORS + 1))
+  fi
+  rm -f "$EXT_COMPILE_LOG"
+else
+  CHANGED_EXT_SOURCES=$(git diff --name-only HEAD -- \
+    "extensions/ritemark/src" \
+    "extensions/ritemark/npm-stubs" \
+    "extensions/ritemark/package.json" \
+    "extensions/ritemark/package-lock.json" \
+    "extensions/ritemark/tsconfig.json" \
+    "extensions/ritemark/esbuild.config.mjs" 2>/dev/null || true)
+  if [[ -n "$CHANGED_EXT_SOURCES" ]]; then
+    echo "ERROR: Extension sources changed but extensions/ritemark/node_modules is missing, so the compile cannot run"
+    echo "$CHANGED_EXT_SOURCES" | head -5 | sed 's/^/  /'
+    echo "  Install with: (cd extensions/ritemark && npm ci --legacy-peer-deps), then retry."
+    ERRORS=$((ERRORS + 1))
+  else
+    echo "NOT PROVEN: extension compile skipped (no extensions/ritemark/node_modules; no extension sources changed vs HEAD)"
+  fi
 fi
-cd "$PROJECT_DIR"
 
 # Check 7b: Webview TypeScript typecheck
 # vite build does NOT type-check (it only transpiles) — tsc --noEmit is the only type gate.
@@ -243,6 +269,15 @@ if [[ -n "$STAGED_BUILD_GUARDS" ]]; then
   fi
   if ! ./scripts/test-worktree-hygiene.sh; then
     echo "ERROR: Worktree hygiene tests failed"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# Check 13: notarize-dmg.sh must exit non-zero on every Apple refusal or failed
+# verification. Stubbed Apple tools — no submission is made.
+if git diff --cached --name-only | grep -qE '^scripts/(notarize-dmg|test-notarize-dmg)\.sh$'; then
+  if ! ./scripts/test-notarize-dmg.sh; then
+    echo "ERROR: notarize-dmg.sh exit-status tests failed"
     ERRORS=$((ERRORS + 1))
   fi
 fi

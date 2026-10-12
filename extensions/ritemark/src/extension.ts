@@ -403,9 +403,11 @@ export function activate(context: vscode.ExtensionContext) {
   });
   unifiedViewProvider.attachCommentTaskController(commentTaskController);
   // Work a crash or a quit abandoned mid-flight becomes an honest `interrupted`
-  // with a Retry, instead of a comment that says "working" forever.
-  void commentTaskController.recoverUnfinished().catch((error: unknown) => {
-    console.warn('[commentTasks] Could not recover unfinished tasks:', error);
+  // with a Retry, instead of a comment that says "working" forever. Then the
+  // retention sweep (30 days / 500 records). Runs in the background; failures
+  // are logged, never thrown.
+  void commentTaskController.sweepOnActivation((message, error) => {
+    console.warn(`[commentTasks] ${message}`, error);
   });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
