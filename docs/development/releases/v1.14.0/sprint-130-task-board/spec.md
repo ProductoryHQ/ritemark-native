@@ -10,6 +10,7 @@ A writer, trainer or consultant keeps the work of one project in one place: what
 - **The user decides.** Agents propose, work and report; only the user marks a card done or deletes it.
 - **One handoff path.** A card reaches an agent the same way a comment does (Sprint 117): host-owned task record, shared availability check, the AI sidebar's queue, results by turn identity. No second agent pipeline.
 - **One tool definition per tool.** Board tools reach all three runtimes from one definition, as browser tools will after this sprint.
+- **The user picks the agent, everywhere** (Jarmo, 2026-10-12). Every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode.
 - **Glanceable first.** The side bar answers "what waits on me, what is running" at 280 px; planning happens in the editor-area board.
 - **Nothing silent.** Every state has words and a glyph; no colour-only signals; no success before the agent's queue accepted the task.
 
@@ -90,7 +91,8 @@ As a user, I want to see what the agent did on the card itself, so I can review 
 Acceptance criteria:
 - When the turn ends, the card shows the result: the agent's own report if it called `report_result` in that turn, otherwise a summary of its last message (at most 280 characters, Sprint 117's bound and fallback), plus the project files the turn changed and how long it took.
 - The result is written into the card file (it travels with the folder) with a history line "Finished: …".
-- A finished card stays in Doing as **Ready to review**: **Mark done** moves it to Done; **Ask for changes…** opens a note box on the card and sends the user's words to the card's conversation.
+- A finished card stays in Doing as **Ready to review**: **Mark done** moves it to Done; **Ask for changes…** opens a note box on the card and **Send to {agent} ▾** sends the user's words to the card's conversation, with the agent the user picks.
+- **Retry with {agent} ▾** on a failed or interrupted card lets the user pick the agent too.
 - A failed turn shows "Failed · {safe reason}" with **Retry**; raw provider errors never appear.
 - While the agent waits in the conversation for an approval, an answer or a plan review, the card says "Needs you · approval / question / plan review" with **Open conversation**; when that is answered it says Working again (fix G3). Approvals are never given on the board.
 
@@ -120,7 +122,7 @@ As a user, I want to jot an idea in one line and have an agent tell me whether i
 
 Acceptance criteria:
 - Ideas are cards in the Idea stage; the Ideas view is a one-line composer and the list of ideas, with the chips To decide and Dropped. Ideas are also added with `+` on the side bar's and the board's Idea headers.
-- **Review with {agent}** runs a short, tool-free check with the chosen agent and shows: a verdict (Good to go / Needs detail / Already on the board / Not a task), one sentence why, a size, and a suggested title and description. It never changes the idea by itself and starts no conversation.
+- **Review with {agent} ▾** (and **Review again with {agent} ▾**) lets the user pick the agent from a dropdown and runs a short, tool-free check with it and shows: a verdict (Good to go / Needs detail / Already on the board / Not a task), one sentence why, a size, and a suggested title and description. It never changes the idea by itself and starts no conversation.
 - **Make it a task** moves the idea to the top of To do with the suggested title and description; the original line stays in the card's history.
 - **Drop** hides the idea into Dropped; **Bring back** returns it. **Delete…** is the real delete (to the system trash).
 - The review is stored on the card and travels with the folder.

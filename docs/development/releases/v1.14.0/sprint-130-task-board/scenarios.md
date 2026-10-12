@@ -146,6 +146,13 @@ When I open the Give menu
 Then Codex shows "Sign in required"; choosing it offers Sign in and starts nothing
 And no handoff record is written
 
+### S20a: The agent can be picked on every agent button
+Given Claude is the board's default
+When I open the dropdown of Review with Claude on an idea and choose Codex
+Then Codex reviews the idea, and every agent button on the board now reads "… Codex"
+And Give to…, Review with… and Retry with… in a card's More actions menu list the same three agents
+And the note box's Send to Codex ▾ and a failed card's Retry with Codex ▾ offer the same choice
+
 ### S21: Stop and retry
 When I press Stop on a working card
 Then the turn stops, the card reads Stopped and offers Give to Claude again
