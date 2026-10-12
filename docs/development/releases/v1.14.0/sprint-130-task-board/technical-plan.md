@@ -174,7 +174,7 @@ Shared pieces: `ui/tabs.tsx` is new (shadcn's Radix Tabs), which adds **one webv
 
 ## W3b — The card page (card mode of the Ritemark editor), revised 2026-10-12
 
-Design: [design.md §5](./design.md#5-the-card-page). It replaces the card dialog. It needs Jarmo's OK before any code.
+Design: [design.md §5](./design.md#5-the-card-page). It replaces the card dialog. Approved by Jarmo on 2026-10-12.
 
 **Precedent.** The Ritemark editor already has a path-based mode. `.claude/agents/*.md` opens in agent mode: `isAgentMode` in the render payload (`ritemarkEditor.ts:309-329`, `editorSync/protocol.ts:309-336`), its own panel, and `applyFrontmatter`, which keeps the body. Card mode follows the same route.
 

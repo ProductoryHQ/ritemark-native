@@ -192,7 +192,7 @@ Acceptance criteria:
 - **D8 Words:** Home's "New AI task" becomes "New AI conversation".
 - **D10 Agent choice:** every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode (Jarmo, 2026-10-12).
 - **D13 Doing limit (2026-10-12):** Doing holds at most 3 cards by default, set from its header; Give to past the limit offers Queue it or Start anyway; autopilot will later fill free slots up to the same limit.
-- **D14 A card opens as a page (2026-10-12, proposed, waits for Jarmo's OK):** clicking a card opens its Markdown file in the editor as a Ritemark document with a slim strip; replaces the card dialog; card files are named `<slug>.md` (design.md §5).
+- **D14 A card opens as a page (2026-10-12, approved by Jarmo):** clicking a card opens its Markdown file in the editor as a Ritemark document with a slim strip; replaces the card dialog; card files are named `<slug>.md` (design.md §5).
 - **D11 Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority; Done when, Check these and the conflict guard are in this sprint; autopilot is later (Jarmo, 2026-10-12).
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 

@@ -43,9 +43,9 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
 - [x] T3.11 Rebuild `media/webview.js`; size change noted (8,366,183 → 8,452,268 bytes, +86 KB)
 
-## Phase 3b: The card page (W3b, revised 2026-10-12, waits for Jarmo's OK)
+## Phase 3b: The card page (W3b, revised 2026-10-12)
 
-- [ ] T3b.0 Jarmo's OK on design.md §5 in the sprint session
+- [x] T3b.0 Jarmo's OK on design.md §5 in the sprint session (2026-10-12: "card page approved, go ahead")
 - [ ] T3b.1 Probe P8: closing the reused card tab with `window.tabGroups.close`; focus after `vscode.openWith`
 - [ ] T3b.2 `cardFileName(title)` → `<slug>.md` with a `-2`… suffix; old `<id>-<slug>.md` files still load; tests
 - [ ] T3b.3 Document-aware file layer for BoardStore: read the open document, edit only the front matter, save only when clean; tests (dirty page keeps typing, clean page saves)

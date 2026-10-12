@@ -606,4 +606,4 @@ The ones the plan asks him to confirm, with the design's recommendation:
 5. The Tasks button sits first among Ritemark's own tools, just above Transcribe. **Yes** (right after Home would need a VS Code patch, which makes the sprint shell-tier).
 6. Comment tasks and document checkboxes stay separate this sprint. **Yes.**
 7. Home's "New AI task" becomes "New AI conversation", so "task" means a board card. **Yes** (one string).
-8. **A card opens as a page in the editor, not a dialog** (2026-10-12, Jarmo's direction through the Development manager; §5). Card files are named after the title alone, so the tab reads well. **Asked of Jarmo in the sprint session.**
+8. **A card opens as a page in the editor, not a dialog** (2026-10-12, Jarmo's direction through the Development manager; §5). Card files are named after the title alone, so the tab reads well. **Approved by Jarmo, 2026-10-12** ("card page approved, go ahead").
