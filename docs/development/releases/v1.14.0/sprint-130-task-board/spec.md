@@ -49,13 +49,13 @@ Acceptance criteria:
 - A card without Done when can still be given to an agent; its detail says "Add what done looks like below. Agents finish better with it."
 - **Stages are fixed:** Idea, To do, Doing, Done (D2).
 - Adding takes one line (Enter to add): the side bar's field and the command add to To do; `+` on the board's Idea and To do columns adds there. **A new card goes to the top of its stage.**
-- A card is moved by drag and drop on the board, by **Move to…** in its More actions menu (side bar and board, the keyboard path) and by the Stage field in its detail.
+- A card is moved by drag and drop on the board, by **Move to…** in its More actions menu (side bar and board, the keyboard path) and by the stage menu on its card page.
 - **The order of To do is the priority.** The top card that can start reads "Next up" on both surfaces.
 - The leading circle of a To do row marks it done in one click. **Reopen** on a Done card moves it back to To do.
 - While an agent is working on a card or waiting for the user in its conversation, the card cannot leave Doing or be marked done; the disabled action says why.
-- Clicking a card opens its detail as designed in [design.md §5](./design.md#5-card-detail): a dialog on the board, the same content filling the side bar; every field is editable there.
+- **Clicking a card opens its card page** (revised 2026-10-12, [design.md §5](./design.md#5-the-card-page)): the card's Markdown file in the editor area as a normal Ritemark document, with a slim strip on top (stage menu, state, the one action that moves the card, History, More actions). The title and Done when are edited in place. When the card is Ready to review, the result sits at the top with **Mark done** and **Ask for changes…**. Opening the next card replaces a page you only looked at; a page you edited stays open. The open card stays highlighted in the side bar.
+- The page shows no front matter. Body edits save like any document. Title, Done when, stage and files go through the board and are recorded in the history. The page never rewrites the board's front matter, and a board write while the card is open goes through the open document.
 - **Files:** **Add files…** opens a picker rooted in the project; only files inside the project can be added; a file that no longer exists is shown as missing, not removed; clicking a file opens it in its usual editor.
-- **Open as document** (More actions only) opens the card's Markdown file in the Ritemark editor.
 - **Delete…** asks once, then moves the card file to the system trash.
 - A card's own `- [ ]` checkboxes show as progress on the card ("2 of 5").
 
@@ -64,10 +64,10 @@ Acceptance criteria:
 As a user, I want the board to be plain files in my project folder, so it travels with the folder, works offline and never locks me in.
 
 Acceptance criteria:
-- Each card is one Markdown file `.ritemark/tasks/<id>-<slug>.md` with the front matter in [research/storage-decision.md](./research/storage-decision.md). The folder is created on the first card, not before.
+- Each card is one Markdown file `.ritemark/tasks/<slug>.md` (the title's slug, `-2` if taken; revised 2026-10-12 so the editor tab reads well) with the front matter in [research/storage-decision.md](./research/storage-decision.md). The folder is created on the first card, not before.
 - Moving a card rewrites that card's file only.
 - Every write is atomic (temporary file, then rename). A crash mid-write leaves the previous version.
-- A card file that does not parse is **never overwritten**: it shows as "Couldn't read this card" with **Open as document**, and the rest of the board works.
+- A card file that does not parse is **never overwritten**: it shows as "Couldn't read this card"; clicking it opens the file as a plain document to repair, and the rest of the board works.
 - Editing, adding or deleting a card file outside Ritemark (another editor, git, a sync tool, an agent's own file tools) shows on the board within one second.
 - Unknown front-matter keys and the body's exact bytes survive a write that does not change them.
 - Which conversation a card's work runs in, and its live state, are stored on this computer only, not in the card file.
@@ -192,6 +192,7 @@ Acceptance criteria:
 - **D8 Words:** Home's "New AI task" becomes "New AI conversation".
 - **D10 Agent choice:** every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode (Jarmo, 2026-10-12).
 - **D13 Doing limit (2026-10-12):** Doing holds at most 3 cards by default, set from its header; Give to past the limit offers Queue it or Start anyway; autopilot will later fill free slots up to the same limit.
+- **D14 A card opens as a page (2026-10-12, proposed, waits for Jarmo's OK):** clicking a card opens its Markdown file in the editor as a Ritemark document with a slim strip; replaces the card dialog; card files are named `<slug>.md` (design.md §5).
 - **D11 Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority; Done when, Check these and the conflict guard are in this sprint; autopilot is later (Jarmo, 2026-10-12).
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 

@@ -95,7 +95,7 @@ Each probe is a short script or dev-instance check, recorded in `research/phase-
 - Injected filesystem (the seven-method `ConversationStoreFileSystem` plus `trash`) so tests run in Node.
 - `list()` reads `.ritemark/tasks/*.md` once, then serves a cache; `invalidate(fileName)` re-reads one file.
 - `mutate(cardId, change)` runs on one serialized tail: re-read the file, refuse if it does not parse (never overwrite), apply the semantic change, append a history entry, write `<file>.tmp-<id>`, rename, remember the written hash.
-- `create(card)` creates `.ritemark/tasks/` on first use (`mkdir -p`) and writes `<id>-<slug>.md` exclusively.
+- `create(card)` creates `.ritemark/tasks/` on first use (`mkdir -p`) and writes `<id>-<slug>.md` exclusively. (Revised 2026-10-12: `<slug>.md` with a `-2` suffix if taken, see W3b.)
 - `remove(cardId)` moves the file to the system trash.
 - The watcher (`vscode.workspace.createFileSystemWatcher(new RelativePattern(folder, '.ritemark/tasks/*.md'))`, composed in `extension.ts`) calls `invalidate`; a change whose hash equals the last write is the host's own echo and is ignored.
 
@@ -164,13 +164,71 @@ Webview (`webview/src/components/tasks/`), lazy-loaded from `main.tsx` for `task
 | `TaskBoard.tsx` | Editor area: tabs Your calls · Board · Ideas · Log, `vscode.setState` for the open tab |
 | `BoardColumns.tsx` | Board tab: four stage columns, drag and drop between and within stages (native HTML5 drag, plus Move to… in the More actions menu as the keyboard path) |
 | `CardRow.tsx` | One card, two densities (side-bar row, board tile); its More actions menu and context menu come from one action list |
-| `CardDetail.tsx` | Card detail (shape per design.md): title, description, files, state, Give to agent, result, ask, history |
+| `CardDetail.tsx` | Card detail as a dialog. **Replaced on 2026-10-12 by the card page (W3b)** |
 | `CallsView.tsx`, `IdeasView.tsx`, `LogView.tsx` | The other three tabs |
 | `AgentSplitButton.tsx` | The one split button for every agent action (Give to, Review with, Review again with, Retry with, Send to): the label names the runtime, the caret menu lists the three runtimes with their availability, and the choice becomes the board's default (`workspaceState`). Row menus use the same runtime list as an in-place submenu |
 | `NoteBox.tsx` | The in-place reply box for Ask for changes… and Something else… |
 | `taskCopy.ts` | Pure state → words + glyph table (design §10), shared by every surface (the `commentTaskCopy.ts` pattern), tested |
 
 Shared pieces: `ui/tabs.tsx` is new (shadcn's Radix Tabs), which adds **one webview dependency, `@radix-ui/react-tabs`** (MIT, the same family as the other `ui/` primitives; compiled into `webview.js`). `RowMenus` is exported from `ai-sidebar/ConversationsPanel.tsx` instead of copied. `kanban` joins `iconMap` and `ritemark-design/references/iconography.md`. Drag and drop is native HTML5, as in `flows/NodePalette.tsx`.
+
+## W3b — The card page (card mode of the Ritemark editor), revised 2026-10-12
+
+Design: [design.md §5](./design.md#5-the-card-page). It replaces the card dialog. It needs Jarmo's OK before any code.
+
+**Precedent.** The Ritemark editor already has a path-based mode. `.claude/agents/*.md` opens in agent mode: `isAgentMode` in the render payload (`ritemarkEditor.ts:309-329`, `editorSync/protocol.ts:309-336`), its own panel, and `applyFrontmatter`, which keeps the body. Card mode follows the same route.
+
+**Host.**
+
+- **Card mode.** `RitemarkEditorProvider` gets an optional `cardPages` dependency from `registerTaskBoard`. A file is in card mode when three things hold:
+  - it sits under `<project>/.ritemark/tasks/`;
+  - it parses as `ritemark: task/1`;
+  - the flag is on.
+
+  The render payload gains `cardMode: { cardId }` (an exact-keys protocol field, like `isAgentMode`). Properties are not sent.
+- **Body edits.** In card mode `serializeSyncEdit` and `contentChanged` ignore `payload.properties`. They take the document's current front-matter text byte for byte and put the edited body under it. Today every save runs the front matter through gray-matter: checked on 2026-10-12, timestamps become `…:00.000Z` and history lines are reflowed. The card still parses, but the page must never write front matter at all.
+- **Board messages on the editor webview.** Messages starting `board/` are routed to `connectBoardSurface` as a third surface, **card page**. It posts the one card's view plus the runtime list and Doing state it needs.
+  - `board/open-card {cardId}` replaces `board/open-as-document` and opens the page with `vscode.openWith(uri, 'ritemark.editor')`.
+  - `ritemark.openTaskBoard {cardId}` focus targets stay as they are.
+- **One reused tab.** Ritemark sets `workbench.editor.enablePreview: false` (`branding/product.json:196`), so VS Code never makes a preview tab. The host remembers the page it last opened. Opening another card closes that page first (`window.tabGroups.close`) unless it is dirty or was edited since it opened. Probe P8 confirms the close and the focus.
+- **Document-aware file layer.** BoardStore's injected filesystem reads and writes through an open document:
+  - When a card's `TextDocument` is open, `readFile` returns `document.getText()`.
+  - A write applies a `WorkspaceEdit` that replaces only the front-matter lines and keeps the document's body, then saves when the document was not dirty.
+  - Without an open document, it is the atomic write of W1.
+
+  This prevents two failures: a tmp-and-rename write under an unsaved page, and a mutation computed from a stale disk copy. A body change from the board (the `update_card` tool) is an edit of the open document, like an agent editing any open file. The watcher's echo check stays. A saved page whose body differs is one extra refresh.
+- **File names.** `cardFileName(title)` is `<slug>.md`, with `-2`, `-3`… if taken; it no longer takes the id (W1 change). Existing `<id>-<slug>.md` files keep working, because identity is the id in the front matter. VS Code names a custom-editor tab after the file (`customEditorInput.ts:186-193`), so this is what the tab shows.
+
+**Webview.**
+
+- `App.tsx` gets a card-mode branch. `CardStrip` takes `DocumentHeader`'s place: the stage menu, the state word, the one action, History (a popover), Comments, Dictate, More actions. `CardHead` sits above the TipTap editor: title, Done when, the state's block, files.
+- Both reuse `CardParts` (state words, `CallActions`, `CheckList`, the note box), `AgentSplitButton` and `CardMenu`, through the same `boardClient` and `boardUi`.
+- Properties and Contents are hidden in card mode.
+
+**What changes in the built W1–W4 code.**
+
+| Part | Change |
+|---|---|
+| `CardDetail.tsx` (495 lines, the dialog and its side-bar form) | Removed; the delete confirmation moves into `CardMenu` |
+| `boardUi.ts` `openCardId` / `openCard` | `openCard` becomes the `board/open-card` request; the dialog state goes |
+| `TasksPanel`, `TaskBoard`, `BoardColumns`, `CallsView`, `IdeasView`, `LogView` | Unchanged apart from where the card click goes; the side-bar row gets the active-page highlight |
+| `CardParts`, `AgentSplitButton`, `CardMenu`, `taskCopy`, `boardClient` | Kept and reused by the page; "Open as document" leaves `CardMenu` |
+| `protocol.ts`, `boardSurface.ts` | `board/open-card` replaces `board/open-as-document`; a third surface for the page |
+| `BoardStore.ts` (W1) | The document-aware file layer; `cardFileName` drops the id |
+| `ritemarkEditor.ts`, `editorSync/protocol.ts` | Card mode, the front-matter-preserving body save, `board/` routing |
+| W2 controller, W4 ledger, the W5 tools | Unchanged |
+
+In short: about a sixth of the W3 webview code (the dialog) is replaced. W1 gets one storage change and the file-name change. W2 and W4 are untouched. The new code is the editor's card mode and the page's two components.
+
+**Tests.**
+
+- Card-mode detection: path, `ritemark: task/1`, flag.
+- The body save keeps the front-matter text byte for byte.
+- The document-aware layer: reads the open document, edits only the front matter, saves only when clean, and a mutation under a dirty page keeps the typing.
+- The `<slug>.md` collision suffix.
+- `board/open-card` decode.
+- The reused-tab rule.
+- A live check on a dev instance: an agent finishes while you type in the card page, and no save conflict appears.
 
 ## W4 — Give to agent and the result coming back
 
@@ -245,7 +303,7 @@ Out of scope and unchanged: G7 (`approvalMode` frozen to `auto`), the ready-queu
 
 **F1, found while building the prototype (2026-10-12), fixed in this sprint:** shadcn's role tokens (`--background`, `--secondary`, `--muted`, `--border`, `--input`, `--accent` and their foregrounds) are declared on `:root` in `webview/src/index.css` and reference `--r-*` tokens that flip only on `body.vscode-dark`. A custom property resolves where it is declared, so in dark mode `bg-background` stays `#ffffff` and `bg-secondary` `#f1f5f9`: an outline button is white with near-white text (checked in the installed 1.13.0 over CDP). The board uses outline buttons in every row, so the fix belongs here: re-declare the neutral role tokens under `body.vscode-dark` (as the prototype does). `--primary` stays as it ships. Check the existing surfaces that use outline or secondary buttons (Settings, dialogs) in dark mode after the change.
 
-**Menus in the card dialog** take the z-90 popover layer of Sprint 126, so the Give menu and More actions show above the dialog (z-80). "Move to…" expands in place inside the menu rather than as a side submenu.
+**Menus.** "Move to…" expands in place inside the menu rather than as a side submenu. (The z-90 layer for menus inside the card dialog went with the dialog, W3b.)
 
 ## W5 — Agent tools in all three runtimes
 

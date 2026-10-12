@@ -1,9 +1,9 @@
 # Sprint 130 Design — Task board in your project folder (#119)
 
 **Status:** Approved with the plan by Jarmo, 2026-10-12. Settled with the `ux-expert` agent and the `ritemark-design` skill on 2026-10-11, before the technical plan.<br>
-**Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. Where the prototype and this text differ, the prototype is newer.<br>
+**Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. The card page (§5) was added on 2026-10-12. Where the prototype and this text differ, the prototype is newer.<br>
 **System:** Ritemark Indigo-Editorial<br>
-**Scope:** activity-bar entry, side-bar view, editor-area board, card detail, Give to agent and the result coming back, Your calls, Ideas, Log, narrow width, state words. Storage, tools and runtime plumbing are in [technical-plan.md](./technical-plan.md).
+**Scope:** activity-bar entry, side-bar view, editor-area board, the card page, Give to agent and the result coming back, Your calls, Ideas, Log, narrow width, state words. Storage, tools and runtime plumbing are in [technical-plan.md](./technical-plan.md).
 
 ## 0. The design in ten lines
 
@@ -12,7 +12,7 @@
 - **Three panels at once.** Tasks side bar on the left (the daily glance), the document or the Task board in the middle (planning), the AI sidebar on the right (the agent's work).
 - **Side bar:** a one-line add field, then Your calls, Doing, To do, Ideas, Done as a vertical list. A card shows once.
 - **Board:** four columns in the editor area. Your calls, Board, Ideas and Log are tabs.
-- **A card opens as a dialog on the board.** In the side bar the same content fills the side bar (the existing narrow-width Dialog rule), so the document stays visible.
+- **A card opens as a page.** Clicking a card opens its Markdown file in the editor area: a normal Ritemark document, with a slim strip on top (stage, state, Give to agent, history). When it is Ready to review, the result sits at the top with Mark done and Ask for changes (revised 2026-10-12, §5).
 - **Give to {Agent} starts a new conversation named after the card.** Later handoffs of that card continue it. Focus never moves.
 - **Every agent action lets the user pick the agent** (Jarmo, 2026-10-12): Give to, Review with, Review again with, Retry with and Send to are one split button. The label names the agent; the caret lists Claude Code, Codex and OpenCode; the last choice becomes the board's default.
 - **The agent never finishes a card.** A finished card stays in Doing as "Ready to review" until the user presses Mark done.
@@ -70,8 +70,8 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | 3 | Side bar = daily glance; editor area = planning | Four columns cannot fit 280–480 px; a glance cannot wait for a tab. Same split as Transcribe |
 | 4 | Side bar as vertical sections; **a card shows once**, under the first section that applies (Your calls, else its stage) | Counts add up to what the user sees |
 | 5 | "Open board" is an icon button (`kanban`) beside the add field | Transcribe's one-row pattern; a title-bar icon is easy to miss for non-technical users |
-| 6 | A card opens as a **Dialog** on the board; in the side bar the same content fills it | With both side bars open the editor area is about 650–700 px (estimate): no room for a pane. `Dialog` already goes full-bleed under 640 px |
-| 7 | "Open as document" is a More actions item only | An escape hatch (repairing a card that won't read), not a flow |
+| 6 | A card opens as a **page in the editor area**: its own Markdown file in the Ritemark editor, in card mode (revised 2026-10-12; was a dialog) | Opening a card should show the work, not a form (Jarmo). The body is what the agent reads; the editor brings comments, dictation and undo; the side bar stays a list |
+| 7 | No "Open as document" (revised 2026-10-12) | The card page is the document. A card file that won't read opens as a plain document |
 | 8 | **Every action that starts agent work is the same split button** (Jarmo, 2026-10-12, "igalpool"): **Give to {Agent} ▾**, **Review with {Agent} ▾**, **Review again with {Agent} ▾**, **Retry with {Agent} ▾** and **Send to {Agent} ▾** in the note box. The label names the agent; the caret lists Claude Code, Codex and OpenCode with the reason when one is unavailable. In row menus the same choice is "Give to…", "Review with…", "Retry with…", expanding the three agents in place | The label says where the work goes, so no caption is needed (Sprint 117 picker rule); one primitive, so no surface forgets the choice |
 | 9 | Default agent: the last used on this board, else the one the AI sidebar is set to | No new setting |
 | 10 | **A new conversation per card**, continued by later handoffs of that card | A card is its own piece of work and often runs beside others. Comments keep Sprint 117's rule (the open conversation) because a comment is a quick ask inside the work you are doing |
@@ -90,7 +90,7 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | 23 | Comment tasks stay separate this sprint | The comment is their source of truth; syncing creates a "which one is real" problem |
 | 24 | `- [ ]` in documents stay separate; a card's own description shows "2/5" | A sync would rewrite the user's prose |
 | 25 | Quick-add command **Tasks: Add a Task…** (VS Code input box, no default shortcut) | One line in, focus returns to the document |
-| 26 | Moving: drag on the board only; **Move to…** in More actions everywhere; a Stage field in the dialog | Keyboard and screen-reader path; no drag between side-bar sections |
+| 26 | Moving: drag on the board only; **Move to…** in More actions everywhere; the stage menu on the card page | Keyboard and screen-reader path; no drag between side-bar sections |
 | 27 | **A new task lands at the top of To do** | The user sees it arrive; reordering is a weekly board activity |
 | 28 | **Reopen** on a Done card moves it back to To do | A reopened task is something to do again; Give to agent is one click from there |
 
@@ -188,17 +188,17 @@ At 280 px "Ask for changes…" is the icon button `[p]` with its tooltip; at 360
 └──────────────────────────────────────────────────────┘
 ```
 
-**Row menus.** The same list in More actions and the right-click menu, built from one action list (`RowMenus`, exported from `ConversationsPanel.tsx` rather than copied a third time). "Move to…" expands its four stages in place inside the menu (a side-by-side submenu covers the menu at 280–420 px); a disabled item says why in its label. Near the bottom of the side bar the menu opens upward. A menu opened inside the card dialog uses the z-90 popover layer, so it shows above the dialog (Sprint 126 modal layering).
+**Row menus.** The same list in More actions and the right-click menu, built from one action list (`RowMenus`, exported from `ConversationsPanel.tsx` rather than copied a third time). "Move to…" expands its four stages in place inside the menu (a side-by-side submenu covers the menu at 280–420 px); a disabled item says why in its label. Near the bottom of the side bar the menu opens upward. 
 
 | Card is | Menu |
 |---|---|
-| To do | Give to… · Move to… · Open as document · Delete… |
-| Working or queued | Open conversation · Stop · Open as document · Delete… (stop the agent first) |
-| Needs you, Decision, Ready to review | Open conversation · Mark done · Move to… · Open as document · Delete… |
+| To do | Give to… · Move to… · Delete… |
+| Working or queued | Open conversation · Stop · Delete… (stop the agent first) |
+| Needs you, Decision, Ready to review | Open conversation · Mark done · Move to… · Delete… |
 | Failed, Interrupted | Retry with… · Open conversation · Move to… · Delete… |
 | Stopped | Give to… · Open conversation · Move to… · Delete… |
-| Done | Reopen · Open conversation · Open as document · Delete… |
-| Idea | Review with… · Make it a task · Drop · Open as document · Delete… |
+| Done | Reopen · Open conversation · Delete… |
+| Idea | Review with… · Make it a task · Drop · Delete… |
 
 "Give to…", "Review with…" and "Retry with…" expand Claude Code, Codex and OpenCode in place, like Move to…; the default agent is checked, an unavailable one says why.
 
@@ -240,138 +240,102 @@ One "Task board" tab per window, with the folder name in muted text after the ti
 - **A card that waits on the user** has a 3 px accent bar on its left edge and a "Your move" tag; amber when the agent is blocked. Nothing else on the board uses the left bar.
 - No board toolbar. Adding happens where the stage is: `+` on Idea and To do opens a one-line field at the top of that column. Doing and Done cards arrive by moving.
 - Column headers: strong ink, uppercase, count. No colour per column. Cards use the Card pattern (hairline, 10 px radius).
-- Drag moves a card; the keyboard path is Move to… and the dialog's Stage field. A working or waiting card refuses to leave Doing and says why in a polite message.
+- Drag moves a card; the keyboard path is Move to… and the card page's stage menu. A working or waiting card refuses to leave Doing and says why in a polite message.
 - The tabs are `ui/tabs.tsx`, shadcn's standard Radix Tabs (§12). The Your calls tab holds the same call rows as the side bar, in one column at most 720 px wide.
 
-## 5. Card detail
+## 5. The card page
 
-- **On the board:** a `Dialog`, about 560 px wide. Focus returns to the card on close.
-- **In the side bar:** the same component, full-bleed.
-- The top bar stays in view at 480 px and wider; below that it scrolls with the content, so it cannot eat the side bar at 200 % zoom.
+**Revised 2026-10-12** (Jarmo, through the Development manager): opening a card shows the work, not a form. This replaces the card dialog. The rest of the design is unchanged.
 
-Order, top to bottom:
+**What opens.** Click a card anywhere: a side-bar row, a board tile, a title in Your calls, Ideas or the Log. Its Markdown file opens in the editor area as a normal Ritemark document, in **card mode**.
 
-1. Title (click to edit), More actions, close.
-2. State bar: "Your move" or "{Agent}'s move", the status line, then the state's buttons on **one line, primary first**.
-3. The state's block: Result, Decision, or nothing. A Result sits above the description.
-4. Description: Markdown, rendered to read and a `Textarea` to edit; saves on blur; its `- [ ]` are real checkboxes.
-5. Files: **Add files…**; each file opens in its editor; a missing file shows "Missing" and stays.
+- The page reuses one tab. The next card you open replaces a page you only looked at; a page you edited stays open. (Ritemark turns VS Code's preview tabs off, so the host does this itself.)
+- While its page is the active tab, the card stays highlighted in the side bar.
+- Buttons on a row still act in place (Mark done, the options, Give to). Only a click on the card itself opens the page.
 
-(Revised 2026-10-12: a **Done when** field, one line, sits above the description. When it is empty, the state bar of a To do card says "Add what done looks like below. Agents finish better with it." The Result block ends with **Check these**, up to three bullets from the agent's report.)
-6. Stage field (Idea, To do, Doing, Done).
-7. History: the last 5 events, then "Show all N".
+**Why a page, not a dialog.**
 
-Button rows collapse by container width: at 360 px and wider secondary buttons keep their labels; below that they become icon buttons with a tooltip and an accessible name; below 240 px only the primary stays and the rest move to More actions.
+- The card already is a file, and its body is what the agent reads as the task.
+- A dialog covers the document and turns the body into a form field.
+- The editor already brings comments, dictation, undo, find, and the AI sidebar's "Active file" context.
+- The side bar stays a list, so the next card is one click away.
 
-**To do**
+**Layout, top to bottom**
 
 ```text
-┌──────────────────────────────────────────────────┐
-│ Update the pricing page                [...] [x] │
-│ Your move                                        │
-│ [Give to Claude | v]                             │
-├──────────────────────────────────────────────────┤
-│ DESCRIPTION                                      │
-│ Refresh the three price tiers and the FAQ.       │
-│ [ ] Check the new rate card                      │
-│ [x] Update the three tiers                       │
-│ FILES                                            │
-│ pricing.md · Offers                [Add files…]  │
-│ HISTORY                                          │
-│ Mon 09:12  Added                                 │
-└──────────────────────────────────────────────────┘
+ tab: tighten-the-executive-summary.md
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [Doing v]  @ Ready to review                 [Give to Claude|v] [H] | [C] [M] [...] │  strip, 40 px
+├──────────────────────────────────────────────────────────────────────────────┤
+│    Tighten the executive summary                                  title (H1)  │
+│    DONE WHEN  Five sentences or fewer, with the three recommendations first.  │
+│   ┌──────────────────────────────────────────────────────────────────────┐   │
+│   │ @ Ready to review · Claude finished in 4m 12s · Open conversation    │   │
+│   │ Cut the summary from nine sentences to five and led with the three   │   │
+│   │ recommendations. Nothing else changed.                               │   │
+│   │ Changed [findings-draft.md]                                          │   │
+│   │ Check these                                                          │   │
+│   │ • The second recommendation still says “two hubs” without naming… │   │
+│   │ [Mark done]  [Ask for changes…]                                      │   │
+│   └──────────────────────────────────────────────────────────────────────┘   │
+│    FILES [findings-draft.md]  + Add files…                                    │
+│    ──────────────────────────────────────────────────────────────────────    │
+│    Make the summary shorter and lead with the three recommendations.          │
+│    Keep the survey numbers.                                    the body       │
+└──────────────────────────────────────────────────────────────────────────────┘
+ [H] History   [C] Comments   [M] Dictate   [...] More actions
 ```
 
-**Working**
+1. **Strip.** It takes DocumentHeader's place, with the same height, surface and hairline. Left to right:
+   - the **stage menu** ("Doing ▾": Idea, To do, Doing, Done). It is disabled while an agent works, and its tooltip says why.
+   - the **state word** with its glyph (§10). The top To do card reads "Next up".
+   - the **one action** that moves the card (table below).
+   - **History**: a popover with the whole history.
+   - the editor's own **Comments** and **Dictate**.
+   - **More actions**: the row menu of §3.
+2. **Title.** The page's heading, edited in place. Enter, or leaving the line, saves it to the card. The file keeps its name.
+3. **Done when.** One quiet line under the title, edited in place. Placeholder: "What does done look like? One line. Agents finish better with it."
+4. **The state's block.** What the card needs from you now, or what the agent is doing. At most one block (table below).
+5. **Files.** Chips open each file in its editor in one click. **Add files…** sits at the end. A missing file shows "Missing" and stays.
+6. **Body.** The card's Markdown below a hairline: a normal Ritemark document with headings, lists, `- [ ]` checkboxes, links and comments. This is the task description the agent reads.
 
-```text
-┌──────────────────────────────────────────────────┐
-│ Draft the Q3 agenda                    [...] [x] │
-│ Claude's move                                    │
-│ ~ Working · Claude                               │
-│ In “Draft the Q3 agenda” · Open conversation     │
-│ [Stop]                                           │
-├──────────────────────────────────────────────────┤
-│ HISTORY                                          │
-│ 09:41  Given to Claude                           │
-│ Mon 09:12  Added                                 │
-└──────────────────────────────────────────────────┘
-```
+The front matter belongs to the board and never shows: id, stage, rank, history, the handoff and the result. Properties is hidden in card mode.
 
-The board does not mirror the agent's live activity ("Editing agenda.md"); the conversation shows that. This keeps the board's state small and its updates rare.
+| Card state | Block under the title | Strip action |
+|---|---|---|
+| To do, Doing by hand | none | Give to {Agent} ▾ |
+| Stopped | one line: "Stopped by you · Open conversation" | Give to {Agent} ▾ |
+| Sending, Queued, Working | one line: glyph, "Working · Claude · Open conversation" | Stop |
+| Needs you (approval, question, plan review) | amber: "Waiting for approval · Codex", the sentence, **Open conversation** | — |
+| Decision for you | accent: who asked and while doing what, the question, the options in one wrapping row, **Something else…** | — |
+| Ready to review | accent: the summary, Changed {files}, Check these, **Mark done**, **Ask for changes…** | — |
+| Failed, Interrupted | "Failed · {reason}" and "Earlier work stays in the conversation", with **Retry with {Agent} ▾** | — |
+| Waits for another card | why it waits, **Start now**, **Don't wait** | — |
+| Queued for room in Doing | "Doing is full (3 of 3)…", **Start anyway**, **Take out of the queue** | — |
+| Give to hit a conflict or a full Doing | the warning block of §6b with its three buttons | — |
+| Done | quiet: "Done · Tue 14:05 · Claude's result", the summary | Reopen |
+| Idea | the review: verdict, why, suggested task, **Make it a task**, **Drop** | Review with {Agent} ▾ |
 
-**Needs you** (the agent is blocked in the conversation)
+**Ask for changes…** and **Something else…** open the note box (§3) inside the block. A Give to from a row menu that hits a conflict or a full Doing opens the card's page with that block, because the question needs the card in front of you.
 
-```text
-┌──────────────────────────────────────────────────┐
-│ Clean up the client list               [...] [x] │
-│ Your move                                        │
-│ ! Waiting for approval                           │
-│ The agent is waiting for your approval.          │
-│ [Open conversation]                              │
-└──────────────────────────────────────────────────┘
-```
+**Saving.**
 
-**Decision for you** (the agent left a decision and is not waiting)
+- Body edits save like any document, with autosave.
+- Title, Done when, stage and files go through the board, so the history records them.
+- The board never rewrites the body, and the page never rewrites the board's part. In card mode the host keeps the front-matter text exactly as it is and puts the edited body under it. Edits from the page carry no properties.
+- While the card is open, a board write goes through the open document. Only the front-matter lines change, so autosave and the board never overwrite each other.
 
-```text
-┌──────────────────────────────────────────────────┐
-│ Pick the audience for the workshop     [...] [x] │
-│ Your move                                        │
-│ ? Decision for you                               │
-│ Claude asks: Which audience is this for?         │
-│ [ Executives                                   ] │
-│ [ Practitioners                                ] │
-│ [ Something else…                              ] │
-└──────────────────────────────────────────────────┘
-```
+**Tab name.** VS Code names a custom-editor tab after the file (`CustomEditorInput.getName()`). So the tab shows the file name, and new card files are named after the title alone: `tighten-the-executive-summary.md`, with `-2` if that name is taken. There is no id prefix; the id stays in the front matter. Renaming a card later keeps its file name, as with any document.
 
-Options stack because they are choices, not an action row. Each is one line (2–4 options, at most 80 characters; longer ones truncate with a tooltip). "Something else…" opens the note box in place.
+**Narrow width and zoom.** The page follows the editor. When the strip runs out of room, History, Comments and Dictate move into More actions. The stage menu, the state word and the action stay.
 
-**Ready to review**
+**What goes away.**
 
-```text
-┌──────────────────────────────────────────────────┐
-│ Tighten the proposal summary           [...] [x] │
-│ Your move                                        │
-│ @ Ready to review                                │
-│ Claude finished in 4m 12s · Open conversation    │
-│ [Mark done]  [Ask for changes…]                  │
-├──────────────────────────────────────────────────┤
-│ RESULT                                           │
-│ Reworked the evidence section and cut the        │
-│ intro to three lines. Nothing else changed.      │
-│ Modified 1 file  [proposal.md]                   │
-└──────────────────────────────────────────────────┘
-```
+- The card dialog, and its full-width form in the side bar.
+- **Open as document** in More actions: the card is the document now.
+- The Stage field and the History list: the strip's stage menu and its History popover replace them.
 
-**Ask for changes…** and **Something else…** open the same note box in place: a label ("What should change?" or "Your answer"), a three-row `Textarea`, and `[Send] [Cancel]` on one row. Cmd/Ctrl+Enter sends, Esc cancels. Send's tooltip: "Send this to Claude in the same conversation". The card returns to Working. Plain text, no attachments; Open conversation is the way to more.
-
-**Failed** (Stopped is the same with `x`, "Stopped" and **Give to Claude** as primary; Interrupted uses `w` and **Retry**)
-
-```text
-┌──────────────────────────────────────────────────┐
-│ Draft the Q3 agenda                    [...] [x] │
-│ Your move                                        │
-│ x Failed · usage limit reached                   │
-│ [Retry]                                          │
-│ Earlier work stays in the conversation.          │
-└──────────────────────────────────────────────────┘
-```
-
-**Done**
-
-```text
-┌──────────────────────────────────────────────────┐
-│ Draft the Q3 agenda                    [...] [x] │
-│ v Done · Tue 14:05                               │
-│ [Reopen]                                         │
-├──────────────────────────────────────────────────┤
-│ RESULT                                           │
-│ Drafted a 3-hour agenda in agenda.md.            │
-│ Modified 1 file  [agenda.md]                     │
-└──────────────────────────────────────────────────┘
-```
+A card file that won't read opens as a plain document, without card mode, so it can be repaired.
 
 ## 6. Give to agent and the result coming back
 
@@ -391,7 +355,7 @@ An unavailable agent is disabled in the menu with the reason in its label. After
 3. A new conversation titled with the card's title appears in the AI sidebar's rail as Working. The conversation the user had open stays open; nothing takes focus. If the AI sidebar is hidden it is shown, without focus, because the agent runs there.
 4. The conversation's first message reads like the user's own request: the title, the description and the paths of the card's files. No machine instructions are shown: how to report back is in the agent's standing Ritemark context, and the runtime prompt adds only one line naming the card.
 5. While running, the card mirrors the conversation: an approval, question or plan review shows "Needs you · …" with Open conversation; once answered it reads Working again.
-6. When the turn ends, the card shows a short result (at most 3 lines in rows, more in the dialog), the files the agent changed and how long it took. It stays in Doing as "Ready to review"; Your calls and the badge go up by one.
+6. When the turn ends, the card shows a short result (at most 3 lines in rows, in full on the card page), the files the agent changed and how long it took. It stays in Doing as "Ready to review"; Your calls and the badge go up by one.
 7. **Mark done** moves it to Done. **Ask for changes…** sends the note to the same conversation; the card reads Working again.
 8. On failure the card reads "Failed · {safe reason}" with Retry. Raw provider errors never appear.
 9. Give to agent again (after a result, on a Stopped card, or from a reopened card) starts another turn in the same conversation. If that conversation was deleted, the card says "Conversation no longer available" and Retry starts a new one.
@@ -413,7 +377,7 @@ When Give to would start an agent on a file that another card's agent is working
 └──────────────────────────────────────────────────────┘
 ```
 
-**Wait for it** keeps the card in To do with a clock and "Starts after “Draft the steering…”", then starts it with the chosen agent by itself when that turn ends; the history says why. The card's detail offers **Start now** and **Don’t wait**. A file counts when both cards name it; that is the only signal, so naming files on cards also protects them.
+**Wait for it** keeps the card in To do with a clock and "Starts after “Draft the steering…”", then starts it with the chosen agent by itself when that turn ends; the history says why. The card page offers **Start now** and **Don’t wait**. A file counts when both cards name it; that is the only signal, so naming files on cards also protects them.
 
 ## 7. Your calls
 
@@ -486,7 +450,7 @@ A one-line composer ("Write an idea…"), then the ideas. Chips: To decide · Dr
 - **Make it a task** moves the idea to the top of To do with the suggested title and description; it is the primary button only when the verdict is Good to go.
 - **Drop** hides the idea into Dropped, with **Bring back**. **Delete…** is the real delete.
 - A failed review says "The review didn't come back. Try again." with Review again.
-- In the side bar, the Ideas section expands to idea rows; clicking one opens the same content full-bleed.
+- In the side bar, the Ideas section expands to idea rows; clicking one opens its card page.
 
 ## 9. Log, empty and error states
 
@@ -535,13 +499,13 @@ A one-line composer ("Write an idea…"), then the ideas. Chips: To decide · Dr
 - **Flag off:** "The task board is turned off."
 - **No agent ready:** Give to agent disabled with its reason (§6).
 - **Offline:** everything works except the agent, which shows the runtime's own message.
-- **A card file that won't read:** "Couldn't read this card" with Open as document. Nothing else is affected.
+- **A card file that won't read:** "Couldn't read this card". Clicking it opens the file as a plain document to repair. Nothing else is affected.
 
 ## 10. State vocabulary
 
-Words come from the AI sidebar: rows use the conversation-list words, the card dialog uses the activity-line sentences. A card's state follows its conversation, so the two always read alike. One pure module (`taskCopy.ts`) holds this table.
+Words come from the AI sidebar: rows use the conversation-list words, the card page uses the activity-line sentences. A card's state follows its conversation, so the two always read alike. One pure module (`taskCopy.ts`) holds this table.
 
-| Host state | Row / board card | Dialog | Glyph (tone) | Whose move | Primary |
+| Host state | Row / board card | Card page | Glyph (tone) | Whose move | Primary |
 |---|---|---|---|---|---|
 | To do, or Doing by hand | — | — | `circle` (neutral; click = Mark done) | You | Give to {Agent} |
 | accepting | Sending to {Agent}… | same | `circle-notch` (accent, spins) | Agent | — |
@@ -591,6 +555,8 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Section header | Show / hide the {N} finished tasks | — |
 | More actions | More actions | — |
 | Reopen | Move this task back to To do | — |
+| Stage menu (card page) | Move this task to another stage | The agent is still working, so the stage can't change |
+| History (card page) | History | — |
 
 ## 12. What each new element costs
 
@@ -603,7 +569,7 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Task row, call row | Nothing shows state + who is next + buttons | Transcribe `RecordingRow`, ConversationsPanel `RowMenus` (exported, not copied) |
 | Board columns, cards, drag | Nothing like it exists in the webview | Card pattern; native HTML5 drag (as `flows/NodePalette.tsx`); Move to… as the keyboard path |
 | `ui/tabs.tsx` | Four peer views with counts; `FilterChip` is a toggle, not a tablist | shadcn's Radix Tabs: **one new webview dependency, `@radix-ui/react-tabs`** (free, MIT, the family the other `ui/` primitives use) |
-| Card dialog | — | `Dialog*`, full-bleed under 640 px |
+| Card page (card mode of the Ritemark editor) | Opening a card should show the work (Jarmo, 2026-10-12) | The Ritemark editor and its agent-file mode precedent (`.claude/agents/*.md`); `CardParts`, `AgentSplitButton`, `CardMenu` |
 | Agent split button (Give to, Review with, Retry with, Send to) | One primitive so every agent action offers the same choice | `Button` + `DropdownMenu`; Sprint 117 picker rule |
 | `taskCopy.ts` | One source of words and glyphs | `presentActivityState`, `commentTaskCopy` pattern |
 | Note box | Reply without leaving the card | `Textarea`, `Button` |
@@ -612,18 +578,18 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Log rail | A read view of one history | The Dev Dashboard's Log layout, in Ritemark tokens |
 | `kanban` in `iconMap` + `iconography.md` | Name missing today (it exists in `@phosphor-icons/react`) | One change updates both |
 
-Not added: no board toolbar, no filters or search, no score meters, no toast or undo bar, no "Open as document" button, no second composer, no detail pane, no add on Doing/Done, no new setting, no link back from the AI sidebar to the board, no live activity mirror.
+Not added: no board toolbar, no filters or search, no score meters, no toast or undo bar, no "Open as document", no card dialog, no second composer, no detail pane, no add on Doing/Done, no new setting, no link back from the AI sidebar to the board, no live activity mirror.
 
 If the sprint must shrink, cut in this order: agent decision rows, drag (Move to… remains), Log, idea review.
 
 ## 13. Accessibility and narrow width
 
-- **Keyboard.** Tab order: add field → board button → Your calls rows (row, then its buttons) → section headers → rows. Enter adds a task and keeps focus; Esc clears. Dialog: focus trap; first focus is the primary action when the state needs the user, else the title; Esc closes and returns focus to the row. After Give, focus stays on the same button, which changes its label in place. Tabs: arrow keys. Section headers: `aria-expanded`. Every drag has a menu path (Move to…, the Stage field).
+- **Keyboard.** Tab order: add field → board button → Your calls rows (row, then its buttons) → section headers → rows. Enter adds a task and keeps focus; Esc clears. Card page: Enter or Space on a row opens it with focus in the page (on the block's first button when the card needs you, else on the title); closing the tab returns focus to the editor group, as for any document. After Give, focus stays on the same button, which changes its label in place. Tabs: arrow keys. Section headers: `aria-expanded`. Every drag has a menu path (Move to…, the Stage field).
 - **Screen reader.** A row's name is "{title}, {state line}". Glyphs are `aria-hidden`; the state is always text. One polite live region per surface announces Needs you, Decision for you, Ready to review and Failed once per change; it does not announce Sending, Queued or Working, never moves focus, and coalesces within 2 seconds.
 - **Reduced motion.** The spinner is static (glyph plus "Working"). No card-move animation.
-- **200 % zoom.** The side bar reflows with no horizontal scroll. The state word never wraps; detail wraps beneath. The dialog is full-bleed.
+- **200 % zoom.** The side bar reflows with no horizontal scroll. The state word never wraps; detail wraps beneath. The card page reflows like any document.
 - **Width.** Options stack in the side bar; secondary buttons collapse as in §5; Done shows 5 in the side bar and 10 on the board.
-- **Long content.** Titles clamp to 2 lines in rows and cards and show in full in the dialog. File names show the base name plus parent folder with a middle ellipsis and the full path in a tooltip. Results: 3 lines in rows, about 1,200 characters in the dialog, then "Open conversation for the rest". Option labels are one line with a tooltip.
+- **Long content.** Titles clamp to 2 lines in rows and cards and show in full on the card page. File names show the base name plus parent folder with a middle ellipsis and the full path in a tooltip. Results: 3 lines in rows, about 1,200 characters on the card page, then "Open conversation for the rest". Option labels are one line with a tooltip.
 - **Three working cards.** Each has its own spinner; there is no live activity text, so no ticker. Only Your calls moves the badge.
 - **Contrast and high contrast.** The sidebar's tokens (`--r-warning`, `--r-accent`, `--r-error`); glyph plus word carry every state.
 - **Pointer.** Every clickable row, card, tab and header gets `cursor: pointer` through the existing global rule in `index.css`.
@@ -640,3 +606,4 @@ The ones the plan asks him to confirm, with the design's recommendation:
 5. The Tasks button sits first among Ritemark's own tools, just above Transcribe. **Yes** (right after Home would need a VS Code patch, which makes the sprint shell-tier).
 6. Comment tasks and document checkboxes stay separate this sprint. **Yes.**
 7. Home's "New AI task" becomes "New AI conversation", so "task" means a board card. **Yes** (one string).
+8. **A card opens as a page in the editor, not a dialog** (2026-10-12, Jarmo's direction through the Development manager; §5). Card files are named after the title alone, so the tab reads well. **Asked of Jarmo in the sprint session.**

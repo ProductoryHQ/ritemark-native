@@ -29,7 +29,7 @@
 
 ## The card file
 
-`.ritemark/tasks/<id>-<slug>.md`. The id is six random lowercase letters and digits, checked against the board. The slug comes from the title at creation and is **never renamed**; a card's identity is the `id` in its front matter, not its filename.
+`.ritemark/tasks/<id>-<slug>.md` (revised 2026-10-12: `<slug>.md`, `-2` if taken, so the editor tab reads well; the id stays in the front matter, see design.md §5). The id is six random lowercase letters and digits, checked against the board. The slug comes from the title at creation and is **never renamed**; a card's identity is the `id` in its front matter, not its filename.
 
 ```markdown
 ---
@@ -91,7 +91,7 @@ On another computer the card shows its result and history, and Give to agent sta
 ## Writing safely
 
 - One serialized mutation queue per board. Every change is semantic ("move to Done", "append a history line", "set the result"): read the file fresh, apply, write `<file>.tmp-<id>` and rename.
-- A file that does not parse is **never overwritten**. The card shows "Couldn't read this card" with **Open as document**; the user fixes or deletes it. Same rule as the global stores' quarantine, without moving the user's file.
+- A file that does not parse is **never overwritten**. The card shows "Couldn't read this card"; clicking it opens the file as a plain document (revised 2026-10-12, the card page replaces Open as document); the user fixes or deletes it. Same rule as the global stores' quarantine, without moving the user's file.
 - A file watcher on `.ritemark/tasks/*.md` picks up edits from git, sync tools, the editor or an agent's own file tools, and refreshes both board surfaces. The host ignores the echo of its own writes by content hash.
 - A writer outside Ritemark that changes the same card in the instant between the host's read and rename follows last-writer semantics on that one card. Accepted, as in Sprint 115.
 - Delete moves the card file to the system trash (`workspace.fs.delete` with `useTrash`). Its history leaves the Log with it.

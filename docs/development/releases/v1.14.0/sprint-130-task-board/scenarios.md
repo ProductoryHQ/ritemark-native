@@ -71,7 +71,7 @@ When I drag a card from To do to Doing
 Then only that card's file changes and the history says "Moved to Doing"
 When I focus a card, open More actions and choose Move to → Done
 Then it moves the same way
-When I change the Stage field in a card's dialog
+When I change the stage menu on a card's page
 Then it moves the same way
 
 ### S7a: A working card stays in Doing
@@ -80,8 +80,32 @@ Then Move to… and Mark done are disabled and say "(the agent is still working)
 And dragging it out of Doing puts it back with a polite message
 
 ### S8: Edit a card
-When I open a card and change its title, description and files
+When I open a card and change its title, Done when, body and files
 Then the file's front matter and body change accordingly and other keys I added by hand are still there
+
+### S8a: A card opens as a page (revised 2026-10-12)
+When I click a card in the side bar, on the board, in Your calls, Ideas or the Log
+Then its Markdown file opens in the editor area as a Ritemark document with the card strip on top
+And no front matter shows, and the tab reads the card's file name
+And the card is highlighted in the side bar while its page is the active tab
+When I click another card without editing the first
+Then the second page replaces the first in the same tab
+When I type in a card's page and then click another card
+Then the edited page stays open in its own tab
+
+### S8b: Review on the page
+Given a card is Ready to review
+When I open it
+Then the result sits under the title with Changed files, Check these, Mark done and Ask for changes…
+And each file opens in one click
+When I press Mark done on the page
+Then the card moves to Done and the page shows Done with Reopen
+
+### S8c: The board writes while I type
+Given a card's page is open and I am typing in its body
+When its agent finishes, or I move the card on the board
+Then my typing is kept, the page shows the new state, and no "file is newer" conflict appears
+And the file's front matter is the board's, byte for byte, apart from the change
 
 ### S9: Files that left the project
 Given a card names `docs/plan.md`
@@ -109,7 +133,7 @@ Then the card appears
 
 ### S13: A broken card file
 Given I break a card's YAML by hand
-Then that card shows "Couldn't read this card" with Open as document
+Then that card shows "Couldn't read this card", and clicking it opens the file as a plain document
 And moving or editing other cards works
 And the broken file is byte-for-byte unchanged after five minutes of board use
 

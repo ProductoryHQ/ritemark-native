@@ -43,6 +43,18 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
 - [x] T3.11 Rebuild `media/webview.js`; size change noted (8,366,183 → 8,452,268 bytes, +86 KB)
 
+## Phase 3b: The card page (W3b, revised 2026-10-12, waits for Jarmo's OK)
+
+- [ ] T3b.0 Jarmo's OK on design.md §5 in the sprint session
+- [ ] T3b.1 Probe P8: closing the reused card tab with `window.tabGroups.close`; focus after `vscode.openWith`
+- [ ] T3b.2 `cardFileName(title)` → `<slug>.md` with a `-2`… suffix; old `<id>-<slug>.md` files still load; tests
+- [ ] T3b.3 Document-aware file layer for BoardStore: read the open document, edit only the front matter, save only when clean; tests (dirty page keeps typing, clean page saves)
+- [ ] T3b.4 `ritemarkEditor.ts` card mode: detection (path, `ritemark: task/1`, flag), `cardMode` in the render payload and `editorSync/protocol.ts`, body saves keep the front-matter text byte for byte, `board/` routing; tests
+- [ ] T3b.5 `board/open-card` replaces `board/open-as-document`; the card-page surface in `boardSurface.ts`; the reused-tab rule; tests
+- [ ] T3b.6 Webview: `CardStrip` and `CardHead` in `App.tsx` card mode (reusing `CardParts`, `AgentSplitButton`, `CardMenu`); Properties and Contents hidden
+- [ ] T3b.7 Remove `CardDetail.tsx`; card clicks on every surface send `board/open-card`; the side-bar row highlights the open page; "Open as document" leaves `CardMenu`
+- [ ] T3b.8 Rebuild `media/webview.js`; a live check of S8a–S8c on a dev instance at 280 and 420 px, light and dark
+
 ## Phase 4: Give to agent (W4, R5, R6, R7, R12)
 
 - [x] T4.1 `src/taskBoard/CardTaskStore.ts` (one record per card; records of deleted cards dropped at activation), covered by the ledger test

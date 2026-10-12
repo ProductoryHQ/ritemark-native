@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: fourteen user-facing requirements; multi-component flow board webview ↔ host ↔ project files ↔ AI sidebar ↔ three agent runtimes; concurrent writers on the same files)<br>
 Override with: "use plain full track"<br>
 Release tier: **extension** by path: everything is under `extensions/ritemark/` plus docs. No VS Code patch, no `product.json`, no `binaries/agents/`, no shell-tier script (the OpenCode tool adapter keeps its output path, so the build checks that name it are untouched). The new activity-bar icon (`media/tasks-icon.svg`) is not part of an extension-only update, so **the feature ships inside the v1.14.0 app release**, as Sprint 128 did inside v1.13.0.<br>
-Status: **Phase 3 (DEVELOP) — plan approved by Jarmo 2026-10-12. Phase 0 probes done the same day (none failed, [research/phase-0-probes.md](./research/phase-0-probes.md)); W1 next.**<br>
+Status: **Phase 3 (DEVELOP) — plan approved by Jarmo 2026-10-12. Phase 0 probes done the same day (none failed, [research/phase-0-probes.md](./research/phase-0-probes.md)); W1–W4 built. The card page (D14, W3b) waits for Jarmo's OK; W5 goes on meanwhile.**<br>
 Branch: `sprint-130-task-board`, created from `main` (37c4973f) after the approval and before any code; the plan docs moved here from `docs/sprint-130-task-board-plan`.<br>
 Release: v1.14.0 (milestone 13; the release plan file does not exist on `main` yet)<br>
 Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decided by Jarmo 2026-10-11 on the Dev Dashboard
@@ -58,6 +58,7 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - **2026-10-12, D10 — Agent choice everywhere:** every action that starts agent work has a dropdown with Claude Code, Codex and OpenCode (Jarmo, on the prototype).
 - **2026-10-12, D11 — Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority (Next up); **Done when**, **Check these** and the **conflict guard** (with Wait for it) are in this sprint (Jarmo: "võta need kolm sprinti 130").
 - **2026-10-12, D13 — Doing limit:** Doing holds at most 3 cards by default, set from its header; past the limit Give to offers Queue it or Start anyway. The later autopilot fills free slots up to the same limit. In this sprint (Jarmo: "limit is in").
+- **2026-10-12, D14 — A card opens as a page (proposed, waits for Jarmo's OK in this session):** Jarmo's direction through the Development manager, "opening a card shows the work, not a form". Clicking a card opens its Markdown file in the editor as a Ritemark document with a slim strip (stage, state, Give to, history); a result to review sits at the top with Mark done and Ask for changes. Replaces the card dialog. Card files are named after the title alone so the tab reads well. Design: [design.md §5](./design.md#5-the-card-page); code: [technical-plan.md W3b](./technical-plan.md).
 - **2026-10-12, D12 — Autopilot later:** agents taking the next card by themselves within a user-set limit is its own later sprint (Jarmo: "autopilot hiljem").
 - **2026-10-11, D9 — Review step:** a finished card waits in Doing as "Ready to review" until the user presses Mark done; no Review column.
 
@@ -65,7 +66,7 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 
 - [ ] Tasks sits in the activity bar above Transcribe with a badge for Your calls; the side bar works at 280 px; Tasks: Add a Task… captures without leaving the document (R1, R11).
 - [ ] One Task board tab with Your calls, Board, Ideas and Log, restored after restart (R2).
-- [ ] Cards can be added, edited, moved (drag, Move to…, Stage), ticked off, reopened, opened as a document and deleted to the trash (R3).
+- [ ] Cards can be added, edited, moved (drag, Move to…, the stage menu), ticked off, reopened, opened as a page in the editor and deleted to the trash (R3; card page revised 2026-10-12, design.md §5).
 - [ ] Each card is one Markdown file in `.ritemark/tasks/`; outside edits show within a second; a broken file is never overwritten (R4).
 - [ ] Give to agent works with Claude Code, Codex and OpenCode: a new conversation per card, focus unchanged, honest live state, the result with changed files back on the card, review and follow-ups in the same conversation (R5, R6).
 - [ ] Your calls lists every card that waits on the user, in the designed order, each answered with a button, with wait times and blocked agents visible on both surfaces (R1, R7).
