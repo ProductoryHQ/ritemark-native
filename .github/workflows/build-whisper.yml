@@ -153,6 +153,76 @@ jobs:
           path: out/
           if-no-files-found: warn
 
+  # The engines committed under extensions/ritemark/binaries/ — what the app
+  # actually ships — on each platform. darwin-arm64 runs on macOS 14 (R11:
+  # it must start on macOS 12+; GitHub has no 12 or 13 runner).
+  committed:
+    name: committed ${{ matrix.target }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win32-x64
+            runner: windows-latest
+            arch: x64
+            binary: whisper-cli.exe
+          - target: darwin-x64
+            runner: macos-15-intel
+            arch: x64
+            binary: whisper-cli
+          - target: darwin-arm64
+            runner: macos-14
+            arch: arm64
+            binary: whisper-cli
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Checkout whisper.cpp sample
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ env.WHISPER_CPP_COMMIT }}
+          path: whisper.cpp
+          sparse-checkout: samples
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: model-cache
+          key: ${{ env.MODEL_CACHE_KEY }}
+
+      - name: Find dumpbin
+        id: tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $d = Get-ChildItem -LiteralPath (Join-Path $vs 'VC\Tools\MSVC') -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -match '\\bin\\Hostx64\\x64\\dumpbin\.exe$' } | Sort-Object FullName | Select-Object -Last 1
+          if (-not $d) { throw 'dumpbin.exe was not found.' }
+          "dumpbin=$($d.FullName)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Contract test (committed binary)
+        shell: bash
+        run: |
+          extra=()
+          if [[ "${{ runner.os }}" == "Windows" ]]; then extra=(--dumpbin "${{ steps.tools.outputs.dumpbin }}"); else extra=(--min-macos 12.0); fi
+          npx --yes ${{ env.TSX }} r/scripts/qa/whisper-contract-test.mjs \
+            --binary "r/extensions/ritemark/binaries/${{ matrix.target }}/${{ matrix.binary }}" \
+            --sample whisper.cpp/samples/jfk.wav \
+            --model-cache model-cache \
+            --arch ${{ matrix.arch }} \
+            "${extra[@]}"
+
   # Sprint 129 W11: Estonian test clips with reference text for the speed and
   # accuracy bench (scripts/qa/windows-whisper-bench.ps1 -Round 2), so the
   # Windows PC downloads a few MB instead of FLEURS' 507 MB audio archive.

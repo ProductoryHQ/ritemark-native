@@ -23,7 +23,7 @@
 
 **TalTech's Whisper with timestamps off:** with dictation's `--no-timestamps`, the fine-tuned model writes the sentence correctly and then does not stop. It repeats phrases and emits stray tokens until the token limit, which scored 92.8% WER. With timestamps on, every output ends cleanly. Using this model would mean dictation runs with timestamps on and strips them from the text, which is a small flag change. Rows marked "needs timestamps on" were scored that way.
 
-A re-score of the standard model with timestamps on was still running when this was written; it will be added here.
+For a like-for-like comparison, the standard model was also scored with timestamps on: **19.9%** (f16) and **20.1%** (q8_0), against TalTech's 11.4% in the same mode. The gap does not come from the mode.
 
 ## What it means
 

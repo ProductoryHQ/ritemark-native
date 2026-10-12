@@ -12,15 +12,15 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → [research/windows-performance-audit.md](./research/windows-performance-audit.md). *(2026-10-11, Ryzen 7 5825U: ~22 s per call; threads adopted, beam and chunk length do nothing)*
 - [x] W6's stop condition triggered: numbers and options taken to Jarmo. *(The speed decision is pending; host work that does not depend on it continued)*
 - [ ] Bench round 2, every candidate (Jarmo 2026-10-12: "mõõda kõiki"; W11): FLEURS-et WER for all candidates on the Mac → `research/asr-candidates-audit.md`; CI clip pack; Windows round-2 script; run instructions to the Development manager; Windows results folded in.
-- [ ] R11 (added 2026-10-12): commit the CI-built darwin-arm64 static engine with the other payloads (W10); Apple silicon dictation check in Gate 2.
+- [x] R11 (added 2026-10-12): the CI-built darwin-arm64 static engine is committed with the other payloads (W10); the `committed` CI job runs it on macOS 14. *(The Apple silicon dictation check is listed under Gate 2)*
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
 
 - [x] `build-whisper.yml`: win32-x64 (V, S), darwin-x64, an Apple silicon candidate, and that candidate re-run on macOS 14; `pull_request` + `workflow_dispatch` triggers; standard runners. *(The committed darwin-arm64 binary was contract-tested locally instead: it fails only the macOS 12 check, audit §12)*
 - [x] `scripts/qa/whisper-contract-test.mjs` (jfk transcript, JSON parse, exit 2/3, Unicode folder, dependencies, architecture, minimum macOS), importing the app's own `dictationArgs()`/`transcribeArgs()`.
 - [x] `scripts/build-whisper.sh` pinned to `v1.8.3`/`2eeeba56`, with `--target darwin-arm64|darwin-x64`, one static binary, a macOS 12.0 floor enforced at compile time, BLAS off.
-- [ ] Artifacts committed to `binaries/win32-x64/` (and `binaries/darwin-x64/`) after the `SHA256SUMS` check; `binaries/whisper-manifest.json` written (darwin-arm64 hashes included).
-- [ ] `.gitattributes` `extensions/ritemark/binaries/** binary`; `binaries/README.md` provenance + MIT notice.
+- [x] Artifacts from run 38225663013 committed after the `SHA256SUMS` check: `binaries/win32-x64/` (config V, 16 files), `binaries/darwin-x64/`, and `binaries/darwin-arm64/` (R11: static, macOS 12+, old dylibs removed). `binaries/whisper-manifest.json` records every file's SHA-256 and the run.
+- [x] `.gitattributes` marks the three engine folders binary; `binaries/README.md` covers provenance, rebuilding, and the MIT and VC++ redistributable notices.
 - [x] `validate-build-output.sh` whisper check (Check 5b: manifest-driven; hash only while unsigned; PE machine / Mach-O architecture; no foreign folder). *(The script has no test harness of its own; exercised in the Phase 1 build check)*
 - [x] `copy-extension-for-target.mjs` generic foreign-folder guard + test for all three targets.
 - [x] Tier lists moved to `extensions/ritemark/binaries/` in `CLAUDE.md`, `release-extension-preflight.sh`, `list-unshipped-extension-changes.mjs` (one commit) + `release-tier-paths.test.mjs`; patch 008 line in `CLAUDE.md` corrected.
