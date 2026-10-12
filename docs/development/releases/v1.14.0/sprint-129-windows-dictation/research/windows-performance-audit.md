@@ -61,3 +61,42 @@ q8_0 is about 1.9× faster on a CPU with the same text, and half the download. I
 4. **Hold dictation on Windows** (drop `win32` from the flag) and ship on-device Transcribe only.
 
 Recommendation: 1 now, 2 as a follow-up issue for real-time dictation.
+
+## Round 2 on Windows (2026-10-12): q8_0 against f16, Whisper only
+
+Run by the "Ritemark on Windows" session (relayed by the Development manager) on the same PC. Inputs:
+- artifacts from run 38225663013 (SHA256SUMS verified);
+- 20 FLEURS Estonian clips (247 s);
+- both models SHA-256 verified.
+
+Dictation's flags, 16 threads, one process per clip.
+
+| Model | WER | Per clip | Load (sum of 20) | Encode (sum of 20) | RTF |
+|---|---:|---:|---:|---:|---:|
+| large-v3-turbo q8_0 | 14.8% | 22,038 ms | 26,882 ms | 367,420 ms | 1.78 |
+| large-v3-turbo f16 | 14.2% | 24,937 ms | 48,186 ms | 387,780 ms | 2.02 |
+
+- **Accuracy:** the same. The text is identical in 19 of 20 clips; the one difference is "looduskaitse ala" against "looduskaitseala".
+- **Speed:** q8_0 is only **1.13×** faster on this Zen 3 CPU, against 1.9× on the Mac CPU. Loading halves (1.3 s against 2.4 s), but encoding takes ~18 s per call for both and dominates.
+- **Per call, flat:** 20–25 s for 8.6–16.6 s of audio, because every call encodes a padded 30 s window. With R8 joining waiting audio (up to 28 s per call), dictation keeps up on this PC, but text arrives ~25–50 s after the speech. A slower PC falls behind and stops with the "can't keep up" notice after a minute of backlog.
+
+## The shorter window, on real speech (Mac, 2026-10-12)
+
+The Windows session pointed back to round 1's `--audio-ctx 576` (9.0 s per 10 s chunk). It was scored on the 100 FLEURS Estonian clips, with the window sized to each clip plus a margin (`asr-wer.mjs --audio-ctx-margin`):
+
+| Window | WER |
+|---|---:|
+| Full 30 s (as shipped) | 19.2% |
+| Clip + 64 frames | 65.6% |
+| Clip + 128 frames | 72.9% |
+| Clip + 256 frames | 59.2% |
+
+At +128, 33 of 100 clips ran away (more than 1.5× the reference words: whole sentences repeated), and 52 were worse than with the full window. The setting itself works (clips it does not upset come out correct). It stays rejected; this is not a speed lever for Estonian.
+
+## Where this leaves W6
+
+The pre-approved levers are used up (threads) or do nothing (beam, chunk length). The two candidate levers outside the plan fail on quality: the shorter window here, and Parakeet/Zipformer by Jarmo's decision. What remains:
+- **GPU (Vulkan):** unmeasured, a new build dependency.
+- **A resident whisper process:** saves the 1.3–2.4 s load per call, about 10%.
+
+This is a decision for Jarmo (sprint-plan.md, open decisions).

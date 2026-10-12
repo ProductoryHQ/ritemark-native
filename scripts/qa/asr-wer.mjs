@@ -11,6 +11,8 @@
 //   npx --yes tsx@4.21.0 scripts/qa/asr-wer.mjs --clips <dir> --label "whisper q8_0" \
 //     --engine whisper --binary <whisper-cli> --model <ggml.bin> [--language et] [--threads N] [--timestamps on] [--report out.json]
 //   (--timestamps on: TalTech's fine-tuned Whisper only stops decoding with timestamps on.)
+//   [--audio-ctx-margin N]: shorten Whisper's 30 s window to each clip's length plus N frames
+//   (50 frames per second), to test that speed-up's accuracy.
 //   npx --yes tsx@4.21.0 scripts/qa/asr-wer.mjs --clips <dir> --label "parakeet v3 int8" \
 //     --engine sherpa --binary <sherpa-onnx-offline> [--report out.json] -- --tokens=... --encoder=... ...
 
@@ -68,6 +70,10 @@ async function runWhisper(clips, options) {
       modelPath: options.model, audioPath: clip.file, language: options.language,
       threads: options.threads ? Number(options.threads) : undefined,
     }).filter(arg => arg !== '--output-txt' && !(options.timestamps === 'on' && arg === '--no-timestamps'));
+    if (options['audio-ctx-margin']) {
+      const frames = Math.min(1500, Math.ceil(seconds(clip.file) * 50) + Number(options['audio-ctx-margin']));
+      args.splice(args.length - 1, 0, '--audio-ctx', String(frames));
+    }
     const started = Date.now();
     const result = spawnSync(options.binary, args, {
       encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,

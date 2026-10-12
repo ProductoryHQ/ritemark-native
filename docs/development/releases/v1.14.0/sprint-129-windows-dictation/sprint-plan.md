@@ -65,7 +65,8 @@ Proposed 2026-10-11 and approved with the plan:
 ## Open decisions for Jarmo (raised 2026-10-11, after approval)
 
 - ~~Apple silicon engine for macOS 12–14~~: approved 2026-10-12, now R11.
-- **Windows dictation speed (W6 stop condition reached, A2; candidates being measured since 2026-10-12).** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
+- **Windows dictation speed: ship or hold (asked 2026-10-12, after round 2).** On Jarmo's Ryzen 7 5825U every dictation call takes ~22 s (q8_0) or ~25 s (f16), whatever its length. Nothing is lost (R8), but text arrives ~25–50 s after the speech. The remaining speed levers fail on quality, or are a GPU build that has not been measured. Choices: ship Windows dictation as it is, or hold it behind the flag (Transcribe on-device ships on Windows either way) until a faster path, GPU, is measured in a follow-up. Detail: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
+- **Earlier framing (2026-10-11):** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
 
 ## Feature Flag Check
 
