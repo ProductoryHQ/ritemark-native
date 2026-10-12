@@ -641,6 +641,27 @@ export class CommentTaskController {
     return unfinished.length;
   }
 
+  /**
+   * Activation sweep: recover abandoned work, then apply retention (D4).
+   * Without retention the store grows without bound, and every lookup rereads
+   * every record ever written. Retention never sweeps unfinished work, so a
+   * task left running months ago is recovered, not lost. A failure in one step
+   * does not skip the other, and neither throws: a missed sweep costs disk,
+   * not activation.
+   */
+  async sweepOnActivation(warn: (message: string, error: unknown) => void): Promise<void> {
+    try {
+      await this.recoverUnfinished();
+    } catch (error) {
+      warn('Could not recover unfinished tasks:', error);
+    }
+    try {
+      await this.dependencies.store.prune();
+    } catch (error) {
+      warn('Could not prune finished tasks:', error);
+    }
+  }
+
   /** Push one document's snapshot to its editors. Called when an editor becomes
    *  ready and after every change to a task bound to that document. */
   async publish(documentUri: string): Promise<void> {

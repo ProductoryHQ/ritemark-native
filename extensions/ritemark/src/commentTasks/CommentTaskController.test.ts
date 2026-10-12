@@ -10,7 +10,7 @@ import {
   type CommentTaskDestination,
   type CommentTaskDocument,
 } from './CommentTaskController';
-import { CommentTaskStore, commentTaskStoreDir } from './CommentTaskStore';
+import { CommentTaskStore, TERMINAL_RETENTION_DAYS, commentTaskStoreDir } from './CommentTaskStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome, CommentTaskResultMessage } from './protocol';
 import { safeFailureMessage, type CommentTaskProjectionV1 } from './types';
@@ -420,6 +420,71 @@ async function main(): Promise<void> {
     assert.equal(recovered?.lifecycle.state, 'interrupted');
     if (recovered?.lifecycle.state === 'interrupted') assert.equal(recovered.lifecycle.reason, 'restart');
     assert.equal(await h.controller.recoverUnfinished(), 0, 'a second sweep finds nothing');
+  }
+
+  // ── Activation sweep: recovery, then retention ─────────────────────────────
+  {
+    const h = harness();
+    const accepted = expectOk(await h.controller.handleRequest(acceptMessage(), doc()), 'accept');
+    const template = await h.store.get((accepted.data as { taskId: string }).taskId);
+    assert.ok(template);
+    const old = new Date(Date.parse('2026-09-14T12:00:00.000Z') - (TERMINAL_RETENTION_DAYS + 1) * 86_400_000).toISOString();
+    const oldDoneId = '00000000-0000-4000-8000-000000000901';
+    const oldRunningId = '00000000-0000-4000-8000-000000000902';
+    await h.store.create({
+      ...template,
+      taskId: oldDoneId,
+      requestId: 'req-old-done',
+      createdAt: old,
+      updatedAt: old,
+      turn: { conversationTurnId: '00000000-0000-4000-8000-000000000911' },
+      lifecycle: { state: 'completed', since: old, terminalEventId: 'e-old', summary: 'Done long ago.' },
+    });
+    await h.store.create({
+      ...template,
+      taskId: oldRunningId,
+      requestId: 'req-old-running',
+      createdAt: old,
+      updatedAt: old,
+      turn: { conversationTurnId: '00000000-0000-4000-8000-000000000912' },
+      lifecycle: { state: 'queued', since: old },
+    });
+
+    const warnings: string[] = [];
+    await h.controller.sweepOnActivation((message) => warnings.push(message));
+    assert.deepEqual(warnings, []);
+    assert.equal(await h.store.get(oldDoneId), null, 'a terminal task past the retention window is swept');
+    const survivor = await h.store.get(oldRunningId);
+    assert.equal(survivor?.lifecycle.state, 'interrupted', 'old unfinished work is recovered, never swept');
+    assert.equal((await h.store.get(template.taskId))?.lifecycle.state, 'interrupted', 'recent work is kept');
+  }
+
+  // ── A failed recovery still prunes, and never throws ───────────────────────
+  {
+    const h = harness();
+    const accepted = expectOk(await h.controller.handleRequest(acceptMessage(), doc()), 'accept');
+    const template = await h.store.get((accepted.data as { taskId: string }).taskId);
+    assert.ok(template);
+    const old = new Date(Date.parse('2026-09-14T12:00:00.000Z') - (TERMINAL_RETENTION_DAYS + 1) * 86_400_000).toISOString();
+    const oldDoneId = '00000000-0000-4000-8000-000000000903';
+    await h.store.create({
+      ...template,
+      taskId: oldDoneId,
+      requestId: 'req-old-done-2',
+      createdAt: old,
+      updatedAt: old,
+      turn: { conversationTurnId: '00000000-0000-4000-8000-000000000913' },
+      lifecycle: { state: 'completed', since: old, terminalEventId: 'e-old-2', summary: 'Done long ago.' },
+    });
+    h.store.listUnfinished = async () => {
+      throw new Error('Injected recovery failure');
+    };
+
+    const warnings: string[] = [];
+    await h.controller.sweepOnActivation((message) => warnings.push(message));
+    assert.deepEqual(warnings, ['Could not recover unfinished tasks:'], 'the failure is reported, not thrown');
+    assert.equal(await h.store.get(oldDoneId), null, 'retention still ran');
+    assert.equal((await h.store.get(template.taskId))?.lifecycle.state, 'queued', 'unfinished work is untouched');
   }
 
   // ── Malformed input never throws into the host ─────────────────────────────
