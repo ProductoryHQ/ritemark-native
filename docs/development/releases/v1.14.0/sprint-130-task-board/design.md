@@ -41,7 +41,9 @@ What this sprint takes from that:
 - **Next up**: the order of To do is the priority.
 - Agents are told to ask the decisions that would change the result **before** a long run, not in the middle.
 
-Later, in its own sprint: **autopilot**, agents taking the next card by themselves within a limit the user sets.
+- **Doing limit** (proposed 2026-10-12): Doing holds at most 3 cards by default, the classic Kanban rule "stop starting, start finishing". Doing counts both kinds of work in flight: agents working and results waiting on the user. Give to past the limit says "Doing is full: 3 of 3" with **Queue it** (starts by itself when a card leaves Doing), **Start anyway** and ×. The limit is set from the Doing header ("3/3 full ▾": 1–6 or No limit).
+
+Later, in its own sprint: **autopilot**, agents taking the next card by themselves; it fills free Doing slots up to the same limit, in To do order, respecting the conflict guard.
 
 ## 1. Behaviour model (estimates)
 

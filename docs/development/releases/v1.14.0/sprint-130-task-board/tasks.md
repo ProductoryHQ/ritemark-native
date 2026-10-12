@@ -22,6 +22,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count
 - [ ] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
 - [ ] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
+- [ ] T2.6 Doing limit (if D13 is approved): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; header control; tests
 - [ ] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)
