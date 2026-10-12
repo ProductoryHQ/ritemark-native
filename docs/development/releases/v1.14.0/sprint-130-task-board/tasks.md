@@ -1,10 +1,10 @@
 # Sprint 130 Tasks
 
-Nothing here starts before Jarmo approves the plan in this sprint's session. The first action after approval is `git checkout -b sprint-130-task-board` from current `main`.
+Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from `main` before any code.
 
 ## Phase 0: Setup and probes
 
-- [ ] T0.1 Branch `sprint-130-task-board` from `main`; check with `git branch --show-current`
+- [x] T0.1 Branch `sprint-130-task-board` from `main`; check with `git branch --show-current`
 - [ ] T0.2 Run probes P1–P7 (technical-plan W0); write `research/phase-0-probes.md` with method and result for each
 - [ ] T0.3 If a probe fails, stop and bring Jarmo the options before the affected workstream
 - [ ] T0.4 Jarmo looks at the design (design.md) on a dev instance mock-up before W3 is finished (short check, not a gate)
@@ -22,7 +22,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count
 - [ ] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
 - [ ] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
-- [ ] T2.6 Doing limit (if D13 is approved): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; header control; tests
+- [ ] T2.6 Doing limit (D13): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; header control; tests
 - [ ] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)

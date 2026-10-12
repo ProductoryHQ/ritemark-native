@@ -3,8 +3,8 @@
 Track: SDD (auto-detected: fourteen user-facing requirements; multi-component flow board webview ↔ host ↔ project files ↔ AI sidebar ↔ three agent runtimes; concurrent writers on the same files)<br>
 Override with: "use plain full track"<br>
 Release tier: **extension** by path: everything is under `extensions/ritemark/` plus docs. No VS Code patch, no `product.json`, no `binaries/agents/`, no shell-tier script (the OpenCode tool adapter keeps its output path, so the build checks that name it are untouched). The new activity-bar icon (`media/tasks-icon.svg`) is not part of an extension-only update, so **the feature ships inside the v1.14.0 app release**, as Sprint 128 did inside v1.13.0.<br>
-Status: **Phase 2 (PLAN) — written 2026-10-11, awaiting Jarmo's approval. No implementation, no sprint branch yet.**<br>
-Branch: `sprint-130-task-board` (created from `main` only after approval, before the first code edit). These docs are on `docs/sprint-130-task-board-plan`.<br>
+Status: **Phase 3 (DEVELOP) — plan approved by Jarmo 2026-10-12. Phase 0 probes first.**<br>
+Branch: `sprint-130-task-board`, created from `main` (37c4973f) after the approval and before any code; the plan docs moved here from `docs/sprint-130-task-board-plan`.<br>
 Release: v1.14.0 (milestone 13; the release plan file does not exist on `main` yet)<br>
 Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decided by Jarmo 2026-10-11 on the Dev Dashboard
 
@@ -12,7 +12,7 @@ Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decid
 
 - [design.md](./design.md) — **the UX design, first**: behaviour model, side bar, editor-area board, card, Give to agent, narrow width, state words.
 - [prototype/task-board-prototype.html](./prototype/task-board-prototype.html) — clickable prototype built from the real 1.13.0 styles, light and dark (Jarmo asked for it before approving, 2026-10-12).
-- [spec.md](./spec.md) — behaviour contract R1–R14 and the proposed decisions D1–D9.
+- [spec.md](./spec.md) — behaviour contract R1–R14 and the decisions D1–D13.
 - [scenarios.md](./scenarios.md) — S1–S37 (43 scenarios), the dev-instance QA matrix.
 - [technical-plan.md](./technical-plan.md) — workstreams W0–W8, message shapes, files, tests, architecture-gate note.
 - [tasks.md](./tasks.md) — implementation checklist.
@@ -43,7 +43,7 @@ In scope:
 
 Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates, several boards per folder, comment tasks or document checkboxes on the board, background runs outside the sidebar, OS notifications. Full list: [spec.md](./spec.md#non-requirements).
 
-## Product decisions (proposed, for Jarmo's approval)
+## Product decisions (approved by Jarmo 2026-10-12)
 
 - **2026-10-11, D0 — UX shape:** the side bar is the daily glance (an add field, Your calls first, then Doing, To do, Ideas, Done as a list); the editor-area Task board is for planning (columns side by side, tabs Your calls · Board · Ideas · Log); a card opens as a dialog. Settled with the `ux-expert` agent: [design.md](./design.md).
 - **2026-10-11, D1 — Storage:** one Markdown file per card in `.ritemark/tasks/`. Readable anywhere, no conflict when two cards change at once in Dropbox or git, one damaged file loses one card. Which conversation a card runs in stays on this computer.
@@ -56,7 +56,7 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - **2026-10-11, D8 — Words:** Home's "New AI task" becomes "New AI conversation", so "task" means a board card.
 - **2026-10-12, D10 — Agent choice everywhere:** every action that starts agent work has a dropdown with Claude Code, Codex and OpenCode (Jarmo, on the prototype).
 - **2026-10-12, D11 — Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority (Next up); **Done when**, **Check these** and the **conflict guard** (with Wait for it) are in this sprint (Jarmo: "võta need kolm sprinti 130").
-- **2026-10-12, D13 — Doing limit (proposed, in the prototype):** Doing holds at most 3 cards by default, set from its header; past the limit Give to offers Queue it or Start anyway. The later autopilot fills free slots up to the same limit.
+- **2026-10-12, D13 — Doing limit:** Doing holds at most 3 cards by default, set from its header; past the limit Give to offers Queue it or Start anyway. The later autopilot fills free slots up to the same limit. In this sprint (Jarmo: "limit is in").
 - **2026-10-12, D12 — Autopilot later:** agents taking the next card by themselves within a user-set limit is its own later sprint (Jarmo: "autopilot hiljem").
 - **2026-10-11, D9 — Review step:** a finished card waits in Doing as "Ready to review" until the user presses Mark done; no Review column.
 
@@ -82,4 +82,4 @@ If Jarmo prefers smaller merges, W5–W6 (agent tools, idea review) can be split
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan (in this session, in his own words)
+- [x] Jarmo approved this sprint plan (in this session, in his own words), 2026-10-12: "plan approved. limit is in. and tasks above transcribe is fine!" (D13 Doing limit in; D7 revised position confirmed)

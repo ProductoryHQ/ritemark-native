@@ -198,7 +198,7 @@ Then "Send the draft to Henrik" starts by itself with Claude, and its history sa
 When I press Start now instead
 Then it starts at once
 
-### S23b: Doing is full (proposed)
+### S23b: Doing is full
 Given the Doing limit is 3 and Doing holds 3 cards
 Then Doing's header reads "3/3 full" and the side bar says "Doing · 3/3"
 When I press Give to Claude on a To do card

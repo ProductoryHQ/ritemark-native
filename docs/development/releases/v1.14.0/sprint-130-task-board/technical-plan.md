@@ -1,6 +1,6 @@
 # Sprint 130 Technical Plan — Task board
 
-**Status:** proposed with the Phase 2 plan, not started. Proposed shapes, not final code: when the code diverges, this file changes first.
+**Status:** approved with the plan 2026-10-12; Phase 0 probes first. Proposed shapes, not final code: when the code diverges, this file changes first.
 **Architecture gate:** **this sprint changes architecture.** It adds a `src/taskBoard/` subsystem, new webview↔host messages, a second agent tool group, and it generalises `BrowserToolsInjector`, which CLAUDE.md lists as a locked decision. `docs/development/architecture.md` and that CLAUDE.md row are updated before the sprint closes (W8).
 
 Facts behind every claim below: [research/current-state-audit.md](./research/current-state-audit.md). Storage reasoning: [research/storage-decision.md](./research/storage-decision.md). Paths are relative to `extensions/ritemark/`.

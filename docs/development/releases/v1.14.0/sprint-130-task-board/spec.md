@@ -87,7 +87,7 @@ Acceptance criteria:
 - **Stop** on a working card stops that turn; the card says "Stopped" and offers **Give to {agent}** again.
 - If Ritemark quits while a card is working, the card says "Interrupted when Ritemark closed" on the next start and offers **Retry**.
 - If the card's conversation was deleted, the card says "Conversation no longer available" and **Retry** starts a new one.
-- **Doing limit** (Kanban WIP limit, proposed 2026-10-12, shown in the prototype). Doing holds at most N cards (default 3; 1–6 or no limit, set from the Doing header; remembered for this project on this computer). Doing's header shows "3/3" (accent when full, amber when over). When Doing is full, Give to does not start: the card says "Doing is full: 3 of 3" with a link to Your calls and offers **Queue it** (the card stays in To do as "Starts when Doing has room" and starts by itself, in To do order, when a card leaves Doing), **Start anyway** and Cancel. Moving a card into a full Doing by hand is allowed and says it is over the limit. Agents cannot move a card into a full Doing.
+- **Doing limit** (Kanban WIP limit, 2026-10-12, shown in the prototype). Doing holds at most N cards (default 3; 1–6 or no limit, set from the Doing header; remembered for this project on this computer). Doing's header shows "3/3" (accent when full, amber when over). When Doing is full, Give to does not start: the card says "Doing is full: 3 of 3" with a link to Your calls and offers **Queue it** (the card stays in To do as "Starts when Doing has room" and starts by itself, in To do order, when a card leaves Doing), **Start anyway** and Cancel. Moving a card into a full Doing by hand is allowed and says it is over the limit. Agents cannot move a card into a full Doing.
 - **Conflict guard.** When another card that names the same file is with an agent (sending, queued, working or waiting for the user), Give to does not start. The card says which task works on which file and offers **Wait for it**, **Start now** and Cancel. **Wait for it** shows "Starts after “…”" on the card and starts it with the chosen agent by itself when that other task's turn ends; **Start now** starts at once.
 
 ### R6: The result comes back to the card
@@ -179,7 +179,7 @@ Acceptance criteria:
 - Notifications outside Ritemark when a card finishes (the multi-window toast idea stays its own item).
 - Telling apart several people who share a folder: every person's change reads as "You".
 
-## Resolved questions (proposed; approved with the plan)
+## Resolved questions (approved with the plan, 2026-10-12)
 
 - **D1 Storage:** one Markdown file per card in `.ritemark/tasks/`; machine-local handoff records in global storage. Rejected: one JSON file (every change conflicts in Dropbox/git, one damaged write loses the board), SQLite (native dependency, binary in a sync folder).
 - **D2 Columns:** fixed Idea / To do / Doing / Done. The stored `stage` is a string, so user columns can come later without migrating files.
@@ -190,7 +190,7 @@ Acceptance criteria:
 - **D7 Position:** the Tasks button first among Ritemark's own tools, just above Transcribe. (Revised 2026-10-12: the real app lists VS Code's built-in entries between Home and every extension container; right after Home would need a patch 002 change and make the sprint shell-tier.) Declaration order in `package.json`, no patch.
 - **D8 Words:** Home's "New AI task" becomes "New AI conversation".
 - **D10 Agent choice:** every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode (Jarmo, 2026-10-12).
-- **D13 Doing limit (proposed 2026-10-12):** Doing holds at most 3 cards by default, set from its header; Give to past the limit offers Queue it or Start anyway; autopilot will later fill free slots up to the same limit.
+- **D13 Doing limit (2026-10-12):** Doing holds at most 3 cards by default, set from its header; Give to past the limit offers Queue it or Start anyway; autopilot will later fill free slots up to the same limit.
 - **D11 Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority; Done when, Check these and the conflict guard are in this sprint; autopilot is later (Jarmo, 2026-10-12).
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 

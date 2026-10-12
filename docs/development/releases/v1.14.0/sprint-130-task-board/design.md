@@ -1,6 +1,6 @@
 # Sprint 130 Design — Task board in your project folder (#119)
 
-**Status:** Draft for plan approval (Phase 2). Settled with the `ux-expert` agent and the `ritemark-design` skill on 2026-10-11, before the technical plan.<br>
+**Status:** Approved with the plan by Jarmo, 2026-10-12. Settled with the `ux-expert` agent and the `ritemark-design` skill on 2026-10-11, before the technical plan.<br>
 **Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. Where the prototype and this text differ, the prototype is newer.<br>
 **System:** Ritemark Indigo-Editorial<br>
 **Scope:** activity-bar entry, side-bar view, editor-area board, card detail, Give to agent and the result coming back, Your calls, Ideas, Log, narrow width, state words. Storage, tools and runtime plumbing are in [technical-plan.md](./technical-plan.md).
@@ -41,7 +41,7 @@ What this sprint takes from that:
 - **Next up**: the order of To do is the priority.
 - Agents are told to ask the decisions that would change the result **before** a long run, not in the middle.
 
-- **Doing limit** (proposed 2026-10-12): Doing holds at most 3 cards by default, the classic Kanban rule "stop starting, start finishing". Doing counts both kinds of work in flight: agents working and results waiting on the user. Give to past the limit says "Doing is full: 3 of 3" with **Queue it** (starts by itself when a card leaves Doing), **Start anyway** and ×. The limit is set from the Doing header ("3/3 full ▾": 1–6 or No limit).
+- **Doing limit** (2026-10-12): Doing holds at most 3 cards by default, the classic Kanban rule "stop starting, start finishing". Doing counts both kinds of work in flight: agents working and results waiting on the user. Give to past the limit says "Doing is full: 3 of 3" with **Queue it** (starts by itself when a card leaves Doing), **Start anyway** and ×. The limit is set from the Doing header ("3/3 full ▾": 1–6 or No limit).
 
 Later, in its own sprint: **autopilot**, agents taking the next card by themselves; it fills free Doing slots up to the same limit, in To do order, respecting the conflict guard.
 
