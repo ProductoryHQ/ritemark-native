@@ -3,7 +3,7 @@
  * Run: npx tsx webview/src/components/dictationProblems.test.ts
  */
 import assert from 'node:assert/strict'
-import { dictationProblemCopy, problemFromCapture, type DictationProblem } from './dictationProblems'
+import { dictationProblemCopy, dictationStateCopy, problemFromCapture, type DictationProblem } from './dictationProblems'
 
 const ALL: DictationProblem[] = [
   'mic-blocked', 'mic-missing', 'mic-busy', 'mic-internal', 'mic-unexpected',
@@ -60,3 +60,27 @@ assert.equal(problemFromCapture('internal-config'), 'mic-internal')
 assert.equal(problemFromCapture('unexpected'), 'mic-unexpected')
 
 console.log('dictationProblems.test.ts: all tests passed')
+
+// R13: the model dialog names the size the host sends, and none when it sends none.
+assert.match(dictationProblemCopy('model-missing', 'win32', '834 MB').body[0].text, /about 834 MB/)
+assert.doesNotMatch(dictationProblemCopy('model-missing', 'win32').body[0].text, /GB|MB/)
+
+// R12: "speak, then text" never promises live text, and says how long the wait is.
+const states = ['idle', 'preparing', 'listening', 'processing', 'finishing'] as const
+for (const mode of ['live', 'deferred'] as const) {
+  for (const state of states) {
+    const copy = dictationStateCopy(state, mode, 'Estonian')
+    assert.ok(copy.tooltip.length > 10, `${mode}/${state}: a tooltip`)
+  }
+}
+const recording = dictationStateCopy('listening', 'deferred', 'Estonian')
+assert.match(recording.placeholder!, /after you stop/)
+assert.match(recording.tooltip, /Recording in Estonian/)
+assert.doesNotMatch(recording.placeholder! + recording.tooltip, /Listening|Dictating/)
+assert.match(dictationStateCopy('idle', 'deferred', 'Estonian').tooltip, /after you stop/)
+assert.equal(dictationStateCopy('idle', 'live', 'Estonian').tooltip, 'Start dictation (Estonian)')
+assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian', { seconds: 20 }).placeholder!, /about 20 seconds/)
+assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian').placeholder!, /up to a minute/)
+assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian', { seconds: 20, overdue: true }).placeholder!, /Still processing/)
+assert.match(dictationStateCopy('finishing', 'live', 'Estonian').placeholder!, /last words/)
+assert.equal(dictationStateCopy('idle', 'deferred', 'Estonian').placeholder, null)

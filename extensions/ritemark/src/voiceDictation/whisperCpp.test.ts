@@ -6,8 +6,11 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import {
+  defaultModelFile,
   describeWhisperFailure,
   dictationArgs,
+  dictationModeFor,
+  getModelPath,
   getWhisperBinaryPath,
   parseDictationStdout,
   probeWhisper,
@@ -113,6 +116,21 @@ async function run(): Promise<void> {
   let tries = 0;
   await assert.rejects(withFileRetry(() => { tries += 1; throw busy('EBUSY'); }, { sleep, totalMs: 1000 }), /EBUSY/);
   assert.ok(tries > 1 && tries < 10, 'gives up once the time budget is spent');
+
+  // R12/R13 (Jarmo 2026-10-12): computers without Apple's GPU dictate "speak,
+  // then text" with the 8-bit model; Apple silicon keeps live text and f16.
+  assert.equal(dictationModeFor('darwin', 'arm64'), 'live');
+  assert.equal(dictationModeFor('win32', 'x64'), 'deferred');
+  assert.equal(dictationModeFor('darwin', 'x64'), 'deferred', 'Intel Macs follow Windows until Jarmo decides');
+  assert.equal(defaultModelFile('darwin', 'arm64'), 'ggml-large-v3-turbo.bin');
+  assert.equal(defaultModelFile('win32', 'x64'), 'ggml-large-v3-turbo-q8_0.bin');
+  assert.equal(defaultModelFile('darwin', 'x64'), 'ggml-large-v3-turbo-q8_0.bin');
+  assert.equal(path.basename(getModelPath()), defaultModelFile(), 'the model path follows this computer');
+  process.env.RITEMARK_DICTATION_MODE = 'deferred';
+  assert.equal(dictationModeFor('darwin', 'arm64'), 'deferred', 'QA override');
+  process.env.RITEMARK_DICTATION_MODE = 'sideways';
+  assert.equal(dictationModeFor('darwin', 'arm64'), 'live', 'an unknown override is ignored');
+  delete process.env.RITEMARK_DICTATION_MODE;
 
   console.log('whisperCpp.test.ts: all tests passed');
 }

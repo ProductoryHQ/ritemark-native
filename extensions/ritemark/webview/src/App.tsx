@@ -51,59 +51,51 @@ type SidePanel = 'none' | 'toc' | 'properties' | 'agent'
 // Minimum container width (px) at which the inline ToC panel is shown.
 // Tunable in T7 during live testing.
 
-// Dictation placeholder texts
-const LISTENING_PLACEHOLDER = '🎤 Listening...'
-const PROCESSING_PLACEHOLDER = '⏳ Processing...'
+// Sprint 129 R12: the dictation placeholder at the cursor. Its text comes from
+// useVoiceDictation (dictationStateCopy) and changes with the state, so the one
+// on the page is remembered here to find it again.
+let shownDictationPlaceholder: string | null = null
 
 /**
- * Find and remove a dictation placeholder from the editor
- * Returns true if found and removed
+ * Find and remove the dictation placeholder from the editor.
+ * Returns where it was, or null if it is not in the document.
  */
-function removeDictationPlaceholder(editor: TipTapEditor): boolean {
-  const { state } = editor
-  const { doc } = state
+function removeDictationPlaceholder(editor: TipTapEditor): number | null {
+  const placeholder = shownDictationPlaceholder
+  shownDictationPlaceholder = null
+  if (!placeholder) return null
 
-  // Search for either placeholder text and remove it
-  let found = false
-  doc.descendants((node, pos) => {
-    if (found) return false
+  let found: number | null = null
+  editor.state.doc.descendants((node, pos) => {
+    if (found !== null) return false
     if (node.isText) {
-      const text = node.text || ''
-      const listeningIdx = text.indexOf(LISTENING_PLACEHOLDER)
-      const processingIdx = text.indexOf(PROCESSING_PLACEHOLDER)
-
-      if (listeningIdx !== -1) {
-        const start = pos + listeningIdx
-        const end = start + LISTENING_PLACEHOLDER.length
-        editor.chain().deleteRange({ from: start, to: end }).run()
-        found = true
-        return false
-      }
-      if (processingIdx !== -1) {
-        const start = pos + processingIdx
-        const end = start + PROCESSING_PLACEHOLDER.length
-        editor.chain().deleteRange({ from: start, to: end }).run()
-        found = true
+      const index = (node.text || '').indexOf(placeholder)
+      if (index !== -1) {
+        found = pos + index
         return false
       }
     }
   })
-
+  if (found !== null) {
+    editor.chain().deleteRange({ from: found, to: found + placeholder.length }).run()
+  }
   return found
 }
 
 /**
- * Insert a dictation placeholder at cursor position
+ * Show a dictation placeholder: at `at` when given (after inserted text),
+ * otherwise where the old one was, or at the cursor.
  */
-function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string) {
-  // First remove any existing placeholder
-  removeDictationPlaceholder(editor)
-
-  // Insert new placeholder with styling
-  editor.chain()
-    .focus()
-    .insertContent(`<span style="color: var(--vscode-descriptionForeground, #888); font-style: italic;">${placeholder}</span>`)
-    .run()
+function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string, at?: number) {
+  const previous = removeDictationPlaceholder(editor)
+  const html = `<span style="color: var(--vscode-descriptionForeground, #888); font-style: italic;">${placeholder}</span>`
+  const position = at ?? previous
+  if (position === null) {
+    editor.chain().focus().insertContent(html).run()
+  } else {
+    editor.chain().insertContentAt(position, html, { updateSelection: false }).run()
+  }
+  shownDictationPlaceholder = placeholder
 }
 
 // Feature flags sent from extension
@@ -328,20 +320,27 @@ function App() {
           handleToolCall(toolName, args, toolSelection)
           break
 
-        case 'dictation:transcription':
-          // Insert transcribed text at cursor position
+        case 'dictation:transcription': {
+          // Insert the text where the placeholder is (the user may be working
+          // elsewhere meanwhile), or at the cursor; then put the placeholder
+          // back after it while dictation goes on.
           const transcribedText = message.text as string
-          if (transcribedText && editorRef.current) {
-            // Remove any placeholder, then insert text
-            removeDictationPlaceholder(editorRef.current)
-            editorRef.current.chain()
-              .focus()
-              .insertContent(transcribedText + ' ')
-              .run()
-            // If still listening, show placeholder again for next chunk
-            // (This will be handled by the next dictation:listening-started event)
+          const editor = editorRef.current
+          if (transcribedText && editor) {
+            const placeholder = shownDictationPlaceholder
+            const at = removeDictationPlaceholder(editor)
+            const text = transcribedText + ' '
+            if (at === null) {
+              editor.chain().focus().insertContent(text).run()
+            } else {
+              editor.chain().insertContentAt(at, text, { updateSelection: false }).run()
+            }
+            if (placeholder) {
+              insertDictationPlaceholder(editor, placeholder, at === null ? undefined : at + text.length)
+            }
           }
           break
+        }
 
         case 'agentFlowsUpdated':
           setAgentFlows((message.flows as string[]) || [])
@@ -357,22 +356,17 @@ function App() {
     // These events coordinate UI between components without involving extension
     onInternalEvent((event: InternalEvent) => {
       switch (event.type) {
-        case 'dictation:listening-started':
-          // Show "Listening..." placeholder when recording starts
-          if (editorRef.current) {
-            insertDictationPlaceholder(editorRef.current, LISTENING_PLACEHOLDER)
+        case 'dictation:placeholder': {
+          // The dictation state changed: show its placeholder (Sprint 129 R12)
+          const text = (event.data as { text?: string } | undefined)?.text
+          if (editorRef.current && text && text !== shownDictationPlaceholder) {
+            insertDictationPlaceholder(editorRef.current, text)
           }
           break
+        }
 
-        case 'dictation:processing':
-          // Change to "Processing..." when audio chunk is sent for transcription
-          if (editorRef.current) {
-            insertDictationPlaceholder(editorRef.current, PROCESSING_PLACEHOLDER)
-          }
-          break
-
-        case 'dictation:listening-stopped':
-          // Remove placeholder when dictation ends
+        case 'dictation:placeholder-clear':
+          // Dictation ended or stopped with a problem
           if (editorRef.current) {
             removeDictationPlaceholder(editorRef.current)
           }

@@ -10,6 +10,7 @@ import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
 import { DictationController, dictationProblemFor } from './voiceDictation/controller';
+import { dictationModeFor } from './voiceDictation/whisperCpp';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
@@ -881,7 +882,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Stop voice dictation and get transcription
             if (this.dictationController) {
               this.dictationController.stopDictation();
+            } else {
+              // Nothing started here: answer anyway, so the button never waits.
+              webview.postMessage({ type: 'dictation:status', status: 'idle' });
             }
+            return;
+
+          case 'dictation:getMode':
+            // Sprint 129 R12: live text, or "speak, then text" on computers without Apple's GPU.
+            webview.postMessage({ type: 'dictation:mode', mode: dictationModeFor() });
             return;
 
           case 'dictation:getModelStatus':

@@ -12,14 +12,24 @@
 // MAX_CALL_SECONDS. Whisper pads every call to a 30 s window, so a call costs
 // about the same whatever its length, and joining audio lets a slow computer
 // keep up instead of losing words. Stop finishes everything already captured.
+//
+// Sprint 129 R12 ("speak, then text", computers without Apple's GPU): nothing is
+// inserted while the user speaks. Full MAX_CALL_SECONDS pieces are transcribed in
+// the background and their text is held; after Stop the rest is transcribed and
+// all text goes in at once. A long dictation then waits about one call after
+// Stop, not as long as it lasted.
 
 import type * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import {
+  AVAILABLE_MODELS,
+  dictationModeFor,
   getModelPath,
   getWhisperBinaryPath,
   transcribeWav,
   WHISPER_TARGETS,
+  type DictationMode,
   type TranscriptionResult,
   type WhisperOptions,
   type WhisperReadiness,
@@ -30,10 +40,13 @@ const SAMPLE_RATE = 16000;
 const BYTES_PER_SECOND = SAMPLE_RATE * 2;
 /** One call stays inside Whisper's 30 s window. */
 export const MAX_CALL_SECONDS = 28;
-/** Waiting audio beyond this means the computer cannot keep up. */
+/** Live dictation only: waiting audio beyond this means the computer cannot keep up. */
 export const BACKLOG_STOP_SECONDS = 60;
 
-export const BACKLOG_NOTICE = "Dictation can't keep up on this computer, so it stopped listening. Everything you said so far has been added.";
+export const BACKLOG_NOTICE = "Dictation can't keep up on this computer, so it stopped listening. The rest of what you said will appear in a moment.";
+
+/** Where the last call's duration is kept, for the next wait estimate (R12). */
+const CALL_MS_KEY = 'ritemark.dictation.lastCallMs';
 
 /**
  * Sprint 129 R6: what the webview's dictation dialog explains. The wording lives
@@ -121,6 +134,12 @@ export interface DictationDeps {
   modelExists: (modelPath: string) => boolean;
   /** A passing notice (VS Code toast) that needs no decision. */
   notify: (message: string) => void;
+  /** Sprint 129 R12: live text, or all of it after Stop. */
+  mode: DictationMode;
+  /** The last call's duration on this computer, from an earlier session. */
+  recallCallMs: () => number | undefined;
+  rememberCallMs: (ms: number) => void;
+  now: () => number;
 }
 
 export class DictationController {
@@ -129,11 +148,14 @@ export class DictationController {
   private pending: Buffer[] = [];
   private pendingBytes = 0;
   private draining: Promise<void> | null = null;
+  /** Deferred mode: text transcribed while recording, inserted after Stop. */
+  private held: string[] = [];
+  private lastCallMs: number | undefined;
   private readonly deps: DictationDeps;
 
   constructor(
     private webview: Pick<vscode.Webview, 'postMessage'>,
-    context: Pick<vscode.ExtensionContext, 'extensionPath'>,
+    context: Pick<vscode.ExtensionContext, 'extensionPath'> & Partial<Pick<vscode.ExtensionContext, 'globalState'>>,
     deps: Partial<DictationDeps> = {}
   ) {
     this.deps = {
@@ -144,8 +166,13 @@ export class DictationController {
       // Loaded lazily so the unit tests run without VS Code.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       notify: (message) => { void (require('vscode') as typeof vscode).window.showInformationMessage(message); },
+      mode: dictationModeFor(),
+      recallCallMs: () => context.globalState?.get<number>(CALL_MS_KEY),
+      rememberCallMs: (ms) => { void context.globalState?.update(CALL_MS_KEY, ms); },
+      now: () => Date.now(),
       ...deps,
     };
+    this.lastCallMs = this.deps.recallCallMs();
   }
 
   /**
@@ -156,6 +183,7 @@ export class DictationController {
     this.isRecording = true;
     this.pending = [];
     this.pendingBytes = 0;
+    this.held = [];
 
     this.webview.postMessage({
       type: 'dictation:status',
@@ -182,15 +210,17 @@ export class DictationController {
     this.pending.push(pcm);
     this.pendingBytes += pcm.length;
 
-    if (this.pendingBytes > BACKLOG_STOP_SECONDS * BYTES_PER_SECOND) {
+    if (this.deps.mode === 'live' && this.pendingBytes > BACKLOG_STOP_SECONDS * BYTES_PER_SECOND) {
       // Stop taking audio; what was captured is still transcribed and inserted.
       // A toast, not the dialog: the user is watching their words still arrive.
+      // Deferred mode has no such stop: a slow computer only makes the wait
+      // after Stop longer.
       this.isRecording = false;
       this.deps.notify(BACKLOG_NOTICE);
       this.webview.postMessage({ type: 'dictation:stop-capture' });
     }
 
-    return this.ensureDraining();
+    return this.hasWork() ? this.ensureDraining() : (this.draining ?? Promise.resolve());
   }
 
   /**
@@ -198,13 +228,19 @@ export class DictationController {
    * webview sends just before this — is transcribed before the button goes idle.
    */
   async stopDictation(): Promise<void> {
-    if (!this.isRecording && !this.draining) {
-      return;
-    }
-
     this.isRecording = false;
-    await this.ensureDraining();
+    if (this.draining || this.pendingBytes > 0) {
+      // The webview shows that text is still on its way (R8/R12).
+      this.webview.postMessage({
+        type: 'dictation:status',
+        status: 'finishing',
+        waitSeconds: this.deps.mode === 'deferred' ? this.estimateWaitSeconds() : undefined,
+      });
+      await this.ensureDraining();
+    }
+    this.flushHeld();
 
+    // Always answered, so the webview never waits on a stop that had nothing to do.
     this.webview.postMessage({
       type: 'dictation:status',
       status: 'idle'
@@ -218,6 +254,7 @@ export class DictationController {
     this.isRecording = false;
     this.pending = [];
     this.pendingBytes = 0;
+    this.held = [];
   }
 
   /**
@@ -236,27 +273,59 @@ export class DictationController {
     return this.draining;
   }
 
+  /**
+   * Whether there is audio to transcribe now. While a deferred recording runs,
+   * only full pieces are: shorter ones wait for more speech or for Stop.
+   */
+  private hasWork(): boolean {
+    if (this.pendingBytes === 0) return false;
+    return this.deps.mode === 'live' || !this.isRecording || this.pendingBytes >= MAX_CALL_SECONDS * BYTES_PER_SECOND;
+  }
+
+  /**
+   * Seconds until the text is in, from the last call's duration on this
+   * computer, rounded up to 10 s; undefined before anything was measured.
+   */
+  private estimateWaitSeconds(): number | undefined {
+    if (!this.lastCallMs) return undefined;
+    const calls = Math.max(1, Math.ceil(this.pendingBytes / (MAX_CALL_SECONDS * BYTES_PER_SECOND)) + (this.draining ? 1 : 0));
+    return Math.ceil((this.lastCallMs * calls) / 10_000) * 10;
+  }
+
+  /** Deferred mode: insert the held text, in the order it was spoken. */
+  private flushHeld(): void {
+    if (this.held.length === 0) return;
+    this.webview.postMessage({ type: 'dictation:transcription', text: this.held.join(' ') });
+    this.held = [];
+  }
+
   /** Transcribe waiting audio in order until none is left. */
   private async drain(): Promise<void> {
-    while (this.pendingBytes > 0) {
+    while (this.hasWork()) {
       const pcm = this.takePending(MAX_CALL_SECONDS * BYTES_PER_SECOND);
+      const live = this.deps.mode === 'live';
 
-      this.webview.postMessage({
-        type: 'dictation:status',
-        status: 'processing'
-      });
+      if (live) {
+        this.webview.postMessage({
+          type: 'dictation:status',
+          status: 'processing'
+        });
+      }
 
       const modelPath = this.deps.modelPath();
       if (!this.deps.modelExists(modelPath)) {
-        this.fail('model-missing');
+        this.fail('model-missing', AVAILABLE_MODELS[path.basename(modelPath)]?.sizeDisplay);
         return;
       }
 
+      const started = this.deps.now();
       const result = await this.deps.transcribe(buildPcmWav(pcm), {
         binaryPath: this.deps.binaryPath(),
         modelPath,
         language: this.language,
       });
+      this.lastCallMs = this.deps.now() - started;
+      this.deps.rememberCallMs(this.lastCallMs);
 
       if (!result.success) {
         console.error('[DictationController] Transcription error:', result.error);
@@ -269,16 +338,18 @@ export class DictationController {
         continue;
       }
 
-      // Send result to webview (only if we got actual text)
-      if (result.text.trim().length > 0) {
+      const text = result.text.trim();
+      if (text.length > 0 && !live) {
+        this.held.push(text);
+      } else if (text.length > 0) {
         this.webview.postMessage({
           type: 'dictation:transcription',
-          text: result.text.trim()
+          text
         });
       }
 
       // Back to listening state if still recording
-      if (this.isRecording) {
+      if (live && this.isRecording) {
         this.webview.postMessage({
           type: 'dictation:status',
           status: 'listening'
@@ -310,13 +381,16 @@ export class DictationController {
     return Buffer.concat(taken, size);
   }
 
-  private fail(problem: DictationEngineProblem): void {
+  private fail(problem: DictationEngineProblem, detail?: string): void {
+    // What was already transcribed goes in before the dialog explains (R12).
+    this.flushHeld();
     this.isRecording = false;
     this.pending = [];
     this.pendingBytes = 0;
     this.webview.postMessage({
       type: 'dictation:problem',
-      problem
+      problem,
+      detail
     });
   }
 }

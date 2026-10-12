@@ -20,3 +20,20 @@
 **Seen, not caused by this sprint (follow-up):** opening a `.wav` from the Explorer shows VS Code's "There are multiple default editors available for the resource." Ritemark's Transcript Workbench and the built-in media preview both claim audio files, and `branding/product.json`'s `workbench.editorAssociations` has no audio entries. This branch does not change either.
 
 **Not covered here:** Windows (branch test, stage B), the Windows microphone wording (unit-tested in `dictationProblems.test.ts`), and macOS 12–13 hands-on (no hardware; CI runs the engine on macOS 14).
+
+## Mac dev instance, "speak, then text" and live mode (2026-10-12, R12, R13, R8)
+
+**Setup:** the same dev instance method as above, with the branch's working tree after merging `main` (#410). The microphone was replaced in the webview by a looping recording of `jfk.wav`, so the real hook, button and placeholder ran end to end. The mic button was clicked with real mouse events. "Speak, then text" was forced with `RITEMARK_DICTATION_MODE=deferred`, the QA switch; on this Mac it changes the mode only, not the model.
+
+| Check | Result |
+|---|---|
+| Recording (deferred) | The placeholder "🎤 Recording... your text appears after you stop" at the cursor; nothing else changed in the document for 32 s; no `processing` status ([qa/mac-deferred-recording.png](qa/mac-deferred-recording.png)) |
+| Background piece | One 28 s piece was transcribed during recording. Its text was held, and its duration fed the estimate |
+| After Stop (deferred) | `finishing` with `waitSeconds: 10`; the button disabled with a spinner; the placeholder "⏳ Processing your recording. This usually takes about 10 seconds." ([qa/mac-deferred-processing.png](qa/mac-deferred-processing.png)) |
+| Text (deferred) | One `dictation:transcription` 2.6 s after Stop, with both pieces in order, then `idle` ([qa/mac-deferred-done.png](qa/mac-deferred-done.png)) |
+| Settings (deferred) | The chunk row is hidden ([qa/mac-deferred-settings.png](qa/mac-deferred-settings.png)) |
+| Live mode | Text appears every ~5 s, and "🎤 Listening..." moves to after each new text. After Stop: "⏳ Adding your last words...", the button disabled until the last words are in, then `idle`. Settings shows "Update text every / How often new text appears while you speak" |
+
+The first deferred run used Estonian on English audio, so its last piece came out as "Kõige, kõige." (visible in the "done" screenshot); a second run in English was clean. Both runs show the expected piece-boundary effect: a word pair cut at 28 s ("your country | can do for you"). This is the boundary loss measured in the performance audit; cutting at pauses is the follow-up for it.
+
+**Not covered here:** the start-up cancel (model already present, so the "preparing" window was too short to click into; covered by code reading); the "Still processing" line (needs a slow computer; unit-tested copy); tooltips by hover (CDP hover did not open the Radix tooltips; their text is unit-tested in `dictationProblems.test.ts`); Windows (branch test).

@@ -23,7 +23,7 @@ import type {
   TranscriptionEngine,
 } from '../TranscriptionEngine';
 import { TranscriptionError } from '../types';
-import { describeWhisperFailure, probeWhisper, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
+import { AVAILABLE_MODELS, describeWhisperFailure, probeWhisper, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
 import type { WhisperReadiness } from '../../voiceDictation/whisperCpp';
 import type { SpeakerSeparation, TranscriptSegment, TranscriptWord, TranscriptionResult } from '../types';
 
@@ -202,7 +202,8 @@ export class WhisperLocalEngine implements TranscriptionEngine {
       return { ready: false, reason: transcribeProblemMessage(engine), action: 'none' };
     }
     if (!fs.existsSync(this.deps.modelPath)) {
-      return { ready: false, reason: 'Model not downloaded — 1.5 GB, one time.', action: 'download-model' };
+      const size = AVAILABLE_MODELS[path.basename(this.deps.modelPath)]?.sizeDisplay;
+      return { ready: false, reason: size ? `Model not downloaded — ${size}, one time.` : 'Model not downloaded.', action: 'download-model' };
     }
     return { ready: true };
   }

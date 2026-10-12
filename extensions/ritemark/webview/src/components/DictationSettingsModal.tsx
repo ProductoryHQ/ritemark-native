@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from './ui/Icon'
 import { sendToExtension, onMessage } from '../bridge'
+import type { DictationMode } from './dictationProblems'
 import {
   Dialog,
   DialogContent,
@@ -60,18 +61,20 @@ interface ModelStatus {
 interface DictationSettingsModalProps {
   isOpen: boolean
   onClose: () => void
+  /** Sprint 129 R12: in "speak, then text" the text comes after Stop, so there is no pace to set. */
+  mode?: DictationMode
 }
 
 /**
  * Dictation settings modal
  *
  * Settings:
- * - Chunk duration (3s/5s/10s)
+ * - Update text every 3s/5s/10s (live dictation only, Sprint 129 R12)
  * - VAD toggle (coming soon)
  * - Noise Reduction toggle (coming soon)
  * - Model management (status + remove)
  */
-export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsModalProps) {
+export function DictationSettingsModal({ isOpen, onClose, mode = 'live' }: DictationSettingsModalProps) {
   const [settings, setSettings] = useState<DictationSettings>(getDictationSettings)
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
@@ -191,11 +194,12 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
           <div>
             <div className="text-[11px] font-semibold text-[var(--r-ink-muted)] uppercase tracking-wider mb-3">AUDIO PROCESSING</div>
 
-            {/* Chunk Duration */}
+            {/* Chunk duration: how often live text appears (none in "speak, then text") */}
+            {mode === 'live' && (
             <div className="flex items-start justify-between py-3 border-b border-[var(--r-hairline)]">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-medium text-[var(--r-ink-strong)]">Chunk duration</span>
-                <span className="text-[11px] text-[var(--r-ink-muted)]">How often audio is sent for transcription</span>
+                <span className="text-[13px] font-medium text-[var(--r-ink-strong)]">Update text every</span>
+                <span className="text-[11px] text-[var(--r-ink-muted)]">How often new text appears while you speak</span>
               </div>
               <div className="flex gap-2">
                 {([3000, 5000, 10000] as const).map((duration) => (
@@ -212,6 +216,7 @@ export function DictationSettingsModal({ isOpen, onClose }: DictationSettingsMod
                 ))}
               </div>
             </div>
+            )}
 
             {/* VAD Toggle */}
             <div className="flex items-start justify-between py-3 border-b border-[var(--r-hairline)] opacity-60">

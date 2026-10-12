@@ -8,43 +8,12 @@ import * as fs from 'fs';
 import * as https from 'https';
 import * as http from 'http';
 import * as crypto from 'crypto';
-import { DEFAULT_MODEL_FILE, getModelDirectory, getModelPath, withFileRetry } from './whisperCpp';
+import { AVAILABLE_MODELS, defaultModelFile, getModelDirectory, getModelPath, withFileRetry, type ModelInfo } from './whisperCpp';
 
 // Sprint 129 R7: one model location for dictation, Transcribe and Settings.
-export { getModelDirectory, getModelPath };
-
-export interface ModelInfo {
-  name: string;
-  url: string;
-  size: number; // exact bytes
-  sizeDisplay: string;
-  /** Sprint 129 R7: the download is accepted only with this hash. */
-  sha256?: string;
-}
-
-/** Pinned Hugging Face revision, so the size and hash below stay true. */
-const MODEL_REVISION = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1';
-
-// Available models
-export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
-  'ggml-small.bin': {
-    name: 'small',
-    url: `${MODEL_REVISION}/ggml-small.bin`,
-    size: 487_601_967,
-    sizeDisplay: '466MB',
-    sha256: '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b'
-  },
-  'ggml-large-v3-turbo.bin': {
-    name: 'large-v3-turbo',
-    url: `${MODEL_REVISION}/ggml-large-v3-turbo.bin`,
-    size: 1_624_555_275,
-    sizeDisplay: '1.5GB',
-    sha256: '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69'
-  }
-};
-
-// Use large-v3-turbo for best multilingual support
-const DEFAULT_MODEL = DEFAULT_MODEL_FILE;
+// R13: the model table lives in whisperCpp.ts, which loads without VS Code.
+export { AVAILABLE_MODELS, defaultModelFile, getModelDirectory, getModelPath };
+export type { ModelInfo };
 
 // Maximum redirects to follow
 const MAX_REDIRECTS = 5;
@@ -59,7 +28,7 @@ function getPartialPath(modelName: string): string {
 /**
  * Check if a model exists and is valid
  */
-export function isModelDownloaded(modelName: string = DEFAULT_MODEL): boolean {
+export function isModelDownloaded(modelName: string = defaultModelFile()): boolean {
   const modelPath = getModelPath(modelName);
   if (!fs.existsSync(modelPath)) {
     return false;
@@ -277,7 +246,7 @@ async function downloadAttempt(modelInfo: ModelInfo, partialPath: string, option
  * download cut short, which left a model whisper could not load).
  */
 export async function downloadModel(
-  modelName: string = DEFAULT_MODEL,
+  modelName: string = defaultModelFile(),
   options: DownloadOptions = {}
 ): Promise<{ success: boolean; error?: string }> {
   const modelInfo = AVAILABLE_MODELS[modelName];
@@ -377,7 +346,7 @@ function formatSpeed(bytesPerSec: number): string {
  * Show download dialog and handle model download
  */
 export async function ensureModelDownloaded(
-  modelName: string = DEFAULT_MODEL
+  modelName: string = defaultModelFile()
 ): Promise<{ success: boolean; cancelled?: boolean; error?: string }> {
   if (isModelDownloaded(modelName)) {
     return { success: true };

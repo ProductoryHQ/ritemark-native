@@ -13,6 +13,11 @@ name: Build whisper.cpp
 
 on:
   workflow_dispatch:
+    inputs:
+      vulkan:
+        description: 'Also build config VK (Vulkan GPU backend; harness only, not shipped)'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - '.github/workflows/build-whisper.yml'
@@ -45,8 +50,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # VK = V + the Vulkan GPU backend, for measuring on Jarmo's PC (2026-10-12); not shipped yet.
-        config: [V, S, VK]
+        # VK = V + the Vulkan GPU backend. Built for measuring (2026-10-12); Jarmo took
+        # GPU out of v1.14.0, so it stays a harness option, built only on request.
+        config: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.vulkan && '["V","S","VK"]' || '["V","S"]') }}
     env:
       VULKAN_VERSION: 1.4.357.0
     steps:

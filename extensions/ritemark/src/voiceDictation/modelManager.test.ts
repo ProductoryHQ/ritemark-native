@@ -144,6 +144,12 @@ async function run(): Promise<void> {
   assert.match(turbo.url, /\/resolve\/[0-9a-f]{40}\/ggml-large-v3-turbo\.bin$/);
   assert.equal(turbo.size, 1_624_555_275);
   assert.match(turbo.sha256 ?? '', /^[0-9a-f]{64}$/);
+  // R13: the 8-bit model from the same revision, pinned the same way.
+  const q8 = AVAILABLE_MODELS['ggml-large-v3-turbo-q8_0.bin'];
+  assert.equal(q8.url, turbo.url.replace('ggml-large-v3-turbo.bin', 'ggml-large-v3-turbo-q8_0.bin'));
+  assert.equal(q8.size, 874_188_075);
+  assert.equal(q8.sha256, '317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1');
+  assert.equal(q8.sizeDisplay, '834 MB');
 
   fs.rmSync(home, { recursive: true, force: true });
   console.log('modelManager.test.ts: all tests passed');

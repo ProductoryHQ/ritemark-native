@@ -34,8 +34,74 @@ export type WhisperReadiness = 'ready' | 'missing' | 'blocked' | 'cpu-unsupporte
 /** Platform-arch pairs Ritemark ships a whisper-cli for (binaries/<target>/). */
 export const WHISPER_TARGETS = ['darwin-arm64', 'darwin-x64', 'win32-x64'];
 
-/** The model dictation and Transcribe share. */
-export const DEFAULT_MODEL_FILE = 'ggml-large-v3-turbo.bin';
+export interface ModelInfo {
+  name: string;
+  url: string;
+  size: number; // exact bytes
+  sizeDisplay: string;
+  /** Sprint 129 R7: the download is accepted only with this hash. */
+  sha256?: string;
+}
+
+/** Pinned Hugging Face revision, so the sizes and hashes below stay true. */
+const MODEL_REVISION = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1';
+
+/** The speech models Ritemark downloads (`modelManager.ts` fetches them). */
+export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
+  'ggml-small.bin': {
+    name: 'small',
+    url: `${MODEL_REVISION}/ggml-small.bin`,
+    size: 487_601_967,
+    sizeDisplay: '466 MB',
+    sha256: '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b'
+  },
+  'ggml-large-v3-turbo.bin': {
+    name: 'large-v3-turbo',
+    url: `${MODEL_REVISION}/ggml-large-v3-turbo.bin`,
+    size: 1_624_555_275,
+    sizeDisplay: '1.5 GB',
+    sha256: '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69'
+  },
+  'ggml-large-v3-turbo-q8_0.bin': {
+    name: 'large-v3-turbo-q8_0',
+    url: `${MODEL_REVISION}/ggml-large-v3-turbo-q8_0.bin`,
+    size: 874_188_075,
+    sizeDisplay: '834 MB',
+    sha256: '317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1'
+  }
+};
+
+/**
+ * Sprint 129 R12/R13 (Jarmo, 2026-10-12): computers without Apple's GPU, where
+ * one call takes ~20 s on the CPU. They dictate as "speak, then text" and use the
+ * 8-bit model (same Estonian accuracy, half the download). Intel Macs follow
+ * Windows until Jarmo decides otherwise.
+ */
+const CPU_ONLY_TARGETS = ['win32-x64', 'darwin-x64'];
+
+/**
+ * How dictation delivers text here: `live` while the user speaks (Apple
+ * silicon), or `deferred`, all at once after Stop.
+ */
+export type DictationMode = 'live' | 'deferred';
+
+export function dictationModeFor(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): DictationMode {
+  // QA only: try the other mode's screens on a Mac dev instance.
+  const forced = process.env.RITEMARK_DICTATION_MODE;
+  if (forced === 'live' || forced === 'deferred') return forced;
+  return CPU_ONLY_TARGETS.includes(`${platform}-${arch}`) ? 'deferred' : 'live';
+}
+
+/** The model dictation, Transcribe and Settings use on this computer. */
+export function defaultModelFile(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): string {
+  return CPU_ONLY_TARGETS.includes(`${platform}-${arch}`) ? 'ggml-large-v3-turbo-q8_0.bin' : 'ggml-large-v3-turbo.bin';
+}
 
 /** A dictation call never runs longer than this; a 28 s chunk on a slow CPU fits. */
 const DICTATION_TIMEOUT_MS = 120_000;
@@ -285,7 +351,7 @@ export function getModelDirectory(): string {
 }
 
 /** The full path to a model file; dictation, Transcribe and Settings share it. */
-export function getModelPath(modelName: string = DEFAULT_MODEL_FILE): string {
+export function getModelPath(modelName: string = defaultModelFile()): string {
   return path.join(getModelDirectory(), modelName);
 }
 

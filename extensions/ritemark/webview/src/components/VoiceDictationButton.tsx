@@ -4,7 +4,7 @@ import { useVoiceDictation, type DictationState } from '../hooks/useVoiceDictati
 import { LanguagePickerModal, WHISPER_LANGUAGES } from './LanguagePickerModal'
 import { DictationSettingsModal } from './DictationSettingsModal'
 import { DictationProblemDialog } from './DictationProblemDialog'
-import { dictationProblemCopy, type DictationAction } from './dictationProblems'
+import { dictationProblemCopy, dictationStateCopy, type DictationAction } from './dictationProblems'
 import { Tooltip } from './ui/tooltip'
 import { webviewPlatform } from '../hooks/usePlatform'
 import { sendToExtension } from '../bridge'
@@ -39,6 +39,12 @@ function getLastLanguage(): string {
   return 'et' // Default: Estonian
 }
 
+// Get language name by code
+function getLanguageName(code: string): string {
+  const lang = WHISPER_LANGUAGES.find(l => l.code === code)
+  return lang?.name || code.toUpperCase()
+}
+
 // Save recent language to local storage
 function saveRecentLanguage(code: string): void {
   try {
@@ -63,7 +69,7 @@ function saveRecentLanguage(code: string): void {
  * - Secondary (right dropdown): Select language
  */
 export function VoiceDictationButton() {
-  const { state, problem, dismissProblem, currentLanguage, startDictation, stopDictation } = useVoiceDictation()
+  const { state, mode, problem, dismissProblem, currentLanguage, startDictation, stopDictation, cancelStart } = useVoiceDictation(getLanguageName)
   const [showDropdown, setShowDropdown] = useState(false)
   const [showFullPicker, setShowFullPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -107,16 +113,21 @@ export function VoiceDictationButton() {
   const handlePrimaryClick = () => {
     if (state === 'listening' || state === 'processing') {
       stopDictation()
-    } else {
+    } else if (state === 'preparing') {
+      cancelStart()
+    } else if (state === 'idle' || state === 'error') {
       // Start with last used language
       startDictation(lastLanguage)
     }
+    // finishing: the button is disabled until the text is in
   }
+
+  const isActive = state !== 'idle' && state !== 'error'
 
   // Handle dropdown toggle
   const handleDropdownClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (state !== 'listening' && state !== 'processing') {
+    if (!isActive) {
       setShowDropdown(!showDropdown)
     }
   }
@@ -130,32 +141,29 @@ export function VoiceDictationButton() {
     startDictation(code)
   }
 
-  // Get language name by code
-  const getLanguageName = (code: string): string => {
-    const lang = WHISPER_LANGUAGES.find(l => l.code === code)
-    return lang?.name || code.toUpperCase()
-  }
-
-  // Get icon and styling based on state
+  // Get icon and styling based on state. Tooltips: dictationStateCopy (R12).
   const getStateStyles = (state: DictationState) => {
+    const language = getLanguageName(state === 'idle' ? lastLanguage : (currentLanguage || lastLanguage))
     switch (state) {
       case 'idle':
         return {
           icon: <Icon name="microphone" size={16} />,
           color: 'var(--r-ink-strong)',
-          title: `Start dictation (${getLanguageName(lastLanguage)})`
+          title: dictationStateCopy('idle', mode, language).tooltip
         }
       case 'listening':
         return {
           icon: <Icon name="microphone" size={16} />,
           color: 'var(--r-error)',
-          title: `Dictating in ${getLanguageName(currentLanguage || lastLanguage)} - click to stop`
+          title: dictationStateCopy('listening', mode, language).tooltip
         }
+      case 'preparing':
       case 'processing':
+      case 'finishing':
         return {
           icon: <Icon name="circle-notch" size={16} className="dictation-spinner" />,
           color: 'var(--r-accent)',
-          title: 'Processing transcription...'
+          title: dictationStateCopy(state, mode, language).tooltip
         }
       case 'error':
         return {
@@ -169,7 +177,6 @@ export function VoiceDictationButton() {
   }
 
   const { icon, color, title } = getStateStyles(state)
-  const isActive = state === 'listening' || state === 'processing'
 
   return (
     <div className="dictation-split-btn" ref={dropdownRef}>
@@ -178,6 +185,7 @@ export function VoiceDictationButton() {
         <button
           className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
           onClick={handlePrimaryClick}
+          disabled={state === 'finishing'}
           style={{ color }}
         >
           {icon}
@@ -283,8 +291,12 @@ export function VoiceDictationButton() {
           border-left-color: var(--r-hairline, rgba(128,128,128,0.3));
         }
 
-        .dictation-dropdown-trigger:disabled {
+        .dictation-dropdown-trigger:disabled,
+        .dictation-primary:disabled {
           cursor: not-allowed;
+        }
+
+        .dictation-dropdown-trigger:disabled {
           opacity: 0.5;
         }
 
@@ -402,6 +414,7 @@ export function VoiceDictationButton() {
       <DictationSettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        mode={mode}
       />
 
       {/* Sprint 129: why dictation cannot start or stopped (microphone, engine, model) */}

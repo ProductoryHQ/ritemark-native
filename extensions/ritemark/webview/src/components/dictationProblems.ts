@@ -1,6 +1,7 @@
 /**
  * Sprint 129 R5/R6: every reason dictation cannot start or had to stop, and what
- * the user is told about it, per platform.
+ * the user is told about it, per platform. R12: also what the mic button and the
+ * in-document placeholder say in each dictation state, live or "speak, then text".
  *
  * The extension host sends a problem code (`dictation:problem`); microphone
  * failures are classified here from getUserMedia with the classifier Transcribe
@@ -185,7 +186,7 @@ export function dictationProblemCopy(problem: DictationProblem, platform: Webvie
     case 'model-missing':
       return {
         title: 'Speech Model Needed',
-        body: [{ text: "Dictation needs its speech model, a one-time download of about 1.5 GB. It isn't on this computer right now." }],
+        body: [{ text: `Dictation needs its speech model, a one-time download${detail ? ` of about ${detail}` : ''}. It isn't on this computer right now.` }],
         icon: 'warning',
         primary: { label: 'Download Speech Model', tooltip: 'Download once. Dictation works offline afterwards.', action: 'retry' },
         secondary: close,
@@ -196,6 +197,63 @@ export function dictationProblemCopy(problem: DictationProblem, platform: Webvie
         body: [{ text: detail || 'Dictation stopped unexpectedly. Please try again.' }],
         icon: 'warning',
         primary: close,
+      }
+  }
+}
+
+/**
+ * Sprint 129 R12: `live` inserts text while the user speaks (Apple silicon);
+ * `deferred` ("speak, then text") inserts it all after Stop, on computers where
+ * one transcription takes ~20 s. The extension host decides (`dictation:mode`).
+ */
+export type DictationMode = 'live' | 'deferred'
+
+export type DictationStateName = 'idle' | 'preparing' | 'listening' | 'processing' | 'finishing'
+
+export interface DictationStateCopy {
+  tooltip: string
+  /** Text shown at the cursor in the document, or null for none. */
+  placeholder: string | null
+}
+
+/**
+ * What the mic button's tooltip and the placeholder say. Wording from the
+ * ux-expert review of 2026-10-12: deferred mode never suggests live text, and
+ * after Stop it says how long the wait usually is on this computer.
+ */
+export function dictationStateCopy(
+  state: DictationStateName,
+  mode: DictationMode,
+  language: string,
+  wait: { seconds?: number | null; overdue?: boolean } = {}
+): DictationStateCopy {
+  const deferred = mode === 'deferred'
+  switch (state) {
+    case 'idle':
+      return {
+        tooltip: deferred ? `Start dictation (${language}). Your text appears after you stop.` : `Start dictation (${language})`,
+        placeholder: null,
+      }
+    case 'preparing':
+      return { tooltip: 'Getting the microphone ready... Click to cancel.', placeholder: null }
+    case 'listening':
+      return deferred
+        ? { tooltip: `Recording in ${language}. Click to stop and get your text.`, placeholder: '🎤 Recording... your text appears after you stop' }
+        : { tooltip: `Dictating in ${language} - click to stop`, placeholder: '🎤 Listening...' }
+    case 'processing':
+      // Live only: a part of the speech is being turned into text while recording goes on.
+      return { tooltip: `Dictating in ${language} - click to stop`, placeholder: '⏳ Processing...' }
+    case 'finishing':
+      if (!deferred) {
+        return { tooltip: 'Adding your last words. Please wait.', placeholder: '⏳ Adding your last words...' }
+      }
+      return {
+        tooltip: "Processing your recording. Your text will be added when it's done.",
+        placeholder: wait.overdue
+          ? '⏳ Still processing. This computer needs a little longer.'
+          : wait.seconds
+            ? `⏳ Processing your recording. This usually takes about ${wait.seconds} seconds.`
+            : '⏳ Processing your recording. This can take up to a minute.',
       }
   }
 }
