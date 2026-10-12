@@ -12,6 +12,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → [research/windows-performance-audit.md](./research/windows-performance-audit.md). *(2026-10-11, Ryzen 7 5825U: ~22 s per call; threads adopted, beam and chunk length do nothing)*
 - [x] W6's stop condition triggered: numbers and options taken to Jarmo. *(The speed decision is pending; host work that does not depend on it continued)*
 - [ ] Bench round 2 (Jarmo 2026-10-12: "mõõda kõiki"; W11): FLEURS-et WER for all candidates on the Mac → `research/asr-candidates-audit.md` *(done)*; CI clip pack *(done)*; run instructions to the Development manager *(done)*. Then Jarmo cut Parakeet and the Zipformer (2026-10-12), so the Windows run is Whisper q8_0 vs f16 *(script trimmed to match)*. Windows results folded in *(2026-10-12: q8_0 ≈ f16 on Estonian, only 1.13× faster on the Ryzen; the shorter window rejected on real speech, 59–73% WER)*. Open: Jarmo's ship-or-hold decision.
+- [ ] Round 3 (Jarmo 2026-10-12: shorter window + resident model, q8_0 only if quality holds) folded in, with the Mac cross-check on the same chunking.
+- [ ] Vulkan (Jarmo 2026-10-12: "kui saab siis jah"): config VK in `build-whisper.yml` *(added, 100d0e09)*; bench on Jarmo's PC; what it changes (size, driver dependency, fallback) put to Jarmo before shipping.
 - [x] R11 (added 2026-10-12): the CI-built darwin-arm64 static engine is committed with the other payloads (W10); the `committed` CI job runs it on macOS 14. *(The Apple silicon dictation check is listed under Gate 2)*
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
