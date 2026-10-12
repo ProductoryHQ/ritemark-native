@@ -176,6 +176,7 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - **Accuracy on the Mac:** a FLEURS Estonian test sample (CC-BY-4.0; references are FLEURS' normalized transcriptions), scored by WER for whisper large-v3-turbo f16 and q8_0, TalTech et-verbatim-2604 (official GGML, f16 and our q8_0), Parakeet TDT 0.6B v3 int8 (sherpa-onnx `sherpa-onnx-offline`) and TalTech streaming Zipformer et-en int8 (sherpa-onnx online). Script: `scripts/qa/asr-wer.mjs`; result in `research/asr-candidates-audit.md`.
 - **Speed on Windows:** bench round 2 runs the Windows candidates on a small FLEURS clip pack (built in CI as artifact `whisper-bench-audio-et`, with references), using official binaries only (whisper-cli from our CI; sherpa-onnx v1.13.8 `win-x64-shared-MD-Release-no-tts`). It reports load and per-clip time, plus WER as a cross-check. Downloads resume and are cached between runs.
 - A non-Whisper engine would be a new runtime (ONNX Runtime via sherpa-onnx); adopting one is Jarmo's separate decision after the numbers.
+- *(Revised 2026-10-12, Jarmo's decision)* Parakeet and the Zipformer are out, so no sherpa-onnx. Round 2 on Windows measures Whisper q8_0 against f16 only (`windows-whisper-bench.ps1 -Round 2`, trimmed to match). `asr-wer.mjs` keeps its sherpa mode for the accuracy record.
 
 ## W9 — Docs, tiers and release notes (R10)
 

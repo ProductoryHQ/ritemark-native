@@ -30,6 +30,7 @@ For a like-for-like comparison, the standard model was also scored with timestam
 - **Accuracy:** TalTech's Estonian-tuned Whisper roughly halves Ritemark's Estonian errors (19.2% → 11.4%). It runs in the same whisper.cpp and costs the same as Whisper q8_0 on a CPU. It is MIT-licensed, and TalTech publishes the GGML file itself.
 - **Speed and accuracy together:** the small TalTech Zipformer is almost as accurate (12.9%) and an order of magnitude faster, because it streams. But it covers Estonian and English only, and it needs a new runtime (sherpa-onnx / ONNX Runtime).
 - **Parakeet is out** for Estonian.
+- **Decision (Jarmo, 2026-10-12):** Parakeet and the Zipformer are out (poor Estonian; Estonian and English only), so no sherpa-onnx runtime. The TalTech Estonian Whisper stays open as an accuracy option. Windows round 2 measures Whisper q8_0 against f16.
 - **Open for the decision (Jarmo):**
   - Languages other than Estonian and English: the TalTech Whisper was fine-tuned on Estonian plus some English, and other languages were not checked.
   - A non-Whisper runtime is a separate decision (Development manager, 2026-10-12).

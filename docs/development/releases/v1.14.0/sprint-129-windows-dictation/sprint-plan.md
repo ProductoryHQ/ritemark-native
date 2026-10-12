@@ -49,6 +49,10 @@ Windows users can dictate into documents and transcribe recordings on their own 
 - **2026-10-12 (Jarmo, relayed by the Development manager):** "1. jah mõõda kõiki 2. jah võta sisse".
   - **Windows speed: measure every candidate** before choosing. The candidates are Whisper large-v3-turbo q8_0; NVIDIA Parakeet TDT 0.6B v3 (int8, via sherpa-onnx); TalTech's Estonian–English streaming Zipformer (sherpa-onnx); and TalTech's Estonian-tuned Whisper (`whisper-large-v3-turbo-et-verbatim-2604`, official GGML, MIT). Accuracy (WER on FLEURS Estonian) is scored on the Mac, because it does not depend on the computer; speed is measured on the Windows PC (bench round 2). Adopting a non-Whisper engine would add a runtime, so that stays a separate decision.
   - **Apple silicon engine for macOS 12–14 is in scope**, as R11.
+- **2026-10-12 (Jarmo, in the "Ritemark on Windows" session, relayed by the Development manager):** "parakeeti pole mõtet (kehv kvaliteet), zipformerit pole mõtet (ainult ET ja EN ei sobi), sherpa-onnx - ma olen kahevahel, miks seda veel?" Then, after the explanation that sherpa-onnx is only those two models' runtime: "tee".
+  - Parakeet (poor Estonian) and the TalTech Zipformer (Estonian and English only) are out, so no sherpa-onnx runtime is needed.
+  - Bench round 2 runs Whisper large-v3-turbo q8_0 against f16 only.
+  - TalTech's Estonian-tuned Whisper (11.4% WER) was not part of this cut and stays open as an accuracy option.
 
 Proposed 2026-10-11 and approved with the plan:
 
