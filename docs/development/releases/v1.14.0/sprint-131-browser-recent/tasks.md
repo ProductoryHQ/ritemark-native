@@ -36,7 +36,7 @@ Workstreams: W0 dev environment + probes · W1 patch 009 bridge · W2 extension 
 
 ## W4: Tests and QA
 
-- [ ] T4.1 `src/browser/browserNavigationRecorder.test.ts`, including the patch-name contract test. S3, S10, S12–S18, S21–S23, S28.
+- [ ] T4.1 `src/browser/browserNavigationRecorder.test.ts`, including the patch-name contract test and a loopback-host case (R7). S3, S10, S12–S18, S21–S23, S26, S28.
 - [ ] T4.2 `src/browser/BrowserHistoryStore.test.ts`. S19, S20, S24, S25.
 - [ ] T4.3 Add both to `npm test`. Run `npm test` and `npm run compile` in `extensions/ritemark`; both clean.
 - [ ] T4.4 Dev-instance QA: run scenarios S1–S26 against the patched build (CDP, local fixture server plus `ritemark.app` / `http://github.com`), collect the Recent rows after each step and screenshot the panel. Evidence in `qa-evidence.md`. Every scenario not run is listed as not run, with the reason.

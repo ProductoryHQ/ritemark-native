@@ -178,6 +178,8 @@ Rules in `handle` (order matters):
 
 An in-page navigation that changes more than the fragment (pushState) is a new entry and restarts the title window, so single-page sites get the route's title.
 
+Loopback hosts (`localhost`, `127.0.0.1`, `[::1]`) get no special case anywhere in these rules: they pass the scheme check as `http`/`https` and are recorded like any web page (R7, S26). A unit test pins this so a later "skip dev servers" change is a deliberate spec change, not a drift.
+
 ### Changed: `extensions/ritemark/src/browser/BrowserHistoryStore.ts`
 
 - `BrowserHistoryEntry` gains `title?: string`. Entries saved by earlier versions stay valid.
@@ -216,7 +218,7 @@ No new UI elements. The empty-state text ("Pages you visit in Ritemark Browser a
 
 Unit tests (`npx tsx`, `node:assert`, same style as `browserActionTools.test.ts`), added to the `test` script in `extensions/ritemark/package.json`:
 
-- `src/browser/browserNavigationRecorder.test.ts`: parse/validate (S28); scheme allowlist, failed, ephemeral, overlong (S12, S13, S16–S18); fragment-only, reload and tab switch (S14, S15, S10 repeat); pushState as a new entry (S3); title window with an injected clock (S21, S22); address-as-title (S23); tracked-page cap; **contract test**: reads `patches/vscode/009-ritemark-browser-context-bridge.patch` and asserts it contains `'ritemark.browser.didNavigate'` (R8).
+- `src/browser/browserNavigationRecorder.test.ts`: parse/validate (S28); scheme allowlist, failed, ephemeral, overlong (S12, S13, S16–S18); fragment-only, reload and tab switch (S14, S15, S10 repeat); pushState as a new entry (S3); loopback hosts recorded like any page (R7, S26); title window with an injected clock (S21, S22); address-as-title (S23); tracked-page cap; **contract test**: reads `patches/vscode/009-ritemark-browser-context-bridge.patch` and asserts it contains `'ritemark.browser.didNavigate'` (R8).
 - `src/browser/BrowserHistoryStore.test.ts` (in-memory `Memento` + `vscode.EventEmitter` stub): legacy entry merge (S19); cap 25 (S20); title kept on revisit; `setTitle` no reorder and no write when unchanged; `pruneMissingFiles` removes only "missing" `file:` entries and keeps others (S24, S25).
 - `npm run compile` (tsc + esbuild) clean.
 
