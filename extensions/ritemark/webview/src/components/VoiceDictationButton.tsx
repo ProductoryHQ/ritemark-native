@@ -191,7 +191,7 @@ export function VoiceDictationButton() {
           {icon}
           <span className="dictation-label">
             {(isActive && dictationStateCopy(state, mode, '').label)
-              || (isActive ? getLanguageName(currentLanguage || lastLanguage) : lastLanguage.toUpperCase())}
+              || (isActive ? (currentLanguage || lastLanguage) : lastLanguage).toUpperCase()}
           </span>
         </button>
       </Tooltip>

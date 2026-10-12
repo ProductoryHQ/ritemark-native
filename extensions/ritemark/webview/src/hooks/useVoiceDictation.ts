@@ -23,11 +23,14 @@ const DEFERRED_SEND_MS = 5000
 /** With no estimate yet, "This can take up to a minute" turns into "Still processing" after this. */
 const UNMEASURED_WAIT_SECONDS = 60
 /**
- * A live microphone always has some noise. This long of exact zeros means it is
- * muted or blocked, so dictation stops at once instead of recording nothing
- * (Windows test, bugs B and C).
+ * A muted or blocked microphone delivers (near-)silence: Jarmo's hardware-muted
+ * Realtek mic peaked at 2.6e-5 (about -92 dBFS), not exact zeros. Below this
+ * peak for MUTED_SECONDS, dictation stops at once instead of recording nothing
+ * (Windows test, bugs B and C). Real speech is far above it: the quietest of 100
+ * FLEURS Estonian clips peaks at -42 dBFS within its first 3 s.
  */
-const DIGITAL_SILENCE_SECONDS = 3
+const MUTED_PEAK = 1e-4 // -80 dBFS
+const MUTED_SECONDS = 3
 
 /**
  * Get chunk duration from localStorage settings
@@ -211,7 +214,7 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
   /** True from microphone start to Stop, whatever the button shows meanwhile. */
   const recordingRef = useRef<boolean>(false)
   const startCancelledRef = useRef<boolean>(false)
-  /** Samples seen so far, and whether any was not exactly zero. */
+  /** Samples seen so far, and whether any reached MUTED_PEAK. */
   const silenceRef = useRef({ samples: 0, heard: false })
   const stopRef = useRef<() => void>(() => undefined)
   const modeRef = useRef<DictationMode>('live')
@@ -316,9 +319,9 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
         audioBufferRef.current.push(new Float32Array(inputData))
         const silence = silenceRef.current
         if (!silence.heard) {
-          silence.heard = inputData.some(sample => sample !== 0)
+          silence.heard = inputData.some(sample => Math.abs(sample) >= MUTED_PEAK)
           silence.samples += inputData.length
-          if (!silence.heard && silence.samples >= actualSampleRateRef.current * DIGITAL_SILENCE_SECONDS) {
+          if (!silence.heard && silence.samples >= actualSampleRateRef.current * MUTED_SECONDS) {
             // Muted or blocked: stop now. The host finds only silence and says so.
             silence.heard = true
             window.setTimeout(() => stopRef.current(), 0)

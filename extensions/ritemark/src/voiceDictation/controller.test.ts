@@ -14,12 +14,17 @@ import {
   MAX_CALL_SECONDS,
   buildPcmWav,
   dictationProblemFor,
-  hasSpeech,
+  audioLevel,
   parsePcmWav,
+  type AudioLevel,
 } from './controller';
 import type { DictationMode, TranscriptionResult } from './whisperCpp';
 
 const BYTES_PER_SECOND = 32000;
+/** Clearly voiced audio, and silence, for tests that are not about the level check. */
+const LOUD: AudioLevel = { audible: 50, voiced: 50 };
+const SILENT: AudioLevel = { audible: 0, voiced: 0 };
+const WEAK: AudioLevel = { audible: 20, voiced: 2 };
 
 /** `seconds` of PCM whose every byte is `tag`, so a call's contents show its order. */
 function pcm(seconds: number, tag: number): Buffer {
@@ -46,7 +51,7 @@ function contents(wav: Buffer): string {
 
 interface Call { wav: Buffer; finish: (result: TranscriptionResult) => void }
 
-function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recallCallMs?: number; modelPath?: string; callMs?: number; hasSpeech?: (pcm: Buffer) => boolean } = {}) {
+function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recallCallMs?: number; modelPath?: string; callMs?: number; audioLevel?: (pcm: Buffer) => AudioLevel } = {}) {
   const messages: Array<Record<string, unknown>> = [];
   const notices: string[] = [];
   const calls: Call[] = [];
@@ -68,7 +73,7 @@ function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recal
       // Every call "takes" callMs: the clock moves on when a call starts.
       now: () => clock,
       // The tagged test audio is not speech-like; the speech check has its own tests.
-      hasSpeech: overrides.hasSpeech ?? (() => true),
+      audioLevel: overrides.audioLevel ?? (() => LOUD),
       transcribe: (wav) => new Promise<TranscriptionResult>((resolve) => {
         clock += overrides.callMs ?? 0;
         calls.push({ wav, finish: resolve });
@@ -230,7 +235,7 @@ async function run(): Promise<void> {
     const controller = new DictationController(
       { postMessage: async (message: unknown) => { messages.push(message as Record<string, unknown>); return true; } },
       { extensionPath: empty },
-      { modelPath: () => model, notify: () => undefined, mode: 'live', hasSpeech: () => true },
+      { modelPath: () => model, notify: () => undefined, mode: 'live', audioLevel: () => LOUD },
     );
     controller.startDictation('en');
     await controller.handleAudioChunk(chunk(5, 1));
@@ -354,7 +359,7 @@ async function run(): Promise<void> {
       { extensionPath: '/nowhere' },
       {
         binaryPath: () => '/nowhere/whisper-cli', modelPath: () => '/nowhere/model.bin', modelExists: () => true,
-        notify: () => undefined, mode, recallCallMs: () => undefined, rememberCallMs: () => undefined, now: () => 0, hasSpeech: () => true,
+        notify: () => undefined, mode, recallCallMs: () => undefined, rememberCallMs: () => undefined, now: () => 0, audioLevel: () => LOUD,
         transcribe: async () => { throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' }); },
       },
     );
@@ -382,23 +387,29 @@ async function run(): Promise<void> {
     await stopped;
   }
 
-  // Windows test, bug C: the speech check. Digital zeros (a muted microphone)
-  // and faint hiss are silence; one loud 100 ms frame in a long piece is not.
+  // Windows test, bug C: the level check, against measured levels.
   {
-    const speech = Buffer.alloc(32000);
-    for (let i = 0; i < 16000; i += 1) speech.writeInt16LE(Math.round(Math.sin(i / 8) * 3000), i * 2);
-    const hiss = Buffer.alloc(320000);
-    for (let i = 0; i < 160000; i += 1) hiss.writeInt16LE(Math.round((Math.random() * 2 - 1) * 60), i * 2);
-    assert.equal(hasSpeech(Buffer.alloc(28 * BYTES_PER_SECOND)), false, 'zeros');
-    assert.equal(hasSpeech(hiss), false, 'hiss at about -55 dBFS');
-    assert.equal(hasSpeech(speech), true, 'a tone at speech level');
-    const mostlyQuiet = Buffer.concat([Buffer.alloc(27 * BYTES_PER_SECOND), speech.subarray(0, 3200)]);
-    assert.equal(hasSpeech(mostlyQuiet), true, '100 ms of speech in 27 s of silence still counts');
+    const tone = (seconds: number, amplitude: number) => {
+      const b = Buffer.alloc(seconds * BYTES_PER_SECOND);
+      for (let i = 0; i < seconds * 16000; i += 1) b.writeInt16LE(Math.round(Math.sin(i / 8) * amplitude), i * 2);
+      return b;
+    };
+    const noise = (seconds: number, amplitude: number) => {
+      const b = Buffer.alloc(seconds * BYTES_PER_SECOND);
+      for (let i = 0; i < seconds * 16000; i += 1) b.writeInt16LE(Math.round((Math.random() * 2 - 1) * amplitude), i * 2);
+      return b;
+    };
+    assert.deepEqual(audioLevel(Buffer.alloc(28 * BYTES_PER_SECOND)), { audible: 0, voiced: 0 }, 'zeros');
+    assert.equal(audioLevel(noise(10, 1)).audible, 0, 'a hardware-muted mic (about -92 dBFS)');
+    const hiss = audioLevel(noise(10, 60));
+    assert.ok(hiss.audible > 0 && hiss.voiced === 0, 'faint hiss (about -60 dBFS) is audible but not voiced');
+    // FLEURS: the quietest real speech peaks near -49 dBFS RMS; a -48 dBFS tone stands in for it.
+    assert.ok(audioLevel(tone(2, 170)).voiced >= 10, 'quiet speech is voiced (a -40 dBFS bar would have dropped it)');
   }
 
   // Bug C: silent audio is never transcribed, and Stop says nothing was heard.
   for (const mode of ['live', 'deferred'] as const) {
-    const h = harness({ mode, hasSpeech: () => false });
+    const h = harness({ mode, audioLevel: () => SILENT });
     h.controller.startDictation('et');
     for (let i = 0; i < 7; i += 1) void h.controller.handleAudioChunk(chunk(5, 1)); // 35 s
     await h.controller.stopDictation();
@@ -408,10 +419,47 @@ async function run(): Promise<void> {
     assert.equal(h.messages.at(-1)?.status, 'idle');
   }
 
+  // Bug C (re-test): weak audio that comes out as whisper's silence phrase is dropped,
+  // and counts as nothing heard; real words from quiet speech stay.
+  {
+    const h = harness({ mode: 'deferred', audioLevel: () => WEAK });
+    h.controller.startDictation('et');
+    void h.controller.handleAudioChunk(chunk(12, 1));
+    const stopped = h.controller.stopDictation();
+    await h.callStarted(1);
+    h.calls[0].finish(ok('Kõige! Kõige!'));
+    await stopped;
+    assert.deepEqual(h.texts(), [], '"Kõige! Kõige!" from a muted mic is not inserted');
+    assert.deepEqual(h.problems(), ['mic-silent']);
+  }
+  {
+    const h = harness({ mode: 'deferred', audioLevel: () => WEAK });
+    h.state.autoFinish = true;
+    h.controller.startDictation('et');
+    void h.controller.handleAudioChunk(chunk(5, 1));
+    h.state.autoFinish = false;
+    const stopped = h.controller.stopDictation();
+    await h.callStarted(1);
+    h.calls[0].finish(ok('Tere hommikust.'));
+    await stopped;
+    assert.deepEqual(h.texts(), ['Tere hommikust.'], 'quiet real speech stays');
+    assert.deepEqual(h.problems(), []);
+  }
+  {
+    const h = harness({ mode: 'deferred' });
+    h.controller.startDictation('en');
+    void h.controller.handleAudioChunk(chunk(5, 1));
+    const stopped = h.controller.stopDictation();
+    await h.callStarted(1);
+    h.calls[0].finish(ok('Thank you.'));
+    await stopped;
+    assert.deepEqual(h.texts(), ['Thank you.'], 'a clearly spoken "Thank you." stays');
+  }
+
   // Bug C: pauses between sentences are skipped, speech is transcribed, no "heard nothing".
   {
     let n = 0;
-    const h = harness({ hasSpeech: () => (n += 1) % 2 === 1 });
+    const h = harness({ audioLevel: () => ((n += 1) % 2 === 1 ? LOUD : SILENT) });
     h.state.autoFinish = true;
     h.controller.startDictation('et');
     for (let i = 0; i < 4; i += 1) await h.controller.handleAudioChunk(chunk(5, i + 1));

@@ -162,6 +162,28 @@ export function stripNonSpeech(text: string): string {
 }
 
 /**
+ * Phrases whisper produces for silence or near-silence. Measured on the Mac and
+ * Jarmo's Windows PC (Sprint 129): "Kõige!", "Kõik põhjad, kõik põhjad." in
+ * Estonian, "you" / "so" in English, plus its well-known English subtitle lines.
+ */
+const SILENCE_PHRASES = new Set([
+  'kõige', 'kõik põhjad', 'aitäh', 'you', 'so', 'thank you', 'thanks for watching',
+  'thank you for watching', 'thank you very much', 'bye',
+]);
+
+/**
+ * Whether a transcription is only whisper's silence phrases ("Kõige! Kõige!").
+ * Used only for weak audio, so a real "Thank you." spoken clearly stays.
+ */
+export function isSilenceHallucination(text: string): boolean {
+  const phrases = text.normalize('NFC').toLowerCase()
+    .split(/[.,!?…;:]+/)
+    .map(phrase => phrase.replace(/[^\p{L}\p{N}\s]+/gu, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return phrases.length > 0 && phrases.every(phrase => SILENCE_PHRASES.has(phrase));
+}
+
+/**
  * The dictated text in whisper-cli's stdout.
  *
  * Status lines are dropped by their prefix only. An earlier filter also dropped
@@ -441,7 +463,7 @@ const recentFailures = new Map<string, { readiness: WhisperReadiness; at: number
  */
 export async function probeWhisper(
   binaryPath: string,
-  deps: { spawn?: SpawnFn; exists?: (file: string) => boolean } = {}
+  deps: { spawn?: SpawnFn; exists?: (file: string) => boolean; fresh?: boolean } = {}
 ): Promise<WhisperReadiness> {
   const exists = deps.exists ?? fs.existsSync;
   if (readyBinaries.has(binaryPath)) {
@@ -451,7 +473,11 @@ export async function probeWhisper(
     readyBinaries.delete(binaryPath);
   }
   const recent = recentFailures.get(binaryPath);
-  if (recent && Date.now() - recent.at < FAILURE_MEMORY_MS) return recent.readiness;
+  // `fresh`: a mic click asks again, so an engine restored meanwhile (e.g. from
+  // antivirus quarantine) works without a restart (Windows re-test, bug E).
+  // A remembered "missing" is also dropped as soon as the file is back.
+  const stale = deps.fresh || (recent?.readiness === 'missing' && exists(binaryPath));
+  if (recent && !stale && Date.now() - recent.at < FAILURE_MEMORY_MS) return recent.readiness;
   if (!exists(binaryPath)) {
     recentFailures.set(binaryPath, { readiness: 'missing', at: Date.now() });
     return 'missing';

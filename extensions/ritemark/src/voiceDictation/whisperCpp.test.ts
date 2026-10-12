@@ -9,6 +9,7 @@ import {
   defaultModelFile,
   describeWhisperFailure,
   dictationArgs,
+  isSilenceHallucination,
   dictationModeFor,
   getModelPath,
   getWhisperBinaryPath,
@@ -87,6 +88,14 @@ async function run(): Promise<void> {
 
   resetWhisperProbeCache();
   assert.equal(await probeWhisper('/x/whisper-cli', { exists: () => false }), 'missing');
+  // Windows re-test, bug E: a remembered "missing" ends as soon as the file is back.
+  const back = fakeSpawn({ exit: [0, null] });
+  assert.equal(await probeWhisper('/x/whisper-cli', { spawn: back.spawn, exists: () => true }), 'ready', 'restored without a restart');
+  resetWhisperProbeCache();
+  const stillBlocked = fakeSpawn({ error: 'EACCES' });
+  assert.equal(await probeWhisper('/y/whisper-cli', { spawn: stillBlocked.spawn, exists: () => true }), 'blocked');
+  const allowed = fakeSpawn({ exit: [0, null] });
+  assert.equal(await probeWhisper('/y/whisper-cli', { spawn: allowed.spawn, exists: () => true, fresh: true }), 'ready', 'a mic click asks again');
 
   resetWhisperProbeCache();
   const blocked = fakeSpawn({ error: 'EACCES' });
@@ -143,6 +152,15 @@ async function run(): Promise<void> {
   assert.equal(stripNonSpeech('(muusika) Kõik on hästi.'), 'Kõik on hästi.');
   assert.equal(stripNonSpeech('Meeting (part two) starts at nine.'), 'Meeting (part two) starts at nine.', 'ordinary parentheses stay');
   assert.equal(parseDictationStdout('\n *music*\n'), '');
+
+  // Windows re-test, bug C: whisper's silence phrases, used only for weak audio.
+  assert.equal(isSilenceHallucination('Kõige! Kõige!'), true);
+  assert.equal(isSilenceHallucination('Kõik põhjad, kõik põhjad. Kõik põhjad, kõik põhjad.'), true);
+  assert.equal(isSilenceHallucination('you'), true);
+  assert.equal(isSilenceHallucination('Thank you for watching!'), true);
+  assert.equal(isSilenceHallucination('Kõige parem on homme.'), false, 'a sentence that starts with "Kõige" is speech');
+  assert.equal(isSilenceHallucination('Tere hommikust.'), false);
+  assert.equal(isSilenceHallucination(''), false);
 
   console.log('whisperCpp.test.ts: all tests passed');
 }

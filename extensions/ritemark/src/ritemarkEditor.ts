@@ -1542,7 +1542,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       // Sprint 129 R3: never offer the 1.5 GB model on a computer where the
       // engine cannot run; say why instead.
       const { getWhisperBinaryPath, probeWhisper } = await import('./voiceDictation/whisperCpp');
-      const engine = await probeWhisper(getWhisperBinaryPath(this.context));
+      // fresh: every mic click asks again, so a restored engine works at once (bug E)
+      const engine = await probeWhisper(getWhisperBinaryPath(this.context), { fresh: true });
       if (engine !== 'ready') {
         webview.postMessage({ type: 'dictation:problem', problem: dictationProblemFor(engine) });
         return;

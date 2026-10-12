@@ -27,6 +27,7 @@ import {
   dictationModeFor,
   getModelPath,
   getWhisperBinaryPath,
+  isSilenceHallucination,
   transcribeWav,
   WHISPER_TARGETS,
   type DictationMode,
@@ -50,20 +51,33 @@ const CALL_MS_KEY = 'ritemark.dictation.lastCallMs';
 
 /** 100 ms of 16 kHz audio. */
 const FRAME_SAMPLES = 1600;
-/**
- * A 100 ms frame louder than this (RMS, about -40 dBFS) may be speech. Room noise
- * after the browser's gain control stays below it; even quiet speech is well above.
- */
-const SPEECH_FRAME_RMS = 328;
+/** RMS of -65 dBFS: above it a frame is audible. A muted microphone sits near -92 dBFS. */
+const AUDIBLE_FRAME_RMS = 18;
+/** RMS of -50 dBFS: above it a frame is clearly voiced. Quiet real speech peaks near -49 dBFS. */
+const VOICED_FRAME_RMS = 104;
+/** Fewer audible 100 ms frames than this: silence, never sent to whisper. */
+const MIN_AUDIBLE_FRAMES = 3;
+/** Under 1 s of voiced frames: weak audio, where whisper's silence phrases are dropped. */
+const STRONG_VOICED_FRAMES = 10;
+
+export interface AudioLevel {
+  /** 100 ms frames above -65 dBFS RMS. */
+  audible: number;
+  /** 100 ms frames above -50 dBFS RMS. */
+  voiced: number;
+}
 
 /**
- * Sprint 129 (Windows test, bug C): whether the audio may hold speech. Whisper
- * invents words for silence: a muted microphone's digital zeros came out as
- * "Kõik põhjad, kõik põhjad." on Windows and "Kõige!" / "you" on the Mac.
- * Silent audio is therefore never transcribed.
+ * Sprint 129 (Windows test, bug C): how much of the audio could be speech.
+ * Whisper invents words for silence: a hardware-muted microphone (about -92 dBFS)
+ * came out as "Kõik põhjad, kõik põhjad." on Windows; zeros gave "Kõige!" / "you"
+ * on the Mac. The thresholds were checked on 100 FLEURS Estonian clips, whose
+ * quietest speech peaks near -49 dBFS (a frame at -40 dBFS, the first threshold
+ * tried, would have dropped real speech).
  */
-export function hasSpeech(pcm: Buffer): boolean {
+export function audioLevel(pcm: Buffer): AudioLevel {
   const samples = Math.floor(pcm.length / 2);
+  const level = { audible: 0, voiced: 0 };
   for (let start = 0; start < samples; start += FRAME_SAMPLES) {
     const end = Math.min(samples, start + FRAME_SAMPLES);
     let sum = 0;
@@ -71,15 +85,13 @@ export function hasSpeech(pcm: Buffer): boolean {
       const v = pcm.readInt16LE(i * 2);
       sum += v * v;
     }
-    if (Math.sqrt(sum / (end - start)) > SPEECH_FRAME_RMS) return true;
+    const rms = Math.sqrt(sum / (end - start));
+    if (rms > AUDIBLE_FRAME_RMS) level.audible += 1;
+    if (rms > VOICED_FRAME_RMS) level.voiced += 1;
   }
-  return false;
+  return level;
 }
 
-/**
- * Sprint 129 R6: what the webview's dictation dialog explains. The wording lives
- * there (webview/src/components/dictationProblems.ts), per platform.
- */
 export type DictationEngineProblem =
   | 'mic-silent'
   | 'engine-missing'
@@ -169,8 +181,8 @@ export interface DictationDeps {
   recallCallMs: () => number | undefined;
   rememberCallMs: (ms: number) => void;
   now: () => number;
-  /** Whether audio may hold speech; silence is never transcribed. */
-  hasSpeech: (pcm: Buffer) => boolean;
+  /** How much of the audio could be speech; silence is never transcribed. */
+  audioLevel: (pcm: Buffer) => AudioLevel;
 }
 
 export class DictationController {
@@ -184,8 +196,9 @@ export class DictationController {
   private lastCallMs: number | undefined;
   /** When the running call started, for the wait estimate. */
   private callStartedAt: number | null = null;
-  /** Whether any audio of this dictation held speech, and how much was captured. */
-  private heardSpeech = false;
+  /** This dictation produced text, or had clearly voiced audio; how much was captured. */
+  private producedText = false;
+  private strongAudio = false;
   private capturedBytes = 0;
   /** A problem was already reported for this dictation. */
   private reported = false;
@@ -208,7 +221,7 @@ export class DictationController {
       recallCallMs: () => context.globalState?.get<number>(CALL_MS_KEY),
       rememberCallMs: (ms) => { void context.globalState?.update(CALL_MS_KEY, ms); },
       now: () => Date.now(),
-      hasSpeech,
+      audioLevel,
       ...deps,
     };
     this.lastCallMs = this.deps.recallCallMs();
@@ -223,7 +236,8 @@ export class DictationController {
     this.pending = [];
     this.pendingBytes = 0;
     this.held = [];
-    this.heardSpeech = false;
+    this.producedText = false;
+    this.strongAudio = false;
     this.capturedBytes = 0;
     this.reported = false;
 
@@ -284,7 +298,7 @@ export class DictationController {
         await this.ensureDraining();
       }
       this.flushHeld();
-      if (!this.heardSpeech && !this.reported && this.capturedBytes >= BYTES_PER_SECOND) {
+      if (!this.producedText && !this.strongAudio && !this.reported && this.capturedBytes >= BYTES_PER_SECOND) {
         // Only silence came in: a muted microphone, or one the system blocks.
         this.reported = true;
         this.webview.postMessage({ type: 'dictation:problem', problem: 'mic-silent' });
@@ -359,14 +373,16 @@ export class DictationController {
       const pcm = this.takePending(MAX_CALL_SECONDS * BYTES_PER_SECOND);
       const live = this.deps.mode === 'live';
 
-      if (!this.deps.hasSpeech(pcm)) {
+      const level = this.deps.audioLevel(pcm);
+      if (level.audible < MIN_AUDIBLE_FRAMES) {
         // Silence: nothing to transcribe (whisper would invent words for it).
         if (live && this.isRecording) {
           this.webview.postMessage({ type: 'dictation:status', status: 'listening' });
         }
         continue;
       }
-      this.heardSpeech = true;
+      const weak = level.voiced < STRONG_VOICED_FRAMES;
+      if (!weak) this.strongAudio = true;
 
       if (live) {
         this.webview.postMessage({
@@ -416,7 +432,12 @@ export class DictationController {
         continue;
       }
 
-      const text = result.text.trim();
+      let text = result.text.trim();
+      if (weak && isSilenceHallucination(text)) {
+        // Weak audio that came out as "Kõige! Kõige!": whisper's silence phrase.
+        text = '';
+      }
+      if (text.length > 0) this.producedText = true;
       if (text.length > 0 && !live) {
         this.held.push(text);
       } else if (text.length > 0) {
