@@ -66,10 +66,11 @@ Make the intro shorter and name the three audiences: trainers, consultants and t
 | `ritemark: task/1` | Format marker and version; a file without it is not a card | Host |
 | `id` | Stable identity; a duplicate (a copied file) gets a fresh id on the next write, with a history line | Host |
 | `title` | One line, at most 200 characters | User, agent tool |
+| `done_when` | One line, at most 200 characters: what done looks like | User, agent tool |
 | `stage` | `idea`, `todo`, `doing` or `done` (fixed, see the plan) | User, agent tool, host |
 | `rank` | Order within the stage: a short string sorted as text, so a move rewrites only the moved card | Host |
 | `files` | Project-relative paths the card names; each is resolved inside the project before use | User, agent tool |
-| `result` | The latest result from an agent: who, when, how long, a summary of at most 280 characters, the project files the turn changed (at most 20) | Host (from the agent's report or the turn's last message, and the turn's file metrics) |
+| `result` | The latest result from an agent: who, when, how long, a summary of at most 280 characters, the project files the turn changed (at most 20), and `check`: up to three short things the user should check | Host (from the agent's report or the turn's last message, and the turn's file metrics) |
 | `ask` | A decision an agent left on the card: question, 2–4 options, who, when | Agent tool; cleared by the user's answer |
 | `review` | An idea's review: verdict (`ready`, `unclear`, `already-on-board`, `not-a-task`), why, size, suggested title and description, who, when | Host (idea review) |
 | `dropped` | `true` on an idea the user dropped (hidden under Dropped, Bring back clears it) | User |
@@ -83,7 +84,7 @@ The `by` values are `you`, `claude`, `codex` and `opencode`. The board is single
 Which conversation a card's work runs in, its turn, and the live state (sending, queued, working, needs you) are true only on this computer: a conversation lives in this computer's global storage. Writing them into the shared card would show "Claude is working" on a colleague's machine where nothing runs. So:
 
 - **In the card file:** durable product facts: stage, result, history, the agent's question.
-- **In `<globalStorage>/task-board/v1/`:** one record per handoff (task id, project scope id, card id, conversation id, runtime, turn id, lifecycle), written with the global stores' atomic pattern.
+- **In `<globalStorage>/task-board/v1/`:** one record per handoff (task id, project scope id, card id, conversation id, runtime, turn id, lifecycle), written with the global stores' atomic pattern. A card that **waits for** another card's agent (the conflict guard's Wait for it) is a handoff record in a `waiting` state that names the blocking card and the chosen runtime; it is local because it is about agents running on this computer.
 
 On another computer the card shows its result and history, and Give to agent starts a new conversation there.
 

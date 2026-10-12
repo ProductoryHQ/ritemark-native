@@ -105,14 +105,15 @@ Each probe is a short script or dev-instance check, recorded in `research/phase-
 |---|---|
 | `board/ready` | `surface: 'sidebar' \| 'panel'` |
 | `board/add` | `requestId`, `title`, `stage` |
-| `board/update` | `requestId`, `cardId`, optional `title`, `description`, `files` |
+| `board/update` | `requestId`, `cardId`, optional `title`, `doneWhen`, `description`, `files` |
 | `board/move` | `requestId`, `cardId`, `stage`, optional `beforeCardId` |
 | `board/delete` | `requestId`, `cardId` |
 | `board/open` | `cardId` (side bar → open the panel with this card) |
 | `board/add-files` | `cardId` (host shows a file picker rooted at the project) |
 | `board/open-file` | `path` (re-resolved inside the project before opening) |
 | `board/open-as-document` | `cardId` |
-| `board/give` | `requestId`, `cardId`, `runtimeId` |
+| `board/give` | `requestId`, `cardId`, `runtimeId`, optional `force` (Start now past the conflict guard) |
+| `board/wait`, `board/unwait` | `requestId`, `cardId` (+ `runtimeId` for wait) |
 | `board/follow-up` | `requestId`, `cardId`, `text` (Ask for changes, or an answer in the user's own words) |
 | `board/answer` | `requestId`, `cardId`, `optionIndex` (Something else… is a `board/follow-up`) |
 | `board/mark-done` | `requestId`, `cardId` |
@@ -133,6 +134,9 @@ The Log is derived in the webview from the cards' history (it is in the snapshot
 - **Who moves next** is derived, never stored: a handoff that is accepting/queued/running → the agent; needs-user, a pending `ask`, a `result` on a card not in Done, or a failed/interrupted handoff → you; otherwise nobody.
 - **Your calls** are derived the same way, one per card, ordered needs-user → decision → review and failed, newest first inside each (design §7). A stopped card is not a call.
 - **Locks:** while a handoff is accepting, queued, running or needs-user, `move` out of Doing and `mark-done` are refused with "the agent is still working".
+- **Attention summary** (in the snapshot): number of calls, the oldest call's wait time, and how many agents are blocked mid-turn (needs-user). Each call carries `since` (when its card started waiting on the user). Calls sort by kind, then longest-waiting first.
+- **Next up**: the top To do card that has no active or waiting handoff.
+- **Conflict guard**: `give` first looks for another card with an active handoff (accepting, queued, running, needs-user) that names one of the same files. If it finds one, it answers `conflict {withCardId, file}` instead of starting; the webview shows the Wait for it / Start now panel. `board/give` takes `force: true` for Start now. `board/wait` records a `waiting` handoff (blocking card + runtime); when the blocking card's turn reaches any terminal state, the controller starts every card waiting for it through the normal give path (which re-checks for conflicts). `board/unwait` drops it.
 - New cards get a rank before the first card of their stage (they land on top). Reopen is a `move` to To do.
 - **Badge**: the number of calls, set on the side-bar view (`view.badge`, Transcribe's workaround for zero).
 - **Agents may not** move a card to Done, delete a card, edit history or set a result except through `report_result` (W5).
@@ -171,6 +175,8 @@ Shared pieces: `ui/tabs.tsx` is new (shadcn's Radix Tabs), which adds **one webv
 ```text
 displayText:
   Rewrite the launch plan intro
+
+  Done when: one paragraph that names the three audiences.
 
   Make the intro shorter and name the three audiences: trainers, consultants and technical writers.
 
@@ -263,15 +269,15 @@ interface RitemarkToolGroup {
 |---|---|---|
 | `list_cards` | optional `stage` | id, title, stage, who moves next, number of files, for every card |
 | `read_card` | `card_id` | title, stage, description, files, result, ask, last 10 history entries |
-| `add_card` | `title`, optional `description`, `stage` (`idea` or `todo`, default `todo`), `files` | creates a card, returns its id |
-| `update_card` | `card_id`, optional `title`, `description`, `files` | changes those fields |
+| `add_card` | `title`, optional `done_when`, `description`, `stage` (`idea` or `todo`, default `todo`), `files` | creates a card, returns its id |
+| `update_card` | `card_id`, optional `title`, `done_when`, `description`, `files` | changes those fields |
 | `move_card` | `card_id`, `stage` (`idea`, `todo` or `doing`) | moves it; **Done is refused**: "Only the user marks a card done." |
-| `report_result` | `card_id`, `summary` | sets the result (bounded to 280 characters) and a history line; the card then waits on the user for review |
+| `report_result` | `card_id`, `summary`, optional `check` (up to three short items, 160 characters each) | sets the result (summary bounded to 280 characters) with its Check these list and a history line; the card then waits on the user for review |
 | `ask_user` | `card_id`, `question`, `options` (2–4) | leaves a decision on the card under Your calls; the answer comes back as a new turn in the card's conversation |
 
   Every tool answers in plain text; a bad id or a path outside the project returns `isError` with a sentence the model can act on. All writes go through `BoardStore.mutate`, so parallel chats are serialized.
 - **No approval prompt for board tools**, in any autonomy mode, as for browser tools today: they only change the board, every change is a history line the user sees, and no tool can delete a card, mark it done or touch a document. Documents are still changed only through the runtime's own (gated) file tools.
-- **`src/ai/capabilityContext.ts`**: `CapabilityDescriptor.hasBoardTools` and a TASK BOARD section: the project has a task board; read and change it only with the `ritemark_board` tools, never by editing `.ritemark/tasks/` files; when a message says it is a card on the task board, finish with `report_result` for that card (one or two sentences on what you did); use `ask_user` on the card for a decision that can wait instead of guessing, then end the turn; only the user marks a card done. `capabilityDescriptorFor(runtime, { browser, board })`. Version bumped.
+- **`src/ai/capabilityContext.ts`**: `CapabilityDescriptor.hasBoardTools` and a TASK BOARD section: the project has a task board; read and change it only with the `ritemark_board` tools, never by editing `.ritemark/tasks/` files; when a message says it is a card on the task board, finish with `report_result` for that card (one or two sentences on what you did, plus up to three things the user should check); work toward the card's Done when; before long work, put the decisions that would change the result to the user with `ask_user` first rather than stopping in the middle; use `ask_user` for any decision that can wait instead of guessing, then end the turn; only the user marks a card done. `capabilityDescriptorFor(runtime, { browser, board })`. Version bumped.
 
 ## W6 — Idea review
 

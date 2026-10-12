@@ -28,6 +28,21 @@ x x-circle / x (failed / stopped)     v check-circle / check (done) w warning (i
 k kanban   p pencil-simple   + plus   > caret-right (collapsed)   [...] dots-three (More actions)
 ```
 
+## 0b. Why the board exists in the long-horizon era (Jarmo and Claude, 2026-10-12)
+
+Agents can run many tasks at once; the user cannot decide and review many at once. So the board's job is not "what do I have to do" but **delegation**: what we want and when it is done (Done when), what agents may do, who has what, and what waits on the user's judgment. Running more agents than the user can review makes every result slower: results go stale, assumptions turn out wrong ten tasks later, two agents overwrite the same file, and quota goes to rework. The right amount of work in flight is the user's review pace.
+
+What this sprint takes from that:
+
+- **Your calls is the most visible thing** on both surfaces, with how long each call has waited and whether an agent is blocked.
+- **Done when** on every card, so an agent knows when to stop and the user knows what to check.
+- **Check these** in the agent's report: up to three things to look at, so a review takes a minute, not a re-read.
+- **Conflict guard**: two agents never start on the same file without the user saying so; **Wait for it** queues the second one.
+- **Next up**: the order of To do is the priority.
+- Agents are told to ask the decisions that would change the result **before** a long run, not in the middle.
+
+Later, in its own sprint: **autopilot**, agents taking the next card by themselves within a limit the user sets.
+
 ## 1. Behaviour model (estimates)
 
 | Action | How often (estimate) | Thought just before | First wish just after |
@@ -82,6 +97,8 @@ What follows from it: capture must not leave the document (a quick-add command, 
 Matched to the neighbours (Transcribe, Agent Library, Home): 13 px titles clamped to two lines, 11 px status line, section headers like Transcribe's `Section`, rows with a stretched hit area and a More actions button that shows on hover, focus and while open.
 
 - The add field is `Input`; **Enter adds** to the top of To do and keeps focus; Esc clears.
+- **Your calls is a panel**: surface background with hairlines above and below, so it stands out from the side bar; the header is strong ink with "oldest 2h" on the right; an amber line "1 agent can’t continue until you answer" when an agent is blocked. Each call's status line ends with how long it has waited ("Needs you · approval · 12 min", "Ready to review · 2h · 2 to check").
+- The top card of To do that can start reads **Next up**.
 - Sections: Your calls (hidden when empty, never collapsible), Doing, To do, Ideas (collapsed), Done (collapsed, latest 5, then "Show all N" opens the board). Each section's collapsed state is remembered (`vscode.setState`).
 - A plain To do row has no status line. Its leading circle is a ghost icon `Button` that marks it done.
 
@@ -217,6 +234,8 @@ One "Task board" tab per window, with the folder name in muted text after the ti
  Tasks are saved in this folder, so they travel with it.
 ```
 
+- **Header pill** on the right of the title: "3 wait on you · oldest 2h" (accent; amber with "· 1 agent blocked" when an agent is blocked). It opens Your calls.
+- **A card that waits on the user** has a 3 px accent bar on its left edge and a "Your move" tag; amber when the agent is blocked. Nothing else on the board uses the left bar.
 - No board toolbar. Adding happens where the stage is: `+` on Idea and To do opens a one-line field at the top of that column. Doing and Done cards arrive by moving.
 - Column headers: strong ink, uppercase, count. No colour per column. Cards use the Card pattern (hairline, 10 px radius).
 - Drag moves a card; the keyboard path is Move to… and the dialog's Stage field. A working or waiting card refuses to leave Doing and says why in a polite message.
@@ -235,6 +254,8 @@ Order, top to bottom:
 3. The state's block: Result, Decision, or nothing. A Result sits above the description.
 4. Description: Markdown, rendered to read and a `Textarea` to edit; saves on blur; its `- [ ]` are real checkboxes.
 5. Files: **Add files…**; each file opens in its editor; a missing file shows "Missing" and stays.
+
+(Revised 2026-10-12: a **Done when** field, one line, sits above the description. When it is empty, the state bar of a To do card says "Add what done looks like below. Agents finish better with it." The Result block ends with **Check these**, up to three bullets from the agent's report.)
 6. Stage field (Idea, To do, Doing, Done).
 7. History: the last 5 events, then "Show all N".
 
@@ -375,6 +396,22 @@ An unavailable agent is disabled in the menu with the reason in its label. After
 10. A card whose conversation is on another computer (a synced folder) shows its result and history; Open conversation is disabled with the reason.
 
 The result is a projection of the conversation's last turn; the conversation owns the detail, as in Sprint 117.
+
+## 6b. Conflict guard and Wait for it
+
+When Give to would start an agent on a file that another card's agent is working on right now, the card shows, in place of its buttons:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│ ⚠ “Draft the steering committee deck outline” is     │
+│   working on findings-draft.md right now. Two agents │
+│   changing the same file can overwrite each other’s  │
+│   work.                                              │
+│   [Wait for it]  [Start now]  [×]                    │
+└──────────────────────────────────────────────────────┘
+```
+
+**Wait for it** keeps the card in To do with a clock and "Starts after “Draft the steering…”", then starts it with the chosen agent by itself when that turn ends; the history says why. The card's detail offers **Start now** and **Don’t wait**. A file counts when both cards name it; that is the only signal, so naming files on cards also protects them.
 
 ## 7. Your calls
 

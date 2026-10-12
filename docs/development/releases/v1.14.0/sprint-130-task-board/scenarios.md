@@ -31,6 +31,14 @@ Then it shows 1, and nothing when none wait
 
 ## Feature: Board and cards (R2, R3)
 
+### S4a: What waits on me stands out
+Given three calls, one of them an agent waiting for an approval for 12 minutes and the oldest waiting 2 hours
+Then the side bar shows Your calls as its own panel with "oldest 2h" and "1 agent can’t continue until you answer"
+And each call says how long it has waited
+And on the Board tab those three cards have the accent (or amber) left bar and a "Your move" tag, and the header says "3 wait on you · oldest 2h · 1 agent blocked"
+When I click that header
+Then the Your calls tab opens
+
 ### S5: Add from the side bar
 When I type "Draft the workshop agenda" in "Add a task…" and press Enter
 Then a card appears at the top of To do on both surfaces and the field keeps focus
@@ -50,6 +58,13 @@ When I click the circle in front of a To do card
 Then it moves to Done with "Marked done" in its history
 When I choose Reopen on it
 Then it is back in To do
+
+### S6c: Next up and Done when
+Then the top card of To do reads "Next up" on both surfaces
+When I open a card without Done when
+Then its state says "Add what done looks like below. Agents finish better with it."
+When I type "One page, three to five themes" in Done when and press Enter
+Then the card file has `done_when`, and Give to sends it as "Done when: …" in the first message
 
 ### S7: Move by drag and by keyboard
 When I drag a card from To do to Doing
@@ -128,6 +143,10 @@ And the card file has `result` (with `files` and `seconds`) and a "Finished: …
 When the agent finishes without calling `report_result`
 Then the result is a summary of its last message (Codex and OpenCode: the conclusion, not the first sentence it streamed)
 
+### S17a: Check these
+When the agent reports two things to check
+Then the result shows "Check these" with both, the call says "2 to check", and the card file's `result.check` has both
+
 ### S18: Review
 When I press Ask for changes…, type "Shorter, please" in the note box and send
 Then the same conversation gets a new turn with my words and the card reads Working again
@@ -167,6 +186,17 @@ Then the card reads "Interrupted when Ritemark closed" with Retry
 ### S23: Three at once
 When I give three cards to three agents
 Then each gets its own conversation, each card follows its own turn, and finishing one does not change the others
+
+### S23a: Two agents, one file
+Given "Draft the steering committee deck outline" is working on findings-draft.md
+When I press Give to Claude on "Send the draft to Henrik", which also names findings-draft.md
+Then nothing starts; the card says which task works on which file and offers Wait for it, Start now and ×
+When I press Wait for it
+Then the card stays in To do with "Starts after “Draft the steering…”"
+When the deck outline's turn ends
+Then "Send the draft to Henrik" starts by itself with Claude, and its history says why
+When I press Start now instead
+Then it starts at once
 
 ### S24: Card on another computer
 Given a card with a result, copied to another computer

@@ -11,7 +11,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 
 ## Phase 1: Card files and store (W1, R4)
 
-- [ ] T1.1 `src/taskBoard/cardFile.ts`: parse/serialize, bounds, `rankBetween`, ids, unknown-key preservation
+- [ ] T1.1 `src/taskBoard/cardFile.ts`: parse/serialize, bounds, `rankBetween`, ids, unknown-key preservation, `done_when`, `result.check`
 - [ ] T1.2 `src/taskBoard/cardFile.test.ts`: round trip, broken YAML → read error, duplicate id, rank order, byte-for-byte body
 - [ ] T1.3 `src/taskBoard/BoardStore.ts`: injected fs, cache, serialized `mutate`, atomic write, exclusive create, trash, echo suppression
 - [ ] T1.4 `src/taskBoard/BoardStore.test.ts` on a temp folder, including "never overwrite an unreadable file" and a leftover `.tmp-*`
@@ -21,6 +21,8 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T2.1 `src/taskBoard/protocol.ts` + `decodeBoardRequest` with exact-field validation
 - [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count
 - [ ] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
+- [ ] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
+- [ ] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)
 
@@ -60,8 +62,8 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T5.2 `BrowserToolsInjector` → `RitemarkToolsInjector` (Claude servers + allow names, Codex dynamic tools + router + thread-reset key, OpenCode descriptors)
 - [ ] T5.3 Generic OpenCode adapter (same output path) + IPC `{op, group, tool, params}`; `AcpRuntime` dispatch by group
 - [ ] T5.4 `CodexRuntime`: `onDynamicToolCall`; `AgentRuntime.ts` callback renamed; `UnifiedViewProvider` wiring
-- [ ] T5.5 Board group: seven tools on `BoardController`
-- [ ] T5.6 `capabilityContext.ts`: `hasBoardTools` + TASK BOARD section; version bump
+- [ ] T5.5 Board group: seven tools on `BoardController`; `done_when` on add/update, `check` on report_result
+- [ ] T5.6 `capabilityContext.ts`: `hasBoardTools` + TASK BOARD section (report with Check these, ask decisions before long work, work toward Done when); version bump
 - [ ] T5.7 Tests: `ritemarkTools.test.ts`, updated `capabilityContext`, `CodexRuntime`, `AcpRuntime` tests; old `BrowserToolsInjector.test.ts` assertions carried over
 
 ## Phase 6: Ideas (W6, R9)
