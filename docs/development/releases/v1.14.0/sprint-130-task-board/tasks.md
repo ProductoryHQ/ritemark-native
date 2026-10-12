@@ -5,8 +5,8 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 ## Phase 0: Setup and probes
 
 - [x] T0.1 Branch `sprint-130-task-board` from `main`; check with `git branch --show-current`
-- [ ] T0.2 Run probes P1–P7 (technical-plan W0); write `research/phase-0-probes.md` with method and result for each
-- [ ] T0.3 If a probe fails, stop and bring Jarmo the options before the affected workstream
+- [x] T0.2 Run probes P1–P7 (technical-plan W0); write `research/phase-0-probes.md` with method and result for each
+- [x] T0.3 If a probe fails, stop and bring Jarmo the options before the affected workstream (none failed, 2026-10-12; five pass with a change, folded into W2–W5)
 - [ ] T0.4 Jarmo looks at the design (design.md) on a dev instance mock-up before W3 is finished (short check, not a gate)
 
 ## Phase 1: Card files and store (W1, R4)
@@ -19,17 +19,18 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 ## Phase 2: Controller and protocol (W2, R3, R7, R10)
 
 - [ ] T2.1 `src/taskBoard/protocol.ts` + `decodeBoardRequest` with exact-field validation
-- [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count
+- [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count (set on the hidden `ritemark.tasksBadge` tree view, P6)
 - [ ] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
 - [ ] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
 - [ ] T2.6 Doing limit (D13): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; header control; tests
+- [ ] T2.7 AI sidebar capacity: `canAttachRuntime` from the host, `waiting` with reason `capacity`, retry on every terminal turn event, a dispatch-time capacity error back to the queue (P1); tests
 - [ ] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)
 
 - [ ] T3.1 `iconMap` gains `kanban` (and any other name design.md uses that is missing); `ritemark-design/references/iconography.md` lists it
 - [ ] T3.2 `media/tasks-icon.svg` (Phosphor, 256 viewBox, `currentColor`)
-- [ ] T3.3 `package.json`: container (declared first among Ritemark's, lands above Transcribe), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`
+- [ ] T3.3 `package.json`: container (declared first among Ritemark's, lands above Transcribe), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`, badge-only tree view `ritemark.tasksBadge` (`when: false`)
 - [ ] T3.4 `src/features/flags.ts`: `task-board`
 - [ ] T3.5 `src/views/TasksViewProvider.ts` (+ badge, flag notice, no-folder state)
 - [ ] T3.6 `src/taskBoard/TaskBoardPanel.ts` (+ serializer, `ritemark.openTaskBoard`)
@@ -47,14 +48,15 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [ ] T4.1 `src/taskBoard/CardTaskStore.ts` + test (lifecycle from `commentTasks/types.ts`, prune at activation)
 - [ ] T4.2 `src/taskBoard/boardPrompt.ts` + test: `displayText` is the user's request only; `prompt` adds the card line only with board tools; follow-up and answer turns
 - [ ] T4.3 `UnifiedViewProvider`: task listener list (G1); comment-task controller registered through it; its tests stay green
-- [ ] T4.4 Enqueue `newConversation` + `sourceKind` (G2): protocol, host, sidebar store, manual title, queue icon
+- [ ] T4.4 Enqueue `newConversation` + `sourceKind` (G2): protocol, host, sidebar store (insert without activating), manual title after the first turn, queue icon
+- [ ] T4.4a History-only destination (P1): store loads the conversation with `conversation/get` under a remembered request id, adds it without activating, focusing or `ai-select-agent`, then queues
 - [ ] T4.5 G3: answered approval/question → `running`
-- [ ] T4.6 G4: last-message summary for Codex/OpenCode (per P5)
+- [ ] T4.6 G4: last-message summary for Codex (`agentMessage` item + `itemId`) and OpenCode (ACP `messageId`), passed in `onCodexComplete`; capture one Codex `item/completed` trace
 - [ ] T4.7 G5: queued task items are not editable
 - [ ] T4.8 G6: `comment-task/dispatch-failed` → `failed`
 - [ ] T4.8a F1: neutral shadcn role tokens re-declared under `body.vscode-dark` in `webview/src/index.css`; outline/secondary buttons checked in dark mode on Settings, dialogs and the board
 - [ ] T4.9 Controller: give, follow-up, answer, stop, retry, open conversation, recover; result onto the card (report first, summary fallback, changed files, seconds); interrupted on restart; deleted conversation; locks while working
-- [ ] T4.9a Focus: no `ritemark.unifiedView.focus` on a handoff; hidden sidebar shown without focus (P7)
+- [ ] T4.9a Focus: the card path shows the sidebar only with `ritemark.unifiedView.focus` + `{ preserveFocus: true }`, including `_awaitActiveConversation` (P7)
 - [ ] T4.10 `BoardController.test.ts`: handoff lifecycle end to end with injected sidebar fakes
 
 ## Phase 5: Agent tools (W5, R8)
@@ -62,7 +64,8 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [ ] T5.1 `src/runtime/ritemarkTools.ts`: registry types; browser group moved onto it with names unchanged
 - [ ] T5.2 `BrowserToolsInjector` → `RitemarkToolsInjector` (Claude servers + allow names, Codex dynamic tools + router + thread-reset key, OpenCode descriptors)
 - [ ] T5.3 Generic OpenCode adapter (same output path) + IPC `{op, group, tool, params}`; `AcpRuntime` dispatch by group
-- [ ] T5.4 `CodexRuntime`: `onDynamicToolCall`; `AgentRuntime.ts` callback renamed; `UnifiedViewProvider` wiring
+- [ ] T5.4 `CodexRuntime`: `onDynamicToolCall`; `AgentRuntime.ts` callback renamed; `UnifiedViewProvider` wiring; tool-set hash in the continuation fingerprint and `:309` records the thread's real tools (P2)
+- [ ] T5.4a `AcpRuntime._handlePermission`: allow `ritemark_board_*` titles and a `doom_loop` on a board tool (P3); test
 - [ ] T5.5 Board group: seven tools on `BoardController`; `done_when` on add/update, `check` on report_result
 - [ ] T5.6 `capabilityContext.ts`: `hasBoardTools` + TASK BOARD section (report with Check these, ask decisions before long work, work toward Done when); version bump
 - [ ] T5.7 Tests: `ritemarkTools.test.ts`, updated `capabilityContext`, `CodexRuntime`, `AcpRuntime` tests; old `BrowserToolsInjector.test.ts` assertions carried over
@@ -83,6 +86,6 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 - [ ] T8.1 `npm test` (extension) and the webview tests green
 - [ ] T8.2 `npm run compile` and the webview build; run the pre-commit validator by hand in the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] T8.3 Dev instance: scenarios S1–S37 (with S20a), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md`
+- [ ] T8.3 Dev instance: scenarios S1–S37 (with S20a, S23c), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md`
 - [ ] T8.4 `qa-validator` review
 - [ ] T8.5 PR with the QA evidence; issue #119 linked; Jarmo's admin-merge yes naming the PR

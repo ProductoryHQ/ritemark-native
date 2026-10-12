@@ -24,7 +24,7 @@ Then the side bar shows "The task board is turned off."
 And a Claude conversation's system context has no TASK BOARD section and no `ritemark_board` tools
 
 ### S4: Badge
-Given two cards wait on me
+Given two cards wait on me and I have not opened Tasks since Ritemark started
 Then the Tasks icon shows 2 and its tooltip says "2 tasks need you"
 When I mark one done
 Then it shows 1, and nothing when none wait
@@ -207,6 +207,13 @@ When I press Queue it and then mark another Doing card done
 Then the queued card starts by itself with Claude, and its history says why
 When I set the limit to "No limit" from the Doing header
 Then queued cards start at once
+
+### S23c: The AI sidebar is busy
+Given five conversations are working or waiting on me (cards and my own chats together) and the Doing limit is No limit
+When I press Give to Claude on a To do card
+Then nothing fails; the card reads "Starts when the AI sidebar has room"
+When one of the five finishes
+Then the card starts by itself, and its history says why
 
 ### S24: Card on another computer
 Given a card with a result, copied to another computer

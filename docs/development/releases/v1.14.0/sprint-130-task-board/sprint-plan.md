@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: fourteen user-facing requirements; multi-component flow board webview ↔ host ↔ project files ↔ AI sidebar ↔ three agent runtimes; concurrent writers on the same files)<br>
 Override with: "use plain full track"<br>
 Release tier: **extension** by path: everything is under `extensions/ritemark/` plus docs. No VS Code patch, no `product.json`, no `binaries/agents/`, no shell-tier script (the OpenCode tool adapter keeps its output path, so the build checks that name it are untouched). The new activity-bar icon (`media/tasks-icon.svg`) is not part of an extension-only update, so **the feature ships inside the v1.14.0 app release**, as Sprint 128 did inside v1.13.0.<br>
-Status: **Phase 3 (DEVELOP) — plan approved by Jarmo 2026-10-12. Phase 0 probes first.**<br>
+Status: **Phase 3 (DEVELOP) — plan approved by Jarmo 2026-10-12. Phase 0 probes done the same day (none failed, [research/phase-0-probes.md](./research/phase-0-probes.md)); W1 next.**<br>
 Branch: `sprint-130-task-board`, created from `main` (37c4973f) after the approval and before any code; the plan docs moved here from `docs/sprint-130-task-board-plan`.<br>
 Release: v1.14.0 (milestone 13; the release plan file does not exist on `main` yet)<br>
 Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decided by Jarmo 2026-10-11 on the Dev Dashboard
@@ -13,11 +13,12 @@ Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decid
 - [design.md](./design.md) — **the UX design, first**: behaviour model, side bar, editor-area board, card, Give to agent, narrow width, state words.
 - [prototype/task-board-prototype.html](./prototype/task-board-prototype.html) — clickable prototype built from the real 1.13.0 styles, light and dark (Jarmo asked for it before approving, 2026-10-12).
 - [spec.md](./spec.md) — behaviour contract R1–R14 and the decisions D1–D13.
-- [scenarios.md](./scenarios.md) — S1–S37 (43 scenarios), the dev-instance QA matrix.
+- [scenarios.md](./scenarios.md) — S1–S37 (50 scenarios), the dev-instance QA matrix.
 - [technical-plan.md](./technical-plan.md) — workstreams W0–W8, message shapes, files, tests, architecture-gate note.
 - [tasks.md](./tasks.md) — implementation checklist.
 - [research/current-state-audit.md](./research/current-state-audit.md) — the patterns reused and the gaps (Transcribe, Agent Library, comment tasks, tool injection).
 - [research/storage-decision.md](./research/storage-decision.md) — one Markdown file per card, and why not JSON or SQLite.
+- [research/phase-0-probes.md](./research/phase-0-probes.md) — P1–P7 results (2026-10-12): none failed; five changes folded into the technical plan.
 
 ## Goal
 

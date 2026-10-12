@@ -596,7 +596,7 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 
 | New element or surface | Why an existing one cannot carry it | Reuses |
 |---|---|---|
-| Activity-bar container **Tasks** + `kanban` icon + badge | Jarmo's decision (own button). Home is a launcher; the AI sidebar lists conversations, not tasks (many tasks never get an agent; a task outlives its conversation) | Transcribe's registration, `view.badge` |
+| Activity-bar container **Tasks** + `kanban` icon + badge | Jarmo's decision (own button). Home is a launcher; the AI sidebar lists conversations, not tasks (many tasks never get an agent; a task outlives its conversation) | Transcribe's registration; the badge sits on a hidden companion tree view so it shows before Tasks is opened (P6) |
 | Side-bar view (`tasks-panel`) | A live list with menus is too stateful for Home's static HTML | Transcribe's route and `Section`; `RowMenus` |
 | Editor-area **Task board** tab | Columns cannot fit 280–480 px | Settings' panel pattern |
 | Add field ×1 + `+` on Idea / To do headers + **Tasks: Add a Task…** | The one daily action, without leaving the document | `ui/input.tsx`, Agent Library's section `+`, VS Code input box |
