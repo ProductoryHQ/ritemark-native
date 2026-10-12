@@ -21,6 +21,7 @@ To be written once the scope is settled. Candidates:
 |---|---|---|
 | [129 — Windows dictation](sprint-129-windows-dictation/sprint-plan.md) | On-device Whisper on Windows: voice dictation and Transcribe's on-device engine ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)). The Intel Mac binary comes from the same pipeline ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203)). The Apple silicon engine is rebuilt for macOS 12–14 (R11, Jarmo 2026-10-12) | Approved 2026-10-11. In development, draft [#399](https://github.com/ProductoryHQ/ritemark-native/pull/399). The Windows dictation speed stop condition was reached: round 3 measures a shorter window and a model kept in memory, then Jarmo decides whether dictation ships on Windows. Windows GPU (Vulkan): "if it can be done, yes" |
 | [130 — Task board](sprint-130-task-board/sprint-plan.md) | Task board in each project folder, with Give to agent ([#119](https://github.com/ProductoryHQ/ritemark-native/issues/119)) | Approved 2026-10-12 (Doing limit in; Tasks above Transcribe). Phase 0 probes done. In development on `sprint-130-task-board`, draft [#409](https://github.com/ProductoryHQ/ritemark-native/pull/409) |
+| [131 — Browser Recent](sprint-131-browser-recent/sprint-plan.md) | Browser Recent records the pages the user visits: address bar, links, the AI agent, files opened in the browser. A bridge in patch 009 forwards navigations to the extension; titles in the list; deleted local files drop out ([#195](https://github.com/ProductoryHQ/ritemark-native/issues/195)). Shell-tier (patch 009) | Plan written 2026-10-12, awaiting Jarmo's approval. No branch or code yet |
 
 The sprint links resolve when each sprint's docs merge with its PR.
 
@@ -38,7 +39,6 @@ The sprint links resolve when each sprint's docs merge with its PR.
 
 ## Milestone items without a sprint yet
 
-- [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195): Browser Recent never records in-panel browsing. Shell-tier (patch 009); its planning session has not started.
 - [#398](https://github.com/ProductoryHQ/ritemark-native/issues/398): make GPT-6.1 Sol Ritemark's default Codex model.
 
 ## Gates
@@ -47,4 +47,5 @@ The sprint links resolve when each sprint's docs merge with its PR.
 - **The release test must cover:**
   - from Sprint 129: on-device Transcribe (and dictation, if it ships) on the signed Windows installer, the whisper files' Productory signature, and Apple silicon dictation on macOS 12–14. Intel Mac evidence is the CI runner's contract test only (Jarmo, 2026-10-11).
   - from Sprint 130: the task board, Give to agent in all three runtimes, and the browser tools after the tool-registry change.
+  - from Sprint 131: Browser Recent on the signed builds, Mac and Windows. Browse by typing an address and by clicking a link, open a link in a background tab (Cmd-click or Ctrl-click) and switch to it, open a local `.html` file, delete that file, then check that Recent lists the pages with their titles and no longer lists the file.
 - **Runtime review:** every release repeats it for the bundled runtimes (Claude Code, Codex, OpenCode).
