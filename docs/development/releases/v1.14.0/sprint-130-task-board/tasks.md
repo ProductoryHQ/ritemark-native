@@ -11,10 +11,10 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 1: Card files and store (W1, R4)
 
-- [ ] T1.1 `src/taskBoard/cardFile.ts`: parse/serialize, bounds, `rankBetween`, ids, unknown-key preservation, `done_when`, `result.check`
-- [ ] T1.2 `src/taskBoard/cardFile.test.ts`: round trip, broken YAML → read error, duplicate id, rank order, byte-for-byte body
-- [ ] T1.3 `src/taskBoard/BoardStore.ts`: injected fs, cache, serialized `mutate`, atomic write, exclusive create, trash, echo suppression
-- [ ] T1.4 `src/taskBoard/BoardStore.test.ts` on a temp folder, including "never overwrite an unreadable file" and a leftover `.tmp-*`
+- [x] T1.1 `src/taskBoard/cardFile.ts`: parse/serialize, bounds, `rankBetween`, ids, unknown-key preservation, `done_when`, `result.check`
+- [x] T1.2 `src/taskBoard/cardFile.test.ts`: round trip, broken YAML → read error, duplicate id, rank order, byte-for-byte body
+- [x] T1.3 `src/taskBoard/BoardStore.ts`: injected fs, cache, serialized `mutate`, atomic write, exclusive create, trash, echo suppression
+- [x] T1.4 `src/taskBoard/BoardStore.test.ts` on a temp folder, including "never overwrite an unreadable file" and a leftover `.tmp-*`; both in `npm test`
 
 ## Phase 2: Controller and protocol (W2, R3, R7, R10)
 
