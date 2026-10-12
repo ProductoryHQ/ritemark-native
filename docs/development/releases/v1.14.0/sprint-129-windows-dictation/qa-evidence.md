@@ -128,7 +128,7 @@ Run by the "Ritemark on Windows" session, relayed by the Development manager: ar
 **Fixes (this commit):**
 - The live check stops when the peak stays below 1e-4 (-80 dBFS) for 3 s.
 - The host check was re-measured on real speech. A first try at -40 dBFS would have treated 32 of 100 FLEURS clips as silence (their loudest frame is -49 dBFS). Now:
-  - fewer than three frames above -65 dBFS means silence;
+  - fewer than three frames above -65 dBFS means silence (lowered to -72 dBFS in the next commit, see below);
   - weak audio (fewer than 10 frames above -50 dBFS) drops output that is only whisper's silence phrases;
   - "heard nothing" means no text and no voiced audio;
   - result: across the 100 clips, no clip is skipped and the least audible has 37 audible frames; 8 of 246 six-second pieces are skipped, all of them silent tails.
@@ -139,3 +139,17 @@ Run by the "Ritemark on Windows" session, relayed by the Development manager: ar
 - A mic stub delivering noise at a 2.6e-5 peak (the measured muted level) stopped by itself within 3 s with **Ritemark Heard Nothing**.
 - Noise at a 1e-3 peak (about -60 dBFS, room noise) kept recording. After Stop, whisper's output for it was dropped, nothing was inserted, and the dialog said nothing was heard.
 - With the engine removed: "Can't Start". Put back, the next click recorded and transcribed with no reload. git shows the engine unchanged.
+
+## Without the Windows PC (2026-10-12): the silence checks verified on real and measured signals
+
+Jarmo closed the Windows branch test ("kuule selkest testist piisab ytle managerile et koik on ok"). **The Windows hardware check of the C and E fixes moves to v1.14.0 Gate 2** (release plan, test list). Until then:
+
+- **Unit tests with the measured muted floor.** The signal is 99.2% non-zero, with max |x| 2.6e-5 and min 3.9e-11, like Jarmo's hardware-muted Realtek mic.
+  - The live check (`webview/src/hooks/dictationLevel.test.ts`) stops on it; the old exact-zero check never did.
+  - Through the webview's own 16-bit conversion it arrives at the host as exact zeros, which `audioLevel()` counts as silence (`controller.test.ts`).
+- **Real speech never counts as silence** (`scripts/qa/dictation-level-check.mjs`, both checks):
+  - 100 FLEURS Estonian clips: none flagged, by either check.
+  - Of 246 six-second pieces, 8 are skipped. All are clip tails of 0.4–1.3 s, mostly below -72 dBFS; two hold under 0.2 s of sound (a breath, a word's end).
+  - A whispered sample (macOS "Whisper" voice) at its own level (-10 dBFS peak), at -40 dBFS peak and at -50 dBFS peak: none flagged, and no piece skipped.
+  - At -50 dBFS the first host bar (-65 dBFS) would have skipped the last word, so it was lowered to -72 dBFS. The muted floor arrives as zeros, so the margin is unchanged.
+- **Mac dev instance:** the muted check used a stub microphone that delivers noise at the measured muted level (2.6e-5 peak), not this Mac's real input muted. A real muted input needs the dev build's microphone permission and a system setting change, which would raise a prompt on Jarmo's screen. Results: it stopped by itself within 3 s with "Ritemark Heard Nothing"; room noise at -60 dBFS kept recording; a restored engine worked without a reload (section above).

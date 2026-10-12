@@ -181,7 +181,7 @@ The Windows test (Jarmo's PC, overlay `d38be0ad`) found four defects. The Develo
 
 Acceptance criteria:
 - **Silence is never transcribed (bug C, revised after the re-test).** Whisper invents text for silence. A hardware-muted microphone (about -92 dBFS, not exact zeros) became "Kõik põhjad, kõik põhjad." on Windows, and zeros became "Kõige!" / "you" on the Mac.
-  - Audio with fewer than three 100 ms frames above -65 dBFS RMS is never sent to whisper.
+  - Audio with fewer than three 100 ms frames above -72 dBFS RMS is never sent to whisper. (A hardware-muted microphone arrives as exact zeros after the 16-bit conversion; a whisper at -50 dBFS peak still passes.)
   - When fewer than 10 frames are above -50 dBFS (weak audio), output that is only whisper's silence phrases ("Kõige!", "Kõik põhjad", "you", "Thank you", …) is dropped.
   - Non-speech labels (`*music*`, `[BLANK_AUDIO]`, `(applause)`, `♪`) are removed from all dictated text.
   - These thresholds were checked on 100 FLEURS Estonian clips: none was skipped, and the quietest speech peaks near -49 dBFS. The first threshold tried, -40 dBFS, would have dropped real speech.

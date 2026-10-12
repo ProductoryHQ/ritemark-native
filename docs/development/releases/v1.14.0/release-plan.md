@@ -45,6 +45,13 @@ The sprint links resolve when each sprint's docs merge with its PR.
 
 - **Shell-tier:** clean-room release worktree from exact `origin/main`, Gate 1 + Gate 2, notarization after the 60-minute hardening window, Windows CI (see `release-manager`).
 - **The release test must cover:**
-  - from Sprint 129: on-device Transcribe and "speak, then text" dictation on the signed Windows installer, the whisper files' Productory signature, and Apple silicon dictation on macOS 12–14. Also on Windows: a two-minute recording while the processor is busy (look for gaps), and dictation while another app uses the microphone (both moved from the branch test, 2026-10-12). Intel Mac evidence is the CI runner's contract test only (Jarmo, 2026-10-11).
+  - from Sprint 129: on-device Transcribe and "speak, then text" dictation on the signed Windows installer, the whisper files' Productory signature, and Apple silicon dictation on macOS 12–14. Also on Windows, moved from the branch test when Jarmo closed it on 2026-10-12:
+    - with the hardware mute key on, the first dictation after launch and once more: recording stops by itself within ~3 s with "Ritemark Heard Nothing", and nothing is inserted;
+    - a 30 s pause between two spoken sentences: no invented words between them;
+    - turn off "Let desktop apps access your microphone" after dictating, then click the mic: a dialog within ~3 s, and nothing inserted;
+    - rename `whisper-cli.exe` and put it back: "Can't Start", then dictation works without a restart;
+    - one normal Estonian dictation, to check that quiet real speech isn't dropped;
+    - a two-minute recording while the processor is busy (look for gaps);
+    - dictation while another app uses the microphone. Intel Mac evidence is the CI runner's contract test only (Jarmo, 2026-10-11).
   - from Sprint 130: the task board, Give to agent in all three runtimes, and the browser tools after the tool-registry change.
 - **Runtime review:** every release repeats it for the bundled runtimes (Claude Code, Codex, OpenCode).
