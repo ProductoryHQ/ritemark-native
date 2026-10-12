@@ -3,8 +3,8 @@
 Track: SDD (auto-detected: a multi-component flow, workbench patch → command bridge → extension host → `globalState` → webview; plus address-classification edge cases: failed loads, `#anchor` jumps, redirects, private sessions, deleted local files)<br>
 Override with: "use plain full track"<br>
 Release tier: **shell** (`patches/vscode/009-ritemark-browser-context-bridge.patch`). It ships in the v1.14.0 app release, which is shell-tier anyway (Sprint 129's whisper binaries, Sprint 130's activity-bar icon). The extension half depends on the patch and cannot go out early in an extension release: the extension preflight refuses any release whose diff since the last app release touches `patches/`, and an extension update always requires its own app version.<br>
-Status: **Phase 2 (PLAN) — written 2026-10-12, awaiting Jarmo's approval. No branch, no code.**<br>
-Branch: `sprint-131-browser-recent` (created from `main` only after approval, before the first code edit)<br>
+Status: **Phase 4 (TEST & VALIDATE).** Plan approved by Jarmo on 2026-10-12 ("plan approved"). W0–W5 done. Dev-instance QA in [qa-evidence.md](./qa-evidence.md): 30 of 31 scenarios pass; S9 (AI agent navigation) is for Gate 2. Two defects found in QA and fixed (P10, port in the name line).<br>
+Branch: `sprint-131-browser-recent` (from the plan commit `8cc92333`, which is `main` `e77a1dee` plus the plan docs)<br>
 Release: [v1.14.0](../release-plan.md) · Milestone [v1.14.0](https://github.com/ProductoryHQ/ritemark-native/milestone/13)<br>
 Issue: [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195), "Browser: Recent never records in-panel browsing" (bug, ux). Jarmo pressed "Build it" on 2026-10-11 and "Start its session" on 2026-10-12.<br>
 Size: small. One contribution of about 50 lines in a file patch 009 already creates. On the extension side, one new module, edits to four files and two test files. No new dependency, flag, setting, patch file or UI element.
@@ -12,7 +12,9 @@ Size: small. One contribution of about 50 lines in a file patch 009 already crea
 ## SDD Artifacts
 
 - [spec.md](./spec.md): behaviour contract (R1–R8).
-- [scenarios.md](./scenarios.md): BDD matrix (S1–S29); it becomes the dev-instance QA matrix.
+- [scenarios.md](./scenarios.md): BDD matrix (S1–S31); it becomes the dev-instance QA matrix.
+- [research/phase0-findings.md](./research/phase0-findings.md): what the probes P1–P5 observed.
+- [qa-evidence.md](./qa-evidence.md): automated checks, the scenario matrix and the step log from the dev instance.
 - [technical-plan.md](./technical-plan.md): workstreams W0–W5, the bridge code shape, the recorder rules table, files to change, risks.
 - [tasks.md](./tasks.md): implementation checklist.
 - [research/current-state-audit.md](./research/current-state-audit.md): what the code does today, with file:line references, the options considered, and what Phase 0 still has to prove.
@@ -44,10 +46,10 @@ Out of scope: history search or a full-history view; a setting to turn recording
 
 | Requirement | Scenarios | Workstreams | Close evidence |
 |---|---|---|---|
-| R1 browsing inside the browser is recorded | S1–S5 | W1, W2 | dev-instance run |
+| R1 browsing inside the browser is recorded | S1–S5, S30 | W1, W2 | dev-instance run |
 | R2 pages opened any other way, once, by real address | S6–S11 | W1, W2 | dev-instance run |
 | R3 what is not recorded | S12–S18 | W2 | unit tests + dev-instance run |
-| R4 one entry per address | S19–S20 | W2 | unit tests + dev-instance run |
+| R4 one entry per address | S19–S20, S31 | W2 | unit tests + dev-instance run |
 | R5 titles | S21–S23 | W2, W3 | unit tests + dev-instance screenshot |
 | R6 deleted local files drop out | S24–S25 | W2, W3 | unit tests + dev-instance run |
 | R7 localhost like any page | S26 | W2 | dev-instance run |
@@ -56,6 +58,7 @@ Out of scope: history search or a full-history view; a setting to turn recording
 ## Product Decisions
 
 - **2026-10-11 (Jarmo):** #195 is in v1.14.0 ("Build it" on the Dev Dashboard).
+- **2026-10-12 (Jarmo, in the Sprint 131 session):** "plan approved". P1–P6 below are accepted as written.
 - **2026-10-12 (proposed with this plan, accepted with approval):**
   - **P1 — Recent means "pages the browser showed you".** That covers what the user typed or clicked, what a command or file opened, and where the AI agent navigated the visible tab. The workbench cannot tell an agent's click from the user's, and the agent works in a tab the user is watching.
   - **P2 — Local dev-server pages are recorded like any other page.** No marker and no skipping. Ritemark users reopen sites their agents built, and Recent is where they would look. The cost is a few `localhost` entries.
@@ -64,6 +67,10 @@ Out of scope: history search or a full-history view; a setting to turn recording
   - **P5 — Deleted local files are removed, unreachable ones are kept.** Only "file not found" removes an entry, so a disconnected drive or network share does not wipe its pages.
   - **P6 — No feature flag.** This fixes a broken existing feature, and the patch cannot be switched off at runtime anyway. Revert is by PR.
   - **P7 — Docs written directly.** The sprint docs were written in this session using the `sprint-manager` templates and the `spec-driven-sprint` playbook, not through the subagent. The subagent stalls on multi-file packages (memory, 2026-09-14).
+- **2026-10-12 (Phase 0, within the plan's W0 rule):** two W2 rule changes from the probes, both recorded in [research/phase0-findings.md](./research/phase0-findings.md) before any extension code. They change no patch and add no requirement.
+  - **P8 — A page counts once the tab stays on it for 1 second.** A meta-refresh redirect reports its intermediate page 12 ms before the destination, so a page the same tab leaves within a second is not recorded (R1 revised, S30).
+  - **P9 — Chromium's fallback titles are ignored.** That is the address without its scheme, or a local file's name (R5 revised).
+- **2026-10-12 (dev-instance QA):** **P10 — one entry per page, whatever its `#fragment`.** A Back navigation to `page.html#section` produced a second row for the same page. Entries are now deduplicated without the fragment, and the entry keeps the latest address (R4 revised, S31).
 
 ## Feature Flag Decision
 
@@ -78,23 +85,27 @@ None (P6). Not platform-specific, not experimental, no download, not premium. A 
 
 ## Success Criteria
 
-- [ ] Typed addresses, same-tab link clicks, single-page-site route changes and back/forward appear in Recent at the address the page ended on (R1).
-- [ ] Pages opened by command, file, terminal link, Recent itself, the AI agent or a background tab appear exactly once (R2).
-- [ ] Blank tabs, failed loads, anchor jumps, reloads, tab switches, private sessions, other schemes and overlong addresses add nothing (R3).
-- [ ] One entry per address, entries saved by earlier versions included; 25 max (R4).
-- [ ] Rows show page titles with the address below; changing titles stop updating after 10 s (R5).
-- [ ] Deleted local files drop out when Recent is shown; unreachable ones stay (R6).
-- [ ] `localhost` pages are recorded like any other (R7).
-- [ ] No error or notification when the extension is not listening; malformed input is ignored; patch 009 still 4 files; full stack applies from pristine and on re-run; contract test green (R8).
-- [ ] `npm test` and `npm run compile` clean; dev-instance evidence in `qa-evidence.md`; `qa-validator` sign-off.
-- [ ] Windows check listed in the v1.14.0 release test.
+- [x] Typed addresses, same-tab link clicks, single-page-site route changes and back/forward appear in Recent at the address the page ended on (R1).
+- [ ] Pages opened by command, file, terminal link, Recent itself, the AI agent or a background tab appear exactly once (R2). *Command, file, Recent and background tab pass in the dev instance. The terminal link calls the same `openInIntegratedBrowser()` as the command. The AI agent is for Gate 2.*
+- [x] Blank tabs, failed loads, anchor jumps, reloads, tab switches, private sessions, other schemes and overlong addresses add nothing (R3).
+- [x] One entry per address, entries saved by earlier versions included; 25 max (R4).
+- [x] Rows show page titles with the address below; changing titles stop updating after 10 s (R5).
+- [x] Deleted local files drop out when Recent is shown; unreachable ones stay (R6).
+- [x] `localhost` pages are recorded like any other (R7).
+- [x] No error or notification when the extension is not listening; malformed input is ignored; patch 009 still 4 files; full stack applies from pristine and on re-run; contract test green (R8).
+- [x] `npm test` and `npm run compile` clean; dev-instance evidence in `qa-evidence.md`; `qa-validator` sign-off. *(qa-validator PASS 2026-10-12 on the staged sprint diff.)*
+- [x] Windows check listed in the v1.14.0 release test.
+
+## Release notes (draft, for the v1.14.0 notes)
+
+- **Browser: Recent now lists the pages you visit.** Addresses you type, links you click, pages the AI agent opens and HTML files you open in the browser all appear, with their page titles. Local files you have deleted drop out of the list. (Fixes the v1.8.6 known issue, [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195).)
 
 ## Status
 
 **Track:** SDD
-**Current Phase:** 2 (PLAN)
-**Approval Required:** Yes. Jarmo, in the Sprint 131 session, in his own words. A relayed message from the Development manager does not count.
+**Current Phase:** 4 (TEST & VALIDATE)
+**Approval Required:** Given 2026-10-12, in the Sprint 131 session.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-10-12, "plan approved")

@@ -32,6 +32,11 @@ Given an empty tab
 When the user loads `http://github.com` (the server redirects to `https://github.com/`)
 Then Recent has one entry, `https://github.com/`, and no `http://` entry
 
+### S30: Client-side redirect *(added 2026-10-12, Phase 0)*
+Given an empty tab
+When the user loads a page that redirects with `<meta http-equiv="refresh" content="0; url=/page2.html">`
+Then Recent has `page2.html` with its title, and no entry for the redirecting page
+
 ## Feature: pages opened any other way (R2)
 
 ### S6: Open in integrated browser from the file explorer
@@ -113,6 +118,11 @@ Then Recent holds one entry for it, at the top, with the page title
 Given Recent holds 25 entries
 When the user visits a new page
 Then the new page is the top row, the oldest entry is gone, and there are still 25
+
+### S31: Back to a page at an anchor *(added 2026-10-12, dev-instance QA)*
+Given the user opened page A, jumped to its `#section`, then followed a link to page B
+When the user presses Back (the tab returns to `A#section`)
+Then Recent has one entry for A, on top, pointing at `A#section`, and B below it
 
 ## Feature: titles (R5)
 

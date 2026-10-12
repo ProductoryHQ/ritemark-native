@@ -2,7 +2,9 @@
 #
 # Purpose: Expose active integrated-browser metadata, page summary, screenshot,
 #          and auto-share trigger to the Ritemark extension host via workbench
-#          commands, enabling browser-aware AI chat context (Sprint 67).
+#          commands, enabling browser-aware AI chat context (Sprint 67); and
+#          push each top-level navigation and title change to the extension
+#          for the Browser Recent list (Sprint 131, #195).
 #
 # Why:
 #   The Ritemark AI sidebar (Claude Code SDK, Codex) needs to answer
@@ -34,6 +36,15 @@
 #   DevTools so the toggle sits in the same place users already access
 #   browser-level actions.
 #
+#   Navigation push (Sprint 131): RitemarkBrowserHistoryContribution follows
+#   the browser tab each editor pane shows and calls the extension command
+#   `ritemark.browser.didNavigate` with { kind, pageId, url, title, failed,
+#   ephemeral } on every onDidNavigate / onDidChangeTitle, and once when a
+#   tab is first shown (a background tab loads while no pane listens). It is
+#   the bridge's only workbench -> extension push. The extension owns every
+#   filtering rule (extensions/ritemark/src/browser/browserNavigationRecorder.ts);
+#   a missing listener is dropped with a trace log, never an error.
+#
 # File(s):
 #   src/vs/platform/browserView/common/browserView.ts
 #   src/vs/workbench/contrib/browserView/common/browserView.ts
@@ -41,6 +52,7 @@
 #   src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 #
 # Created: 2026-05-11
+# Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index ecb40a9e856..832846bd4a5 100644
@@ -152,10 +164,10 @@ index be1e6c7d1cb..3bd599e42e5 100644
  	EditorPaneDescriptor.create(
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..b267f405973
+index 00000000000..11792629ed9
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,301 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -165,10 +177,12 @@ index 00000000000..b267f405973
 +import { Codicon } from '../../../../../base/common/codicons.js';
 +import { VSBuffer } from '../../../../../base/common/buffer.js';
 +import { Action2, MenuId, registerAction2 } from '../../../../../platform/actions/common/actions.js';
-+import { BrowserViewCommandId } from '../../../../../platform/browserView/common/browserView.js';
++import { BrowserViewCommandId, BrowserViewStorageScope } from '../../../../../platform/browserView/common/browserView.js';
 +import { IPlaywrightService } from '../../../../../platform/browserView/common/playwrightService.js';
++import { ICommandService } from '../../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr, IContextKey, IContextKeyService, RawContextKey } from '../../../../../platform/contextkey/common/contextkey.js';
 +import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
++import { ILogService } from '../../../../../platform/log/common/log.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { BrowserEditor } from '../browserEditor.js';
 +import { BrowserActionCategory } from '../browserViewActions.js';
@@ -250,6 +264,62 @@ index 00000000000..b267f405973
 +}
 +
 +BrowserEditor.registerContribution(RitemarkBrowserAnnotationContribution);
++
++/** Extension command that keeps Browser Recent (extensions/ritemark/src/browser/browserNavigationRecorder.ts). */
++const RITEMARK_BROWSER_DID_NAVIGATE_COMMAND = 'ritemark.browser.didNavigate';
++
++interface IRitemarkBrowserNavigationDto {
++	readonly kind: 'navigate' | 'title';
++	readonly pageId: string;
++	readonly url: string;
++	readonly title: string;
++	/** The page's main-frame load failed (the error page is showing). */
++	readonly failed: boolean;
++	/** The tab browses in an ephemeral (private) storage session. */
++	readonly ephemeral: boolean;
++}
++
++/**
++ * Forwards top-level navigations and title changes of the browser tab this
++ * editor pane shows to the Ritemark extension, which keeps the Recent list.
++ * The extension owns every filtering rule; this only reports what the tab shows.
++ */
++class RitemarkBrowserHistoryContribution extends BrowserEditorContribution {
++	constructor(
++		editor: BrowserEditor,
++		@ICommandService private readonly commandService: ICommandService,
++		@ILogService private readonly logService: ILogService,
++	) {
++		super(editor);
++	}
++
++	protected override subscribeToModel(model: IBrowserViewModel, store: DisposableStore): void {
++		// A tab opened in the background loaded while no pane listened, so report
++		// what it shows now. The extension ignores a repeat of the tab's last address.
++		this.send(model, 'navigate', model.url, model.title);
++		store.add(model.onDidNavigate(e => this.send(model, 'navigate', e.url, e.title)));
++		store.add(model.onDidChangeTitle(e => this.send(model, 'title', model.url, e.title)));
++	}
++
++	private send(model: IBrowserViewModel, kind: 'navigate' | 'title', url: string, title: string): void {
++		if (!url) {
++			return;
++		}
++		const dto: IRitemarkBrowserNavigationDto = {
++			kind,
++			pageId: model.id,
++			url,
++			title,
++			failed: model.error !== undefined,
++			ephemeral: model.storageScope === BrowserViewStorageScope.Ephemeral,
++		};
++		this.commandService.executeCommand(RITEMARK_BROWSER_DID_NAVIGATE_COMMAND, dto).catch(err => {
++			this.logService.trace('[Ritemark] Browser Recent: navigation not delivered', err);
++		});
++	}
++}
++
++BrowserEditor.registerContribution(RitemarkBrowserHistoryContribution);
 +
 +class GetActiveBrowserContextAction extends Action2 {
 +	constructor() {

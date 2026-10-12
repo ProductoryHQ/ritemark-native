@@ -125,6 +125,7 @@ export const DID_NAVIGATE_COMMAND = 'ritemark.browser.didNavigate';
 export const MAX_URL_LENGTH = 8192;
 export const MAX_TITLE_LENGTH = 300;
 export const TITLE_SETTLE_MS = 10_000;
+export const SETTLE_MS = 1_000;
 const MAX_TRACKED_PAGES = 200;
 
 export interface BrowserNavigationEvent {
@@ -154,12 +155,13 @@ export interface HistorySink {
 }
 
 export class BrowserNavigationRecorder {
-  /** pageId → address last recorded for that tab and when; capped at MAX_TRACKED_PAGES (oldest dropped). */
-  private readonly lastByPage = new Map<string, { url: string; at: number }>();
+  /** pageId → the tab's current document: address, navigation time, title, waiting timer; capped at MAX_TRACKED_PAGES (oldest dropped). */
+  private readonly tabs = new Map<string, TabState>();
 
-  constructor(private readonly sink: HistorySink, private readonly now: () => number = Date.now) {}
+  constructor(private readonly sink: HistorySink, private readonly clock: RecorderClock = realClock) {}
 
-  async handle(raw: unknown): Promise<void>;
+  handle(raw: unknown): void;
+  dispose(): void;   // records every waiting navigation
 }
 ```
 
@@ -171,10 +173,13 @@ Rules in `handle` (order matters):
 | any | `ephemeral` → ignore | R3 |
 | navigate | `failed` → ignore | R3 |
 | navigate | `normalizeHistoryUrl` undefined (scheme, length, unparsable) → ignore | R3 |
-| navigate | `sameDocument(url, lastByPage[pageId].url)` → no new entry; if `cleanTitle` gives a title, `setTitle` | R3 (reload, tab switch, `#anchor`) |
-| navigate | otherwise → `record(url, cleanTitle(...))`, `lastByPage[pageId] = { url, at: now }` | R1, R2 |
-| title | page not tracked, or `!sameDocument(url, last.url)`, or `now - last.at > TITLE_SETTLE_MS` → ignore | R5 |
-| title | otherwise `setTitle(last.url, cleanTitle(...))` when non-empty | R5 |
+| navigate | `sameDocument(url, tab.url)` → no new entry; handled as a title update (below) | R3 (reload, tab switch, `#anchor`) |
+| navigate | otherwise → a waiting tab navigation that has not settled is dropped (R1 revised); new tab state `{ url, at: now, title: cleanTitle(...), recorded: false }`; after `SETTLE_MS` (1 s) → `record(url, title)`, `recorded = true` | R1, R2 |
+| title (and same-document navigate) | tab not tracked, or `!sameDocument(url, tab.url)`, or `now - tab.at > TITLE_SETTLE_MS` → ignore | R5 |
+| title (and same-document navigate) | `cleanTitle(...)` empty → ignore; tab still waiting → its title is replaced; already recorded → `setTitle(tab.url, title)` | R5 |
+| dispose | every waiting navigation is recorded at once | R1 revised |
+
+*(revised 2026-10-12 after Phase 0 — [phase0-findings.md](./research/phase0-findings.md))*: the 1 s settle step and the wider `cleanTitle` (the scheme-less address and a local file's name are Chromium fallbacks) come from P2 and the meta-refresh observation. The timer is injected (`schedule(fn, ms) → cancel`) so the tests need no real time.
 
 An in-page navigation that changes more than the fragment (pushState) is a new entry and restarts the title window, so single-page sites get the route's title.
 
@@ -183,7 +188,7 @@ Loopback hosts (`localhost`, `127.0.0.1`, `[::1]`) get no special case anywhere 
 ### Changed: `extensions/ritemark/src/browser/BrowserHistoryStore.ts`
 
 - `BrowserHistoryEntry` gains `title?: string`. Entries saved by earlier versions stay valid.
-- `record(url, title?)`: dedupe by `historyKey(url)` (`normalizeHistoryUrl(url) ?? url`), so entries saved by earlier versions merge (R4, S19). A missing title keeps the entry's existing title, so revisiting a page does not briefly drop its title.
+- `record(url, title?)`: dedupe by `historyKey(url)` (`normalizeHistoryUrl(url) ?? url`, without its `#fragment`; revised 2026-10-12 after QA, S31), so entries saved by earlier versions merge (R4, S19). A missing title keeps the entry's existing title, so revisiting a page does not briefly drop its title.
 - New `setTitle(url, title)`: updates the matching entry in place. No reorder, no `visitedAt` change, no write when unchanged.
 - New `pruneMissingFiles(isMissing: (url: string) => Promise<boolean>)`: checks only `file:` entries and does at most one write (R6).
 - `getAll`, `remove`, `clear`, the cap of 25 and the storage key are unchanged.
@@ -205,7 +210,7 @@ Loopback hosts (`localhost`, `127.0.0.1`, `[::1]`) get no special case anywhere 
 
 | Address | With title | Without title (as today) |
 |---|---|---|
-| `http(s)` | name = title; description = host + path (path omitted when `/`) | name = host; description = path |
+| `http(s)` | name = title; description = host + path (path omitted when `/`) | name = host incl. a non-default port (revised 2026-10-12, QA); description = path |
 | `file:` | name = title; description = decoded path | name = basename; description = decoded path |
 
 - `RecentItem` stays `{ url, name, description, visitedAt }`; the row HTML and CSS do not change. Tooltip stays the full URL.
@@ -218,7 +223,7 @@ No new UI elements. The empty-state text ("Pages you visit in Ritemark Browser a
 
 Unit tests (`npx tsx`, `node:assert`, same style as `browserActionTools.test.ts`), added to the `test` script in `extensions/ritemark/package.json`:
 
-- `src/browser/browserNavigationRecorder.test.ts`: parse/validate (S28); scheme allowlist, failed, ephemeral, overlong (S12, S13, S16–S18); fragment-only, reload and tab switch (S14, S15, S10 repeat); pushState as a new entry (S3); loopback hosts recorded like any page (R7, S26); title window with an injected clock (S21, S22); address-as-title (S23); tracked-page cap; **contract test**: reads `patches/vscode/009-ritemark-browser-context-bridge.patch` and asserts it contains `'ritemark.browser.didNavigate'` (R8).
+- `src/browser/browserNavigationRecorder.test.ts`: parse/validate (S28); scheme allowlist, failed, ephemeral, overlong (S12, S13, S16–S18); fragment-only, reload and tab switch (S14, S15, S10 repeat); pushState as a new entry (S3); 1 s settle drops a redirect's intermediate page and flushes on dispose (S30); loopback hosts recorded like any page (R7, S26); title window with an injected clock (S21, S22); address-as-title (S23); tracked-page cap; **contract test**: reads `patches/vscode/009-ritemark-browser-context-bridge.patch` and asserts it contains `'ritemark.browser.didNavigate'` (R8).
 - `src/browser/BrowserHistoryStore.test.ts` (in-memory `Memento` + `vscode.EventEmitter` stub): legacy entry merge (S19); cap 25 (S20); title kept on revisit; `setTitle` no reorder and no write when unchanged; `pruneMissingFiles` removes only "missing" `file:` entries and keeps others (S24, S25).
 - `npm run compile` (tsc + esbuild) clean.
 

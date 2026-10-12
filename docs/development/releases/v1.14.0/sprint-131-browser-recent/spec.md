@@ -25,6 +25,10 @@ Acceptance criteria:
 - Back and forward to a page record it again (it moves to the top).
 - The recorded address is the address the page ended on (after redirects), as shown in the address bar.
 
+*(revised 2026-10-12, Phase 0 finding — [phase0-findings.md](./research/phase0-findings.md))*: client-side redirects (meta refresh, script) arrive as separate navigations a few milliseconds apart, so "the address the page ended on" needs a rule:
+- A navigation is recorded once the tab has stayed on it for 1 second. A page the same tab leaves for another document within that second is not recorded: a redirect's intermediate page, an OAuth hop, or a page clicked through at once. A title that arrives in that second is recorded with it.
+- If the extension shuts down while a navigation waits, it is recorded at once.
+
 ### R2: Pages opened any other way are recorded once, by their real address
 As a user, I want pages opened from a file, a terminal link, the Recent list itself or by the AI agent to appear in Recent the same way.
 
@@ -52,14 +56,18 @@ Acceptance criteria:
 - `https://site` and `https://site/`, and two addresses that differ only in host letter case or a default port, are the same entry. This also holds for entries saved by earlier versions.
 - Most recent first, at most 25 entries (unchanged).
 
+*(revised 2026-10-12, dev-instance QA)*: two addresses that differ only in their `#fragment` are the same entry. Going Back to `page.html#section` from another page made a second row for the same page next to `page.html`. The entry keeps the address of the latest visit, fragment included, so clicking it returns to that spot.
+
 ### R5: Page titles in the list
 As a user, I want to recognise pages by their title, not only by host name.
 
 Acceptance criteria:
 - When the page has a title, the row's first line is the title and the second line is the address without the scheme: host plus path for web pages, the file path for local files. The tooltip stays the full address.
 - When there is no title, the row looks as it does today (host or file name, then path). Entries saved by earlier versions have no title and show as today until visited again.
+  *(revised 2026-10-12, dev-instance QA)*: the name line shows a non-default port (`localhost:8765`, not `localhost`), so two local dev servers can be told apart. For ordinary sites nothing changes.
 - Titles that change on their own after the page has loaded (unread counters, clocks) do not keep rewriting the entry. Only title changes within 10 seconds of the navigation are taken.
 - A "title" that is just the address (Chromium's fallback for pages without a title) is ignored.
+  *(revised 2026-10-12, Phase 0 finding)*: Chromium's fallback is the address without its scheme for web pages (`localhost:8765/titled.html`) and the file's name for local files (`report.html`). The title is ignored when it equals the address, the address without its scheme (with or without a trailing slash), or a local file's name.
 - Titles are trimmed to one line and at most 300 characters.
 
 ### R6: Local files that are gone drop out of the list
