@@ -33,7 +33,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T3.7 `extension.ts` composition: store, controller, watcher, both surfaces, serializer
 - [ ] T3.8 `webview/src/main.tsx`: `tasks-panel` and `task-board` branches, side-bar background list
 - [ ] T3.9a `ui/tabs.tsx` (shadcn Radix Tabs) + `@radix-ui/react-tabs` in `webview/package.json` and the lockfile; export `RowMenus` from `ConversationsPanel.tsx`
-- [ ] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardRow`, `CardDetail`, `NoteBox`, `CallsView`, `IdeasView`, `LogView`, `GiveToAgentButton`, `taskCopy.ts`
+- [ ] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardRow`, `CardDetail`, `NoteBox`, `CallsView`, `IdeasView`, `LogView`, `AgentSplitButton` (used by every agent action: Give to, Review with, Retry with, Send to), `taskCopy.ts`
 - [ ] T3.9b `ritemark.addTask` (input box, top of To do, focus returns)
 - [ ] T3.9c Home: "New AI task" → "New AI conversation" (R14); `HomeViewProvider.test.ts` updated
 - [ ] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
@@ -80,6 +80,6 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 
 - [ ] T8.1 `npm test` (extension) and the webview tests green
 - [ ] T8.2 `npm run compile` and the webview build; run the pre-commit validator by hand in the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] T8.3 Dev instance: scenarios S1–S37, each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md`
+- [ ] T8.3 Dev instance: scenarios S1–S37 (with S20a), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md`
 - [ ] T8.4 `qa-validator` review
 - [ ] T8.5 PR with the QA evidence; issue #119 linked; Jarmo's admin-merge yes naming the PR

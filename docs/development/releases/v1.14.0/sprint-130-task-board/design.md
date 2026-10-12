@@ -14,6 +14,7 @@
 - **Board:** four columns in the editor area. Your calls, Board, Ideas and Log are tabs.
 - **A card opens as a dialog on the board.** In the side bar the same content fills the side bar (the existing narrow-width Dialog rule), so the document stays visible.
 - **Give to {Agent} starts a new conversation named after the card.** Later handoffs of that card continue it. Focus never moves.
+- **Every agent action lets the user pick the agent** (Jarmo, 2026-10-12): Give to, Review with, Review again with, Retry with and Send to are one split button. The label names the agent; the caret lists Claude Code, Codex and OpenCode; the last choice becomes the board's default.
 - **The agent never finishes a card.** A finished card stays in Doing as "Ready to review" until the user presses Mark done.
 - **Replies are a small note box on the card** (Ask for changes…, Something else…). Approvals and questions inside a running turn are answered in the conversation, never on the board.
 - **The card uses the AI sidebar's own words and glyphs** for agent state (§10).
@@ -54,7 +55,7 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | 5 | "Open board" is an icon button (`kanban`) beside the add field | Transcribe's one-row pattern; a title-bar icon is easy to miss for non-technical users |
 | 6 | A card opens as a **Dialog** on the board; in the side bar the same content fills it | With both side bars open the editor area is about 650–700 px (estimate): no room for a pane. `Dialog` already goes full-bleed under 640 px |
 | 7 | "Open as document" is a More actions item only | An escape hatch (repairing a card that won't read), not a flow |
-| 8 | Split button **Give to {Agent} ▾**; the label names the agent; the menu lists all three with the reason when one is unavailable | The label says where the work goes, so no caption is needed (Sprint 117 picker rule) |
+| 8 | **Every action that starts agent work is the same split button** (Jarmo, 2026-10-12, "igalpool"): **Give to {Agent} ▾**, **Review with {Agent} ▾**, **Review again with {Agent} ▾**, **Retry with {Agent} ▾** and **Send to {Agent} ▾** in the note box. The label names the agent; the caret lists Claude Code, Codex and OpenCode with the reason when one is unavailable. In row menus the same choice is "Give to…", "Review with…", "Retry with…", expanding the three agents in place | The label says where the work goes, so no caption is needed (Sprint 117 picker rule); one primitive, so no surface forgets the choice |
 | 9 | Default agent: the last used on this board, else the one the AI sidebar is set to | No new setting |
 | 10 | **A new conversation per card**, continued by later handoffs of that card | A card is its own piece of work and often runs beside others. Comments keep Sprint 117's rule (the open conversation) because a comment is a quick ask inside the work you are doing |
 | 11 | **Focus stays where it was.** The AI sidebar does not switch: the card's conversation appears in its rail as Working. Only Open conversation opens and focuses it | The wish after handing off is to get on with other work. The card's status line is the proof of receipt |
@@ -65,7 +66,7 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | 16 | Approvals and in-turn questions: **Open conversation** only | One approval surface (the unified approval gate) |
 | 17 | Ideas are cards in the Idea stage; the Ideas tab shows the same cards with a composer and reviews | A card keeps its id and history when it becomes a task |
 | 18 | The side bar's field adds tasks; ideas are added in the Ideas tab and with `+` on the Idea headers | Task capture is daily, idea capture weekly (estimates) |
-| 19 | Idea review **on request**: "Review with {Agent}" | It spends the user's agent and quota and needs a signed-in agent; capture must stay free |
+| 19 | Idea review **on request**: "Review with {Agent} ▾" | It spends the user's agent and quota and needs a signed-in agent; capture must stay free |
 | 20 | **Drop** hides an idea into Dropped (Bring back); **Delete…** is the real delete (to the system trash) | Non-technical users cannot find the system trash |
 | 21 | Log derived from card history | One history, two views |
 | 22 | **Fixed columns** Idea · To do · Doing · Done | Side bar sections, badge and state words read from fixed stages. The first likely request, "Waiting on someone else", is one more stage later, not custom columns |
@@ -172,13 +173,15 @@ At 280 px "Ask for changes…" is the icon button `[p]` with its tooltip; at 360
 
 | Card is | Menu |
 |---|---|
-| To do | Give to {Agent} · Move to… · Open as document · Delete… |
+| To do | Give to… · Move to… · Open as document · Delete… |
 | Working or queued | Open conversation · Stop · Open as document · Delete… (stop the agent first) |
 | Needs you, Decision, Ready to review | Open conversation · Mark done · Move to… · Open as document · Delete… |
-| Failed, Interrupted | Retry · Open conversation · Move to… · Delete… |
-| Stopped | Give to {Agent} · Open conversation · Move to… · Delete… |
+| Failed, Interrupted | Retry with… · Open conversation · Move to… · Delete… |
+| Stopped | Give to… · Open conversation · Move to… · Delete… |
 | Done | Reopen · Open conversation · Open as document · Delete… |
-| Idea | Review with {Agent} · Make it a task · Drop · Open as document · Delete… |
+| Idea | Review with… · Make it a task · Drop · Open as document · Delete… |
+
+"Give to…", "Review with…" and "Retry with…" expand Claude Code, Codex and OpenCode in place, like Move to…; the default agent is checked, an unavailable one says why.
 
 While an agent is working or waiting, the card cannot leave Doing or be marked done; the disabled item says "(the agent is still working)".
 
@@ -531,16 +534,16 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Open the board (`kanban`) | Open the task board | — |
 | Leading circle | Mark “{title}” done | The agent is still working |
 | Give to {Agent} | Start a new conversation about this task in the AI sidebar, with {Agent} (later: "Continue this task's conversation with {Agent}") | No agent set up: "Set up Claude, Codex or OpenCode in the AI sidebar first"; while sending: "Sending…" |
-| Caret | Choose which agent | — |
+| Caret on any agent button | Choose which agent | — |
 | Mark done | Move this task to Done | — |
 | Ask for changes… | Say what to change. It goes to the same conversation | — |
 | Open conversation | Open this task's conversation in the AI sidebar | The conversation is on another computer, or was deleted |
 | Stop | Stop the agent. You can give the task again | — |
-| Retry | Try this task again with {Agent} | — |
+| Retry with {Agent} | Try this task again with {Agent}, in the same conversation | — |
 | Option buttons | Answer “{option}”. {Agent} continues right away | — |
 | Something else… | Answer in your own words | — |
-| Send (note box) | Send this to {Agent} in the same conversation | Write something first |
-| Review with {Agent} | {Agent} reads this idea and says whether it is worth doing | No agent set up, or "{Agent} is already reviewing this" |
+| Send to {Agent} (note box) | Send this to {Agent} in the same conversation | Write something first |
+| Review with {Agent} / Review again with {Agent} | {Agent} reads this idea and says whether it is worth doing | No agent set up, or "{Agent} is already reviewing this" |
 | Make it a task | Move this idea to To do | — |
 | Drop | Hide this idea. You can bring it back from Dropped | — |
 | Bring back | Show this idea again | — |
@@ -562,7 +565,7 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Board columns, cards, drag | Nothing like it exists in the webview | Card pattern; native HTML5 drag (as `flows/NodePalette.tsx`); Move to… as the keyboard path |
 | `ui/tabs.tsx` | Four peer views with counts; `FilterChip` is a toggle, not a tablist | shadcn's Radix Tabs: **one new webview dependency, `@radix-ui/react-tabs`** (free, MIT, the family the other `ui/` primitives use) |
 | Card dialog | — | `Dialog*`, full-bleed under 640 px |
-| Split Give button | — | `Button` + `DropdownMenu`; Sprint 117 picker rule |
+| Agent split button (Give to, Review with, Retry with, Send to) | One primitive so every agent action offers the same choice | `Button` + `DropdownMenu`; Sprint 117 picker rule |
 | `taskCopy.ts` | One source of words and glyphs | `presentActivityState`, `commentTaskCopy` pattern |
 | Note box | Reply without leaving the card | `Textarea`, `Button` |
 | Result block, file chips | — | `FilesSummary` wording ("Modified N files") |

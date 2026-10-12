@@ -156,7 +156,7 @@ Webview (`webview/src/components/tasks/`), lazy-loaded from `main.tsx` for `task
 | `CardRow.tsx` | One card, two densities (side-bar row, board tile); its More actions menu and context menu come from one action list |
 | `CardDetail.tsx` | Card detail (shape per design.md): title, description, files, state, Give to agent, result, ask, history |
 | `CallsView.tsx`, `IdeasView.tsx`, `LogView.tsx` | The other three tabs |
-| `GiveToAgentButton.tsx` | Split button: primary "Give to {runtime}", menu with the three runtimes and their availability |
+| `AgentSplitButton.tsx` | The one split button for every agent action (Give to, Review with, Review again with, Retry with, Send to): the label names the runtime, the caret menu lists the three runtimes with their availability, and the choice becomes the board's default (`workspaceState`). Row menus use the same runtime list as an in-place submenu |
 | `NoteBox.tsx` | The in-place reply box for Ask for changes… and Something else… |
 | `taskCopy.ts` | Pure state → words + glyph table (design §10), shared by every surface (the `commentTaskCopy.ts` pattern), tested |
 

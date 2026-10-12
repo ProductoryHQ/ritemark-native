@@ -1595,9 +1595,11 @@ button:disabled, [aria-disabled="true"] { cursor: default; }
 .tb-mi .sub { margin-left: auto; }
 .tb-kbd { margin-left: auto; color: var(--r-ink-faint); font-size: 11px; }
 .tb-split { display: inline-flex; }
-.tb-split > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.tb-split > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.22); padding-left: 8px; padding-right: 8px; }
-.tb-split > button:last-child:only-child { border-radius: 6px; }
+.tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.tb-split > :last-child > button { border-left: 1px solid rgba(255,255,255,.24); padding-left: 8px !important; padding-right: 8px !important; }
+.tb-split-outline > :last-child > button { border-left-color: var(--r-hairline-strong); margin-left: -1px; }
+.tb-split > :first-child > button:disabled + *, .tb-split button:disabled { opacity: .6; }
 .tb-label { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); margin: 20px 0 8px; }
 .tb-label:first-child { margin-top: 0; }
 .tb-whose { font-size: 11px; font-weight: 600; color: var(--r-ink-muted); }
@@ -1968,7 +1970,7 @@ function rowActions(c, p, narrow, where) {
       : button({ label: 'Ask for changes…', variant: 'outline', act: 'note-changes', id: c.id, data: ` data-where="${where}"`, tip: 'Say what to change. It goes to the same conversation' })}</div>`;
   if (p.call === 'decision') return `<div class="tb-summary" style="-webkit-line-clamp:4">${esc(c.ask.question)}</div><div class="tb-actions stack">${c.ask.options.map((o, i) => button({ label: esc(o), variant: 'outline', act: 'answer', id: c.id, data: ` data-opt="${i}"`, extra: 'w-full tb-opt', tip: `Answer “${o}”. ${rt} continues right away` })).join('')}${button({ label: 'Something else…', variant: 'outline', act: 'note-answer', id: c.id, data: ` data-where="${where}"`, extra: 'w-full tb-opt', tip: 'Answer in your own words' })}</div>`;
   if (p.call === 'needs') return `<div class="tb-actions">${button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
-  if (p.call === 'failed') return `<div class="tb-actions">${button({ label: 'Retry', act: 'retry', id: c.id, tip: `Try this task again with ${rt}` })}${narrow ? '' : button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
+  if (p.call === 'failed') return `<div class="tb-actions">${retryButton(c, where)}${narrow ? '' : button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
   return '';
 }
 
@@ -1993,7 +1995,7 @@ function noteBox(c, rt) {
   const kind = state.note.kind;
   return `<div class="tb-note" style="pointer-events:auto;position:relative;z-index:10"><label for="note-${c.id}">${kind === 'changes' ? 'What should change?' : 'Your answer'}</label>
     <textarea id="note-${c.id}" rows="3" class="${INPUT} resize-y" data-input="note" placeholder="${kind === 'changes' ? 'For example: shorter, and keep the numbers' : 'For example: Poznań and Aarhus, Duisburg in November'}"></textarea>
-    <div class="mt-2 flex gap-2">${button({ label: 'Send', act: 'send-note', id: c.id, tip: `Send this to ${rt} in the same conversation` })}${button({ label: 'Cancel', variant: 'ghost', act: 'cancel-note', id: c.id, tip: 'Close without sending' })}</div></div>`;
+    <div class="mt-2 flex gap-2">${agentSplit({ verb: 'Send to', act: 'send-note', id: c.id, tip: (r) => `Send this to ${r} in the same conversation` })}${button({ label: 'Cancel', variant: 'ghost', act: 'cancel-note', id: c.id, tip: 'Close without sending' })}</div></div>`;
 }
 
 /* ===================== Task board (editor area) ===================== */
@@ -2021,7 +2023,7 @@ function callsView() {
     else if (p.call === 'decision') acts = `<div class="tb-actions" style="flex-wrap:wrap">${c.ask.options.map((o, i) => button({ label: esc(o), variant: 'outline', act: 'answer', id: c.id, data: ` data-opt="${i}"`, tip: `Answer “${o}”. ${rt} continues right away` })).join('')}${button({ label: 'Something else…', variant: 'outline', act: 'note-answer', id: c.id, data: ' data-where="calls"', tip: 'Answer in your own words' })}</div>`;
     else if (p.call === 'review') acts = `<div class="tb-actions">${button({ label: 'Mark done', act: 'done', id: c.id, tip: 'Move this task to Done' })}${button({ label: 'Ask for changes…', variant: 'outline', act: 'note-changes', id: c.id, data: ' data-where="calls"', tip: 'Say what to change. It goes to the same conversation' })}</div>`;
     else if (p.call === 'needs') acts = `<div class="tb-actions">${button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
-    else if (p.call === 'failed') acts = `<div class="tb-actions">${button({ label: 'Retry', act: 'retry', id: c.id, tip: `Try this task again with ${rt}` })}${button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
+    else if (p.call === 'failed') acts = `<div class="tb-actions">${retryButton(c, 'calls')}${button({ label: 'Open conversation', variant: 'outline', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' })}</div>`;
     return `<div class="tb-callcard"><div class="flex items-start gap-2.5">${icon(p.glyph, 16, TONE_FILL[p.tone], 'tb-glyph' + (p.spin ? ' tb-spin' : ''))}
       <div class="min-w-0 flex-1"><div class="flex items-start gap-3"><button class="min-w-0 flex-1 text-left text-[13px] font-semibold text-ink-strong hover:underline" style="border:0;background:none;padding:0;font-family:inherit" data-act="open" data-id="${c.id}" data-where="board">${esc(c.title)}</button><span class="shrink-0 text-[11px] tone-${p.tone}">${esc(p.row)}</span></div>${detail}${acts}</div></div></div>`;
   }).join('')}</div>`;
@@ -2068,8 +2070,8 @@ function ideaCard(c) {
   else if (c.reviewing) body = `<div class="tb-sub" style="margin-top:6px">${RT_NAME(c.reviewing)} is reading the idea and the titles on your board. This takes a few seconds and starts no conversation.</div>`;
   else if (rv) body = `<div class="tb-summary" style="-webkit-line-clamp:6;font-size:13px;margin-top:8px">${esc(rv.why)}</div>
     <div class="tb-suggest"><div class="tb-label" style="margin:0 0 4px">Suggested task</div><div class="text-[13px] font-medium text-ink-strong">${esc(rv.title)}</div><div class="tb-sub">First step: ${esc(rv.first)} How big: ${rv.size}.</div></div>
-    <div class="tb-actions">${button({ label: 'Make it a task', variant: rv.verdict === 'ready' ? 'default' : 'outline', act: 'make-task', id: c.id, tip: 'Move this idea to To do' })}${button({ label: 'Drop', variant: 'outline', act: 'drop', id: c.id, tip: 'Hide this idea. You can bring it back from Dropped' })}${button({ label: 'Review again', variant: 'ghost', act: 'review', id: c.id, tip: `${rt} reads this idea again` })}</div>`;
-  else body = `<div class="tb-actions">${button({ label: `Review with ${rt}`, variant: 'outline', act: 'review', id: c.id, tip: `${rt} reads this idea and says whether it is worth doing` })}</div>`;
+    <div class="tb-actions">${button({ label: 'Make it a task', variant: rv.verdict === 'ready' ? 'default' : 'outline', act: 'make-task', id: c.id, tip: 'Move this idea to To do' })}${button({ label: 'Drop', variant: 'outline', act: 'drop', id: c.id, tip: 'Hide this idea. You can bring it back from Dropped' })}${reviewButton(c, 'board', true)}</div>`;
+  else body = `<div class="tb-actions">${reviewButton(c, 'board')}</div>`;
   const status = c.dropped ? 'Dropped' : rv && !c.reviewing ? `${VERDICT[rv.verdict].label} · reviewed by ${RT_NAME(rv.by)} ${rv.age}` : p.row;
   return `<div class="tb-callcard"><div class="flex items-start gap-2.5">${icon(c.dropped ? 'eye-slash' : p.glyph, 16, TONE_FILL[c.dropped ? 'faint' : p.tone], 'tb-glyph' + (p.spin ? ' tb-spin' : ''))}
     <div class="min-w-0 flex-1"><div class="flex items-start gap-3"><button class="min-w-0 flex-1 text-left text-[13px] font-semibold text-ink-strong hover:underline" style="border:0;background:none;padding:0;font-family:inherit" data-act="open" data-id="${c.id}" data-where="board">${esc(c.title)}</button>${moreBtn(c.id, c.title, 'board', 'row')}</div>
@@ -2106,11 +2108,11 @@ function cardDialog(where) {
   let stateBlock = '', actions = '', resultBlock = '';
   const give = giveButton(c, where);
   if (c.stage === 'done') { actions = button({ label: 'Reopen', variant: 'outline', act: 'reopen', id: c.id, tip: 'Move this task back to To do' }); }
-  else if (c.stage === 'idea') { actions = c.reviewing ? '' : button({ label: `Review with ${RT_NAME(state.lastRuntime)}`, variant: 'outline', act: 'review', id: c.id, tip: `${RT_NAME(state.lastRuntime)} reads this idea and says whether it is worth doing` }) + (c.review ? button({ label: 'Make it a task', act: 'make-task', id: c.id, tip: 'Move this idea to To do' }) : ''); }
+  else if (c.stage === 'idea') { actions = c.reviewing ? '' : (c.review ? button({ label: 'Make it a task', act: 'make-task', id: c.id, tip: 'Move this idea to To do' }) : '') + reviewButton(c, where, !!c.review); }
   else if (p.plain) { actions = give; }
   else if (p.call === 'review') { actions = button({ label: 'Mark done', act: 'done', id: c.id, tip: 'Move this task to Done' }) + (narrow && state.side < 360 ? button({ ico: 'pencil-simple', variant: 'outline', size: 'iconSm', act: 'note-changes', id: c.id, data: ` data-where="dlg-${where}"`, tip: 'Ask for changes. It goes to the same conversation', aria: 'Ask for changes' }) : button({ label: 'Ask for changes…', variant: 'outline', act: 'note-changes', id: c.id, data: ` data-where="dlg-${where}"`, tip: 'Say what to change. It goes to the same conversation' })); }
   else if (p.call === 'needs') { actions = button({ label: 'Open conversation', act: 'open-conv', id: c.id, tip: 'Open this task’s conversation in the AI sidebar' }); }
-  else if (p.call === 'failed') { actions = button({ label: 'Retry', act: 'retry', id: c.id, tip: `Try this task again with ${rt}` }); }
+  else if (p.call === 'failed') { actions = retryButton(c, where); }
   else if (c.handoff && c.handoff.state === 'cancelled') { actions = give; }
   else if (c.handoff && c.handoff.state === 'accepting') { actions = give; }
   else if (p.busy) { actions = button({ label: 'Stop', variant: 'outline', act: 'stop', id: c.id, tip: 'Stop the agent. You can give the task again', ico: 'stop' }); }
@@ -2155,13 +2157,19 @@ function cardDialog(where) {
 }
 const fileChip = (f) => `<span class="inline-flex min-w-0 max-w-full" data-tip="${esc(f)}"><button class="tb-file" data-act="toast" data-msg="Opens ${esc(f)} in its editor.">${icon('file-text', 12, 'currentColor')}<span>${esc(f.split('/').pop())}</span></button></span>`;
 
-function giveButton(c, where) {
-  const rt = state.lastRuntime;
-  const h = c.handoff;
-  const sending = h && h.state === 'accepting';
-  const again = h && h.conv;
-  return `<span class="tb-split">${button({ label: sending ? `Sending to ${RT_NAME(rt)}…` : `Give to ${RT_NAME(rt)}`, act: 'give', id: c.id, disabled: sending, tip: again ? `Continue this task’s conversation with ${RT_NAME(rt)}` : `Start a new conversation about this task in the AI sidebar, with ${RT_NAME(rt)}` })}${button({ ico: 'caret-down', act: 'give-menu', id: c.id, data: ` data-where="${where}"`, tip: 'Choose which agent', aria: 'Choose which agent', extra: '' })}</span>`;
+/* Every action that starts agent work is this one split button (Jarmo, 2026-10-12): the label names the
+   agent, the caret chooses Claude Code, Codex or OpenCode, and the choice becomes the board's default. */
+function agentSplit({ verb, act, id, where = '', variant = 'default', disabled = false, label = null, tip }) {
+  const rt = RT_NAME(state.lastRuntime);
+  return `<span class="tb-split${variant === 'outline' ? ' tb-split-outline' : ''}">${button({ label: label || `${verb} ${rt}`, variant, act, id, disabled, tip: tip(rt) })}${button({ ico: 'caret-down', variant, act: 'agent-menu', id, data: ` data-for="${act}" data-where="${where}"`, tip: 'Choose which agent', aria: 'Choose which agent', disabled })}</span>`;
 }
+function giveButton(c, where) {
+  const h = c.handoff; const sending = h && h.state === 'accepting'; const again = h && h.conv;
+  return agentSplit({ verb: 'Give to', act: 'give', id: c.id, where, disabled: sending, label: sending ? `Sending to ${RT_NAME(state.lastRuntime)}…` : null,
+    tip: (rt) => again ? `Continue this task’s conversation with ${rt}` : `Start a new conversation about this task in the AI sidebar, with ${rt}` });
+}
+const reviewButton = (c, where, again = false) => agentSplit({ verb: again ? 'Review again with' : 'Review with', act: 'review', id: c.id, where, variant: 'outline', tip: (rt) => `${rt} reads this idea and says whether it is worth doing` });
+const retryButton = (c, where) => agentSplit({ verb: 'Retry with', act: 'retry', id: c.id, where, tip: (rt) => `Try this task again with ${rt}, in the same conversation` });
 
 function confirmDialog(where) {
   if (!state.confirm || state.confirm.where !== where) return '';
@@ -2178,16 +2186,16 @@ function menuItems(c, where) {
   const p = present(c); const rt = RT_NAME(state.lastRuntime);
   const it = (label, ico, act, extra = {}) => ({ label, ico, act, ...extra });
   const L = [];
-  if (state.menu.kind === 'give') {
-    return Object.entries(RT).map(([k, r]) => it(r.unavailable ? `${r.full} · ${r.unavailable}` : r.full, k === state.lastRuntime ? 'check' : null, 'give-with', { rt: k, disabled: !!r.unavailable }));
+  if (state.menu.kind === 'agent') {
+    return Object.entries(RT).map(([k, r]) => it(r.unavailable ? `${r.full} · ${r.unavailable}` : r.full, k === state.lastRuntime ? 'check' : null, 'agent-run', { rt: k, forAct: state.menu.forAct, disabled: !!r.unavailable }));
   }
-  if (c.stage === 'idea') L.push(it(`Review with ${rt}`, 'sparkle', 'review'), it('Make it a task', 'arrow-right', 'make-task'), it(c.dropped ? 'Bring back' : 'Drop', 'eye-slash', c.dropped ? 'bring-back' : 'drop'), it('Open as document', 'file-text', 'as-doc'));
+  if (c.stage === 'idea') L.push(it('Review with…', 'sparkle', '', { sub: 'review' }), it('Make it a task', 'arrow-right', 'make-task'), it(c.dropped ? 'Bring back' : 'Drop', 'eye-slash', c.dropped ? 'bring-back' : 'drop'), it('Open as document', 'file-text', 'as-doc'));
   else if (c.stage === 'done') L.push(it('Reopen', 'arrow-counter-clockwise', 'reopen'), ...(c.handoff ? [it('Open conversation', 'chat-circle', 'open-conv')] : []), it('Open as document', 'file-text', 'as-doc'));
   else if (p.busy && p.call !== 'needs') L.push(it('Open conversation', 'chat-circle', 'open-conv'), it('Stop', 'stop', 'stop'), it('Open as document', 'file-text', 'as-doc'));
   else if (p.call === 'needs') L.push(it('Open conversation', 'chat-circle', 'open-conv'), it('Mark done (the agent is still working)', 'check', 'done', { disabled: true }), it('Move to… (the agent is still working)', 'arrows-down-up', '', { disabled: true }), it('Open as document', 'file-text', 'as-doc'));
-  else if (p.call === 'decision' || p.call === 'review') L.push(it('Open conversation', 'chat-circle', 'open-conv'), it('Mark done', 'check', 'done'), it('Move to…', 'arrows-down-up', '', { sub: true }), it('Open as document', 'file-text', 'as-doc'));
-  else if (p.call === 'failed') L.push(it('Retry', 'arrow-counter-clockwise', 'retry'), it('Open conversation', 'chat-circle', 'open-conv'), it('Move to…', 'arrows-down-up', '', { sub: true }));
-  else L.push(it(`Give to ${rt}`, 'sparkle', 'give'), it('Move to…', 'arrows-down-up', '', { sub: true }), ...(c.handoff && c.handoff.conv ? [it('Open conversation', 'chat-circle', 'open-conv')] : []), it('Open as document', 'file-text', 'as-doc'));
+  else if (p.call === 'decision' || p.call === 'review') L.push(it('Open conversation', 'chat-circle', 'open-conv'), it('Mark done', 'check', 'done'), it('Move to…', 'arrows-down-up', '', { sub: 'move' }), it('Open as document', 'file-text', 'as-doc'));
+  else if (p.call === 'failed') L.push(it('Retry with…', 'arrow-counter-clockwise', '', { sub: 'retry' }), it('Open conversation', 'chat-circle', 'open-conv'), it('Move to…', 'arrows-down-up', '', { sub: 'move' }));
+  else L.push(it('Give to…', 'sparkle', '', { sub: 'give' }), it('Move to…', 'arrows-down-up', '', { sub: 'move' }), ...(c.handoff && c.handoff.conv ? [it('Open conversation', 'chat-circle', 'open-conv')] : []), it('Open as document', 'file-text', 'as-doc'));
   L.push({ sep: true }, it(p.busy ? 'Delete… (stop the agent first)' : 'Delete…', 'trash', 'ask-delete', { danger: true, disabled: p.busy }));
   return L;
 }
@@ -2196,8 +2204,9 @@ function menuHTML(where) {
   const c = card(m.id); if (!c) return '';
   const items = menuItems(c, where);
   const stageRows = () => STAGES.map(([s, n]) => `<div role="menuitemradio" aria-checked="${c.stage === s}" class="${MI} tb-mi" style="padding-left:30px"${c.stage === s ? ' aria-disabled="true"' : ''} data-act="mi" data-mi="move" data-stage="${s}" data-id="${c.id}"><span>${n}</span>${c.stage === s ? `<span class="sub">${icon('check', 14, 'currentColor')}</span>` : ''}</div>`).join('');
-  const row = (x) => x.sep ? `<div role="separator" class="-mx-1 my-1 h-px bg-hairline"></div>`
-    : `<div role="menuitem" class="${MI} tb-mi${x.danger ? ' text-[var(--r-error)] focus:text-[var(--r-error)]' : ''}"${x.disabled ? ' aria-disabled="true" data-disabled=""' : ''} data-act="${x.sub ? 'sub' : 'mi'}" data-mi="${x.act}" data-id="${c.id}"${x.rt ? ` data-rt="${x.rt}"` : ''}${x.sub ? ` aria-expanded="${!!m.sub}"` : ''}${x.sub && m.sub ? ' data-hl="true"' : ''}>${x.ico ? icon(x.ico, 14, 'currentColor') : '<span style="width:14px"></span>'}<span>${esc(x.label)}</span>${x.sub ? `<span class="sub">${icon(m.sub ? 'caret-down' : 'caret-right', 12, 'currentColor')}</span>` : ''}</div>${x.sub && m.sub ? stageRows() : ''}`;
+  const agentRows = (forAct) => Object.entries(RT).map(([k, r]) => `<div role="menuitemradio" aria-checked="${k === state.lastRuntime}" class="${MI} tb-mi" style="padding-left:30px"${r.unavailable ? ' aria-disabled="true"' : ''} data-act="mi" data-mi="agent-run" data-for="${forAct}" data-rt="${k}" data-id="${c.id}"><span>${r.full}${r.unavailable ? ` · ${r.unavailable}` : ''}</span>${k === state.lastRuntime ? `<span class="sub">${icon('check', 14, 'currentColor')}</span>` : ''}</div>`).join('');
+  const row = (x) => { const open = x.sub && m.sub === x.sub; return x.sep ? `<div role="separator" class="-mx-1 my-1 h-px bg-hairline"></div>`
+    : `<div role="menuitem" class="${MI} tb-mi${x.danger ? ' text-[var(--r-error)] focus:text-[var(--r-error)]' : ''}"${x.disabled ? ' aria-disabled="true" data-disabled=""' : ''} data-act="${x.sub ? 'sub' : 'mi'}" data-sub="${x.sub || ''}" data-mi="${x.act}" data-id="${c.id}"${x.rt ? ` data-rt="${x.rt}"` : ''}${x.forAct ? ` data-for="${x.forAct}"` : ''}${x.sub ? ` aria-expanded="${open}"` : ''}${open ? ' data-hl="true"' : ''}>${x.ico ? icon(x.ico, 14, 'currentColor') : '<span style="width:14px"></span>'}<span>${esc(x.label)}</span>${x.sub ? `<span class="sub">${icon(open ? 'caret-down' : 'caret-right', 12, 'currentColor')}</span>` : ''}</div>${open ? (x.sub === 'move' ? stageRows() : agentRows(x.sub)) : ''}`; };
   return `<div class="tb-menu ${MENU}" role="menu" style="left:${m.x}px;top:${m.y}px" data-menu>${items.map(row).join('')}</div>`;
 }
 
@@ -2307,15 +2316,15 @@ function act(el, kind, ev) {
   switch (a) {
     case 'open': state.open = { id, where: where === 'side' ? 'side' : 'board' }; state.histAll = false; state.note = null; closeMenu(); break;
     case 'close-dlg': state.open = null; state.note = null; closeMenu(); break;
-    case 'menu': case 'give-menu': {
-      if (state.menu && state.menu.id === id && state.menu.from === (where || kind) && state.menu.kind === (a === 'give-menu' ? 'give' : 'row')) { closeMenu(); break; }
+    case 'menu': case 'agent-menu': {
+      if (state.menu && state.menu.id === id && state.menu.from === (where || kind) && state.menu.kind === (a === 'agent-menu' ? 'agent' : 'row') && state.menu.forAct === el.dataset.for) { closeMenu(); break; }
       const r = el.getBoundingClientRect(); const vw = el.ownerDocument.defaultView.innerWidth;
-      const w = a === 'give-menu' ? 230 : 210;
-      const split = a === 'give-menu' && el.closest ? el.closest('.tb-split') : null; const left = split ? split.getBoundingClientRect().left : r.right - w;
-      state.menu = { id, where: kind, from: where || kind, kind: a === 'give-menu' ? 'give' : 'row', x: Math.max(8, Math.min(vw - w - 8, left)), y: r.bottom + 4, top: r.top, sub: false };
+      const w = a === 'agent-menu' ? 230 : 210;
+      const split = a === 'agent-menu' && el.closest ? el.closest('.tb-split') : null; const left = split ? split.getBoundingClientRect().left : r.right - w;
+      state.menu = { id, where: kind, from: where || kind, kind: a === 'agent-menu' ? 'agent' : 'row', forAct: el.dataset.for, x: Math.max(8, Math.min(vw - w - 8, left)), y: r.bottom + 4, top: r.top, sub: null };
       break; }
-    case 'sub': state.menu.sub = !state.menu.sub; break;
-    case 'mi': { const mi = el.dataset.mi; closeMenu(); if (mi === 'move') { moveCard(c, el.dataset.stage); break; } if (mi === 'give-with') { give(id, el.dataset.rt); break; } return act({ dataset: { act: mi, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); }
+    case 'sub': state.menu.sub = state.menu.sub === el.dataset.sub ? null : el.dataset.sub; break;
+    case 'mi': { const mi = el.dataset.mi; closeMenu(); if (mi === 'move') { moveCard(c, el.dataset.stage); break; } if (mi === 'agent-run') { state.lastRuntime = el.dataset.rt; return act({ dataset: { act: el.dataset.for, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); } return act({ dataset: { act: mi, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); }
     case 'give': give(id); break;
     case 'tick': if (c) { moveCard(c, 'done'); } break;
     case 'done': c.stage = 'done'; c.doneDay = 'Today'; c.doneTime = now(); c.rank = Math.min(...byStage('done').map((x) => x.rank), 1) - 1; hist(c, 'Marked done'); if (c.handoff) c.handoff.state = 'closed'; state.note = null; break;
@@ -2323,14 +2332,14 @@ function act(el, kind, ev) {
     case 'note-changes': state.note = { id, kind: 'changes', where: where || kind }; break;
     case 'note-answer': state.note = { id, kind: 'answer', where: where || kind }; break;
     case 'cancel-note': state.note = null; break;
-    case 'send-note': { const ta = el.ownerDocument.querySelector('[data-input="note"]'); const text = (ta && ta.value.trim()) || (state.note.kind === 'changes' ? 'Shorter, please, and keep the numbers.' : 'Poznań and Aarhus.'); const k = state.note.kind; state.note = null;
+    case 'send-note': { const ta = el.ownerDocument.querySelector('[data-input="note"]'); const text = (ta && ta.value.trim()) || (state.note.kind === 'changes' ? 'Shorter, please, and keep the numbers.' : 'Poznań and Aarhus.'); const k = state.note.kind; state.note = null; c.handoff.runtime = state.lastRuntime;
       if (k === 'answer') { c._answered = true; hist(c, `You chose: ${text}`); c.ask = undefined; continueConv(c, text); } else { hist(c, `Asked for changes: ${text}`); continueConv(c, text); } break; }
     case 'answer': { const o = c.ask.options[+el.dataset.opt]; c._answered = true; hist(c, `You chose: ${o}`); c.ask = undefined; continueConv(c, `I choose: ${o}`); break; }
     case 'open-conv': if (c && c.handoff && c.handoff.conv) { state.activeConv = c.handoff.conv; state.ai = true; } if (ev) ev.preventDefault(); break;
     case 'switch-conv': state.activeConv = el.dataset.conv; break;
     case 'approve': case 'reject': c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); hist(c, a === 'approve' ? 'You approved a change in the conversation' : 'You rejected a change in the conversation'); scheduleFinish(c, 5000); break;
     case 'stop': if (c._finish) clearTimeout(c._finish); c.handoff.state = 'cancelled'; hist(c, 'Stopped'); break;
-    case 'retry': c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); hist(c, `Given to ${RT_NAME(c.handoff.runtime)} again`); scheduleFinish(c, 7000); break;
+    case 'retry': c.handoff.runtime = state.lastRuntime; c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); hist(c, `Given to ${RT_NAME(c.handoff.runtime)} again`); scheduleFinish(c, 7000); break;
     case 'open-board': state.scene = 'board'; state.boardTab = el.dataset.tab || state.boardTab; state.open = null; break;
     case 'tab': state.boardTab = el.dataset.tab; break;
     case 'toggle-sec': state.sections[el.dataset.sec] = !state.sections[el.dataset.sec]; break;
@@ -2339,7 +2348,7 @@ function act(el, kind, ev) {
     case 'show-all-done': state.showAllDone = !state.showAllDone; break;
     case 'hist-all': state.histAll = !state.histAll; break;
     case 'idea-chip': state.ideaChip = el.dataset.chip; break;
-    case 'review': c.reviewing = state.lastRuntime; c.review = undefined; later(2600, () => { c.reviewing = undefined; c.review = IDEA_REVIEWS[c.id] || IDEA_REVIEWS.default(c); hist(c, `Reviewed by ${RT_NAME(state.lastRuntime)}: ${VERDICT[c.review.verdict].label}`); }); break;
+    case 'review': { const by = state.lastRuntime; c.reviewing = by; c.review = undefined; later(2600, () => { c.reviewing = undefined; c.review = Object.assign({}, IDEA_REVIEWS[c.id] || IDEA_REVIEWS.default(c), { by }); hist(c, `Reviewed by ${RT_NAME(by)}: ${VERDICT[c.review.verdict].label}`); }); break; }
     case 'make-task': { const rv = c.review; hist(c, `Made a task from the idea “${c.title}”`); if (rv) { c.title = rv.title; c.desc = rv.first; } c.review = undefined; moveCard(c, 'todo', true); break; }
     case 'drop': c.dropped = true; hist(c, 'Dropped'); state.open = null; break;
     case 'bring-back': c.dropped = false; hist(c, 'Brought back'); break;
@@ -2351,7 +2360,7 @@ function act(el, kind, ev) {
     case 'toast': toast(el.dataset.msg); break;
     default: return;
   }
-  if (a !== 'menu' && a !== 'give-menu' && a !== 'sub') { if (state.menu && a !== 'mi') state.menu = null; }
+  if (a !== 'menu' && a !== 'agent-menu' && a !== 'sub') { if (state.menu && a !== 'mi') state.menu = null; }
   render();
 }
 const IDEA_REVIEWS = {
