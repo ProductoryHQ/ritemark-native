@@ -47,12 +47,21 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onOpenAutoFocus, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      // Focus the dialog itself on open, not its first button (the header X):
+      // a focused button opens its tooltip, so "Close" would pop up every time
+      // a dialog appears. The dialog's title is announced instead. A dialog
+      // that wants a field focused passes its own onOpenAutoFocus.
+      onOpenAutoFocus={onOpenAutoFocus ?? ((event) => {
+        event.preventDefault();
+        (event.currentTarget as HTMLElement | null)?.focus();
+      })}
       className={cn(
+        'focus:outline-none',
         // Wide host (the editor area): a centred card with breathing room.
         'fixed left-[50%] top-[50%] z-[80] w-[calc(100%-32px)] max-w-[480px] translate-x-[-50%] translate-y-[-50%]',
         'flex flex-col max-h-[80vh]',

@@ -48,12 +48,12 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 ## Phase 4: Validation on macOS (scenarios marked **M** and **U** in [scenarios.md](./scenarios.md))
 
 - [ ] `npm test`, script tests, TypeScript compile, `./scripts/validate-qa.sh`.
-- [ ] RunDev on Apple silicon: dictation (Estonian + English, Stop mid-transcription), Transcribe on-device, microphone-denied dialog, with screenshots checked for finish quality (scenarios marked **M**).
+- [x] RunDev on Apple silicon: dictation (injected speech through the webview bridge, Stop mid-transcription), Transcribe on-device, microphone-denied dialog and every host problem state, with screenshots checked → [qa-evidence.md](./qa-evidence.md). *(Estonian dictation by voice is left for Jarmo's checks; Estonian accuracy is in research/asr-candidates-audit.md)*
 - [ ] `qa-validator` review.
 
 ## Phase 5: Windows branch test (W8 stage B — R1–R9; scenarios marked **B** in [scenarios.md](./scenarios.md))
 
-- [ ] `scripts/qa/make-windows-test-overlay.sh` and `scripts/qa/windows-branch-test.ps1` written; overlay zip built from the branch.
+- [ ] `scripts/qa/make-windows-test-overlay.sh` and `scripts/qa/windows-branch-test.ps1` written; overlay zip built from the branch. *(Scripts written 2026-10-12; the zip is built once the Windows speed decision is in, so Jarmo tests the final engine once)*
 - [ ] **Jarmo:** runs the branch test on his Windows machine through the scenarios marked **B**. A3 errors recorded in `research/windows-mic-audit.md`; Windows copy adjusted if A3 requires it.
 - [x] ~~Intel Mac branch check~~: no Intel Mac available (Jarmo, 2026-10-11). Evidence = CI contract test on `macos-15-intel`.
 
