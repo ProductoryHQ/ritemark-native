@@ -137,6 +137,8 @@
 .cp-strip { container-type: inline-size; }
 @container (max-width: 560px) { .cp-strip .cp-state { display: none; } }
 @container (max-width: 470px) { .cp-strip .cp-tools { display: none; } }
+@container (max-width: 420px) { .cp-strip .cp-showboard-label { display: none; } .cp-strip .cp-showboard { padding: 0 8px; } }
+.cp-strip .cp-showboard { height: 28px; gap: 6px; padding: 0 10px 0 8px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .cp-head { max-width: 900px; margin: 0 auto; padding: 2rem 2rem 0 4rem; color: var(--r-ink-body); }
 .wysiwyg-editor .cp-head ~ div .ProseMirror { padding-top: 1.5rem !important; }
 .cp-title { font: 600 2rem/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--r-ink-strong); outline: none; margin: 0 0 8px; cursor: text; word-break: break-word; border-radius: 4px; }

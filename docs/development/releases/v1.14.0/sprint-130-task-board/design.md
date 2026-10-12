@@ -287,6 +287,7 @@ One "Task board" tab per window, with the folder name in muted text after the ti
 ```
 
 1. **Strip.** It takes DocumentHeader's place, with the same height, surface and hairline. Left to right:
+   - **Show board** (Jarmo, 2026-10-12): opens the Task board on its Board tab. In a narrow editor it keeps only its icon.
    - the **stage menu** ("Doing ▾": Idea, To do, Doing, Done). It is disabled while an agent works, and its tooltip says why.
    - the **state word** with its glyph (§10). The top To do card reads "Next up".
    - the **one action** that moves the card (table below).
@@ -555,6 +556,7 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | Section header | Show / hide the {N} finished tasks | — |
 | More actions | More actions | — |
 | Reopen | Move this task back to To do | — |
+| Show board (card page) | Show the task board | — |
 | Stage menu (card page) | Move this task to another stage | The agent is still working, so the stage can't change |
 | History (card page) | Show the history / Hide the history | — |
 

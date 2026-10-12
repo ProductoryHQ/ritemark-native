@@ -2,9 +2,9 @@
  * CardPage — a task card open as a page in the Ritemark editor (Sprint 130,
  * design.md §5). Opening a card shows the work, not a form.
  *
- * `CardStrip` takes the document header's place: the stage menu, the card's
- * state, the one action that moves the card, History, then the editor's own
- * tools and More actions. `CardHead` sits above the body inside the editor's
+ * `CardStrip` takes the document header's place: Show board, the stage menu,
+ * the card's state, the one action that moves the card, History, then the
+ * editor's own tools and More actions. `CardHead` sits above the body inside the editor's
  * scroll: the title and Done when, edited in place; the state's block (the
  * result to review, a decision, why it waits…); the card's files; and the
  * history when it is shown. Below it the card's Markdown is a normal document,
@@ -126,6 +126,19 @@ export function CardStrip({
   return (
     <header className="cp-strip sticky left-0 right-0 top-0 z-[60] h-10 border-b border-hairline bg-surface">
       <div className="flex h-full items-center gap-1.5 px-4">
+        <Tooltip label="Show the task board">
+          <Button
+            type="button"
+            variant="toolbar"
+            size="sm"
+            className="cp-showboard"
+            aria-label="Show board"
+            onClick={() => notify({ type: 'board/open', tab: 'board' })}
+          >
+            <Icon name="kanban" size={14} tone="muted" />
+            <span className="cp-showboard-label">Show board</span>
+          </Button>
+        </Tooltip>
         {card && snapshot && p ? (
           <>
             <StageMenu card={card} />
