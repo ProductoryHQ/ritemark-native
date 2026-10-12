@@ -1,6 +1,6 @@
 /**
  * taskCopy — the words, glyph and tone for every card state (Sprint 130,
- * design.md §10), shared by the Tasks side bar, the board and the card dialog.
+ * design.md §10), shared by the Tasks side bar, the board and the card page.
  *
  * A card's state follows its conversation, so these words come from the AI
  * sidebar's own vocabulary (Working, Needs you, Interrupted, Sending…, Queued
@@ -20,8 +20,8 @@ export interface CardPresentation {
   spin: boolean
   /** Rows and tiles; empty for a plain card. */
   row: string
-  /** The card dialog's state line. */
-  dialog: string
+  /** The full state line, on the card page. */
+  full: string
   call: CallKind | null
   /** The agent is in flight or blocked mid-turn. */
   busy: boolean
@@ -31,10 +31,10 @@ export interface CardPresentation {
   plain: boolean
 }
 
-export const NEEDS: Record<NeedsKind, { glyph: PhosphorIconName; word: string; dialog: string; sentence: string }> = {
-  approval: { glyph: 'shield-check', word: 'approval', dialog: 'Waiting for approval', sentence: 'The agent is waiting for your approval.' },
-  question: { glyph: 'question', word: 'question', dialog: 'Needs your answer', sentence: 'The agent asked you a question.' },
-  plan: { glyph: 'clipboard-text', word: 'plan review', dialog: 'Waiting for your review', sentence: 'The agent wrote a plan for you to review.' },
+export const NEEDS: Record<NeedsKind, { glyph: PhosphorIconName; word: string; full: string; sentence: string }> = {
+  approval: { glyph: 'shield-check', word: 'approval', full: 'Waiting for approval', sentence: 'The agent is waiting for your approval.' },
+  question: { glyph: 'question', word: 'question', full: 'Needs your answer', sentence: 'The agent asked you a question.' },
+  plan: { glyph: 'clipboard-text', word: 'plan review', full: 'Waiting for your review', sentence: 'The agent wrote a plan for you to review.' },
 }
 
 export const VERDICTS = {
@@ -134,39 +134,39 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
   if (card.stage === 'done') {
     const at = doneAt(card)
     const day = at ? shortDay(at, context.now) : 'Today'
-    return { ...base, glyph: 'check-circle', tone: 'muted', row: `Done · ${day}`, dialog: at ? `Done · ${day} ${timeOfDay(at)}` : 'Done', call: null }
+    return { ...base, glyph: 'check-circle', tone: 'muted', row: `Done · ${day}`, full: at ? `Done · ${day} ${timeOfDay(at)}` : 'Done', call: null }
   }
   if (card.stage === 'idea' && !h) {
-    if (card.dropped) return { ...base, glyph: 'eye-slash', tone: 'faint', row: 'Dropped', dialog: 'Dropped', call: null }
+    if (card.dropped) return { ...base, glyph: 'eye-slash', tone: 'faint', row: 'Dropped', full: 'Dropped', call: null }
     if (card.review) {
       const verdict = VERDICTS[card.review.verdict]
-      return { ...base, glyph: verdict.glyph, tone: verdict.tone, row: verdict.label, dialog: verdict.label }
+      return { ...base, glyph: verdict.glyph, tone: verdict.tone, row: verdict.label, full: verdict.label }
     }
-    return { ...base, glyph: 'lightbulb', tone: 'faint', row: 'Not reviewed', dialog: 'Not reviewed' }
+    return { ...base, glyph: 'lightbulb', tone: 'faint', row: 'Not reviewed', full: 'Not reviewed' }
   }
 
   if (h?.state === 'waiting') {
     const waitFor = h.waitFor
     if (waitFor?.kind === 'conflict') {
       const title = context.titleOf(waitFor.cardId) ?? 'another task'
-      return { ...base, glyph: 'clock', tone: 'muted', row: `Starts after “${shortTitle(title)}”`, dialog: `Starts when “${title}” finishes`, waiting: true }
+      return { ...base, glyph: 'clock', tone: 'muted', row: `Starts after “${shortTitle(title)}”`, full: `Starts when “${title}” finishes`, waiting: true }
     }
     const words = waitFor?.kind === 'capacity' ? 'Starts when the AI sidebar has room' : 'Starts when Doing has room'
-    return { ...base, glyph: 'clock', tone: 'muted', row: words, dialog: words, waiting: true }
+    return { ...base, glyph: 'clock', tone: 'muted', row: words, full: words, waiting: true }
   }
 
   if (h) {
     const agent = agentName(h.runtimeId)
     switch (h.state) {
       case 'accepting':
-        return { ...base, glyph: 'circle-notch', spin: true, tone: 'accent', row: `Sending to ${agent}…`, dialog: `Sending to ${agent}…`, busy: true }
+        return { ...base, glyph: 'circle-notch', spin: true, tone: 'accent', row: `Sending to ${agent}…`, full: `Sending to ${agent}…`, busy: true }
       case 'queued':
-        return { ...base, glyph: 'clock', tone: 'muted', row: `Queued for ${agent}`, dialog: `Queued for ${agent}`, busy: true }
+        return { ...base, glyph: 'clock', tone: 'muted', row: `Queued for ${agent}`, full: `Queued for ${agent}`, busy: true }
       case 'running':
-        return { ...base, glyph: 'circle-notch', spin: true, tone: 'accent', row: `Working · ${agent}`, dialog: `Working · ${agent}`, busy: true }
+        return { ...base, glyph: 'circle-notch', spin: true, tone: 'accent', row: `Working · ${agent}`, full: `Working · ${agent}`, busy: true }
       case 'needs-user': {
         const needs = NEEDS[h.needs ?? 'approval']
-        return { ...base, glyph: needs.glyph, tone: 'amber', row: `Needs you · ${needs.word} · ${since(h.since)}`, dialog: needs.dialog, busy: true }
+        return { ...base, glyph: needs.glyph, tone: 'amber', row: `Needs you · ${needs.word} · ${since(h.since)}`, full: needs.full, busy: true }
       }
       default:
         break
@@ -174,17 +174,17 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
   }
 
   if (card.ask) {
-    return { ...base, glyph: 'question', tone: 'accent', row: `Decision for you · ${since(card.ask.at)}`, dialog: 'Decision for you' }
+    return { ...base, glyph: 'question', tone: 'accent', row: `Decision for you · ${since(card.ask.at)}`, full: 'Decision for you' }
   }
   if (h?.state === 'failed') {
     const reason = h.failure ?? 'something went wrong'
-    return { ...base, glyph: 'x-circle', tone: 'red', row: `Failed · ${reason} · ${since(h.since)}`, dialog: `Failed · ${reason}` }
+    return { ...base, glyph: 'x-circle', tone: 'red', row: `Failed · ${reason} · ${since(h.since)}`, full: `Failed · ${reason}` }
   }
   if (h?.state === 'interrupted') {
-    return { ...base, glyph: 'warning', tone: 'muted', row: `Interrupted · ${since(h.since)}`, dialog: 'Interrupted when Ritemark closed' }
+    return { ...base, glyph: 'warning', tone: 'muted', row: `Interrupted · ${since(h.since)}`, full: 'Interrupted when Ritemark closed' }
   }
   if (h?.state === 'conversation-gone') {
-    return { ...base, glyph: 'warning', tone: 'muted', row: 'Conversation no longer available', dialog: 'Conversation no longer available' }
+    return { ...base, glyph: 'warning', tone: 'muted', row: 'Conversation no longer available', full: 'Conversation no longer available' }
   }
   if (card.call === 'review' && card.result) {
     const check = card.result.check.length
@@ -193,13 +193,13 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
       glyph: 'eye',
       tone: 'accent',
       row: `Ready to review · ${since(card.result.at)}${check ? ` · ${check} to check` : ''}`,
-      dialog: 'Ready to review',
+      full: 'Ready to review',
     }
   }
   if (h?.state === 'cancelled') {
-    return { ...base, glyph: 'x', tone: 'faint', row: 'Stopped', dialog: 'Stopped' }
+    return { ...base, glyph: 'x', tone: 'faint', row: 'Stopped', full: 'Stopped' }
   }
-  return { ...base, glyph: 'circle', tone: 'faint', row: '', dialog: '', plain: true }
+  return { ...base, glyph: 'circle', tone: 'faint', row: '', full: '', plain: true }
 }
 
 /** "Claude finished in 4m 12s" for a result, when the turn's length is known. */

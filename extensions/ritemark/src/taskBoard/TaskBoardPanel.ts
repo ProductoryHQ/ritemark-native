@@ -15,8 +15,8 @@ export class TaskBoardPanel {
   public static readonly viewType = 'ritemark.taskBoard';
   private static current: TaskBoardPanel | undefined;
 
-  /** Open the board, or bring it forward; show a view and/or a card. */
-  static show(extensionUri: vscode.Uri, context: BoardSurfaceContext, target: { cardId?: string; tab?: BoardTab } = {}): void {
+  /** Open the board, or bring it forward; show a view. */
+  static show(extensionUri: vscode.Uri, context: BoardSurfaceContext, target: { tab?: BoardTab } = {}): void {
     if (TaskBoardPanel.current) {
       TaskBoardPanel.current.panel.reveal(undefined, false);
     } else {
@@ -28,7 +28,7 @@ export class TaskBoardPanel {
       );
       TaskBoardPanel.current = new TaskBoardPanel(panel, extensionUri, context);
     }
-    if (target.cardId || target.tab) TaskBoardPanel.current.connection.focus(target);
+    if (target.tab) TaskBoardPanel.current.connection.focus(target);
   }
 
   /** Restore the tab VS Code kept from the last session. */

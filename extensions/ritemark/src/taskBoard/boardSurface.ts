@@ -1,8 +1,8 @@
 /**
- * boardSurface — one board webview (the Tasks side bar or the Task board tab)
- * connected to the board (Sprint 130, #119).
+ * boardSurface — one board webview (the Tasks side bar, the Task board tab or a
+ * card's page in the editor) connected to the board (Sprint 130, #119).
  *
- * Both surfaces speak the same protocol and see the same snapshot, so this is
+ * The surfaces speak the same protocol and see the same snapshot, so this is
  * the one place that turns their messages into controller calls and the
  * controller's snapshots into messages. Requests are decoded first
  * (`decodeBoardRequest`); a malformed one is answered with its reason, never
@@ -26,9 +26,10 @@ import {
 
 /** What the board needs from the rest of the extension. */
 export interface BoardHostActions {
-  openBoard(target: { cardId?: string; tab?: BoardTab }): Promise<void>;
+  openBoard(target: { tab?: BoardTab }): Promise<void>;
   openFile(relativePath: string): Promise<void>;
-  openAsDocument(target: { cardId?: string; fileName?: string }): Promise<void>;
+  /** A card's page in the editor; a card file that won't read opens as a plain document. */
+  openCard(target: { cardId?: string; fileName?: string }): Promise<void>;
   addFiles(cardId: string): Promise<void>;
   recover(action: BoardRecoverAction): Promise<void>;
   reviewIdea(cardId: string, runtimeId: string): Promise<BoardAnswer>;
@@ -43,25 +44,34 @@ export interface BoardSurfaceContext {
   actions: BoardHostActions;
   /** A surface finished loading (the host refreshes the agents' availability). */
   onReady?: () => void;
+  /** The card whose page is the active editor tab, for the side bar's highlight. */
+  activePage?: {
+    current(): string | null;
+    onDidChange(listener: (cardId: string | null) => void): () => void;
+  };
 }
 
 export interface BoardSurfaceConnection extends vscode.Disposable {
-  /** Show a view and/or a card on this surface (the board tab, opened from the side bar). */
-  focus(target: { cardId?: string; tab?: BoardTab }): void;
+  /** Show a view on this surface (the board tab, opened from the side bar). */
+  focus(target: { tab?: BoardTab }): void;
 }
 
 export function connectBoardSurface(
   webview: vscode.Webview,
   surface: BoardSurface,
   context: BoardSurfaceContext,
+  options: { onRequest?: (request: BoardRequest) => void } = {},
 ): BoardSurfaceConnection {
   let ready = false;
-  let pendingFocus: { cardId?: string; tab?: BoardTab } | null = null;
+  let pendingFocus: { tab?: BoardTab } | null = null;
   const post = (message: BoardHostMessage) => {
     void webview.postMessage(message);
   };
   const unsubscribe = context.controller?.subscribe((snapshot) => {
     if (ready) post({ type: 'board/state', snapshot });
+  });
+  const stopActive = context.activePage?.onDidChange((cardId) => {
+    if (ready) post({ type: 'board/active-page', cardId });
   });
 
   const receiving = webview.onDidReceiveMessage(async (raw: unknown) => {
@@ -80,12 +90,14 @@ export function connectBoardSurface(
       ready = true;
       context.onReady?.();
       post({ type: 'board/state', snapshot: context.controller ? await context.controller.snapshot() : context.emptySnapshot() });
+      if (context.activePage) post({ type: 'board/active-page', cardId: context.activePage.current() });
       if (pendingFocus) {
         post({ type: 'board/focus', ...pendingFocus });
         pendingFocus = null;
       }
       return;
     }
+    options.onRequest?.(request);
     const answer = await route(request, context);
     if ('requestId' in request && answer) post({ type: 'board/result', requestId: request.requestId, answer });
   });
@@ -97,6 +109,7 @@ export function connectBoardSurface(
     },
     dispose() {
       unsubscribe?.();
+      stopActive?.();
       receiving.dispose();
     },
   };
@@ -112,11 +125,11 @@ async function route(request: Exclude<BoardRequest, { type: 'board/ready' }>, co
     case 'board/open-file':
       await actions.openFile(request.path);
       return null;
-    case 'board/open-as-document':
-      await actions.openAsDocument({ cardId: request.cardId, fileName: request.fileName });
+    case 'board/open-card':
+      await actions.openCard({ cardId: request.cardId, fileName: request.fileName });
       return null;
     case 'board/open':
-      await actions.openBoard({ cardId: request.cardId, tab: request.tab });
+      await actions.openBoard({ tab: request.tab });
       return null;
     case 'board/add-files':
       await actions.addFiles(request.cardId);

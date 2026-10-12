@@ -74,6 +74,35 @@ test('validates host update payloads at runtime', () => {
   assert.equal(message.type, 'document:update');
 });
 
+test('a task card page carries its card id, and nothing else', () => {
+  const update = (cardMode: unknown) => parseDocumentHostMessage({
+    type: 'document:update',
+    ...identity,
+    revision: 1,
+    baseDiskHash: sha,
+    modelHash: sha,
+    payloadHash: sha,
+    reason: 'open',
+    attempt: 1,
+    payload: {
+      fileType: 'markdown',
+      filename: 'call-maria.md',
+      content: 'Ask about the pilot.',
+      properties: {},
+      hasProperties: false,
+      imageMappings: {},
+      features: { voiceDictation: false, markdownExport: true },
+      cardMode,
+    },
+  });
+  const message = update({ cardId: 'k3f9x2' });
+  assert.ok(message.type === 'document:update' && message.payload.fileType === 'markdown');
+  assert.deepEqual(message.type === 'document:update' && message.payload.fileType === 'markdown' && message.payload.cardMode, { cardId: 'k3f9x2' });
+  assert.throws(() => update({ cardId: 'K3F9X2' }), DocumentProtocolError);
+  assert.throws(() => update({ cardId: 'k3f9x2', stage: 'doing' }), DocumentProtocolError);
+  assert.throws(() => update('k3f9x2'), DocumentProtocolError);
+});
+
 test('accepts exact CSV edit, applied receipt, and resolution messages', () => {
   assert.equal(parseDocumentViewMessage({
     type: 'document:edit',

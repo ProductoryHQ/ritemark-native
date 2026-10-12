@@ -18,6 +18,7 @@ import { act, moveCard, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { CardGlyph, GivePromptPanel, INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
 import { STAGE_NAMES, type CardPresentation } from './taskCopy'
+import { UnreadableCards } from './UnreadableCards'
 
 const HINTS: Record<CardStage, string> = {
   idea: 'Ideas an agent can weigh up.',
@@ -119,6 +120,9 @@ export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
             </section>
           )
         })}
+      </div>
+      <div className="px-2">
+        <UnreadableCards snapshot={snapshot} />
       </div>
       <div className="tb-foot">Tasks are saved in this folder, so they travel with it.</div>
     </>

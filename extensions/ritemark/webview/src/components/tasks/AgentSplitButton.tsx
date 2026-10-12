@@ -37,7 +37,6 @@ export function AgentSplitButton({
   tip,
   variant = 'default',
   disabled = false,
-  inDialog = false,
   className,
 }: {
   verb: string
@@ -49,8 +48,6 @@ export function AgentSplitButton({
   tip: (agent: string) => string
   variant?: 'default' | 'outline'
   disabled?: boolean
-  /** Menus opened inside the card dialog take the z-90 popover layer. */
-  inDialog?: boolean
   className?: string
 }) {
   const current = runtimes.find((runtime) => runtime.id === selected)
@@ -77,7 +74,7 @@ export function AgentSplitButton({
             </Button>
           </DropdownMenuTrigger>
         </Tooltip>
-        <DropdownMenuContent align="end" className={cn(inDialog && 'z-[90]')}>
+        <DropdownMenuContent align="end">
           {runtimes.map((runtime) => (
             <DropdownMenuItem
               key={runtime.id}

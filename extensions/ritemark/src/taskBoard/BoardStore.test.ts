@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, type BoardEntry, type BoardStoreFileSystem } from './BoardStore';
-import { parseCardFile, serializeCard, type Card } from './cardFile';
+import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
+import { parseCardFile, serializeCard, splitCardText, type Card } from './cardFile';
 
 const trashed: string[] = [];
 
@@ -58,8 +58,10 @@ async function main(): Promise<void> {
 
     const first = await store.create({ title: 'Draft the workshop agenda', stage: 'todo', by: 'you' });
     assert.match(first.id, /^[a-z0-9]{6}$/);
-    const name = `${first.id}-draft-the-workshop-agenda.md`;
-    assert.deepEqual(filesIn(folder), [name], 'one file, named after the id and the title');
+    const name = 'draft-the-workshop-agenda.md';
+    assert.deepEqual(filesIn(folder), [name], 'one file, named after the title');
+    assert.equal(store.cardIdOfFile(name), first.id);
+    assert.equal(store.cardIdOfFile('nothing.md'), null);
     const onDisk = parseCardFile(fs.readFileSync(path.join(tasksDir(folder), name), 'utf8'));
     assert.equal(onDisk.kind, 'card');
     if (onDisk.kind === 'card') {
@@ -70,6 +72,14 @@ async function main(): Promise<void> {
     const second = await store.create({ title: 'Call Maria', stage: 'todo', by: 'you' });
     const todo = cardsOf(await store.list()).filter((card) => card.stage === 'todo');
     assert.deepEqual(todo.map((card) => card.id), [second.id, first.id], 'a new card lands on top of its stage');
+
+    // The same title again gets -2, then -3; a hand-made file with the name counts too.
+    const again = await store.create({ title: 'Call Maria', stage: 'todo', by: 'you' });
+    fs.writeFileSync(path.join(tasksDir(folder), 'call-maria-3.md'), '# my own notes\n');
+    const third = await store.create({ title: 'Call Maria', stage: 'todo', by: 'you' });
+    assert.equal(store.cardIdOfFile('call-maria-2.md'), again.id);
+    assert.equal(store.cardIdOfFile('call-maria-4.md'), third.id);
+    assert.equal(fs.readFileSync(path.join(tasksDir(folder), 'call-maria-3.md'), 'utf8'), '# my own notes\n', 'a file that is not a card is never touched');
 
     await assert.rejects(
       () => store.create({ title: '   ', stage: 'todo', by: 'you' }),
@@ -89,7 +99,7 @@ async function main(): Promise<void> {
     assert.equal(moved.history.at(-1)?.what, 'Moved to Doing');
     for (const name of filesIn(folder)) {
       const now = fs.readFileSync(path.join(tasksDir(folder), name), 'utf8');
-      if (name.startsWith(b.id)) assert.equal(now, before[name], 'the other card is untouched');
+      if (name === 'b.md') assert.equal(now, before[name], 'the other card is untouched');
       else assert.notEqual(now, before[name]);
     }
     await assert.rejects(
@@ -145,7 +155,7 @@ async function main(): Promise<void> {
     const store = newStore(folder);
     const card = await store.create({ title: 'Will break', stage: 'todo', by: 'you' });
     const other = await store.create({ title: 'Stays fine', stage: 'todo', by: 'you' });
-    const file = path.join(tasksDir(folder), `${card.id}-will-break.md`);
+    const file = path.join(tasksDir(folder), 'will-break.md');
     const broken = fs.readFileSync(file, 'utf8').replace('stage: todo', 'stage: [todo');
     fs.writeFileSync(file, broken);
     await assert.rejects(
@@ -165,7 +175,7 @@ async function main(): Promise<void> {
     let changes = 0;
     store.onDidChange(() => changes++);
     const card = await store.create({ title: 'Original title', stage: 'todo', by: 'you' });
-    const name = `${card.id}-original-title.md`;
+    const name = 'original-title.md';
     changes = 0;
     assert.equal(await store.invalidate(name), false, 'the echo of our own write is ignored');
     assert.equal(changes, 0);
@@ -221,7 +231,7 @@ async function main(): Promise<void> {
     const card = await store.create({ title: 'Delete me', stage: 'idea', by: 'you' });
     trashed.length = 0;
     await store.remove(card.id);
-    assert.deepEqual(trashed.map((file) => path.basename(file)), [`${card.id}-delete-me.md`]);
+    assert.deepEqual(trashed.map((file) => path.basename(file)), ['delete-me.md']);
     assert.equal(await store.get(card.id), null);
     await assert.rejects(() => store.remove(card.id), (error: BoardStoreError) => error.code === 'not-found');
   }
@@ -270,6 +280,74 @@ async function main(): Promise<void> {
     assert.ok(cardsOf(await store.list()).every((card) => !card.rank.endsWith('0')));
     assert.equal((await store.get(fresh.id))?.history.length, 1);
     assert.equal((await store.get('aaaaa1'))?.history.length, 0, 'spreading ranks adds no history line');
+  }
+
+  // ── A card open as a page: read and written through its document ──────────
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'open-card.md', { id: 'opn001', title: 'Open card', description: 'Saved body\n' });
+    const file = path.join(tasksDir(folder), 'open-card.md');
+    // A fake editor: the document's text, its unsaved state, and what it was asked to change.
+    const doc = { open: true, text: fs.readFileSync(file, 'utf8'), dirty: false, saves: 0, writes: [] as Array<{ head: string; body?: string }> };
+    const documents: CardDocuments = {
+      openText: (target) => (doc.open && target === file ? doc.text : undefined),
+      isDirty: (target) => doc.open && target === file && doc.dirty,
+      async write(target, change) {
+        if (!doc.open || target !== file) return false;
+        doc.writes.push(change);
+        const now = splitCardText(doc.text)!;
+        doc.text = change.head + (change.body ?? now.body);
+        if (!doc.dirty) {
+          fs.writeFileSync(file, doc.text);
+          doc.saves += 1;
+        }
+        return true;
+      },
+    };
+    let tick = 0;
+    const store = new BoardStore(folder, {
+      fileSystem: fileSystem(),
+      documents,
+      now: () => new Date(Date.parse('2026-10-12T09:00:00.000Z') + 1000 * tick++),
+    });
+    await store.list();
+
+    // The user types on the page; the change is not saved yet.
+    doc.text = splitCardText(doc.text)!.head + 'Saved body\nTyping in progress\n';
+    doc.dirty = true;
+    const diskBefore = fs.readFileSync(file, 'utf8');
+    assert.equal(await store.invalidate('open-card.md'), true, 'unsaved typing shows on the board');
+    assert.equal((await store.get('opn001'))?.description, 'Saved body\nTyping in progress\n');
+
+    // An agent finishes: the board changes the stage. Only the front matter goes
+    // into the document, the typing stays, and the disk is not written under it.
+    await store.mutate('opn001', { by: 'claude', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' }));
+    assert.equal(doc.writes.length, 1);
+    assert.equal(doc.writes[0].body, undefined, 'a front-matter change leaves the body alone');
+    assert.ok(doc.text.endsWith('Saved body\nTyping in progress\n'), 'the typing is kept');
+    assert.equal(parseCardFile(doc.text).kind === 'card' && (parseCardFile(doc.text) as { card: Card }).card.stage, 'doing');
+    assert.equal(fs.readFileSync(file, 'utf8'), diskBefore, 'nothing is written to disk under unsaved typing');
+    assert.equal(doc.saves, 0, 'a document with unsaved typing is left for autosave');
+
+    // A change to the description (an agent's update_card) replaces the body too.
+    await store.mutate('opn001', null, (card) => ({ ...card, description: 'From the agent\n' }));
+    assert.equal(doc.writes[1].body, 'From the agent\n');
+    assert.ok(doc.text.endsWith('From the agent\n'));
+
+    // Saved and clean: the board's change is put in the document and saved.
+    fs.writeFileSync(file, doc.text);
+    doc.dirty = false;
+    await store.mutate('opn001', null, (card) => ({ ...card, title: 'Open card, renamed' }));
+    assert.equal(doc.saves, 1);
+    const saved = parseCardFile(fs.readFileSync(file, 'utf8'));
+    assert.equal(saved.kind === 'card' && saved.card.title, 'Open card, renamed');
+
+    // Closed: back to the atomic disk write.
+    doc.open = false;
+    await store.mutate('opn001', null, (card) => ({ ...card, stage: 'done' }));
+    assert.equal(doc.writes.length, 3, 'a closed document is not written to');
+    const closed = parseCardFile(fs.readFileSync(file, 'utf8'));
+    assert.equal(closed.kind === 'card' && closed.card.stage, 'done');
   }
 
   console.log('taskBoard/BoardStore: all assertions passed');

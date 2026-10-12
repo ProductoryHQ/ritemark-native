@@ -19,7 +19,10 @@ export type BoardNotice = Exclude<BoardRequest, { requestId: string } | { type: 
 let snapshot: BoardSnapshot | null = null
 const listeners = new Set<() => void>()
 const pending = new Map<string, (answer: BoardAnswer) => void>()
-const focusListeners = new Set<(target: { cardId?: string; tab?: BoardTab }) => void>()
+const focusListeners = new Set<(target: { tab?: BoardTab }) => void>()
+/** The card whose page is the active editor tab (the side bar highlights it). */
+let activePage: string | null = null
+const activeListeners = new Set<() => void>()
 let installed = false
 let counter = 0
 
@@ -39,7 +42,10 @@ function install(): void {
         resolve(message.answer)
       }
     } else if (message.type === 'board/focus') {
-      for (const listener of focusListeners) listener({ cardId: message.cardId, tab: message.tab })
+      for (const listener of focusListeners) listener({ tab: message.tab })
+    } else if (message.type === 'board/active-page') {
+      activePage = message.cardId
+      for (const listener of activeListeners) listener()
     }
   })
 }
@@ -57,6 +63,16 @@ function subscribe(listener: () => void): () => void {
 
 export function useBoardSnapshot(): BoardSnapshot | null {
   return useSyncExternalStore(subscribe, () => snapshot)
+}
+
+function subscribeActive(listener: () => void): () => void {
+  activeListeners.add(listener)
+  return () => activeListeners.delete(listener)
+}
+
+/** The card whose page is the active editor tab; null when none. */
+export function useActivePage(): string | null {
+  return useSyncExternalStore(subscribeActive, () => activePage)
 }
 
 /** A request the host answers. Resolves with a refusal if no answer comes in 30 s. */
@@ -83,8 +99,8 @@ export function notify(message: BoardNotice): void {
   vscode.postMessage(message)
 }
 
-/** The host asks this surface to show a view and/or a card (the board, opened from the side bar). */
-export function onFocus(listener: (target: { cardId?: string; tab?: BoardTab }) => void): () => void {
+/** The host asks this surface to show a view (the board, opened from the side bar). */
+export function onFocus(listener: (target: { tab?: BoardTab }) => void): () => void {
   install()
   focusListeners.add(listener)
   return () => focusListeners.delete(listener)

@@ -15,9 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Tooltip } from '../ui/tooltip'
 import { BoardColumns } from './BoardColumns'
 import { onFocus, startBoard, useBoardSnapshot } from './boardClient'
-import { useBoardUi } from './boardUi'
 import { CallsView } from './CallsView'
-import { CardDetail, DeleteConfirm } from './CardDetail'
+import { DeleteConfirm } from './DeleteConfirm'
 import { useNow } from './CardParts'
 import { IdeasView } from './IdeasView'
 import { LogView } from './LogView'
@@ -33,7 +32,6 @@ function savedTab(): BoardTab {
 export function TaskBoard() {
   const snapshot = useBoardSnapshot()
   const [tab, setTab] = useState<BoardTab>(savedTab)
-  const openCard = useBoardUi((state) => state.openCard)
   useEffect(() => startBoard('panel'), [])
   useEffect(() => {
     vscode.setState({ ...((vscode.getState() as object | null) ?? {}), tab })
@@ -42,9 +40,8 @@ export function TaskBoard() {
     () =>
       onFocus((target) => {
         if (target.tab) setTab(target.tab)
-        if (target.cardId) openCard(target.cardId)
       }),
-    [openCard],
+    [],
   )
   if (!snapshot) return null
   if (snapshot.folder === null || !snapshot.enabled) {
@@ -109,7 +106,6 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
           </TabsContent>
         </div>
       </Tabs>
-      <CardDetail snapshot={snapshot} narrow={false} onShowCalls={() => setTab('calls')} />
       <DeleteConfirm snapshot={snapshot} />
       <Notice />
     </div>

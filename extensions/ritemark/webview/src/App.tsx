@@ -10,7 +10,10 @@ import {
 import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
-import { DocumentHeader, PropertiesModal, ExportMenu } from './components/header'
+import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from './components/header'
+import { VoiceDictationButton } from './components/VoiceDictationButton'
+import { CardHead, CardStrip } from './components/tasks/CardPage'
+import { startBoard, useBoardSnapshot } from './components/tasks/boardClient'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
 import type { GoogleDocsAction, GoogleDocsProjection } from './components/header/googleDocsMenu'
 import { PropertiesSidePanel } from './components/properties'
@@ -147,6 +150,15 @@ function App() {
   // only renders its projection and sends intent.
   const [googleDocs, setGoogleDocs] = useState<GoogleDocsProjection | null>(null)
 
+  // Task card page (Sprint 130, design.md §5): the card's strip and head come
+  // from the board, the body is this document.
+  const [cardMode, setCardMode] = useState<{ cardId: string } | null>(null)
+  const boardSnapshot = useBoardSnapshot()
+  const cardPageOn = cardMode !== null
+  useEffect(() => {
+    if (cardPageOn) startBoard('page')
+  }, [cardPageOn])
+
   // Agent mode state
   const [isAgentMode, setIsAgentMode] = useState(false)
   const [agentFrontmatter, setAgentFrontmatter] = useState<AgentFrontmatter>({})
@@ -231,6 +243,8 @@ function App() {
         saveAsMarkdownFromPreview: payload.features.saveAsMarkdownFromPreview ?? false,
         commentCallouts: payload.features.commentCallouts,
       })
+      const nextCard = payload.cardMode ?? null
+      setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))
       if (payload.isAgentMode) {
         setIsAgentMode(true)
         setAgentFrontmatter((payload.agentFrontmatter as AgentFrontmatter) || {})
@@ -310,6 +324,7 @@ function App() {
             markdownExport: false,
             saveAsMarkdownFromPreview: false
           })
+          setCardMode((message.cardMode as { cardId: string } | undefined) ?? null)
           if (message.isAgentMode) {
             setIsAgentMode(true)
             setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
@@ -810,30 +825,48 @@ function App() {
     )
   }
 
-  // Side panel visibility derivation
-  const inlineTocShown = activePanel === 'toc' && headings.length >= 2
-  const propertiesPanelShown = activePanel === 'properties'
+  // Side panel visibility derivation. A card page has no Contents or
+  // Properties: the board owns its front matter, the strip its controls.
+  const inlineTocShown = !cardMode && activePanel === 'toc' && headings.length >= 2
+  const propertiesPanelShown = !cardMode && activePanel === 'properties'
   const agentPanelShown = activePanel === 'agent' && isAgentMode
+  const pageCard = cardMode && boardSnapshot ? boardSnapshot.cards.find((card) => card.id === cardMode.cardId) ?? null : null
+  const commentsSlot = features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined
 
   const contentsClick = headings.length >= 2 ? toggleInlineToc : undefined
 
   // Default: Markdown editor
   return (
     <div className="h-screen bg-surface flex flex-col">
-      {/* Document Header - Sticky with Properties and Export buttons */}
-      <DocumentHeader
-        onPropertiesClick={handlePropertiesClick}
-        onExportClick={handleExportClick}
-        onContentsClick={contentsClick}
-        contentsButtonRef={contentsButtonRef}
-        contentsActive={inlineTocShown}
-        propertiesActive={propertiesPanelShown}
-        agentActive={agentPanelShown}
-        onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
-        commentsSlot={features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined}
-        syncAction={syncAction}
-        features={features}
-      />
+      {/* Document Header - Sticky with Properties and Export buttons; a task
+          card's page shows the card strip in its place (Sprint 130). */}
+      {cardMode ? (
+        <CardStrip
+          card={pageCard}
+          snapshot={boardSnapshot}
+          tools={
+            <>
+              {commentsSlot}
+              {features.voiceDictation ? <VoiceDictationButton /> : null}
+            </>
+          }
+          alert={syncAction ? <SyncActionButton action={syncAction} /> : null}
+        />
+      ) : (
+        <DocumentHeader
+          onPropertiesClick={handlePropertiesClick}
+          onExportClick={handleExportClick}
+          onContentsClick={contentsClick}
+          contentsButtonRef={contentsButtonRef}
+          contentsActive={inlineTocShown}
+          propertiesActive={propertiesPanelShown}
+          agentActive={agentPanelShown}
+          onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
+          commentsSlot={commentsSlot}
+          syncAction={syncAction}
+          features={features}
+        />
+      )}
 
       {/* Editor row — flex-row so side panel sits left of the scroll container */}
       <div ref={flexWrapperRef} className="flex-1 flex overflow-hidden" style={{ position: 'relative' }}>
@@ -880,12 +913,13 @@ function App() {
             onChange={handleContentChange}
             onSelectionChange={handleSelectionChange}
             onEditorReady={handleEditorReady}
-            placeholder="Start writing..."
+            placeholder={cardMode ? 'Notes, steps, links: anything the agent should know.' : 'Start writing...'}
             className="h-full"
             imageMappings={imageMappings}
             commentCallouts={features.commentCallouts}
             syncTarget={syncTarget}
             onExternalApplied={handleDocumentApplied}
+            header={pageCard && boardSnapshot ? <CardHead card={pageCard} snapshot={boardSnapshot} /> : undefined}
           />
         </div>
       </div>

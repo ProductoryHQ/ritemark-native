@@ -12,6 +12,10 @@
  *   - only the changed card's file is written. A move rewrites one file, so two
  *     changes to different cards never conflict in git or a sync folder.
  *
+ * A card open as a page in the editor (design.md §5) is read and written
+ * through its document (`CardDocuments`): only the front matter changes, so a
+ * board change never lands as a disk change under the user's unsaved typing.
+ *
  * The same shape as `../commentTasks/CommentTaskStore.ts` and the conversation
  * store: a plain base path, an injected filesystem (so the tests run on a temp
  * folder), one serialized mutation tail, tmp-then-rename writes.
@@ -36,6 +40,7 @@ import {
   parseCardFile,
   rankBetween,
   serializeCard,
+  splitCardText,
   spreadRanks,
   withHistory,
   type Card,
@@ -53,6 +58,25 @@ export const nodeBoardStoreFileSystem: BoardStoreFileSystem = {
     throw new Error('No system trash outside VS Code; compose BoardStore with workspace.fs.');
   },
 };
+
+/**
+ * Card files open in an editor (the card page). Composed in the host from
+ * `vscode.workspace.textDocuments`; absent in tests that need no editor.
+ */
+export interface CardDocuments {
+  /** The open document's text (it may hold unsaved typing); undefined when the
+   *  file is not open. */
+  openText(file: string): string | undefined;
+  /** The open document has unsaved changes. */
+  isDirty(file: string): boolean;
+  /**
+   * Put the board's front matter (`head`, both `---` lines included) into the
+   * open document, and its body too when the change touched the description.
+   * Saves when the document had no unsaved changes. False when the file is not
+   * open (any more): the store then writes the disk.
+   */
+  write(file: string, change: { head: string; body?: string }): Promise<boolean>;
+}
 
 export type BoardStoreErrorCode = 'not-found' | 'unreadable' | 'invalid' | 'write-failed';
 
@@ -97,6 +121,8 @@ export interface BoardStoreDependencies {
   random?: (max: number) => number;
   /** Suffix for temporary files. */
   tempId?: () => string;
+  /** Card files open in an editor. */
+  documents?: CardDocuments;
 }
 
 interface CachedEntry {
@@ -129,6 +155,7 @@ export class BoardStore {
   private readonly now: () => Date;
   private readonly random: (max: number) => number;
   private readonly tempId: () => string;
+  private readonly documents: CardDocuments | null;
   private readonly entries = new Map<string, CachedEntry>();
   /** fileName → the id a copied file is shown under until its next write. */
   private readonly provisionalIds = new Map<string, string>();
@@ -144,6 +171,7 @@ export class BoardStore {
     this.now = dependencies.now ?? (() => new Date());
     this.random = dependencies.random ?? ((max) => randomInt(max));
     this.tempId = dependencies.tempId ?? (() => randomUUID().slice(0, 8));
+    this.documents = dependencies.documents ?? null;
   }
 
   /** Called after every change the store makes or picks up from disk. */
@@ -168,10 +196,17 @@ export class BoardStore {
     });
   }
 
-  /** Absolute path of a card's file (Open as document). */
+  /** Absolute path of a card's file (the card page). */
   filePathOf(cardId: string): string | null {
     const fileName = this.byId.get(cardId);
     return fileName ? path.join(this.tasksDir, fileName) : null;
+  }
+
+  /** The id a card file is shown under (a copy's provisional id included);
+   *  null until the folder is read or when the file is not a card. */
+  cardIdOfFile(fileName: string): string | null {
+    for (const [id, name] of this.byId) if (name === fileName) return id;
+    return null;
   }
 
   /** A new card at the top of its stage, in a new file. */
@@ -185,13 +220,12 @@ export class BoardStore {
       for (const entry of this.entries.values()) {
         if (entry.parsed.kind === 'card') taken.add(entry.parsed.card.id);
       }
-      let id = mintCardId(taken, this.random);
-      let fileName = cardFileName(id, title.value);
-      // The id is new, so only a hand-made file can already have this name.
+      const id = mintCardId(taken, this.random);
+      let copy = 1;
+      let fileName = cardFileName(title.value);
       while (this.entries.has(fileName) || (await this.exists(fileName))) {
-        taken.add(id);
-        id = mintCardId(taken, this.random);
-        fileName = cardFileName(id, title.value);
+        copy += 1;
+        fileName = cardFileName(title.value, copy);
       }
       const rank = await this.topRank(input.stage);
       const card = withHistory(
@@ -312,9 +346,13 @@ export class BoardStore {
 
   /** Read one file into the cache. True when the cache changed. */
   private async reread(fileName: string): Promise<boolean> {
+    const file = path.join(this.tasksDir, fileName);
+    // Unsaved typing on a card page is what the user sees, so the board shows
+    // it too. A saved document is read from disk, which is never older.
+    const unsaved = this.documents?.isDirty(file) ? this.documents.openText(file) : undefined;
     let text: string;
     try {
-      text = await this.fs.readFile(path.join(this.tasksDir, fileName));
+      text = unsaved ?? (await this.fs.readFile(file));
     } catch (error) {
       if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read ${fileName}: ${messageOf(error)}`, error);
       const had = this.entries.delete(fileName);
@@ -345,9 +383,12 @@ export class BoardStore {
     const fileName = this.byId.get(cardId);
     if (!fileName) throw new BoardStoreError('not-found', 'That card is no longer on the board.');
     const file = path.join(this.tasksDir, fileName);
+    // A card open as a page is changed through its document, which may hold
+    // typing the disk has not seen yet.
+    const open = this.documents?.openText(file);
     let text: string;
     try {
-      text = await this.fs.readFile(file);
+      text = open ?? (await this.fs.readFile(file));
     } catch (error) {
       if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read ${fileName}: ${messageOf(error)}`, error);
       this.entries.delete(fileName);
@@ -375,7 +416,9 @@ export class BoardStore {
     let changed: Card = { ...next, updated: at };
     if (history) changed = withHistory(changed, { at, ...history });
     const out = serializeCard(changed, parsed.source);
-    await this.write(fileName, out);
+    const written =
+      open !== undefined && (await this.writeOpen(file, out, changed.description !== parsed.card.description));
+    if (!written) await this.write(fileName, out);
     this.provisionalIds.delete(fileName);
     this.entries.set(fileName, { fileName, hash: hashOf(out), parsed: { kind: 'card', card: changed } });
     this.resolveIds();
@@ -384,9 +427,10 @@ export class BoardStore {
 
   /**
    * Work out which id each card is shown under. A file copied in Finder or by
-   * git carries its original's id; the original keeps it (the file whose name
-   * starts with the id, shortest name first) and every copy gets a fresh id,
-   * kept stable across re-reads until its next write.
+   * git carries its original's id; the original keeps it (an older file whose
+   * name starts with the id first, then the shortest name, as a Finder copy
+   * adds " copy") and every copy gets a fresh id, kept stable across re-reads
+   * until its next write.
    */
   private resolveIds(): void {
     const filesById = new Map<string, string[]>();
@@ -500,6 +544,17 @@ export class BoardStore {
       return true;
     } catch (error) {
       return !isMissing(error);
+    }
+  }
+
+  /** Write through the card's open document; false when it is not open. */
+  private async writeOpen(file: string, contents: string, bodyChanged: boolean): Promise<boolean> {
+    const split = splitCardText(contents);
+    if (!this.documents || !split) return false;
+    try {
+      return await this.documents.write(file, bodyChanged ? split : { head: split.head });
+    } catch (error) {
+      throw new BoardStoreError('write-failed', `Couldn't save ${path.basename(file)}: ${messageOf(error)}`, error);
     }
   }
 

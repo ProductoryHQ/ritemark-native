@@ -1,16 +1,17 @@
 /**
- * boardUi — what the board's surfaces remember while they are open (Sprint
- * 130): the open card, an open note box, the conflict / Doing-full choice a
- * Give to produced, a delete waiting for confirmation, a short notice. Plus the
- * actions that send requests and turn the host's answers into that state.
+ * boardUi — what a board surface remembers while it is open (Sprint 130): an
+ * open note box, the conflict / Doing-full choice a Give to produced, a delete
+ * waiting for confirmation, a short notice. Plus the actions that send
+ * requests and turn the host's answers into that state.
  *
- * One store per webview; the side bar and the board tab each have their own.
+ * One store per webview: the side bar, the board tab and each card page have
+ * their own. Opening a card is the host's: its page opens in the editor.
  */
 
 import { create } from 'zustand'
 import type { AgentId } from '../../../../src/agent/types'
 import type { BoardAnswer, CardStage } from '../../../../src/taskBoard/protocol'
-import { request, type BoardCall } from './boardClient'
+import { notify, request, type BoardCall } from './boardClient'
 
 export type NoteKind = 'changes' | 'answer'
 
@@ -19,15 +20,15 @@ export type GivePrompt =
   | { cardId: string; runtimeId: AgentId; kind: 'doing-full'; count: number; limit: number }
 
 interface BoardUiState {
-  openCardId: string | null
-  /** A note box open on a card; `where` keeps two copies of one card apart (row vs dialog). */
+  /** A note box open on a card; `where` keeps two copies of one card apart (row vs page). */
   note: { cardId: string; where: string; kind: NoteKind } | null
   prompt: GivePrompt | null
   confirmDeleteId: string | null
   notice: string | null
   /** Cards with a request in flight: their agent buttons wait. */
   pending: Record<string, true>
-  openCard(cardId: string | null): void
+  /** Open the card's page in the editor (design.md §5). */
+  openCard(cardId: string): void
   openNote(cardId: string, where: string, kind: NoteKind): void
   closeNote(): void
   clearPrompt(): void
@@ -38,13 +39,12 @@ interface BoardUiState {
 let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useBoardUi = create<BoardUiState>((set) => ({
-  openCardId: null,
   note: null,
   prompt: null,
   confirmDeleteId: null,
   notice: null,
   pending: {},
-  openCard: (cardId) => set({ openCardId: cardId }),
+  openCard: (cardId) => notify({ type: 'board/open-card', cardId }),
   openNote: (cardId, where, kind) => set({ note: { cardId, where, kind } }),
   closeNote: () => set({ note: null }),
   clearPrompt: () => set({ prompt: null }),

@@ -2,9 +2,10 @@
  * taskBoardHost — composes the task board into the extension (Sprint 130, #119).
  *
  * One board per window, for the first workspace folder (the app's project). It
- * wires the card store to the folder (with a watcher for outside edits and the
- * system trash for deletes), the controller to the two surfaces, the activity
- * bar badge, the two commands, and the agents' availability.
+ * wires the card store to the folder (with a watcher for outside edits, the
+ * system trash for deletes and the open card pages), the controller to the
+ * board surfaces, the card pages, the activity bar badge, the two commands, and
+ * the agents' availability.
  *
  * Without a folder, or with `ritemark.features.task-board` off, the surfaces
  * still load and say why there is no board; nothing is written to disk.
@@ -23,6 +24,7 @@ import { CardHandoffLedger, type CardTaskSidebar } from './CardHandoffLedger';
 import { CardTaskStore, cardTaskStoreDir } from './CardTaskStore';
 import { BoardStore, nodeBoardStoreFileSystem } from './BoardStore';
 import { TaskBoardPanel } from './TaskBoardPanel';
+import { CardPages, workspaceCardDocuments } from './cardPages';
 import type { BoardAnswer, BoardSnapshot } from './protocol';
 import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
@@ -42,6 +44,8 @@ export interface TaskBoardHostDependencies {
 export interface TaskBoardHost {
   controller: BoardController | null;
   store: BoardStore | null;
+  /** Cards opened as pages in the Ritemark editor; null without a board. */
+  cardPages: CardPages | null;
 }
 
 const RECOVER_COMMANDS: Record<string, string> = {
@@ -104,6 +108,8 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
           await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true });
         },
       },
+      // A card open as a page is read and written through its document.
+      documents: workspaceCardDocuments(),
     });
     const ledger = new CardHandoffLedger({
       store: new CardTaskStore(cardTaskStoreDir(context.globalStorageUri.fsPath, root)),
@@ -168,8 +174,12 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
 
   const notYet = async (): Promise<BoardAnswer> => ({ ok: false, code: 'invalid', message: 'Idea review is not connected in this build yet.' });
 
+  let cardPages: CardPages | null = null;
   const actions: BoardHostActions = {
     openBoard: async (target) => TaskBoardPanel.show(extensionUri, surfaceContext, target),
+    openCard: async (target) => {
+      await cardPages?.open(target);
+    },
     openFile: async (relative) => {
       if (!folder) return;
       const inside = insideFolder(folder.uri.fsPath, relative);
@@ -185,20 +195,6 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
         return;
       }
       await vscode.commands.executeCommand('vscode.open', uri, { preview: false });
-    },
-    openAsDocument: async (target) => {
-      if (!folder || !store) return;
-      if (target.cardId) {
-        const file = store.filePathOf(target.cardId);
-        if (file) await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), { preview: false });
-        return;
-      }
-      if (target.fileName) {
-        // A card that does not parse opens as plain text, where the broken
-        // front matter is visible and fixable.
-        const file = path.join(store.tasksDir, path.basename(target.fileName));
-        await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), 'default', { preview: false });
-      }
     },
     addFiles: async (cardId) => {
       if (!folder || !controller || !store) return;
@@ -243,6 +239,11 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     actions,
     onReady: refreshRuntimes,
   };
+  if (store) {
+    cardPages = new CardPages(store, () => surfaceContext);
+    surfaceContext.activePage = cardPages.activePage;
+    context.subscriptions.push(cardPages);
+  }
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(TasksViewProvider.viewType, new TasksViewProvider(extensionUri, surfaceContext), {
@@ -253,8 +254,10 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
         TaskBoardPanel.revive(panel, extensionUri, surfaceContext);
       },
     }),
-    vscode.commands.registerCommand('ritemark.openTaskBoard', (cardId?: unknown) => {
-      TaskBoardPanel.show(extensionUri, surfaceContext, typeof cardId === 'string' ? { cardId } : {});
+    // With a card id, the card's page opens instead of the board.
+    vscode.commands.registerCommand('ritemark.openTaskBoard', async (cardId?: unknown) => {
+      if (typeof cardId === 'string' && cardPages) await cardPages.open({ cardId });
+      else TaskBoardPanel.show(extensionUri, surfaceContext);
     }),
     vscode.commands.registerCommand('ritemark.addTask', async () => {
       if (!controller) {
@@ -275,5 +278,5 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     }),
   );
 
-  return { controller, store };
+  return { controller, store, cardPages };
 }

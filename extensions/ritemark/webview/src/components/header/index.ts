@@ -1,4 +1,4 @@
-export { DocumentHeader } from './DocumentHeader'
+export { DocumentHeader, SyncActionButton } from './DocumentHeader'
 export { PropertiesModal } from './PropertiesModal'
 export { ExportMenu } from './ExportMenu'
 export { SpreadsheetToolbar } from './SpreadsheetToolbar'

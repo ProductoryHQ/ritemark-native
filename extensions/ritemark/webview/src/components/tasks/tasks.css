@@ -35,21 +35,13 @@
 .tb-split > :first-child > button:disabled + *, .tb-split button:disabled { opacity: .6; }
 .tb-label { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); margin: 20px 0 8px; }
 .tb-label:first-child { margin-top: 0; }
-.tb-whose { font-size: 11px; font-weight: 600; color: var(--r-ink-muted); }
-.tb-state { margin-top: 6px; display: flex; align-items: flex-start; gap: 6px; font-size: 13px; font-weight: 500; }
-.tb-state svg { margin-top: 1.5px; flex-shrink: 0; }
 .tb-sub { margin-top: 2px; font-size: 12px; color: var(--r-ink-muted); }
 .tb-sub a { color: var(--r-accent); text-decoration: none; font-weight: 600; }
 .tb-sub a:hover { text-decoration: underline; }
-.tb-result { border: 1px solid var(--r-hairline); background: var(--r-surface-muted); border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; color: var(--r-ink-body); }
 .tb-file { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; border: 1px solid var(--r-hairline); color: var(--r-ink-body); background: var(--r-surface); }
 .tb-file:hover { border-color: var(--r-hairline-strong); color: var(--r-ink-strong); }
 .tb-file.missing { color: var(--r-ink-faint); }
 .tb-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tb-desc { font-size: 13px; line-height: 1.55; color: var(--r-ink-body); white-space: pre-wrap; }
-.tb-desc .cb { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
-.tb-desc .cb input { width: 14px; height: 14px; accent-color: var(--r-accent); margin: 0; }
-.tb-desc .cb.done span { color: var(--r-ink-muted); text-decoration: line-through; }
 .tb-hist { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 6px 10px; font-size: 12px; color: var(--r-ink-body); }
 .tb-hist .t { color: var(--r-ink-faint); font-variant-numeric: tabular-nums; }
 .tb-linkbtn { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--r-accent); margin-top: 8px; }
@@ -57,8 +49,6 @@
 .tb-note { margin-top: 10px; border: 1px solid var(--r-hairline); border-radius: 8px; padding: 10px; background: var(--r-surface); }
 .tb-note label { display: block; font-size: 12px; font-weight: 600; color: var(--r-ink-strong); margin-bottom: 6px; }
 .tb-note textarea { min-height: 64px; }
-.tb-title-edit { font: 600 16px/1.3 var(--ritemark-ui-font-family); color: var(--r-ink-strong); border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; margin: -3px -7px; background: transparent; outline: none; word-break: break-word; cursor: text; }
-.tb-cardhead { position: sticky; top: 0; z-index: 2; background: var(--r-surface); }
 .tb-progress { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--r-ink-muted); }
 /* Board */
 .tb-board-head { padding: 18px 24px 0; }
@@ -89,7 +79,6 @@
 .tb-empty { display: flex; align-items: center; gap: 8px; padding: 18px 14px; color: var(--r-ink-muted); font-size: 13px; }
 .tb-ideas { max-width: 760px; padding: 16px 24px 24px; }
 .tb-chips { display: flex; gap: 6px; margin: 12px 0 14px; }
-.tb-verdict { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
 .tb-suggest { margin-top: 10px; border-top: 1px solid var(--r-hairline); padding-top: 10px; }
 .tb-log { max-width: 760px; padding: 16px 24px 24px; }
 .tb-day { margin-bottom: 18px; }
@@ -132,13 +121,51 @@
 .tb-inlink { color: var(--r-accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .tb-inlink:hover { text-decoration: underline; }
 .tb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.tb-title-edit:hover { border-color: var(--r-hairline); }
-.tb-title-edit:focus { border-color: var(--r-accent); box-shadow: 0 0 0 4px var(--r-ring-color); }
 .tb-row-active { background: var(--r-surface-soft); }
-.tb-select { height: 32px; min-width: 160px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--r-ink-strong); border-radius: 4px; padding: 0 8px; font: 13px var(--ritemark-ui-font-family); }
-.tb-select:disabled { opacity: .6; }
-/* The card dialog is wider on the board and full-height in the narrow side bar (design §5). */
-@media (min-width: 641px) { .tb-dlg { max-width: 560px; max-height: calc(100% - 64px); } }
 .tb-toast { position: fixed; left: 50%; bottom: 16px; z-index: 95; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
 .tb-toast button { border: 0; background: none; color: inherit; opacity: .7; padding: 0; }
 .tb-toast button:hover { opacity: 1; }
+/* The card page (design.md §5): a card open in the Ritemark editor. The strip
+   takes DocumentHeader's place; the head sits in the editor's column, which
+   follows .wysiwyg-editor .ProseMirror (max-width 900px, 2rem 2rem 0 4rem). */
+.cp-strip .cp-stage { gap: 6px; padding: 0 8px 0 10px; height: 28px; font-size: 12px; font-weight: 600; }
+.cp-state { display: inline-flex; align-items: center; gap: 6px; min-width: 0; margin-left: 4px; font: 500 12px var(--ritemark-ui-font-family); white-space: nowrap; }
+.cp-state .tb-glyph { width: 14px; height: 14px; margin-top: 0; }
+.cp-sep { width: 1px; height: 16px; background: var(--r-hairline-strong); margin: 0 2px; flex-shrink: 0; }
+/* A narrow editor: the state word gives way first, then Comments and Dictate;
+   the stage, the action, History, a save problem and More always stay. */
+.cp-strip { container-type: inline-size; }
+@container (max-width: 560px) { .cp-strip .cp-state { display: none; } }
+@container (max-width: 470px) { .cp-strip .cp-tools { display: none; } }
+.cp-head { max-width: 900px; margin: 0 auto; padding: 2rem 2rem 0 4rem; color: var(--r-ink-body); }
+.wysiwyg-editor .cp-head ~ div .ProseMirror { padding-top: 1.5rem !important; }
+.cp-title { font: 600 2rem/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--r-ink-strong); outline: none; margin: 0 0 8px; cursor: text; word-break: break-word; border-radius: 4px; }
+.cp-title:focus-visible { box-shadow: 0 0 0 4px var(--r-ring-color); }
+.cp-donewhen { display: flex; gap: 10px; align-items: baseline; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--r-ink-muted); }
+.cp-donewhen b, .cp-label { font: 700 11px var(--ritemark-ui-font-family); letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); flex-shrink: 0; }
+.cp-donewhen b { position: relative; top: -1px; }
+.cp-donewhen-text { flex: 1; min-width: 60px; outline: none; cursor: text; border-radius: 4px; }
+.cp-donewhen-text:focus-visible { box-shadow: 0 0 0 4px var(--r-ring-color); }
+.cp-title:empty::before, .cp-donewhen-text:empty::before { content: attr(data-ph); color: var(--r-ink-faint); }
+.cp-gap { margin-top: 20px; }
+.cp-block { margin: 22px 0 6px; border: 1px solid var(--r-hairline); border-radius: 10px; background: var(--r-surface-muted); padding: 14px 16px 16px; font: 14px/1.5 var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.cp-block.you { border-color: var(--r-accent-fainter); box-shadow: inset 3px 0 0 var(--r-accent); }
+.cp-block.blocked { border-color: var(--r-warning-soft); box-shadow: inset 3px 0 0 var(--r-warning); }
+.cp-block.quiet { background: transparent; }
+.cp-block-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 600; color: var(--r-ink-strong); }
+.cp-block-h .m { font-weight: 500; color: var(--r-ink-muted); }
+.cp-block-h a, .cp-say a, .cp-line a { color: var(--r-accent); font-weight: 600; text-decoration: none; }
+.cp-block-h a:hover, .cp-say a:hover, .cp-line a:hover { text-decoration: underline; }
+.cp-block-h .tb-glyph, .cp-line .tb-glyph { margin-top: 0; }
+.cp-say { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--r-ink-strong); }
+.cp-say.small { font-size: 14px; color: var(--r-ink-body); }
+.cp-block .tb-check ul { font-size: 13.5px; }
+.cp-block .tb-actions { margin-top: 14px; flex-wrap: wrap; }
+.cp-changed { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--r-ink-muted); }
+.cp-line { margin: 20px 0 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font: 500 13px var(--ritemark-ui-font-family); }
+.cp-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--r-hairline); }
+.cp-files .cp-label { margin-right: 4px; }
+.cp-files .tb-file, .cp-changed .tb-file { font-size: 12.5px; padding: 3px 9px; }
+.cp-addfiles { margin: 0; display: inline-flex; align-items: center; gap: 4px; height: 26px; font-size: 12.5px; }
+.cp-history { padding: 16px 0 20px; border-bottom: 1px solid var(--r-hairline); }
+.cp-history .cp-label { display: block; margin-bottom: 8px; }

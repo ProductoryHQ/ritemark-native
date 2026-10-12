@@ -1,7 +1,7 @@
 # Sprint 130 Design — Task board in your project folder (#119)
 
 **Status:** Approved with the plan by Jarmo, 2026-10-12. Settled with the `ux-expert` agent and the `ritemark-design` skill on 2026-10-11, before the technical plan.<br>
-**Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. The card page (§5) was added on 2026-10-12. Where the prototype and this text differ, the prototype is newer.<br>
+**Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. The card page (§5) was added on 2026-10-12. Where the prototype and this text differ, the prototype is newer, except on the card page, where the build (W3b) settled two details: History opens under the card's files, and a Give to choice appears where Give to was pressed.<br>
 **System:** Ritemark Indigo-Editorial<br>
 **Scope:** activity-bar entry, side-bar view, editor-area board, the card page, Give to agent and the result coming back, Your calls, Ideas, Log, narrow width, state words. Storage, tools and runtime plumbing are in [technical-plan.md](./technical-plan.md).
 
@@ -290,7 +290,7 @@ One "Task board" tab per window, with the folder name in muted text after the ti
    - the **stage menu** ("Doing ▾": Idea, To do, Doing, Done). It is disabled while an agent works, and its tooltip says why.
    - the **state word** with its glyph (§10). The top To do card reads "Next up".
    - the **one action** that moves the card (table below).
-   - **History**: a popover with the whole history.
+   - **History**: shows the whole history under the card's files, and hides it again.
    - the editor's own **Comments** and **Dictate**.
    - **More actions**: the row menu of §3.
 2. **Title.** The page's heading, edited in place. Enter, or leaving the line, saves it to the card. The file keeps its name.
@@ -316,7 +316,7 @@ The front matter belongs to the board and never shows: id, stage, rank, history,
 | Done | quiet: "Done · Tue 14:05 · Claude's result", the summary | Reopen |
 | Idea | the review: verdict, why, suggested task, **Make it a task**, **Drop** | Review with {Agent} ▾ |
 
-**Ask for changes…** and **Something else…** open the note box (§3) inside the block. A Give to from a row menu that hits a conflict or a full Doing opens the card's page with that block, because the question needs the card in front of you.
+**Ask for changes…** and **Something else…** open the note box (§3) inside the block. A Give to that hits a conflict or a full Doing shows its choice where Give to was pressed: under the side-bar row, on the board tile, or on the page.
 
 **Saving.**
 
@@ -327,13 +327,13 @@ The front matter belongs to the board and never shows: id, stage, rank, history,
 
 **Tab name.** VS Code names a custom-editor tab after the file (`CustomEditorInput.getName()`). So the tab shows the file name, and new card files are named after the title alone: `tighten-the-executive-summary.md`, with `-2` if that name is taken. There is no id prefix; the id stays in the front matter. Renaming a card later keeps its file name, as with any document.
 
-**Narrow width and zoom.** The page follows the editor. When the strip runs out of room, History, Comments and Dictate move into More actions. The stage menu, the state word and the action stay.
+**Narrow width and zoom.** The page follows the editor. When the strip runs out of room, the state word gives way first, then Comments and Dictate (below about 470 px of editor). The stage menu, the action, History, a save problem and More actions always stay.
 
 **What goes away.**
 
 - The card dialog, and its full-width form in the side bar.
 - **Open as document** in More actions: the card is the document now.
-- The Stage field and the History list: the strip's stage menu and its History popover replace them.
+- The Stage field and the History list: the strip's stage menu and its History button replace them.
 
 A card file that won't read opens as a plain document, without card mode, so it can be repaired.
 
@@ -499,7 +499,7 @@ A one-line composer ("Write an idea…"), then the ideas. Chips: To decide · Dr
 - **Flag off:** "The task board is turned off."
 - **No agent ready:** Give to agent disabled with its reason (§6).
 - **Offline:** everything works except the agent, which shows the runtime's own message.
-- **A card file that won't read:** "Couldn't read this card". Clicking it opens the file as a plain document to repair. Nothing else is affected.
+- **A card file that won't read:** listed under **Couldn't read** at the end of the side bar and below the board's columns, with the parse error. Clicking it opens the file as plain text to repair. Nothing else is affected.
 
 ## 10. State vocabulary
 
@@ -556,7 +556,7 @@ Only shadcn `Button` (the leading circle is a ghost icon Button); every button h
 | More actions | More actions | — |
 | Reopen | Move this task back to To do | — |
 | Stage menu (card page) | Move this task to another stage | The agent is still working, so the stage can't change |
-| History (card page) | History | — |
+| History (card page) | Show the history / Hide the history | — |
 
 ## 12. What each new element costs
 

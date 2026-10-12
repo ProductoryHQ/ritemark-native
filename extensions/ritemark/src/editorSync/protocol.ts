@@ -20,6 +20,8 @@ export type DocumentRenderPayload =
       agentFrontmatter?: Record<string, unknown>;
       agentFlows?: string[];
       agentSkills?: unknown[];
+      /** A task card shown as a page (Sprint 130): the view shows the card strip, not properties. */
+      cardMode?: { cardId: string };
     }
   | {
       fileType: 'csv';
@@ -306,7 +308,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     return { fileType, filename, content, sizeBytes: integer(input, 'sizeBytes') };
   }
   if (fileType !== 'markdown') throw new DocumentProtocolError('Unknown render file type');
-  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills']);
+  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills', 'cardMode']);
   if (typeof input.hasProperties !== 'boolean') throw new DocumentProtocolError('hasProperties must be boolean');
   if (input.isAgentMode !== undefined && typeof input.isAgentMode !== 'boolean') throw new DocumentProtocolError('isAgentMode must be boolean');
   const features = record(input.features, 'features');
@@ -337,7 +339,15 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     ...(input.agentFrontmatter === undefined ? {} : { agentFrontmatter: record(input.agentFrontmatter, 'agentFrontmatter') }),
     ...(input.agentFlows === undefined ? {} : { agentFlows: stringArray(input.agentFlows, 'agentFlows') }),
     ...(input.agentSkills === undefined ? {} : { agentSkills: array(input.agentSkills, 'agentSkills') }),
+    ...(input.cardMode === undefined ? {} : { cardMode: cardModeOf(input.cardMode) }),
   };
+}
+
+function cardModeOf(value: unknown): { cardId: string } {
+  const mode = record(value, 'cardMode');
+  exactKeys(mode, ['cardId']);
+  if (typeof mode.cardId !== 'string' || !/^[a-z0-9]{6}$/.test(mode.cardId)) throw new DocumentProtocolError('cardMode.cardId must be a card id');
+  return { cardId: mode.cardId };
 }
 
 function object(value: unknown): Record<string, unknown> {

@@ -113,12 +113,10 @@ export function NoteBox({
   card,
   kind,
   snapshot,
-  inDialog = false,
 }: {
   card: BoardCardView
   kind: 'changes' | 'answer'
   snapshot: BoardSnapshot
-  inDialog?: boolean
 }) {
   const [text, setText] = useState('')
   const area = useRef<HTMLTextAreaElement>(null)
@@ -156,7 +154,6 @@ export function NoteBox({
           selected={runtime}
           onRun={send}
           disabled={pending || !text.trim()}
-          inDialog={inDialog}
           tip={(agent) => `Send this to ${agent} in the same conversation`}
         />
         <Tooltip label="Close without sending">
@@ -170,7 +167,7 @@ export function NoteBox({
 }
 
 /** Give to {agent}, Retry with {agent}: the card's agent work buttons. */
-export function GiveButton({ card, snapshot, inDialog = false }: { card: BoardCardView; snapshot: BoardSnapshot; inDialog?: boolean }) {
+export function GiveButton({ card, snapshot }: { card: BoardCardView; snapshot: BoardSnapshot }) {
   const pending = useBoardUi((state) => Boolean(state.pending[card.id]))
   const sending = card.handoff?.state === 'accepting'
   const again = Boolean(card.handoff?.canOpen)
@@ -182,7 +179,6 @@ export function GiveButton({ card, snapshot, inDialog = false }: { card: BoardCa
       runtimes={snapshot.runtimes}
       selected={runtime}
       disabled={pending || sending}
-      inDialog={inDialog}
       onRun={(runtimeId) => void giveCard(card.id, runtimeId)}
       tip={(agent) =>
         again ? `Continue this task’s conversation with ${agent}` : `Start a new conversation about this task in the AI sidebar, with ${agent}`
@@ -191,7 +187,7 @@ export function GiveButton({ card, snapshot, inDialog = false }: { card: BoardCa
   )
 }
 
-export function RetryButton({ card, snapshot, inDialog = false }: { card: BoardCardView; snapshot: BoardSnapshot; inDialog?: boolean }) {
+export function RetryButton({ card, snapshot }: { card: BoardCardView; snapshot: BoardSnapshot }) {
   const pending = useBoardUi((state) => Boolean(state.pending[card.id]))
   return (
     <AgentSplitButton
@@ -199,7 +195,6 @@ export function RetryButton({ card, snapshot, inDialog = false }: { card: BoardC
       runtimes={snapshot.runtimes}
       selected={cardAgent(card, snapshot.defaultRuntime)}
       disabled={pending}
-      inDialog={inDialog}
       onRun={(runtimeId) => void act({ type: 'board/retry', cardId: card.id, runtimeId })}
       tip={(agent) => `Try this task again with ${agent}, in the same conversation`}
     />
@@ -247,7 +242,7 @@ export function AskForChangesButton({ card, where, narrow = false }: { card: Boa
   )
 }
 
-/** The buttons that answer a call, in a row, a call card or the dialog. */
+/** The buttons that answer a call, in a row, a call card or the card page. */
 export function CallActions({
   card,
   p,
@@ -255,7 +250,6 @@ export function CallActions({
   where,
   narrow = false,
   stacked = false,
-  inDialog = false,
 }: {
   card: BoardCardView
   p: CardPresentation
@@ -263,12 +257,11 @@ export function CallActions({
   where: string
   narrow?: boolean
   stacked?: boolean
-  inDialog?: boolean
 }) {
   const note = useBoardUi((state) => state.note)
   const openNote = useBoardUi((state) => state.openNote)
   if (note && note.cardId === card.id && note.where === where) {
-    return <NoteBox card={card} kind={note.kind} snapshot={snapshot} inDialog={inDialog} />
+    return <NoteBox card={card} kind={note.kind} snapshot={snapshot} />
   }
   const agent = agentName(cardAgent(card, snapshot.defaultRuntime))
   switch (p.call) {
@@ -312,7 +305,7 @@ export function CallActions({
     case 'failed':
       return (
         <div className="tb-actions">
-          <RetryButton card={card} snapshot={snapshot} inDialog={inDialog} />
+          <RetryButton card={card} snapshot={snapshot} />
           {narrow ? null : <OpenConversationButton card={card} />}
         </div>
       )

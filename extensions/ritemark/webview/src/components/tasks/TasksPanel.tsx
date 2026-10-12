@@ -1,8 +1,8 @@
 /**
  * TasksPanel — the Tasks side bar (Sprint 130, design.md §3): the daily glance.
  * An add field, then Your calls as a panel of its own, then Doing, To do,
- * Ideas and Done. Opening a card shows the card dialog; the board tab is one
- * click away.
+ * Ideas and Done. Clicking a card opens its page in the editor (design.md §5),
+ * and the open card stays highlighted; the board tab is one click away.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -11,13 +11,14 @@ import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { notify, startBoard, useBoardSnapshot } from './boardClient'
+import { notify, startBoard, useActivePage, useBoardSnapshot } from './boardClient'
 import { act, useBoardUi } from './boardUi'
-import { CardDetail, DeleteConfirm } from './CardDetail'
 import { CardMenu } from './CardMenu'
+import { DeleteConfirm } from './DeleteConfirm'
 import { CallActions, CardGlyph, GivePromptPanel, INPUT, SECTION, toneClass, useNow, usePresenter } from './CardParts'
 import { STAGE_NAMES, waited } from './taskCopy'
 import { Notice } from './Notice'
+import { UnreadableCards } from './UnreadableCards'
 import './tasks.css'
 
 const DONE_SHOWN = 5
@@ -179,10 +180,10 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
                 </div>
               ) : null}
             </Collapsible>
+            <UnreadableCards snapshot={snapshot} />
           </>
         )}
       </div>
-      <CardDetail snapshot={snapshot} narrow={narrow} onShowCalls={showCalls} />
       <DeleteConfirm snapshot={snapshot} />
       <Notice />
     </div>
@@ -245,7 +246,7 @@ function SideRow({
   onShowCalls: () => void
 }) {
   const openCard = useBoardUi((state) => state.openCard)
-  const openCardId = useBoardUi((state) => state.openCardId)
+  const activePage = useActivePage()
   const prompt = useBoardUi((state) => state.prompt)
   const p = present(card)
   const progress = card.checkboxes.total ? `${card.checkboxes.done}/${card.checkboxes.total}` : ''
@@ -259,7 +260,7 @@ function SideRow({
     </div>
   ) : null
   return (
-    <div className={cn('group relative flex items-start gap-2.5 px-4 py-2.5 hover:bg-surface-soft', openCardId === card.id && 'tb-row-active')}>
+    <div className={cn('group relative flex items-start gap-2.5 px-4 py-2.5 hover:bg-surface-soft', activePage === card.id && 'tb-row-active')}>
       <button
         type="button"
         className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
@@ -276,7 +277,7 @@ function SideRow({
             {card.ask.question}
           </div>
         ) : null}
-        {prompt && prompt.cardId === card.id && openCardId !== card.id ? (
+        {prompt && prompt.cardId === card.id ? (
           <div className="pointer-events-auto relative z-10">
             <GivePromptPanel prompt={prompt} snapshot={snapshot} onShowCalls={onShowCalls} />
           </div>

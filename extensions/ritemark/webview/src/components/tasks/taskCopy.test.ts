@@ -39,7 +39,7 @@ function handoff(state: CardHandoffView['state'], extra: Partial<CardHandoffView
 const context = { now, titleOf: (id: string) => (id === 'deck01' ? 'Draft the steering committee deck outline' : null) }
 const words = (c: BoardCardView) => {
   const p = presentCard(c, context)
-  return [p.glyph, p.tone, p.row, p.dialog]
+  return [p.glyph, p.tone, p.row, p.full]
 }
 
 function main(): void {

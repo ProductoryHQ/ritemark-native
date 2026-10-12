@@ -401,8 +401,40 @@ export function cardSlug(title: string): string {
   return slug || 'task';
 }
 
-export function cardFileName(id: string, title: string): string {
-  return `${id}-${cardSlug(title)}.md`;
+/** A new card's file name: the title alone, so the editor tab that shows the
+ *  card page reads well (design.md §5). `copy` 2, 3… is added when the name is
+ *  taken. Older `<id>-<slug>.md` files keep working: identity is the id in the
+ *  front matter. */
+export function cardFileName(title: string, copy = 1): string {
+  return copy > 1 ? `${cardSlug(title)}-${copy}.md` : `${cardSlug(title)}.md`;
+}
+
+/**
+ * A card file cut into its front matter (`head`, both `---` lines included) and
+ * its body: the body is what gray-matter reads as the content, so
+ * `head + body` is the file. Null when the text does not start with front
+ * matter.
+ */
+export function splitCardText(text: string): { head: string; body: string } | null {
+  const open = /^---[ \t]*\r?\n/.exec(text);
+  if (!open) return null;
+  const rest = text.slice(open[0].length);
+  const close = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/.exec(rest);
+  if (!close) return null;
+  const end = open[0].length + close.index + close[0].length;
+  return { head: text.slice(0, end), body: text.slice(end) };
+}
+
+/**
+ * The card page saves only the body (design.md §5): the front matter stays
+ * byte for byte, so the editor never rewrites the board's part. The body keeps
+ * a trailing newline, as every saved document does. Null when `current` has no
+ * front matter to keep.
+ */
+export function spliceCardBody(current: string, body: string): string | null {
+  const split = splitCardText(current);
+  if (!split) return null;
+  return split.head + (body.length === 0 || body.endsWith('\n') ? body : `${body}\n`);
 }
 
 /** Append a history line, dropping the oldest beyond the cap. */

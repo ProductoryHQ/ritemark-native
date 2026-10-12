@@ -201,7 +201,7 @@ Design: [design.md §5](./design.md#5-the-card-page). It replaces the card dialo
 
 **Webview.**
 
-- `App.tsx` gets a card-mode branch. `CardStrip` takes `DocumentHeader`'s place: the stage menu, the state word, the one action, History (a popover), Comments, Dictate, More actions. `CardHead` sits above the TipTap editor: title, Done when, the state's block, files.
+- `App.tsx` gets a card-mode branch. `CardStrip` takes `DocumentHeader`'s place: the stage menu, the state word, the one action, History (shown under the files), Comments, Dictate, a save problem, More actions. `CardHead` sits above the TipTap editor: title, Done when, the state's block, files.
 - Both reuse `CardParts` (state words, `CallActions`, `CheckList`, the note box), `AgentSplitButton` and `CardMenu`, through the same `boardClient` and `boardUi`.
 - Properties and Contents are hidden in card mode.
 
@@ -219,6 +219,22 @@ Design: [design.md §5](./design.md#5-the-card-page). It replaces the card dialo
 | W2 controller, W4 ledger, the W5 tools | Unchanged |
 
 In short: about a sixth of the W3 webview code (the dialog) is replaced. W1 gets one storage change and the file-name change. W2 and W4 are untouched. The new code is the editor's card mode and the page's two components.
+
+**As built (2026-10-12).**
+
+| Piece | Where |
+|---|---|
+| Card mode, body splice, the page's board connection, opening with one reused tab, the active page, `workspaceCardDocuments()` | `src/taskBoard/cardPages.ts` (`CardPages`), composed in `taskBoardHost.ts`, exported from `extension.ts` as `taskBoard` and reached from `ritemarkEditor.ts` by lazy require, as the comment tasks are |
+| `splitCardText`, `spliceCardBody`, `cardFileName(title, copy)` | `src/taskBoard/cardFile.ts` |
+| `CardDocuments`, `cardIdOfFile` | `src/taskBoard/BoardStore.ts` |
+| `board/open-card`, surface `page`, `board/active-page` | `src/taskBoard/protocol.ts`, `boardSurface.ts` |
+| `cardMode` in the render payload | `src/editorSync/protocol.ts` |
+| `CardStrip`, `CardHead` | `webview/src/components/tasks/CardPage.tsx`; the editor's `header` slot in `Editor.tsx` keeps the head in the document's scroll; `SyncActionButton` is shared with `DocumentHeader` |
+| Unreadable card files | `UnreadableCards.tsx`, in the side bar and below the board's columns (a W3 gap against R4, fixed here) |
+
+A Give to that hits a conflict or a full Doing keeps showing its choice where it was pressed (the row, the tile, the page), as W3 built it; no handoff between webviews is needed.
+
+P8 (2026-10-12, dev instance): `window.tabGroups.close(tab, true)` closes the page that was only looked at, and `vscode.openWith` moves focus to the new page. A page's edit (typing, or a change through its strip) keeps it open.
 
 **Tests.**
 

@@ -12,6 +12,8 @@ import {
   parseCardFile,
   rankBetween,
   serializeCard,
+  splitCardText,
+  spliceCardBody,
   spreadRanks,
   withHistory,
   type Card,
@@ -231,7 +233,42 @@ function main(): void {
     assert.equal(cardSlug('🎉🎉'), 'task');
     assert.equal(cardSlug('Supercalifragilisticexpialidocious-and-even-longer-words-here'), 'supercalifragilisticexpialidocious-and');
     assert.ok(cardSlug('word '.repeat(30)).length <= 40);
-    assert.equal(cardFileName('k3f9x2', 'Call Maria'), 'k3f9x2-call-maria.md');
+    assert.equal(cardFileName('Call Maria'), 'call-maria.md');
+    assert.equal(cardFileName('Call Maria', 2), 'call-maria-2.md');
+  }
+
+  // ── Front matter and body, for the card page ──────────────────────────────
+  {
+    const card = parsedCard(EXAMPLE).card;
+    const text = serializeCard(card);
+    const split = splitCardText(text);
+    assert.ok(split, 'a serialized card splits');
+    assert.equal(split!.head + split!.body, text, 'head and body are the whole file');
+    assert.equal(split!.body, card.description, 'the body is what the parser reads as the description');
+    assert.ok(split!.head.startsWith('---\n') && split!.head.endsWith('\n---\n'));
+    // gray-matter's own reading agrees on hand-written files too.
+    for (const sample of [EXAMPLE, '---\nritemark: task/1\n---\n', '---\r\nritemark: task/1\r\n---\r\nBody\r\n', '---\n---\nOnly a body']) {
+      const cut = splitCardText(sample);
+      assert.ok(cut, sample);
+      assert.equal(cut!.head + cut!.body, sample);
+    }
+    assert.equal(splitCardText('# No front matter\n'), null);
+    assert.equal(splitCardText('---\nnever closed\n'), null);
+    assert.deepEqual(splitCardText('---\nritemark: task/1\n---'), { head: '---\nritemark: task/1\n---', body: '' });
+
+    // Splicing keeps the front matter byte for byte and only replaces the body.
+    const spliced = spliceCardBody(text, 'New body with **bold**');
+    assert.equal(spliced, split!.head + 'New body with **bold**\n');
+    assert.equal(spliceCardBody(text, ''), split!.head);
+    assert.equal(spliceCardBody(text, 'Ends\n'), split!.head + 'Ends\n');
+    assert.equal(spliceCardBody('# Not a card', 'x'), null);
+    const reparsed = parseCardFile(spliced!);
+    assert.equal(reparsed.kind, 'card');
+    if (reparsed.kind === 'card') {
+      assert.equal(reparsed.card.title, card.title);
+      assert.deepEqual(reparsed.card.history, card.history);
+      assert.equal(reparsed.card.description, 'New body with **bold**\n');
+    }
   }
 
   // ── History cap and bounds ─────────────────────────────────────────────────

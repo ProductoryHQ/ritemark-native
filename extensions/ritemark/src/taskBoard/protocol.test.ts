@@ -30,9 +30,11 @@ function main(): void {
     { type: 'board/move', requestId: 'r5', cardId: 'k3f9x2', stage: 'doing', beforeCardId: 'a1b2c3' },
   );
   assert.deepEqual(
-    decodeBoardRequest({ type: 'board/open-as-document', fileName: 'b0rk3n-broken.md' }),
-    { type: 'board/open-as-document', fileName: 'b0rk3n-broken.md' },
+    decodeBoardRequest({ type: 'board/open-card', fileName: 'broken.md' }),
+    { type: 'board/open-card', fileName: 'broken.md' },
   );
+  assert.deepEqual(decodeBoardRequest({ type: 'board/open-card', cardId: 'k3f9x2' }), { type: 'board/open-card', cardId: 'k3f9x2' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/ready', surface: 'page' }), { type: 'board/ready', surface: 'page' });
   assert.deepEqual(
     decodeBoardRequest({ type: 'board/follow-up', requestId: 'r6', cardId: 'k3f9x2', text: 'Shorter', runtimeId: undefined }),
     { type: 'board/follow-up', requestId: 'r6', cardId: 'k3f9x2', text: 'Shorter' },
@@ -51,9 +53,12 @@ function main(): void {
   rejects({ type: 'board/set-wip', requestId: 'r', limit: 7 }, /limit must be 1–6 or null/);
   rejects({ type: 'board/set-wip', requestId: 'r', limit: 0 }, /limit must be 1–6 or null/);
   rejects({ type: 'board/answer', requestId: 'r', cardId: 'k3f9x2', optionIndex: -1 }, /option number/);
-  rejects({ type: 'board/open-as-document' }, /exactly one of cardId or fileName/);
-  rejects({ type: 'board/open-as-document', cardId: 'k3f9x2', fileName: 'k3f9x2-a.md' }, /exactly one/);
-  rejects({ type: 'board/open-as-document', fileName: '../escape.md' }, /card file name/);
+  rejects({ type: 'board/open-card' }, /exactly one of cardId or fileName/);
+  rejects({ type: 'board/open-card', cardId: 'k3f9x2', fileName: 'a.md' }, /exactly one/);
+  rejects({ type: 'board/open-card', fileName: '../escape.md' }, /card file name/);
+  rejects({ type: 'board/open-as-document', cardId: 'k3f9x2' }, /known board request/);
+  rejects({ type: 'board/open', cardId: 'k3f9x2' }, /cardId is not part of board\/open/);
+  rejects({ type: 'board/ready', surface: 'window' }, /sidebar, panel or page/);
   rejects({ type: 'board/follow-up', requestId: 'r', cardId: 'k3f9x2', text: 'x'.repeat(300 * 1024) }, /too long/, 'payload-too-large');
   rejects({ type: 'board/recover', action: 'format-disk' }, /known recovery/);
   rejects({ type: 'board/ready', surface: 'sidebar', requestId: 'r' }, /requestId is not part of board\/ready/);

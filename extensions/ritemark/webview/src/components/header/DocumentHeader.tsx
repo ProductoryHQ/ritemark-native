@@ -97,21 +97,7 @@ export function DocumentHeader({
             {syncAction?.label ?? ''}
           </span>
 
-          {syncAction && (
-            <Button
-              variant="toolbar"
-              size="sm"
-              onClick={syncAction.onClick}
-              aria-label={syncAction.label}
-              title={syncAction.title ?? syncAction.label}
-              className={syncAction.kind === 'conflict'
-                ? 'text-[var(--r-warning)] border-[var(--r-warning)]'
-                : 'text-[var(--r-error)] border-[var(--r-error-soft)]'}
-            >
-              <Icon name={syncAction.kind === 'conflict' ? 'warning' : 'arrows-clockwise'} size={14} tone="active" />
-              <span>{syncAction.label}</span>
-            </Button>
-          )}
+          {syncAction && <SyncActionButton action={syncAction} />}
 
           <Button
             variant="toolbar"
@@ -125,5 +111,24 @@ export function DocumentHeader({
         </div>
       </div>
     </header>
+  )
+}
+
+/** A save problem's button (conflict or failed sync); also on a task card's strip. */
+export function SyncActionButton({ action }: { action: DocumentSyncAction }) {
+  return (
+    <Button
+      variant="toolbar"
+      size="sm"
+      onClick={action.onClick}
+      aria-label={action.label}
+      title={action.title ?? action.label}
+      className={action.kind === 'conflict'
+        ? 'text-[var(--r-warning)] border-[var(--r-warning)]'
+        : 'text-[var(--r-error)] border-[var(--r-error-soft)]'}
+    >
+      <Icon name={action.kind === 'conflict' ? 'warning' : 'arrows-clockwise'} size={14} tone="active" />
+      <span>{action.label}</span>
+    </Button>
   )
 }

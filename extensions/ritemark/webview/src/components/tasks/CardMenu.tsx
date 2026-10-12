@@ -12,7 +12,6 @@ import { CARD_STAGES } from '../../../../src/taskBoard/cardTypes'
 import { cn } from '../../lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { Icon, type PhosphorIconName } from '../ui/Icon'
-import { notify } from './boardClient'
 import { act, giveCard, moveCard, useBoardUi } from './boardUi'
 import { STAGE_NAMES, type CardPresentation } from './taskCopy'
 
@@ -33,21 +32,18 @@ export function CardMenu({
   p,
   snapshot,
   density = 'row',
-  inDialog = false,
   className,
 }: {
   card: BoardCardView
   p: CardPresentation
   snapshot: BoardSnapshot
   density?: 'row' | 'header'
-  inDialog?: boolean
   className?: string
 }) {
   const [open, setOpen] = useState<Sub | null>(null)
   const askDelete = useBoardUi((state) => state.askDelete)
   const busy = card.locked
   const canOpen = Boolean(card.handoff?.canOpen)
-  const asDoc: Item = { label: 'Open as document', icon: 'file-text', run: () => notify({ type: 'board/open-as-document', cardId: card.id }) }
   const conversation: Item = { label: 'Open conversation', icon: 'chat-circle', run: () => void act({ type: 'board/open-conversation', cardId: card.id }) }
   const move: Item = { label: 'Move to…', icon: 'arrows-down-up', sub: 'move' }
 
@@ -63,32 +59,28 @@ export function CardMenu({
       card.dropped
         ? { label: 'Bring back', icon: 'eye', run: () => void act({ type: 'board/bring-back', cardId: card.id }) }
         : { label: 'Drop', icon: 'eye-slash', run: () => void act({ type: 'board/drop', cardId: card.id }) },
-      asDoc,
     )
   } else if (card.stage === 'done') {
     items.push({ label: 'Reopen', icon: 'arrow-counter-clockwise', run: () => void moveCard(card.id, 'todo') })
     if (canOpen) items.push(conversation)
-    items.push(asDoc)
   } else if (busy && p.call !== 'needs-you') {
-    items.push(conversation, { label: 'Stop', icon: 'x-circle', run: () => void act({ type: 'board/stop', cardId: card.id }) }, asDoc)
+    items.push(conversation, { label: 'Stop', icon: 'x-circle', run: () => void act({ type: 'board/stop', cardId: card.id }) })
   } else if (p.call === 'needs-you') {
     items.push(
       conversation,
       { label: 'Mark done (the agent is still working)', icon: 'check', disabled: true },
       { label: 'Move to… (the agent is still working)', icon: 'arrows-down-up', disabled: true },
-      asDoc,
     )
   } else if (p.call === 'decision' || p.call === 'review') {
     if (canOpen) items.push(conversation)
-    items.push({ label: 'Mark done', icon: 'check', run: () => void act({ type: 'board/mark-done', cardId: card.id }) }, move, asDoc)
+    items.push({ label: 'Mark done', icon: 'check', run: () => void act({ type: 'board/mark-done', cardId: card.id }) }, move)
   } else if (p.call === 'failed') {
     items.push({ label: 'Retry with…', icon: 'arrow-counter-clockwise', sub: 'retry' })
     if (canOpen) items.push(conversation)
-    items.push(move, asDoc)
+    items.push(move)
   } else {
     items.push({ label: 'Give to…', icon: 'sparkle', sub: 'give' }, move)
     if (canOpen) items.push(conversation)
-    items.push(asDoc)
   }
 
   const runAgent = (sub: Sub, runtimeId: AgentId) => {
@@ -135,7 +127,7 @@ export function CardMenu({
   return (
     <DropdownMenu modal={false} onOpenChange={(next) => !next && setOpen(null)}>
       <MoreActionsTrigger label={`More actions for ${card.title}`} density={density} className={className} />
-      <DropdownMenuContent align="end" className={cn(inDialog && 'z-[90]')} onClick={(event) => event.stopPropagation()}>
+      <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
         {items.map((item) => (
           <div key={item.label}>
             <DropdownMenuItem

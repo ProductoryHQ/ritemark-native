@@ -1,7 +1,7 @@
 /**
- * Task-board protocol — the typed boundary between the two board webviews (the
- * Tasks side bar and the Task board tab) and the extension host (Sprint 130,
- * #119).
+ * Task-board protocol — the typed boundary between the board webviews (the
+ * Tasks side bar, the Task board tab and a card's page in the editor) and the
+ * extension host (Sprint 130, #119).
  *
  * `decodeBoardRequest` is the only place webview JSON becomes a board request.
  * Every field is checked and unknown fields are refused, so a webview bug shows
@@ -169,12 +169,15 @@ export type BoardAnswer =
 export type BoardHostMessage =
   | { type: 'board/state'; snapshot: BoardSnapshot }
   | { type: 'board/result'; requestId: string; answer: BoardAnswer }
-  /** The board tab should show this view and/or card (opened from the side bar). */
-  | { type: 'board/focus'; cardId?: string; tab?: BoardTab };
+  /** The board tab should show this view (opened from the side bar). */
+  | { type: 'board/focus'; tab?: BoardTab }
+  /** The card whose page is the active editor tab, for the side bar's highlight; null when none. */
+  | { type: 'board/active-page'; cardId: string | null };
 
 // ── Requests (webview → host) ───────────────────────────────────────────────
 
-export type BoardSurface = 'sidebar' | 'panel';
+/** `page` is a card open as a page in the Ritemark editor (design.md §5). */
+export type BoardSurface = 'sidebar' | 'panel' | 'page';
 
 /** The Task board tab's views. */
 export type BoardTab = 'calls' | 'board' | 'ideas' | 'log';
@@ -209,10 +212,11 @@ export type BoardRequest =
   | { type: 'board/review-idea'; requestId: string; cardId: string; runtimeId: AgentId }
   | { type: 'board/accept-review'; requestId: string; cardId: string }
   | { type: 'board/set-wip'; requestId: string; limit: number | null }
-  | { type: 'board/open'; cardId?: string; tab?: BoardTab }
+  | { type: 'board/open'; tab?: BoardTab }
   | { type: 'board/add-files'; cardId: string }
   | { type: 'board/open-file'; path: string }
-  | { type: 'board/open-as-document'; cardId?: string; fileName?: string }
+  /** Open a card's page; `fileName` names a card file that won't read, which opens as a plain document. */
+  | { type: 'board/open-card'; cardId?: string; fileName?: string }
   | { type: 'board/recover'; action: BoardRecoverAction };
 
 export type BoardRecoverAction = 'sign-in-claude' | 'sign-in-codex' | 'settings' | 'open-folder';
@@ -269,10 +273,10 @@ const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; op
   'board/review-idea': { required: { requestId: 'requestId', cardId: 'cardId', runtimeId: 'runtime' } },
   'board/accept-review': { required: { requestId: 'requestId', cardId: 'cardId' } },
   'board/set-wip': { required: { requestId: 'requestId', limit: 'limit' } },
-  'board/open': { required: {}, optional: { cardId: 'cardId', tab: 'tab' } },
+  'board/open': { required: {}, optional: { tab: 'tab' } },
   'board/add-files': { required: { cardId: 'cardId' } },
   'board/open-file': { required: { path: 'path' } },
-  'board/open-as-document': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName' } },
+  'board/open-card': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName' } },
   'board/recover': { required: { action: 'recover' } },
 };
 
@@ -325,7 +329,7 @@ function decodeField(key: string, rule: FieldRule, value: unknown): unknown {
       if (!(BOARD_TABS as readonly unknown[]).includes(value)) invalid(`${key} must be one of ${BOARD_TABS.join(', ')}`);
       return value;
     case 'surface':
-      if (value !== 'sidebar' && value !== 'panel') invalid(`${key} must be sidebar or panel`);
+      if (value !== 'sidebar' && value !== 'panel' && value !== 'page') invalid(`${key} must be sidebar, panel or page`);
       return value;
     case 'recover':
       if (value !== 'sign-in-claude' && value !== 'sign-in-codex' && value !== 'settings' && value !== 'open-folder') {
@@ -365,8 +369,8 @@ export function decodeBoardRequest(value: unknown): BoardRequest {
   for (const key of Object.keys(input)) {
     if (key !== 'type' && !(key in rules.required) && !(key in (rules.optional ?? {}))) invalid(`${key} is not part of ${type}`);
   }
-  if (type === 'board/open-as-document' && (out.cardId === undefined) === (out.fileName === undefined)) {
-    invalid('board/open-as-document needs exactly one of cardId or fileName');
+  if (type === 'board/open-card' && (out.cardId === undefined) === (out.fileName === undefined)) {
+    invalid('board/open-card needs exactly one of cardId or fileName');
   }
   return out as BoardRequest;
 }
