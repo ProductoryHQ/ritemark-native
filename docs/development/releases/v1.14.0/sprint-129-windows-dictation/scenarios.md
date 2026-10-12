@@ -117,7 +117,7 @@ Then the dialog names System Settings → Privacy & Security → Microphone and 
 ### Scenario: Resume and remove (B)
 Given a model download interrupted at about 40%
 When I click the microphone button again
-Then Ritemark offers "Resume downloading the voice model?" in a dialog that stays in front, even when the window lost focus meanwhile (Windows test, bug A), and finishes it
+Then Ritemark offers "Resume downloading the voice model?" in a dialog that stays in front, even when the window lost focus meanwhile (Windows test, bug A), and finishes it. (A download is paused with the progress notification's **Cancel**, which says "Download paused. Click mic to resume.")
 And Dictation Settings → Model → Remove deletes the file in `%USERPROFILE%\.ritemark\models` (location kept by the Development manager, 2026-10-12)
 
 ### Scenario: Antivirus holds the new file (U)
@@ -216,8 +216,8 @@ Then text appears while I speak, and after Stop the button shows "Adding your la
 ## Feature: Honest about silence and late failures (R14, Windows test 2026-10-12)
 
 ### Scenario: A muted microphone (B, M)
-Given the laptop's microphone is muted with its hardware key
-When I click the microphone and talk
+Given the laptop's microphone is muted with its hardware key (it then delivers about -92 dBFS, not exact zeros)
+When I click the microphone and talk, including on the first dictation after launch
 Then within about 3 seconds recording stops and "Ritemark Heard Nothing" asks me to check the mute key and the Windows setting, with **Open Microphone Settings**
 And nothing is inserted into the document
 
@@ -230,6 +230,12 @@ Then I see a microphone dialog ("Microphone Access Is Off" or "Ritemark Heard No
 Given I pause for half a minute in the middle of dictating
 When I press Stop
 Then the text has no invented words for the pause (such as "Kõige!", "you" or "*music*")
+
+### Scenario: A restored engine works without a reload (B, M; bug E)
+Given dictation showed "Dictation Can't Start" because the engine file was gone
+When the file is put back (e.g. restored from antivirus quarantine) and I click the microphone
+Then dictation starts recording, with no reload
+And after **Remove**, the next click offers the download
 
 ### Scenario: The engine fails after recording (U)
 Given the engine fails while my recording is being transcribed

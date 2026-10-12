@@ -111,3 +111,31 @@ Deferred mode via the QA switch, launched with the anti-backgrounding flags. Aud
 | Console | Radix warned that the problem dialog's description was missing (Sprint 129 code: it overrode the description id). Fixed and re-checked: `aria-describedby` points at the description, and the warning is gone |
 
 **Not checked by hand:** the modal download/resume prompt. The model was present, and it is a VS Code API option; the Windows re-test covers it.
+
+## Windows re-test 1 (2026-10-12, `72cf3c18`) and the follow-up fixes
+
+Run by the "Ritemark on Windows" session, relayed by the Development manager: artifact 11766506167, branch extension 1.99.1791829794. The laptop's hardware mute key stayed on for the whole run and Jarmo was away, so "pause with speech" and B (stale access) could not run.
+
+| Item | Result |
+|---|---|
+| A, prompt can't hide | **Pass.** Native Windows task dialogs for both offers. Resume opened every time after focus moved away; it continued from 34.5 MB to 40.3 MB |
+| D, engine gone in an open window | **Pass.** "Dictation Can't Start" at once, with no recording |
+| Labels | **Pass.** **Transcribe now**, then **Transcribing…** (disabled), then **ET**; no "up to a minute" flash. "Estonian" showed for ~0.3 s during the start-up check |
+| Transcribe | **Pass.** An MP3 transcribed in 166 s; Cancel ended whisper-cli.exe within ~0.3 s |
+| C, muted mic | **Partial.** After Stop, the dialog was right and nothing was inserted (2 of 3 runs). But the live stop never fired: the muted Realtek mic gives 99.2% non-zero samples, peak 2.6e-5 (about -92 dBFS). And the first run after launch inserted "Kõige! Kõige!" |
+| E (new) | A "missing" engine stayed missing after the file came back, and Remove offered no download, until Reload Window |
+
+**Fixes (this commit):**
+- The live check stops when the peak stays below 1e-4 (-80 dBFS) for 3 s.
+- The host check was re-measured on real speech. A first try at -40 dBFS would have treated 32 of 100 FLEURS clips as silence (their loudest frame is -49 dBFS). Now:
+  - fewer than three frames above -65 dBFS means silence;
+  - weak audio (fewer than 10 frames above -50 dBFS) drops output that is only whisper's silence phrases;
+  - "heard nothing" means no text and no voiced audio;
+  - result: across the 100 clips, no clip is skipped and the least audible has 37 audible frames; 8 of 246 six-second pieces are skipped, all of them silent tails.
+- A mic click probes the engine afresh, and a remembered "missing" ends when the file is back.
+- The start-up label shows the language code.
+
+**Mac dev-instance check:**
+- A mic stub delivering noise at a 2.6e-5 peak (the measured muted level) stopped by itself within 3 s with **Ritemark Heard Nothing**.
+- Noise at a 1e-3 peak (about -60 dBFS, room noise) kept recording. After Stop, whisper's output for it was dropped, nothing was inserted, and the dialog said nothing was heard.
+- With the engine removed: "Can't Start". Put back, the next click recorded and transcribed with no reload. git shows the engine unchanged.

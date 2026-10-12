@@ -72,6 +72,12 @@ Windows users can dictate into documents and transcribe recordings on their own 
   - The missing-engine wording stays as built.
   - The note may sit inside a heading: it goes where the caret is, like typing.
   - MP3 Transcribe, cancelling a transcription and the fixes go to a Windows re-test. The two-minute recording on a busy CPU and "microphone in use" move to the v1.14.0 Gate 2 list.
+- **2026-10-12, after Windows re-test 1 (the Development manager, on Jarmo's delegation):**
+  - The live muted check uses a level (peak below about -80 dBFS for 3 s), checked against quiet real speech.
+  - The host checks the level too, so a first muted run can't insert "Kõige!".
+  - Fix bug E (a sticky "missing" engine) in this sprint.
+  - The start label may show the language code.
+  - Pausing a download is the notification's Cancel.
 - **2026-10-12 (Jarmo, relayed):** "kui nupp on aktiivne st dictation käib siis peaks olema nupul tekst: Transcribe now, mitte enam Estonian".
   - While recording, the button reads **Transcribe now** ("speak, then text"), then **Transcribing…** while processing; the tooltip keeps the language.
   - Live mode on Apple silicon (Claude's choice): **Stop**, then **Finishing…**. "Transcribe now" would be wrong there, because the text is already appearing.
