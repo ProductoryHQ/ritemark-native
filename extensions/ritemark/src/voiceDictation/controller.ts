@@ -19,9 +19,10 @@ import {
   getModelPath,
   getWhisperBinaryPath,
   transcribeWav,
-  whisperProblemMessage,
+  WHISPER_TARGETS,
   type TranscriptionResult,
   type WhisperOptions,
+  type WhisperReadiness,
 } from './whisperCpp';
 
 /** 16 kHz mono 16-bit PCM, what the webview sends and whisper wants. */
@@ -32,7 +33,37 @@ export const MAX_CALL_SECONDS = 28;
 /** Waiting audio beyond this means the computer cannot keep up. */
 export const BACKLOG_STOP_SECONDS = 60;
 
-export const BACKLOG_NOTICE = "Dictation can't keep up on this computer. Everything you said so far has been added.";
+export const BACKLOG_NOTICE = "Dictation can't keep up on this computer, so it stopped listening. Everything you said so far has been added.";
+
+/**
+ * Sprint 129 R6: what the webview's dictation dialog explains. The wording lives
+ * there (webview/src/components/dictationProblems.ts), per platform.
+ */
+export type DictationEngineProblem =
+  | 'engine-missing'
+  | 'engine-blocked'
+  | 'engine-cpu'
+  | 'engine-failed'
+  | 'engine-unavailable'
+  | 'model-missing';
+
+/** Which dialog a whisper readiness result calls for. */
+export function dictationProblemFor(
+  readiness: Exclude<WhisperReadiness, 'ready'>,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): DictationEngineProblem {
+  switch (readiness) {
+    case 'missing':
+      return WHISPER_TARGETS.includes(`${platform}-${arch}`) ? 'engine-missing' : 'engine-unavailable';
+    case 'blocked':
+      return 'engine-blocked';
+    case 'cpu-unsupported':
+      return 'engine-cpu';
+    case 'failed':
+      return 'engine-failed';
+  }
+}
 
 /**
  * The PCM samples of a 16 kHz mono 16-bit WAV, or null for anything else.
@@ -88,6 +119,8 @@ export interface DictationDeps {
   binaryPath: () => string;
   modelPath: () => string;
   modelExists: (modelPath: string) => boolean;
+  /** A passing notice (VS Code toast) that needs no decision. */
+  notify: (message: string) => void;
 }
 
 export class DictationController {
@@ -108,6 +141,9 @@ export class DictationController {
       binaryPath: () => getWhisperBinaryPath(context),
       modelPath: () => getModelPath(),
       modelExists: (modelPath) => fs.existsSync(modelPath),
+      // Loaded lazily so the unit tests run without VS Code.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      notify: (message) => { void (require('vscode') as typeof vscode).window.showInformationMessage(message); },
       ...deps,
     };
   }
@@ -148,8 +184,10 @@ export class DictationController {
 
     if (this.pendingBytes > BACKLOG_STOP_SECONDS * BYTES_PER_SECOND) {
       // Stop taking audio; what was captured is still transcribed and inserted.
+      // A toast, not the dialog: the user is watching their words still arrive.
       this.isRecording = false;
-      this.webview.postMessage({ type: 'dictation:error', error: BACKLOG_NOTICE });
+      this.deps.notify(BACKLOG_NOTICE);
+      this.webview.postMessage({ type: 'dictation:stop-capture' });
     }
 
     return this.ensureDraining();
@@ -210,7 +248,7 @@ export class DictationController {
 
       const modelPath = this.deps.modelPath();
       if (!this.deps.modelExists(modelPath)) {
-        this.fail('Speech model not downloaded. Click the mic button to download.');
+        this.fail('model-missing');
         return;
       }
 
@@ -225,7 +263,7 @@ export class DictationController {
         // R6: an engine that cannot run stops dictation with a reason, instead
         // of "listening" while every chunk fails.
         if (result.failure) {
-          this.fail(whisperProblemMessage(result.failure));
+          this.fail(dictationProblemFor(result.failure));
           return;
         }
         continue;
@@ -272,13 +310,13 @@ export class DictationController {
     return Buffer.concat(taken, size);
   }
 
-  private fail(message: string): void {
+  private fail(problem: DictationEngineProblem): void {
     this.isRecording = false;
     this.pending = [];
     this.pendingBytes = 0;
     this.webview.postMessage({
-      type: 'dictation:error',
-      error: message
+      type: 'dictation:problem',
+      problem
     });
   }
 }

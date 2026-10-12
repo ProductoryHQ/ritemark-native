@@ -12,6 +12,7 @@ import {
   DictationController,
   MAX_CALL_SECONDS,
   buildPcmWav,
+  dictationProblemFor,
   parsePcmWav,
 } from './controller';
 import type { TranscriptionResult } from './whisperCpp';
@@ -45,6 +46,7 @@ interface Call { wav: Buffer; finish: (result: TranscriptionResult) => void }
 
 function harness(overrides: { modelExists?: boolean } = {}) {
   const messages: Array<Record<string, unknown>> = [];
+  const notices: string[] = [];
   const calls: Call[] = [];
   const state = { autoFinish: false };
   let waiting: (() => void) | null = null;
@@ -55,6 +57,7 @@ function harness(overrides: { modelExists?: boolean } = {}) {
       binaryPath: () => '/nowhere/whisper-cli',
       modelPath: () => '/nowhere/model.bin',
       modelExists: () => overrides.modelExists ?? true,
+      notify: (message) => { notices.push(message); },
       transcribe: (wav) => new Promise<TranscriptionResult>((resolve) => {
         calls.push({ wav, finish: resolve });
         if (state.autoFinish) resolve(ok(`t${calls.length}`));
@@ -69,8 +72,8 @@ function harness(overrides: { modelExists?: boolean } = {}) {
     check();
   });
   const texts = () => messages.filter(m => m.type === 'dictation:transcription').map(m => m.text);
-  const errors = () => messages.filter(m => m.type === 'dictation:error').map(m => m.error);
-  return { controller, messages, calls, state, callStarted, texts, errors };
+  const problems = () => messages.filter(m => m.type === 'dictation:problem').map(m => m.problem);
+  return { controller, messages, notices, calls, state, callStarted, texts, problems };
 }
 
 function ok(text: string): TranscriptionResult {
@@ -78,6 +81,13 @@ function ok(text: string): TranscriptionResult {
 }
 
 async function run(): Promise<void> {
+  // R6: which dialog each engine result calls for.
+  assert.equal(dictationProblemFor('missing', 'win32', 'x64'), 'engine-missing');
+  assert.equal(dictationProblemFor('missing', 'linux', 'x64'), 'engine-unavailable', 'no build for this computer');
+  assert.equal(dictationProblemFor('blocked', 'win32', 'x64'), 'engine-blocked');
+  assert.equal(dictationProblemFor('cpu-unsupported'), 'engine-cpu');
+  assert.equal(dictationProblemFor('failed'), 'engine-failed');
+
   // WAV in and out.
   const round = parsePcmWav(buildPcmWav(pcm(1, 7)));
   assert.equal(round?.length, BYTES_PER_SECOND);
@@ -160,7 +170,9 @@ async function run(): Promise<void> {
     await h.callStarted(1);
     const chunks = Math.floor(BACKLOG_STOP_SECONDS / 5) + 1; // just over the limit
     for (let i = 0; i < chunks; i += 1) void h.controller.handleAudioChunk(chunk(5, 2));
-    assert.deepEqual(h.errors(), [BACKLOG_NOTICE]);
+    assert.deepEqual(h.notices, [BACKLOG_NOTICE], 'a toast, not the dialog');
+    assert.ok(h.messages.some(m => m.type === 'dictation:stop-capture'), 'the webview is told to stop the microphone');
+    assert.deepEqual(h.problems(), []);
     void h.controller.handleAudioChunk(chunk(5, 3));
     h.state.autoFinish = true;
     h.calls[0].finish(ok('t1'));
@@ -181,7 +193,7 @@ async function run(): Promise<void> {
     h.calls[0].finish({ success: false, text: '', error: 'exit 3221225501', failure: 'cpu-unsupported' });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(h.calls.length, 1, 'waiting audio is not sent to a broken engine');
-    assert.match(String(h.errors()[0]), /newer processor/);
+    assert.deepEqual(h.problems(), ['engine-cpu']);
     assert.equal(h.controller.isActive(), false);
   }
 
@@ -190,7 +202,7 @@ async function run(): Promise<void> {
     const h = harness({ modelExists: false });
     h.controller.startDictation('en');
     await h.controller.handleAudioChunk(chunk(5, 1));
-    assert.match(String(h.errors()[0]), /Speech model not downloaded/);
+    assert.deepEqual(h.problems(), ['model-missing']);
     assert.equal(h.calls.length, 0);
   }
 
@@ -205,13 +217,13 @@ async function run(): Promise<void> {
     const controller = new DictationController(
       { postMessage: async (message: unknown) => { messages.push(message as Record<string, unknown>); return true; } },
       { extensionPath: empty },
-      { modelPath: () => model },
+      { modelPath: () => model, notify: () => undefined },
     );
     controller.startDictation('en');
     await controller.handleAudioChunk(chunk(5, 1));
-    const error = messages.find(m => m.type === 'dictation:error');
-    assert.ok(error, 'an error is shown');
-    assert.match(String(error!.error), /missing from this installation|not available on this computer/);
+    const problem = messages.find(m => m.type === 'dictation:problem');
+    assert.ok(problem, 'the dialog is shown');
+    assert.ok(['engine-missing', 'engine-unavailable'].includes(String(problem!.problem)));
     fs.rmSync(empty, { recursive: true, force: true });
   }
 

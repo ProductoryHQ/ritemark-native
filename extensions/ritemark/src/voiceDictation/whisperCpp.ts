@@ -417,24 +417,3 @@ export function resetWhisperProbeCache(): void {
   readyBinaries.clear();
   recentFailures.clear();
 }
-
-/** Sprint 129 R6: what the user is told when the engine cannot run. */
-export function whisperProblemMessage(
-  readiness: Exclude<WhisperReadiness, 'ready'>,
-  platform: NodeJS.Platform = process.platform,
-  arch: string = process.arch
-): string {
-  if (readiness === 'missing' && !WHISPER_TARGETS.includes(`${platform}-${arch}`)) {
-    return 'On-device speech recognition is not available on this computer.';
-  }
-  switch (readiness) {
-    case 'missing':
-      return "Ritemark's speech engine is missing from this installation. Reinstall Ritemark to restore it.";
-    case 'blocked':
-      return "Your computer's security settings stopped Ritemark's speech engine from starting.";
-    case 'cpu-unsupported':
-      return 'On-device speech recognition needs a newer processor than this computer has.';
-    case 'failed':
-      return 'On-device speech recognition stopped unexpectedly. Please try again. If it keeps happening, please report the problem.';
-  }
-}

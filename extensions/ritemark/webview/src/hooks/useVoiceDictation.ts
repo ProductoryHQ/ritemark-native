@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendToExtension, onMessage, emitInternalEvent } from '../bridge'
 import { DICTATION_SETTINGS_KEY, DEFAULT_DICTATION_SETTINGS } from '../components/DictationSettingsModal'
+import { classifyCaptureError } from '../components/transcribe/recording/capture'
+import { HOST_PROBLEMS, problemFromCapture, type DictationProblem } from '../components/dictationProblems'
 
 export type DictationState = 'idle' | 'listening' | 'processing' | 'error'
 
@@ -20,13 +22,22 @@ function getChunkDuration(): number {
   return DEFAULT_DICTATION_SETTINGS.chunkDuration
 }
 
+/** Sprint 129 R5/R6: why dictation stopped, shown by DictationProblemDialog. */
+export interface DictationProblemState {
+  code: DictationProblem
+  /** The host's own text, for the "generic" problem only. */
+  detail?: string
+}
+
 export interface VoiceDictationHook {
   state: DictationState
-  error: string | null
+  problem: DictationProblemState | null
+  /** Close the problem dialog and return to idle. */
+  dismissProblem: () => void
   isListening: boolean
   currentLanguage: string | null
   startDictation: (language: string) => Promise<void>
-  stopDictation: () => void
+  stopDictation: (options?: { keepProblem?: boolean }) => void
 }
 
 /**
@@ -154,7 +165,7 @@ async function countAudioInputs(): Promise<number> {
  */
 export function useVoiceDictation(): VoiceDictationHook {
   const [state, setState] = useState<DictationState>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [problem, setProblem] = useState<DictationProblemState | null>(null)
   const [currentLanguage, setCurrentLanguage] = useState<string | null>(null)
 
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -180,7 +191,7 @@ export function useVoiceDictation(): VoiceDictationHook {
   const startDictation = useCallback(async (language: string) => {
     try {
       setState('processing')
-      setError(null)
+      setProblem(null)
       setCurrentLanguage(language)
       selectedLanguageRef.current = language
 
@@ -190,7 +201,7 @@ export function useVoiceDictation(): VoiceDictationHook {
       // Wait for 'dictation:ready' message before starting mic capture
     } catch (err) {
       console.error('[Dictation] Failed to prepare dictation:', err)
-      setError('Failed to start dictation. Please try again.')
+      setProblem({ code: 'engine-failed' })
       setState('error')
     }
   }, [])
@@ -282,31 +293,17 @@ export function useVoiceDictation(): VoiceDictationHook {
 
     } catch (err) {
       console.error('[Dictation] Failed to start mic capture:', err)
-      if (err instanceof Error) {
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          if (!isMicrophoneDelegated()) {
-            // Permissions-Policy block inside the webview iframe (GH #116):
-            // System Settings advice would be wrong here — nothing the user can fix.
-            console.error('[Dictation] Microphone is not delegated to the webview iframe (Permissions Policy). This is a Ritemark packaging bug — see GH #116.')
-            setError('Dictation is blocked by an internal configuration error in this build. Please update Ritemark or report this issue.')
-          } else {
-            setError('Microphone access denied. Please enable microphone permissions.')
-          }
-        } else if (err.name === 'NotFoundError') {
-          const inputs = await countAudioInputs()
-          if (inputs === 0) {
-            setError('No microphone found. Please connect a microphone.')
-          } else {
-            // Devices exist (or enumeration failed) yet none could be opened —
-            // on macOS this means the OS is blocking access, not missing hardware.
-            setError('Microphone access denied. A microphone exists but macOS blocked access to it.')
-          }
-        } else {
-          setError(`Failed to start dictation: ${err.message}`)
-        }
-      } else {
-        setError('Failed to start dictation. Please try again.')
+      // Sprint 129 R5: the same reading as Transcribe Record. A Permissions-Policy
+      // block is a Ritemark packaging bug (GH #116), not the user's settings; a
+      // NotFoundError while devices exist means the OS is refusing access.
+      const name = err instanceof Error ? err.name : undefined
+      const delegated = isMicrophoneDelegated()
+      const audioInputs = name === 'NotFoundError' || name === 'DevicesNotFoundError' ? await countAudioInputs() : 1
+      const code = classifyCaptureError(name, { delegated, audioInputs })
+      if (code === 'internal-config') {
+        console.error('[Dictation] Microphone is not delegated to the webview iframe (Permissions Policy). This is a Ritemark packaging bug — see GH #116.')
       }
+      setProblem({ code: problemFromCapture(code) })
       setState('error')
     }
   }, [])
@@ -314,7 +311,7 @@ export function useVoiceDictation(): VoiceDictationHook {
   /**
    * Stop microphone capture and cleanup
    */
-  const stopDictation = useCallback(() => {
+  const stopDictation = useCallback((options?: { keepProblem?: boolean }) => {
     // Guard: only do work if we have active audio resources
     const hasActiveResources = streamRef.current || audioContextRef.current || sendIntervalRef.current
 
@@ -370,8 +367,18 @@ export function useVoiceDictation(): VoiceDictationHook {
       emitInternalEvent('dictation:listening-stopped')
     }
 
+    // A host-reported problem stops the microphone but keeps its dialog open.
+    if (options?.keepProblem) {
+      setState('error')
+    } else {
+      setState('idle')
+      setProblem(null)
+    }
+  }, [])
+
+  const dismissProblem = useCallback(() => {
+    setProblem(null)
     setState('idle')
-    setError(null)
   }, [])
 
 
@@ -400,10 +407,22 @@ export function useVoiceDictation(): VoiceDictationHook {
           }
           break
 
+        case 'dictation:problem': {
+          // Sprint 129 R6: the engine cannot run, or the model is missing.
+          const code = message.problem as DictationProblem
+          setProblem(HOST_PROBLEMS.includes(code) ? { code } : { code: 'generic' })
+          stopDictation({ keepProblem: true })
+          break
+        }
+
         case 'dictation:error':
-          const errorMsg = message.error as string
-          setError(errorMsg || 'An error occurred during dictation')
-          setState('error')
+          setProblem({ code: 'generic', detail: (message.error as string) || undefined })
+          stopDictation({ keepProblem: true })
+          break
+
+        case 'dictation:stop-capture':
+          // Sprint 129 R8: the computer could not keep up. The host has already
+          // said so in a toast and still inserts what was captured.
           stopDictation()
           break
 
@@ -438,7 +457,8 @@ export function useVoiceDictation(): VoiceDictationHook {
 
   return {
     state,
-    error,
+    problem,
+    dismissProblem,
     isListening,
     currentLanguage,
     startDictation,

@@ -78,7 +78,7 @@ SHELL_TIER_PATHS=(
   "patches/"
   "vscode"
   "branding/product.json"
-  "extensions/ritemark/binaries/agents/"
+  "extensions/ritemark/binaries/"
   ".github/workflows/build-"
   "scripts/build-prod.sh"
   "scripts/build-prod-windows.sh"

@@ -9,7 +9,8 @@
 //
 // Run with tsx:
 //   npx --yes tsx@4.21.0 scripts/qa/asr-wer.mjs --clips <dir> --label "whisper q8_0" \
-//     --engine whisper --binary <whisper-cli> --model <ggml.bin> [--language et] [--threads N] [--report out.json]
+//     --engine whisper --binary <whisper-cli> --model <ggml.bin> [--language et] [--threads N] [--timestamps on] [--report out.json]
+//   (--timestamps on: TalTech's fine-tuned Whisper only stops decoding with timestamps on.)
 //   npx --yes tsx@4.21.0 scripts/qa/asr-wer.mjs --clips <dir> --label "parakeet v3 int8" \
 //     --engine sherpa --binary <sherpa-onnx-offline> [--report out.json] -- --tokens=... --encoder=... ...
 
@@ -66,16 +67,19 @@ async function runWhisper(clips, options) {
     const args = dictationArgs({
       modelPath: options.model, audioPath: clip.file, language: options.language,
       threads: options.threads ? Number(options.threads) : undefined,
-    }).filter(arg => arg !== '--output-txt'); // keep the clip folder clean; the text is on stdout
+    }).filter(arg => arg !== '--output-txt' && !(options.timestamps === 'on' && arg === '--no-timestamps'));
     const started = Date.now();
     const result = spawnSync(options.binary, args, {
       encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
       env: { ...process.env, DYLD_LIBRARY_PATH: path.dirname(options.binary) },
     });
     const load = /load time\s*=\s*([\d.]+) ms/.exec(result.stderr ?? '');
+    const stdout = options.timestamps === 'on'
+      ? (result.stdout ?? '').replace(/^\[[^\]]*\]\s*/gm, '')
+      : (result.stdout ?? '');
     return {
       ...clip,
-      hypothesis: parseDictationStdout(result.stdout ?? ''),
+      hypothesis: parseDictationStdout(stdout),
       wallMs: Date.now() - started,
       loadMs: load ? Number(load[1]) : null,
       exit: result.status,

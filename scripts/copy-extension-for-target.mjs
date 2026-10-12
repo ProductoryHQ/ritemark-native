@@ -24,7 +24,7 @@ function shouldCopy(sourceRoot, target, candidate) {
 	const segments = relative.split(path.sep);
 	if (segments[0] !== 'binaries') return true;
 
-	// Platform-specific extension binaries (currently macOS dictation) are
+	// Platform-specific extension binaries (the whisper speech engine) are
 	// copied only into a matching target. Filtering the directory before fs.cp
 	// descends into it avoids Windows trying to materialize macOS dylib symlinks.
 	if (platformDirectoryPattern.test(segments[1] || '')) {
@@ -76,8 +76,11 @@ export function copyExtensionForTarget({ source, destination, target }) {
 	if (foreignAgents.length > 0) {
 		throw new Error(`copied extension contains foreign agent runtimes: ${foreignAgents.join(', ')}`);
 	}
-	if (target !== 'darwin-arm64' && fs.existsSync(path.join(destinationRoot, 'binaries', 'darwin-arm64'))) {
-		throw new Error(`copied ${target} extension contains darwin-arm64 native binaries`);
+	const foreignNative = fs.readdirSync(path.join(destinationRoot, 'binaries'), { withFileTypes: true })
+		.filter(entry => entry.isDirectory() && platformDirectoryPattern.test(entry.name) && entry.name !== target)
+		.map(entry => entry.name);
+	if (foreignNative.length > 0) {
+		throw new Error(`copied ${target} extension contains native binaries for ${foreignNative.join(', ')}`);
 	}
 
 	console.log(`Extension copied for ${target}: ${sourceRoot} -> ${destinationRoot}`);

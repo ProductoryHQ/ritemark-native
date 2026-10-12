@@ -23,7 +23,7 @@ import type {
   TranscriptionEngine,
 } from '../TranscriptionEngine';
 import { TranscriptionError } from '../types';
-import { describeWhisperFailure, probeWhisper, whisperProblemMessage, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
+import { describeWhisperFailure, probeWhisper, whisperThreads, WHISPER_TARGETS } from '../../voiceDictation/whisperCpp';
 import type { WhisperReadiness } from '../../voiceDictation/whisperCpp';
 import type { SpeakerSeparation, TranscriptSegment, TranscriptWord, TranscriptionResult } from '../types';
 
@@ -328,12 +328,31 @@ export class WhisperLocalEngine implements TranscriptionEngine {
   }
 }
 
-/** Sprint 129 R6: the engine message, plus the cloud alternative where it helps. */
-function transcribeProblemMessage(readiness: Exclude<WhisperReadiness, 'ready'>): string {
-  const message = whisperProblemMessage(readiness);
-  const noLocalEngine = readiness === 'cpu-unsupported'
-    || (readiness === 'missing' && !WHISPER_TARGETS.includes(`${process.platform}-${process.arch}`));
-  return noLocalEngine ? `${message} You can transcribe with ElevenLabs instead.` : message;
+/**
+ * Sprint 129 R6: why on-device transcription cannot run, in plain words, with
+ * the cloud alternative where no local fix exists. Wording reviewed with
+ * ux-expert on 2026-10-12: no "engine" or "installation", and name where to look.
+ */
+export function transcribeProblemMessage(
+  readiness: Exclude<WhisperReadiness, 'ready'>,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string {
+  const elevenLabs = ' You can transcribe with ElevenLabs instead.';
+  switch (readiness) {
+    case 'missing':
+      return WHISPER_TARGETS.includes(`${platform}-${arch}`)
+        ? 'A part of Ritemark that on-device transcription needs is missing. Reinstalling Ritemark will restore it.'
+        : `On-device transcription isn't available on this computer.${elevenLabs}`;
+    case 'blocked':
+      return platform === 'win32'
+        ? 'Windows Security or your antivirus stopped on-device transcription from starting. Allow Ritemark in it, then try again.'
+        : "Your Mac's security settings stopped on-device transcription from starting.";
+    case 'cpu-unsupported':
+      return `On-device transcription needs a newer processor than this computer has.${elevenLabs}`;
+    case 'failed':
+      return 'On-device transcription stopped unexpectedly. Please try again.';
+  }
 }
 
 function firstErrorLine(stderr: string): string {

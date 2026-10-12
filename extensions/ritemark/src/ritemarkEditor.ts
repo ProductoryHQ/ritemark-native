@@ -9,7 +9,7 @@ import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
-import { DictationController } from './voiceDictation/controller';
+import { DictationController, dictationProblemFor } from './voiceDictation/controller';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
@@ -1527,10 +1527,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     try {
       // Sprint 129 R3: never offer the 1.5 GB model on a computer where the
       // engine cannot run; say why instead.
-      const { getWhisperBinaryPath, probeWhisper, whisperProblemMessage } = await import('./voiceDictation/whisperCpp');
+      const { getWhisperBinaryPath, probeWhisper } = await import('./voiceDictation/whisperCpp');
       const engine = await probeWhisper(getWhisperBinaryPath(this.context));
       if (engine !== 'ready') {
-        webview.postMessage({ type: 'dictation:error', error: whisperProblemMessage(engine) });
+        webview.postMessage({ type: 'dictation:problem', problem: dictationProblemFor(engine) });
         return;
       }
 

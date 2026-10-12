@@ -12,6 +12,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Icon } from './Icon';
+import { Tooltip } from './tooltip';
 import { cn } from '../../lib/utils';
 
 const Dialog = DialogPrimitive.Root;
@@ -105,13 +106,15 @@ const DialogHeader = ({
       {children}
     </div>
     {onClose && (
-      <DialogPrimitive.Close
-        onClick={onClose}
-        aria-label="Close dialog"
-        className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong"
-      >
-        <Icon name="x" size={16} />
-      </DialogPrimitive.Close>
+      <Tooltip label="Close">
+        <DialogPrimitive.Close
+          onClick={onClose}
+          aria-label="Close dialog"
+          className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong"
+        >
+          <Icon name="x" size={16} />
+        </DialogPrimitive.Close>
+      </Tooltip>
     )}
   </div>
 );

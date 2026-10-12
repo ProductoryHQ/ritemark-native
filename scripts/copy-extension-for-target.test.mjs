@@ -49,6 +49,9 @@ function fixture() {
 		write(source, `binaries/agents/${target}/opencode-path/rg${target === 'win32-x64' ? '.exe' : ''}`, 'ripgrep');
 	}
 	write(source, 'binaries/darwin-arm64/libwhisper.1.dylib', 'native');
+	write(source, 'binaries/darwin-x64/whisper-cli', 'native');
+	write(source, 'binaries/win32-x64/whisper-cli.exe', 'native');
+	write(source, 'binaries/whisper-manifest.json', '{"schema":1}');
 	try {
 		fs.symlinkSync('libwhisper.1.dylib', path.join(source, 'binaries/darwin-arm64/libwhisper.dylib'));
 	} catch {
@@ -71,10 +74,14 @@ test('target copy is immutable and filters foreign native payloads', () => {
 			for (const foreign of ['darwin-arm64', 'darwin-x64', 'win32-x64'].filter(value => value !== target)) {
 				assert.equal(fs.existsSync(path.join(destination, 'binaries/agents', foreign)), false);
 			}
-			assert.equal(
-				fs.existsSync(path.join(destination, 'binaries/darwin-arm64')),
-				target === 'darwin-arm64',
-			);
+			for (const platform of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
+				assert.equal(
+					fs.existsSync(path.join(destination, 'binaries', platform)),
+					platform === target,
+					`${target} copy: binaries/${platform}`,
+				);
+			}
+			assert.ok(fs.existsSync(path.join(destination, 'binaries/whisper-manifest.json')), 'the shared manifest is copied');
 			assert.deepEqual(snapshot(source), before);
 		}
 	} finally {

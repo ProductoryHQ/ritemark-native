@@ -84,6 +84,13 @@ Acceptance criteria (draft copy; final wording reviewed with `ux-expert` in Phas
 - Dictation stops listening and shows the message on `missing`, `blocked`, `cpu-unsupported` and `failed`. It no longer keeps "listening" while every chunk fails.
 - The technical cause (exit code, errno, stderr tail) goes to the log only.
 
+**R5/R6 (revised 2026-10-12, after the ux-expert review):**
+- The host sends a problem code (`dictation:problem`), not a sentence. The webview words every state per platform in `webview/src/components/dictationProblems.ts`, and `DictationProblemDialog` shows it. Titles are Title Case, as other dialogs. "Try Again" appears wherever the user can fix the problem.
+- Windows names the two switches (**Microphone access**, **Let desktop apps access your microphone**) instead of a menu path, because Windows 10 and 11 word the path differently and the button opens the page directly.
+- The jargon is gone ("speech engine", "installation", "configuration"). A blocked start names "Windows Security or your antivirus". The dictation dialog promises no ElevenLabs fallback; that line belongs to Transcribe only.
+- The R8 backlog notice is a VS Code toast, not the dialog: the user is watching their words still arrive. The webview is told to stop the microphone (`dictation:stop-capture`).
+- Transcribe's on-device messages (`transcribeProblemMessage` in `whisperLocalEngine.ts`) follow the same wording rules.
+
 ### R7: Model storage on Windows
 
 As a Windows user, I want the 1.5 GB model to download, resume and remove reliably.

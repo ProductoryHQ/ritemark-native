@@ -87,7 +87,7 @@ A change is **shell-tier** if it touches a path that starts with one of these en
 patches/
 vscode
 branding/product.json
-extensions/ritemark/binaries/agents/
+extensions/ritemark/binaries/
 .github/workflows/build-
 scripts/build-prod.sh
 scripts/build-prod-windows.sh
@@ -115,7 +115,7 @@ This list is the single source of truth — `scripts/release-extension-preflight
 
 **Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI, no repo-visibility toggle for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
 
-**Extension-tier by path does not mean an extension release delivers it.** An extension release ships only `out/**/*.js`, `media/webview.js`, `media/office-preview.js` (+ NOTICES) and `package.json`, laid over the app's bundled copy. Every other file under `extensions/ritemark/` (icons, fonts, themes, starter pack, draw.io/PDF assets, whisper binaries) and every esbuild external in `node_modules` (e.g. the Claude Agent SDK) changes for users only with a shell release. `release-extension-preflight.sh` lists such changes and stops; `--allow-unshipped` releases without them, only with Jarmo's OK.
+**Extension-tier by path does not mean an extension release delivers it.** An extension release ships only `out/**/*.js`, `media/webview.js`, `media/office-preview.js` (+ NOTICES) and `package.json`, laid over the app's bundled copy. Every other file under `extensions/ritemark/` (icons, fonts, themes, starter pack, draw.io/PDF assets) and every esbuild external in `node_modules` (e.g. the Claude Agent SDK) changes for users only with a shell release. `release-extension-preflight.sh` lists such changes and stops; `--allow-unshipped` releases without them, only with Jarmo's OK.
 
 * * *
 
@@ -184,7 +184,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
 | `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
 | `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 API compatibility fixes |
-| `008-ritemark-windows-binary-strip.patch` | Strip debug symbols from Windows agent binaries |
+| `008-ritemark-windows-binary-strip.patch` | Strip non-Windows native binaries from the bundled Copilot and Agent SDK packages so Windows packaging (`rcedit`) does not fail |
 | `009-ritemark-browser-context-bridge.patch` | Bridges VS Code webview context to the integrated browser panel |
 | `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
 | `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |

@@ -21,9 +21,9 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] `scripts/build-whisper.sh` pinned to `v1.8.3`/`2eeeba56`, with `--target darwin-arm64|darwin-x64`, one static binary, a macOS 12.0 floor enforced at compile time, BLAS off.
 - [ ] Artifacts committed to `binaries/win32-x64/` (and `binaries/darwin-x64/`) after the `SHA256SUMS` check; `binaries/whisper-manifest.json` written (darwin-arm64 hashes included).
 - [ ] `.gitattributes` `extensions/ritemark/binaries/** binary`; `binaries/README.md` provenance + MIT notice.
-- [ ] `validate-build-output.sh` whisper check (unsigned hash, signed presence/architecture, no foreign folder) + test.
-- [ ] `copy-extension-for-target.mjs` generic foreign-folder guard + test for all three targets.
-- [ ] Tier lists moved to `extensions/ritemark/binaries/` in `CLAUDE.md`, `release-extension-preflight.sh`, `list-unshipped-extension-changes.mjs` (one commit) + `release-tier-paths.test.mjs`; patch 008 line in `CLAUDE.md` corrected.
+- [x] `validate-build-output.sh` whisper check (Check 5b: manifest-driven; hash only while unsigned; PE machine / Mach-O architecture; no foreign folder). *(The script has no test harness of its own; exercised in the Phase 1 build check)*
+- [x] `copy-extension-for-target.mjs` generic foreign-folder guard + test for all three targets.
+- [x] Tier lists moved to `extensions/ritemark/binaries/` in `CLAUDE.md`, `release-extension-preflight.sh`, `list-unshipped-extension-changes.mjs` (one commit) + `release-tier-paths.test.mjs`; patch 008 line in `CLAUDE.md` corrected.
 
 ## Phase 2: Extension host (W2–W6, R3, R4, R6–R9)
 
@@ -39,11 +39,11 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 3: Webview (W7, R5)
 
-- [ ] `ux-expert` review of the microphone dialog states and the R5/R6 copy before code.
-- [ ] `platform` in the editor bootstrap (`ritemarkEditor.ts`, `pdfEditorProvider.ts`, `officePreviewProvider.ts`) → `App.tsx` → `DocumentHeader` → `VoiceDictationButton`.
-- [ ] `useVoiceDictation` uses `classifyCaptureError`; `hooks/dictationMicCopy.ts` + tests.
-- [ ] Microphone dialog rebuilt on `ui/dialog.tsx` + `Button` + `Tooltip`; **Open Microphone Settings**; opens on `os-denied` (and on `device-busy` on Windows).
-- [ ] Webview bundle rebuilt; pre-commit validator passes (`CLAUDE_PROJECT_DIR="$PWD"` in this worktree).
+- [x] `ux-expert` review of the microphone dialog states and the R5/R6 copy before code. *(2026-10-12; adopted, see spec R5/R6 revision)*
+- [x] ~~`platform` in the editor bootstrap~~: `webviewPlatform` from `hooks/usePlatform.ts` instead; the editor payload is unchanged.
+- [x] `useVoiceDictation` uses `classifyCaptureError`; problem codes from host and microphone; a host problem stops capture without clearing its message. `components/dictationProblems.ts` + `dictationProblems.test.ts`.
+- [x] `DictationProblemDialog` on `ui/dialog.tsx` + `Button` + `Tooltip` for every state (microphone, engine, model, host error); the backlog notice is a toast. Split-button `title`s are now `Tooltip`s, and the dialog's X has a tooltip.
+- [x] Webview bundle rebuilt; pre-commit validator passes (`CLAUDE_PROJECT_DIR="$PWD"` in this worktree).
 
 ## Phase 4: Validation on macOS (scenarios marked **M** and **U** in [scenarios.md](./scenarios.md))
 

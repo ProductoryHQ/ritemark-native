@@ -12,7 +12,6 @@ import {
   parseDictationStdout,
   probeWhisper,
   resetWhisperProbeCache,
-  whisperProblemMessage,
   whisperThreads,
   withFileRetry,
 } from './whisperCpp';
@@ -62,15 +61,6 @@ async function run(): Promise<void> {
   assert.equal(describeWhisperFailure({ exitCode: 3221225781 }), 'failed', 'Windows: DLL not found');
   assert.equal(describeWhisperFailure({ exitCode: 1 }), 'failed');
   assert.equal(describeWhisperFailure({ exitCode: null, signal: 'SIGABRT' }), 'failed', 'macOS: dyld refused the binary');
-
-  // R6: words, never codes.
-  for (const readiness of ['missing', 'blocked', 'cpu-unsupported', 'failed'] as const) {
-    const message = whisperProblemMessage(readiness, 'win32', 'x64');
-    assert.ok(message.length > 20 && !/\d{3,}|0x|ENOENT|EPERM|SIG/.test(message), `${readiness}: plain words`);
-  }
-  assert.match(whisperProblemMessage('missing', 'win32', 'x64'), /Reinstall Ritemark/);
-  assert.match(whisperProblemMessage('missing', 'linux', 'x64'), /not available on this computer/);
-  assert.match(whisperProblemMessage('cpu-unsupported'), /newer processor/);
 
   // Dictation stdout: status lines go, dictated words stay.
   assert.equal(
