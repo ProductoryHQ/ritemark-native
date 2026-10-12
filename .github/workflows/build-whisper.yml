@@ -18,6 +18,7 @@ on:
       - '.github/workflows/build-whisper.yml'
       - 'scripts/build-whisper*'
       - 'scripts/qa/whisper-contract-test.mjs'
+      - 'scripts/qa/fleurs-clip-pack.mjs'
       - 'extensions/ritemark/src/voiceDictation/whisperCpp.ts'
       - 'extensions/ritemark/src/speech/engines/whisperLocalEngine.ts'
       - 'extensions/ritemark/binaries/**'
@@ -151,6 +152,53 @@ jobs:
           name: whisper-${{ matrix.target }}
           path: out/
           if-no-files-found: warn
+
+  # Sprint 129 W11: Estonian test clips with reference text for the speed and
+  # accuracy bench (scripts/qa/windows-whisper-bench.ps1 -Round 2), so the
+  # Windows PC downloads a few MB instead of FLEURS' 507 MB audio archive.
+  bench-audio:
+    name: Estonian clip pack (FLEURS)
+    runs-on: ubuntu-latest
+    env:
+      FLEURS: https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/et_ee
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v4
+        with:
+          path: r
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache FLEURS Estonian test split
+        uses: actions/cache@v4
+        with:
+          path: fleurs
+          key: fleurs-et-test-70bb2e84
+
+      - name: Fetch FLEURS Estonian test split (CC BY 4.0)
+        run: |
+          mkdir -p fleurs
+          [ -f fleurs/test.tsv ] || curl -sfL --retry 5 -o fleurs/test.tsv "$FLEURS/test.tsv"
+          echo "2d37ae07a737c74cee0a2e173612fbc91114877aee298d36a4d9197d3a93c672  fleurs/test.tsv" | sha256sum -c -
+          if [ ! -d fleurs/test ]; then
+            curl -sfL --retry 5 -o fleurs.tar.gz "$FLEURS/audio/test.tar.gz"
+            echo "cdece29c50357790dc87f034242d54066fcacbc694cd057e75a29f2f56c14cbf  fleurs.tar.gz" | sha256sum -c -
+            tar -xzf fleurs.tar.gz -C fleurs
+            rm fleurs.tar.gz
+          fi
+
+      - name: Build the clip pack
+        run: node r/scripts/qa/fleurs-clip-pack.mjs --tsv fleurs/test.tsv --audio-dir fleurs/test --out bench-audio-et --count 20 --stride 5
+
+      - name: Upload clip pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-bench-audio-et
+          path: bench-audio-et/
+          if-no-files-found: error
 
   # The Apple silicon build asks for macOS 12.0; this runs it on an older macOS
   # than the one it was built on. (GitHub has no macOS 12 or 13 runner left.)

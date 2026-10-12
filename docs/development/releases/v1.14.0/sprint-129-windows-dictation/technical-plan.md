@@ -163,6 +163,19 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - **Stage C — Gate 2 on the signed v1.14.0 RC installer**: the whisper files show the Productory signature (Properties → Digital Signatures, or `verify-windows-signatures.ps1 -Mode Verify` on the install folder). The core scenarios are repeated quickly, and the Smart App Control state is recorded.
 - **macOS:** RunDev regression on Apple silicon for dictation (R8 change) and Transcribe on-device, then Gate 2 on the arm64 and x64 RCs. Intel Mac hands-on only if Jarmo has one; otherwise the CI contract test on `macos-15-intel` is the evidence, and the gap is stated in the release report.
 
+## W10 — Apple silicon engine for macOS 12+ (R11, added 2026-10-12)
+
+- Replace `binaries/darwin-arm64/` (whisper-cli + 6 dylibs + version symlinks) with the static `whisper-cli` from the `darwin-arm64` job of `build-whisper.yml`, after the `SHA256SUMS` check, in the same commit as the win32-x64 and darwin-x64 payloads. Record it in `whisper-manifest.json` as built by the workflow, not "local build".
+- The `DYLD_LIBRARY_PATH` set by both callers stays; it is harmless without dylibs.
+- `codesign-app.sh` already signs files named `whisper-cli`; the `.dylib` loop simply finds no whisper dylibs any more.
+- The contract test job for the committed binaries (Phase 1) then covers darwin-arm64 on macOS 15 and 14.
+
+## W11 — Bench round 2: every speed candidate (added 2026-10-12)
+
+- **Accuracy on the Mac:** a FLEURS Estonian test sample (CC-BY-4.0; references are FLEURS' normalized transcriptions), scored by WER for whisper large-v3-turbo f16 and q8_0, TalTech et-verbatim-2604 (official GGML, f16 and our q8_0), Parakeet TDT 0.6B v3 int8 (sherpa-onnx `sherpa-onnx-offline`) and TalTech streaming Zipformer et-en int8 (sherpa-onnx online). Script: `scripts/qa/asr-wer.mjs`; result in `research/asr-candidates-audit.md`.
+- **Speed on Windows:** bench round 2 runs the Windows candidates on a small FLEURS clip pack (built in CI as artifact `whisper-bench-audio-et`, with references), using official binaries only (whisper-cli from our CI; sherpa-onnx v1.13.8 `win-x64-shared-MD-Release-no-tts`). It reports load and per-clip time, plus WER as a cross-check. Downloads resume and are cached between runs.
+- A non-Whisper engine would be a new runtime (ONNX Runtime via sherpa-onnx); adopting one is Jarmo's separate decision after the numbers.
+
 ## W9 — Docs, tiers and release notes (R10)
 
 - Tiers: the `CLAUDE.md` shell-tier list, the `scripts/release-extension-preflight.sh` denylist and `SHELL_TIER` in `scripts/list-unshipped-extension-changes.mjs` move from `extensions/ritemark/binaries/agents/` to `extensions/ritemark/binaries/`, in one commit, with `release-tier-paths.test.mjs` and `list-unshipped-extension-changes.test.mjs` updated. The patch 008 line in `CLAUDE.md` is corrected.

@@ -46,8 +46,11 @@ Windows users can dictate into documents and transcribe recordings on their own 
 
 - **2026-10-11 (Jarmo):** "approved, no Intel Mac — use the CI runner". The plan and the five decisions below stand. Intel Mac evidence is the contract test on the `macos-15-intel` runner; Gate 2 has no Intel Mac hands-on, and the release report says so.
 
-Proposed 2026-10-11 and approved with the plan:
+- **2026-10-12 (Jarmo, relayed by the Development manager):** "1. jah mõõda kõiki 2. jah võta sisse".
+  - **Windows speed: measure every candidate** before choosing. The candidates are Whisper large-v3-turbo q8_0; NVIDIA Parakeet TDT 0.6B v3 (int8, via sherpa-onnx); TalTech's Estonian–English streaming Zipformer (sherpa-onnx); and TalTech's Estonian-tuned Whisper (`whisper-large-v3-turbo-et-verbatim-2604`, official GGML, MIT). Accuracy (WER on FLEURS Estonian) is scored on the Mac, because it does not depend on the computer; speed is measured on the Windows PC (bench round 2). Adopting a non-Whisper engine would add a runtime, so that stays a separate decision.
+  - **Apple silicon engine for macOS 12–14 is in scope**, as R11.
 
+Proposed 2026-10-11 and approved with the plan:
 
 - **Intel Mac binary (#203) rides along.** It is one more CI job on the existing `macos-15-intel` runner, and the existing signing rules already cover it. Without it, the Intel Mac dictation defect needs its own fix anyway. Declining it still leaves Intel Macs with an honest "needs Apple silicon" message (R3/R6).
 - **Dictation stops dropping speech when busy (R8)**, on Mac too. It matters most on Windows, where transcription runs on the CPU only.
@@ -57,8 +60,8 @@ Proposed 2026-10-11 and approved with the plan:
 
 ## Open decisions for Jarmo (raised 2026-10-11, after approval)
 
-- **Apple silicon engine for macOS 12–14 (scope change, proposed).** The engine shipped since v1.0.3 is built for macOS 15.0 and later, but Ritemark runs on macOS 12. So on macOS 12–14, dictation and on-device Transcribe fail today. The same pipeline produces a macOS 12 build that passes every check, including a run on macOS 14, at the same speed. Shipping it replaces the Apple silicon binary, which the plan excluded, and adds an Apple silicon dictation check to Gate 2. If approved, it becomes R11 in the spec.
-- **Windows dictation speed (W6 stop condition reached, A2).** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
+- ~~Apple silicon engine for macOS 12–14~~: approved 2026-10-12, now R11.
+- **Windows dictation speed (W6 stop condition reached, A2; candidates being measured since 2026-10-12).** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
 
 ## Feature Flag Check
 

@@ -151,6 +151,18 @@ Given the chosen settings
 When I dictate for two minutes at a normal pace
 Then text appears within about one chunk length after I pause (measured in A2 terms: the median call stays under the chunk length)
 
+## Feature: Apple silicon engine on macOS 12+ (R11, added 2026-10-12)
+
+### Scenario: The engine starts on older macOS (CI)
+Given the darwin-arm64 build from `build-whisper.yml`
+When the contract test runs on the `macos-14` runner
+Then all checks pass, including "runs on macOS 12.0+"
+
+### Scenario: Nothing changes on a current Mac (M, C)
+Given Ritemark with the new Apple silicon engine on Jarmo's Mac
+When I dictate in Estonian and transcribe a recording on-device
+Then both behave as in v1.13.0
+
 ## Feature: Tiers and docs (R10)
 
 ### Scenario: Whisper binaries count as shell-tier (U)

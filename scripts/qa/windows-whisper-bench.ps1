@@ -14,8 +14,8 @@
   powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip"
 
 .EXAMPLE
-  # Round 2: the full model against the q8_0 model on real 5/10/20 s clips (+ your Estonian WAV in 10 s pieces)
-  powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Round 2 -Audio "$HOME\Desktop\eesti.wav"
+  # Round 2: speed and Estonian accuracy of every candidate engine on the same clips
+  powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Round 2 -Clips "$HOME\Downloads\whisper-bench-audio-et.zip"
 
 .EXAMPLE
   # also an Estonian recording of your own (wav, mp3, flac or ogg)
@@ -27,7 +27,8 @@ param(
   [Parameter(Mandatory)][string]$Zip,
   [string]$Audio,
   [string]$Language = 'et',
-  [ValidateSet(1, 2)][int]$Round = 1
+  [ValidateSet(1, 2)][int]$Round = 1,
+  [string]$Clips
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,10 +40,17 @@ $ModelUrl = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e95
 $ModelSha256 = '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69'
 $ModelBytes = 1624555275
 $SampleUrl = "https://raw.githubusercontent.com/ggml-org/whisper.cpp/$WhisperCommit/samples/jfk.wav"
-# Round 2: the 8-bit quantized model, 1.9x faster on a CPU in the Sprint 129 Mac test.
+# Round 2 (Sprint 129 W11): the candidates Jarmo asked to measure on 2026-10-12.
+# Whisper large-v3-turbo q8_0: 1.9x faster than f16 on a CPU in the Mac test, identical text.
 $Q8Url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q8_0.bin'
 $Q8Sha256 = '317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1'
 $Q8Bytes = 874188075
+# sherpa-onnx official Windows build, and the two sherpa-onnx models.
+$SherpaUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-win-x64-shared-MD-Release-no-tts.tar.bz2'
+$ParakeetUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2'
+$ParakeetSha256 = '5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf'
+$ZipformerBase = 'https://huggingface.co/TalTechNLP/streaming-zipformer.et-en/resolve/7edbacc1d13a4bc8fba21307753569e8334938a0'
+$ZipformerEncoderSha256 = '37b1eff8127447f192e3f8eae29fe3893be45a39283e444c9154b489bba6bbde'
 
 function Get-Sha256([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
@@ -76,15 +84,17 @@ $buildInfo = Get-Content -LiteralPath (Join-Path $work 'info\build-info.json') -
 
 $modelDir = Join-Path $HOME '.ritemark\models'
 $model = Join-Path $modelDir 'ggml-large-v3-turbo.bin'
-if ((Test-Path -LiteralPath $model) -and ((Get-Item -LiteralPath $model).Length -eq $ModelBytes)) {
-  Write-Host 'Checking the speech model already on this computer...'
-} else {
-  Write-Host 'Downloading the speech model (1.5 GB, once; Ritemark uses the same file)...'
-  New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
-  Get-Download $ModelUrl "$model.partial" -Progress
-  Move-Item -LiteralPath "$model.partial" -Destination $model -Force
+if ($Round -eq 1) {
+  if ((Test-Path -LiteralPath $model) -and ((Get-Item -LiteralPath $model).Length -eq $ModelBytes)) {
+    Write-Host 'Checking the speech model already on this computer...'
+  } else {
+    Write-Host 'Downloading the speech model (1.5 GB, once; Ritemark uses the same file)...'
+    New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
+    Get-Download $ModelUrl "$model.partial" -Progress
+    Move-Item -LiteralPath "$model.partial" -Destination $model -Force
+  }
+  if ((Get-Sha256 $model) -ne $ModelSha256) { throw "The model at $model is damaged. Delete it and run this again." }
 }
-if ((Get-Sha256 $model) -ne $ModelSha256) { throw "The model at $model is damaged. Delete it and run this again." }
 
 $jfk = Join-Path $work 'jfk.wav'
 Get-Download $SampleUrl $jfk
@@ -147,103 +157,151 @@ function Get-DictationArgs([string]$File, [string]$Lang, [int]$Threads, [int]$Be
   $list + @($File)
 }
 
-function Write-PcmWav([string]$Path, [byte[]]$Pcm) {
-  $s = [System.IO.File]::Create($Path)
-  $w = New-Object System.IO.BinaryWriter($s)
-  $w.Write([Text.Encoding]::ASCII.GetBytes('RIFF')); $w.Write([int](36 + $Pcm.Length))
-  $w.Write([Text.Encoding]::ASCII.GetBytes('WAVEfmt ')); $w.Write([int]16); $w.Write([int16]1); $w.Write([int16]1)
-  $w.Write([int]16000); $w.Write([int]32000); $w.Write([int16]2); $w.Write([int16]16)
-  $w.Write([Text.Encoding]::ASCII.GetBytes('data')); $w.Write([int]$Pcm.Length); $w.Write($Pcm)
-  $w.Close()
-}
-
-function Get-Slice([byte[]]$Bytes, [int]$Start, [int]$Length) {
-  $out = New-Object byte[] $Length
-  [Array]::Copy($Bytes, $Start, $out, 0, $Length)
-  , $out
-}
-
-# The PCM of a 16 kHz mono 16-bit WAV (what Ritemark's Record saves), or $null.
-function Read-PcmWav([string]$Path) {
-  $b = [System.IO.File]::ReadAllBytes($Path)
-  if ([Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'RIFF') { return $null }
-  $o = 12; $ok = $false
-  while ($o + 8 -le $b.Length) {
-    $id = [Text.Encoding]::ASCII.GetString($b, $o, 4); $size = [BitConverter]::ToInt32($b, $o + 4)
-    if ($id -eq 'fmt ') {
-      $ok = ([BitConverter]::ToInt16($b, $o + 8) -eq 1) -and ([BitConverter]::ToInt16($b, $o + 10) -eq 1) -and
-        ([BitConverter]::ToInt32($b, $o + 12) -eq 16000) -and ([BitConverter]::ToInt16($b, $o + 22) -eq 16)
-    } elseif ($id -eq 'data') {
-      if (-not $ok) { return $null }
-      return , (Get-Slice $b ($o + 8) ([Math]::Min($size, $b.Length - $o - 8)))
-    }
-    $o += 8 + $size + ($size % 2)
-  }
-  $null
-}
-
 if ($Round -eq 2) {
+  if (-not $Clips) { throw 'Round 2 needs -Clips: the whisper-bench-audio-et zip from the same workflow run.' }
+  # Downloads are kept between runs, so a second run starts at once.
+  $cache = Join-Path $env:LOCALAPPDATA 'rm-asr-bench'
+  New-Item -ItemType Directory -Path $cache -Force | Out-Null
+
+  $clipDir = Join-Path $work 'clips'
+  Unblock-File -LiteralPath $Clips
+  Expand-Archive -LiteralPath $Clips -DestinationPath $clipDir
+  $clipRows = @(Get-Content -LiteralPath (Join-Path $clipDir 'refs.tsv') -Encoding UTF8 | Where-Object { $_ } | ForEach-Object {
+    $f = $_ -split "`t"; [pscustomobject]@{ file = (Join-Path $clipDir $f[0]); name = $f[0]; reference = $f[1] }
+  })
+  $clipSeconds = ($clipRows | ForEach-Object { ((Get-Item -LiteralPath $_.file).Length - 44) / 32000.0 } | Measure-Object -Sum).Sum
+
   $q8 = Join-Path $modelDir 'ggml-large-v3-turbo-q8_0.bin'
   if (-not ((Test-Path -LiteralPath $q8) -and ((Get-Item -LiteralPath $q8).Length -eq $Q8Bytes))) {
-    Write-Host 'Downloading the q8_0 model (870 MB, once)...'
+    Write-Host 'Downloading the Whisper q8_0 model (870 MB, once)...'
+    New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
     Get-Download $Q8Url "$q8.partial" -Progress
     Move-Item -LiteralPath "$q8.partial" -Destination $q8 -Force
   }
   if ((Get-Sha256 $q8) -ne $Q8Sha256) { throw "The model at $q8 is damaged. Delete it and run this again." }
 
-  # Real clips: --duration does not shorten what the encoder sees, so cut the audio itself.
-  $clips = @()
-  foreach ($sec in 5, 10) {
-    $f = Join-Path $work "jfk-$sec.wav"; Write-PcmWav $f (Get-Slice $pcm 0 ($sec * 32000)); $clips += , @("jfk ${sec}s", $f, 'en')
+  $sherpaDir = Join-Path $cache 'sherpa-onnx-v1.13.8-win-x64-shared-MD-Release-no-tts'
+  if (-not (Test-Path -LiteralPath (Join-Path $sherpaDir 'bin\sherpa-onnx-offline.exe'))) {
+    Write-Host 'Downloading sherpa-onnx (official Windows build, 19 MB)...'
+    Get-Download $SherpaUrl (Join-Path $cache 'sherpa.tar.bz2')
+    & tar.exe -xjf (Join-Path $cache 'sherpa.tar.bz2') -C $cache
+    if ($LASTEXITCODE -ne 0) { throw 'Could not unpack sherpa-onnx.' }
   }
-  $f20 = Join-Path $work 'jfk-20.wav'
-  Write-PcmWav $f20 ([byte[]]($pcm + (New-Object byte[] 32000) + (Get-Slice $pcm 0 (8 * 32000)))); $clips += , @('jfk 20s', $f20, 'en')
-  if ($Audio) {
-    $mine = Read-PcmWav (Resolve-Path -LiteralPath $Audio).Path
-    if ($mine) {
-      $pieces = [Math]::Min(6, [int][Math]::Floor($mine.Length / 320000))
-      for ($i = 0; $i -lt $pieces; $i++) {
-        $f = Join-Path $work "yours-$i.wav"; Write-PcmWav $f (Get-Slice $mine ($i * 320000) 320000); $clips += , @("yours $($i * 10)-$($i * 10 + 10)s", $f, $Language)
+  $parakeetDir = Join-Path $cache 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'
+  if (-not (Test-Path -LiteralPath (Join-Path $parakeetDir 'encoder.int8.onnx'))) {
+    Write-Host 'Downloading Parakeet TDT 0.6B v3 int8 (490 MB, once)...'
+    $pk = Join-Path $cache 'parakeet.tar.bz2'
+    Get-Download $ParakeetUrl $pk -Progress
+    if ((Get-Sha256 $pk) -ne $ParakeetSha256) { Remove-Item -LiteralPath $pk; throw 'The Parakeet download is damaged; run this again.' }
+    & tar.exe -xjf $pk -C $cache
+    if ($LASTEXITCODE -ne 0) { throw 'Could not unpack Parakeet.' }
+  }
+  $zfDir = Join-Path $cache 'zipformer-et-en'
+  New-Item -ItemType Directory -Path $zfDir -Force | Out-Null
+  foreach ($name in 'encoder.int8.onnx', 'decoder.int8.onnx', 'joiner.int8.onnx', 'tokens.txt') {
+    $target = Join-Path $zfDir $name
+    if (-not (Test-Path -LiteralPath $target)) { Write-Host "Downloading TalTech Zipformer $name..."; Get-Download "$ZipformerBase/$name" $target }
+  }
+  if ((Get-Sha256 (Join-Path $zfDir 'encoder.int8.onnx')) -ne $ZipformerEncoderSha256) { throw 'The Zipformer download is damaged; delete it and run this again.' }
+
+  function Get-WerText([string]$Text) {
+    ($Text.Normalize([Text.NormalizationForm]::FormC).ToLowerInvariant() -replace '[^\p{L}\p{N}]+', ' ').Trim()
+  }
+  function Get-WordErrors([string]$Ref, [string]$Hyp) {
+    $r = @(if ($Ref) { $Ref -split ' ' }); $h = @(if ($Hyp) { $Hyp -split ' ' })
+    $prev = 0..$h.Count
+    for ($i = 1; $i -le $r.Count; $i++) {
+      $cur = New-Object int[] ($h.Count + 1); $cur[0] = $i
+      for ($j = 1; $j -le $h.Count; $j++) {
+        $cost = if ($r[$i - 1] -eq $h[$j - 1]) { 0 } else { 1 }
+        $cur[$j] = [Math]::Min([Math]::Min($prev[$j] + 1, $cur[$j - 1] + 1), $prev[$j - 1] + $cost)
       }
-    } else {
-      Write-Host 'Your recording is not a 16 kHz mono WAV, so it runs whole (record it with Ritemark Transcribe to get 10 s pieces).'
-      $clips += , @('yours (whole)', (Resolve-Path -LiteralPath $Audio).Path, $Language)
+      $prev = $cur
+    }
+    [pscustomobject]@{ errors = $prev[$h.Count]; words = $r.Count }
+  }
+  function Measure-Wer($Texts) {
+    $e = 0; $w = 0
+    for ($i = 0; $i -lt $clipRows.Count; $i++) {
+      $s = Get-WordErrors (Get-WerText $clipRows[$i].reference) (Get-WerText $Texts[$i]); $e += $s.errors; $w += $s.words
+    }
+    [Math]::Round(100.0 * $e / [Math]::Max(1, $w), 1)
+  }
+  # One sherpa-onnx process for every clip: one JSON line per clip, in order.
+  function Invoke-Sherpa([string]$Exe, [string[]]$ModelArgs) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $Exe
+    $psi.Arguments = (($ModelArgs + @($clipRows | ForEach-Object { $_.file })) | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [Text.Encoding]::UTF8; $psi.StandardErrorEncoding = [Text.Encoding]::UTF8
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $proc = [Diagnostics.Process]::Start($psi)
+    $errTask = $proc.StandardError.ReadToEndAsync()
+    $out = $proc.StandardOutput.ReadToEnd()
+    $proc.WaitForExit(); $watch.Stop()
+    $all = $out + "`n" + $errTask.Result
+    # `{"lang": ...}` from the offline binary, `{ "text": ...}` from the streaming one.
+    $texts = @($all -split "`r?`n" | Where-Object { $_ -match '^\{\s*"(lang|text)"' } | ForEach-Object { ($_ | ConvertFrom-Json).text })
+    if ($texts.Count -ne $clipRows.Count) { Write-Host ($all.Substring([Math]::Max(0, $all.Length - 1500))); throw "$([IO.Path]::GetFileName($Exe)) returned $($texts.Count) results for $($clipRows.Count) clips." }
+    $load = [regex]::Match($all, '(?i)recognizer created in ([\d.]+) s')
+    # Offline prints one total. Streaming decodes every clip at once and prints, per clip,
+    # the time until that clip finished, so the longest is the total.
+    $decValues = @([regex]::Matches($all, 'Elapsed seconds: ([\d.]+)') | ForEach-Object { [double]$_.Groups[1].Value })
+    [pscustomobject]@{
+      wallMs = $watch.ElapsedMilliseconds
+      loadMs = if ($load.Success) { [int]([double]$load.Groups[1].Value * 1000) } else { $null }
+      decodeMs = if ($decValues.Count -gt 0) { [int](($decValues | Measure-Object -Maximum).Maximum * 1000) } else { $null }
+      texts = $texts
     }
   }
 
   $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
   $threads = [int]$cpu.NumberOfLogicalProcessors
-  Write-Host ''
-  Write-Host "CPU: $($cpu.Name.Trim()), $threads threads. Dictation settings: $threads threads, beam 8, default window."
+  $cores = [int]$cpu.NumberOfCores
   $results = New-Object System.Collections.Generic.List[object]
-  foreach ($m in @(@('full', $model), @('q8_0', $q8))) {
-    Write-Host "Model $($m[0]): warming up..."
-    $null = Invoke-Whisper @('--model', $m[1], '--language', 'en', '--threads', "$threads", $jfk)
-    foreach ($c in $clips) {
-      $args2 = @('--model', $m[1], '--language', $c[2], '--threads', "$threads", '--no-timestamps', '--no-fallback',
-        '--beam-size', '8', '--entropy-thold', '2.4', '--logprob-thold', '-1.0', '--max-len', '0', $c[1])
-      $r = Invoke-Whisper $args2
-      $results.Add([pscustomobject]@{ model = $m[0]; clip = $c[0]; exit = $r.exit; wallMs = $r.wallMs; loadMs = $r.loadMs; encodeMs = $r.encodeMs; decodeMs = $r.decodeMs; text = $r.text })
-      Write-Host ('  {0,-5} {1,-16} wall {2,7:N0} ms  load {3,6:N0}  encode {4,7:N0}  decode {5,6:N0}  exit {6}' -f $m[0], $c[0], $r.wallMs, $r.loadMs, $r.encodeMs, $r.decodeMs, $r.exit)
-    }
-  }
   Write-Host ''
-  Write-Host "Transcribe with q8_0: ten minutes of audio, $threads threads (takes a while)"
-  $tq = Invoke-Whisper @('-m', $q8, '-f', $long, '-ojf', '-of', (Join-Path $work 'q8'), '-pp', '-t', "$threads", '-l', 'en')
-  $results.Add([pscustomobject]@{ model = 'q8_0'; clip = 'transcribe 10 min'; exit = $tq.exit; wallMs = $tq.wallMs; loadMs = $tq.loadMs; encodeMs = $tq.encodeMs; decodeMs = $tq.decodeMs; text = '' })
-  Write-Host ('  q8_0  transcribe 10 min wall {0,7:N0} ms  exit {1}' -f $tq.wallMs, $tq.exit)
+  Write-Host ("CPU: {0}, {1} cores / {2} threads. {3} Estonian clips, {4:N0} s of audio (FLEURS, CC BY 4.0)." -f $cpu.Name.Trim(), $cores, $threads, $clipRows.Count, $clipSeconds)
+
+  # Whisper: one process per clip with dictation's flags, the way Ritemark runs it today.
+  Write-Host 'Whisper large-v3-turbo q8_0 (one process per clip, as dictation runs today)...'
+  $null = Invoke-Whisper @('--model', $q8, '--language', 'et', '--threads', "$threads", $jfk)
+  $wTexts = @(); $wWall = 0; $wLoad = 0
+  foreach ($c in $clipRows) {
+    $r = Invoke-Whisper @('--model', $q8, '--language', 'et', '--threads', "$threads", '--no-timestamps', '--no-fallback',
+      '--beam-size', '8', '--entropy-thold', '2.4', '--logprob-thold', '-1.0', '--max-len', '0', $c.file)
+    $wTexts += , $r.text; $wWall += $r.wallMs; $wLoad += [double]$r.loadMs
+  }
+  $results.Add([pscustomobject]@{ engine = 'whisper-turbo-q8_0'; threads = $threads; wer = (Measure-Wer $wTexts); wallMs = $wWall; loadMs = [int]$wLoad
+    perClipMs = [int]($wWall / $clipRows.Count); rtf = [Math]::Round($wWall / 1000.0 / $clipSeconds, 3); texts = $wTexts })
+
+  $offline = Join-Path $sherpaDir 'bin\sherpa-onnx-offline.exe'
+  $online = Join-Path $sherpaDir 'bin\sherpa-onnx.exe'
+  foreach ($n in @($cores, $threads) | Sort-Object -Unique) {
+    Write-Host "Parakeet TDT 0.6B v3 int8 ($n threads, one process for all clips)..."
+    $pr = Invoke-Sherpa $offline @("--num-threads=$n", "--tokens=$parakeetDir\tokens.txt", "--encoder=$parakeetDir\encoder.int8.onnx",
+      "--decoder=$parakeetDir\decoder.int8.onnx", "--joiner=$parakeetDir\joiner.int8.onnx", '--model-type=nemo_transducer')
+    $results.Add([pscustomobject]@{ engine = 'parakeet-v3-int8'; threads = $n; wer = (Measure-Wer $pr.texts); wallMs = $pr.wallMs; loadMs = $pr.loadMs
+      perClipMs = [int]($pr.decodeMs / $clipRows.Count); rtf = [Math]::Round($pr.decodeMs / 1000.0 / $clipSeconds, 3); texts = $pr.texts })
+    Write-Host "TalTech Zipformer et-en int8 ($n threads, streaming, one process for all clips)..."
+    $zr = Invoke-Sherpa $online @("--num-threads=$n", "--tokens=$zfDir\tokens.txt", "--encoder=$zfDir\encoder.int8.onnx",
+      "--decoder=$zfDir\decoder.int8.onnx", "--joiner=$zfDir\joiner.int8.onnx")
+    $results.Add([pscustomobject]@{ engine = 'zipformer-et-en-int8'; threads = $n; wer = (Measure-Wer $zr.texts); wallMs = $zr.wallMs; loadMs = $zr.loadMs
+      perClipMs = if ($zr.decodeMs) { [int]($zr.decodeMs / $clipRows.Count) } else { $null }
+      rtf = if ($zr.decodeMs) { [Math]::Round($zr.decodeMs / 1000.0 / $clipSeconds, 3) } else { $null }; texts = $zr.texts })
+  }
 
   Write-Host ''
-  Write-Host 'Text, full model then q8_0, per clip:'
-  foreach ($c in $clips) {
-    Write-Host "  $($c[0]):"
-    $results | Where-Object { $_.clip -eq $c[0] } | ForEach-Object { Write-Host ('    {0,-5} {1}' -f $_.model, $_.text) }
+  Write-Host ('{0,-22} {1,7} {2,7} {3,10} {4,9} {5,10} {6,7}' -f 'engine', 'threads', 'WER %', 'per clip', 'load', 'total', 'RTF')
+  foreach ($r in $results) {
+    Write-Host ('{0,-22} {1,7} {2,7} {3,8:N0}ms {4,7:N0}ms {5,8:N0}ms {6,7}' -f $r.engine, $r.threads, $r.wer, $r.perClipMs, $r.loadMs, $r.wallMs, $r.rtf)
   }
-  $reportPath = Join-Path (Get-Location) "whisper-bench-round2-$($env:COMPUTERNAME).json"
-  [ordered]@{ computer = $env:COMPUTERNAME; cpu = $cpu.Name.Trim(); threads = $threads; build = $buildInfo.runId; rows = $results } |
+  Write-Host '(Whisper per clip includes loading the model each time; sherpa-onnx loads once, shown as load.)'
+  $reportPath = Join-Path (Get-Location) "asr-bench-round2-$($env:COMPUTERNAME).json"
+  [ordered]@{ computer = $env:COMPUTERNAME; cpu = $cpu.Name.Trim(); cores = $cores; threads = $threads; build = $buildInfo.runId
+    clips = @($clipRows | ForEach-Object { $_.name }); references = @($clipRows | ForEach-Object { $_.reference }); results = $results } |
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $reportPath -Encoding UTF8
   Write-Host ''
-  Write-Host "Done. Please send the output above, or this file: $reportPath"
+  Write-Host "Done. Please send the table above and this file: $reportPath"
   return
 }
 

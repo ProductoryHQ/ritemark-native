@@ -129,12 +129,24 @@ Acceptance criteria:
 - The shell-tier list (`CLAUDE.md`), `scripts/release-extension-preflight.sh` and `scripts/list-unshipped-extension-changes.mjs` treat `extensions/ritemark/binaries/` as shell-tier (all three edited in one commit, with `release-tier-paths.test.mjs`). The patch 008 description in `CLAUDE.md` is corrected.
 - `docs/CHANGELOG.md` and the v1.14.0 release notes are drafted. #133 (and #203) close when v1.14.0 publishes.
 
+### R11: Apple silicon engine runs on macOS 12 and later (added 2026-10-12)
+
+Jarmo's scope decision of 2026-10-12, relayed by the Development manager. The engine shipped since v1.0.3 asks for macOS 15.0 (audit §12), while Ritemark supports macOS 12.
+
+As a user on an Apple silicon Mac with macOS 12, 13 or 14, I want dictation and on-device Transcribe to work, so that I get what Ritemark promises for my Mac.
+
+Acceptance criteria:
+- `extensions/ritemark/binaries/darwin-arm64/` holds the `build-whisper.yml` build: one static `whisper-cli` from whisper.cpp v1.8.3 (`2eeeba56`), minimum macOS 12.0, Metal embedded, BLAS off. The old dylibs are removed, and `whisper-manifest.json` records it like the other targets.
+- The contract test passes on the `macos-15` and `macos-14` runners, including the macOS 12.0 check. GitHub has no macOS 12 or 13 runner, so hands-on use on 12 and 13 is intentionally untested.
+- On Jarmo's Mac, dictation and on-device Transcribe behave as in v1.13.0 (same speed in the local check: 0.58 s vs 0.57 s per dictation call).
+- `codesign-app.sh` signs it with the existing `whisper-cli` rule and notarization accepts it. Gate 2 includes an Apple silicon dictation check.
+
 ## Non-Requirements
 
 - No GPU acceleration on Windows (Vulkan/CUDA) unless A2 forces a scope change that Jarmo approves.
 - No on-device m4a/aac on Windows. It needs a converter; the existing honest message stays and ElevenLabs handles those files. Follow-up issue.
 - No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8.
-- No whisper.cpp upgrade, and no rebuild of the Apple silicon binary.
+- No whisper.cpp upgrade. (The Apple silicon binary *is* rebuilt from the same version: R11, added 2026-10-12.)
 - No Windows on ARM native build. On ARM, Windows runs the x64 build under emulation (not tested). No Linux binary.
 - No change to the model location, the model itself, or the language list.
 - No VS Code patch or submodule change.

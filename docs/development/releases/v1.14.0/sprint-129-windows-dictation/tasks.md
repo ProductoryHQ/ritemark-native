@@ -11,7 +11,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] `scripts/qa/windows-whisper-bench.ps1` written (PowerShell 5.1, ASCII only). It also measures a shorter audio window (`--audio-ctx`), which is not a pre-approved setting, so Jarmo can decide with numbers. *(No CI dry run: the runner's 4 vCPUs are no speed reference, and the script's whisper calls use the same flags the contract test already runs)*
 - [x] **Jarmo:** runs the bench on his Windows machine (one command) and pastes the output. → [research/windows-performance-audit.md](./research/windows-performance-audit.md). *(2026-10-11, Ryzen 7 5825U: ~22 s per call; threads adopted, beam and chunk length do nothing)*
 - [x] W6's stop condition triggered: numbers and options taken to Jarmo. *(The speed decision is pending; host work that does not depend on it continued)*
-- [ ] Bench round 2 (full vs q8_0 on real clips + Estonian), if Jarmo chooses the q8_0 option.
+- [ ] Bench round 2, every candidate (Jarmo 2026-10-12: "mõõda kõiki"; W11): FLEURS-et WER for all candidates on the Mac → `research/asr-candidates-audit.md`; CI clip pack; Windows round-2 script; run instructions to the Development manager; Windows results folded in.
+- [ ] R11 (added 2026-10-12): commit the CI-built darwin-arm64 static engine with the other payloads (W10); Apple silicon dictation check in Gate 2.
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
 
