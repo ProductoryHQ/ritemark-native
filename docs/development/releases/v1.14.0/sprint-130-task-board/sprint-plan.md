@@ -56,6 +56,7 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - **2026-10-11, D8 — Words:** Home's "New AI task" becomes "New AI conversation", so "task" means a board card.
 - **2026-10-12, D10 — Agent choice everywhere:** every action that starts agent work has a dropdown with Claude Code, Codex and OpenCode (Jarmo, on the prototype).
 - **2026-10-12, D11 — Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority (Next up); **Done when**, **Check these** and the **conflict guard** (with Wait for it) are in this sprint (Jarmo: "võta need kolm sprinti 130").
+- **2026-10-12, D13 — Doing limit (proposed, in the prototype):** Doing holds at most 3 cards by default, set from its header; past the limit Give to offers Queue it or Start anyway. The later autopilot fills free slots up to the same limit.
 - **2026-10-12, D12 — Autopilot later:** agents taking the next card by themselves within a user-set limit is its own later sprint (Jarmo: "autopilot hiljem").
 - **2026-10-11, D9 — Review step:** a finished card waits in Doing as "Ready to review" until the user presses Mark done; no Review column.
 

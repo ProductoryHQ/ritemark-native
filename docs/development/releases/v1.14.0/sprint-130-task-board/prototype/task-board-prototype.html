@@ -1696,6 +1696,15 @@ button:disabled, [aria-disabled="true"] { cursor: default; }
 .tb-check ul { list-style: disc; padding-left: 20px; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--r-ink-body); }
 .tb-conflict { margin-top: 12px; border: 1px solid var(--r-warning-soft); background: color-mix(in srgb, var(--r-warning-soft) 45%, var(--r-surface)); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--r-ink-body); }
 .tb-conflict b { color: var(--r-ink-strong); font-weight: 600; }
+.tb-wip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; font: 400 11px var(--ritemark-ui-font-family); color: var(--r-ink-faint); letter-spacing: 0; text-transform: none; }
+.tb-wip:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+.tb-wip span { font-weight: 600; }
+.tb-wip.full { color: var(--r-accent-deep); background: var(--r-accent-soft); font-weight: 600; }
+.tb-wip.over { color: var(--r-warning); background: var(--r-warning-soft); font-weight: 600; }
+.tb-wiptext-full { color: var(--r-accent-deep); } .tb-wiptext-over { color: var(--r-warning); }
+.tb-slot { border-color: var(--r-accent-soft) !important; background: color-mix(in srgb, var(--r-accent-soft) 40%, var(--r-surface)) !important; }
+.tb-inlink { color: var(--r-accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.tb-inlink:hover { text-decoration: underline; }
 .tb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 /* AI sidebar bits the captured markup does not cover */
 .tb-userline { white-space: pre-wrap; word-break: break-word; color: var(--r-ink-strong); line-height: 1.5; }
@@ -1758,9 +1767,9 @@ function seed() {
       { id: 'k3f9x2', title: 'Tighten the executive summary', stage: 'doing', rank: 1, since: '2h', doneWhen: 'Five sentences or fewer, with the three recommendations first.', desc: 'Make the summary shorter and lead with the three recommendations. Keep the survey numbers.', files: ['04-deliverable/findings-draft.md'],
         handoff: { state: 'completed', runtime: 'claude', seconds: 252, conv: 'c1' }, result: { by: 'claude', age: '2h', summary: 'Cut the summary from nine sentences to five and led with the three recommendations. Nothing else changed.', files: ['04-deliverable/findings-draft.md'], check: ['The second recommendation still says “two hubs” without naming them.', 'The survey numbers moved to section 2. Check that the footnote still points to the right table.'] },
         history: [['Today 08:05', 'Claude finished: Cut the summary from nine sentences to five…'], ['Today 08:01', 'Given to Claude'], ['Mon 16:40', 'Added']] },
-      { id: 'p7d2m1', title: 'Pick the pilot sites for October', stage: 'doing', rank: 2, since: '1h', doneWhen: 'Two hubs chosen, with a reason for each.', desc: 'Two hubs for the October pilot. Use the interview notes and the survey.', files: ['03-analysis/analysis.md', '01-interviews/2026-09-02-tomasz-wisniewski-poznan-hub.md'],
-        handoff: { state: 'completed', runtime: 'claude', seconds: 188, conv: 'c2' }, ask: { by: 'claude', question: 'Which two hubs should the October pilot cover?', options: ['Poznań and Duisburg', 'Poznań and Aarhus', 'Duisburg and Aarhus'] },
-        history: [['Today 09:12', 'Claude asked: Which two hubs should the October pilot cover?'], ['Today 09:09', 'Given to Claude'], ['Mon 11:20', 'Added']] },
+      { id: 'p7d2m1', title: 'Pick the pilot sites for October', stage: 'todo', rank: 0, since: '1h', doneWhen: 'Two hubs chosen, with a reason for each.', desc: 'Two hubs for the October pilot. Use the interview notes and the survey.', files: ['03-analysis/analysis.md', '01-interviews/2026-09-02-tomasz-wisniewski-poznan-hub.md'],
+        ask: { by: 'claude', conv: 'c4', askedIn: 'Draft the steering committee deck outline', question: 'Which two hubs should the October pilot cover?', options: ['Poznań and Duisburg', 'Poznań and Aarhus', 'Duisburg and Aarhus'] },
+        history: [['Today 10:41', 'Claude asked, while drafting the deck outline: Which two hubs should the October pilot cover?'], ['Mon 11:20', 'Added']] },
       { id: 's1v8q4', title: 'Clean up the survey export', stage: 'doing', rank: 3, since: '12 min', doneWhen: 'No test answers or empty rows; the column names are unchanged.', desc: 'Remove the test answers and the empty rows, and keep the column names.', files: ['03-analysis/survey-results.csv'],
         handoff: { state: 'needs-user', kind: 'approval', runtime: 'codex', conv: 'c3' }, history: [['Today 10:02', 'Given to Codex'], ['Tue 09:15', 'Added']] },
       { id: 'd4k9w2', title: 'Draft the steering committee deck outline', stage: 'doing', rank: 4, doneWhen: 'Ten slides in deck-outline.md, one line each.', desc: 'Ten slides for 29 September: the problem, what we heard, the three recommendations and the pilot.', files: ['04-deliverable/findings-draft.md', '02-workshop/workshop-plan.md'],
@@ -1784,7 +1793,6 @@ function seed() {
 const CONVS0 = {
   c0: { title: 'Interview themes', slot: 5, runtime: 'claude', kind: 'own' },
   c1: { title: 'Tighten the executive summary', slot: 6, runtime: 'claude', card: 'k3f9x2' },
-  c2: { title: 'Pick the pilot sites for October', slot: 2, runtime: 'claude', card: 'p7d2m1' },
   c3: { title: 'Clean up the survey export', slot: 3, runtime: 'codex', card: 's1v8q4' },
   c4: { title: 'Draft the steering committee deck outline', slot: 1, runtime: 'claude', card: 'd4k9w2' },
 };
@@ -1813,7 +1821,7 @@ const RESULT_FILES = { i5t3n7: ['01-interviews/themes.md'], d4k9w2: ['04-deliver
 
 /* ===================== state ===================== */
 const state = {
-  theme: 'light', scene: 'doc', side: 300, ai: true, data: 'full',
+  theme: 'light', scene: 'doc', side: 300, ai: true, data: 'full', wip: 3, slot: null,
   boardTab: 'board', db: seed(), convs: JSON.parse(JSON.stringify(CONVS0)), activeConv: 'c0', nextSlot: 4,
   open: null,            // { id, where: 'board' | 'side' }
   menu: null,            // { id, where, kind, x, y, sub }
@@ -1845,6 +1853,7 @@ function present(c) {
     if (c.review) { const v = VERDICT[c.review.verdict]; return { glyph: v.glyph, tone: v.tone, row: v.label, dlg: v.label, whose: 'you' }; }
     return { glyph: 'lightbulb', tone: 'faint', row: 'Not reviewed', dlg: 'Not reviewed', whose: 'you' };
   }
+  if (c.waitSlot) return { glyph: 'clock', tone: 'muted', row: 'Starts when Doing has room', dlg: 'Starts when Doing has room', whose: 'agent', waiting: true };
   if (c.waitFor) { const b = card(c.waitFor); const t = b ? b.title : 'another task'; return { glyph: 'clock', tone: 'muted', row: `Starts after “${short(t)}”`, dlg: `Starts when “${t}” finishes`, whose: 'agent', waiting: true }; }
   if (h) {
     if (h.state === 'accepting') return { glyph: 'circle-notch', spin: true, tone: 'accent', row: `Sending to ${rt}…`, dlg: `Sending to ${rt}…`, whose: 'agent', busy: true };
@@ -1966,7 +1975,7 @@ function sideHTML() {
     const ws = key === 'calls' ? waitSummary() : null;
     const head = `<div class="${SECTION}${key === 'calls' ? ' tb-callhead' : ''}">${collapsible
       ? `<button class="tb-sec-btn" data-act="toggle-sec" data-sec="${key}" aria-expanded="${open}" data-tip="${open ? 'Hide' : 'Show'} the ${list.length} ${key === 'done' ? 'finished tasks' : 'ideas'}">${icon('caret-right', 10, 'currentColor')}<span>${title}</span><span class="font-semibold normal-case tracking-normal">· ${list.length}</span></button>`
-      : `<span>${title}</span><span class="font-semibold normal-case tracking-normal">· ${list.length}</span>`}
+      : `<span>${title}</span><span class="font-semibold normal-case tracking-normal${key === 'doing' ? wipClass().replace(' ', ' tb-wiptext-') : ''}"${key === 'doing' ? ` data-tip="${state.wip ? `Doing holds at most ${state.wip} tasks. ` : ''}${cs.filter((x) => x.stage === 'doing').length} of the ${doingCount()} in Doing are in Your calls above"` : ''}>· ${key === 'doing' ? wipLabel() : list.length}</span>`}
       ${ws ? `<span class="ml-auto font-semibold normal-case tracking-normal" data-tip="The oldest one has waited ${ws.oldest}">oldest ${ws.oldest}</span>` : ''}
       ${opts.add ? `<span class="ml-auto inline-flex" data-tip="Add an idea"><button class="tb-addsec" data-act="add-idea-side" aria-label="Add an idea">${icon('plus', 12, 'currentColor')}</button></span>` : ''}</div>`;
     if (!open) return `<div class="mb-1">${head}</div>`;
@@ -1992,7 +2001,7 @@ function sideHTML() {
     </div></div>`;
 }
 
-const isNext = (c) => { if (c.stage !== 'todo' || c.waitFor) return false; const top = byStage('todo').find((x) => !x.waitFor && present(x).plain); return top && top.id === c.id; };
+const isNext = (c) => { if (c.stage !== 'todo' || c.waitFor || c.waitSlot) return false; const top = byStage('todo').find((x) => !x.waitFor && !x.waitSlot && present(x).plain); return top && top.id === c.id; };
 function glyphHTML(c, p, where) {
   if (p.plain && c.stage !== 'done') {
     const busy = false;
@@ -2079,7 +2088,8 @@ function columnsView() {
     if (s === 'done' && !state.showAllDone) list = list.slice(0, 10);
     const add = (s === 'idea' || s === 'todo') ? `<span class="ml-auto inline-flex" data-tip="${s === 'idea' ? 'Add an idea' : 'Add a task'}"><button class="tb-addsec" data-act="add-col" data-stage="${s}" aria-label="${s === 'idea' ? 'Add an idea' : 'Add a task'}">${icon('plus', 12, 'currentColor')}</button></span>` : '';
     const adding = state.addCol === s ? `<div class="tb-addrow"><input class="${INPUT} h-8" placeholder="${s === 'idea' ? 'Write an idea…' : 'Add a task…'}" data-input="add-col" data-stage="${s}" aria-label="New card title"></div>` : '';
-    return `<section class="tb-col" data-col="${s}" aria-label="${name}"><div class="tb-colhead">${name} <span class="n">${total}</span>${add}</div>${adding}
+    const count = s === 'doing' ? `<span class="inline-flex" data-tip="${state.wip ? `Doing holds at most ${state.wip} tasks at once. Change the limit` : 'No limit on Doing. Set one'}"><button class="tb-wip${wipClass()}" data-act="wip-menu" aria-label="Doing limit">${wipLabel()}${state.wip && doingCount() >= state.wip ? `<span>${doingCount() > state.wip ? 'over' : 'full'}</span>` : ''}${icon('caret-down', 10, 'currentColor')}</button></span>` : `<span class="n">${total}</span>`;
+    return `<section class="tb-col" data-col="${s}" aria-label="${name}"><div class="tb-colhead">${name} ${count}${add}</div>${adding}
       ${list.map(tileHTML).join('') || `<div class="tb-colhint">${hints[s]}</div>`}
       ${s === 'done' && total > 10 ? `<button class="tb-more" data-act="show-all-done">${state.showAllDone ? 'Show fewer' : `Show all ${total}`}</button>` : ''}</section>`;
   }).join('')}</div><div class="tb-foot">Tasks are saved in this folder, so they travel with it.</div>`;
@@ -2153,6 +2163,7 @@ function cardDialog(where) {
   const give = giveButton(c, where);
   if (c.stage === 'done') { actions = button({ label: 'Reopen', variant: 'outline', act: 'reopen', id: c.id, tip: 'Move this task back to To do' }); }
   else if (c.stage === 'idea') { actions = c.reviewing ? '' : (c.review ? button({ label: 'Make it a task', act: 'make-task', id: c.id, tip: 'Move this idea to To do' }) : '') + reviewButton(c, where, !!c.review); }
+  else if (c.waitSlot) { actions = button({ label: 'Start anyway', act: 'start-anyway', id: c.id, tip: `Start now. Doing goes to ${doingCount() + 1} of ${state.wip}` }) + button({ label: 'Take out of the queue', variant: 'outline', act: 'unqueue', id: c.id, tip: 'Keep it in To do without starting it' }); }
   else if (c.waitFor) { actions = button({ label: 'Start now', act: 'start-now', id: c.id, tip: 'Start without waiting. Two agents may change the same file' }) + button({ label: 'Don’t wait', variant: 'outline', act: 'unwait', id: c.id, tip: 'Keep the task in To do without starting it' }); }
   else if (p.plain) { actions = give; }
   else if (p.call === 'review') { actions = button({ label: 'Mark done', act: 'done', id: c.id, tip: 'Move this task to Done' }) + (narrow && state.side < 360 ? button({ ico: 'pencil-simple', variant: 'outline', size: 'iconSm', act: 'note-changes', id: c.id, data: ` data-where="dlg-${where}"`, tip: 'Ask for changes. It goes to the same conversation', aria: 'Ask for changes' }) : button({ label: 'Ask for changes…', variant: 'outline', act: 'note-changes', id: c.id, data: ` data-where="dlg-${where}"`, tip: 'Say what to change. It goes to the same conversation' })); }
@@ -2171,13 +2182,14 @@ function cardDialog(where) {
   else if (c.stage === 'done' && c.result) sub = `<div class="tb-sub">${convLink.replace(' · ', '')}</div>`;
 
   if (c.waitFor) sub = `<div class="tb-sub">Both work on ${esc(conflictFile(c, card(c.waitFor)) || 'the same file')}. It starts by itself when that task finishes.</div>`;
-  if (p.plain && !c.doneWhen && c.stage !== 'done' && !(state.conflict && state.conflict.id === c.id)) sub = `<div class="tb-sub">Add what done looks like below. Agents finish better with it.</div>`;
-  const conflictPanel = state.conflict && state.conflict.id === c.id ? conflictHTML(c) : '';
+  if (p.plain && !c.doneWhen && c.stage !== 'done' && !(state.conflict && state.conflict.id === c.id) && !(state.slot && state.slot.id === c.id)) sub = `<div class="tb-sub">Add what done looks like below. Agents finish better with it.</div>`;
+  if (c.waitSlot) sub = `<div class="tb-sub">Doing is full (${doingCount()} of ${state.wip}). It starts by itself with ${RT_NAME(c.waitRuntime || state.lastRuntime)} when a task leaves Doing.</div>`;
+  const conflictPanel = state.conflict && state.conflict.id === c.id ? conflictHTML(c) : state.slot && state.slot.id === c.id ? slotHTML(c) : '';
   stateBlock = `<div>${whose ? `<div class="tb-whose">${whose}</div>` : ''}${p.dlg ? `<div class="tb-state tone-${p.tone === 'faint' ? 'muted' : p.tone}">${icon(p.glyph, 16, TONE_FILL[p.tone], p.spin ? 'tb-spin' : '')}<span>${esc(p.dlg)}</span></div>` : ''}${sub}
     ${conflictPanel || (state.note && state.note.id === c.id && state.note.where === 'dlg-' + where ? noteBox(c, rt) : actions ? `<div class="tb-actions" style="margin-top:12px">${actions}</div>` : '')}</div>`;
   if (c.ask && !c.handoff?.state?.match(/running|accepting|queued/)) {
     const o = c.ask.options.map((o, i) => button({ label: esc(o), variant: 'outline', act: 'answer', id: c.id, data: ` data-opt="${i}"`, extra: 'w-full tb-opt', tip: `Answer “${o}”. ${rt} continues right away` })).join('');
-    resultBlock = `<div class="tb-label">Decision</div><div class="tb-result"><div class="text-[13px] text-ink-strong">${rt} asks: ${esc(c.ask.question)}</div>${state.note && state.note.id === c.id && state.note.where === 'ask-' + where ? noteBox(c, rt) : `<div class="tb-actions stack" style="margin-top:10px">${o}${button({ label: 'Something else…', variant: 'outline', act: 'note-answer', id: c.id, data: ` data-where="ask-${where}"`, extra: 'w-full tb-opt', tip: 'Answer in your own words' })}</div>`}</div>`;
+    resultBlock = `<div class="tb-label">Decision</div><div class="tb-result"><div class="text-[13px] text-ink-strong">${RT_NAME(c.ask.by)} asks${c.ask.askedIn ? `, while working on “${esc(c.ask.askedIn)}”` : ''}: ${esc(c.ask.question)}</div>${state.note && state.note.id === c.id && state.note.where === 'ask-' + where ? noteBox(c, rt) : `<div class="tb-actions stack" style="margin-top:10px">${o}${button({ label: 'Something else…', variant: 'outline', act: 'note-answer', id: c.id, data: ` data-where="ask-${where}"`, extra: 'w-full tb-opt', tip: 'Answer in your own words' })}</div>`}</div>`;
   }
   if (c.result && !c.ask) resultBlock = `<div class="tb-label">Result</div><div class="tb-result">${esc(c.result.summary)}${checkList(c)}<div class="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-muted">Modified ${c.result.files.length} file${c.result.files.length === 1 ? '' : 's'} ${c.result.files.map((f) => fileChip(f)).join('')}</div></div>`;
   if (c.stage === 'idea' && c.review) resultBlock = `<div class="tb-label">Review</div><div class="tb-result"><div class="tb-verdict tone-${VERDICT[c.review.verdict].tone}">${icon(VERDICT[c.review.verdict].glyph, 14, 'currentColor')}${VERDICT[c.review.verdict].label}</div><div class="mt-1">${esc(c.review.why)}</div><div class="tb-suggest"><div class="text-[13px] font-medium text-ink-strong">${esc(c.review.title)}</div><div class="tb-sub">First step: ${esc(c.review.first)} How big: ${c.review.size}.</div></div></div>`;
@@ -2206,6 +2218,19 @@ function cardDialog(where) {
 }
 const fileChip = (f) => `<span class="inline-flex min-w-0 max-w-full" data-tip="${esc(f)}"><button class="tb-file" data-act="toast" data-msg="Opens ${esc(f)} in its editor.">${icon('file-text', 12, 'currentColor')}<span>${esc(f.split('/').pop())}</span></button></span>`;
 
+const doingCount = () => byStage('doing').length;
+const wipFull = () => !!state.wip && doingCount() >= state.wip;
+function wipLabel() { if (!state.wip) return `${doingCount()}`; return `${doingCount()}/${state.wip}`; }
+function wipClass() { if (!state.wip) return ''; const n = doingCount(); return n > state.wip ? ' over' : n === state.wip ? ' full' : ''; }
+function fillSlots() {
+  if (!state.wip) { for (const w of cards().filter((x) => x.waitSlot)) { w.waitSlot = undefined; give(w.id, w.waitRuntime || state.lastRuntime, true, null, true); } return; }
+  const q = cards().filter((x) => x.waitSlot).sort((a, b) => a.rank - b.rank);
+  while (q.length && doingCount() < state.wip) { const w = q.shift(); w.waitSlot = undefined; hist(w, 'Doing had room again, so it started'); give(w.id, w.waitRuntime || state.lastRuntime, true, null, true); }
+}
+function slotHTML(c) {
+  return `<div class="tb-conflict tb-slot" role="status"><div class="flex items-start gap-2">${icon('clock', 16, 'var(--r-accent)', 'shrink-0')}<div><b>Doing is full: ${doingCount()} of ${state.wip}.</b> Review or decide what waits on you, and this task starts by itself when there’s room. <a href="#" data-act="tab" data-tab="calls" class="tb-inlink">See what waits on you</a></div></div>
+    <div class="tb-actions" style="margin-top:10px">${button({ label: 'Queue it', act: 'queue-slot', id: c.id, tip: `${RT_NAME(state.lastRuntime)} starts on it by itself when a task leaves Doing` })}${button({ label: 'Start anyway', variant: 'outline', act: 'start-anyway', id: c.id, tip: `Start now. Doing goes to ${doingCount() + 1} of ${state.wip}` })}${button({ ico: 'x', variant: 'ghost', size: 'iconSm', act: 'cancel-slot', id: c.id, tip: 'Cancel', aria: 'Cancel' })}</div></div>`;
+}
 function conflictFile(a, b) { if (!a || !b) return null; return a.files.find((f) => b.files.includes(f)) || null; }
 function conflictWith(c) { return cards().find((o) => o !== c && o.handoff && ['accepting', 'queued', 'running', 'needs-user'].includes(o.handoff.state) && conflictFile(c, o)); }
 function conflictHTML(c) {
@@ -2257,6 +2282,7 @@ function menuItems(c, where) {
 }
 function menuHTML(where) {
   const m = state.menu; if (!m || m.where !== where) return '';
+  if (m.kind === 'wip') return `<div class="tb-menu ${MENU}" role="menu" style="left:${m.x}px;top:${m.y}px;min-width:200px" data-menu><div class="px-2 pt-1 pb-1.5 text-[11px] text-ink-muted">At most this many tasks in Doing</div>${[1, 2, 3, 4, 5, 6, 0].map((n) => `<div role="menuitemradio" aria-checked="${(state.wip || 0) === n}" class="${MI} tb-mi" data-act="mi" data-mi="wip-set" data-n="${n}">${(state.wip || 0) === n ? icon('check', 14, 'currentColor') : '<span style="width:14px"></span>'}<span>${n || 'No limit'}</span></div>`).join('')}</div>`;
   const c = card(m.id); if (!c) return '';
   const items = menuItems(c, where);
   const stageRows = () => STAGES.map(([s, n]) => `<div role="menuitemradio" aria-checked="${c.stage === s}" class="${MI} tb-mi" style="padding-left:30px"${c.stage === s ? ' aria-disabled="true"' : ''} data-act="mi" data-mi="move" data-stage="${s}" data-id="${c.id}"><span>${n}</span>${c.stage === s ? `<span class="sub">${icon('check', 14, 'currentColor')}</span>` : ''}</div>`).join('');
@@ -2336,11 +2362,13 @@ function renderFrame(kind) {
 function render() { renderChrome(); for (const k of ['side', 'board', 'ai']) renderFrame(k); syncControls(); fit(); }
 
 /* ===================== actions ===================== */
-function give(id, rt, force = false, where = null) {
+function give(id, rt, force = false, where = null, slotForce = false) {
   const c = card(id); state.lastRuntime = rt || state.lastRuntime;
   const other = force ? null : conflictWith(c);
   if (other) { state.conflict = { id, with: other.id }; if (!state.open || state.open.id !== id) state.open = { id, where: where || 'board' }; return; }
-  state.conflict = null; c.waitFor = undefined;
+  if (!slotForce && c.stage !== 'doing' && wipFull()) { state.conflict = null; state.slot = { id }; if (!state.open || state.open.id !== id) state.open = { id, where: where || 'board' }; return; }
+  state.conflict = null; state.slot = null; c.waitFor = undefined; c.waitSlot = undefined;
+  if (c.stage !== 'doing') { c.stage = 'doing'; c.rank = Math.min(0, ...byStage('doing').filter((x) => x !== c).map((x) => x.rank)) - 1; }
   const runtime = state.lastRuntime;
   let conv = c.handoff && c.handoff.conv && state.convs[c.handoff.conv] ? c.handoff.conv : null;
   c.handoff = { state: 'accepting', runtime, conv };
@@ -2360,10 +2388,16 @@ function finish(c) {
   if (!c.handoff || c.handoff.state !== 'running') return;
   c.handoff.state = 'completed'; c.handoff.seconds = Math.max(41, Math.round((Date.now() - (c.handoff.startedAt || Date.now())) / 1000) + 180);
   c.since = 'just now';
-  for (const w of cards().filter((x) => x.waitFor === c.id)) { w.waitFor = undefined; hist(w, `“${c.title}” finished, so it started`); give(w.id, w.waitRuntime || state.lastRuntime, true); }
+  for (const w of cards().filter((x) => x.waitFor === c.id)) { w.waitFor = undefined; if (wipFull()) { w.waitSlot = true; hist(w, `“${c.title}” finished; it waits for room in Doing`); } else { hist(w, `“${c.title}” finished, so it started`); give(w.id, w.waitRuntime || state.lastRuntime, true); } }
   if (c.id === 'p7d2m1' && !c._answered) { c.ask = CARD_ASK; } else { c.result = { by: c.handoff.runtime, age: 'just now', summary: RESULTS[c.id] || 'Did the task and left a short summary in the conversation.', files: RESULT_FILES[c.id] || c.files.slice(0, 1), check: RESULT_CHECK[c.id] || [] }; hist(c, `${RT_NAME(c.handoff.runtime)} finished: ${c.result.summary.slice(0, 60)}…`); }
 }
 const CARD_ASK = { by: 'claude', question: 'Which two hubs should the October pilot cover?', options: ['Poznań and Duisburg', 'Poznań and Aarhus', 'Duisburg and Aarhus'] };
+function answerAsk(c, text) {
+  c._answered = true; hist(c, `You chose: ${text}`); const via = c.ask && c.ask.conv; c.ask = undefined;
+  if (c.handoff && c.handoff.conv) { continueConv(c, `I choose: ${text}`); return; }
+  c.desc = (c.desc ? c.desc + '\n' : '') + `Decided: ${text}`;
+  if (via && state.convs[via]) (state.convs[via].followups = state.convs[via].followups || []).push(`On “${c.title}”: ${text}`);
+}
 function continueConv(c, text) {
   const conv = state.convs[c.handoff.conv]; (conv.followups = conv.followups || []).push(text);
   c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); c.result = undefined; scheduleFinish(c, 7000);
@@ -2385,28 +2419,33 @@ function act(el, kind, ev) {
       state.menu = { id, where: kind, from: where || kind, kind: a === 'agent-menu' ? 'agent' : 'row', forAct: el.dataset.for, x: Math.max(8, Math.min(vw - w - 8, left)), y: r.bottom + 4, top: r.top, sub: null };
       break; }
     case 'sub': state.menu.sub = state.menu.sub === el.dataset.sub ? null : el.dataset.sub; break;
-    case 'mi': { const mi = el.dataset.mi; closeMenu(); if (mi === 'move') { moveCard(c, el.dataset.stage); break; } if (mi === 'agent-run') { state.lastRuntime = el.dataset.rt; return act({ dataset: { act: el.dataset.for, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); } return act({ dataset: { act: mi, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); }
+    case 'mi': { const mi = el.dataset.mi; closeMenu(); if (mi === 'wip-set') { state.wip = +el.dataset.n || null; break; } if (mi === 'move') { moveCard(c, el.dataset.stage); break; } if (mi === 'agent-run') { state.lastRuntime = el.dataset.rt; return act({ dataset: { act: el.dataset.for, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); } return act({ dataset: { act: mi, id, where: kind }, ownerDocument: el.ownerDocument, getBoundingClientRect: () => el.getBoundingClientRect() }, kind); }
     case 'give': give(id, null, false, kind === 'side' ? 'side' : 'board'); break;
     case 'wait-for': { const o = card(state.conflict.with); c.waitFor = o.id; c.waitRuntime = state.lastRuntime; hist(c, `Waits for “${o.title}”`); state.conflict = null; break; }
     case 'start-now': state.conflict = null; c.waitFor = undefined; give(id, null, true); break;
     case 'unwait': c.waitFor = undefined; hist(c, 'Stopped waiting'); break;
     case 'cancel-conflict': state.conflict = null; break;
+    case 'queue-slot': c.waitSlot = true; c.waitRuntime = state.lastRuntime; hist(c, `Queued for ${RT_NAME(state.lastRuntime)}: starts when Doing has room`); state.slot = null; break;
+    case 'start-anyway': state.slot = null; c.waitSlot = undefined; give(id, null, true, null, true); break;
+    case 'cancel-slot': state.slot = null; break;
+    case 'unqueue': c.waitSlot = undefined; hist(c, 'Taken out of the queue'); break;
+    case 'wip-menu': { if (state.menu && state.menu.kind === 'wip') { closeMenu(); break; } const r = el.getBoundingClientRect(); const vw = el.ownerDocument.defaultView.innerWidth; state.menu = { id: 'wip', where: kind, from: kind, kind: 'wip', x: Math.max(8, Math.min(vw - 200, r.left)), y: r.bottom + 4, top: r.top, sub: null }; break; }
     case 'tick': if (c) { moveCard(c, 'done'); } break;
     case 'done': c.stage = 'done'; c.doneDay = 'Today'; c.doneTime = now(); c.rank = Math.min(...byStage('done').map((x) => x.rank), 1) - 1; hist(c, 'Marked done'); if (c.handoff) c.handoff.state = 'closed'; state.note = null; break;
     case 'reopen': moveCard(c, 'todo'); hist(c, 'Reopened'); break;
     case 'note-changes': state.note = { id, kind: 'changes', where: where || kind }; break;
     case 'note-answer': state.note = { id, kind: 'answer', where: where || kind }; break;
     case 'cancel-note': state.note = null; break;
-    case 'send-note': { const ta = el.ownerDocument.querySelector('[data-input="note"]'); const text = (ta && ta.value.trim()) || (state.note.kind === 'changes' ? 'Shorter, please, and keep the numbers.' : 'Poznań and Aarhus.'); const k = state.note.kind; state.note = null; c.handoff.runtime = state.lastRuntime;
-      if (k === 'answer') { c._answered = true; hist(c, `You chose: ${text}`); c.ask = undefined; continueConv(c, text); } else { hist(c, `Asked for changes: ${text}`); continueConv(c, text); } break; }
-    case 'answer': { const o = c.ask.options[+el.dataset.opt]; c._answered = true; hist(c, `You chose: ${o}`); c.ask = undefined; continueConv(c, `I choose: ${o}`); break; }
+    case 'send-note': { const ta = el.ownerDocument.querySelector('[data-input="note"]'); const text = (ta && ta.value.trim()) || (state.note.kind === 'changes' ? 'Shorter, please, and keep the numbers.' : 'Poznań and Aarhus.'); const k = state.note.kind; state.note = null; if (c.handoff) c.handoff.runtime = state.lastRuntime;
+      if (k === 'answer') { answerAsk(c, text); } else { hist(c, `Asked for changes: ${text}`); continueConv(c, text); } break; }
+    case 'answer': answerAsk(c, c.ask.options[+el.dataset.opt]); break;
     case 'open-conv': if (c && c.handoff && c.handoff.conv) { state.activeConv = c.handoff.conv; state.ai = true; } if (ev) ev.preventDefault(); break;
     case 'switch-conv': state.activeConv = el.dataset.conv; break;
     case 'approve': case 'reject': c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); hist(c, a === 'approve' ? 'You approved a change in the conversation' : 'You rejected a change in the conversation'); scheduleFinish(c, 5000); break;
     case 'stop': if (c._finish) clearTimeout(c._finish); c.handoff.state = 'cancelled'; hist(c, 'Stopped'); break;
     case 'retry': c.handoff.runtime = state.lastRuntime; c.handoff.state = 'running'; c.handoff.startedAt = Date.now(); hist(c, `Given to ${RT_NAME(c.handoff.runtime)} again`); scheduleFinish(c, 7000); break;
     case 'open-board': state.scene = 'board'; state.boardTab = el.dataset.tab || state.boardTab; state.open = null; break;
-    case 'tab': state.boardTab = el.dataset.tab; break;
+    case 'tab': state.boardTab = el.dataset.tab; state.scene = 'board'; if (kind !== 'board' || el.classList.contains('tb-inlink')) state.open = null; if (ev) ev.preventDefault(); break;
     case 'toggle-sec': state.sections[el.dataset.sec] = !state.sections[el.dataset.sec]; break;
     case 'add-idea-side': state.scene = 'board'; state.boardTab = 'ideas'; break;
     case 'add-col': state.addCol = state.addCol === el.dataset.stage ? null : el.dataset.stage; break;
@@ -2425,7 +2464,8 @@ function act(el, kind, ev) {
     case 'toast': toast(el.dataset.msg); break;
     default: return;
   }
-  if (a !== 'menu' && a !== 'agent-menu' && a !== 'sub') { if (state.menu && a !== 'mi') state.menu = null; }
+  if (a !== 'menu' && a !== 'agent-menu' && a !== 'sub' && a !== 'wip-menu') { if (state.menu && a !== 'mi') state.menu = null; }
+  fillSlots();
   render();
 }
 const IDEA_REVIEWS = {
@@ -2441,6 +2481,7 @@ function moveCard(c, stage, top = true) {
   c.stage = stage; c.rank = top ? (list.length ? list[0].rank - 1 : 1) : (list.length ? list[list.length - 1].rank + 1 : 1);
   if (stage === 'done') { c.doneDay = 'Today'; c.doneTime = now(); hist(c, 'Marked done'); if (c.handoff) c.handoff.state = 'closed'; }
   else hist(c, `Moved to ${STAGE_NAME[stage]}`);
+  if (stage === 'doing' && state.wip && doingCount() > state.wip) toast(`Doing is over its limit now: ${doingCount()} of ${state.wip}.`);
 }
 function addCard(title, stage) {
   if (!title.trim()) return;
@@ -2491,7 +2532,7 @@ function wire(f, kind) {
     if (stage !== c.stage) { moveCard(c, stage); }
     const list = byStage(stage).filter((x) => x !== c); const idx = beforeEl ? list.findIndex((x) => x.id === beforeEl.dataset.drag) : list.length;
     if (!present(c).busy || stage === 'doing') { const prev = list[idx - 1], next = list[idx]; c.rank = prev && next ? (prev.rank + next.rank) / 2 : prev ? prev.rank + 1 : next ? next.rank - 1 : 1; }
-    render(); });
+    fillSlots(); render(); });
 }
 function showTip(doc, t) {
   const label = t.dataset.tip; if (!label) return;
@@ -2533,7 +2574,7 @@ document.getElementById('controls').addEventListener('click', (e) => {
     render(); return;
   }
   const k = b.dataset.ctl;
-  if (k === 'reset') { for (const t of timers) clearTimeout(t); timers.clear(); Object.assign(state, { db: seed(), convs: JSON.parse(JSON.stringify(CONVS0)), activeConv: 'c0', open: null, menu: null, note: null, confirm: null, addCol: null, toast: null, quick: false, data: 'full', boardTab: 'board' }); render(); }
+  if (k === 'reset') { for (const t of timers) clearTimeout(t); timers.clear(); Object.assign(state, { wip: 3, slot: null, conflict: null, db: seed(), convs: JSON.parse(JSON.stringify(CONVS0)), activeConv: 'c0', open: null, menu: null, note: null, confirm: null, addCol: null, toast: null, quick: false, data: 'full', boardTab: 'board' }); render(); }
   if (k === 'finish') { for (const c of cards()) if (c.handoff && c.handoff.state === 'running') { if (c._finish) clearTimeout(c._finish); finish(c); } render(); }
   if (k === 'quickadd') { state.quick = true; render(); }
 });

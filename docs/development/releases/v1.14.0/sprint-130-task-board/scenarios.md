@@ -198,6 +198,16 @@ Then "Send the draft to Henrik" starts by itself with Claude, and its history sa
 When I press Start now instead
 Then it starts at once
 
+### S23b: Doing is full (proposed)
+Given the Doing limit is 3 and Doing holds 3 cards
+Then Doing's header reads "3/3 full" and the side bar says "Doing · 3/3"
+When I press Give to Claude on a To do card
+Then nothing starts; the card says "Doing is full: 3 of 3" and offers Queue it, Start anyway and ×
+When I press Queue it and then mark another Doing card done
+Then the queued card starts by itself with Claude, and its history says why
+When I set the limit to "No limit" from the Doing header
+Then queued cards start at once
+
 ### S24: Card on another computer
 Given a card with a result, copied to another computer
 Then it shows the result and history, no Open conversation, and Give to agent starts a new conversation there
