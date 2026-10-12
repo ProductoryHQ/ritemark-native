@@ -469,9 +469,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
-  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too — only the
-  // on-device engine is macOS-only, and the registry says so rather than the
-  // whole view disappearing). Jobs live in the subsystem, not the view, so a
+  // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the
+  // on-device engine can't run, the registry says so rather than the whole view
+  // disappearing (Sprint 129: it runs on Windows and Intel Macs as well). Jobs live in the subsystem, not the view, so a
   // running transcription survives the panel being closed.
   if (isEnabled('transcription-workbench')) {
     const { createSpeechSubsystem } = require('./speech') as typeof import('./speech');

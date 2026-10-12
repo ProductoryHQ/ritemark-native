@@ -245,7 +245,8 @@ export async function transcribeWav(
 
   // Write WAV to temp file
   const tempDir = os.tmpdir();
-  const tempFile = path.join(tempDir, `ritemark-audio-${Date.now()}.wav`);
+  // Unique per call: two editor tabs can dictate at the same moment.
+  const tempFile = path.join(tempDir, `ritemark-audio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.wav`);
 
   try {
     fs.writeFileSync(tempFile, wavBuffer);
@@ -296,7 +297,8 @@ export async function transcribeWav(
         });
       });
 
-      whisperProc.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+      // 'close', not 'exit': stdout is fully read only once the streams close.
+      whisperProc.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
         clearTimeout(timer);
         if (code === 0) {
           resolve({ text: parseDictationStdout(stdout), success: true });

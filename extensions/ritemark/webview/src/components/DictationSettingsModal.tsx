@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Icon } from './ui/Icon'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DictationMode } from './dictationProblems'
+import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
 import {
   Dialog,
   DialogContent,
@@ -170,21 +172,28 @@ export function DictationSettingsModal({ isOpen, onClose, mode = 'live' }: Dicta
                 </div>
               </div>
               {modelStatus?.downloaded && !showConfirmRemove && (
-                <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-[var(--r-hairline-strong)] rounded-md text-xs text-[var(--r-error,#ef4444)] cursor-pointer transition-colors hover:bg-[rgba(239,68,68,0.1)] hover:border-[var(--r-error,#ef4444)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleRemoveClick}
-                  disabled={isRemoving || modelStatus.isDictationActive}
-                  title={modelStatus.isDictationActive ? 'Stop dictation first' : 'Remove model'}
-                >
-                  <Icon name="trash" size={14} />
-                  {isRemoving ? 'Removing...' : modelStatus.isDictationActive ? 'In use' : 'Remove'}
-                </button>
+                <Tooltip label={modelStatus.isDictationActive ? 'Stop dictation first, then remove the model' : 'Delete the speech model to free the space. Dictation offers the download again next time.'}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[var(--r-error,#ef4444)] hover:text-[var(--r-error,#ef4444)] hover:border-[var(--r-error,#ef4444)]"
+                    onClick={handleRemoveClick}
+                    disabled={isRemoving || modelStatus.isDictationActive}
+                  >
+                    <Icon name="trash" size={14} />
+                    {isRemoving ? 'Removing...' : modelStatus.isDictationActive ? 'In use' : 'Remove'}
+                  </Button>
+                </Tooltip>
               )}
               {showConfirmRemove && (
                 <div className="flex items-center gap-2 text-xs text-[var(--r-ink-strong)]">
                   <span>Delete?</span>
-                  <button className="px-2.5 py-1 rounded bg-[var(--r-error,#ef4444)] text-white text-xs border-none cursor-pointer hover:opacity-90" onClick={handleConfirmRemove}>Yes</button>
-                  <button className="px-2.5 py-1 rounded bg-transparent text-[var(--r-ink-strong)] text-xs border border-[var(--r-hairline-strong)] cursor-pointer hover:bg-[var(--r-surface-soft)]" onClick={handleCancelRemove}>No</button>
+                  <Tooltip label="Delete the speech model now">
+                    <Button variant="destructive" size="sm" onClick={handleConfirmRemove}>Yes</Button>
+                  </Tooltip>
+                  <Tooltip label="Keep the speech model">
+                    <Button variant="outline" size="sm" onClick={handleCancelRemove}>No</Button>
+                  </Tooltip>
                 </div>
               )}
             </div>

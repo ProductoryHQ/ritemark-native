@@ -147,7 +147,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private readonly documentSync: DocumentSyncCoordinator;
 
   // Voice dictation controller
-  private dictationController: DictationController | null = null;
+  // One per editor webview: each tab dictates into its own document (Sprint 129).
+  private readonly dictationControllers = new Map<vscode.Webview, DictationController>();
 
   public static register(
     context: vscode.ExtensionContext,
@@ -865,23 +866,25 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'dictation:start':
             // Start voice dictation
-            if (!this.dictationController) {
-              this.dictationController = new DictationController(webview, this.context);
+            {
+              let controller = this.dictationControllers.get(webview);
+              if (!controller) {
+                controller = new DictationController(webview, this.context);
+                this.dictationControllers.set(webview, controller);
+              }
+              controller.startDictation(message.language as string || 'en');
             }
-            this.dictationController.startDictation(message.language as string || 'en');
             return;
 
           case 'dictation:audioChunk':
             // Handle incoming audio chunk (base64 WAV)
-            if (this.dictationController) {
-              this.dictationController.handleAudioChunk(message.audio as string);
-            }
+            void this.dictationControllers.get(webview)?.handleAudioChunk(message.audio as string);
             return;
 
           case 'dictation:stop':
             // Stop voice dictation and get transcription
-            if (this.dictationController) {
-              this.dictationController.stopDictation();
+            if (this.dictationControllers.has(webview)) {
+              void this.dictationControllers.get(webview)!.stopDictation();
             } else {
               // Nothing started here: answer anyway, so the button never waits.
               webview.postMessage({ type: 'dictation:status', status: 'idle' });
@@ -1055,6 +1058,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       }
       imageWatcher.dispose();
       this.documentSync.disposeView(document, webview);
+      this.dictationControllers.get(webview)?.cleanup();
+      this.dictationControllers.delete(webview);
 
       RitemarkEditorProvider._wordCounts.delete(webviewPanel);
       if (RitemarkEditorProvider._activeMarkdownPanel === webviewPanel) {
@@ -1626,7 +1631,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       }
 
       // Check if dictation is currently active
-      const isDictationActive = this.dictationController?.isActive() ?? false;
+      const isDictationActive = [...this.dictationControllers.values()].some(controller => controller.isActive());
 
       webview.postMessage({
         type: 'dictation:modelStatus',
@@ -1660,19 +1665,24 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
    */
   private async removeModel(webview: vscode.Webview): Promise<void> {
     try {
-      const { getModelPath, withFileRetry } = await import('./voiceDictation/whisperCpp');
-      const modelPath = getModelPath();
+      const { AVAILABLE_MODELS, getModelPath, withFileRetry } = await import('./voiceDictation/whisperCpp');
 
-      if (fs.existsSync(modelPath)) {
-        // Windows refuses to delete a file another process (antivirus) holds
-        await withFileRetry(() => fs.unlinkSync(modelPath));
-        vscode.window.showInformationMessage('Voice model removed successfully.');
+      // Every speech model Ritemark downloads, not only this computer's
+      // default: an Intel Mac that downloaded the 1.5 GB model before R13
+      // would otherwise keep it forever, out of sight (Sprint 129).
+      let removed = false;
+      for (const name of Object.keys(AVAILABLE_MODELS)) {
+        const modelPath = getModelPath(name);
+        for (const file of [modelPath, modelPath + '.partial']) {
+          if (fs.existsSync(file)) {
+            // Windows refuses to delete a file another process (antivirus) holds
+            await withFileRetry(() => fs.unlinkSync(file));
+            removed ||= file === modelPath;
+          }
+        }
       }
-
-      // Also remove partial download if exists
-      const partialPath = modelPath + '.partial';
-      if (fs.existsSync(partialPath)) {
-        await withFileRetry(() => fs.unlinkSync(partialPath));
+      if (removed) {
+        vscode.window.showInformationMessage('Voice model removed successfully.');
       }
 
       webview.postMessage({

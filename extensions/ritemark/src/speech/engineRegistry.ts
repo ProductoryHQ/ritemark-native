@@ -3,8 +3,8 @@
  *
  * Mirrors `runtime/RuntimeRegistry` in spirit: register concrete engines once,
  * then ask which are usable *here*. Platform filtering lives here so the UI
- * never has to special-case Windows — it renders whatever the registry reports,
- * including the honest "not available on Windows yet" state.
+ * never has to special-case a platform — it renders whatever the registry reports,
+ * including the honest state of an engine that can't run on this computer.
  */
 
 import { getCurrentPlatform } from '../utils/platform';

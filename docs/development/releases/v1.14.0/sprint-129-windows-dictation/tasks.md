@@ -59,9 +59,9 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 
 ## Phase 4: Validation on macOS (scenarios marked **M** and **U** in [scenarios.md](./scenarios.md))
 
-- [ ] `npm test`, script tests, TypeScript compile, `./scripts/validate-qa.sh`.
+- [x] `npm test`, script tests, TypeScript compile, `./scripts/validate-qa.sh`. *(2026-10-12, qa-validator run on `4aa74cb8`: all green)*
 - [x] RunDev on Apple silicon: dictation (injected speech through the webview bridge, Stop mid-transcription), Transcribe on-device, microphone-denied dialog and every host problem state, with screenshots checked → [qa-evidence.md](./qa-evidence.md). *(Estonian dictation by voice is left for Jarmo's checks; Estonian accuracy is in research/asr-candidates-audit.md)*
-- [ ] `qa-validator` review.
+- [ ] `qa-validator` review. *(First run 2026-10-12: BLOCK on B1 (a throwing transcription hung the button) and B2 (one controller shared by all tabs); both fixed with tests and a two-tab check, see qa-evidence.md. Re-review pending)*
 
 ## Phase 5: Windows branch test (W8 stage B — R1–R9; scenarios marked **B** in [scenarios.md](./scenarios.md))
 

@@ -229,22 +229,24 @@ export class DictationController {
    */
   async stopDictation(): Promise<void> {
     this.isRecording = false;
-    if (this.draining || this.pendingBytes > 0) {
-      // The webview shows that text is still on its way (R8/R12).
+    try {
+      if (this.draining || this.pendingBytes > 0) {
+        // The webview shows that text is still on its way (R8/R12).
+        this.webview.postMessage({
+          type: 'dictation:status',
+          status: 'finishing',
+          waitSeconds: this.deps.mode === 'deferred' ? this.estimateWaitSeconds() : undefined,
+        });
+        await this.ensureDraining();
+      }
+      this.flushHeld();
+    } finally {
+      // Always answered, so the webview's button never waits for good.
       this.webview.postMessage({
         type: 'dictation:status',
-        status: 'finishing',
-        waitSeconds: this.deps.mode === 'deferred' ? this.estimateWaitSeconds() : undefined,
+        status: 'idle'
       });
-      await this.ensureDraining();
     }
-    this.flushHeld();
-
-    // Always answered, so the webview never waits on a stop that had nothing to do.
-    this.webview.postMessage({
-      type: 'dictation:status',
-      status: 'idle'
-    });
   }
 
   /**
@@ -319,13 +321,25 @@ export class DictationController {
       }
 
       const started = this.deps.now();
-      const result = await this.deps.transcribe(buildPcmWav(pcm), {
-        binaryPath: this.deps.binaryPath(),
-        modelPath,
-        language: this.language,
-      });
-      this.lastCallMs = this.deps.now() - started;
-      this.deps.rememberCallMs(this.lastCallMs);
+      let result: TranscriptionResult;
+      try {
+        result = await this.deps.transcribe(buildPcmWav(pcm), {
+          binaryPath: this.deps.binaryPath(),
+          modelPath,
+          language: this.language,
+        });
+      } catch (error) {
+        // The temp file could not be written (full disk), or the process
+        // could not be started: stop with a reason, never hang (QA B1).
+        console.error('[DictationController] Transcription threw:', error);
+        this.fail('engine-failed');
+        return;
+      }
+      if (result.success) {
+        // Only real calls feed the wait estimate; a quick failure would skew it.
+        this.lastCallMs = this.deps.now() - started;
+        this.deps.rememberCallMs(this.lastCallMs);
+      }
 
       if (!result.success) {
         console.error('[DictationController] Transcription error:', result.error);

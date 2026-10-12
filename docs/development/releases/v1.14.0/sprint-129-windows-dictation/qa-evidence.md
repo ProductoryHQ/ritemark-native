@@ -39,3 +39,23 @@
 The first deferred run used Estonian on English audio, so its last piece came out as "Kõige, kõige." (visible in the "done" screenshot); a second run in English was clean. Both runs show the expected piece-boundary effect: a word pair cut at 28 s ("your country | can do for you"). This is the boundary loss measured in the performance audit; cutting at pauses is the follow-up for it.
 
 **Not covered here:** the start-up cancel (model already present, so the "preparing" window was too short to click into; covered by code reading); the "Still processing" line (needs a slow computer; unit-tested copy); tooltips by hover (CDP hover did not open the Radix tooltips; their text is unit-tested in `dictationProblems.test.ts`); Windows (branch test).
+
+## qa-validator review and fixes (2026-10-12)
+
+The first `qa-validator` review (HEAD `4aa74cb8`) returned **BLOCK** with two defects. Both are fixed:
+
+- **B1: a transcription that throws left the button disabled forever.** A full disk, or a process that can't start, made `drain()` reject. Stop then never posted `idle`, and the button stayed in "finishing". Now the call is wrapped: dictation stops with **Dictation Stopped**, and Stop posts `idle` in a `finally`. `controller.test.ts` covers both modes with a transcriber that throws ENOSPC.
+- **B2: one dictation controller was shared by every editor tab.** After dictating in tab A, tab B's text and status went to tab A, so tab B's button never left "finishing". There is now one controller per webview, removed when its tab closes.
+  - Checked on the Mac dev instance: dictate in `Dictation test.md`, then in `Second.md`. Each tab got its own `listening → finishing → idle`, and its button came back. Each file on disk holds its own dictated text, and tab A received nothing from tab B.
+
+Also fixed from the review:
+- Failed calls no longer feed the wait estimate.
+- whisper's output is read on `close`, not `exit`.
+- Temp file names are unique per call.
+- **Remove** clears every speech model Ritemark downloads, so an Intel Mac's old 1.5 GB file doesn't stay behind.
+- The settings dialog's Remove and Yes/No are shadcn `Button`s with tooltips.
+- Two stale "macOS-only" comments were corrected.
+
+**Test-setup note:** a dev window covered by other windows reports `visibilityState: hidden` and stops rendering. Its editors then can't confirm a document update in time: `apply-error`, a **Retry document update** button, and edits that aren't saved. That is the known occlusion effect, not a product defect. Launch with `--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling`, placed after the folder argument (`code.sh` would otherwise take the folder as a flag's value). Audio also needs one real mouse click into the webview first.
+
+**Since fixed on main:** the "multiple default editors" note for `.wav` files seen above is fixed by #412.

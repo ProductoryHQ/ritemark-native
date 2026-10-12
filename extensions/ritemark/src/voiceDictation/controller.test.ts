@@ -342,6 +342,43 @@ async function run(): Promise<void> {
     assert.deepEqual(h.texts(), ['jõudsin öelda']);
   }
 
+  // QA B1: a transcriber that throws (a full disk, a process that can't start)
+  // stops dictation with a reason, and Stop still answers idle.
+  for (const mode of ['live', 'deferred'] as const) {
+    const messages: Array<Record<string, unknown>> = [];
+    const controller = new DictationController(
+      { postMessage: async (message: unknown) => { messages.push(message as Record<string, unknown>); return true; } },
+      { extensionPath: '/nowhere' },
+      {
+        binaryPath: () => '/nowhere/whisper-cli', modelPath: () => '/nowhere/model.bin', modelExists: () => true,
+        notify: () => undefined, mode, recallCallMs: () => undefined, rememberCallMs: () => undefined, now: () => 0,
+        transcribe: async () => { throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' }); },
+      },
+    );
+    controller.startDictation('et');
+    await controller.handleAudioChunk(chunk(mode === 'deferred' ? 30 : 5, 1));
+    await controller.stopDictation();
+    assert.deepEqual(messages.filter(m => m.type === 'dictation:problem').map(m => m.problem), ['engine-failed'], `${mode}: the dialog explains`);
+    assert.equal(messages.at(-1)?.status, 'idle', `${mode}: Stop still answers idle`);
+    assert.equal(controller.isActive(), false);
+  }
+
+  // Failed calls do not feed the wait estimate.
+  {
+    const h = harness({ mode: 'deferred', callMs: 500, recallCallMs: 21_000 });
+    h.controller.startDictation('et');
+    for (let i = 0; i < 6; i += 1) void h.controller.handleAudioChunk(chunk(5, 1)); // 30 s
+    await h.callStarted(1);
+    h.calls[0].finish({ success: false, text: '', error: 'exit 1' }); // a quick failure, no engine problem
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(h.remembered, [], 'a failed call is not remembered');
+    h.state.autoFinish = true;
+    void h.controller.handleAudioChunk(chunk(3, 2));
+    const stopped = h.controller.stopDictation();
+    assert.equal(h.messages.find(m => m.status === 'finishing')!.waitSeconds, 30, 'still the earlier 21 s, rounded');
+    await stopped;
+  }
+
   // R13: the model dialog names the size of the model this computer uses.
   {
     const h = harness({ modelExists: false, modelPath: '/nowhere/ggml-large-v3-turbo-q8_0.bin' });
