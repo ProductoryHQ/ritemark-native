@@ -185,7 +185,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
 | `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 API compatibility fixes |
 | `008-ritemark-windows-binary-strip.patch` | Strip debug symbols from Windows agent binaries |
-| `009-ritemark-browser-context-bridge.patch` | Bridges VS Code webview context to the integrated browser panel |
+| `009-ritemark-browser-context-bridge.patch` | Exposes the active browser tab's context to the extension host for AI chat, and pushes each navigation to the extension for Browser Recent (`ritemark.browser.didNavigate`, Sprint 131) |
 | `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
 | `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |
 | `012-ritemark-shell-watchdog.patch` | Quarantines a broken user-dir copy of `ritemark.ritemark` on activation failure and falls back to the bundled built-in |

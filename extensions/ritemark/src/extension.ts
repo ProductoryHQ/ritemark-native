@@ -50,9 +50,9 @@ import {
   openInIntegratedBrowser,
   openIntegratedBrowserUrlExternally,
   reloadIntegratedBrowser,
-  setBrowserHistoryStore,
 } from './browser/IntegratedBrowser';
 import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
+import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/browserNavigationRecorder';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
@@ -808,8 +808,10 @@ export function activate(context: vscode.ExtensionContext) {
   // layer so the text editor never opens in the first place.
 
   // Browser history store + Activity Bar panel (Indigo-Editorial webview).
+  // Sprint 131 (#195): patch 009 reports every navigation of a shown browser tab
+  // to DID_NAVIGATE_COMMAND; the recorder decides what counts as a visit.
   const browserHistoryStore = new BrowserHistoryStore(context.globalState);
-  setBrowserHistoryStore(browserHistoryStore);
+  const browserNavigationRecorder = new BrowserNavigationRecorder(browserHistoryStore);
   const browserPanelProvider = new BrowserPanelProvider(browserHistoryStore, context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -817,9 +819,12 @@ export function activate(context: vscode.ExtensionContext) {
       browserPanelProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     ),
+    vscode.commands.registerCommand(DID_NAVIGATE_COMMAND, (event: unknown) =>
+      browserNavigationRecorder.handle(event)
+    ),
     browserPanelProvider,
-    browserHistoryStore,
-    { dispose: () => setBrowserHistoryStore(undefined) }
+    browserNavigationRecorder,
+    browserHistoryStore
   );
 
   context.subscriptions.push(

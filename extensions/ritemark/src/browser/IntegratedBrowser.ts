@@ -1,17 +1,10 @@
 import * as vscode from 'vscode';
-import { BrowserHistoryStore } from './BrowserHistoryStore';
 
 const OPEN_BROWSER_COMMAND = 'workbench.action.browser.open';
 const GO_BACK_COMMAND = 'workbench.action.browser.goBack';
 const GO_FORWARD_COMMAND = 'workbench.action.browser.goForward';
 const RELOAD_COMMAND = 'workbench.action.browser.reload';
 const OPEN_EXTERNAL_COMMAND = 'workbench.action.browser.openExternal';
-
-let historyStore: BrowserHistoryStore | undefined;
-
-export function setBrowserHistoryStore(store: BrowserHistoryStore | undefined): void {
-  historyStore = store;
-}
 
 export function normalizeBrowserUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -32,8 +25,9 @@ export function normalizeBrowserUrl(raw: string): string {
 
 export async function openInIntegratedBrowser(target: string | vscode.Uri): Promise<void> {
   const url = typeof target === 'string' ? normalizeBrowserUrl(target) : target.toString();
+  // Browser Recent records the page when it loads, at the address it ends on
+  // (patch 009 → BrowserNavigationRecorder, Sprint 131), not here.
   await vscode.commands.executeCommand(OPEN_BROWSER_COMMAND, { url, openToSide: false });
-  void historyStore?.record(url);
 }
 
 export async function openEmptyBrowserTab(): Promise<void> {
