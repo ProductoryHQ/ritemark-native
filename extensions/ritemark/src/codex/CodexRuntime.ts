@@ -43,7 +43,7 @@ import {
 } from '../runtime/continuation';
 import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
-import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
+import { toolSetKey } from '../runtime/ritemarkTools';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -101,7 +101,6 @@ const CODEX_PLAN_TURN_REMINDER = [
   '- After calling request_user_input, wait for the answer instead of finishing the turn with the question in prose.',
 ].join('\n');
 
-const _browserToolsInjector = new BrowserToolsInjector();
 
 // Sprint 103 R1: prompt-text sniffing removed (decision D4) — plan-first is an
 // explicit UI choice carried on `turn.mode`; words like "plan mode" in a prompt
@@ -141,7 +140,7 @@ export type CodexSidebarStatus = {
  *
  * Everything that used to be a scalar on the adapter lives here. That is the
  * whole point of the class: with N conversations sharing one adapter, a scalar
- * `_threadId` / `_threadApprovalKey` / `_browserToolsEnabledForThread` meant
+ * `_threadId` / `_threadApprovalKey` / `_toolSetForThread` meant
  * chat B toggling browser control (or switching Auto↔Ask) nulled chat A's
  * thread id and silently destroyed A's entire context.
  */
@@ -156,11 +155,12 @@ export class CodexSession implements RuntimeSession {
   private readonly _turnStateWaiters = new Set<(turnId: string, state: 'started' | 'completed') => void>();
 
   /**
-   * Whether browser tools were wired into THIS conversation's thread, so a
-   * thread reset is triggered when its browser-control state changes between
-   * turns. Per-conversation since Sprint 99 (B1).
+   * The dynamic tools THIS conversation's thread has (`toolSetKey`; '' for
+   * none), so a thread reset is triggered when its tools change between turns
+   * (browser control turned on, a task board opened). Per-conversation since
+   * Sprint 99 (B1); the whole tool set since Sprint 130 (W5).
    */
-  private _browserToolsEnabledForThread = false;
+  private _toolSetForThread = '';
 
   /**
    * Approval policy + sandbox THIS conversation's thread was started with
@@ -195,8 +195,8 @@ export class CodexSession implements RuntimeSession {
     this._config = config;
   }
 
-  /** True when browser dynamic tools are wired into this conversation's thread. */
-  getBrowserToolsEnabled(): boolean { return this._browserToolsEnabledForThread; }
+  /** The key of the dynamic tools wired into this conversation's thread ('' for none). */
+  getToolSetForThread(): string { return this._toolSetForThread; }
 
   /** Drop this conversation's thread (e.g. after logout). Siblings keep theirs. */
   resetThread(): void {
@@ -228,16 +228,16 @@ export class CodexSession implements RuntimeSession {
       : (config.codexSandboxMode ?? 'workspace-write')) as 'read-only' | 'workspace-write' | 'danger-full-access';
     const approvalKey = `${approvalPolicy}:${sandbox}`;
 
-    // Reset THIS conversation's thread when its browser-tools state OR its
-    // approval policy/sandbox would change — both are fixed at threadStart, so a
-    // live thread must be recreated for a new unified approval mode (Auto↔Ask)
-    // to take effect. Sibling conversations are untouched.
-    const browserToolsNeeded = Boolean(config.onBrowserToolCall);
-    if (this._threadId && browserToolsNeeded !== this._browserToolsEnabledForThread) {
-      traceCodex('execution', 'resetting thread: browser-tools state changed', {
+    // Reset THIS conversation's thread when its dynamic tools OR its approval
+    // policy/sandbox would change — all are fixed at threadStart, so a live
+    // thread must be recreated for a new unified approval mode (Auto↔Ask) or a
+    // new tool set to take effect. Sibling conversations are untouched.
+    const dynamicTools = config.onDynamicToolCall && config.codexDynamicTools?.length ? config.codexDynamicTools : undefined;
+    const toolSet = toolSetKey(dynamicTools);
+    if (this._threadId && toolSet !== this._toolSetForThread) {
+      traceCodex('execution', 'resetting thread: dynamic tools changed', {
         conversationId: this.conversationId,
-        was: this._browserToolsEnabledForThread,
-        now: browserToolsNeeded,
+        tools: dynamicTools?.length ?? 0,
       });
       this._clearThread();
     }
@@ -258,7 +258,6 @@ export class CodexSession implements RuntimeSession {
     // native id falls through to a new thread; transcript fallback framing is
     // injected by the host coordinator, never by provider history replay.
     if (!this._threadId) {
-      const dynamicTools = _browserToolsInjector.getCodexDynamicTools(browserToolsNeeded);
       const planDevInstructions = config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS;
       let result: { thread: { id: string }; reasoningEffort?: string | null } | null = null;
       if (continuation.kind === 'native') {
@@ -306,7 +305,9 @@ export class CodexSession implements RuntimeSession {
         ? providerDefault
         : turn.thinkingEffortDefault ?? null;
       this._runtime._bindThread(result.thread.id, this);
-      this._browserToolsEnabledForThread = Boolean(dynamicTools?.length);
+      // A resumed thread has the tools it started with; the continuation
+      // fingerprint includes the tool set, so it resumes only when they match.
+      this._toolSetForThread = toolSet;
       this._threadApprovalKey = approvalKey;
       const compatibility = config.continuation?.compatibility;
       if (compatibility) {
@@ -322,7 +323,7 @@ export class CodexSession implements RuntimeSession {
         conversationId: this.conversationId,
         approvalPolicy,
         sandbox,
-        browserTools: this._browserToolsEnabledForThread,
+        dynamicTools: dynamicTools?.length ?? 0,
       });
     }
 
@@ -584,8 +585,8 @@ export class CodexRuntime implements AgentRuntime {
   }
 
   /** Whether browser dynamic tools are wired into a conversation's thread. */
-  getBrowserToolsEnabled(conversationId: string): boolean {
-    return this._sessions.get(conversationId)?.getBrowserToolsEnabled() ?? false;
+  getToolSetForThread(conversationId: string): string {
+    return this._sessions.get(conversationId)?.getToolSetForThread() ?? '';
   }
 
   setLoginInProgress(v: boolean): void { this._loginInProgress = v; }
@@ -901,11 +902,11 @@ export class CodexRuntime implements AgentRuntime {
       }
     });
 
-    // Server-initiated requests (approvals + questions + browser tools).
+    // Server-initiated requests (approvals + questions + Ritemark's tools).
     this._appServer.on(
       'server-request',
       (request: { id: string | number; method: string; params: Record<string, unknown> }) => {
-        // Browser dynamic tool calls
+        // Ritemark's dynamic tools (browser, task board)
         if (request.method === 'item/tool/call') {
           const params = request.params as Record<string, unknown>;
           const config = this._sessionForThread(threadIdOf(params), 'item/tool/call')?.config;
@@ -916,10 +917,10 @@ export class CodexRuntime implements AgentRuntime {
           } else if (typeof params.arguments === 'string') {
             try { toolArgs = JSON.parse(params.arguments) as Record<string, unknown>; } catch { toolArgs = {}; }
           }
-          if (config?.onBrowserToolCall) {
-            void config.onBrowserToolCall(toolName, toolArgs, request.id).then(
+          if (config?.onDynamicToolCall) {
+            void config.onDynamicToolCall(toolName, toolArgs, request.id).then(
               (reply) => this._appServer?.sendToolCallResponse(request.id, reply.text, reply.success),
-              () => this._appServer?.sendToolCallResponse(request.id, `Browser tool error: ${toolName}`, false),
+              () => this._appServer?.sendToolCallResponse(request.id, `Tool error: ${toolName}`, false),
             );
           } else {
             this._appServer?.sendToolCallResponse(request.id, `Unknown dynamic tool: ${toolName}`, false);

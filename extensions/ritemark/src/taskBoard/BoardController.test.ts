@@ -199,6 +199,62 @@ async function main(): Promise<void> {
     assert.equal((await controller.snapshot()).doing.count, 4);
   }
 
+  // ── report_result and ask_user: what agents leave on a card (W5) ──────────
+  {
+    const { ledger, controller } = setup();
+    const id = await card(controller, 'Tighten the summary', 'doing');
+    const reported = await controller.reportResult(id, 'claude', {
+      summary: '  Cut the summary to   five sentences.  ',
+      check: ['The footnote', ' ', 'x'.repeat(400)],
+    });
+    assert.ok(reported.ok);
+    let view = (await controller.refresh()).cards.find((c) => c.id === id)!;
+    assert.equal(view.result?.summary, 'Cut the summary to five sentences.');
+    assert.equal(view.result?.by, 'claude');
+    assert.equal(view.result?.check.length, 2, 'empty items are dropped');
+    assert.ok(view.result!.check[1].length <= 160 && view.result!.check[1].endsWith('…'), 'a long item is clipped');
+    assert.equal(view.call, 'review', 'a result on a Doing card waits for review');
+    assert.equal(view.history.at(-1)?.what, 'Reported: Cut the summary to five sentences.');
+    assert.equal(view.history.at(-1)?.by, 'claude');
+
+    // During the card's own turn the ledger writes the history line at the end.
+    ledger.set(id, { state: 'running', runtimeId: 'claude-code', since: at(0), canOpen: true });
+    const before = view.history.length;
+    assert.ok((await controller.reportResult(id, 'claude', { summary: 'Second pass.' })).ok);
+    view = (await controller.refresh()).cards.find((c) => c.id === id)!;
+    assert.equal(view.history.length, before, 'no history line in the card\'s own turn');
+    assert.equal(view.result?.summary, 'Second pass.');
+
+    for (const [input, words] of [
+      [{ summary: '   ' }, 'The summary is empty'],
+      [{ summary: 'Done.', check: ['a', 'b', 'c', 'd'] }, 'at most 3'],
+    ] as const) {
+      const refused = await controller.reportResult(id, 'codex', input as { summary: string; check?: string[] });
+      assert.equal(refused.ok, false);
+      assert.ok(!refused.ok && refused.message.includes(words), words);
+    }
+    assert.equal((await controller.reportResult('zzz999', 'codex', { summary: 'x' })).ok, false, 'an unknown card is refused');
+
+    const plan = await card(controller, 'Plan the pilot');
+    const asked = await controller.askUser(plan, 'codex', { question: 'Which two hubs?', options: ['Poznań and Duisburg', ' Aarhus and Duisburg '] });
+    assert.ok(asked.ok);
+    const withAsk = (await controller.refresh()).cards.find((c) => c.id === plan)!;
+    assert.deepEqual(withAsk.ask?.options, ['Poznań and Duisburg', 'Aarhus and Duisburg']);
+    assert.equal(withAsk.call, 'decision');
+    assert.equal(withAsk.history.at(-1)?.what, 'Asked: Which two hubs?');
+    for (const [input, words] of [
+      [{ question: '', options: ['A', 'B'] }, 'empty'],
+      [{ question: 'Q?', options: ['Only one'] }, '2 to 4 options'],
+      [{ question: 'Q?', options: ['A', 'B', 'C', 'D', 'E'] }, '2 to 4 options'],
+      [{ question: 'Q?', options: ['A', 'x'.repeat(81)] }, 'at most 80'],
+      [{ question: 'x'.repeat(501), options: ['A', 'B'] }, 'at most 500'],
+    ] as const) {
+      const refused = await controller.askUser(plan, 'codex', input as { question: string; options: string[] });
+      assert.equal(refused.ok, false, words);
+      assert.ok(!refused.ok && refused.message.includes(words), `${words}: ${!refused.ok ? refused.message : ''}`);
+    }
+  }
+
   // ── Give to agent: availability, conflict guard, Doing limit ──────────────
   {
     const { ledger, controller, settings } = setup();

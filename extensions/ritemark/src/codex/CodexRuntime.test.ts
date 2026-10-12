@@ -60,6 +60,9 @@ const capturedTurnStarts: unknown[][] = [];
 /** Event listeners the runtime registered on the mock, so tests can fire them. */
 type Listener = (params: unknown) => void;
 
+const capturedThreadStarts: Array<Record<string, unknown>> = [];
+const toolResponses: Array<{ requestId: unknown; text: string; success: boolean }> = [];
+
 function makeMockAppServer(threadIds: string[] = ['thread-1']) {
   const listeners = new Map<string, Listener[]>();
   let threadSeq = 0;
@@ -74,8 +77,9 @@ function makeMockAppServer(threadIds: string[] = ['thread-1']) {
       listeners.set(event, list);
     },
     ensureInitialized: async () => { calls.push('ensureInitialized'); return {}; },
-    threadStart: async (_params: unknown, _conversationId?: string) => {
+    threadStart: async (params: unknown, _conversationId?: string) => {
       calls.push('threadStart');
+      capturedThreadStarts.push(params as Record<string, unknown>);
       const id = threadIds[Math.min(threadSeq++, threadIds.length - 1)];
       return { thread: { id }, model: 'gpt-5', reasoningEffort: 'medium' };
     },
@@ -97,9 +101,15 @@ function makeMockAppServer(threadIds: string[] = ['thread-1']) {
       calls.push('sendApprovalResponse');
     },
     sendToolRequestUserInputResponse: () => { calls.push('answerQuestion'); },
+    sendToolCallResponse: (requestId: unknown, text: string, success: boolean) => {
+      toolResponses.push({ requestId, text, success });
+    },
     dispose: () => { calls.push('appServerDispose'); },
   };
 }
+
+const TOOL_A = { name: 'ritemark_board_list_cards', description: 'List cards.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } };
+const TOOL_B = { name: 'ritemark_board_read_card', description: 'Read a card.', inputSchema: { type: 'object', properties: { card_id: { type: 'string' } }, required: ['card_id'], additionalProperties: false } };
 
 const dummyConfig: RuntimeSessionConfig = {
   workspacePath: '/tmp/test',
@@ -327,10 +337,10 @@ async function run() {
   }
 
   // ── Test 8: B1 REGRESSION — switching approval mode in one conversation must
-  // not reset another's thread. `_threadApprovalKey` and
-  // `_browserToolsEnabledForThread` were adapter scalars, so chat B switching
-  // Auto→Ask (or toggling browser control) nulled `_threadId` and silently
-  // destroyed chat A's entire thread context. Highest-severity bug in the sprint.
+  // not reset another's thread. `_threadApprovalKey` and the browser-tools
+  // state were adapter scalars, so chat B switching Auto→Ask (or toggling
+  // browser control) nulled `_threadId` and silently destroyed chat A's entire
+  // thread context. Highest-severity bug in the sprint.
   {
     const { runtime } = makeRuntime(['thread-a', 'thread-b', 'thread-b2']);
     const a = await openTurn(runtime, 'conv-a', { ...dummyConfig, codexApprovalPolicy: 'never' });
@@ -344,13 +354,52 @@ async function run() {
     assert.strictEqual(b.threadId, 'thread-b2', "B's own thread is recreated for the new approval mode");
     assert.strictEqual(a.threadId, 'thread-a', "A's thread MUST survive B's approval-mode switch");
 
-    // Same for a browser-control toggle in B.
-    b.applyConfig({ ...dummyConfig, codexApprovalPolicy: 'untrusted', onBrowserToolCall: async () => ({ text: '', success: true }) });
-    await b.prompt({ prompt: 'with browser' });
-    assert.strictEqual(a.threadId, 'thread-a', "A's thread MUST survive B's browser-control toggle");
-    assert.strictEqual(a.getBrowserToolsEnabled(), false, "A's browser-tools state is its own");
-    assert.strictEqual(b.getBrowserToolsEnabled(), true, "B's browser-tools state is its own");
-    console.log('✓ Test 8: B1 — a conversation switching approval/browser mode cannot reset a sibling');
+    // Same for a change of B's tools (browser control turned on, a board opened).
+    b.applyConfig({ ...dummyConfig, codexApprovalPolicy: 'untrusted', codexDynamicTools: [TOOL_A], onDynamicToolCall: async () => ({ text: '', success: true }) });
+    await b.prompt({ prompt: 'with tools' });
+    assert.strictEqual(a.threadId, 'thread-a', "A's thread MUST survive B's tool change");
+    assert.strictEqual(a.getToolSetForThread(), '', "A's tools are its own");
+    assert.notStrictEqual(b.getToolSetForThread(), '', "B's tools are its own");
+    console.log('✓ Test 8: B1 — a conversation switching approval mode or tools cannot reset a sibling');
+  }
+
+  // ── Test 8b: Sprint 130 W5 — Ritemark's dynamic tools: given at thread
+  // start, a call routed to onDynamicToolCall, and a new tool set starts a
+  // new thread (a thread keeps the tools it started with, P2).
+  {
+    const { runtime, mock } = makeRuntime(['thread-t1', 'thread-t2', 'thread-t3']);
+    capturedThreadStarts.length = 0;
+    toolResponses.length = 0;
+    const seen: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const onDynamicToolCall = async (name: string, args: Record<string, unknown>) => {
+      seen.push({ name, args });
+      return { text: `ran ${name}`, success: true };
+    };
+    const session = await openTurn(runtime, 'conv-t', { ...dummyConfig, codexDynamicTools: [TOOL_A], onDynamicToolCall });
+    assert.deepStrictEqual((capturedThreadStarts[0].dynamicTools as Array<{ name: string }>).map((tool) => tool.name), ['ritemark_board_list_cards']);
+    mock.emit('server-request', { id: 41, method: 'item/tool/call', params: { threadId: 'thread-t1', tool: 'ritemark_board_list_cards', arguments: { stage: 'todo' } } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepStrictEqual(seen, [{ name: 'ritemark_board_list_cards', args: { stage: 'todo' } }]);
+    assert.deepStrictEqual(toolResponses, [{ requestId: 41, text: 'ran ritemark_board_list_cards', success: true }]);
+
+    // The same tools keep the thread; another tool set starts a new one.
+    session.applyConfig({ ...dummyConfig, codexDynamicTools: [TOOL_A], onDynamicToolCall });
+    await session.prompt({ prompt: 'same tools' });
+    assert.strictEqual(session.threadId, 'thread-t1');
+    session.applyConfig({ ...dummyConfig, codexDynamicTools: [TOOL_A, TOOL_B], onDynamicToolCall });
+    await session.prompt({ prompt: 'more tools' });
+    assert.strictEqual(session.threadId, 'thread-t2', 'a new tool set starts a new thread');
+    assert.strictEqual((capturedThreadStarts[1].dynamicTools as unknown[]).length, 2);
+
+    // Without the hook no tools are given, and a call is refused.
+    session.applyConfig({ ...dummyConfig });
+    await session.prompt({ prompt: 'no tools' });
+    assert.strictEqual(session.threadId, 'thread-t3');
+    assert.strictEqual(capturedThreadStarts[2].dynamicTools, undefined);
+    toolResponses.length = 0;
+    mock.emit('server-request', { id: 42, method: 'item/tool/call', params: { threadId: 'thread-t3', tool: 'ritemark_board_list_cards', arguments: {} } });
+    assert.deepStrictEqual(toolResponses, [{ requestId: 42, text: 'Unknown dynamic tool: ritemark_board_list_cards', success: false }]);
+    console.log('✓ Test 8b: W5 — dynamic tools at thread start, calls routed, a new tool set starts a new thread');
   }
 
   // ── Test 9: B4 — the app-server exiting fans out to EVERY conversation ──

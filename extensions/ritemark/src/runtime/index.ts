@@ -23,4 +23,4 @@ export {
 export { RuntimeRegistry } from './RuntimeRegistry';
 export { createRuntime } from './runtimeFactory';
 export { UnifiedApprovalGate, type ApprovalResult } from './UnifiedApprovalGate';
-export { BrowserToolsInjector } from './BrowserToolsInjector';
+export { RitemarkToolsInjector } from './RitemarkToolsInjector';

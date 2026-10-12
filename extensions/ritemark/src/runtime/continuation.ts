@@ -171,6 +171,13 @@ export interface RuntimeCompatibilityFingerprintInput {
   approvalPolicy: string | null;
   /** API/BYOK value, stable account identity, or a provider-managed marker. */
   authBinding: string;
+  /**
+   * Codex: the key of the thread's dynamic tools (`toolSetKey`). A Codex thread
+   * keeps the tools it started with and `thread/resume` cannot add any (Sprint
+   * 130, Phase 0 P2), so a thread resumes only when they match. Absent for the
+   * other runtimes, whose fingerprints stay what they were.
+   */
+  toolSet?: string;
 }
 
 /**
@@ -191,6 +198,7 @@ export function createRuntimeCompatibilityFingerprint(
     input.sandboxMode,
     input.approvalPolicy,
     input.authBinding,
+    ...(input.toolSet !== undefined ? [input.toolSet] : []),
   ]);
   return createHmac('sha256', hostSecret).update(canonical).digest('hex');
 }

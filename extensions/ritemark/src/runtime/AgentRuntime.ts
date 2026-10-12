@@ -11,6 +11,7 @@ import type {
   ThinkingEffortCapability,
 } from './thinkingEffort';
 import type { RuntimeFailureKind } from './runtimeErrorPresentation';
+import type { DynamicToolDefinition } from '../codex/codexProtocol';
 
 export type { AgentId };
 export type {
@@ -179,8 +180,14 @@ export interface RuntimeSessionConfig {
   onExit?: () => void;
   /** Called with slow-RPC progress (thread/start etc.) to show UI feedback */
   onRpcProgress?: (method: string, message: string) => void;
-  /** Called when Codex requests a browser tool call (dynamic tools) */
-  onBrowserToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean }>;
+  /**
+   * Codex dynamic tools for a new thread: Ritemark's tool groups (browser, task
+   * board; Sprint 130 W5). Fixed when the thread starts, so a turn whose tools
+   * differ starts a fresh thread.
+   */
+  codexDynamicTools?: DynamicToolDefinition[];
+  /** Called when Codex calls one of `codexDynamicTools`. */
+  onDynamicToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean }>;
 }
 
 export interface RuntimeTurnConfig {

@@ -42,7 +42,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AcpRuntime, AcpSession, buildAcpPromptText } = require('./AcpRuntime') as typeof import('./AcpRuntime');
+const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission } = require('./AcpRuntime') as typeof import('./AcpRuntime');
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
 type AcpSession = import('./AcpRuntime').AcpSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -353,6 +353,43 @@ async function run() {
     console.log('✓ Test 6d: every live-advertised ACP effort is forwarded unchanged');
   }
 
+  // ── Test 6e: Sprint 130 (P3) — board tools never ask, in any mode; a
+  // doom_loop on a board tool neither. Edits and other tools still ask.
+  {
+    const runtime = new AcpRuntime();
+    const asked: string[] = [];
+    const session = addSession(runtime, 'conv-board', {
+      ...dummyConfig,
+      approvalMode: 'ask',
+      onApprovalRequest: (req) => {
+        asked.push(req.kind === 'shell-command' ? req.command : req.kind);
+        runtime.getSession('conv-board')?.respondToApproval(req.requestId, false, false);
+      },
+    });
+    const permission = (toolCall: Record<string, unknown>) => ({
+      sessionId: session.acpSessionId,
+      toolCall: { toolCallId: 'tc', status: 'pending', ...toolCall },
+      options: [
+        { optionId: 'once', kind: 'allow_once', name: 'Allow once' },
+        { optionId: 'no', kind: 'reject_once', name: 'Reject' },
+      ],
+    } as unknown as RequestPermissionRequest);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handle = (params: RequestPermissionRequest) => (runtime as any)._handlePermission(params) as Promise<{ outcome: { outcome: string; optionId?: string } }>;
+
+    const board = await handle(permission({ title: 'ritemark_board_report_result', kind: 'other' }));
+    assert.deepStrictEqual(board.outcome, { outcome: 'selected', optionId: 'once' }, 'a board tool is allowed without asking');
+    const loop = await handle(permission({ title: 'doom_loop', kind: 'other', rawInput: { tool: 'ritemark_board_list_cards' } }));
+    assert.deepStrictEqual(loop.outcome, { outcome: 'selected', optionId: 'once' }, 'a doom_loop on a board tool is allowed');
+    assert.deepStrictEqual(asked, [], 'nothing was asked');
+
+    await handle(permission({ title: 'doom_loop', kind: 'other', rawInput: { tool: 'bash' } }));
+    await handle(permission({ title: 'ritemark_browser_browser_click', kind: 'other' }));
+    assert.deepStrictEqual(asked, ['doom_loop', 'ritemark_browser_browser_click'], 'other tools still ask in Ask mode');
+    assert.equal(isBoardToolPermission(permission({ title: 'ritemark_boarding_pass' })), false, 'the prefix includes the underscore');
+    console.log('✓ Test 6e: P3 — board tools and their doom_loop never ask; other tools still do');
+  }
+
   // ── Test 7: C1 REGRESSION — two sessions must not share write-approval state.
   // Before Sprint 99 `_recentlyPermissionedWrites` was a process-wide
   // Set<filePath> on the runtime: chat A approving a write to foo.md silently
@@ -508,7 +545,7 @@ async function run() {
   // OpenCode the browser tools whenever `browser-agent-control` is on.
   {
     const runtime = new AcpRuntime();
-    const context = renderCapabilityContext(capabilityDescriptorFor('opencode', true));
+    const context = renderCapabilityContext(capabilityDescriptorFor('opencode', { browser: true, board: true }));
     const session = addSession(runtime, 'conv-once', { ...dummyConfig, extraSystemPrompt: context });
     const sent: string[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

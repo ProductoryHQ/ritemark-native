@@ -56,8 +56,6 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
-import { BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
-import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
@@ -67,7 +65,8 @@ import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
-import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
+import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
+import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
@@ -135,7 +134,7 @@ import {
   type ChatLocalTarget,
 } from './chatLinkTargets';
 
-const _browserToolsInjector = new BrowserToolsInjector();
+const _toolsInjector = new RitemarkToolsInjector();
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -748,6 +747,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             && capabilitiesFor(agentId as import('../agent/types').AgentId).planFirst;
           const codexTurnMode: 'plan' | 'execute' = planFirst ? 'plan' : 'execute';
           const browserEnabled = isEnabled('browser-agent-control');
+          // Ritemark's own tools this turn (Sprint 130, W5): the browser with its
+          // flag, the task board whenever this window has one. OpenCode gets the
+          // same groups through its adapter, fixed for its process.
+          const toolGroups = toolGroupsFor({ browser: browserEnabled });
+          const codexDynamicTools = isCodex ? _toolsInjector.codexDynamicTools(toolGroups) : undefined;
 
           // ── Per-turn context injection (parity with the pre-Sprint-79 handlers;
           //    Sprint 79 unifies the plumbing, NOT the behavior — see architecture.md) ──
@@ -792,10 +796,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ? { path: commentTaskSourcePath }
               : this._getActiveFileContext();
 
-          // Browser MCP server for Claude Code (in-process server)
+          // Ritemark's tools for Claude Code: one in-process MCP server per group.
           let mcpServers: Record<string, unknown> | undefined;
-          if (isClaudeCode && browserEnabled) {
-            mcpServers = await _browserToolsInjector.getMcpServers(true);
+          if (isClaudeCode) {
+            mcpServers = await _toolsInjector.claudeMcpServers(toolGroups);
           }
 
           const byokKeys = await this._readByokKeys();
@@ -894,6 +898,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   sandboxMode: codexSandboxMode ?? null,
                   approvalPolicy: codexApprovalPolicy ?? null,
                   authBinding,
+                  // A Codex thread resumes only with the tools it started with (P2).
+                  ...(isCodex && codexDynamicTools ? { toolSet: toolSetKey(codexDynamicTools) } : {}),
                 },
               ),
             };
@@ -1017,11 +1023,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             // runtime its browser tools (Claude: in-process MCP server, Codex:
             // dynamic tools, OpenCode: the MCP adapter AcpRuntime attaches).
             extraSystemPrompt: renderCapabilityContext(
-              capabilityDescriptorFor(agentId as AgentId, browserEnabled),
+              capabilityDescriptorFor(agentId as AgentId, { browser: browserEnabled, board: boardToolsAvailable() }),
             ),
             mcpServers,
-            allowedTools: isClaudeCode && browserEnabled
-              ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]
+            allowedTools: isClaudeCode && toolGroups.length
+              ? [...DEFAULT_TOOLS, ..._toolsInjector.claudeAllowedTools(toolGroups)]
               : undefined,
             live: isClaudeCode
               ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled)
@@ -1223,16 +1229,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (!isCurrentRuntimeTurn()) return;
               this._view?.webview.postMessage({ type: 'codex-rpc-progress', conversationId, method: _method, message: msg });
             },
-            // Codex dynamic browser tools (dispatched in extension host, results sent back to Codex)
-            onBrowserToolCall: (agentId === 'codex' && browserEnabled)
+            // Codex dynamic tools: Ritemark's tool groups, run in the extension
+            // host, results sent back to Codex.
+            codexDynamicTools,
+            onDynamicToolCall: codexDynamicTools
               ? async (toolName, args, _requestId) => {
                 if (!isCurrentRuntimeTurn()) {
                   return { text: 'This agent handoff is no longer active.', success: false };
                 }
-                if (isCodexBrowserToolCall(toolName)) {
-                  return dispatchCodexBrowserToolCall(toolName, args);
-                }
-                return { text: `Unknown browser tool: ${toolName}`, success: false };
+                return _toolsInjector.codexToolCall(toolGroups, toolName, args);
               }
               : undefined,
           };

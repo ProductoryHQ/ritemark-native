@@ -75,14 +75,14 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 5: Agent tools (W5, R8)
 
-- [ ] T5.1 `src/runtime/ritemarkTools.ts`: registry types; browser group moved onto it with names unchanged
-- [ ] T5.2 `BrowserToolsInjector` → `RitemarkToolsInjector` (Claude servers + allow names, Codex dynamic tools + router + thread-reset key, OpenCode descriptors)
-- [ ] T5.3 Generic OpenCode adapter (same output path) + IPC `{op, group, tool, params}`; `AcpRuntime` dispatch by group
-- [ ] T5.4 `CodexRuntime`: `onDynamicToolCall`; `AgentRuntime.ts` callback renamed; `UnifiedViewProvider` wiring; tool-set hash in the continuation fingerprint and `:309` records the thread's real tools (P2)
-- [ ] T5.4a `AcpRuntime._handlePermission`: allow `ritemark_board_*` titles and a `doom_loop` on a board tool (P3); test
-- [ ] T5.5 Board group: seven tools on `BoardController`; `done_when` on add/update, `check` on report_result
-- [ ] T5.6 `capabilityContext.ts`: `hasBoardTools` + TASK BOARD section (report with Check these, ask decisions before long work, work toward Done when); version bump
-- [ ] T5.7 Tests: `ritemarkTools.test.ts`, updated `capabilityContext`, `CodexRuntime`, `AcpRuntime` tests; old `BrowserToolsInjector.test.ts` assertions carried over
+- [x] T5.1 `src/runtime/ritemarkTools.ts`: registry types; browser group moved onto it with names unchanged (the generated schemas equal the old adapter's, tested)
+- [x] T5.2 `BrowserToolsInjector` → `RitemarkToolsInjector` (Claude servers + allow names, Codex dynamic tools + router + thread-reset key, OpenCode descriptors)
+- [x] T5.3 Generic OpenCode adapter (same output path) + IPC `{op, group, tool, params}`; `AcpRuntime` dispatch by group
+- [x] T5.4 `CodexRuntime`: `onDynamicToolCall`; `AgentRuntime.ts` callback renamed; `UnifiedViewProvider` wiring; tool-set hash in the continuation fingerprint and `:309` records the thread's real tools (P2)
+- [x] T5.4a `AcpRuntime._handlePermission`: allow `ritemark_board_*` titles and a `doom_loop` on a board tool (P3); test
+- [x] T5.5 Board group: seven tools on `BoardController`; `done_when` on add/update, `check` on report_result
+- [x] T5.6 `capabilityContext.ts`: `hasBoardTools` + TASK BOARD section (report with Check these, ask decisions before long work, work toward Done when); version bump
+- [x] T5.7 Tests: `ritemarkTools.test.ts`, updated `capabilityContext`, `CodexRuntime`, `AcpRuntime` tests; old `BrowserToolsInjector.test.ts` assertions carried over
 
 ## Phase 6: Ideas (W6, R9)
 

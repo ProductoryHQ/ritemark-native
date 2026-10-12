@@ -25,6 +25,7 @@ import { CardTaskStore, cardTaskStoreDir } from './CardTaskStore';
 import { BoardStore, nodeBoardStoreFileSystem } from './BoardStore';
 import { TaskBoardPanel } from './TaskBoardPanel';
 import { CardPages, workspaceCardDocuments } from './cardPages';
+import { setBoardToolController } from '../runtime/ritemarkTools';
 import type { BoardAnswer, BoardSnapshot } from './protocol';
 import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
@@ -37,8 +38,6 @@ export interface TaskBoardHostDependencies {
   cardSidebar: CardTaskSidebar;
   /** Hear turn events next to the comment tasks (G1). */
   attachTaskListener: (listener: AgentTaskListener) => void;
-  /** Whether a runtime gets the board tools (W5); the prompt then names the card. */
-  hasBoardTools?: (runtimeId: AgentId) => boolean;
 }
 
 export interface TaskBoardHost {
@@ -116,7 +115,9 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
       board: store,
       sidebar: deps.cardSidebar,
       folderPath: root,
-      hasBoardTools: deps.hasBoardTools,
+      // Every runtime gets the board tools whenever the board exists (W5), so
+      // a card's prompt can name the card.
+      hasBoardTools: () => true,
     });
     controller = new BoardController({
       store,
@@ -138,6 +139,9 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     });
     const boardController = controller;
     context.subscriptions.push({ dispose: () => boardController.dispose() });
+    // The agents' board tools (W5) act on this board.
+    setBoardToolController(() => boardController);
+    context.subscriptions.push({ dispose: () => setBoardToolController(() => null) });
     deps.attachTaskListener(ledger);
     // Work a quit or crash left in flight becomes Interrupted (with Retry);
     // records of cards that are gone are dropped.

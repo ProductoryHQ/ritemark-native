@@ -586,6 +586,62 @@ export class BoardController {
     return this.startTurn(card, runtime, { kind: 'retry' }, { by: 'you', what: `Retried with ${RUNTIME_LABELS[runtime]}` });
   }
 
+  // ── For agents (the board tools, W5) ──────────────────────────────────────
+
+  /**
+   * report_result: an agent's own account of its work on a card, with up to
+   * three things the user should check. The card then waits on the user for
+   * review (when it is in Doing). During a card's own turn the ledger adds the
+   * "Finished" history line and the changed files when the turn ends.
+   */
+  async reportResult(cardId: string, actor: BoardActor, input: { summary: string; check?: string[] }): Promise<BoardAnswer> {
+    const summary = input.summary.replace(/\s+/g, ' ').trim();
+    if (!summary) return answerError('invalid', 'The summary is empty. Say in a sentence or two what you did.');
+    const items = (input.check ?? []).map((item) => item.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (items.length > CARD_LIMITS.check) return answerError('invalid', `List at most ${CARD_LIMITS.check} things to check.`);
+    const inTurn = this.isLocked(cardId);
+    const at = this.now().toISOString();
+    try {
+      await this.store.mutate(cardId, inTurn ? null : { by: actor, what: `Reported: ${shortTitle(summary)}` }, (card) => ({
+        ...card,
+        result: {
+          by: actor,
+          at,
+          summary: clip(summary, CARD_LIMITS.summary),
+          files: card.result?.files ?? [],
+          check: items.map((item) => clip(item, CARD_LIMITS.checkItem)),
+        },
+      }));
+      return { ok: true, cardId };
+    } catch (error) {
+      return fromStoreError(error);
+    }
+  }
+
+  /** ask_user: leave a decision on the card; the answer comes back as a turn. */
+  async askUser(cardId: string, actor: BoardActor, input: { question: string; options: string[] }): Promise<BoardAnswer> {
+    const question = input.question.replace(/\s+/g, ' ').trim();
+    if (!question) return answerError('invalid', 'The question is empty.');
+    if (question.length > CARD_LIMITS.question) return answerError('invalid', `A question can be at most ${CARD_LIMITS.question} characters.`);
+    const options = input.options.map((option) => option.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (options.length < CARD_LIMITS.optionsMin || options.length > CARD_LIMITS.optionsMax) {
+      return answerError('invalid', `Give ${CARD_LIMITS.optionsMin} to ${CARD_LIMITS.optionsMax} options.`);
+    }
+    if (options.some((option) => option.length > CARD_LIMITS.option)) {
+      return answerError('invalid', `Each option can be at most ${CARD_LIMITS.option} characters.`);
+    }
+    const at = this.now().toISOString();
+    try {
+      await this.store.mutate(cardId, { by: actor, what: `Asked: ${shortTitle(question)}` }, (card) => ({
+        ...card,
+        ask: { by: actor, at, question, options },
+      }));
+      return { ok: true, cardId };
+    } catch (error) {
+      return fromStoreError(error);
+    }
+  }
+
   async stop(cardId: string): Promise<BoardAnswer> {
     await this.ledger.stop(cardId);
     return { ok: true, cardId };

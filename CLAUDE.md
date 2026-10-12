@@ -19,7 +19,7 @@ Ritemark Native is a VS Code OSS fork with Ritemark built-in as the native markd
 | Telemetry | Minimal, opt-out | Privacy first |
 | Agent runtimes | Claude Code (SDK), Codex (stdio), ACP/OpenCode (stdio) + `AgentRuntime` interface | All runtimes implement the same interface — see `docs/development/architecture.md` |
 | Agent approval | Unified approval gate — one webview message type for all runtimes | No runtime-specific approval message types after Sprint 79 |
-| Browser tools | `BrowserMcpServer` injected into all runtimes via `BrowserToolsInjector` | No runtime-specific browser tool implementations |
+| Ritemark tools (browser, task board) | One registry, `src/runtime/ritemarkTools.ts`, injected into all runtimes via `RitemarkToolsInjector` (Sprint 130) | No runtime-specific tool implementations or hand copies of a tool |
 | Model IDs | `src/ai/modelConfig.ts` is the authoritative registry | Never hardcode model IDs elsewhere; never split into runtime-specific files |
 
 **Full extension architecture (subsystems, TO BE items, open debt):** `docs/development/architecture.md`

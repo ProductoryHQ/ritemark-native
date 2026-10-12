@@ -56,8 +56,8 @@ export interface AcpManagerConfig {
   /** Runtime-owned command directories prepended for child-process discovery. */
   pathEntries?: string[];
   /**
-   * MCP stdio server descriptors to pass to session/new. Populated by
-   * BrowserToolsInjector when the browser-agent-control feature flag is on.
+   * MCP stdio server descriptors to pass to session/new: Ritemark's tool
+   * groups (browser, task board) from RitemarkToolsInjector.
    */
   mcpServers?: unknown[];
   /** Permission handler — Phase 4 renders the approval UI. */

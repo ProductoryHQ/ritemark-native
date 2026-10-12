@@ -1,9 +1,11 @@
 /**
- * BrowserIpcServer — Extension-host Unix socket (or named pipe on Windows)
- * that receives browser-action requests from the browserMcpAdapter subprocess
- * and dispatches them to BrowserActionTools.
+ * RitemarkIpcServer — Extension-host Unix socket (or named pipe on Windows)
+ * that answers the OpenCode MCP adapter subprocess (`browserMcpAdapter`): the
+ * tools of a group (`list`) and a tool call (`call`), for every Ritemark tool
+ * group (browser, task board; Sprint 130 W5). Was BrowserIpcServer, which knew
+ * only the six browser tools.
  *
- * One server instance per ACP session; disposed when the session ends.
+ * One server per OpenCode process; disposed when the process ends.
  */
 
 import * as net from 'net';
@@ -11,25 +13,30 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 
-export interface BrowserIpcRequest {
-  id: string;
-  tool:
-    | 'browser_navigate'
-    | 'browser_click'
-    | 'browser_fill'
-    | 'browser_type'
-    | 'browser_scroll'
-    | 'browser_snapshot';
-  params: Record<string, unknown>;
+export type RitemarkIpcRequest =
+  | { id: string; op: 'list'; group: string }
+  | { id: string; op: 'call'; group: string; tool: string; params: Record<string, unknown> };
+
+export interface RitemarkIpcToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
 }
 
-export interface BrowserIpcResponse {
+/** The answer to one request: the group's tools, or a call's text. */
+export interface RitemarkIpcResult {
+  tools?: RitemarkIpcToolDefinition[];
+  text?: string;
+  isError?: boolean;
+}
+
+export interface RitemarkIpcResponse extends RitemarkIpcResult {
   id: string;
-  result?: string;
+  /** The host could not answer at all (a thrown error). */
   error?: string;
 }
 
-export class BrowserIpcServer {
+export class RitemarkIpcServer {
   private _server: net.Server | null = null;
 
   /** Absolute path to the socket file (Unix) or named-pipe name (Windows). */
@@ -38,17 +45,17 @@ export class BrowserIpcServer {
   constructor(sessionId: string) {
     this.socketPath =
       process.platform === 'win32'
-        ? `\\\\.\\pipe\\ritemark-browser-${sessionId}`
-        : path.join(os.tmpdir(), `ritemark-browser-${sessionId}.sock`);
+        ? `\\\\.\\pipe\\ritemark-tools-${sessionId}`
+        : path.join(os.tmpdir(), `ritemark-tools-${sessionId}.sock`);
   }
 
   /**
-   * Start listening. The `handler` is called for each incoming request and must
-   * return the formatted text result (or throw on fatal error — the server
-   * converts thrown errors into BrowserIpcResponse.error so the subprocess
-   * can surface them to the model rather than crashing).
+   * Start listening. The `handler` is called for each incoming request and
+   * returns the tools or the call's text (a thrown error becomes
+   * `RitemarkIpcResponse.error`, so the subprocess can tell the model rather
+   * than crash).
    */
-  async start(handler: (req: BrowserIpcRequest) => Promise<string>): Promise<void> {
+  async start(handler: (req: RitemarkIpcRequest) => Promise<RitemarkIpcResult>): Promise<void> {
     // Remove stale socket file so the bind succeeds on Unix.
     if (process.platform !== 'win32') {
       try {
@@ -76,9 +83,9 @@ export class BrowserIpcServer {
               continue;
             }
 
-            let req: BrowserIpcRequest;
+            let req: RitemarkIpcRequest;
             try {
-              req = JSON.parse(trimmed) as BrowserIpcRequest;
+              req = JSON.parse(trimmed) as RitemarkIpcRequest;
             } catch {
               // Malformed JSON — ignore.
               continue;
@@ -86,11 +93,11 @@ export class BrowserIpcServer {
 
             handler(req)
               .then((result) => {
-                const response: BrowserIpcResponse = { id: req.id, result };
+                const response: RitemarkIpcResponse = { id: req.id, ...result };
                 socket.write(JSON.stringify(response) + '\n');
               })
               .catch((err) => {
-                const response: BrowserIpcResponse = {
+                const response: RitemarkIpcResponse = {
                   id: req.id,
                   error: err instanceof Error ? err.message : String(err),
                 };
