@@ -71,6 +71,11 @@ locales/*.pak
 *.dll
 *.pak
 
+# Sprint 129: the committed Windows whisper engine is source, not build output
+# (see extensions/ritemark/binaries/README.md and whisper-manifest.json).
+!extensions/ritemark/binaries/win32-x64/*.exe
+!extensions/ritemark/binaries/win32-x64/*.dll
+
 # Visual Studio project files (root-anchored to avoid case-insensitive match on extensions/ritemark/)
 /Ritemark/
 *.sln

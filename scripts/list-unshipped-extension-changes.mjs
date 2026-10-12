@@ -7,7 +7,7 @@
 // On the user's machine src/update/userExtensionInstaller.ts clones the app's
 // bundled extension and lays those files over it, so everything else keeps the
 // version the last shell release installed: icons, fonts, themes, the starter
-// pack, draw.io and PDF assets, the whisper binaries, and every package that
+// pack, draw.io and PDF assets, and every package that
 // loads from node_modules instead of being compiled into out/extension.js (the
 // esbuild externals and what they pull in). release-extension-preflight.sh
 // stops the release when this prints anything.
@@ -32,7 +32,7 @@ const COMPILED_SOURCES = ['src/', 'webview/', 'esbuild.config.mjs', 'tsconfig.js
 // Never loaded at runtime.
 const DEV_ONLY = ['scripts/', '.gitignore'];
 // Shell-tier (CLAUDE.md "Release Tiers"); the preflight's tier check blocks these.
-const SHELL_TIER = ['binaries/agents/'];
+const SHELL_TIER = ['binaries/'];
 
 const matchesAny = (relPath, entries) =>
   entries.some(entry => (entry.endsWith('/') ? relPath.startsWith(entry) : relPath === entry));

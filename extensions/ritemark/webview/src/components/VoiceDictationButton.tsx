@@ -3,6 +3,10 @@ import { Icon } from './ui/Icon'
 import { useVoiceDictation, type DictationState } from '../hooks/useVoiceDictation'
 import { LanguagePickerModal, WHISPER_LANGUAGES } from './LanguagePickerModal'
 import { DictationSettingsModal } from './DictationSettingsModal'
+import { DictationProblemDialog } from './DictationProblemDialog'
+import { dictationProblemCopy, dictationStateCopy, type DictationAction } from './dictationProblems'
+import { Tooltip } from './ui/tooltip'
+import { webviewPlatform } from '../hooks/usePlatform'
 import { sendToExtension } from '../bridge'
 
 // Local storage keys
@@ -35,6 +39,12 @@ function getLastLanguage(): string {
   return 'et' // Default: Estonian
 }
 
+// Get language name by code
+function getLanguageName(code: string): string {
+  const lang = WHISPER_LANGUAGES.find(l => l.code === code)
+  return lang?.name || code.toUpperCase()
+}
+
 // Save recent language to local storage
 function saveRecentLanguage(code: string): void {
   try {
@@ -59,11 +69,10 @@ function saveRecentLanguage(code: string): void {
  * - Secondary (right dropdown): Select language
  */
 export function VoiceDictationButton() {
-  const { state, error, currentLanguage, startDictation, stopDictation } = useVoiceDictation()
+  const { state, mode, problem, dismissProblem, currentLanguage, startDictation, stopDictation, cancelStart } = useVoiceDictation(getLanguageName)
   const [showDropdown, setShowDropdown] = useState(false)
   const [showFullPicker, setShowFullPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [showMicPermission, setShowMicPermission] = useState(false)
   const [recentLanguages, setRecentLanguages] = useState<string[]>(['et', 'en'])
   const [lastLanguage, setLastLanguage] = useState<string>('et')
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -74,12 +83,18 @@ export function VoiceDictationButton() {
     setLastLanguage(getLastLanguage())
   }, [])
 
-  // Show mic permission modal when mic access is denied
-  useEffect(() => {
-    if (error && error.includes('Microphone access denied')) {
-      setShowMicPermission(true)
+  // Sprint 129 R5/R6: the problem dialog's buttons. Opening Settings keeps the
+  // dialog open, so the user can come back and press Try Again.
+  const handleProblemAction = (action: DictationAction) => {
+    if (action === 'open-mic-settings') {
+      sendToExtension('system:openMicSettings', {})
+    } else if (action === 'retry') {
+      dismissProblem()
+      startDictation(lastLanguage)
+    } else {
+      dismissProblem()
     }
-  }, [error])
+  }
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -98,16 +113,21 @@ export function VoiceDictationButton() {
   const handlePrimaryClick = () => {
     if (state === 'listening' || state === 'processing') {
       stopDictation()
-    } else {
+    } else if (state === 'preparing') {
+      cancelStart()
+    } else if (state === 'idle' || state === 'error') {
       // Start with last used language
       startDictation(lastLanguage)
     }
+    // finishing: the button is disabled until the text is in
   }
+
+  const isActive = state !== 'idle' && state !== 'error'
 
   // Handle dropdown toggle
   const handleDropdownClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (state !== 'listening' && state !== 'processing') {
+    if (!isActive) {
       setShowDropdown(!showDropdown)
     }
   }
@@ -121,70 +141,72 @@ export function VoiceDictationButton() {
     startDictation(code)
   }
 
-  // Get language name by code
-  const getLanguageName = (code: string): string => {
-    const lang = WHISPER_LANGUAGES.find(l => l.code === code)
-    return lang?.name || code.toUpperCase()
-  }
-
-  // Get icon and styling based on state
+  // Get icon and styling based on state. Tooltips: dictationStateCopy (R12).
   const getStateStyles = (state: DictationState) => {
+    const language = getLanguageName(state === 'idle' ? lastLanguage : (currentLanguage || lastLanguage))
     switch (state) {
       case 'idle':
         return {
           icon: <Icon name="microphone" size={16} />,
           color: 'var(--r-ink-strong)',
-          title: `Start dictation (${getLanguageName(lastLanguage)})`
+          title: dictationStateCopy('idle', mode, language).tooltip
         }
       case 'listening':
         return {
           icon: <Icon name="microphone" size={16} />,
           color: 'var(--r-error)',
-          title: `Dictating in ${getLanguageName(currentLanguage || lastLanguage)} - click to stop`
+          title: dictationStateCopy('listening', mode, language).tooltip
         }
+      case 'preparing':
       case 'processing':
+      case 'finishing':
         return {
           icon: <Icon name="circle-notch" size={16} className="dictation-spinner" />,
           color: 'var(--r-accent)',
-          title: 'Processing transcription...'
+          title: dictationStateCopy(state, mode, language).tooltip
         }
       case 'error':
         return {
           icon: <Icon name="warning" size={16} />,
           color: 'var(--r-warning)',
-          title: error || 'Dictation error - click to retry'
+          title: problem
+            ? `${dictationProblemCopy(problem.code, webviewPlatform, problem.detail, problem.stage).title}. Click to try again.`
+            : 'Dictation stopped. Click to try again.'
         }
     }
   }
 
   const { icon, color, title } = getStateStyles(state)
-  const isActive = state === 'listening' || state === 'processing'
 
   return (
     <div className="dictation-split-btn" ref={dropdownRef}>
       {/* Primary button - start/stop dictation */}
-      <button
-        className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
-        onClick={handlePrimaryClick}
-        title={title}
-        style={{ color }}
-      >
-        {icon}
-        <span className="dictation-label">
-          {isActive ? getLanguageName(currentLanguage || lastLanguage) : lastLanguage.toUpperCase()}
-        </span>
-      </button>
+      <Tooltip label={title}>
+        <button
+          className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
+          onClick={handlePrimaryClick}
+          disabled={state === 'finishing'}
+          style={{ color }}
+        >
+          {icon}
+          <span className="dictation-label">
+            {(isActive && dictationStateCopy(state, mode, '').label)
+              || (isActive ? (currentLanguage || lastLanguage) : lastLanguage).toUpperCase()}
+          </span>
+        </button>
+      </Tooltip>
 
       {/* Dropdown trigger */}
-      <button
-        className="dictation-dropdown-trigger"
-        onClick={handleDropdownClick}
-        title="Select language"
-        disabled={isActive}
-        style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
-      >
-        <Icon name="caret-down" size={12} />
-      </button>
+      <Tooltip label={isActive ? 'Stop dictation to change the language' : 'Select language'}>
+        <button
+          className="dictation-dropdown-trigger"
+          onClick={handleDropdownClick}
+          disabled={isActive}
+          style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
+        >
+          <Icon name="caret-down" size={12} />
+        </button>
+      </Tooltip>
 
       {/* Language dropdown */}
       {showDropdown && (
@@ -250,6 +272,7 @@ export function VoiceDictationButton() {
         }
 
         .dictation-label {
+          white-space: nowrap;
           font-weight: 400;
         }
 
@@ -270,8 +293,12 @@ export function VoiceDictationButton() {
           border-left-color: var(--r-hairline, rgba(128,128,128,0.3));
         }
 
-        .dictation-dropdown-trigger:disabled {
+        .dictation-dropdown-trigger:disabled,
+        .dictation-primary:disabled {
           cursor: not-allowed;
+        }
+
+        .dictation-dropdown-trigger:disabled {
           opacity: 0.5;
         }
 
@@ -389,136 +416,17 @@ export function VoiceDictationButton() {
       <DictationSettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        mode={mode}
       />
 
-      {/* Microphone permission modal */}
-      {showMicPermission && (
-        <>
-          <div className="mic-permission-backdrop" onClick={() => setShowMicPermission(false)}>
-            <div className="mic-permission-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="mic-permission-icon">
-                <Icon name="microphone" size={20} />
-              </div>
-              <h3 className="mic-permission-title">Microphone Access Required</h3>
-              <p className="mic-permission-text">
-                Ritemark needs microphone access for voice dictation.
-              </p>
-              <div className="mic-permission-steps">
-                <p><strong>To enable:</strong></p>
-                <p>System Settings → Privacy & Security → Microphone → Enable <strong>Ritemark</strong></p>
-              </div>
-              <div className="mic-permission-buttons">
-                <button
-                  className="mic-permission-btn-primary"
-                  onClick={() => {
-                    sendToExtension('system:openMicSettings', {})
-                    setShowMicPermission(false)
-                  }}
-                >
-                  Open System Settings
-                </button>
-                <button
-                  className="mic-permission-btn-secondary"
-                  onClick={() => setShowMicPermission(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-          <style>{`
-            .mic-permission-backdrop {
-              position: fixed;
-              inset: 0;
-              background: rgba(0, 0, 0, 0.4);
-              z-index: 9999;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              animation: modal-fade-in 150ms ease-out;
-            }
-            .mic-permission-modal {
-              width: 340px;
-              max-width: 90vw;
-              background: var(--vscode-editor-background);
-              border: 1px solid var(--r-hairline);
-              border-radius: 12px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
-              padding: 24px;
-              text-align: center;
-            }
-            .mic-permission-icon {
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              width: 48px;
-              height: 48px;
-              border-radius: 50%;
-              background: var(--r-surface-soft);
-              color: var(--r-ink-strong);
-              margin-bottom: 12px;
-            }
-            .mic-permission-title {
-              font-size: 16px;
-              font-weight: 600;
-              color: var(--r-ink-strong);
-              margin: 0 0 8px;
-            }
-            .mic-permission-text {
-              font-size: 13px;
-              color: var(--r-ink-muted);
-              margin: 0 0 16px;
-            }
-            .mic-permission-steps {
-              text-align: left;
-              background: var(--r-surface-soft, rgba(128,128,128,0.1));
-              border-radius: 8px;
-              padding: 12px 16px;
-              margin-bottom: 20px;
-              font-size: 13px;
-              color: var(--r-ink-strong);
-            }
-            .mic-permission-steps p {
-              margin: 0 0 4px;
-            }
-            .mic-permission-steps p:last-child {
-              margin: 0;
-            }
-            .mic-permission-buttons {
-              display: flex;
-              gap: 8px;
-              justify-content: center;
-            }
-            .mic-permission-btn-primary {
-              padding: 8px 16px;
-              border: none;
-              border-radius: 6px;
-              background: var(--r-accent);
-              color: var(--vscode-button-foreground);
-              font-size: 13px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: opacity 0.15s ease;
-            }
-            .mic-permission-btn-primary:hover {
-              opacity: 0.9;
-            }
-            .mic-permission-btn-secondary {
-              padding: 8px 16px;
-              border: 1px solid var(--r-hairline);
-              border-radius: 6px;
-              background: transparent;
-              color: var(--r-ink-strong);
-              font-size: 13px;
-              cursor: pointer;
-              transition: background-color 0.15s ease;
-            }
-            .mic-permission-btn-secondary:hover {
-              background: var(--r-surface-soft);
-            }
-          `}</style>
-        </>
-      )}
+      {/* Sprint 129: why dictation cannot start or stopped (microphone, engine, model) */}
+      <DictationProblemDialog
+        problem={problem?.code ?? null}
+        detail={problem?.detail}
+        stage={problem?.stage}
+        platform={webviewPlatform}
+        onAction={handleProblemAction}
+      />
     </div>
   )
 }

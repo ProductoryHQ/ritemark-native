@@ -56,7 +56,7 @@ Hover over any button in the panel to see what it does, or why it is unavailable
 | Where the audio goes | Stays on your machine | Uploaded to ElevenLabs |
 | Cost | Free | About $0.22 per hour, shown before upload |
 | Speakers | **Cannot separate them** | Separates them, up to 32 |
-| Platform | macOS on Apple silicon only ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)) | macOS, Windows, Linux |
+| Platform | macOS (Apple silicon and Intel) and Windows | macOS, Windows, Linux |
 
 This is a real trade, not a preference: today, "the audio never leaves my machine" and "I know who said what" cannot both be true. Pick per recording.
 
@@ -114,13 +114,15 @@ creating an Insights document never changes that link.
 
 ## Good to Know
 
-**Long recordings.** A 60-minute file transcribes on-device in roughly two and a half minutes on Apple silicon. Close the panel and it keeps going — the Activity Bar icon shows how many jobs are running. **Cancel** stops it at once. If Ritemark closes mid-transcription, the recording comes back marked **Interrupted**, never silently dropped.
+**Long recordings.** A 60-minute file transcribes on-device in roughly two and a half minutes on Apple silicon. On other computers Ritemark uses only the processor, so a typical Windows laptop takes about as long as the recording itself, roughly 50 minutes for an hour; Intel Macs are slow too. Close the panel and it keeps going — the Activity Bar icon shows how many jobs are running. **Cancel** stops it at once. If Ritemark closes mid-transcription, the recording comes back marked **Interrupted**, never silently dropped.
 
 **One project at a time.** Transcripts belong to the folder that was open when you made them. Opening a different project shows that project's recordings.
 
 **If a recording moves.** The row says so and offers **Find it** — the transcript is not lost, only the path went stale.
 
 **Video files are not supported yet.** Export the audio track first.
+
+**`.m4a` and `.aac` on Windows.** On-device transcription on Windows can't read these yet. Use ElevenLabs for them, or save the recording as `.mp3` or `.wav` first. Ritemark's own recordings are `.wav`.
 
 **A recording is saved while it happens.** Until you stop, the audio is written to `Recording … .wav.part` beside where the recording will land. If the panel reloads, or Ritemark quits or crashes in the middle, the audio is not lost: the panel shows **Recording interrupted**, with **Save recording** and **Discard**. Discard moves the file to the Trash.
 
@@ -136,7 +138,7 @@ creating an Insights document never changes that link.
 
 ## Requirements
 
-- **On-device:** macOS on Apple silicon (M1 and later). The first run downloads a 1.5 GB speech model, once. On an Intel Mac the engine reports that it is missing from the build — use ElevenLabs there.
+- **On-device:** a Mac (Apple silicon or Intel, macOS 12 or later) or a Windows PC. The first run downloads the speech model once: 1.5 GB on Apple silicon, 834 MB on Windows and Intel Macs. [Voice dictation](dictation.md) uses the same model. If on-device can't run on your computer (a very old processor, or security software blocking it), Ritemark says why. Use ElevenLabs there.
 - **ElevenLabs:** an API key from [elevenlabs.io](https://elevenlabs.io/app/settings/api-keys), and a connection.
 - **Insights:** any configured AI runtime (Claude sign-in or an API key).
 - **Recording:** a microphone, and permission for Ritemark to use it.

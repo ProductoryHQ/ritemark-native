@@ -1,6 +1,11 @@
 /**
  * whisper.cpp binary wrapper
  * Transcribes WAV audio files using whisper-cli
+ *
+ * Sprint 129: also the one place that finds the bundled binary, tests whether it
+ * can run here, and names its failures — for dictation and for Transcribe's
+ * on-device engine alike. Keep this file free of `vscode` imports: the CI
+ * contract test and the unit tests load it under plain Node.
  */
 
 import * as child_process from 'child_process';
@@ -19,7 +24,93 @@ export interface TranscriptionResult {
   text: string;
   success: boolean;
   error?: string;
+  /** Sprint 129 R6: why the engine could not run, when it could not. */
+  failure?: Exclude<WhisperReadiness, 'ready'>;
 }
+
+/** Sprint 129 R3/R6: whether the bundled engine can run on this computer. */
+export type WhisperReadiness = 'ready' | 'missing' | 'blocked' | 'cpu-unsupported' | 'failed';
+
+/** Platform-arch pairs Ritemark ships a whisper-cli for (binaries/<target>/). */
+export const WHISPER_TARGETS = ['darwin-arm64', 'darwin-x64', 'win32-x64'];
+
+export interface ModelInfo {
+  name: string;
+  url: string;
+  size: number; // exact bytes
+  sizeDisplay: string;
+  /** Sprint 129 R7: the download is accepted only with this hash. */
+  sha256?: string;
+}
+
+/** Pinned Hugging Face revision, so the sizes and hashes below stay true. */
+const MODEL_REVISION = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1';
+
+/** The speech models Ritemark downloads (`modelManager.ts` fetches them). */
+export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
+  'ggml-small.bin': {
+    name: 'small',
+    url: `${MODEL_REVISION}/ggml-small.bin`,
+    size: 487_601_967,
+    sizeDisplay: '466 MB',
+    sha256: '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b'
+  },
+  'ggml-large-v3-turbo.bin': {
+    name: 'large-v3-turbo',
+    url: `${MODEL_REVISION}/ggml-large-v3-turbo.bin`,
+    size: 1_624_555_275,
+    sizeDisplay: '1.5 GB',
+    sha256: '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69'
+  },
+  'ggml-large-v3-turbo-q8_0.bin': {
+    name: 'large-v3-turbo-q8_0',
+    url: `${MODEL_REVISION}/ggml-large-v3-turbo-q8_0.bin`,
+    size: 874_188_075,
+    sizeDisplay: '834 MB',
+    sha256: '317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1'
+  }
+};
+
+/**
+ * Sprint 129 R12/R13 (Jarmo, 2026-10-12): computers without Apple's GPU, where
+ * one call takes ~20 s on the CPU. They dictate as "speak, then text" and use the
+ * 8-bit model (same Estonian accuracy, half the download). Intel Macs follow
+ * Windows (the Development manager, on Jarmo's delegation, 2026-10-12).
+ */
+const CPU_ONLY_TARGETS = ['win32-x64', 'darwin-x64'];
+
+/**
+ * How dictation delivers text here: `live` while the user speaks (Apple
+ * silicon), or `deferred`, all at once after Stop.
+ */
+export type DictationMode = 'live' | 'deferred';
+
+export function dictationModeFor(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): DictationMode {
+  // QA only: try the other mode's screens on a Mac dev instance.
+  const forced = process.env.RITEMARK_DICTATION_MODE;
+  if (forced === 'live' || forced === 'deferred') return forced;
+  return CPU_ONLY_TARGETS.includes(`${platform}-${arch}`) ? 'deferred' : 'live';
+}
+
+/** The model dictation, Transcribe and Settings use on this computer. */
+export function defaultModelFile(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): string {
+  return CPU_ONLY_TARGETS.includes(`${platform}-${arch}`) ? 'ggml-large-v3-turbo-q8_0.bin' : 'ggml-large-v3-turbo.bin';
+}
+
+/** A dictation call never runs longer than this; a 28 s chunk on a slow CPU fits. */
+const DICTATION_TIMEOUT_MS = 120_000;
+
+/** `--help` answers in well under a second; this only catches a hung process. */
+const PROBE_TIMEOUT_MS = 10_000;
+
+/** Windows reports a crash as its NTSTATUS code in the exit code. */
+const STATUS_ILLEGAL_INSTRUCTION = 0xc000001d;
 
 /**
  * Filter out hallucination patterns from transcription
@@ -51,6 +142,118 @@ function filterHallucinations(text: string): string {
   return filtered.trim();
 }
 
+/** Words whisper puts in parentheses for sounds that are not speech. */
+const NON_SPEECH_WORDS = 'music|applause|laughter|laughs|laughing|silence|noise|inaudible|blank_audio|coughs?|sighs?|muusika|aplaus|naer|vaikus|müra';
+
+/**
+ * Sprint 129 (Windows test, bug C): whisper labels sounds it heard but that were
+ * not speech, such as "*music*", "[BLANK_AUDIO]", "(applause)" or "♪". None of it
+ * is dictation. Square brackets and asterisks never come from speech in its
+ * output; parentheses only go when they hold a non-speech word.
+ */
+export function stripNonSpeech(text: string): string {
+  return text
+    .replace(/\[[^\]\n]{0,40}\]/g, ' ')
+    .replace(/\*[^*\n]{1,40}\*/g, ' ')
+    .replace(new RegExp(`\\(\\s*(?:${NON_SPEECH_WORDS})[^)\\n]{0,30}\\)`, 'gi'), ' ')
+    .replace(/♪+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Phrases whisper produces for silence or near-silence. Measured on the Mac and
+ * Jarmo's Windows PC (Sprint 129): "Kõige!", "Kõik põhjad, kõik põhjad." in
+ * Estonian, "you" / "so" in English, plus its well-known English subtitle lines.
+ */
+const SILENCE_PHRASES = new Set([
+  'kõige', 'kõik põhjad', 'aitäh', 'you', 'so', 'thank you', 'thanks for watching',
+  'thank you for watching', 'thank you very much', 'bye',
+]);
+
+/**
+ * Whether a transcription is only whisper's silence phrases ("Kõige! Kõige!").
+ * Used only for weak audio, so a real "Thank you." spoken clearly stays.
+ */
+export function isSilenceHallucination(text: string): boolean {
+  const phrases = text.normalize('NFC').toLowerCase()
+    .split(/[.,!?…;:]+/)
+    .map(phrase => phrase.replace(/[^\p{L}\p{N}\s]+/gu, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return phrases.length > 0 && phrases.every(phrase => SILENCE_PHRASES.has(phrase));
+}
+
+/**
+ * The dictated text in whisper-cli's stdout.
+ *
+ * Status lines are dropped by their prefix only. An earlier filter also dropped
+ * every line containing "processing", which threw away dictated sentences that
+ * used the word.
+ */
+export function parseDictationStdout(stdout: string): string {
+  const lines = stdout.split('\n').filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (trimmed.startsWith('whisper_')) return false;
+    if (trimmed.startsWith('system_info:')) return false;
+    if (trimmed.startsWith('main:')) return false;
+    if (/^\[\d+:\d+:\d+/.test(trimmed)) return false; // timestamps
+    return true;
+  });
+
+  return filterHallucinations(stripNonSpeech(lines.map(line => line.trim()).join(' ')));
+}
+
+/**
+ * How many CPU threads whisper-cli gets.
+ *
+ * Sprint 129 R9 (A2, Ryzen 7 5825U, 8 cores / 16 threads): without a GPU the
+ * encoder is the whole cost, and all logical threads were fastest (46 s at 4
+ * threads, 29 s at 8, 23 s at 16 per call). Apple silicon runs the model on
+ * Metal, where the thread count barely matters; it keeps 4.
+ */
+export function whisperThreads(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+  logicalCpus: number = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
+): number {
+  if (platform === 'darwin' && arch === 'arm64') return 4;
+  return Math.max(1, logicalCpus);
+}
+
+/**
+ * The whisper-cli arguments for one dictation chunk, with anti-hallucination settings.
+ *
+ * Sprint 129: exported so the CI contract test (`scripts/qa/whisper-contract-test.mjs`)
+ * runs every bundled binary with exactly what dictation sends.
+ */
+export function dictationArgs(options: {
+  modelPath: string;
+  audioPath: string;
+  language?: string;
+  threads?: number;
+}): string[] {
+  const args = [
+    '--model', options.modelPath,
+    '--threads', String(options.threads || whisperThreads()),
+    '--no-timestamps',
+    '--no-fallback',        // Prevent temperature fallback loops
+    '--beam-size', '8',     // Larger beam = more accurate
+    '--entropy-thold', '2.4', // Detect hallucination via entropy
+    '--logprob-thold', '-1.0', // Log probability threshold
+    '--max-len', '0',       // No max segment length limit
+    '--output-txt',
+    options.audioPath
+  ];
+
+  // Only specify language if explicitly provided, otherwise let Whisper auto-detect
+  if (options.language) {
+    args.splice(2, 0, '--language', options.language);
+  }
+
+  return args;
+}
+
 /**
  * Transcribe a WAV audio buffer using whisper-cli
  *
@@ -67,7 +270,8 @@ export async function transcribeWav(
     return {
       text: '',
       success: false,
-      error: `Whisper binary not found at ${options.binaryPath}`
+      error: `Whisper binary not found at ${options.binaryPath}`,
+      failure: 'missing'
     };
   }
 
@@ -82,108 +286,73 @@ export async function transcribeWav(
 
   // Write WAV to temp file
   const tempDir = os.tmpdir();
-  const tempFile = path.join(tempDir, `ritemark-audio-${Date.now()}.wav`);
+  // Unique per call: two editor tabs can dictate at the same moment.
+  const tempFile = path.join(tempDir, `ritemark-audio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.wav`);
 
   try {
     fs.writeFileSync(tempFile, wavBuffer);
 
-    // Get directory containing the binary (for DYLD_LIBRARY_PATH)
-    const binaryDir = path.dirname(options.binaryPath);
+    const args = dictationArgs({
+      modelPath: options.modelPath,
+      audioPath: tempFile,
+      language: options.language,
+      threads: options.threads
+    });
 
-    // Build command arguments with anti-hallucination settings
-    const args = [
-      '--model', options.modelPath,
-      '--threads', String(options.threads || 4),
-      '--no-timestamps',
-      '--no-fallback',        // Prevent temperature fallback loops
-      '--beam-size', '8',     // Larger beam = more accurate
-      '--entropy-thold', '2.4', // Detect hallucination via entropy
-      '--logprob-thold', '-1.0', // Log probability threshold
-      '--max-len', '0',       // No max segment length limit
-      '--output-txt',
-      tempFile
-    ];
-
-    // Only specify language if explicitly provided, otherwise let Whisper auto-detect
-    if (options.language) {
-      args.splice(2, 0, '--language', options.language);
-    }
-
-    // Execute whisper-cli
-    const result = await new Promise<TranscriptionResult>((resolve) => {
+    // Resolves only once the process is gone: Windows cannot delete the temp
+    // file while whisper-cli still holds it open.
+    return await new Promise<TranscriptionResult>((resolve) => {
       const whisperProc = child_process.spawn(options.binaryPath, args, {
         env: {
           ...process.env,
-          DYLD_LIBRARY_PATH: binaryDir
+          // The macOS 1.8.3 build loads dylibs beside the binary; harmless elsewhere.
+          DYLD_LIBRARY_PATH: path.dirname(options.binaryPath)
         }
       });
 
       let stdout = '';
       let stderr = '';
+      let timedOut = false;
+
+      const timer = setTimeout(() => {
+        timedOut = true;
+        whisperProc.kill();
+      }, DICTATION_TIMEOUT_MS);
 
       whisperProc.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString('utf-8');
       });
 
       whisperProc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString('utf-8');
+        stderr = (stderr + data.toString('utf-8')).slice(-4000);
       });
 
-      whisperProc.on('error', (error: Error) => {
+      whisperProc.on('error', (error: NodeJS.ErrnoException) => {
+        clearTimeout(timer);
         console.error('[Whisper] Process error:', error);
         resolve({
           text: '',
           success: false,
-          error: error.message
+          error: error.message,
+          failure: describeWhisperFailure({ spawnErrorCode: error.code })
         });
       });
 
-      whisperProc.on('exit', (code: number | null) => {
+      // 'close', not 'exit': stdout is fully read only once the streams close.
+      whisperProc.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+        clearTimeout(timer);
         if (code === 0) {
-          // whisper-cli outputs transcription to stdout
-          // Filter out status/progress lines
-          const lines = stdout.split('\n').filter(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return false;
-            // Skip whisper status lines
-            if (trimmed.startsWith('whisper_')) return false;
-            if (trimmed.startsWith('system_info:')) return false;
-            if (trimmed.startsWith('main:')) return false;
-            if (trimmed.includes('processing')) return false;
-            if (trimmed.match(/^\[\d+:\d+:\d+/)) return false; // timestamps
-            return true;
-          });
-
-          let text = lines.join(' ').trim();
-
-          // Post-process: detect and remove hallucination patterns
-          text = filterHallucinations(text);
-
-          resolve({
-            text,
-            success: true
-          });
-        } else {
-          resolve({
-            text: '',
-            success: false,
-            error: `Whisper exited with code ${code}: ${stderr}`
-          });
+          resolve({ text: parseDictationStdout(stdout), success: true });
+          return;
         }
-      });
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        whisperProc.kill();
         resolve({
           text: '',
           success: false,
-          error: 'Transcription timeout'
+          error: timedOut ? 'Transcription timeout' : `Whisper exited with code ${code}${signal ? ` (${signal})` : ''}: ${stderr}`,
+          failure: timedOut ? 'failed' : describeWhisperFailure({ exitCode: code, signal })
         });
-      }, 30000);
+      });
     });
-
-    return result;
 
   } finally {
     // Clean up temp file
@@ -203,74 +372,166 @@ export async function transcribeWav(
 }
 
 /**
- * Transcribe audio from file path
+ * Where the bundled whisper-cli lives for a platform and CPU.
+ *
+ * Sprint 129 R3: never throws. Whether it can run is `probeWhisper()`'s call,
+ * so a computer without a build gets an explanation rather than an exception.
+ * `.exe` on Windows: spawn would find the binary without it, `fs.existsSync`
+ * would not.
  */
-export async function transcribeAudio(options: {
-  audioPath: string;
-  modelPath: string;
-  binaryPath: string;
-  language?: string;
-  threads?: number;
-}): Promise<string> {
-  const wavBuffer = fs.readFileSync(options.audioPath);
-  const result = await transcribeWav(wavBuffer, {
-    modelPath: options.modelPath,
-    binaryPath: options.binaryPath,
-    language: options.language,
-    threads: options.threads
-  });
+export function getWhisperBinaryPath(
+  context: { extensionPath: string },
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): string {
+  const name = platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
+  return path.join(context.extensionPath, 'binaries', `${platform}-${arch}`, name);
+}
 
-  if (!result.success) {
-    throw new Error(result.error || 'Transcription failed');
+/** Where downloaded speech models live (`~/.ritemark/models`, on Windows too). */
+export function getModelDirectory(): string {
+  return path.join(os.homedir(), '.ritemark', 'models');
+}
+
+/** The full path to a model file; dictation, Transcribe and Settings share it. */
+export function getModelPath(modelName: string = defaultModelFile()): string {
+  return path.join(getModelDirectory(), modelName);
+}
+
+const BUSY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+/**
+ * Sprint 129 R7: run a file operation, retrying while the file is busy.
+ *
+ * On Windows, antivirus commonly holds a freshly written file for a moment after
+ * it is closed, so renaming the downloaded model can fail with EPERM/EBUSY.
+ */
+export async function withFileRetry<T>(
+  operation: () => T,
+  options: { totalMs?: number; sleep?: (ms: number) => Promise<void> } = {}
+): Promise<T> {
+  const totalMs = options.totalMs ?? 10_000;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
+  let waited = 0;
+  let delay = 100;
+  for (;;) {
+    try {
+      return operation();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (!code || !BUSY_CODES.has(code) || waited >= totalMs) throw error;
+      await sleep(delay);
+      waited += delay;
+      delay = Math.min(delay * 2, 2000);
+    }
+  }
+}
+
+/**
+ * Sprint 129 R6: name a whisper-cli failure from how it failed.
+ *
+ * Pure, so every platform's codes are unit-tested on any platform.
+ */
+export function describeWhisperFailure(input: {
+  spawnErrorCode?: string;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
+}): Exclude<WhisperReadiness, 'ready'> {
+  if (input.spawnErrorCode === 'ENOENT') return 'missing';
+  if (input.spawnErrorCode === 'EACCES' || input.spawnErrorCode === 'EPERM') return 'blocked';
+  if (input.spawnErrorCode) return 'failed';
+  if (input.signal === 'SIGILL') return 'cpu-unsupported';
+  if (typeof input.exitCode === 'number' && (input.exitCode >>> 0) === STATUS_ILLEGAL_INSTRUCTION) {
+    return 'cpu-unsupported';
+  }
+  return 'failed';
+}
+
+type SpawnFn = typeof child_process.spawn;
+
+const readyBinaries = new Set<string>();
+/** A failed probe is not repeated for a minute, so a panel re-render does not respawn it. */
+const FAILURE_MEMORY_MS = 60_000;
+const recentFailures = new Map<string, { readiness: WhisperReadiness; at: number }>();
+
+/**
+ * Sprint 129 R3: can the bundled whisper-cli run here?
+ *
+ * Runs `whisper-cli --help` without blocking the extension host. A `ready`
+ * answer is remembered for the session; a failure is not, so a fix (a
+ * reinstall, an antivirus exception) is picked up on the next try.
+ */
+export async function probeWhisper(
+  binaryPath: string,
+  deps: { spawn?: SpawnFn; exists?: (file: string) => boolean; fresh?: boolean } = {}
+): Promise<WhisperReadiness> {
+  const exists = deps.exists ?? fs.existsSync;
+  if (readyBinaries.has(binaryPath)) {
+    // A cached "ready" still needs the file: it can be removed while Ritemark
+    // runs (Windows test, bug D), and dictation must say so before recording.
+    if (exists(binaryPath)) return 'ready';
+    readyBinaries.delete(binaryPath);
+  }
+  const recent = recentFailures.get(binaryPath);
+  // `fresh`: a mic click asks again, so an engine restored meanwhile (e.g. from
+  // antivirus quarantine) works without a restart (Windows re-test, bug E).
+  // A remembered "missing" is also dropped as soon as the file is back.
+  const stale = deps.fresh || (recent?.readiness === 'missing' && exists(binaryPath));
+  if (recent && !stale && Date.now() - recent.at < FAILURE_MEMORY_MS) return recent.readiness;
+  if (!exists(binaryPath)) {
+    recentFailures.set(binaryPath, { readiness: 'missing', at: Date.now() });
+    return 'missing';
   }
 
-  return result.text;
-}
+  const spawn = deps.spawn ?? child_process.spawn;
+  const readiness = await new Promise<WhisperReadiness>((resolve) => {
+    let settled = false;
+    const settle = (value: WhisperReadiness) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
 
-/**
- * Get the path to the whisper binary for the current platform
- */
-export function getWhisperBinaryPath(context: { extensionPath: string }): string {
-  const platform = process.platform;
-  const arch = process.arch;
-
-  if (platform === 'darwin' && arch === 'arm64') {
-    return path.join(context.extensionPath, 'binaries', 'darwin-arm64', 'whisper-cli');
-  }
-
-  // Future: add other platforms
-  throw new Error(`Unsupported platform: ${platform}-${arch}`);
-}
-
-/**
- * Get the default model path
- */
-export function getModelPath(): string {
-  const modelsDir = path.join(os.homedir(), '.ritemark', 'models');
-  return path.join(modelsDir, 'ggml-large-v3-turbo.bin');
-}
-
-/**
- * Check if whisper binary is available and working
- */
-export async function checkWhisperBinary(binaryPath: string): Promise<boolean> {
-  try {
-    if (!fs.existsSync(binaryPath)) {
-      return false;
+    let child: child_process.ChildProcess;
+    try {
+      child = spawn(binaryPath, ['--help'], {
+        env: { ...process.env, DYLD_LIBRARY_PATH: path.dirname(binaryPath) },
+        stdio: 'ignore'
+      });
+    } catch (error) {
+      settle(describeWhisperFailure({ spawnErrorCode: (error as NodeJS.ErrnoException).code ?? 'UNKNOWN' }));
+      return;
     }
 
-    const binaryDir = path.dirname(binaryPath);
+    const timer = setTimeout(() => {
+      child.kill();
+      settle('failed');
+    }, PROBE_TIMEOUT_MS);
 
-    const result = child_process.spawnSync(binaryPath, ['--help'], {
-      env: {
-        ...process.env,
-        DYLD_LIBRARY_PATH: binaryDir
-      },
-      timeout: 5000
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      settle(describeWhisperFailure({ spawnErrorCode: error.code ?? 'UNKNOWN' }));
     });
+    child.on('exit', (code, signal) => {
+      clearTimeout(timer);
+      // whisper-cli prints its usage and exits 0; older builds exit 1.
+      settle(code === 0 || code === 1 ? 'ready' : describeWhisperFailure({ exitCode: code, signal }));
+    });
+  });
 
-    return result.status === 0 || result.status === 1; // --help may return 1
-  } catch {
-    return false;
+  if (readiness === 'ready') {
+    readyBinaries.add(binaryPath);
+    recentFailures.delete(binaryPath);
+  } else {
+    recentFailures.set(binaryPath, { readiness, at: Date.now() });
+    console.warn(`[Whisper] ${binaryPath} is not usable here: ${readiness}`);
   }
+  return readiness;
+}
+
+/** For tests: forget remembered probe results. */
+export function resetWhisperProbeCache(): void {
+  readyBinaries.clear();
+  recentFailures.clear();
 }

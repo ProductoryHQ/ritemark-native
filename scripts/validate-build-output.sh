@@ -381,6 +381,105 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 5b: Whisper speech engine (Sprint 129, manifest-driven)
+#
+# extensions/ritemark/binaries/<target>/ is built by .github/workflows/build-whisper.yml
+# and committed; binaries/whisper-manifest.json records every file's SHA-256.
+# Hashes are compared only before signing (signing rewrites PE and Mach-O files);
+# after it, RITEMARK_RUNTIME_FILES_SIGNED=1 leaves presence and architecture.
+# -----------------------------------------------------------------------------
+echo ""
+echo "Validating the whisper speech engine..."
+
+pe_machine() {
+  # PE header: offset at 0x3c, machine type two bytes after the "PE\0\0" signature.
+  local f="$1" off
+  off=$(od -An -tu4 -j60 -N4 "$f" 2>/dev/null | tr -d ' ')
+  [[ -n "$off" ]] || return 1
+  od -An -tx2 -j$((off + 4)) -N2 "$f" 2>/dev/null | tr -d ' '
+}
+
+WHISPER_MANIFEST="$EXT_PATH/binaries/whisper-manifest.json"
+WHISPER_DIR="$EXT_PATH/binaries/$TARGET"
+if [[ ! -f "$WHISPER_MANIFEST" ]]; then
+  echo -e "  ${RED}FAIL${NC}: whisper-manifest.json missing at $WHISPER_MANIFEST"
+  ERRORS=$((ERRORS + 1))
+elif [[ -z "$PYTHON" ]]; then
+  echo -e "  ${RED}FAIL${NC}: python is needed to read $WHISPER_MANIFEST"
+  ERRORS=$((ERRORS + 1))
+else
+  whisper_rows=$("$PYTHON" -c '
+import json, sys
+target = json.load(open(sys.argv[1]))["targets"].get(sys.argv[2])
+if not target:
+    sys.exit(3)
+for f in target["files"]:
+    print(f["path"] + "\t" + f["sha256"])
+' "$WHISPER_MANIFEST" "$TARGET") || {
+    echo -e "  ${RED}FAIL${NC}: whisper-manifest.json has no entry for $TARGET"
+    ERRORS=$((ERRORS + 1))
+    whisper_rows=""
+  }
+  while IFS=$'\t' read -r rel expected_sha; do
+    [[ -z "$rel" ]] && continue
+    file_path="$WHISPER_DIR/$rel"
+    printf "  %-40s " "$TARGET/$rel"
+    if [[ ! -f "$file_path" ]]; then
+      echo -e "${RED}FAIL${NC} (missing)"
+      ERRORS=$((ERRORS + 1))
+      continue
+    fi
+    if [[ "${RITEMARK_RUNTIME_FILES_SIGNED:-0}" != "1" ]]; then
+      actual_sha=$(file_sha256 "$file_path" || true)
+      if [[ "$actual_sha" != "$expected_sha" ]]; then
+        echo -e "${RED}FAIL${NC} (SHA-256 differs from whisper-manifest.json)"
+        echo "    Expected: $expected_sha"
+        echo "    Got:      ${actual_sha:-<unavailable>}"
+        ERRORS=$((ERRORS + 1))
+        continue
+      fi
+    fi
+    case "$TARGET" in
+      win32-x64)
+        machine=$(pe_machine "$file_path" || true)
+        if [[ "$machine" != "8664" ]]; then
+          echo -e "${RED}FAIL${NC} (not an x64 PE file: ${machine:-unreadable})"
+          ERRORS=$((ERRORS + 1))
+          continue
+        fi
+        ;;
+      darwin-arm64|darwin-x64)
+        want_arch="arm64"; [[ "$TARGET" == "darwin-x64" ]] && want_arch="x86_64"
+        if [[ "$rel" == "whisper-cli" ]] && [[ ! -x "$file_path" ]]; then
+          echo -e "${RED}FAIL${NC} (exec bit missing)"
+          ERRORS=$((ERRORS + 1))
+          continue
+        fi
+        if ! file -b "$file_path" | grep -q "$want_arch"; then
+          echo -e "${RED}FAIL${NC} (not $want_arch: $(file -b "$file_path"))"
+          ERRORS=$((ERRORS + 1))
+          continue
+        fi
+        ;;
+    esac
+    echo -e "${GREEN}OK${NC}"
+  done <<< "$whisper_rows"
+fi
+
+# Another platform's engine must never ride along (copy-extension-for-target.mjs filters it).
+if [[ -d "$EXT_PATH/binaries" ]]; then
+  for platform_dir in "$EXT_PATH"/binaries/*-*/; do
+    [[ -d "$platform_dir" ]] || continue
+    name=$(basename "$platform_dir")
+    if [[ "$name" =~ ^(darwin|win32|linux)-(arm64|x64)$ ]] && [[ "$name" != "$TARGET" ]]; then
+      echo -e "  ${RED}FAIL${NC}: foreign native folder binaries/$name in a $TARGET build"
+      ERRORS=$((ERRORS + 1))
+    fi
+  done
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
 # Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""

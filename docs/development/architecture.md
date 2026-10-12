@@ -149,7 +149,7 @@ extensions/ritemark/src/
 ├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
-├── voiceDictation/  Whisper-based STT for live dictation (macOS only)
+├── voiceDictation/  On-device dictation (Whisper): engine resolver + readiness, model download, controller (macOS and Windows)
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
@@ -867,7 +867,7 @@ src/speech/
 ├── TranscriptionEngine.ts   the interface (capabilities, readiness, cost, transcribe)
 ├── engineRegistry.ts        registration + platform filtering + local-first preference
 ├── engines/
-│   ├── whisperLocalEngine.ts   bundled whisper.cpp, macOS only (#133)
+│   ├── whisperLocalEngine.ts   bundled whisper.cpp (darwin-arm64, darwin-x64, win32-x64)
 │   └── elevenLabsEngine.ts     Scribe v2, diarized, one request per file
 ├── JobManager.ts            single-flight queue, progress, cancel, restart recovery
 ├── SessionStore.ts          file-backed sessions in globalStorage (D5)
@@ -892,9 +892,11 @@ src/speech/
    English-only turn markers (`-tdrz`) or a stereo split. Real diarization means
    ElevenLabs. So "private" and "knows who spoke" are mutually exclusive, and the
    UI states the trade at the point of choice rather than hiding it.
-2. **On-device Whisper is macOS-only** (`binaries/darwin-arm64/`, #133). Transcribe
-   still ships on Windows with ElevenLabs; the registry reports the gap so the UI
-   can explain it rather than the feature silently shrinking.
+2. **On-device Whisper runs where Ritemark ships an engine:** darwin-arm64,
+   darwin-x64 and win32-x64 since Sprint 129 (#133, #203). The registry still
+   reports a computer without one (or one whose engine cannot start, see below),
+   so the UI can explain it rather than the feature silently shrinking. m4a/aac
+   need `afconvert`, so on Windows those files say to use ElevenLabs.
 
 **Insights output contract (Sprint 113).** The sandboxed workbench sends a
 validated discriminated choice: Auto, a known catalog code, or an explicitly
@@ -1023,10 +1025,47 @@ Radix tooltip. Its trigger is a wrapping span because `Button` does not forward
 refs (React 18) and a disabled button gets no pointer events; every Transcribe
 panel button uses it instead of a native `title`.
 
-**Open debt:** live dictation (`voiceDictation/`) still has its own whisper
-integration with a 30 s timeout and `--no-timestamps`, deliberately untouched by
-Sprint 108. A later sprint can collapse both callers onto `speech/engines/whisperLocalEngine`
-so there is one Whisper integration rather than two.
+**Open debt (partly paid, Sprint 129):** dictation and Transcribe share one engine
+resolver (`getWhisperBinaryPath`), one readiness check (`probeWhisper`), one model
+table and path (`AVAILABLE_MODELS`, `getModelPath`) and one failure mapping, all in
+`voiceDictation/whisperCpp.ts`. The two call paths remain: dictation runs
+`--no-timestamps` calls of up to 28 s (`transcribeWav`), and Transcribe runs whole
+files with JSON output (`whisperLocalEngine`).
+
+### On-device Whisper engine (Sprint 129)
+
+- **Provenance.** `.github/workflows/build-whisper.yml` builds whisper.cpp v1.8.3
+  (pinned commit) per target and runs `scripts/qa/whisper-contract-test.mjs` with the
+  app's own argument builders. The output is committed to
+  `extensions/ritemark/binaries/<target>/` (shell-tier) and recorded with SHA-256 in
+  `binaries/whisper-manifest.json`. `validate-build-output.sh` Check 5b fails a release
+  build when an engine is missing, changed (until signing), the wrong architecture, or
+  from another platform.
+  - win32-x64 is config V: CPU variants chosen at run time (`GGML_BACKEND_DL`), an
+    app-local VC++ runtime, and a UTF-8 code-page manifest.
+  - macOS builds are one static binary for macOS 12+, with Metal on arm64.
+  - Config VK (Vulkan) builds only on request and does not ship.
+- **Readiness before download.** `probeWhisper` runs `whisper-cli --help` once.
+  - Ready is cached; a failure is remembered for 60 s.
+  - The result maps to `missing`, `blocked` (EACCES/EPERM, e.g. Smart App Control),
+    `cpu-unsupported` (SIGILL / 0xC000001D) or `failed`.
+  - Dictation checks it before offering the model, and the webview's problem dialog
+    explains each case per platform (`webview/src/components/dictationProblems.ts`).
+- **Two dictation modes** (`dictationModeFor`).
+  - `live` on Apple silicon: text is inserted while the user speaks.
+  - `deferred` ("speak, then text") on win32-x64 and darwin-x64, where one CPU call
+    takes ~20 s whatever its length (Whisper pads every call to a 30 s window).
+  - `DictationController` joins audio that waits while a call runs, up to 28 s per
+    call (R8). In deferred mode it transcribes full 28 s pieces in the background
+    and posts all text once after Stop.
+  - Stop always gets `finishing` (when work remains) and then `idle`. Deferred
+    `finishing` carries a wait estimate from the last call's duration (globalState).
+- **Model per platform** (`defaultModelFile`): `ggml-large-v3-turbo.bin` on Apple
+  silicon, `…-q8_0.bin` on win32-x64/darwin-x64. q8_0 has the same Estonian accuracy
+  and half the download. The pinned Hugging Face revision is checked by exact size
+  and SHA-256.
+- **The dictation note is a decoration** (`webview/src/extensions/DictationPlaceholder.ts`),
+  not document text, so autosave (1 s) never writes it into the file.
 
 ---
 

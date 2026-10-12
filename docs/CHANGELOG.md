@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.0] — Unreleased
+
+### Added
+- **Voice dictation on Windows and Intel Macs (Sprint 129, #133, #203).** The microphone in the document header now works on Windows and Intel Macs, with the speech turned into text on the computer itself. Because these computers do it on the processor alone, dictation works as "speak, then text": you talk, press Stop, and the text arrives about 20 seconds later on a typical laptop, even after a long dictation, because Ritemark works through the recording while you speak. A note at the cursor says it is recording, then processing and how long that usually takes; nothing is typed along while you speak.
+- **On-device Transcribe on Windows and Intel Macs (Sprint 129).** On-device · Whisper now works there for MP3, WAV, FLAC, OGG and Record files; on Windows, `.m4a` and `.aac` say to use ElevenLabs. A typical Windows laptop takes about as long as the recording.
+- **A smaller speech model on Windows and Intel Macs (Sprint 129).** They download 834 MB instead of 1.5 GB, with the same accuracy.
+- **A guide to voice dictation** in the user docs.
+
+### Changed
+- **Apple silicon Macs with macOS 12–14 can dictate and transcribe on-device (Sprint 129).** The on-device engine shipped since 1.0.3 needed macOS 15; it is rebuilt for macOS 12 and later.
+- **Dictation tells you why it can't start (Sprint 129).** A blocked microphone, a missing microphone, security software stopping the engine, a processor that is too old, or a missing speech model each get a plain dialog with the right button: **Open Microphone Settings** names the exact Windows or macOS switches. The model is never offered for download on a computer where dictation can't run.
+
+### Fixed
+- **Dictation never drops what you say (Sprint 129).** When transcription ran behind, speech that arrived meanwhile was thrown away. It now waits and is transcribed next, in order.
+- **The last words after Stop (Sprint 129).** The microphone button looked finished while the last sentence was still being turned into text, and a new dictation could start in the middle of it. It now shows **Adding your last words...** until they are in.
+- **The dictation note is never saved into your file (Sprint 129).** The grey **Listening...** note was document text, so autosave wrote it into the file while you dictated. It is now drawn on top of the document.
+- **Dictation's start can be cancelled (Sprint 129).** Clicking the microphone again while it got ready did nothing, and the microphone then started anyway. It now cancels.
+- **Dictation on Intel Macs no longer fails silently (Sprint 129, #203).** It downloaded the 1.5 GB model and then never inserted any text.
+- **Dictated sentences containing "processing" are kept (Sprint 129).** A filter for status lines dropped them.
+- **Silence no longer turns into invented text (Sprint 129).** With the microphone muted, or during a long pause, Whisper made up words such as "Kõige!" or "you". Silent audio is now skipped. A dictation that heard nothing at all says so ("Ritemark Heard Nothing") and names the mute key and the microphone setting, and a muted or blocked microphone is noticed within a few seconds.
+- **The download prompt can't get lost (Sprint 129).** The voice-model download and resume prompts are dialogs now. As a notification, the prompt could slide out of sight, and the microphone then seemed to do nothing.
+- **The microphone button says what a click does (Sprint 129).** While you dictate it reads **Transcribe now** on Windows and Intel Macs (**Stop** on Apple silicon), and **Transcribing…** / **Finishing…** while the text is on its way.
+
 ## [1.13.0] — 2026-10-11
 
 ### Added

@@ -5,7 +5,6 @@
  * gets a single call instead of five constructors and a path join.
  */
 
-import * as path from 'path';
 import type * as vscode from 'vscode';
 import { EngineRegistry } from './engineRegistry';
 import { JobManager } from './JobManager';
@@ -13,7 +12,7 @@ import { SessionStore } from './SessionStore';
 import { WhisperLocalEngine } from './engines/whisperLocalEngine';
 import { ElevenLabsEngine } from './engines/elevenLabsEngine';
 import { sessionStoreDir, speechWorkDir } from './paths';
-import { getModelPath } from '../voiceDictation/modelManager';
+import { getModelPath, getWhisperBinaryPath } from '../voiceDictation/whisperCpp';
 
 export interface SpeechSubsystem {
   registry: EngineRegistry;
@@ -21,25 +20,14 @@ export interface SpeechSubsystem {
   store: SessionStore;
 }
 
-/**
- * Where the bundled whisper binary lives.
- *
- * `voiceDictation/whisperCpp.getWhisperBinaryPath()` throws on unsupported
- * platforms, which is right for dictation (it never runs there) but wrong here:
- * the registry wants to describe the engine on Windows in order to explain why
- * it is unavailable. So the path is computed without throwing, and readiness is
- * decided by the engine.
- */
-function whisperBinaryPath(extensionPath: string): string {
-  return path.join(extensionPath, 'binaries', `${process.platform}-${process.arch}`, 'whisper-cli');
-}
-
 export function createSpeechSubsystem(context: vscode.ExtensionContext): SpeechSubsystem {
   const registry = new EngineRegistry();
 
   registry.register(
     new WhisperLocalEngine({
-      binaryPath: whisperBinaryPath(context.extensionPath),
+      // Sprint 129 R3: the same resolver dictation uses; it never throws, and
+      // the engine's readiness check explains a computer it cannot run on.
+      binaryPath: getWhisperBinaryPath(context),
       modelPath: getModelPath(),
       workDir: speechWorkDir(),
     }),

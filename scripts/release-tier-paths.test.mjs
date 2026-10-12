@@ -61,6 +61,7 @@ test('the preflight tier guard matches entries at the start of a path, not anywh
       '.github/workflows/build-windows.yml',
       'branding/product.json',
       'extensions/ritemark/binaries/agents/manifest.json',
+      'extensions/ritemark/binaries/win32-x64/whisper-cli.exe',
       'installer/windows/ritemark.iss',
       'patches/vscode/017-ritemark-ä.patch',
       'scripts/build-prod.sh',

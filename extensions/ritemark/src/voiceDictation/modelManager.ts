@@ -5,57 +5,18 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import * as os from 'os';
+import * as crypto from 'crypto';
+import { AVAILABLE_MODELS, defaultModelFile, getModelDirectory, getModelPath, withFileRetry, type ModelInfo } from './whisperCpp';
 
-export interface ModelInfo {
-  name: string;
-  url: string;
-  size: number; // bytes
-  sizeDisplay: string;
-}
-
-// Available models
-export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
-  'ggml-small.bin': {
-    name: 'small',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
-    size: 466_000_000,
-    sizeDisplay: '466MB'
-  },
-  'ggml-large-v3-turbo.bin': {
-    name: 'large-v3-turbo',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin',
-    size: 1_500_000_000,
-    sizeDisplay: '1.5GB'
-  }
-};
-
-// Use large-v3-turbo for best multilingual support
-const DEFAULT_MODEL = 'ggml-large-v3-turbo.bin';
+// Sprint 129 R7: one model location for dictation, Transcribe and Settings.
+// R13: the model table lives in whisperCpp.ts, which loads without VS Code.
+export { AVAILABLE_MODELS, defaultModelFile, getModelDirectory, getModelPath };
+export type { ModelInfo };
 
 // Maximum redirects to follow
 const MAX_REDIRECTS = 5;
-
-// Download timeout (15 minutes for large files)
-const DOWNLOAD_TIMEOUT = 15 * 60 * 1000;
-
-/**
- * Get the directory where models are stored
- */
-export function getModelDirectory(): string {
-  const homeDir = os.homedir();
-  return path.join(homeDir, '.ritemark', 'models');
-}
-
-/**
- * Get the full path to a model file
- */
-export function getModelPath(modelName: string = DEFAULT_MODEL): string {
-  return path.join(getModelDirectory(), modelName);
-}
 
 /**
  * Get path for partial download
@@ -67,7 +28,7 @@ function getPartialPath(modelName: string): string {
 /**
  * Check if a model exists and is valid
  */
-export function isModelDownloaded(modelName: string = DEFAULT_MODEL): boolean {
+export function isModelDownloaded(modelName: string = defaultModelFile()): boolean {
   const modelPath = getModelPath(modelName);
   if (!fs.existsSync(modelPath)) {
     return false;
@@ -78,10 +39,8 @@ export function isModelDownloaded(modelName: string = DEFAULT_MODEL): boolean {
     return false;
   }
 
-  // Check file size is at least 90% of expected (some tolerance)
-  const stats = fs.statSync(modelPath);
-  const minSize = modelInfo.size * 0.9;
-  return stats.size >= minSize;
+  // Sprint 129 R7: the exact size. A file cut short is not a model.
+  return fs.statSync(modelPath).size === modelInfo.size;
 }
 
 /**
@@ -109,6 +68,8 @@ async function resolveRedirects(url: string, maxRedirects: number = MAX_REDIRECT
         headers: { 'User-Agent': 'Ritemark/1.0' },
         timeout: 10000
       }, (response) => {
+        // Only the final URL is wanted here: never let a 1.6 GB body start flowing.
+        response.destroy();
         if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
           redirectCount++;
           if (redirectCount > maxRedirects) {
@@ -147,13 +108,145 @@ export interface DownloadOptions {
   onProgress?: (downloaded: number, total: number, speed: number) => void;
   onCancel?: () => boolean; // Return true if cancelled
   resume?: boolean;
+  /** Waits between attempts after a dropped connection (tests shorten them). */
+  retryDelaysMs?: number[];
 }
 
 /**
- * Download a model with progress reporting and resume support
+ * Sprint 129 R7: a dropped connection resumes on its own. The Hugging Face CDN
+ * closed the connection twice in one 1.6 GB download on a Windows test machine.
+ */
+const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000];
+
+/** No bytes for this long counts as a dropped connection. */
+const STALL_TIMEOUT_MS = 60_000;
+
+type AttemptResult =
+  | { kind: 'complete' }
+  | { kind: 'cancelled' }
+  | { kind: 'retry'; error: string }
+  | { kind: 'fatal'; error: string };
+
+function sha256File(file: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    fs.createReadStream(file)
+      .on('data', (chunk) => hash.update(chunk))
+      .on('error', reject)
+      .on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/** One request, appending to the partial file from where it ends. */
+async function downloadAttempt(modelInfo: ModelInfo, partialPath: string, options: DownloadOptions): Promise<AttemptResult> {
+  let startByte = fs.existsSync(partialPath) ? fs.statSync(partialPath).size : 0;
+  if (startByte >= modelInfo.size) {
+    return { kind: 'complete' };
+  }
+
+  let finalUrl: string;
+  try {
+    finalUrl = await resolveRedirects(modelInfo.url);
+  } catch (error) {
+    return { kind: 'retry', error: `Connection error: ${error instanceof Error ? error.message : String(error)}.` };
+  }
+
+  return new Promise<AttemptResult>((resolve) => {
+    let settled = false;
+    const headers: Record<string, string> = { 'User-Agent': 'Ritemark/1.0' };
+    if (startByte > 0) {
+      headers['Range'] = `bytes=${startByte}-`;
+    }
+
+    const protocol = finalUrl.startsWith('https') ? https : http;
+    const request = protocol.get(finalUrl, { headers }, (response) => {
+      const isPartialContent = response.statusCode === 206;
+      const isOk = response.statusCode === 200;
+
+      if (!isOk && !isPartialContent) {
+        response.resume();
+        const status = response.statusCode ?? 0;
+        const transient = status === 408 || status === 429 || status >= 500;
+        finish(transient
+          ? { kind: 'retry', error: `Server returned HTTP ${status}.` }
+          : { kind: 'fatal', error: `Server returned HTTP ${status}` });
+        return;
+      }
+
+      // A server that ignores Range sends the whole file again: start over.
+      if (startByte > 0 && !isPartialContent) {
+        startByte = 0;
+      }
+      const file = fs.createWriteStream(partialPath, { flags: startByte > 0 ? 'a' : 'w' });
+
+      let downloadedBytes = startByte;
+      let lastProgressTime = Date.now();
+      let lastProgressBytes = startByte;
+
+      response.on('data', (chunk: Buffer) => {
+        if (options.onCancel?.()) {
+          request.destroy();
+          file.end(() => finish({ kind: 'cancelled' }));
+          return;
+        }
+
+        downloadedBytes += chunk.length;
+        file.write(chunk);
+
+        // Calculate speed
+        const now = Date.now();
+        const timeDelta = (now - lastProgressTime) / 1000;
+        let speed = 0;
+        if (timeDelta > 0.5) { // Update speed every 0.5s
+          speed = (downloadedBytes - lastProgressBytes) / timeDelta;
+          lastProgressTime = now;
+          lastProgressBytes = downloadedBytes;
+        }
+        options.onProgress?.(downloadedBytes, modelInfo.size, speed);
+      });
+
+      // 'end' on a clean finish; 'aborted'/'error' when the connection drops.
+      response.on('end', () => {
+        file.end(() => finish(downloadedBytes >= modelInfo.size
+          ? { kind: 'complete' }
+          : { kind: 'retry', error: `The connection closed at ${Math.round(downloadedBytes / 1024 / 1024)} MB.` }));
+      });
+      response.on('aborted', () => {
+        file.end(() => finish({ kind: 'retry', error: 'The connection was interrupted.' }));
+      });
+      response.on('error', (error) => {
+        console.error('[ModelManager] Response error:', error);
+        file.end(() => finish({ kind: 'retry', error: `Network error: ${error.message}.` }));
+      });
+    });
+
+    request.on('error', (error) => {
+      console.error('[ModelManager] Request error:', error);
+      finish({ kind: 'retry', error: `Connection error: ${error.message}.` });
+    });
+
+    request.setTimeout(STALL_TIMEOUT_MS, () => {
+      request.destroy(new Error('no data for 60 seconds'));
+    });
+
+    function finish(result: AttemptResult): void {
+      if (!settled) {
+        settled = true;
+        resolve(result);
+      }
+    }
+  });
+}
+
+/**
+ * Download a model with progress reporting and resume support.
+ *
+ * Sprint 129 R7: resumes on its own after a dropped connection, and accepts the
+ * file only at its exact size and SHA-256 (the old 90%-of-size check accepted a
+ * download cut short, which left a model whisper could not load).
  */
 export async function downloadModel(
-  modelName: string = DEFAULT_MODEL,
+  modelName: string = defaultModelFile(),
   options: DownloadOptions = {}
 ): Promise<{ success: boolean; error?: string }> {
   const modelInfo = AVAILABLE_MODELS[modelName];
@@ -174,149 +267,60 @@ export async function downloadModel(
     fs.mkdirSync(modelDir, { recursive: true });
   }
 
-  // Check for existing partial download
-  let startByte = 0;
-  if (options.resume !== false && fs.existsSync(partialPath)) {
-    startByte = fs.statSync(partialPath).size;
-  } else if (fs.existsSync(partialPath)) {
+  if (options.resume === false && fs.existsSync(partialPath)) {
     fs.unlinkSync(partialPath);
   }
 
+  const delays = options.retryDelaysMs ?? RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    const result = await downloadAttempt(modelInfo, partialPath, options);
+    if (result.kind === 'cancelled') {
+      return { success: false, error: 'Download cancelled' };
+    }
+    if (result.kind === 'fatal') {
+      return { success: false, error: result.error };
+    }
+    if (result.kind === 'complete') {
+      break;
+    }
+    if (attempt >= delays.length) {
+      return { success: false, error: `${result.error} Partial download saved, click Download to resume.` };
+    }
+    console.warn(`[ModelManager] ${result.error} Resuming in ${delays[attempt] / 1000} s.`);
+    await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+    if (options.onCancel?.()) {
+      return { success: false, error: 'Download cancelled' };
+    }
+  }
+
+  const damaged = 'The download was damaged. Click Download to try again.';
+  const size = fs.statSync(partialPath).size;
+  if (size !== modelInfo.size) {
+    console.error(`[ModelManager] Downloaded ${size} bytes, expected ${modelInfo.size}`);
+    fs.rmSync(partialPath, { force: true });
+    return { success: false, error: damaged };
+  }
+  if (modelInfo.sha256) {
+    const actual = await sha256File(partialPath);
+    if (actual !== modelInfo.sha256) {
+      console.error(`[ModelManager] SHA-256 ${actual}, expected ${modelInfo.sha256}`);
+      fs.rmSync(partialPath, { force: true });
+      return { success: false, error: damaged };
+    }
+  }
+
+  // Rename partial to final, waiting out an antivirus scan (Windows)
   try {
-    // Resolve redirects first
-    const finalUrl = await resolveRedirects(modelInfo.url);
-
-    return new Promise((resolve) => {
-      const file = fs.createWriteStream(partialPath, {
-        flags: startByte > 0 ? 'a' : 'w'
-      });
-
-      let downloadedBytes = startByte;
-      let lastProgressTime = Date.now();
-      let lastProgressBytes = startByte;
-
-      const headers: Record<string, string> = {
-        'User-Agent': 'Ritemark/1.0'
-      };
-
-      // Request range if resuming
-      if (startByte > 0) {
-        headers['Range'] = `bytes=${startByte}-`;
+    await withFileRetry(() => {
+      if (fs.existsSync(modelPath)) {
+        fs.unlinkSync(modelPath);
       }
-
-      const protocol = finalUrl.startsWith('https') ? https : http;
-      const request = protocol.get(finalUrl, { headers }, (response) => {
-        // Check for successful response
-        const isPartialContent = response.statusCode === 206;
-        const isOk = response.statusCode === 200;
-
-        if (!isOk && !isPartialContent) {
-          file.close();
-          fs.unlinkSync(partialPath);
-          resolve({ success: false, error: `Server returned HTTP ${response.statusCode}` });
-          return;
-        }
-
-        // If server doesn't support Range, start from beginning
-        if (startByte > 0 && !isPartialContent) {
-          downloadedBytes = 0;
-          // Truncate file
-          fs.truncateSync(partialPath, 0);
-        }
-
-        // Get total size
-        let totalBytes: number;
-        if (isPartialContent) {
-          // Parse Content-Range: bytes 0-999/1234
-          const contentRange = response.headers['content-range'];
-          if (contentRange) {
-            const match = contentRange.match(/\/(\d+)$/);
-            totalBytes = match ? parseInt(match[1], 10) : modelInfo.size;
-          } else {
-            totalBytes = modelInfo.size;
-          }
-        } else {
-          totalBytes = parseInt(response.headers['content-length'] || '0', 10) || modelInfo.size;
-        }
-
-        response.on('data', (chunk: Buffer) => {
-          // Check cancellation
-          if (options.onCancel?.()) {
-            request.destroy();
-            file.close();
-            resolve({ success: false, error: 'Download cancelled' });
-            return;
-          }
-
-          downloadedBytes += chunk.length;
-          file.write(chunk);
-
-          // Calculate speed
-          const now = Date.now();
-          const timeDelta = (now - lastProgressTime) / 1000;
-          let speed = 0;
-          if (timeDelta > 0.5) { // Update speed every 0.5s
-            speed = (downloadedBytes - lastProgressBytes) / timeDelta;
-            lastProgressTime = now;
-            lastProgressBytes = downloadedBytes;
-          }
-
-          if (options.onProgress) {
-            options.onProgress(downloadedBytes, totalBytes, speed);
-          }
-        });
-
-        response.on('end', () => {
-          file.end(() => {
-            // Verify download
-            if (fs.existsSync(partialPath)) {
-              const stats = fs.statSync(partialPath);
-              const minExpected = modelInfo.size * 0.9;
-
-              if (stats.size >= minExpected) {
-                // Rename partial to final
-                if (fs.existsSync(modelPath)) {
-                  fs.unlinkSync(modelPath);
-                }
-                fs.renameSync(partialPath, modelPath);
-                resolve({ success: true });
-              } else {
-                console.error(`[ModelManager] Downloaded file too small: ${stats.size} bytes, expected ~${modelInfo.size}`);
-                // Keep partial file for resume
-                resolve({
-                  success: false,
-                  error: `Download incomplete: got ${Math.round(stats.size / 1024 / 1024)}MB, expected ${modelInfo.sizeDisplay}. Click Download to resume.`
-                });
-              }
-            } else {
-              resolve({ success: false, error: 'Download failed - file not created' });
-            }
-          });
-        });
-
-        response.on('error', (error) => {
-          file.close();
-          console.error('[ModelManager] Response error:', error);
-          resolve({ success: false, error: `Network error: ${error.message}. Partial download saved, click Download to resume.` });
-        });
-      });
-
-      request.on('error', (error) => {
-        file.close();
-        console.error('[ModelManager] Request error:', error);
-        resolve({ success: false, error: `Connection error: ${error.message}` });
-      });
-
-      request.setTimeout(DOWNLOAD_TIMEOUT, () => {
-        request.destroy();
-        file.close();
-        resolve({ success: false, error: 'Download timeout. Partial download saved, click Download to resume.' });
-      });
+      fs.renameSync(partialPath, modelPath);
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { success: false, error: `Failed to start download: ${message}` };
+    return { success: false, error: `Could not save the voice model: ${error instanceof Error ? error.message : String(error)}` };
   }
+  return { success: true };
 }
 
 /**
@@ -338,11 +342,14 @@ function formatSpeed(bytesPerSec: number): string {
   return `${(bytesPerSec / 1024 / 1024).toFixed(1)} MB/s`;
 }
 
+/** A download is running: a second one would write the same .partial file. */
+let downloadInFlight = false;
+
 /**
  * Show download dialog and handle model download
  */
 export async function ensureModelDownloaded(
-  modelName: string = DEFAULT_MODEL
+  modelName: string = defaultModelFile()
 ): Promise<{ success: boolean; cancelled?: boolean; error?: string }> {
   if (isModelDownloaded(modelName)) {
     return { success: true };
@@ -353,66 +360,84 @@ export async function ensureModelDownloaded(
     return { success: false, error: `Unknown model: ${modelName}` };
   }
 
+  if (downloadInFlight) {
+    void vscode.window.showInformationMessage('The voice model is still downloading. Click the microphone again when it is done.');
+    return { success: false, cancelled: true };
+  }
+
   // Check for partial download
   const partialSize = getPartialSize(modelName);
   const hasPartial = partialSize > 0;
 
-  // Build message (keep short to fit one line)
   let message: string;
+  let detail: string;
   if (hasPartial) {
     const partialMB = Math.round(partialSize / 1024 / 1024);
     const totalMB = Math.round(modelInfo.size / 1024 / 1024);
-    message = `Resume download? (${partialMB}/${totalMB}MB done)`;
+    message = 'Resume downloading the voice model?';
+    detail = `${partialMB} of ${totalMB} MB are already downloaded.`;
   } else {
-    message = `Download voice model (${modelInfo.sizeDisplay})?`;
+    message = `Download the voice model (${modelInfo.sizeDisplay})?`;
+    detail = 'Dictation and on-device Transcribe use it. It downloads once; after that they work offline.';
   }
 
-  // Ask user to download
+  // Sprint 129 (Windows test, bug A): a modal dialog, not a toast. A toast slid
+  // into the notification centre when the window lost focus, and the mic then
+  // seemed to do nothing. A modal cannot get lost; Cancel comes with it.
   const response = await vscode.window.showInformationMessage(
     message,
-    hasPartial ? 'Resume' : 'Download',
-    'Cancel'
+    { modal: true, detail },
+    hasPartial ? 'Resume' : 'Download'
   );
 
   if (response !== 'Download' && response !== 'Resume') {
     return { success: false, cancelled: true };
   }
+  if (downloadInFlight) {
+    return { success: false, cancelled: true };
+  }
+  downloadInFlight = true;
 
   // Show progress
   let isCancelled = false;
 
-  const result = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: hasPartial ? 'Resuming download' : 'Downloading voice model',
-      cancellable: true
-    },
-    async (progress, token) => {
-      token.onCancellationRequested(() => {
-        isCancelled = true;
-      });
+  let result: Awaited<ReturnType<typeof downloadModel>>;
+  try {
+    result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: hasPartial ? 'Resuming download' : 'Downloading voice model',
+        cancellable: true
+      },
+      async (progress, token) => {
+        token.onCancellationRequested(() => {
+          isCancelled = true;
+        });
 
-      let lastPercent = 0;
+        let lastPercent = 0;
 
-      const downloadResult = await downloadModel(modelName, {
-        resume: true,
-        onCancel: () => isCancelled,
-        onProgress: (downloaded, total, speed) => {
-          const percent = Math.round((downloaded / total) * 100);
-          if (percent > lastPercent || speed > 0) {
-            const speedStr = speed > 0 ? ` • ${formatSpeed(speed)}` : '';
-            progress.report({
-              increment: percent - lastPercent,
-              message: `${percent}% (${formatBytes(downloaded)} / ${formatBytes(total)})${speedStr}`
-            });
-            lastPercent = percent;
+        const downloadResult = await downloadModel(modelName, {
+          resume: true,
+          onCancel: () => isCancelled,
+          onProgress: (downloaded, total, speed) => {
+            const percent = Math.round((downloaded / total) * 100);
+            if (percent > lastPercent || speed > 0) {
+              const speedStr = speed > 0 ? ` • ${formatSpeed(speed)}` : '';
+              progress.report({
+                increment: percent - lastPercent,
+                message: `${percent}% (${formatBytes(downloaded)} / ${formatBytes(total)})${speedStr}`
+              });
+              lastPercent = percent;
+            }
           }
-        }
-      });
+        });
 
-      return downloadResult;
-    }
-  );
+        return downloadResult;
+      }
+    );
+  } finally {
+    downloadInFlight = false;
+  }
 
   if (isCancelled) {
     vscode.window.showInformationMessage('Download paused. Click mic to resume.');

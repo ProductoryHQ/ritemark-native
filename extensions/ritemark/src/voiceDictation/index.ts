@@ -1,4 +1,6 @@
 // Voice dictation exports
 export { DictationController } from './controller';
-export { transcribeAudio, getWhisperBinaryPath, getModelPath } from './whisperCpp';
+export { transcribeWav, getWhisperBinaryPath, getModelPath, probeWhisper } from './whisperCpp';
+export { dictationProblemFor } from './controller';
+export type { DictationEngineProblem } from './controller';
 export { ensureModelDownloaded, isModelDownloaded } from './modelManager';

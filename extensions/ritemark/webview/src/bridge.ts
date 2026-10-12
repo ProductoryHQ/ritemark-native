@@ -134,9 +134,11 @@ export function getState<T>(): T | undefined {
 // Does NOT communicate with VS Code extension.
 //
 // Example flow for dictation:
-// 1. useVoiceDictation hook calls emitInternalEvent('dictation:listening-started')
-// 2. App.tsx receives this via onInternalEvent and inserts "Listening..." placeholder
-// 3. When transcription arrives, placeholder is replaced with actual text
+// 1. useVoiceDictation emits 'dictation:placeholder' with the text for its state
+//    ("Listening...", "Processing your recording...") or 'dictation:placeholder-clear'
+// 2. App.tsx receives this via onInternalEvent and shows that note at the cursor
+//    (extensions/DictationPlaceholder.ts: a decoration, not document text)
+// 3. When transcription arrives, the text goes where the note is
 // ============================================================================
 
 /**

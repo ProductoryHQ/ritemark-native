@@ -12,14 +12,14 @@
 ## Release Thesis
 
 To be written once the scope is settled. Candidates:
-- Windows users get on-device transcription, and voice dictation if it is fast enough.
+- Windows users get on-device transcription, and voice dictation as "speak, then text": they talk, press Stop, and the text arrives about 20 s later.
 - Every project folder gets a task board whose cards can be handed to an agent.
 
 ## Sprints
 
 | Sprint | Scope | Status |
 |---|---|---|
-| [129 — Windows dictation](sprint-129-windows-dictation/sprint-plan.md) | On-device Whisper on Windows: voice dictation and Transcribe's on-device engine ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)). The Intel Mac binary comes from the same pipeline ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203)). The Apple silicon engine is rebuilt for macOS 12–14 (R11, Jarmo 2026-10-12) | Approved 2026-10-11. In development, draft [#399](https://github.com/ProductoryHQ/ritemark-native/pull/399). The Windows dictation speed stop condition was reached: round 3 measures a shorter window and a model kept in memory, then Jarmo decides whether dictation ships on Windows. Windows GPU (Vulkan): "if it can be done, yes" |
+| [129 — Windows dictation](sprint-129-windows-dictation/sprint-plan.md) | On-device Whisper on Windows: voice dictation and Transcribe's on-device engine ([#133](https://github.com/ProductoryHQ/ritemark-native/issues/133)). The Intel Mac binary comes from the same pipeline ([#203](https://github.com/ProductoryHQ/ritemark-native/issues/203)). The Apple silicon engine is rebuilt for macOS 12–14 (R11, Jarmo 2026-10-12) | Approved 2026-10-11. PR [#399](https://github.com/ProductoryHQ/ritemark-native/pull/399) ready on 2026-10-12: qa-validator passed, and Jarmo closed the Windows branch test ("koik on ok"). Waiting for the admin merge. Jarmo's speed decisions (2026-10-12, after round 3): on Windows, dictation ships as "speak, then text" (record, press Stop, then the text) with the full audio window; the shorter window does not ship; q8_0 is the Windows model; no GPU (Vulkan) in v1.14.0; cutting at pauses (VAD) is separate work for all platforms |
 | [130 — Task board](sprint-130-task-board/sprint-plan.md) | Task board in each project folder, with Give to agent ([#119](https://github.com/ProductoryHQ/ritemark-native/issues/119)) | Approved 2026-10-12 (Doing limit in; Tasks above Transcribe). Phase 0 probes done. In development on `sprint-130-task-board`, draft [#409](https://github.com/ProductoryHQ/ritemark-native/pull/409) |
 | [131 — Browser Recent](sprint-131-browser-recent/sprint-plan.md) | Browser Recent records the pages the user visits: address bar, links, the AI agent, files opened in the browser. A bridge in patch 009 forwards navigations to the extension; titles in the list; deleted local files drop out ([#195](https://github.com/ProductoryHQ/ritemark-native/issues/195)). Shell-tier (patch 009) | Approved 2026-10-12. Implemented on `sprint-131-browser-recent`, [#414](https://github.com/ProductoryHQ/ritemark-native/pull/414) (plan PR #413 closed into it). Dev-instance QA: 30 of 31 scenarios pass; AI-agent navigation and Windows are on the Gate 2 list. Waiting for the admin merge |
 
@@ -45,7 +45,14 @@ The sprint links resolve when each sprint's docs merge with its PR.
 
 - **Shell-tier:** clean-room release worktree from exact `origin/main`, Gate 1 + Gate 2, notarization after the 60-minute hardening window, Windows CI (see `release-manager`).
 - **The release test must cover:**
-  - from Sprint 129: on-device Transcribe (and dictation, if it ships) on the signed Windows installer, the whisper files' Productory signature, and Apple silicon dictation on macOS 12–14. Intel Mac evidence is the CI runner's contract test only (Jarmo, 2026-10-11).
+  - from Sprint 129: on-device Transcribe and "speak, then text" dictation on the signed Windows installer, the whisper files' Productory signature, and Apple silicon dictation on macOS 12–14. Also on Windows, moved from the branch test when Jarmo closed it on 2026-10-12:
+    - with the hardware mute key on, the first dictation after launch and once more: recording stops by itself within ~3 s with "Ritemark Heard Nothing", and nothing is inserted;
+    - a 30 s pause between two spoken sentences: no invented words between them;
+    - turn off "Let desktop apps access your microphone" after dictating, then click the mic: a dialog within ~3 s, and nothing inserted;
+    - rename `whisper-cli.exe` and put it back: "Can't Start", then dictation works without a restart;
+    - one normal Estonian dictation, to check that quiet real speech isn't dropped;
+    - a two-minute recording while the processor is busy (look for gaps);
+    - dictation while another app uses the microphone. Intel Mac evidence is the CI runner's contract test only (Jarmo, 2026-10-11).
   - from Sprint 130: the task board, Give to agent in all three runtimes, and the browser tools after the tool-registry change.
   - from Sprint 131: Browser Recent on the signed builds, Mac and Windows. Browse by typing an address and by clicking a link, open a link in a background tab (Cmd-click or Ctrl-click) and switch to it, open a local `.html` file, delete that file, then check that Recent lists the pages with their titles and no longer lists the file.
 - **Runtime review:** every release repeats it for the bundled runtimes (Claude Code, Codex, OpenCode).

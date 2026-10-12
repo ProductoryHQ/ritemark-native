@@ -21,7 +21,7 @@ A native desktop app for writing, structured data, and AI automation—all in on
 - Clean markdown output that works everywhere
 - Slash commands for quick formatting
 - AI writing assistant (rephrase, expand, translate)
-- Voice dictation (macOS)
+- Voice dictation on your own computer (macOS and Windows)
 - PDF and Word export
 
 ### Data Mode
