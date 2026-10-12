@@ -103,6 +103,15 @@ async function main() {
     assert.ok(requestedMaxResults >= 5000, `expected a high cap, got ${requestedMaxResults}`);
   });
 
+  await test('the AI quick action says "New AI conversation" (Sprint 130 R14: a task is a board card)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = provider as any;
+    view._view = { webview: { asWebviewUri: (uri: unknown) => uri, cspSource: 'csp' } };
+    const html: string = view._html(true, [], []);
+    assert.ok(html.includes('New AI conversation'), 'the quick action names a conversation');
+    assert.ok(!html.includes('New AI task'), 'no "New AI task" left');
+  });
+
   console.log(`\n${passed} passed`);
 }
 

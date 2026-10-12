@@ -19,6 +19,7 @@ import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
+import { registerTaskBoard } from './taskBoard/taskBoardHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
@@ -408,6 +409,14 @@ export function activate(context: vscode.ExtensionContext) {
   // are logged, never thrown.
   void commentTaskController.sweepOnActivation((message, error) => {
     console.warn(`[commentTasks] ${message}`, error);
+  });
+
+  // ── Task board (Sprint 130, #119) ───────────────────────────────────────────
+  // One board per window for the project folder: cards in `.ritemark/tasks/`,
+  // the Tasks side bar, the Task board tab, the badge and the two commands.
+  registerTaskBoard({
+    context,
+    runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
   });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────

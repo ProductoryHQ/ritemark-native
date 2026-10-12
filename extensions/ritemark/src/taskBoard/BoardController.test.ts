@@ -150,6 +150,15 @@ async function main(): Promise<void> {
     assert.equal(view(stopped).call, null);
     assert.equal(view(decision).call, 'decision');
     assert.equal(view(todoTop).nextUp, true, 'the top To do card without agent work is Next up');
+    // A decision on top of To do is a call, not Next up.
+    await store.mutate(todoTop, null, (c) => ({ ...c, ask: { by: 'claude', at: at(0), question: 'Q?', options: ['A', 'B'] } }));
+    const withAsk = await controller.snapshot();
+    assert.equal(withAsk.cards.find((c) => c.id === todoTop)?.nextUp, false);
+    await store.mutate(todoTop, null, (c) => {
+      const next = { ...c };
+      delete next.ask;
+      return next;
+    });
     assert.equal(view(decision).nextUp, false);
     assert.equal(snapshot.doing.count, 6);
     assert.equal(snapshot.doing.limit, 3, 'the Doing limit defaults to 3');

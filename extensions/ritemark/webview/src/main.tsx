@@ -37,6 +37,15 @@ const TranscriptWorkbench = lazy(() =>
   import('./components/transcribe/workbench/Workbench').then((m) => ({ default: m.Workbench }))
 )
 
+// Lazy load the task board (Sprint 130, #119): the Tasks side bar and the Task
+// board tab share one set of components and one host protocol.
+const TasksPanel = lazy(() =>
+  import('./components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel }))
+)
+const TaskBoard = lazy(() =>
+  import('./components/tasks/TaskBoard').then((m) => ({ default: m.TaskBoard }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -51,7 +60,8 @@ if (
   editorType === 'flows-panel' ||
   editorType === 'ai-sidebar' ||
   editorType === 'settings' ||
-  editorType === 'transcribe-panel'
+  editorType === 'transcribe-panel' ||
+  editorType === 'tasks-panel'
 ) {
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
@@ -97,6 +107,14 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'transcript-workbench' ? (
       <Suspense fallback={<LoadingFallback />}>
         <TranscriptWorkbench />
+      </Suspense>
+    ) : editorType === 'tasks-panel' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <TasksPanel />
+      </Suspense>
+    ) : editorType === 'task-board' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <TaskBoard />
       </Suspense>
     ) : (
       <App />

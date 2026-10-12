@@ -26,6 +26,7 @@ import {
   messageForRuntimeAvailability,
   recoveryForRuntimeAvailability,
   type RuntimeAvailabilities,
+  type RuntimeAvailability,
 } from '../runtime/availability';
 import { BoardStoreError, type BoardEntry, type BoardStore } from './BoardStore';
 import {
@@ -113,7 +114,10 @@ export interface BoardControllerDependencies {
   ledger: HandoffLedger;
   folderName: string;
   settings: BoardSettings;
+  /** Last known availability of each agent, for the buttons (cheap, cached). */
   runtimes: () => RuntimeAvailabilities;
+  /** The authoritative check right before agent work starts (may probe). */
+  checkRuntime?: (runtimeId: AgentId) => Promise<RuntimeAvailability>;
   enabled: () => boolean;
   fileExists: (relativePath: string) => Promise<boolean>;
   setBadge?: (count: number) => void;
@@ -555,7 +559,7 @@ export class BoardController {
     if (this.isLocked(cardId)) return answerError('busy', 'The agent is still working on this card.');
     const runtime = runtimeId ?? this.ledger.list().get(cardId)?.runtimeId ?? this.defaultRuntime();
     if (runtimeId) await this.rememberRuntime(runtimeId);
-    const gate = this.availability(runtime);
+    const gate = await this.availability(runtime);
     if (gate) return gate;
     return this.startTurn(card, runtime, { kind: 'follow-up', text: words }, { by: 'you', what: `Asked for changes: ${shortTitle(words)}` });
   }
@@ -577,7 +581,7 @@ export class BoardController {
     if (this.isLocked(cardId)) return answerError('busy', 'The agent is still working on this card.');
     const runtime = runtimeId ?? this.ledger.list().get(cardId)?.runtimeId ?? this.defaultRuntime();
     if (runtimeId) await this.rememberRuntime(runtimeId);
-    const gate = this.availability(runtime);
+    const gate = await this.availability(runtime);
     if (gate) return gate;
     return this.startTurn(card, runtime, { kind: 'retry' }, { by: 'you', what: `Retried with ${RUNTIME_LABELS[runtime]}` });
   }
@@ -598,7 +602,7 @@ export class BoardController {
 
   private async answerWith(card: Card, runtime: AgentId, choice: string): Promise<BoardAnswer> {
     if (this.isLocked(card.id)) return answerError('busy', 'The agent is still working on this card.');
-    const gate = this.availability(runtime);
+    const gate = await this.availability(runtime);
     if (gate) return gate;
     try {
       await this.store.mutate(card.id, { by: 'you', what: `You chose: ${shortTitle(choice)}` }, (current) => {
@@ -623,7 +627,7 @@ export class BoardController {
     if (!card) return answerError('not-found', 'That card is no longer on the board.');
     if (card.stage === 'done') return answerError('invalid', 'Reopen the card before giving it to an agent.');
     if (this.isLocked(cardId)) return answerError('busy', 'An agent is already working on this card.');
-    const gate = this.availability(runtimeId);
+    const gate = await this.availability(runtimeId);
     if (gate) return gate;
     if (!options.force) {
       const conflict = this.findConflict(entries, card);
@@ -705,7 +709,7 @@ export class BoardController {
     const card = await this.store.get(cardId);
     if (!card) return answerError('not-found', 'That card is no longer on the board.');
     if (this.isLocked(cardId)) return answerError('busy', 'An agent is already working on this card.');
-    const gate = this.availability(runtimeId);
+    const gate = await this.availability(runtimeId);
     if (gate) return gate;
     await this.rememberRuntime(runtimeId);
     await this.ledger.wait(cardId, runtimeId, reason);
@@ -714,8 +718,10 @@ export class BoardController {
     return { ok: true, cardId, waiting: reason };
   }
 
-  private availability(runtimeId: AgentId): BoardAnswer | null {
-    const availability = this.deps.runtimes()[runtimeId];
+  private async availability(runtimeId: AgentId): Promise<BoardAnswer | null> {
+    const availability = this.deps.checkRuntime
+      ? await this.deps.checkRuntime(runtimeId)
+      : this.deps.runtimes()[runtimeId];
     if (availability.usable) return null;
     return {
       ok: false,
@@ -758,9 +764,12 @@ export class BoardController {
 
   private nextUpId(cards: Card[], handoffs: ReadonlyMap<string, CardHandoffView>): string | null {
     const todo = cards.filter((card) => card.stage === 'todo').sort(compareCards);
+    // The top card that is ready to give: no agent work in flight or waiting,
+    // and nothing on it waits on the user (a decision is a call, not Next up).
     const next = todo.find((card) => {
-      const state = handoffs.get(card.id)?.state;
-      return !state || (!ACTIVE_HANDOFF_STATES.has(state) && state !== 'waiting');
+      const handoff = handoffs.get(card.id) ?? null;
+      const who = deriveWho(card, handoff);
+      return who.move !== 'agent' && who.call === null;
     });
     return next?.id ?? null;
   }

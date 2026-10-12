@@ -28,20 +28,20 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)
 
-- [ ] T3.1 `iconMap` gains `kanban` (and any other name design.md uses that is missing); `ritemark-design/references/iconography.md` lists it
-- [ ] T3.2 `media/tasks-icon.svg` (Phosphor, 256 viewBox, `currentColor`)
-- [ ] T3.3 `package.json`: container (declared first among Ritemark's, lands above Transcribe), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`, badge-only tree view `ritemark.tasksBadge` (`when: false`)
-- [ ] T3.4 `src/features/flags.ts`: `task-board`
-- [ ] T3.5 `src/views/TasksViewProvider.ts` (+ badge, flag notice, no-folder state)
-- [ ] T3.6 `src/taskBoard/TaskBoardPanel.ts` (+ serializer, `ritemark.openTaskBoard`)
-- [ ] T3.7 `extension.ts` composition: store, controller, watcher, both surfaces, serializer
-- [ ] T3.8 `webview/src/main.tsx`: `tasks-panel` and `task-board` branches, side-bar background list
-- [ ] T3.9a `ui/tabs.tsx` (shadcn Radix Tabs) + `@radix-ui/react-tabs` in `webview/package.json` and the lockfile; export `RowMenus` from `ConversationsPanel.tsx`
-- [ ] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardRow`, `CardDetail`, `NoteBox`, `CallsView`, `IdeasView`, `LogView`, `AgentSplitButton` (used by every agent action: Give to, Review with, Retry with, Send to), `taskCopy.ts`
-- [ ] T3.9b `ritemark.addTask` (input box, top of To do, focus returns)
-- [ ] T3.9c Home: "New AI task" → "New AI conversation" (R14); `HomeViewProvider.test.ts` updated
-- [ ] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
-- [ ] T3.11 Rebuild `media/webview.js`; size change noted
+- [x] T3.1 `iconMap` gains `kanban` (and any other name design.md uses that is missing); `ritemark-design/references/iconography.md` lists it
+- [x] T3.2 `media/tasks-icon.svg` (Phosphor, 256 viewBox, `currentColor`), plus `tasks-tab-light.svg` / `tasks-tab-dark.svg` for the board tab (a tab icon cannot follow `currentColor`)
+- [x] T3.3 `package.json`: container (declared first among Ritemark's, lands above Transcribe), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`, badge-only tree view `ritemark.tasksBadge` (`when: false`)
+- [x] T3.4 `src/features/flags.ts`: `task-board`
+- [x] T3.5 `src/views/TasksViewProvider.ts` (+ badge, flag notice, no-folder state)
+- [x] T3.6 `src/taskBoard/TaskBoardPanel.ts` (+ serializer, `ritemark.openTaskBoard`)
+- [x] T3.7 `extension.ts` composition: store, controller, watcher, both surfaces, serializer
+- [x] T3.8 `webview/src/main.tsx`: `tasks-panel` and `task-board` branches, side-bar background list
+- [x] T3.9a `ui/tabs.tsx` (shadcn Radix Tabs) + `@radix-ui/react-tabs` in `webview/package.json` and the lockfile; export `RowMenus` from `ConversationsPanel.tsx`
+- [x] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardRow`, `CardDetail`, `NoteBox`, `CallsView`, `IdeasView`, `LogView`, `AgentSplitButton` (used by every agent action: Give to, Review with, Retry with, Send to), `taskCopy.ts`
+- [x] T3.9b `ritemark.addTask` (input box, top of To do, focus returns)
+- [x] T3.9c Home: "New AI task" → "New AI conversation" (R14); `HomeViewProvider.test.ts` updated
+- [x] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
+- [x] T3.11 Rebuild `media/webview.js`; size change noted (8,366,183 → 8,452,268 bytes, +86 KB)
 
 ## Phase 4: Give to agent (W4, R5, R6, R7, R12)
 
@@ -54,7 +54,8 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [ ] T4.6 G4: last-message summary for Codex (`agentMessage` item + `itemId`) and OpenCode (ACP `messageId`), passed in `onCodexComplete`; capture one Codex `item/completed` trace
 - [ ] T4.7 G5: queued task items are not editable
 - [ ] T4.8 G6: `comment-task/dispatch-failed` → `failed`
-- [ ] T4.8a F1: neutral shadcn role tokens re-declared under `body.vscode-dark` in `webview/src/index.css`; outline/secondary buttons checked in dark mode on Settings, dialogs and the board
+- [x] T4.8a F1: neutral shadcn role tokens re-declared under `body.vscode-dark` in `webview/src/index.css`; outline/secondary buttons checked in dark mode on Settings, dialogs and the board
+- [ ] T4.0 Replace the interim `NOT_CONNECTED_LEDGER` in `taskBoardHost.ts` with the W4 ledger (it must not ship)
 - [ ] T4.9 Controller: give, follow-up, answer, stop, retry, open conversation, recover; result onto the card (report first, summary fallback, changed files, seconds); interrupted on restart; deleted conversation; locks while working
 - [ ] T4.9a Focus: the card path shows the sidebar only with `ritemark.unifiedView.focus` + `{ preserveFocus: true }`, including `_awaitActiveConversation` (P7)
 - [ ] T4.10 `BoardController.test.ts`: handoff lifecycle end to end with injected sidebar fakes

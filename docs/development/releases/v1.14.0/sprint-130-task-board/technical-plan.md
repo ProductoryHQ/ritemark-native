@@ -222,6 +222,8 @@ board/give ─────────→  availability gate (shared)
 
 Later handoffs on the same card (Give to agent again, Ask for changes, answering an `ask`) enqueue into the bound `conversationId` without revealing it (P1). After a restart that conversation is usually only in durable history, so the sidebar loads it in the background first (G2). Retry follows Sprint 117: new generation, new turn id, previous outcome kept in history. A bound conversation that no longer exists gives "Conversation no longer available", and Retry starts a new one.
 
+**The ledger's start contract (found while building W3, 2026-10-12).** The controller moves the card into Doing with its history line, then calls `ledger.start`. Any start that does not reach the sidebar (agent not ready at dispatch, sidebar unreachable, no conversation) must leave a `failed` handoff with a safe one-line reason, so the card reads "Failed · {reason}" with Retry (design §6, item 8). A card in Doing with no handoff would look like a card moved by hand. `capacity` is the one exception: the controller turns it into a waiting card. `start` also refuses a second start for a card whose handoff is active.
+
 **Focus.** A card handoff shows the AI sidebar only with `ritemark.unifiedView.focus` and `{ preserveFocus: true }` (P7: the sidebar appears and the document keeps focus). That includes `_awaitActiveConversation` (`UnifiedViewProvider.ts:1611`), which today runs the plain focus command when the view is not resolved; it gains a `preserveFocus` option that the card path sets, and comment tasks keep their behaviour. Only **Open conversation** focuses the sidebar.
 
 **Changes to the Sprint 117 path** (each one with a test; G-numbers from the audit):

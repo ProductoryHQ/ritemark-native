@@ -77,6 +77,7 @@ import {
   deriveRuntimeAvailabilities,
   messageForRuntimeAvailability,
   recoveryForRuntimeAvailability,
+  type RuntimeAvailability,
 } from '../runtime/availability';
 import type {
   CommentTaskAvailability,
@@ -1652,6 +1653,33 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * runtime boundary (audit F19).
    */
   private async _checkRuntimeAvailability(runtimeId: AgentId): Promise<CommentTaskAvailability> {
+    const probe = await this._probeRuntimeAvailability(runtimeId);
+    if (!probe.ok) {
+      // A probe that throws is an unknown state, never a usable one.
+      return { usable: false, message: probe.message, recovery: 'retry' };
+    }
+    const result = probe.availability;
+    if (result.usable) return { usable: true };
+    return {
+      usable: false,
+      message: messageForRuntimeAvailability(runtimeId, result),
+      recovery: recoveryForRuntimeAvailability(result.state),
+    };
+  }
+
+  /**
+   * One agent's availability from the same authorities as the comment-task
+   * gate (Sprint 130: the task board's Give to agent). A probe that throws
+   * reads as `error`, never as usable.
+   */
+  public async runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability> {
+    const probe = await this._probeRuntimeAvailability(runtimeId);
+    return probe.ok ? probe.availability : { state: 'error', usable: false, detail: probe.message };
+  }
+
+  private async _probeRuntimeAvailability(
+    runtimeId: AgentId,
+  ): Promise<{ ok: true; availability: RuntimeAvailability } | { ok: false; message: string }> {
     const codexEnabled = isEnabled('codex-integration');
     const opencodeEnabled = isEnabled('opencode-integration');
     let setupStatus: SetupStatus | null = null;
@@ -1667,12 +1695,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         acpProviders = byokProviderFlags(await this._readByokKeys());
       }
     } catch (error) {
-      // A probe that throws is an unknown state, never a usable one.
-      return {
-        usable: false,
-        message: error instanceof Error ? error.message : String(error),
-        recovery: 'retry',
-      };
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
 
     const availabilities = deriveRuntimeAvailabilities({
@@ -1689,13 +1712,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       acpProviders,
       byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
     });
-    const result = availabilities[runtimeId];
-    if (result.usable) return { usable: true };
-    return {
-      usable: false,
-      message: messageForRuntimeAvailability(runtimeId, result),
-      recovery: recoveryForRuntimeAvailability(result.state),
-    };
+    return { ok: true, availability: availabilities[runtimeId] };
   }
 
   /**

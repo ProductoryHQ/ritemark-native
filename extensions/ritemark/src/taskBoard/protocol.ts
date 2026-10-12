@@ -16,6 +16,8 @@ import type { AgentId } from '../agent/types';
 import type { RuntimeAvailabilityRecovery, RuntimeAvailabilityState } from '../runtime/availability';
 import { CARD_STAGES, type CardAsk, type CardHistoryEntry, type CardResult, type CardReview, type CardStage } from './cardTypes';
 
+export type { CardStage } from './cardTypes';
+
 export const BOARD_AGENTS: readonly AgentId[] = ['claude-code', 'codex', 'opencode'];
 
 /** Largest inbound message the host will parse. A description is text; anything
@@ -166,11 +168,17 @@ export type BoardAnswer =
 
 export type BoardHostMessage =
   | { type: 'board/state'; snapshot: BoardSnapshot }
-  | { type: 'board/result'; requestId: string; answer: BoardAnswer };
+  | { type: 'board/result'; requestId: string; answer: BoardAnswer }
+  /** The board tab should show this view and/or card (opened from the side bar). */
+  | { type: 'board/focus'; cardId?: string; tab?: BoardTab };
 
 // ── Requests (webview → host) ───────────────────────────────────────────────
 
 export type BoardSurface = 'sidebar' | 'panel';
+
+/** The Task board tab's views. */
+export type BoardTab = 'calls' | 'board' | 'ideas' | 'log';
+export const BOARD_TABS: readonly BoardTab[] = ['calls', 'board', 'ideas', 'log'];
 
 export type BoardRequest =
   | { type: 'board/ready'; surface: BoardSurface }
@@ -201,11 +209,13 @@ export type BoardRequest =
   | { type: 'board/review-idea'; requestId: string; cardId: string; runtimeId: AgentId }
   | { type: 'board/accept-review'; requestId: string; cardId: string }
   | { type: 'board/set-wip'; requestId: string; limit: number | null }
-  | { type: 'board/open'; cardId: string }
+  | { type: 'board/open'; cardId?: string; tab?: BoardTab }
   | { type: 'board/add-files'; cardId: string }
   | { type: 'board/open-file'; path: string }
   | { type: 'board/open-as-document'; cardId?: string; fileName?: string }
-  | { type: 'board/recover'; action: 'sign-in-claude' | 'sign-in-codex' | 'settings' };
+  | { type: 'board/recover'; action: BoardRecoverAction };
+
+export type BoardRecoverAction = 'sign-in-claude' | 'sign-in-codex' | 'settings' | 'open-folder';
 
 export type BoardRequestType = BoardRequest['type'];
 
@@ -224,7 +234,7 @@ function invalid(message: string): never {
 }
 
 /** Field rules per request type: the decoder refuses any other field. */
-type FieldRule = 'requestId' | 'cardId' | 'stage' | 'runtime' | 'text' | 'shortText' | 'bool' | 'files' | 'index' | 'limit' | 'path' | 'fileName' | 'surface' | 'recover';
+type FieldRule = 'requestId' | 'cardId' | 'stage' | 'runtime' | 'text' | 'shortText' | 'bool' | 'files' | 'index' | 'limit' | 'path' | 'fileName' | 'surface' | 'recover' | 'tab';
 
 const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; optional?: Record<string, FieldRule> }> = {
   'board/ready': { required: { surface: 'surface' } },
@@ -259,7 +269,7 @@ const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; op
   'board/review-idea': { required: { requestId: 'requestId', cardId: 'cardId', runtimeId: 'runtime' } },
   'board/accept-review': { required: { requestId: 'requestId', cardId: 'cardId' } },
   'board/set-wip': { required: { requestId: 'requestId', limit: 'limit' } },
-  'board/open': { required: { cardId: 'cardId' } },
+  'board/open': { required: {}, optional: { cardId: 'cardId', tab: 'tab' } },
   'board/add-files': { required: { cardId: 'cardId' } },
   'board/open-file': { required: { path: 'path' } },
   'board/open-as-document': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName' } },
@@ -311,11 +321,16 @@ function decodeField(key: string, rule: FieldRule, value: unknown): unknown {
     case 'fileName':
       if (typeof value !== 'string' || !/^[^/\\]{1,255}\.md$/.test(value) || value.startsWith('.')) invalid(`${key} must be a card file name`);
       return value;
+    case 'tab':
+      if (!(BOARD_TABS as readonly unknown[]).includes(value)) invalid(`${key} must be one of ${BOARD_TABS.join(', ')}`);
+      return value;
     case 'surface':
       if (value !== 'sidebar' && value !== 'panel') invalid(`${key} must be sidebar or panel`);
       return value;
     case 'recover':
-      if (value !== 'sign-in-claude' && value !== 'sign-in-codex' && value !== 'settings') invalid(`${key} must be a known recovery`);
+      if (value !== 'sign-in-claude' && value !== 'sign-in-codex' && value !== 'settings' && value !== 'open-folder') {
+        invalid(`${key} must be a known recovery`);
+      }
       return value;
   }
 }
