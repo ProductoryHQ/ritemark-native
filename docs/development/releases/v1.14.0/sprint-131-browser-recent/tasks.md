@@ -53,5 +53,5 @@ Workstreams: W0 dev environment + probes · W1 patch 009 bridge · W2 extension 
 - [x] T5.1 `docs/development/architecture.md`: the workbench→extension push in the browser subsystem, plus an update-log row.
 - [x] T5.2 `CLAUDE.md` patch table: 009's row (navigations to Browser Recent; "extension host", not "browser panel").
 - [x] T5.3 v1.14.0 release notes draft line; mark the v1.8.6 known issue for #195 as fixed. *(In sprint-plan.md "Release notes (draft)"; no v1.14.0 notes file exists yet, so none was created for one sprint.)*
-- [ ] T5.4 Release plan: Sprint 131 status, and the Windows check in the release test list (S1, S2, S6, S10 with Ctrl-click, S24 on the signed installer).
+- [x] T5.4 Release plan: Sprint 131 status, and the Windows check in the release test list (S1, S2, S6, S10 with Ctrl-click, S24 on the signed installer).
 - [ ] T5.5 Draft PR to ready. In the "PR ready" message, ask Jarmo for an admin merge, naming the PR number. #195 closes with the v1.14.0 release (post-release issue sweep).

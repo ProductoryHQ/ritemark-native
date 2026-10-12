@@ -4,7 +4,7 @@ Track: SDD (auto-detected: a multi-component flow, workbench patch → command b
 Override with: "use plain full track"<br>
 Release tier: **shell** (`patches/vscode/009-ritemark-browser-context-bridge.patch`). It ships in the v1.14.0 app release, which is shell-tier anyway (Sprint 129's whisper binaries, Sprint 130's activity-bar icon). The extension half depends on the patch and cannot go out early in an extension release: the extension preflight refuses any release whose diff since the last app release touches `patches/`, and an extension update always requires its own app version.<br>
 Status: **Phase 4 (TEST & VALIDATE).** Plan approved by Jarmo on 2026-10-12 ("plan approved"). W0–W5 done. Dev-instance QA in [qa-evidence.md](./qa-evidence.md): 30 of 31 scenarios pass; S9 (AI agent navigation) is for Gate 2. Two defects found in QA and fixed (P10, port in the name line).<br>
-Branch: `sprint-131-browser-recent` (from the plan commit `8cc92333`, which is `main` `e77a1dee` plus the plan docs)<br>
+Branch: `sprint-131-browser-recent` (from the plan commit `8cc92333`, which is `main` `e77a1dee` plus the plan docs) · PR [#414](https://github.com/ProductoryHQ/ritemark-native/pull/414)<br>
 Release: [v1.14.0](../release-plan.md) · Milestone [v1.14.0](https://github.com/ProductoryHQ/ritemark-native/milestone/13)<br>
 Issue: [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195), "Browser: Recent never records in-panel browsing" (bug, ux). Jarmo pressed "Build it" on 2026-10-11 and "Start its session" on 2026-10-12.<br>
 Size: small. One contribution of about 50 lines in a file patch 009 already creates. On the extension side, one new module, edits to four files and two test files. No new dependency, flag, setting, patch file or UI element.
