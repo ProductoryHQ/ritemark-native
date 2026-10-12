@@ -107,21 +107,23 @@ Each probe is a short script or dev-instance check, recorded in `research/phase-
 |---|---|
 | `board/ready` | `surface: 'sidebar' \| 'panel'` |
 | `board/add` | `requestId`, `title`, `stage` |
-| `board/update` | `requestId`, `cardId`, optional `title`, `doneWhen`, `description`, `files` |
-| `board/move` | `requestId`, `cardId`, `stage`, optional `beforeCardId` |
-| `board/delete` | `requestId`, `cardId` |
+| `board/update` | `requestId`, `cardId`, optional `title`, `doneWhen` (empty clears it), `description`, `files` |
+| `board/move` | `requestId`, `cardId`, `stage`, optional `beforeCardId` or `atEnd` (default: top of the stage). Done → To do is "Reopened" |
+| `board/mark-done`, `board/delete` | `requestId`, `cardId` |
+| `board/drop`, `board/bring-back` | `requestId`, `cardId` (ideas only) |
+| `board/give` | `requestId`, `cardId`, `runtimeId`, optional `force` (Start now past the conflict guard), `overLimit` (Start anyway past the Doing limit) |
+| `board/queue` | `requestId`, `cardId`, `runtimeId` (Doing is full → Queue it) |
+| `board/wait`, `board/unwait` | `requestId`, `cardId` (+ `runtimeId` for wait) |
+| `board/follow-up` | `requestId`, `cardId`, `text`, optional `runtimeId` (Send to ▾). Ask for changes…; when a decision waits, Something else… (the user's words answer it) |
+| `board/answer` | `requestId`, `cardId`, `optionIndex` |
+| `board/retry` | `requestId`, `cardId`, optional `runtimeId` (Retry with ▾) |
+| `board/stop`, `board/open-conversation` | `requestId`, `cardId` |
+| `board/review-idea`, `board/accept-review` | `requestId`, `cardId` (+ `runtimeId` for review) |
+| `board/set-wip` | `requestId`, `limit` (1–6, or `null` for no limit) |
 | `board/open` | `cardId` (side bar → open the panel with this card) |
 | `board/add-files` | `cardId` (host shows a file picker rooted at the project) |
 | `board/open-file` | `path` (re-resolved inside the project before opening) |
-| `board/open-as-document` | `cardId` |
-| `board/give` | `requestId`, `cardId`, `runtimeId`, optional `force` (Start now past the conflict guard) |
-| `board/wait`, `board/unwait` | `requestId`, `cardId` (+ `runtimeId` for wait) |
-| `board/follow-up` | `requestId`, `cardId`, `text` (Ask for changes, or an answer in the user's own words) |
-| `board/answer` | `requestId`, `cardId`, `optionIndex` (Something else… is a `board/follow-up`) |
-| `board/mark-done` | `requestId`, `cardId` |
-| `board/drop`, `board/bring-back` | `requestId`, `cardId` (ideas only) |
-| `board/open-conversation`, `board/stop`, `board/retry` | `cardId` |
-| `board/review-idea`, `board/accept-review` | `requestId`, `cardId` (+ `runtimeId` for review) |
+| `board/open-as-document` | exactly one of `cardId` or `fileName` (an unreadable card has no id) |
 | `board/recover` | `action: 'sign-in-claude' \| 'sign-in-codex' \| 'settings'` (mapped to `ritemark.claudeLogin`, `ritemark.codexLogin`, `ritemark.aiSettings`, as `comment:recover`) |
 
 | Host → webview | Fields |
@@ -131,10 +133,10 @@ Each probe is a short script or dev-instance check, recorded in `research/phase-
 
 The Log is derived in the webview from the cards' history (it is in the snapshot already), grouped by local day.
 
-**`src/taskBoard/BoardController.ts`** (no `vscode` import; every dependency injected, as `CommentTaskController` and `GoogleDocsController`):
+**`src/taskBoard/BoardController.ts`** (no `vscode` import; every dependency injected, as `CommentTaskController` and `GoogleDocsController`). The machine-local side of Give to agent is one injected interface, `HandoffLedger` (`list`, `start`, `wait`, `unwait`, `stop`, `openConversation`, `canAttach`, `onDidChange`), which W4 implements over `CardTaskStore` and the AI sidebar. The W2 tests use a fake ledger. Card types and constants live in `cardTypes.ts`, which has no imports, so the webviews can share them without bundling the YAML parser.
 - Board operations above, each one a `BoardStore.mutate` with its history line.
 - **Who moves next** is derived, never stored: a handoff that is accepting/queued/running → the agent; needs-user, a pending `ask`, a `result` on a card not in Done, or a failed/interrupted handoff → you; otherwise nobody.
-- **Your calls** are derived the same way, one per card, ordered needs-user → decision → review and failed, newest first inside each (design §7). A stopped card is not a call.
+- **Your calls** are derived the same way, one per card, ordered needs-user → decision → review → failed, longest-waiting first inside each (spec R7, D11; S26a). A stopped card is not a call.
 - **Locks:** while a handoff is accepting, queued, running or needs-user, `move` out of Doing and `mark-done` are refused with "the agent is still working".
 - **Attention summary** (in the snapshot): number of calls, the oldest call's wait time, and how many agents are blocked mid-turn (needs-user). Each call carries `since` (when its card started waiting on the user). Calls sort by kind, then longest-waiting first.
 - **Next up**: the top To do card that has no active or waiting handoff.

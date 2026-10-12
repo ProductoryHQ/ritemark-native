@@ -18,13 +18,13 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 2: Controller and protocol (W2, R3, R7, R10)
 
-- [ ] T2.1 `src/taskBoard/protocol.ts` + `decodeBoardRequest` with exact-field validation
-- [ ] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count (set on the hidden `ritemark.tasksBadge` tree view, P6)
-- [ ] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
-- [ ] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
-- [ ] T2.6 Doing limit (D13): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; header control; tests
-- [ ] T2.7 AI sidebar capacity: `canAttachRuntime` from the host, `waiting` with reason `capacity`, retry on every terminal turn event, a dispatch-time capacity error back to the queue (P1); tests
-- [ ] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
+- [x] T2.1 `src/taskBoard/protocol.ts` + `decodeBoardRequest` with exact-field validation
+- [x] T2.2 `src/taskBoard/BoardController.ts`: operations, derived who-moves-next, Your calls, badge count (set on the hidden `ritemark.tasksBadge` tree view, P6)
+- [x] T2.3 `BoardController.test.ts`: operations and history lines, derived calls, agents cannot reach Done
+- [x] T2.4 Attention summary (count, oldest, blocked), `since` per call, longest-waiting order, Next up; tests
+- [x] T2.6 Doing limit (D13): `wipLimit` in workspaceState, `doing-full` answer, `board/queue`, start queued cards when a card leaves Doing, agent move into full Doing refused, `board/set-wip`; tests (the header control is T3.9)
+- [x] T2.7 AI sidebar capacity (controller side; the host's `canAttach` is T4.9): `canAttachRuntime` from the host, `waiting` with reason `capacity`, retry on every terminal turn event, a dispatch-time capacity error back to the queue (P1); tests
+- [x] T2.5 Conflict guard: shared-file detection, `conflict` answer, `force`, `waiting` handoff, auto-start on the blocker's terminal event, unwait; tests
 
 ## Phase 3: Surfaces (W3, R1, R2, R3, R9, R10, R11)
 

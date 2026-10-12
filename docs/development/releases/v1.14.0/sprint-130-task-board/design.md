@@ -417,7 +417,7 @@ When Give to would start an agent on a file that another card's agent is working
 
 ## 7. Your calls
 
-Four kinds. Order: blocked agents (Needs you) first, then decisions, then results and failures, newest first inside each. The badge counts all of them; its tooltip reads "3 tasks need you". Stopped is not a call.
+Four kinds. Order: blocked agents (Needs you) first, then decisions, then results and failures, longest-waiting first inside each (D11; the spec R7 is the contract). The badge counts all of them; its tooltip reads "3 tasks need you". Stopped is not a call.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
