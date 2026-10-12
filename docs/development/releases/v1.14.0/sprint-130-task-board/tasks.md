@@ -26,7 +26,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 
 - [ ] T3.1 `iconMap` gains `kanban` (and any other name design.md uses that is missing); `ritemark-design/references/iconography.md` lists it
 - [ ] T3.2 `media/tasks-icon.svg` (Phosphor, 256 viewBox, `currentColor`)
-- [ ] T3.3 `package.json`: container (declared first, lands after Home), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`
+- [ ] T3.3 `package.json`: container (declared first among Ritemark's, lands above Transcribe), view, `ritemark.openTaskBoard`, `ritemark.addTask`, activation event, `ritemark.features.task-board`
 - [ ] T3.4 `src/features/flags.ts`: `task-board`
 - [ ] T3.5 `src/views/TasksViewProvider.ts` (+ badge, flag notice, no-folder state)
 - [ ] T3.6 `src/taskBoard/TaskBoardPanel.ts` (+ serializer, `ritemark.openTaskBoard`)
@@ -49,6 +49,7 @@ Nothing here starts before Jarmo approves the plan in this sprint's session. The
 - [ ] T4.6 G4: last-message summary for Codex/OpenCode (per P5)
 - [ ] T4.7 G5: queued task items are not editable
 - [ ] T4.8 G6: `comment-task/dispatch-failed` → `failed`
+- [ ] T4.8a F1: neutral shadcn role tokens re-declared under `body.vscode-dark` in `webview/src/index.css`; outline/secondary buttons checked in dark mode on Settings, dialogs and the board
 - [ ] T4.9 Controller: give, follow-up, answer, stop, retry, open conversation, recover; result onto the card (report first, summary fallback, changed files, seconds); interrupted on restart; deleted conversation; locks while working
 - [ ] T4.9a Focus: no `ritemark.unifiedView.focus` on a handoff; hidden sidebar shown without focus (P7)
 - [ ] T4.10 `BoardController.test.ts`: handoff lifecycle end to end with injected sidebar fakes

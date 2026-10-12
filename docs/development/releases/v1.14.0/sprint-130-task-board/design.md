@@ -1,6 +1,7 @@
 # Sprint 130 Design — Task board in your project folder (#119)
 
 **Status:** Draft for plan approval (Phase 2). Settled with the `ux-expert` agent and the `ritemark-design` skill on 2026-10-11, before the technical plan.<br>
+**Prototype:** [prototype/task-board-prototype.html](./prototype/task-board-prototype.html), a clickable HTML prototype (2026-10-12) built from the installed Ritemark 1.13.0: its webview CSS and fonts, VS Code theme variables, measured window chrome, Phosphor icons and a real document view, in light and dark. Where the prototype and this text differ, the prototype is newer.<br>
 **System:** Ritemark Indigo-Editorial<br>
 **Scope:** activity-bar entry, side-bar view, editor-area board, card detail, Give to agent and the result coming back, Your calls, Ideas, Log, narrow width, state words. Storage, tools and runtime plumbing are in [technical-plan.md](./technical-plan.md).
 
@@ -47,7 +48,7 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | # | Decision | Why |
 |---|---|---|
 | 1 | Activity-bar entry **Tasks**, Phosphor `kanban`, badge = number of Your calls | `kanban` reads as "board" and differs from the four neighbours; the badge answers "is it done?" without switching |
-| 2 | **Place it right after Home** (proposed; the issue says "next to Home, Transcribe, Agent Library and Browser") | After Home it will be the most visited tool, and the only one with a badge. Extension-only either way (declaration order) |
+| 2 | **Place it first among Ritemark's own tools, just above Transcribe** (revised 2026-10-12) | Measured in the real app: VS Code's built-in entries (File Browser, Search, Source Control, Extensions) always come between Home and the extension containers, and only patch 002 can move a container next to Home. Above Transcribe needs no patch |
 | 3 | Side bar = daily glance; editor area = planning | Four columns cannot fit 280–480 px; a glance cannot wait for a tab. Same split as Transcribe |
 | 4 | Side bar as vertical sections; **a card shows once**, under the first section that applies (Your calls, else its stage) | Counts add up to what the user sees |
 | 5 | "Open board" is an icon button (`kanban`) beside the add field | Transcribe's one-row pattern; a title-bar icon is easy to miss for non-technical users |
@@ -167,7 +168,7 @@ At 280 px "Ask for changes…" is the icon button `[p]` with its tooltip; at 360
 └──────────────────────────────────────────────────────┘
 ```
 
-**Row menus.** The same list in More actions and the right-click menu, built from one action list (`RowMenus`, exported from `ConversationsPanel.tsx` rather than copied a third time). "Move to…" is a submenu; a disabled item says why in its label.
+**Row menus.** The same list in More actions and the right-click menu, built from one action list (`RowMenus`, exported from `ConversationsPanel.tsx` rather than copied a third time). "Move to…" expands its four stages in place inside the menu (a side-by-side submenu covers the menu at 280–420 px); a disabled item says why in its label. Near the bottom of the side bar the menu opens upward. A menu opened inside the card dialog uses the z-90 popover layer, so it shows above the dialog (Sprint 126 modal layering).
 
 | Card is | Menu |
 |---|---|
@@ -594,6 +595,6 @@ The ones the plan asks him to confirm, with the design's recommendation:
 2. A finished task waits in Doing as "Ready to review" until you press Mark done; agents never finish or delete a task. **Yes.**
 3. Four fixed columns: Idea, To do, Doing, Done. **Yes.**
 4. Ideas are reviewed only when you press Review; Drop hides an idea, Delete deletes it. **Yes.**
-5. The Tasks button sits right after Home (rather than after Transcribe). **After Home.**
+5. The Tasks button sits first among Ritemark's own tools, just above Transcribe. **Yes** (right after Home would need a VS Code patch, which makes the sprint shell-tier).
 6. Comment tasks and document checkboxes stay separate this sprint. **Yes.**
 7. Home's "New AI task" becomes "New AI conversation", so "task" means a board card. **Yes** (one string).

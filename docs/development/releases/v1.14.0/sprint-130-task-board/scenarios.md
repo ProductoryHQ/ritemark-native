@@ -7,7 +7,7 @@ These are the manual QA matrix on a dev instance. Run the Give to agent rows onc
 ### S1: First look in a project folder
 Given a project folder with no `.ritemark/tasks/`
 When I click Tasks in the activity bar
-Then the Tasks button sits right after Home
+Then the Tasks button sits just above Transcribe, the first of Ritemark's own tools
 And the side bar shows "Tasks for this project live here. Give any of them to an agent.", the "Add a task…" field and the Open board icon button beside it
 And no `.ritemark/tasks/` folder exists yet
 
