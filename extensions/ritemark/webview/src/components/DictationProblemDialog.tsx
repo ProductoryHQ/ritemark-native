@@ -8,22 +8,24 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, Dia
 import { Button } from './ui/button'
 import { Tooltip } from './ui/tooltip'
 import { Icon } from './ui/Icon'
-import { dictationProblemCopy, type DictationAction, type DictationProblem, type ProblemButton } from './dictationProblems'
+import { dictationProblemCopy, type DictationAction, type DictationProblem, type ProblemButton, type ProblemStage } from './dictationProblems'
 import type { WebviewPlatform } from '../hooks/usePlatform'
 
 export function DictationProblemDialog({
   problem,
   detail,
+  stage,
   platform,
   onAction,
 }: {
   problem: DictationProblem | null
   detail?: string
+  stage?: ProblemStage
   platform: WebviewPlatform
   onAction: (action: DictationAction) => void
 }) {
   if (!problem) return null
-  const copy = dictationProblemCopy(problem, platform, detail)
+  const copy = dictationProblemCopy(problem, platform, detail, stage)
 
   const button = (spec: ProblemButton, variant: 'default' | 'secondary') => (
     <Tooltip label={spec.tooltip} side="top">
@@ -35,12 +37,13 @@ export function DictationProblemDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onAction('close') }}>
-      <DialogContent aria-describedby="dictation-problem-body">
+      <DialogContent>
         <DialogHeader icon={<Icon name={copy.icon} size={20} />} onClose={() => onAction('close')}>
           <DialogTitle>{copy.title}</DialogTitle>
         </DialogHeader>
         <DialogBody>
-          <DialogDescription id="dictation-problem-body" className="text-sm leading-relaxed text-ink-body">
+          {/* Radix links the description to the dialog by its own id; overriding it raised a console warning. */}
+          <DialogDescription className="text-sm leading-relaxed text-ink-body">
             {copy.body.map((part, index) => part.strong
               ? <strong key={index} className="font-semibold text-ink-strong">{part.text}</strong>
               : <span key={index}>{part.text}</span>)}

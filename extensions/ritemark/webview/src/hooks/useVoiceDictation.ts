@@ -8,6 +8,7 @@ import {
   problemFromCapture,
   type DictationMode,
   type DictationProblem,
+  type ProblemStage,
 } from '../components/dictationProblems'
 
 /**
@@ -21,6 +22,12 @@ export type DictationState = 'idle' | 'preparing' | 'listening' | 'processing' |
 const DEFERRED_SEND_MS = 5000
 /** With no estimate yet, "This can take up to a minute" turns into "Still processing" after this. */
 const UNMEASURED_WAIT_SECONDS = 60
+/**
+ * A live microphone always has some noise. This long of exact zeros means it is
+ * muted or blocked, so dictation stops at once instead of recording nothing
+ * (Windows test, bugs B and C).
+ */
+const DIGITAL_SILENCE_SECONDS = 3
 
 /**
  * Get chunk duration from localStorage settings
@@ -41,8 +48,9 @@ function getChunkDuration(): number {
 /** Sprint 129 R5/R6: why dictation stopped, shown by DictationProblemDialog. */
 export interface DictationProblemState {
   code: DictationProblem
-  /** The host's own text, for the "generic" problem only. */
+  /** The host's own text for "generic"; the model size for "model-missing". */
   detail?: string
+  stage?: ProblemStage
 }
 
 export interface VoiceDictationHook {
@@ -188,7 +196,8 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
   const [mode, setMode] = useState<DictationMode>('live')
   const [problem, setProblem] = useState<DictationProblemState | null>(null)
   const [currentLanguage, setCurrentLanguage] = useState<string | null>(null)
-  const [waitSeconds, setWaitSeconds] = useState<number | null>(null)
+  // undefined until the host says; null when nothing is measured on this computer yet
+  const [waitSeconds, setWaitSeconds] = useState<number | null | undefined>(undefined)
   const [overdue, setOverdue] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -202,6 +211,9 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
   /** True from microphone start to Stop, whatever the button shows meanwhile. */
   const recordingRef = useRef<boolean>(false)
   const startCancelledRef = useRef<boolean>(false)
+  /** Samples seen so far, and whether any was not exactly zero. */
+  const silenceRef = useRef({ samples: 0, heard: false })
+  const stopRef = useRef<() => void>(() => undefined)
   const modeRef = useRef<DictationMode>('live')
 
   const isListening = state === 'listening'
@@ -297,10 +309,21 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
       processorRef.current = processor
 
       // Collect audio samples
+      silenceRef.current = { samples: 0, heard: false }
       processor.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0)
         // Copy the samples (they're reused by the audio system)
         audioBufferRef.current.push(new Float32Array(inputData))
+        const silence = silenceRef.current
+        if (!silence.heard) {
+          silence.heard = inputData.some(sample => sample !== 0)
+          silence.samples += inputData.length
+          if (!silence.heard && silence.samples >= actualSampleRateRef.current * DIGITAL_SILENCE_SECONDS) {
+            // Muted or blocked: stop now. The host finds only silence and says so.
+            silence.heard = true
+            window.setTimeout(() => stopRef.current(), 0)
+          }
+        }
       }
       // Connect: mic -> processor -> muted gain (prevents echo/feedback)
       // ScriptProcessor needs to be connected to output to process, but we mute it
@@ -430,7 +453,7 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
       // R8/R12: the host still turns the last speech into text; it answers
       // with "idle" when the text is in.
       setOverdue(false)
-      setWaitSeconds(null)
+      setWaitSeconds(undefined)
       setState('finishing')
       setProblem(null)
     } else {
@@ -443,6 +466,8 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
     startCancelledRef.current = true
     setState('idle')
   }, [])
+
+  stopRef.current = stopDictation
 
   const dismissProblem = useCallback(() => {
     setProblem(null)
@@ -475,11 +500,11 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
             // Only while recording; after Stop the button keeps "finishing".
             if (recordingRef.current) setState(status)
           } else if (status === 'finishing') {
-            setWaitSeconds(typeof message.waitSeconds === 'number' ? message.waitSeconds : null)
+            setWaitSeconds(typeof message.waitSeconds === 'number' ? message.waitSeconds : message.waitSeconds === null ? null : undefined)
             setState(current => current === 'error' ? current : 'finishing')
           } else if (status === 'idle') {
             setOverdue(false)
-            setWaitSeconds(null)
+            setWaitSeconds(undefined)
             setState(current => current === 'error' || recordingRef.current ? current : 'idle')
           }
           break
@@ -489,7 +514,8 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
           // Sprint 129 R6: the engine cannot run, or the model is missing.
           const code = message.problem as DictationProblem
           const detail = typeof message.detail === 'string' ? message.detail : undefined
-          setProblem(HOST_PROBLEMS.includes(code) ? { code, detail } : { code: 'generic' })
+          const stage: ProblemStage | undefined = message.stage === 'transcribing' ? 'transcribing' : undefined
+          setProblem(HOST_PROBLEMS.includes(code) ? { code, detail, stage } : { code: 'generic' })
           stopDictation({ keepProblem: true })
           break
         }

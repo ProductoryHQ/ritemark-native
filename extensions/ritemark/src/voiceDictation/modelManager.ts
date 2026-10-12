@@ -342,6 +342,9 @@ function formatSpeed(bytesPerSec: number): string {
   return `${(bytesPerSec / 1024 / 1024).toFixed(1)} MB/s`;
 }
 
+/** A download is running: a second one would write the same .partial file. */
+let downloadInFlight = false;
+
 /**
  * Show download dialog and handle model download
  */
@@ -357,66 +360,84 @@ export async function ensureModelDownloaded(
     return { success: false, error: `Unknown model: ${modelName}` };
   }
 
+  if (downloadInFlight) {
+    void vscode.window.showInformationMessage('The voice model is still downloading. Click the microphone again when it is done.');
+    return { success: false, cancelled: true };
+  }
+
   // Check for partial download
   const partialSize = getPartialSize(modelName);
   const hasPartial = partialSize > 0;
 
-  // Build message (keep short to fit one line)
   let message: string;
+  let detail: string;
   if (hasPartial) {
     const partialMB = Math.round(partialSize / 1024 / 1024);
     const totalMB = Math.round(modelInfo.size / 1024 / 1024);
-    message = `Resume download? (${partialMB}/${totalMB}MB done)`;
+    message = 'Resume downloading the voice model?';
+    detail = `${partialMB} of ${totalMB} MB are already downloaded.`;
   } else {
-    message = `Download voice model (${modelInfo.sizeDisplay})?`;
+    message = `Download the voice model (${modelInfo.sizeDisplay})?`;
+    detail = 'Dictation and on-device Transcribe use it. It downloads once; after that they work offline.';
   }
 
-  // Ask user to download
+  // Sprint 129 (Windows test, bug A): a modal dialog, not a toast. A toast slid
+  // into the notification centre when the window lost focus, and the mic then
+  // seemed to do nothing. A modal cannot get lost; Cancel comes with it.
   const response = await vscode.window.showInformationMessage(
     message,
-    hasPartial ? 'Resume' : 'Download',
-    'Cancel'
+    { modal: true, detail },
+    hasPartial ? 'Resume' : 'Download'
   );
 
   if (response !== 'Download' && response !== 'Resume') {
     return { success: false, cancelled: true };
   }
+  if (downloadInFlight) {
+    return { success: false, cancelled: true };
+  }
+  downloadInFlight = true;
 
   // Show progress
   let isCancelled = false;
 
-  const result = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: hasPartial ? 'Resuming download' : 'Downloading voice model',
-      cancellable: true
-    },
-    async (progress, token) => {
-      token.onCancellationRequested(() => {
-        isCancelled = true;
-      });
+  let result: Awaited<ReturnType<typeof downloadModel>>;
+  try {
+    result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: hasPartial ? 'Resuming download' : 'Downloading voice model',
+        cancellable: true
+      },
+      async (progress, token) => {
+        token.onCancellationRequested(() => {
+          isCancelled = true;
+        });
 
-      let lastPercent = 0;
+        let lastPercent = 0;
 
-      const downloadResult = await downloadModel(modelName, {
-        resume: true,
-        onCancel: () => isCancelled,
-        onProgress: (downloaded, total, speed) => {
-          const percent = Math.round((downloaded / total) * 100);
-          if (percent > lastPercent || speed > 0) {
-            const speedStr = speed > 0 ? ` • ${formatSpeed(speed)}` : '';
-            progress.report({
-              increment: percent - lastPercent,
-              message: `${percent}% (${formatBytes(downloaded)} / ${formatBytes(total)})${speedStr}`
-            });
-            lastPercent = percent;
+        const downloadResult = await downloadModel(modelName, {
+          resume: true,
+          onCancel: () => isCancelled,
+          onProgress: (downloaded, total, speed) => {
+            const percent = Math.round((downloaded / total) * 100);
+            if (percent > lastPercent || speed > 0) {
+              const speedStr = speed > 0 ? ` • ${formatSpeed(speed)}` : '';
+              progress.report({
+                increment: percent - lastPercent,
+                message: `${percent}% (${formatBytes(downloaded)} / ${formatBytes(total)})${speedStr}`
+              });
+              lastPercent = percent;
+            }
           }
-        }
-      });
+        });
 
-      return downloadResult;
-    }
-  );
+        return downloadResult;
+      }
+    );
+  } finally {
+    downloadInFlight = false;
+  }
 
   if (isCancelled) {
     vscode.window.showInformationMessage('Download paused. Click mic to resume.');

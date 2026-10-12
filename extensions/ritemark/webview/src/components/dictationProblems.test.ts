@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { dictationProblemCopy, dictationStateCopy, problemFromCapture, type DictationProblem } from './dictationProblems'
 
 const ALL: DictationProblem[] = [
-  'mic-blocked', 'mic-missing', 'mic-busy', 'mic-internal', 'mic-unexpected',
+  'mic-silent', 'mic-blocked', 'mic-missing', 'mic-busy', 'mic-internal', 'mic-unexpected',
   'engine-missing', 'engine-blocked', 'engine-cpu', 'engine-failed', 'engine-unavailable',
   'model-missing', 'generic',
 ]
@@ -80,7 +80,31 @@ assert.doesNotMatch(recording.placeholder! + recording.tooltip, /Listening|Dicta
 assert.match(dictationStateCopy('idle', 'deferred', 'Estonian').tooltip, /after you stop/)
 assert.equal(dictationStateCopy('idle', 'live', 'Estonian').tooltip, 'Start dictation (Estonian)')
 assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian', { seconds: 20 }).placeholder!, /about 20 seconds/)
-assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian').placeholder!, /up to a minute/)
+assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian', { seconds: null }).placeholder!, /up to a minute/)
+assert.equal(dictationStateCopy('finishing', 'deferred', 'Estonian').placeholder, '⏳ Processing your recording.', 'no "up to a minute" flash before the host answers')
 assert.match(dictationStateCopy('finishing', 'deferred', 'Estonian', { seconds: 20, overdue: true }).placeholder!, /Still processing/)
 assert.match(dictationStateCopy('finishing', 'live', 'Estonian').placeholder!, /last words/)
 assert.equal(dictationStateCopy('idle', 'deferred', 'Estonian').placeholder, null)
+
+// Windows test, bug C/B: "heard nothing" says what to check, per platform.
+const silentWin = dictationProblemCopy('mic-silent', 'win32')
+assert.equal(silentWin.title, 'Ritemark Heard Nothing')
+assert.match(silentWin.body[0].text, /muted/)
+assert.match(silentWin.body[0].text, /desktop apps/)
+assert.equal(silentWin.primary.action, 'open-mic-settings')
+assert.doesNotMatch(dictationProblemCopy('mic-silent', 'darwin').body[0].text, /Windows|desktop apps/)
+
+// Bug D: after recording, an engine problem says "Dictation Stopped", not "Can't Start".
+const late = dictationProblemCopy('engine-missing', 'win32', undefined, 'transcribing')
+assert.equal(late.title, 'Dictation Stopped')
+assert.match(late.body.map(p => p.text).join(''), /^Your recording couldn't be turned into text\. A part of Ritemark/)
+assert.equal(dictationProblemCopy('engine-missing', 'win32').title, "Dictation Can't Start")
+
+// Jarmo 2026-10-12: while recording, the button says what a click does.
+assert.equal(dictationStateCopy('listening', 'deferred', 'Estonian').label, 'Transcribe now')
+assert.equal(dictationStateCopy('finishing', 'deferred', 'Estonian').label, 'Transcribing…')
+assert.equal(dictationStateCopy('listening', 'live', 'Estonian').label, 'Stop')
+assert.equal(dictationStateCopy('idle', 'deferred', 'Estonian').label, null, 'idle shows the language')
+assert.match(dictationStateCopy('listening', 'deferred', 'Estonian').tooltip, /Estonian/, 'the language stays in the tooltip')
+
+console.log('dictationProblems.test.ts: R12/R13 and Windows-test additions passed')

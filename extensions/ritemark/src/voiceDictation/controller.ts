@@ -48,11 +48,40 @@ export const BACKLOG_NOTICE = "Dictation can't keep up on this computer, so it s
 /** Where the last call's duration is kept, for the next wait estimate (R12). */
 const CALL_MS_KEY = 'ritemark.dictation.lastCallMs';
 
+/** 100 ms of 16 kHz audio. */
+const FRAME_SAMPLES = 1600;
+/**
+ * A 100 ms frame louder than this (RMS, about -40 dBFS) may be speech. Room noise
+ * after the browser's gain control stays below it; even quiet speech is well above.
+ */
+const SPEECH_FRAME_RMS = 328;
+
+/**
+ * Sprint 129 (Windows test, bug C): whether the audio may hold speech. Whisper
+ * invents words for silence: a muted microphone's digital zeros came out as
+ * "Kõik põhjad, kõik põhjad." on Windows and "Kõige!" / "you" on the Mac.
+ * Silent audio is therefore never transcribed.
+ */
+export function hasSpeech(pcm: Buffer): boolean {
+  const samples = Math.floor(pcm.length / 2);
+  for (let start = 0; start < samples; start += FRAME_SAMPLES) {
+    const end = Math.min(samples, start + FRAME_SAMPLES);
+    let sum = 0;
+    for (let i = start; i < end; i += 1) {
+      const v = pcm.readInt16LE(i * 2);
+      sum += v * v;
+    }
+    if (Math.sqrt(sum / (end - start)) > SPEECH_FRAME_RMS) return true;
+  }
+  return false;
+}
+
 /**
  * Sprint 129 R6: what the webview's dictation dialog explains. The wording lives
  * there (webview/src/components/dictationProblems.ts), per platform.
  */
 export type DictationEngineProblem =
+  | 'mic-silent'
   | 'engine-missing'
   | 'engine-blocked'
   | 'engine-cpu'
@@ -140,6 +169,8 @@ export interface DictationDeps {
   recallCallMs: () => number | undefined;
   rememberCallMs: (ms: number) => void;
   now: () => number;
+  /** Whether audio may hold speech; silence is never transcribed. */
+  hasSpeech: (pcm: Buffer) => boolean;
 }
 
 export class DictationController {
@@ -151,6 +182,13 @@ export class DictationController {
   /** Deferred mode: text transcribed while recording, inserted after Stop. */
   private held: string[] = [];
   private lastCallMs: number | undefined;
+  /** When the running call started, for the wait estimate. */
+  private callStartedAt: number | null = null;
+  /** Whether any audio of this dictation held speech, and how much was captured. */
+  private heardSpeech = false;
+  private capturedBytes = 0;
+  /** A problem was already reported for this dictation. */
+  private reported = false;
   private readonly deps: DictationDeps;
 
   constructor(
@@ -170,6 +208,7 @@ export class DictationController {
       recallCallMs: () => context.globalState?.get<number>(CALL_MS_KEY),
       rememberCallMs: (ms) => { void context.globalState?.update(CALL_MS_KEY, ms); },
       now: () => Date.now(),
+      hasSpeech,
       ...deps,
     };
     this.lastCallMs = this.deps.recallCallMs();
@@ -184,6 +223,9 @@ export class DictationController {
     this.pending = [];
     this.pendingBytes = 0;
     this.held = [];
+    this.heardSpeech = false;
+    this.capturedBytes = 0;
+    this.reported = false;
 
     this.webview.postMessage({
       type: 'dictation:status',
@@ -209,6 +251,7 @@ export class DictationController {
 
     this.pending.push(pcm);
     this.pendingBytes += pcm.length;
+    this.capturedBytes += pcm.length;
 
     if (this.deps.mode === 'live' && this.pendingBytes > BACKLOG_STOP_SECONDS * BYTES_PER_SECOND) {
       // Stop taking audio; what was captured is still transcribed and inserted.
@@ -235,11 +278,17 @@ export class DictationController {
         this.webview.postMessage({
           type: 'dictation:status',
           status: 'finishing',
-          waitSeconds: this.deps.mode === 'deferred' ? this.estimateWaitSeconds() : undefined,
+          // null: nothing measured yet on this computer (the webview says "up to a minute")
+          waitSeconds: this.deps.mode === 'deferred' ? (this.estimateWaitSeconds() ?? null) : undefined,
         });
         await this.ensureDraining();
       }
       this.flushHeld();
+      if (!this.heardSpeech && !this.reported && this.capturedBytes >= BYTES_PER_SECOND) {
+        // Only silence came in: a muted microphone, or one the system blocks.
+        this.reported = true;
+        this.webview.postMessage({ type: 'dictation:problem', problem: 'mic-silent' });
+      }
     } finally {
       // Always answered, so the webview's button never waits for good.
       this.webview.postMessage({
@@ -290,8 +339,11 @@ export class DictationController {
    */
   private estimateWaitSeconds(): number | undefined {
     if (!this.lastCallMs) return undefined;
-    const calls = Math.max(1, Math.ceil(this.pendingBytes / (MAX_CALL_SECONDS * BYTES_PER_SECOND)) + (this.draining ? 1 : 0));
-    return Math.ceil((this.lastCallMs * calls) / 10_000) * 10;
+    // The running call is part done; count only what is left of it (Windows
+    // test: counting it whole showed "about 70" for a 50 s wait).
+    const running = this.callStartedAt === null ? 0 : Math.max(0, this.lastCallMs - (this.deps.now() - this.callStartedAt));
+    const queued = Math.ceil(this.pendingBytes / (MAX_CALL_SECONDS * BYTES_PER_SECOND)) * this.lastCallMs;
+    return Math.max(10, Math.ceil((running + queued) / 10_000) * 10);
   }
 
   /** Deferred mode: insert the held text, in the order it was spoken. */
@@ -307,6 +359,15 @@ export class DictationController {
       const pcm = this.takePending(MAX_CALL_SECONDS * BYTES_PER_SECOND);
       const live = this.deps.mode === 'live';
 
+      if (!this.deps.hasSpeech(pcm)) {
+        // Silence: nothing to transcribe (whisper would invent words for it).
+        if (live && this.isRecording) {
+          this.webview.postMessage({ type: 'dictation:status', status: 'listening' });
+        }
+        continue;
+      }
+      this.heardSpeech = true;
+
       if (live) {
         this.webview.postMessage({
           type: 'dictation:status',
@@ -321,6 +382,7 @@ export class DictationController {
       }
 
       const started = this.deps.now();
+      this.callStartedAt = started;
       let result: TranscriptionResult;
       try {
         result = await this.deps.transcribe(buildPcmWav(pcm), {
@@ -334,6 +396,8 @@ export class DictationController {
         console.error('[DictationController] Transcription threw:', error);
         this.fail('engine-failed');
         return;
+      } finally {
+        this.callStartedAt = null;
       }
       if (result.success) {
         // Only real calls feed the wait estimate; a quick failure would skew it.
@@ -401,10 +465,14 @@ export class DictationController {
     this.isRecording = false;
     this.pending = [];
     this.pendingBytes = 0;
+    this.reported = true;
     this.webview.postMessage({
       type: 'dictation:problem',
       problem,
-      detail
+      detail,
+      // Speech was captured and could not be turned into text: the dialog says
+      // "Dictation Stopped", not "Can't Start" (Windows test, bug D).
+      stage: 'transcribing',
     });
   }
 }

@@ -15,6 +15,7 @@ import {
   parseDictationStdout,
   probeWhisper,
   resetWhisperProbeCache,
+  stripNonSpeech,
   whisperThreads,
   withFileRetry,
 } from './whisperCpp';
@@ -81,6 +82,8 @@ async function run(): Promise<void> {
   assert.deepEqual(ok.calls, [['--help']]);
   assert.equal(await probeWhisper('/x/whisper-cli', { spawn: ok.spawn, exists: () => true }), 'ready');
   assert.equal(ok.calls.length, 1, 'ready is not probed twice');
+  // Windows test, bug D: a cached "ready" is dropped once the file is gone.
+  assert.equal(await probeWhisper('/x/whisper-cli', { spawn: ok.spawn, exists: () => false }), 'missing');
 
   resetWhisperProbeCache();
   assert.equal(await probeWhisper('/x/whisper-cli', { exists: () => false }), 'missing');
@@ -131,6 +134,15 @@ async function run(): Promise<void> {
   process.env.RITEMARK_DICTATION_MODE = 'sideways';
   assert.equal(dictationModeFor('darwin', 'arm64'), 'live', 'an unknown override is ignored');
   delete process.env.RITEMARK_DICTATION_MODE;
+
+  // Windows test, bug C: whisper's labels for non-speech never reach the document.
+  assert.equal(stripNonSpeech('*music*'), '');
+  assert.equal(stripNonSpeech('[BLANK_AUDIO]'), '');
+  assert.equal(stripNonSpeech('♪ ♪'), '');
+  assert.equal(stripNonSpeech('Tere. (Applause) Aitäh. [Music]'), 'Tere. Aitäh.');
+  assert.equal(stripNonSpeech('(muusika) Kõik on hästi.'), 'Kõik on hästi.');
+  assert.equal(stripNonSpeech('Meeting (part two) starts at nine.'), 'Meeting (part two) starts at nine.', 'ordinary parentheses stay');
+  assert.equal(parseDictationStdout('\n *music*\n'), '');
 
   console.log('whisperCpp.test.ts: all tests passed');
 }

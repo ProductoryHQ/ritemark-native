@@ -142,6 +142,25 @@ function filterHallucinations(text: string): string {
   return filtered.trim();
 }
 
+/** Words whisper puts in parentheses for sounds that are not speech. */
+const NON_SPEECH_WORDS = 'music|applause|laughter|laughs|laughing|silence|noise|inaudible|blank_audio|coughs?|sighs?|muusika|aplaus|naer|vaikus|müra';
+
+/**
+ * Sprint 129 (Windows test, bug C): whisper labels sounds it heard but that were
+ * not speech, such as "*music*", "[BLANK_AUDIO]", "(applause)" or "♪". None of it
+ * is dictation. Square brackets and asterisks never come from speech in its
+ * output; parentheses only go when they hold a non-speech word.
+ */
+export function stripNonSpeech(text: string): string {
+  return text
+    .replace(/\[[^\]\n]{0,40}\]/g, ' ')
+    .replace(/\*[^*\n]{1,40}\*/g, ' ')
+    .replace(new RegExp(`\\(\\s*(?:${NON_SPEECH_WORDS})[^)\\n]{0,30}\\)`, 'gi'), ' ')
+    .replace(/♪+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * The dictated text in whisper-cli's stdout.
  *
@@ -160,7 +179,7 @@ export function parseDictationStdout(stdout: string): string {
     return true;
   });
 
-  return filterHallucinations(lines.map(line => line.trim()).join(' ').trim());
+  return filterHallucinations(stripNonSpeech(lines.map(line => line.trim()).join(' ')));
 }
 
 /**
@@ -424,10 +443,15 @@ export async function probeWhisper(
   binaryPath: string,
   deps: { spawn?: SpawnFn; exists?: (file: string) => boolean } = {}
 ): Promise<WhisperReadiness> {
-  if (readyBinaries.has(binaryPath)) return 'ready';
+  const exists = deps.exists ?? fs.existsSync;
+  if (readyBinaries.has(binaryPath)) {
+    // A cached "ready" still needs the file: it can be removed while Ritemark
+    // runs (Windows test, bug D), and dictation must say so before recording.
+    if (exists(binaryPath)) return 'ready';
+    readyBinaries.delete(binaryPath);
+  }
   const recent = recentFailures.get(binaryPath);
   if (recent && Date.now() - recent.at < FAILURE_MEMORY_MS) return recent.readiness;
-  const exists = deps.exists ?? fs.existsSync;
   if (!exists(binaryPath)) {
     recentFailures.set(binaryPath, { readiness: 'missing', at: Date.now() });
     return 'missing';

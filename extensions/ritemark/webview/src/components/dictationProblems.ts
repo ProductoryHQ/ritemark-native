@@ -14,6 +14,7 @@ import type { CaptureFailureCode } from './transcribe/recording/capture'
 import type { WebviewPlatform } from '../hooks/usePlatform'
 
 export type DictationProblem =
+  | 'mic-silent'
   | 'mic-blocked'
   | 'mic-missing'
   | 'mic-busy'
@@ -47,7 +48,7 @@ export interface ProblemCopy {
 
 /** Problem codes the extension host may send; anything else is shown as "generic". */
 export const HOST_PROBLEMS: readonly DictationProblem[] = [
-  'engine-missing', 'engine-blocked', 'engine-cpu', 'engine-failed', 'engine-unavailable', 'model-missing',
+  'mic-silent', 'engine-missing', 'engine-blocked', 'engine-cpu', 'engine-failed', 'engine-unavailable', 'model-missing',
 ]
 
 export function problemFromCapture(code: CaptureFailureCode): DictationProblem {
@@ -76,9 +77,42 @@ function retry(tooltip: string): ProblemButton {
   return { label: 'Try Again', tooltip, action: 'retry' }
 }
 
-export function dictationProblemCopy(problem: DictationProblem, platform: WebviewPlatform, detail?: string): ProblemCopy {
+/**
+ * When the problem came up. `transcribing`: speech was recorded and could not be
+ * turned into text, so the dialog says "Dictation Stopped" rather than "Can't
+ * Start" (Windows test, bug D).
+ */
+export type ProblemStage = 'starting' | 'transcribing'
+
+export function dictationProblemCopy(problem: DictationProblem, platform: WebviewPlatform, detail?: string, stage: ProblemStage = 'starting'): ProblemCopy {
+  const copy = problemCopy(problem, platform, detail)
+  if (stage === 'transcribing' && copy.title === "Dictation Can't Start") {
+    return {
+      ...copy,
+      title: 'Dictation Stopped',
+      body: [{ text: "Your recording couldn't be turned into text. " }, ...copy.body],
+    }
+  }
+  return copy
+}
+
+function problemCopy(problem: DictationProblem, platform: WebviewPlatform, detail?: string): ProblemCopy {
   const windows = platform === 'win32'
   switch (problem) {
+    case 'mic-silent':
+      // Windows test, bug C/B: a muted microphone (or one Windows blocks) sends
+      // only zeros, and whisper invented words for them.
+      return {
+        title: 'Ritemark Heard Nothing',
+        body: [{
+          text: windows
+            ? 'Your microphone sent only silence. Check that it isn\'t muted (many laptops have a mute key) and that Windows lets desktop apps use it.'
+            : 'Your microphone sent only silence. Check that it isn\'t muted, and that Ritemark is allowed to use it in Microphone settings.',
+        }],
+        icon: 'microphone',
+        primary: openSettings(platform),
+        secondary: retry('Start dictation again'),
+      }
     case 'mic-blocked':
       return windows
         ? {
@@ -214,6 +248,8 @@ export interface DictationStateCopy {
   tooltip: string
   /** Text shown at the cursor in the document, or null for none. */
   placeholder: string | null
+  /** The mic button's label, or null to show the language. */
+  label: string | null
 }
 
 /**
@@ -233,27 +269,34 @@ export function dictationStateCopy(
       return {
         tooltip: deferred ? `Start dictation (${language}). Your text appears after you stop.` : `Start dictation (${language})`,
         placeholder: null,
+        label: null,
       }
     case 'preparing':
-      return { tooltip: 'Getting the microphone ready... Click to cancel.', placeholder: null }
+      return { tooltip: 'Getting the microphone ready... Click to cancel.', placeholder: null, label: null }
     case 'listening':
+      // Jarmo, 2026-10-12: while recording the button says what a click does.
       return deferred
-        ? { tooltip: `Recording in ${language}. Click to stop and get your text.`, placeholder: '🎤 Recording... your text appears after you stop' }
-        : { tooltip: `Dictating in ${language} - click to stop`, placeholder: '🎤 Listening...' }
+        ? { tooltip: `Recording in ${language}. Click to stop and get your text.`, placeholder: '🎤 Recording... your text appears after you stop', label: 'Transcribe now' }
+        : { tooltip: `Dictating in ${language} - click to stop`, placeholder: '🎤 Listening...', label: 'Stop' }
     case 'processing':
       // Live only: a part of the speech is being turned into text while recording goes on.
-      return { tooltip: `Dictating in ${language} - click to stop`, placeholder: '⏳ Processing...' }
+      return { tooltip: `Dictating in ${language} - click to stop`, placeholder: '⏳ Processing...', label: 'Stop' }
     case 'finishing':
       if (!deferred) {
-        return { tooltip: 'Adding your last words. Please wait.', placeholder: '⏳ Adding your last words...' }
+        return { tooltip: 'Adding your last words. Please wait.', placeholder: '⏳ Adding your last words...', label: 'Finishing…' }
       }
       return {
         tooltip: "Processing your recording. Your text will be added when it's done.",
+        // seconds: undefined until the host answers (no "up to a minute" flash),
+        // null when nothing has been measured on this computer yet.
         placeholder: wait.overdue
           ? '⏳ Still processing. This computer needs a little longer.'
-          : wait.seconds
-            ? `⏳ Processing your recording. This usually takes about ${wait.seconds} seconds.`
-            : '⏳ Processing your recording. This can take up to a minute.',
+          : wait.seconds === undefined
+            ? '⏳ Processing your recording.'
+            : wait.seconds
+              ? `⏳ Processing your recording. This usually takes about ${wait.seconds} seconds.`
+              : '⏳ Processing your recording. This can take up to a minute.',
+        label: 'Transcribing…',
       }
   }
 }

@@ -170,7 +170,7 @@ export function VoiceDictationButton() {
           icon: <Icon name="warning" size={16} />,
           color: 'var(--r-warning)',
           title: problem
-            ? `${dictationProblemCopy(problem.code, webviewPlatform, problem.detail).title}. Click to try again.`
+            ? `${dictationProblemCopy(problem.code, webviewPlatform, problem.detail, problem.stage).title}. Click to try again.`
             : 'Dictation stopped. Click to try again.'
         }
     }
@@ -190,7 +190,8 @@ export function VoiceDictationButton() {
         >
           {icon}
           <span className="dictation-label">
-            {isActive ? getLanguageName(currentLanguage || lastLanguage) : lastLanguage.toUpperCase()}
+            {(isActive && dictationStateCopy(state, mode, '').label)
+              || (isActive ? getLanguageName(currentLanguage || lastLanguage) : lastLanguage.toUpperCase())}
           </span>
         </button>
       </Tooltip>
@@ -271,6 +272,7 @@ export function VoiceDictationButton() {
         }
 
         .dictation-label {
+          white-space: nowrap;
           font-weight: 400;
         }
 
@@ -421,6 +423,7 @@ export function VoiceDictationButton() {
       <DictationProblemDialog
         problem={problem?.code ?? null}
         detail={problem?.detail}
+        stage={problem?.stage}
         platform={webviewPlatform}
         onAction={handleProblemAction}
       />
