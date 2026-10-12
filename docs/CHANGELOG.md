@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dictation's start can be cancelled (Sprint 129).** Clicking the microphone again while it got ready did nothing, and the microphone then started anyway. It now cancels.
 - **Dictation on Intel Macs no longer fails silently (Sprint 129, #203).** It downloaded the 1.5 GB model and then never inserted any text.
 - **Dictated sentences containing "processing" are kept (Sprint 129).** A filter for status lines dropped them.
+- **Silence no longer turns into invented text (Sprint 129).** With the microphone muted, or during a long pause, Whisper made up words such as "Kõige!" or "you". Silent audio is now skipped. A dictation that heard nothing at all says so ("Ritemark Heard Nothing") and names the mute key and the microphone setting, and a muted or blocked microphone is noticed within a few seconds.
+- **The download prompt can't get lost (Sprint 129).** The voice-model download and resume prompts are dialogs now. As a notification, the prompt could slide out of sight, and the microphone then seemed to do nothing.
+- **The microphone button says what a click does (Sprint 129).** While you dictate it reads **Transcribe now** on Windows and Intel Macs (**Stop** on Apple silicon), and **Transcribing…** / **Finishing…** while the text is on its way.
 
 ## [1.13.0] — 2026-10-11
 

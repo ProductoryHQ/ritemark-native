@@ -18,5 +18,8 @@
 - **The dictation note stays out of your file.** The grey **Listening...** note at the cursor used to be saved into the document while you dictated. It is now drawn on top of the document and never saved.
 - **Cancel a start.** Clicking the microphone again while it gets ready now cancels.
 - **Intel Macs.** Dictation used to download the speech model and then never insert any text there.
+- **Silence stays silent.** A muted microphone or a long pause no longer turns into invented words. If Ritemark heard nothing at all, it says so and tells you what to check, and it notices a muted microphone within a few seconds.
+- **A clear button.** While you dictate, the microphone button says what a click does: **Transcribe now**, or **Stop** on Apple silicon Macs.
+- **The download prompt stays in view.** The voice-model download and resume prompts are dialogs, so they can't slide out of sight.
 
 New: a guide to [voice dictation](../../user/features/dictation.md).

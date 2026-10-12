@@ -59,3 +59,55 @@ Also fixed from the review:
 **Test-setup note:** a dev window covered by other windows reports `visibilityState: hidden` and stops rendering. Its editors then can't confirm a document update in time: `apply-error`, a **Retry document update** button, and edits that aren't saved. That is the known occlusion effect, not a product defect. Launch with `--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling`, placed after the folder argument (`code.sh` would otherwise take the folder as a flag's value). Audio also needs one real mouse click into the webview first.
 
 **Since fixed on main:** the "multiple default editors" note for `.wav` files seen above is fixed by #412.
+
+## Windows branch test, stage B (2026-10-12)
+
+Run by the "Ritemark on Windows" session with Jarmo at the PC, relayed by the Development manager. Overlay artifact 11756844647 (`d38be0ad`) over the installed 1.13.0; Ryzen 7 5825U, built-in Realtek microphone.
+
+| Scenario | Result |
+|---|---|
+| Model offer and download | "Download voice model (834 MB)?", then "Voice model ready!". The file is 874,188,075 B with the right SHA-256, and Transcribe On-device used it |
+| Resume | Paused at 33%: "Resume download? (313/834MB done)"; it continued from the `.partial` file |
+| Engine missing | In a fresh window, the dialog at once and no download offered |
+| English dictation | 97 words (33.7 s), WER 6.2%, in order, last sentence present. Estonian: "eesti keelt testisin varem see oli ok" (Jarmo) |
+| Transcribe | A 4:27 WAV (the FLEURS stream) at 16.6% WER; a 22 s recording worked |
+| m4a | Pass |
+| Microphone access off (fresh window) | "Microphone Access Is Off", **Try Again**, and **Open Microphone Settings** opened the right page |
+| Recording copy and tooltips | As built; the document didn't change while recording |
+| Processing | Spinner, button disabled, the note with the estimate (table below) |
+| Typing elsewhere while it processes | Pass |
+
+Estimate shown against the actual wait:
+
+| Recording | Shown | Actual |
+|---|---|---|
+| 27.0 s | "up to a minute" | 29.4 s |
+| 65.9 s | about 60 (flashed "up to a minute" first) | 43.7 s |
+| 42.4 s | about 50 | 42.0 s |
+| 26.7 s | about 30 | 32.1 s |
+| 33.7 s | about 70 | 50.3 s |
+| 10.2 s | about 30 | 29.7 s |
+| 19.0 s | about 30 | 34.5 s |
+
+**Not run:** MP3 Transcribe, cancelling a transcription, no microphone, microphone in use, and the two-minute recording on a busy CPU.
+
+**Bugs found, all fixed in this sprint (R14):**
+- **C:** a hardware-muted microphone's silence became invented text, with no message. Reproduced on the Mac: 28 s of zeros gave "Kõige!" (et) and "you" (en).
+- **B:** with microphone access turned off after the window had dictated, there was no dialog; it "recorded", processed and inserted nothing.
+- **A:** the resume prompt slid into the notification centre, and the mic then seemed to do nothing.
+- **D:** an engine removed after the readiness check was found only after Stop, under a "Can't Start" title.
+- The two estimate issues (the running call counted whole, and the "up to a minute" flash) are fixed too.
+
+## Mac dev instance after the R14 fixes (2026-10-12)
+
+Deferred mode via the QA switch, launched with the anti-backgrounding flags. Audio was started after one real click into the editor.
+
+| Check | Result |
+|---|---|
+| Muted microphone (a stream of exact zeros) | The button read **Transcribe now**. About 3 s later recording stopped by itself: `finishing`, `mic-silent`, `idle`. **Ritemark Heard Nothing** offered **Try Again** and **Open Microphone Settings** ([qa/mac-heard-nothing.png](qa/mac-heard-nothing.png)). Nothing was inserted, and the file was unchanged |
+| Real speech (English) | **Transcribe now** while recording; **Transcribing…**, disabled, right after Stop ([qa/mac-transcribing-label.png](qa/mac-transcribing-label.png)); then **EN**, with the text in the file. The note said "This can take up to a minute.", correct with no call measured yet |
+| Engine removed after a dictation in the same window | The next mic click showed "Dictation Can't Start" before any recording. The engine file was restored, and git shows it unchanged |
+| Silence on the Mac engine before the fix | 28 s of zeros gave "Kõige!" (et) and "you" (en); faint hiss gave "Kõige." / "so". Now such audio is never sent to the engine |
+| Console | Radix warned that the problem dialog's description was missing (Sprint 129 code: it overrode the description id). Fixed and re-checked: `aria-describedby` points at the description, and the warning is gone |
+
+**Not checked by hand:** the modal download/resume prompt. The model was present, and it is a VS Code API option; the Windows re-test covers it.

@@ -9,7 +9,7 @@ Release tier: shell (new native binaries under `extensions/ritemark/binaries/win
 
 ## SDD Artifacts
 
-- [spec.md](./spec.md): behaviour contract R1–R13
+- [spec.md](./spec.md): behaviour contract R1–R14
 - [scenarios.md](./scenarios.md): manual QA matrix, by stage
 - [technical-plan.md](./technical-plan.md): workstreams W0–W14
 - [tasks.md](./tasks.md): implementation tracker
@@ -67,6 +67,14 @@ Windows users can dictate into documents and transcribe recordings on their own 
   - **Wording:** kept as built, including "Click to cancel." on the start-up tooltip. Revisit if the Windows test finds wording that reads wrong.
   - **Intel Macs follow Windows:** "speak, then text" and the q8_0 model (R12, R13). They are CPU-only and slower than Jarmo's laptop.
   - **Background pieces accepted:** transcribe in pieces of up to 28 s while the user talks, holding the text until Stop.
+- **2026-10-12, after the Windows branch test (the Development manager, on Jarmo's delegation):** fix bugs A–D in this sprint (R14).
+  - Remove stays under Dictation Settings → Model.
+  - The missing-engine wording stays as built.
+  - The note may sit inside a heading: it goes where the caret is, like typing.
+  - MP3 Transcribe, cancelling a transcription and the fixes go to a Windows re-test. The two-minute recording on a busy CPU and "microphone in use" move to the v1.14.0 Gate 2 list.
+- **2026-10-12 (Jarmo, relayed):** "kui nupp on aktiivne st dictation käib siis peaks olema nupul tekst: Transcribe now, mitte enam Estonian".
+  - While recording, the button reads **Transcribe now** ("speak, then text"), then **Transcribing…** while processing; the tooltip keeps the language.
+  - Live mode on Apple silicon (Claude's choice): **Stop**, then **Finishing…**. "Transcribe now" would be wrong there, because the text is already appearing.
 
 Proposed 2026-10-11 and approved with the plan:
 

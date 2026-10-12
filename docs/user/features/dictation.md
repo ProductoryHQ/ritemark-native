@@ -20,7 +20,7 @@ Dictation types what you say at the cursor in any Markdown document. The speech 
 
 Put the cursor where the text should go, then click the microphone in the document header. The button shows the language it will use, such as **ET**. To use another language, open the arrow beside it and pick one; dictation starts in that language, and the button remembers it.
 
-The first time, Ritemark offers to download the speech model, once. When the download finishes, click the microphone again.
+The first time, Ritemark asks whether to download the speech model, once. When the download finishes, click the microphone again. If you stop the download, the next click offers to resume it.
 
 | Computer | Speech model |
 | --- | --- |
@@ -40,12 +40,12 @@ The grey note is not part of your document and is never saved into the file.
 
 ### 3. Stop
 
-Click the microphone again.
+Click the microphone again. While you dictate, its label says what a click does: **Stop** on a Mac with Apple silicon, **Transcribe now** on Windows and Intel Macs.
 
 - **Mac with Apple silicon:** the note says **Adding your last words...** for a moment, and the last sentence goes in.
 - **Windows and Intel Macs:** the note says **Processing your recording** and how long it usually takes on your computer. On a typical laptop that is about 20 seconds, also after a long dictation. Then all of the text goes in at once, in the order you said it.
 
-While the text is on its way the microphone button is unavailable. Hover over it to see why.
+While the text is on its way the microphone button is unavailable (**Finishing…** or **Transcribing…**). Hover over it to see why.
 
 ---
 
@@ -73,6 +73,7 @@ Ritemark says what stopped it, in a dialog, with a button that helps:
 | **Dictation Can't Start**: Windows Security or your antivirus stopped it | Allow Ritemark in Windows Security or your antivirus, then **Try Again**. See also [Windows Smart App Control](../windows-smart-app-control.md) |
 | **Dictation Can't Start**: needs a newer processor | The processor is too old for on-device speech recognition; dictation can't run on this computer |
 | **Speech Model Needed** | **Download Speech Model** downloads it again |
+| **Ritemark Heard Nothing** | The microphone sent only silence. Check that it isn't muted (many laptops have a mute key); on Windows, also that desktop apps may use it. Ritemark stops after a few seconds of total silence, so you don't talk into a muted microphone for long |
 
 Ritemark checks that dictation can run on your computer before it offers the download, so the model is never downloaded for nothing.
 
@@ -81,6 +82,8 @@ Ritemark checks that dictation can run on your computer before it offers the dow
 ## Good to Know
 
 **Accuracy.** Whisper is good with clear speech and common words, and weaker with names, product terms and switching languages in mid-sentence. Read the text through once.
+
+**Silence is skipped.** Pauses in your speech are never turned into text, so a long pause doesn't add invented words.
 
 **Pauses help.** Ritemark cuts the audio into pieces at fixed times, so a word that lands on a cut can come out wrong. Pausing briefly between sentences gives the cleanest text. Cutting at your pauses is planned ([#411](https://github.com/ProductoryHQ/ritemark-native/issues/411)).
 

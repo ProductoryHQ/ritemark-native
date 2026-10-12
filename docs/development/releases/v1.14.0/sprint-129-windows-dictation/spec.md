@@ -175,6 +175,18 @@ Acceptance criteria:
 - Apple silicon keeps `ggml-large-v3-turbo.bin`. A model already downloaded for one platform is never deleted by the other's logic.
 - Evidence: FLEURS Estonian WER 14.8% against 14.2% for f16 on the Windows PC, 19.5% against 19.2% on 100 clips on the Mac; half the download; 1.13× faster on the Ryzen.
 
+### R14: Honest about silence and late failures (added 2026-10-12, from the Windows branch test)
+
+The Windows test (Jarmo's PC, overlay `d38be0ad`) found four defects. The Development manager decided, on Jarmo's delegation, that they are fixed in this sprint.
+
+Acceptance criteria:
+- **Silence is never transcribed (bug C).** Whisper invents text for silence: a hardware-muted microphone's zeros became "Kõik põhjad, kõik põhjad." on Windows, and "Kõige!" / "you" on the Mac. Audio with no 100 ms frame above about -40 dBFS (RMS) is skipped, on every platform. Whisper's non-speech labels (`*music*`, `[BLANK_AUDIO]`, `(applause)`, `♪`) are removed from dictated text.
+- **"Ritemark heard nothing" (bugs C and B).** If a dictation held no speech at all, nothing is inserted and the dialog says so. On Windows it names the mute key and the desktop-apps setting, and offers **Open Microphone Settings**. Three seconds of exact digital zeros (a muted or blocked microphone) stop the recording at once. Every recording asks the browser for a fresh microphone stream.
+- **The download prompt can't get lost (bug A).** The download and resume prompts are modal dialogs, not toasts that slide into the notification centre. A second download never starts while one is running.
+- **A missing engine is found before recording (bug D).** A cached "ready" is re-checked against the file on every mic click. A failure after recording says "Dictation Stopped: your recording couldn't be turned into text", not "Can't Start".
+- **The button says what a click does (Jarmo, 2026-10-12).** In "speak, then text" the label reads **Transcribe now** while recording and **Transcribing…** while processing. In live mode it reads **Stop** and **Finishing…** (Claude's choice, told to the Development manager). Idle keeps the language code, and the tooltip keeps the language.
+- **The wait estimate** counts only what is left of the running call. Before the host answers, the note shows no estimate, so "up to a minute" no longer flashes first.
+
 ## Non-Requirements
 
 - No GPU acceleration on Windows (Vulkan/CUDA). Measured as far as a build (config VK); Jarmo took it out of v1.14.0 on 2026-10-12.

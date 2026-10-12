@@ -36,14 +36,15 @@ Then the text appears in the document and the transcript opens
 ### Scenario: First dictation on Windows offers the model (B)
 Given a fresh profile with no model in `%USERPROFILE%\.ritemark\models`
 When I click the microphone button
-Then Ritemark asks "Download voice model (1.5GB)?"
-And after the download, the next click starts listening
+Then Ritemark asks, in a dialog that stays in front, "Download the voice model (834 MB)?"
+And after the download, the next click starts recording
 
 ### Scenario: Engine missing — no download offered (U, B)
 Given `whisper-cli.exe` is removed from the test copy
 When I click the microphone button
-Then I see "Ritemark's speech engine is missing from this installation. Reinstall Ritemark to restore it."
+Then I see "A part of Ritemark that dictation needs is missing. Reinstalling Ritemark will restore it." (wording kept by the Development manager, 2026-10-12)
 And no download is offered
+And the same happens in a window that already dictated before the file was removed (Windows test, bug D)
 
 ### Scenario: Intel Mac without a binary (U; only if R2 is declined)
 Given darwin-x64 with no `binaries/darwin-x64/`
@@ -116,8 +117,8 @@ Then the dialog names System Settings → Privacy & Security → Microphone and 
 ### Scenario: Resume and remove (B)
 Given a model download interrupted at about 40%
 When I click the microphone button again
-Then Ritemark offers "Resume download?" and finishes it
-And Settings → Component readiness → Voice model → Remove deletes the file in `%USERPROFILE%\.ritemark\models`
+Then Ritemark offers "Resume downloading the voice model?" in a dialog that stays in front, even when the window lost focus meanwhile (Windows test, bug A), and finishes it
+And Dictation Settings → Model → Remove deletes the file in `%USERPROFILE%\.ritemark\models` (location kept by the Development manager, 2026-10-12)
 
 ### Scenario: Antivirus holds the new file (U)
 Given rename fails with `EPERM` twice and then succeeds
@@ -211,6 +212,34 @@ Then the microphone does not start and the button is idle
 Given an Apple silicon Mac in the normal mode
 When I dictate and press Stop
 Then text appears while I speak, and after Stop the button shows "Adding your last words" until the last words are in
+
+## Feature: Honest about silence and late failures (R14, Windows test 2026-10-12)
+
+### Scenario: A muted microphone (B, M)
+Given the laptop's microphone is muted with its hardware key
+When I click the microphone and talk
+Then within about 3 seconds recording stops and "Ritemark Heard Nothing" asks me to check the mute key and the Windows setting, with **Open Microphone Settings**
+And nothing is inserted into the document
+
+### Scenario: Microphone access turned off after dictating (B)
+Given this window has dictated before
+When I turn off "Let desktop apps access your microphone" and click the microphone again
+Then I see a microphone dialog ("Microphone Access Is Off" or "Ritemark Heard Nothing") within about 3 seconds, and nothing is inserted
+
+### Scenario: Silence between sentences (B, M, U)
+Given I pause for half a minute in the middle of dictating
+When I press Stop
+Then the text has no invented words for the pause (such as "Kõige!", "you" or "*music*")
+
+### Scenario: The engine fails after recording (U)
+Given the engine fails while my recording is being transcribed
+Then the dialog says "Dictation Stopped" and that the recording couldn't be turned into text, not "Can't Start"
+
+### Scenario: The button says what a click does (B, M)
+Given "speak, then text"
+When I start dictating
+Then the button reads **Transcribe now**, and while it processes **Transcribing…** (disabled); idle it shows **ET**/**EN**
+And on Apple silicon (live) it reads **Stop**, then **Finishing…**
 
 ## Feature: The 8-bit model on Windows (R13, added 2026-10-12)
 

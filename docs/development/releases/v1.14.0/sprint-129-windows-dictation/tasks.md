@@ -49,6 +49,17 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] The dictation note is a decoration (`extensions/DictationPlaceholder.ts` + `dictationPlaceholder.test.ts`): autosave wrote the text placeholder into the file, for the whole recording in deferred mode (found in the Mac check, fixed and re-checked on disk).
 - [x] Mac dev instance: deferred mode (QA switch) and live mode, with screenshots → [qa-evidence.md](./qa-evidence.md). *(2026-10-12)*
 
+## Phase 2c: Windows branch test fixes (R14, 2026-10-12)
+
+- [x] Bug C: `hasSpeech()` gates every piece (both modes), `stripNonSpeech()` in the dictation parser, `mic-silent` at Stop when nothing was heard, and the webview stops after 3 s of exact zeros. Mac check: zeros and hiss gave "Kõige!" / "you" before the fix.
+- [x] Bug B: covered by the 3 s zero check and `mic-silent` (each recording already asks for a fresh stream). Needs the Windows re-test.
+- [x] Bug A: the download/resume prompt is modal, with an in-flight guard.
+- [x] Bug D: `probeWhisper` re-checks a cached ready; engine problems from a transcription carry `stage: 'transcribing'` → "Dictation Stopped".
+- [x] Labels: Transcribe now / Transcribing… (deferred), Stop / Finishing… (live).
+- [x] The estimate counts only what is left of the running call; no "up to a minute" flash.
+- [x] Tests: controller (silence, pauses, stage, estimate), whisperCpp (non-speech labels, probe re-check), dictationProblems (heard nothing, stage, labels).
+- [ ] Windows re-test (C, B, A, D, labels, MP3 Transcribe, cancelling a transcription), through the Development manager.
+
 ## Phase 3: Webview (W7, R5)
 
 - [x] `ux-expert` review of the microphone dialog states and the R5/R6 copy before code. *(2026-10-12; adopted, see spec R5/R6 revision)*
