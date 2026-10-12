@@ -155,7 +155,7 @@ Jarmo's decision of 2026-10-12, after round 3: on a CPU-only Windows laptop each
 As a Windows user, I want to say what I mean, press Stop, and get accurate text, without the app pretending to type along.
 
 Acceptance criteria:
-- **Where:** win32. Intel Macs (darwin-x64) follow Windows until Jarmo decides otherwise (asked 2026-10-12). Apple silicon keeps live dictation.
+- **Where:** win32 and Intel Macs (darwin-x64; decided 2026-10-12 by the Development manager on Jarmo's delegation). Apple silicon keeps live dictation.
 - **While recording:** no text is inserted. The in-editor indicator and the button's tooltip say that the text comes after Stop (wording from the `ux-expert` review, confirmed by Jarmo). Nothing flips to "Processing" while the user talks.
 - **In the background:** captured audio is transcribed in pieces of up to 28 s while the user is still talking, each with the full 30 s window. The text is held, in order.
 - **After Stop:** the indicator and the button show that Ritemark is transcribing until the text is in. All text is then inserted at once at the cursor, in the order it was spoken.
@@ -170,7 +170,7 @@ Acceptance criteria:
 As a Windows user, I want the smaller download when it costs no accuracy.
 
 Acceptance criteria:
-- On win32 (and darwin-x64 until Jarmo decides otherwise), dictation, Transcribe on-device and Settings use `ggml-large-v3-turbo-q8_0.bin`: 874,188,075 bytes, SHA-256 `317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1`, from the same pinned Hugging Face revision as the f16 model. The download is resumed and checked as in R7.
+- On win32 and darwin-x64, dictation, Transcribe on-device and Settings use `ggml-large-v3-turbo-q8_0.bin`: 874,188,075 bytes, SHA-256 `317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1`, from the same pinned Hugging Face revision as the f16 model. The download is resumed and checked as in R7.
 - Every place that names the download size shows this model's size (about 834 MB), not 1.5 GB.
 - Apple silicon keeps `ggml-large-v3-turbo.bin`. A model already downloaded for one platform is never deleted by the other's logic.
 - Evidence: FLEURS Estonian WER 14.8% against 14.2% for f16 on the Windows PC, 19.5% against 19.2% on 100 clips on the Mac; half the download; 1.13× faster on the Ryzen.
@@ -198,4 +198,4 @@ Acceptance criteria:
 - **A1:** runtime CPU variants with app-local VC++ runtime, or a single static AVX2 exe? The rule is in the technical plan.
 - **A3:** which `getUserMedia` error does Windows raise for each microphone state?
 - ~~For Jarmo: Intel Mac ride-along yes/no; is an Intel Mac available for Gate 2?~~ Yes; no Intel Mac (2026-10-11).
-- **For Jarmo (2026-10-12):** do Intel Macs follow Windows in R12 and R13?
+- ~~For Jarmo (2026-10-12): do Intel Macs follow Windows in R12 and R13?~~ Yes (the Development manager on Jarmo's delegation, 2026-10-12).

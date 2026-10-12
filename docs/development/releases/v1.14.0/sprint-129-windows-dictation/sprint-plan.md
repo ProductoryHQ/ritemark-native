@@ -63,6 +63,10 @@ Windows users can dictate into documents and transcribe recordings on their own 
   3. **Cutting at pauses (VAD) is separate work for every platform**: [#411](https://github.com/ProductoryHQ/ritemark-native/issues/411). whisper-cli 1.8.3 already has `--vad`, `--vad-model` and `--vad-max-speech-duration-s`.
   4. **No GPU in v1.14.0.** The GPU round does not run; this replaces his earlier "if it can be done, yes". Config VK stays in `build-whisper.yml` as a harness option, built only on request (W12); nothing Vulkan ships.
   - **How R12 does the work (engineering, told to Jarmo):** the audio is transcribed in the background in pieces of up to 28 s while the user is still talking, and the text is held until Stop. A long dictation then waits ~20 s after Stop instead of about as long as it lasted. Accuracy is the same within measurement noise (17.5% against 16.6% WER on 255 s of continuous Estonian; 3 words in 338). The user sees exactly "record, press Stop, then the text".
+- **2026-10-12 (the Development manager, answering on Jarmo's delegation: "those tiny end questions ask your dev manager to answer"):** not gates.
+  - **Wording:** kept as built, including "Click to cancel." on the start-up tooltip. Revisit if the Windows test finds wording that reads wrong.
+  - **Intel Macs follow Windows:** "speak, then text" and the q8_0 model (R12, R13). They are CPU-only and slower than Jarmo's laptop.
+  - **Background pieces accepted:** transcribe in pieces of up to 28 s while the user talks, holding the text until Stop.
 
 Proposed 2026-10-11 and approved with the plan:
 
@@ -76,8 +80,8 @@ Proposed 2026-10-11 and approved with the plan:
 
 - ~~Apple silicon engine for macOS 12–14~~: approved 2026-10-12, now R11.
 - ~~Windows dictation: ship or hold~~: decided 2026-10-12, "speak, then text" (R12), q8_0 (R13), no GPU. History: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
-- **Intel Macs (asked 2026-10-12):** they are CPU-only like Windows, and slower than Jarmo's laptop. Do they also get "speak, then text" and the q8_0 model? The code has one switch for each; until he answers, Intel Macs follow Windows.
-- **"Speak, then text" copy (asked 2026-10-12):** the recording and transcribing wording from the `ux-expert` review, as a Dev Dashboard ask through the Development manager.
+- ~~Intel Macs~~: decided 2026-10-12 by the Development manager on Jarmo's delegation: they follow Windows (R12, R13).
+- ~~"Speak, then text" wording~~: decided 2026-10-12 by the Development manager on Jarmo's delegation: kept as built.
 
 ## Feature Flag Check
 

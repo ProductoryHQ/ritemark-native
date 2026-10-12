@@ -121,7 +121,7 @@ async function run(): Promise<void> {
   // then text" with the 8-bit model; Apple silicon keeps live text and f16.
   assert.equal(dictationModeFor('darwin', 'arm64'), 'live');
   assert.equal(dictationModeFor('win32', 'x64'), 'deferred');
-  assert.equal(dictationModeFor('darwin', 'x64'), 'deferred', 'Intel Macs follow Windows until Jarmo decides');
+  assert.equal(dictationModeFor('darwin', 'x64'), 'deferred', 'Intel Macs follow Windows');
   assert.equal(defaultModelFile('darwin', 'arm64'), 'ggml-large-v3-turbo.bin');
   assert.equal(defaultModelFile('win32', 'x64'), 'ggml-large-v3-turbo-q8_0.bin');
   assert.equal(defaultModelFile('darwin', 'x64'), 'ggml-large-v3-turbo-q8_0.bin');

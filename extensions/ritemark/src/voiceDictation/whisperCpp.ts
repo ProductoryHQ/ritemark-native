@@ -75,7 +75,7 @@ export const AVAILABLE_MODELS: Record<string, ModelInfo> = {
  * Sprint 129 R12/R13 (Jarmo, 2026-10-12): computers without Apple's GPU, where
  * one call takes ~20 s on the CPU. They dictate as "speak, then text" and use the
  * 8-bit model (same Estonian accuracy, half the download). Intel Macs follow
- * Windows until Jarmo decides otherwise.
+ * Windows (the Development manager, on Jarmo's delegation, 2026-10-12).
  */
 const CPU_ONLY_TARGETS = ['win32-x64', 'darwin-x64'];
 

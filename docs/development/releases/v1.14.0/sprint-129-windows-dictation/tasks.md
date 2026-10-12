@@ -15,7 +15,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Round 3 (Jarmo 2026-10-12: shorter window + resident model, q8_0 only if quality holds) folded in, with the Mac cross-check on the same chunking. *(2026-10-12: the shorter window doubles errors at 10 s and loops at 5 s on both machines; the resident model saves 1.3–2.4 s per call; q8_0 ≈ f16 in the full window. Continuous-speech check: R8's long calls on slow PCs score near "record, then transcribe")*
 - [ ] Vulkan (Jarmo 2026-10-12: "kui saab siis jah"): config VK in `build-whisper.yml` *(added, 100d0e09; green in run 38252509147: 62 MB, imports `vulkan-1.dll`)*; bench on Jarmo's PC *(`windows-whisper-bench.ps1 -Round 3`, sent to the Development manager)*; what it changes (size, driver dependency, fallback) put to Jarmo before shipping; a PC without `vulkan-1.dll` checked before shipping.
 - [x] Jarmo's decisions after round 3 recorded (2026-10-12): "speak, then text" on Windows (R12), q8_0 on Windows (R13), VAD separate ([#411](https://github.com/ProductoryHQ/ritemark-native/issues/411)), no GPU in v1.14.0. Config VK built only on request.
-- [ ] Jarmo: the "speak, then text" wording, and whether Intel Macs follow Windows (asked through the Development manager, 2026-10-12).
+- [x] The "speak, then text" wording, Intel Macs, background pieces: answered 2026-10-12 by the Development manager on Jarmo's delegation (wording kept, Intel Macs follow Windows, pieces kept).
 - [x] R11 (added 2026-10-12): the CI-built darwin-arm64 static engine is committed with the other payloads (W10); the `committed` CI job runs it on macOS 14. *(The Apple silicon dictation check is listed under Gate 2)*
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
