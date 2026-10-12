@@ -163,6 +163,60 @@ Given Ritemark with the new Apple silicon engine on Jarmo's Mac
 When I dictate in Estonian and transcribe a recording on-device
 Then both behave as in v1.13.0
 
+## Feature: "Speak, then text" (R12, added 2026-10-12)
+
+### Scenario: Recording says the text comes after Stop (B, C; M with the QA switch)
+Given Ritemark on Windows (or a Mac dev instance started with `RITEMARK_DICTATION_MODE=deferred`)
+When I click the mic button
+Then its tooltip said "Your text appears after you stop" before the click
+And the document shows "🎤 Recording... your text appears after you stop" at the cursor
+And nothing changes in the document while I speak, not even after half a minute
+
+### Scenario: Stop, then the text (B, C, M)
+Given I dictated for about a minute in Estonian
+When I click Stop
+Then the button shows a spinner and is disabled, with the tooltip "Processing your recording. Your text will be added when it's done."
+And the document says "⏳ Processing your recording." and how long it usually takes
+And about 20 s later (Jarmo's laptop) all the text appears where the placeholder was, in the order I spoke, and the button is idle again
+
+### Scenario: Work elsewhere while it processes (B, M)
+Given I clicked Stop and the placeholder is showing
+When I click into another paragraph and type
+Then my typing is not interrupted, and the text goes where the placeholder was, not where I am typing
+
+### Scenario: A slow computer waits longer instead of stopping (U)
+Given transcription is slower than speech
+When I dictate for two minutes
+Then dictation does not stop on its own, and everything I said appears after Stop
+
+### Scenario: The engine fails part-way (U)
+Given a part of the recording was already transcribed
+When the engine fails on the next part
+Then the text already transcribed is inserted first, then the problem dialog explains
+
+### Scenario: Cancel while it gets ready (M)
+Given I clicked the mic button and it shows "Getting the microphone ready..."
+When I click it again
+Then the microphone does not start and the button is idle
+
+### Scenario: Apple silicon keeps live text (M)
+Given an Apple silicon Mac in the normal mode
+When I dictate and press Stop
+Then text appears while I speak, and after Stop the button shows "Adding your last words" until the last words are in
+
+## Feature: The 8-bit model on Windows (R13, added 2026-10-12)
+
+### Scenario: The smaller download is offered (B, C)
+Given Windows with no speech model downloaded
+When I click the mic button for the first time
+Then Ritemark offers "Download voice model (834 MB)?"
+And after the download, Settings shows the model as installed, and Transcribe On-device works with it
+
+### Scenario: Apple silicon keeps its model (U, M)
+Given an Apple silicon Mac with `ggml-large-v3-turbo.bin`
+When I dictate or open Settings
+Then nothing asks for a new download
+
 ## Feature: Tiers and docs (R10)
 
 ### Scenario: Whisper binaries count as shell-tier (U)

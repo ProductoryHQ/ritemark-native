@@ -113,8 +113,8 @@ As a dictating user on a slower computer, I want every word I say to end up in t
 Acceptance criteria:
 - An audio chunk that arrives while a transcription is running is held. When the running call finishes, the held audio is transcribed next, joined into one call of up to 28 s (below Whisper's 30 s window).
 - Audio beyond 28 s waits as a further segment. Nothing is dropped.
-- If the waiting audio exceeds 60 s, dictation stops listening. The transcription of everything already captured still finishes and is inserted, and the user sees: "Dictation can't keep up on this computer. Everything you said so far has been added."
-- On **Stop**, audio already captured, including the final chunk, is transcribed and inserted before the button returns to idle.
+- If the waiting audio exceeds 60 s, dictation stops listening (live dictation only; R12 has no such stop). The transcription of everything already captured still finishes and is inserted, and the user sees: "Dictation can't keep up on this computer, so it stopped listening. The rest of what you said will appear in a moment." *(Wording revised 2026-10-12: the old "has been added" was shown while the words were still on their way.)*
+- On **Stop**, audio already captured, including the final chunk, is transcribed and inserted before the button returns to idle. Meanwhile the button is disabled and says the last words are being added (added 2026-10-12; before, it looked idle while text was still coming).
 - Text is inserted in the order it was spoken.
 - Temporary WAV files are deleted only after their process has exited (Windows cannot delete a file another process holds open).
 
@@ -148,14 +148,41 @@ Acceptance criteria:
 - On Jarmo's Mac, dictation and on-device Transcribe behave as in v1.13.0 (same speed in the local check: 0.58 s vs 0.57 s per dictation call).
 - `codesign-app.sh` signs it with the existing `whisper-cli` rule and notarization accepts it. Gate 2 includes an Apple silicon dictation check.
 
+### R12: "Speak, then text" on computers without GPU acceleration (added 2026-10-12)
+
+Jarmo's decision of 2026-10-12, after round 3: on a CPU-only Windows laptop each transcription call takes ~20 s, so live text is not possible without losing accuracy. Supersedes R9's speed target for these computers.
+
+As a Windows user, I want to say what I mean, press Stop, and get accurate text, without the app pretending to type along.
+
+Acceptance criteria:
+- **Where:** win32. Intel Macs (darwin-x64) follow Windows until Jarmo decides otherwise (asked 2026-10-12). Apple silicon keeps live dictation.
+- **While recording:** no text is inserted. The in-editor indicator and the button's tooltip say that the text comes after Stop (wording from the `ux-expert` review, confirmed by Jarmo). Nothing flips to "Processing" while the user talks.
+- **In the background:** captured audio is transcribed in pieces of up to 28 s while the user is still talking, each with the full 30 s window. The text is held, in order.
+- **After Stop:** the indicator and the button show that Ritemark is transcribing until the text is in. All text is then inserted at once at the cursor, in the order it was spoken.
+- **Wait:** about 20 s after Stop on Jarmo's laptop, for a short phrase and a long dictation alike; longer on slower computers. Nothing is ever dropped.
+- **No backlog stop:** nothing is live, so R8's 60-second stop applies to live dictation only. A slow computer only makes the wait after Stop longer.
+- **Failure:** if the engine fails part-way, the text already transcribed is inserted first, then the problem dialog (R6) explains.
+- **Settings:** the dictation settings say nothing that implies live text in this mode (chunk length has no visible effect here).
+
+### R13: The 8-bit model on Windows (added 2026-10-12)
+
+As a Windows user, I want the smaller download when it costs no accuracy.
+
+Acceptance criteria:
+- On win32 (and darwin-x64 until Jarmo decides otherwise), dictation, Transcribe on-device and Settings use `ggml-large-v3-turbo-q8_0.bin`: 874,188,075 bytes, SHA-256 `317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1`, from the same pinned Hugging Face revision as the f16 model. The download is resumed and checked as in R7.
+- Every place that names the download size shows this model's size (about 834 MB), not 1.5 GB.
+- Apple silicon keeps `ggml-large-v3-turbo.bin`. A model already downloaded for one platform is never deleted by the other's logic.
+- Evidence: FLEURS Estonian WER 14.8% against 14.2% for f16 on the Windows PC, 19.5% against 19.2% on 100 clips on the Mac; half the download; 1.13× faster on the Ryzen.
+
 ## Non-Requirements
 
-- No GPU acceleration on Windows (Vulkan/CUDA) unless A2 forces a scope change that Jarmo approves.
+- No GPU acceleration on Windows (Vulkan/CUDA). Measured as far as a build (config VK); Jarmo took it out of v1.14.0 on 2026-10-12.
 - No on-device m4a/aac on Windows. It needs a converter; the existing honest message stays and ElevenLabs handles those files. Follow-up issue.
-- No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8.
+- No persistent whisper process, VAD, AudioWorklet or binary transport (#117 items), apart from R8. Cutting at pauses (VAD) is separate work for every platform (Jarmo, 2026-10-12).
+- No shorter audio window (`--audio-ctx`) anywhere: it doubles the errors at 10 s and loops at 5 s in Estonian.
 - No whisper.cpp upgrade. (The Apple silicon binary *is* rebuilt from the same version: R11, added 2026-10-12.)
 - No Windows on ARM native build. On ARM, Windows runs the x64 build under emulation (not tested). No Linux binary.
-- No change to the model location, the model itself, or the language list.
+- No change to the model location or the language list. The model changes on Windows only (R13).
 - No VS Code patch or submodule change.
 
 ## Resolved Questions
@@ -169,4 +196,5 @@ Acceptance criteria:
 
 - **A1:** runtime CPU variants with app-local VC++ runtime, or a single static AVX2 exe? The rule is in the technical plan.
 - **A3:** which `getUserMedia` error does Windows raise for each microphone state?
-- **For Jarmo:** Intel Mac ride-along yes/no; is an Intel Mac available for Gate 2?
+- ~~For Jarmo: Intel Mac ride-along yes/no; is an Intel Mac available for Gate 2?~~ Yes; no Intel Mac (2026-10-11).
+- **For Jarmo (2026-10-12):** do Intel Macs follow Windows in R12 and R13?

@@ -5,13 +5,13 @@ Release tier: shell (new native binaries under `extensions/ritemark/binaries/win
 **Status:** Phase 3 (DEVELOP), starting with the Phase 0 audits. Plan approved by Jarmo on 2026-10-11.<br>
 **Branch after approval:** `sprint-129-windows-dictation`, cut from this worktree's tip, which must be `origin/main` plus the plan commit only (`git log origin/main..HEAD` shows one commit; rebase onto the then-current `origin/main` first)<br>
 **Worktree:** `.claude/worktrees/vibrant-lewin-74cd1d` (plan only; the sprint branch is cut from `main` after approval)<br>
-**Release:** [v1.14.0](../release-plan.md) (milestone 13). Nothing merges before v1.13.0 is published.
+**Release:** [v1.14.0](../release-plan.md) (milestone 13). v1.13.0 published on 2026-10-11; merging needs Jarmo's admin-merge yes for the PR by number.
 
 ## SDD Artifacts
 
-- [spec.md](./spec.md): behaviour contract R1–R10
+- [spec.md](./spec.md): behaviour contract R1–R13
 - [scenarios.md](./scenarios.md): manual QA matrix, by stage
-- [technical-plan.md](./technical-plan.md): workstreams W0–W8
+- [technical-plan.md](./technical-plan.md): workstreams W0–W14
 - [tasks.md](./tasks.md): implementation tracker
 - [research/current-state-audit.md](./research/current-state-audit.md): what ships today, with file and line references
 - [sprint-plan.md](./sprint-plan.md): this file (intent, decisions, status)
@@ -28,7 +28,7 @@ Windows users can dictate into documents and transcribe recordings on their own 
 
 ## What changes for users
 
-- **Windows:** the microphone button appears in the editor header. The first click offers the same 1.5 GB voice model as on the Mac. Transcribe's On-device · Whisper engine works for MP3, WAV, FLAC, OGG and Record files.
+- **Windows:** the microphone button appears in the editor header. Dictation works as "speak, then text": the user talks, presses Stop, and the text arrives about 20 s later (R12). The first click offers a 0.8 GB voice model, the 8-bit version of the Mac's (R13). Transcribe's On-device · Whisper engine works for MP3, WAV, FLAC, OGG and Record files.
 - **Windows microphone blocked:** a dialog names the exact Windows switches (**Microphone access**, **Let desktop apps access your microphone**) and has an **Open Microphone Settings** button.
 - **Intel Mac** (if approved): the same on-device dictation and transcription. Today the mic button downloads 1.5 GB and then never inserts text (code reading, §4 of the audit).
 - **Every platform:** dictation no longer drops speech when transcription runs behind; the words arrive a little later instead. Ritemark never offers the download on a computer where the engine cannot start.
@@ -57,6 +57,12 @@ Windows users can dictate into documents and transcribe recordings on their own 
   1. **Measure the shorter window with the model kept in memory** (round 3, on the Windows PC): fixed 5 s and 10 s chunks cut the way dictation cuts them, all through one whisper-cli process.
   2. **q8_0 only if quality does not suffer.**
   3. **GPU on Windows: "if it can be done, yes".** A Vulkan build (config VK) is added to `build-whisper.yml` for measuring. Before it goes into the product, Jarmo gets what it changes: download size, the GPU-driver dependency (`vulkan-1.dll`), and the CPU fallback.
+- **2026-10-12 (Jarmo, in the "Ritemark on Windows" session, relayed by the Development manager), after round 3:** "1. Nõus! 2. ok 3. ok 4. unustame selle graafikaardi testi hetkel".
+  1. **Windows dictation is "speak, then text"** (R12). The user records and presses Stop; Ritemark then transcribes with the full 30 s window (~14% WER on his laptop). The wait is about 20 s for a short phrase. The UI says it is processing and does not suggest live text. The shorter window (`--audio-ctx`) does not ship.
+  2. **q8_0 is the default model on Windows** (R13).
+  3. **Cutting at pauses (VAD) is separate work for every platform**, in its own issue. whisper-cli 1.8.3 already has `--vad`, `--vad-model` and `--vad-max-speech-duration-s`.
+  4. **No GPU in v1.14.0.** The GPU round does not run. Config VK stays in `build-whisper.yml` as a harness option, built only on request (W12); nothing Vulkan ships.
+  - **How R12 does the work (engineering, told to Jarmo):** the audio is transcribed in the background in pieces of up to 28 s while the user is still talking, and the text is held until Stop. A long dictation then waits ~20 s after Stop instead of about as long as it lasted. Accuracy is the same within measurement noise (17.5% against 16.6% WER on 255 s of continuous Estonian; 3 words in 338). The user sees exactly "record, press Stop, then the text".
 
 Proposed 2026-10-11 and approved with the plan:
 
@@ -69,9 +75,9 @@ Proposed 2026-10-11 and approved with the plan:
 ## Open decisions for Jarmo (raised 2026-10-11, after approval)
 
 - ~~Apple silicon engine for macOS 12–14~~: approved 2026-10-12, now R11.
-- **Windows dictation: GPU round, then ship or hold (updated 2026-10-12, after round 3).** On CPU alone, Jarmo's Ryzen 7 5825U gives accurate dictation only with a long delay: every call encodes a full 30 s window (~18 s), so text arrives ~25–50 s after the speech. The shorter window fits real time but doubles the errors at 10 s and loops at 5 s, on Windows and Mac alike, so it is out. Keeping the model in memory saves only 1.3–2.4 s per call. "Record, then transcribe on Stop" is not needed as a mode: on a slow PC, R8 already joins waiting audio into ~22–28 s calls, which is about as accurate (17.5–20.7% against 16.6% WER on continuous Estonian) and does the work while the user speaks. The Vulkan engine is built (62 MB instead of 9 MB, needs the graphics driver's `vulkan-1.dll`, falls back to the CPU) and goes to the Windows PC for a GPU round first. Then: ship with the GPU if it is near real time, ship on CPU with honest wording about the delay, or hold Windows dictation behind the flag (Transcribe on-device and the rest of the sprint ship either way). Detail: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
-- **Round 2 framing (2026-10-12):** on the 5825U every dictation call takes ~22 s (q8_0) or ~25 s (f16), whatever its length; nothing is lost (R8), but text arrives ~25–50 s after the speech.
-- **Earlier framing (2026-10-11):** On Jarmo's Ryzen 7 5825U one dictation call takes ~22 s, against a 5 s target; only the thread count helped. A shorter audio window is fast but puts repeated text into documents, so it is rejected. The 8-bit (q8_0) model was 1.9× faster on a CPU in the Mac test, with identical text and half the download. Options and recommendation: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
+- ~~Windows dictation: ship or hold~~: decided 2026-10-12, "speak, then text" (R12), q8_0 (R13), no GPU. History: [research/windows-performance-audit.md](./research/windows-performance-audit.md).
+- **Intel Macs (asked 2026-10-12):** they are CPU-only like Windows, and slower than Jarmo's laptop. Do they also get "speak, then text" and the q8_0 model? The code has one switch for each; until he answers, Intel Macs follow Windows.
+- **"Speak, then text" copy (asked 2026-10-12):** the recording and transcribing wording from the `ux-expert` review, as a Dev Dashboard ask through the Development manager.
 
 ## Feature Flag Check
 

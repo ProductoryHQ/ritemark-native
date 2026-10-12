@@ -14,6 +14,8 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [ ] Bench round 2 (Jarmo 2026-10-12: "mõõda kõiki"; W11): FLEURS-et WER for all candidates on the Mac → `research/asr-candidates-audit.md` *(done)*; CI clip pack *(done)*; run instructions to the Development manager *(done)*. Then Jarmo cut Parakeet and the Zipformer (2026-10-12), so the Windows run is Whisper q8_0 vs f16 *(script trimmed to match)*. Windows results folded in *(2026-10-12: q8_0 ≈ f16 on Estonian, only 1.13× faster on the Ryzen; the shorter window rejected on real speech, 59–73% WER)*. Open: Jarmo's ship-or-hold decision.
 - [x] Round 3 (Jarmo 2026-10-12: shorter window + resident model, q8_0 only if quality holds) folded in, with the Mac cross-check on the same chunking. *(2026-10-12: the shorter window doubles errors at 10 s and loops at 5 s on both machines; the resident model saves 1.3–2.4 s per call; q8_0 ≈ f16 in the full window. Continuous-speech check: R8's long calls on slow PCs score near "record, then transcribe")*
 - [ ] Vulkan (Jarmo 2026-10-12: "kui saab siis jah"): config VK in `build-whisper.yml` *(added, 100d0e09; green in run 38252509147: 62 MB, imports `vulkan-1.dll`)*; bench on Jarmo's PC *(`windows-whisper-bench.ps1 -Round 3`, sent to the Development manager)*; what it changes (size, driver dependency, fallback) put to Jarmo before shipping; a PC without `vulkan-1.dll` checked before shipping.
+- [x] Jarmo's decisions after round 3 recorded (2026-10-12): "speak, then text" on Windows (R12), q8_0 on Windows (R13), VAD separate, no GPU in v1.14.0. Config VK built only on request.
+- [ ] Jarmo: the "speak, then text" wording, and whether Intel Macs follow Windows (asked through the Development manager, 2026-10-12).
 - [x] R11 (added 2026-10-12): the CI-built darwin-arm64 static engine is committed with the other payloads (W10); the `committed` CI job runs it on macOS 14. *(The Apple silicon dictation check is listed under Gate 2)*
 
 ## Phase 1: Binaries and pipeline (W1, R1, R2, R10 tiers)
@@ -38,6 +40,13 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] `DictationController` coalescing queue, 28 s cap, 60 s backlog stop, Stop flush, one temp file per call deleted after exit, stop on engine failure. Also fixed: dictated sentences containing "processing" were dropped (audit §12).
 - [ ] `cpuOnlyDefaults()` per the A2 decision; `defaultChunkMs` in the editor bootstrap.
 - [ ] Unit tests: resolver matrix, failure mapping, probe cache, coalescing (fake transcriber), WAV parse/build, rename retry, CPU defaults, flag platforms, engine registry win32; Intel Mac silent-failure regression test (old behaviour reproduced first, then fixed). Registered in `npm test`. *(Done: `whisperCpp.test.ts`, `controller.test.ts`, `transcriptionFlag.test.ts`; old Intel Mac behaviour reproduced on the v1.13.0 controller, audit §12. Open: CPU defaults (after A2), engine registry win32 case)*
+
+## Phase 2b: "Speak, then text" and the 8-bit model (W13, W14 — R12, R13)
+
+- [x] Host: `dictationModeFor`, `defaultModelFile`, model table in `whisperCpp.ts` with the q8_0 entry; deferred mode in `DictationController` (background pieces, held text, finishing + wait estimate, no backlog stop, failure order); `dictation:getMode`; Stop always answered.
+- [x] Webview: `preparing` (cancel) and `finishing` states, placeholder from state, text inserted where the placeholder is, `dictationStateCopy`, settings row per mode, model size in the model-missing dialog.
+- [x] Unit tests for both (controller, whisperCpp, modelManager, dictationProblems).
+- [x] Mac dev instance: deferred mode (QA switch) and live mode, with screenshots → [qa-evidence.md](./qa-evidence.md). *(2026-10-12)*
 
 ## Phase 3: Webview (W7, R5)
 

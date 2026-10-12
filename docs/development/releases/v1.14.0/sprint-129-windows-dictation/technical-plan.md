@@ -183,6 +183,26 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - **Round 3 (Windows session):** fixed 5 s and 10 s chunks of the FLEURS clips through one resident whisper-cli process, with the full window and `--audio-ctx` 576/320, f16 and q8_0. A Mac cross-check on the same chunking runs `asr-wer.mjs --chunk-seconds N --resident on`, which shows whether a different result comes from chunking, the flags or the resident process.
 - **Vulkan (config VK):** `build-whisper-windows.ps1 -Config VK` = config V plus `-DGGML_VULKAN=ON`, built with the LunarG Vulkan SDK 1.4.357.0 on `windows-latest`. `ggml-vulkan.dll` is one more backend chosen at run time. It loads only where the GPU driver installs `vulkan-1.dll`; otherwise the CPU variants run. The contract test treats `vulkan-1.dll` as a driver DLL. The artifact is measured on Jarmo's PC first; shipping it is his decision once size, driver dependency and fallback are in front of him.
 - **A resident process in the product** (the model stays loaded between dictation calls) would replace the per-chunk spawn in `DictationController`. It is designed only if round 3 shows it matters.
+- *(Closed 2026-10-12, Jarmo's decisions)* Round 3 ran: the shorter window is rejected; the resident process saves 1.3–2.4 s per call, so it is not built. The GPU round does not run. Config VK stays in `build-whisper.yml` as a harness option: it builds only from a manual run with `vulkan: true`, not on pull requests. Nothing Vulkan ships.
+
+## W13 — "Speak, then text" (R12, added 2026-10-12)
+
+- `whisperCpp.ts`: `dictationModeFor(platform, arch)` returns `deferred` for win32-x64 and darwin-x64 and `live` for Apple silicon (one table, `CPU_ONLY_TARGETS`, shared with W14). `RITEMARK_DICTATION_MODE=live|deferred` forces a mode, for QA on a Mac dev instance only.
+- `DictationController` takes the mode. In deferred mode `hasWork()` starts a call only for a full 28 s piece while recording, and for any rest after Stop. Text goes into `held` and is posted as one `dictation:transcription` after the last call. There is no backlog stop, and no `processing`/`listening` status while recording. `fail()` posts the held text before the problem.
+- **Stop protocol (both modes):** the host posts `dictation:status finishing` when work remains, then `idle` when the text is in. A Stop with nothing to do, or with no controller, still gets `idle`. In deferred mode `finishing` carries `waitSeconds`: the last call's duration × the calls left, rounded up to 10 s. The last call's duration is kept in `globalState` (`ritemark.dictation.lastCallMs`), so the first Stop of a session also has a number.
+- `ritemarkEditor.ts`: `dictation:getMode` → `dictation:mode`.
+- **Webview:**
+  - `useVoiceDictation` has the states `preparing` (a click cancels the start) and `finishing` (button disabled until the host's `idle`). It asks for the mode on mount, sends audio every 5 s in deferred mode, and keeps a `recordingRef` so the unmount cleanup also stops a recording shown as "processing".
+  - The placeholder follows the state: `dictation:placeholder {text}` and `dictation:placeholder-clear`.
+  - `App.tsx` inserts the text where the placeholder is (`insertContentAt`, without moving the user's cursor), then puts the placeholder back after it while dictation goes on.
+  - The wording lives in `dictationStateCopy()` in `dictationProblems.ts`.
+  - `DictationSettingsModal` hides the chunk row in deferred mode, and renames it "Update text every" in live mode.
+- Tests: `controller.test.ts` (deferred pieces, one insertion, estimate, no backlog stop, failure order, Stop answers), `whisperCpp.test.ts` (mode and model matrix, QA switch), `dictationProblems.test.ts` (state copy).
+
+## W14 — The 8-bit model on Windows (R13, added 2026-10-12)
+
+- `AVAILABLE_MODELS` moves to `whisperCpp.ts` (vscode-free; re-exported by `modelManager.ts`) and gains `ggml-large-v3-turbo-q8_0.bin` (874,188,075 bytes, SHA-256 `317eb69c…`, same pinned revision). `defaultModelFile(platform, arch)` picks it for `CPU_ONLY_TARGETS`, and `getModelPath()`, `isModelDownloaded()`, `ensureModelDownloaded()` and Settings default to it.
+- The download size shown comes from the table everywhere: the download prompt, Settings, Transcribe's "Model not downloaded", and the model-missing dialog (the host sends the size as `detail`).
 
 ## W9 — Docs, tiers and release notes (R10)
 
