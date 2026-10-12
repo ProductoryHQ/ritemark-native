@@ -733,7 +733,15 @@
       "terminal.integrated.defaultLocation": "view",
       "problems.decorations.enabled": false,
       "markdown.validate.enabled": false,
-      "workbench.secondarySideBar.showLabels": false
+      "workbench.secondarySideBar.showLabels": false,
+      "workbench.editorAssociations": {
+        "*.m4a": "ritemark.transcriptWorkbench",
+        "*.mp3": "ritemark.transcriptWorkbench",
+        "*.wav": "ritemark.transcriptWorkbench",
+        "*.flac": "ritemark.transcriptWorkbench",
+        "*.ogg": "ritemark.transcriptWorkbench",
+        "*.aac": "ritemark.transcriptWorkbench"
+      }
     },
     "themes": [
       {
