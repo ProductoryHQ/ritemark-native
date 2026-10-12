@@ -146,13 +146,29 @@ commits. Once the commit is an ancestor of `origin/main` the work is
 demonstrably in main, so a missing upstream is not a risk — that is simply what
 a branch looks like after a merge deleted its remote.
 
+**Squash merges.** Every PR on `main` is squash-merged, so a merged branch's
+commits never become ancestors of `origin/main`. Archiving a session leaves its
+worktree detached at the PR's pre-squash commit, and the ancestry check alone
+held such worktrees forever. For a clean worktree with no build output, the
+audit therefore asks GitHub (`gh`) about each commit ahead of `origin/main`. A
+commit is proven when it is in a pull request GitHub reports as merged into
+`main`, when it was such a pull request's head before a force-push replaced it
+(the PR was rebased just before merging; the branch name comes from the
+worktree, its upstream, or its HEAD reflog), when it is an ancestor of a commit
+already proven, or when it is a merge of `origin/main` whose tree is exactly
+what Git's own merge of its parents produces. One unproven commit keeps the old
+verdict, and the reason names it. With `gh` offline or unauthenticated nothing
+is proven and every verdict is what it was before the check existed.
+
 **Possible hand-editing in `vscode/`.** A changed submodule is *derived state*,
 not user work: `apply-patches.sh` reproduces it exactly. The audit proves this
 per worktree by reading the canonical patch targets and the branding assets that
 `apply-patches.sh` copies, plus the npm/gulp-regenerated directories. Every
 changed path must belong to that set; one path outside it blocks the worktree,
 because CLAUDE.md forbids editing the submodule directly and an unexplained
-change may be someone's work.
+change may be someone's work. The submodule must also sit at the commit the
+superproject records: a checkout moved off it may hold commits made inside
+`vscode/`, which `git worktree remove` would delete with the worktree.
 
 Treating a patched submodule as unreviewable instead of proving it derived was
 why the janitor could not reclaim a single development worktree while offering

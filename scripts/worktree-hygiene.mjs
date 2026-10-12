@@ -29,10 +29,16 @@ Safety contract:
     never removed, whatever its Git state says: that output is not in Git, can
     represent hours of compute plus notarization submissions, and is invisible
     to git status because it is ignored;
-  - ordinary worktrees are removable only when HEAD is already in origin/main;
-  - a modified vscode submodule is treated as derived state only when every
-    modified path belongs to the canonical patch set; one unexpected path
-    blocks the worktree as possible hand-editing.
+  - ordinary worktrees are removable only when HEAD is already in origin/main,
+    or when GitHub proves it squash-merged: every commit ahead of origin/main
+    is in a pull request GitHub reports as merged into main (or was its head
+    before a force-push), or is a merge of origin/main that adds nothing of
+    its own. With gh offline or unauthenticated the worktree keeps its
+    unmerged verdict;
+  - a modified vscode submodule is treated as derived state only when it sits
+    at the commit the superproject records and every modified path belongs to
+    the canonical patch set; one unexpected path or commit blocks the worktree
+    as possible hand-editing.
 
 --clean is a human-authorized operation. The scheduled janitor runs --report
 and never deletes anything.`);
@@ -205,6 +211,183 @@ function submoduleIsRegenerated(target) {
   return { derived: true, count: entries.length };
 }
 
+// A vscode checkout moved off the commit the superproject records can hold
+// commits made inside the submodule, and `git worktree remove` deletes them with
+// the worktree's modules directory. Only the recorded commit is derived state.
+// Returns a reason when the checkout is off that commit, otherwise null.
+function vscodeOffRecordedCommit(target) {
+  const submodule = path.join(target, 'vscode');
+  if (!fs.existsSync(submodule)) return null;
+  const top = git(submodule, ['rev-parse', '--show-toplevel'], { allowFailure: true });
+  // Not an initialized checkout of its own; submoduleIsRegenerated reports it.
+  if (top.status !== 0 || fs.realpathSync((top.stdout || '').trim()) !== fs.realpathSync(submodule)) return null;
+  const [recorded, staged, checkedOut] = [
+    git(target, ['rev-parse', 'HEAD:vscode'], { allowFailure: true }),
+    git(target, ['rev-parse', ':vscode'], { allowFailure: true }),
+    git(submodule, ['rev-parse', 'HEAD'], { allowFailure: true })
+  ].map(result => result.status === 0 ? (result.stdout || '').trim() : null);
+  if (!recorded || !staged || !checkedOut) return 'the vscode submodule commit is unreadable';
+  if (staged !== recorded) return `the vscode gitlink is staged at ${staged.slice(0, 8)}, not the committed ${recorded.slice(0, 8)}`;
+  if (checkedOut !== recorded) {
+    return `vscode is checked out at ${checkedOut.slice(0, 8)}, not the recorded ${recorded.slice(0, 8)}, and may hold commits made inside it`;
+  }
+  return null;
+}
+
+function githubRepository(target) {
+  // The raw configured URL, so a url.<base>.insteadOf rewrite does not hide it.
+  const url = (git(target, ['config', '--get', 'remote.origin.url'], { allowFailure: true }).stdout || '').trim();
+  const match = /github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec(url);
+  return match ? { owner: match[1], name: match[2] } : null;
+}
+
+// Set to the first gh failure that is not an answer from GitHub (gh missing,
+// offline, unauthenticated, rate-limited); later calls in the run are skipped.
+let githubUnavailable = null;
+
+// `missing` means GitHub answered that it does not have the object (HTTP 404 or
+// 422): a definite "not proven", not an outage.
+function ghApi(ghArgs) {
+  if (githubUnavailable) return { unavailable: githubUnavailable };
+  const result = spawnSync('gh', ['api', ...ghArgs], { encoding: 'utf8', stdio: 'pipe', timeout: 30000 });
+  if (result.status === 0) {
+    try {
+      return { answer: JSON.parse(result.stdout) };
+    } catch {
+      githubUnavailable = 'gh returned unreadable JSON';
+      return { unavailable: githubUnavailable };
+    }
+  }
+  const detail = (result.error?.message || result.stderr || result.stdout || `gh exited ${result.status}`)
+    .trim().split('\n').filter(Boolean).slice(-1)[0];
+  if (/\(HTTP (404|422)\)/.test(detail)) return { missing: true };
+  githubUnavailable = detail;
+  return { unavailable: detail };
+}
+
+function isAncestor(target, ancestor, descendant) {
+  return git(target, ['merge-base', '--is-ancestor', ancestor, descendant], { allowFailure: true }).status === 0;
+}
+
+// Updating a branch from main before its squash merge leaves a merge commit
+// that is in no pull request. It adds nothing of its own when its tree is
+// exactly what Git's merge of its two parents produces; a hand-resolved
+// conflict differs and is not proven.
+function isCleanMergeOfMain(target, commit) {
+  const parents = git(target, ['rev-list', '--parents', '-n', '1', commit]).split(/\s+/).slice(1);
+  if (parents.length !== 2 || !isAncestor(target, parents[1], 'origin/main')) return false;
+  const merged = git(target, ['merge-tree', '--write-tree', parents[0], parents[1]], { allowFailure: true });
+  if (merged.status !== 0) return false;
+  return (merged.stdout || '').split('\n')[0].trim() === git(target, ['rev-parse', `${commit}^{tree}`]);
+}
+
+// Branch names the worktree's commits may have been pushed under. A worktree
+// that an archived session left detached still names its branch in its HEAD
+// reflog. The names only select which pull requests to ask about; the proof is
+// always an exact commit match.
+function candidateBranches(target, entry) {
+  const names = [];
+  const add = name => {
+    if (name && !/^[0-9a-f]{7,40}$/.test(name) && !names.includes(name)) names.push(name);
+  };
+  if (entry.branch) add(entry.branch.replace('refs/heads/', ''));
+  const upstream = git(target, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], { allowFailure: true });
+  if (upstream.status === 0) add((upstream.stdout || '').trim().replace(/^[^/]+\//, ''));
+  const reflog = git(target, ['reflog', 'show', '--format=%gs', '-n', '200', 'HEAD'], { allowFailure: true });
+  for (const line of (reflog.stdout || '').split('\n')) {
+    if (names.length >= 5) break;
+    const match = /^checkout: moving from .+ to (\S+)$/.exec(line) ||
+      /^rebase.*\(finish\): returning to refs\/heads\/(\S+)$/.exec(line);
+    if (match) add(match[1]);
+  }
+  return names;
+}
+
+const FORMER_HEADS_QUERY = `query($owner: String!, $name: String!, $branch: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(headRefName: $branch, states: MERGED, first: 20) {
+      nodes {
+        number
+        baseRefName
+        headRefOid
+        timelineItems(itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT], first: 100) {
+          nodes { ... on HeadRefForcePushedEvent { beforeCommit { oid } } }
+        }
+      }
+    }
+  }
+}`;
+
+// Every PR on main is squash-merged, so a merged branch's commits never become
+// ancestors of origin/main and the ancestry check alone keeps such worktrees
+// forever. Prove the merge from GitHub instead. Each commit ahead of origin/main
+// must be in a pull request merged into main, have been the head of one before
+// a force-push replaced it (a rebase just before merging), be an ancestor of a
+// commit already proven, or be a clean merge of origin/main. Returns
+// { proven: true, summary } or { proven: false, note } naming what is missing.
+function proveSquashMerge(target, entry, github) {
+  if (!github) return { proven: false, note: 'squash merge not checked: origin is not a GitHub repository' };
+  const commits = git(target, ['rev-list', '--topo-order', 'origin/main..HEAD']).split('\n').filter(Boolean);
+  const provenTips = [];
+  const pulls = new Map();
+  let mergesOfMain = 0;
+  let formerHeads = null;
+
+  for (const commit of commits) {
+    if (provenTips.some(tip => isAncestor(target, commit, tip))) continue;
+    if (isCleanMergeOfMain(target, commit)) {
+      mergesOfMain += 1;
+      continue;
+    }
+
+    const lookup = ghApi([`repos/${github.owner}/${github.name}/commits/${commit}/pulls`]);
+    if (lookup.unavailable) return { proven: false, note: `squash merge not checked: GitHub unavailable (${lookup.unavailable})` };
+    const associated = Array.isArray(lookup.answer) ? lookup.answer : [];
+    const merged = associated.find(pull => pull.merged_at && pull.base?.ref === 'main');
+    if (merged) {
+      provenTips.push(commit);
+      pulls.set(merged.number, pulls.get(merged.number) || '');
+      continue;
+    }
+
+    if (!formerHeads) {
+      formerHeads = new Map();
+      for (const branch of candidateBranches(target, entry)) {
+        const result = ghApi(['graphql', '-f', `query=${FORMER_HEADS_QUERY}`,
+          '-f', `owner=${github.owner}`, '-f', `name=${github.name}`, '-f', `branch=${branch}`]);
+        if (result.unavailable) return { proven: false, note: `squash merge not checked: GitHub unavailable (${result.unavailable})` };
+        for (const pull of result.answer?.data?.repository?.pullRequests?.nodes || []) {
+          if (pull?.baseRefName !== 'main') continue;
+          for (const event of pull.timelineItems?.nodes || []) {
+            if (event?.beforeCommit?.oid) formerHeads.set(event.beforeCommit.oid, pull.number);
+          }
+        }
+      }
+    }
+    const formerHead = [...formerHeads.keys()].find(head => head === commit || isAncestor(target, commit, head));
+    if (formerHead) {
+      provenTips.push(commit);
+      pulls.set(formerHeads.get(formerHead), ' (its head before a force-push)');
+      continue;
+    }
+
+    const open = associated.find(pull => !pull.merged_at);
+    const why = lookup.missing ? 'is not on GitHub'
+      : open ? `is only in unmerged PR #${open.number}`
+        : 'is in no merged pull request';
+    return { proven: false, note: `not a proven squash merge: ${commit.slice(0, 8)} ${why}` };
+  }
+
+  const sources = [];
+  if (pulls.size > 0) {
+    const list = [...pulls].sort(([a], [b]) => a - b).map(([number, how]) => `#${number}${how}`).join(', ');
+    sources.push(`merged ${pulls.size === 1 ? 'PR' : 'PRs'} ${list}`);
+  }
+  if (mergesOfMain > 0) sources.push(`${mergesOfMain === 1 ? 'a clean merge' : `${mergesOfMain} clean merges`} of origin/main`);
+  const ahead = commits.length === 1 ? 'the commit ahead of origin/main is' : `the ${commits.length} commits ahead of origin/main are`;
+  return { proven: true, summary: `squash-merged: ${ahead} in ${sources.join(' or ')}` };
+}
+
 
 try {
   repo = fs.realpathSync(repo);
@@ -218,6 +401,7 @@ try {
   }
 
   const baseRef = (baseRefResult.stdout || '').trim();
+  const github = githubRepository(repo);
   const nowSeconds = Math.floor(Date.now() / 1000);
   const removable = [];
   const rows = [];
@@ -285,6 +469,11 @@ try {
       record('BLOCKED', target, `uncommitted superproject changes (${label})`, size);
       continue;
     }
+    const offRecordedCommit = completeStatus && !releaseMarker ? vscodeOffRecordedCommit(target) : null;
+    if (offRecordedCommit) {
+      record('BLOCKED', target, `local changes need review — ${offRecordedCommit} (${label})`, size);
+      continue;
+    }
     // A patched vscode submodule is derived state, not user work:
     // apply-patches.sh reproduces it exactly. Refusing every such worktree made
     // the janitor unable to clean any development worktree at all. Prove it
@@ -300,37 +489,43 @@ try {
     }
 
     const merged = git(repo, ['merge-base', '--is-ancestor', head, 'origin/main'], { allowFailure: true }).status === 0;
+    // Asked only of a clean worktree with no build output: the checks above
+    // have already held back everything else.
+    const squash = !releaseMarker && !merged ? proveSquashMerge(target, entry, github) : null;
+    const squashNote = squash && !squash.proven ? `; ${squash.note}` : '';
 
     // Only an unmerged branch needs an upstream to prove its commits survive.
     // Once HEAD is an ancestor of origin/main the work is demonstrably in main,
     // and the remote branch is normally deleted by the merge itself.
-    if (!releaseMarker && !merged) {
+    if (!releaseMarker && !merged && !squash.proven) {
       const upstreamResult = git(target, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], { allowFailure: true });
       if (upstreamResult.status !== 0) {
-        record('BLOCKED', target, `unmerged branch has no upstream (${label})`, size);
+        record('BLOCKED', target, `unmerged branch has no upstream (${label})${squashNote}`, size);
         continue;
       }
       const upstream = (upstreamResult.stdout || '').trim();
       const ahead = Number(git(target, ['rev-list', '--count', `${upstream}..HEAD`]));
       if (ahead > 0) {
-        record('BLOCKED', target, `${ahead} commit(s) are not pushed (${label})`, size);
+        record('BLOCKED', target, `${ahead} commit(s) are not pushed (${label})${squashNote}`, size);
         continue;
       }
     }
 
-    if (!merged) {
+    if (!merged && !squash?.proven) {
       const commitSeconds = Number(git(target, ['show', '-s', '--format=%ct', 'HEAD']));
       const ageDays = Math.floor((nowSeconds - commitSeconds) / 86400);
       const staleLabel = ageDays >= staleDays ? `; review: ${ageDays} days since last commit` : '';
-      record('KEEP', target, `active/unmerged (${label})${staleLabel}`, size);
+      record('KEEP', target, `active/unmerged (${label})${squashNote}${staleLabel}`, size);
       continue;
     }
 
     const kind = releaseMarker
       ? 'verified disposable release worktree'
-      : derivedVscodeMarker
-        ? 'fully pushed/merged with verified derived VS Code state'
-        : 'fully pushed and merged';
+      : squash?.proven
+        ? squash.summary
+        : derivedVscodeMarker
+          ? 'fully pushed/merged with verified derived VS Code state'
+          : 'fully pushed and merged';
     record('REVIEW', target, `${kind} (${label})${derivedNote}`, size, { removable: true });
     const hasInitializedSubmodule = git(target, ['submodule', 'status', '--recursive'], { allowFailure: true }).stdout?.trim().length > 0;
     // Git refuses to remove any worktree containing an initialized submodule
@@ -369,7 +564,7 @@ try {
     if (review.length > 0) {
       console.log('## Safe to remove — needs your go-ahead');
       console.log('');
-      console.log('Each one is fully pushed, already merged into main, and holds no build output.');
+      console.log('Each one is fully pushed, already in main (merged, or squash-merged through a pull request GitHub reports as merged), and holds no build output.');
       console.log('');
       console.log(list(review));
       console.log('');
