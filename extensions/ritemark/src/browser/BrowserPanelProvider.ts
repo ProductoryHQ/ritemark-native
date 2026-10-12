@@ -18,17 +18,30 @@ function getNonce(): string {
   return text;
 }
 
-function describe(url: string): { name: string; description: string } {
+/** Row text: the page title over its address when there is a title, else host/file name over path (R5). */
+export function describe(url: string, title?: string): { name: string; description: string } {
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'file:') {
       const decoded = decodeURIComponent(parsed.pathname);
-      return { name: path.basename(decoded) || url, description: decoded };
+      return { name: title || path.basename(decoded) || url, description: decoded };
     }
     const pathname = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '';
-    return { name: parsed.hostname || url, description: pathname };
+    if (title) return { name: title, description: parsed.host + pathname };
+    // host, not hostname: two dev servers on different ports stay apart (localhost:5173 vs :3000).
+    return { name: parsed.host || url, description: pathname };
   } catch {
-    return { name: url, description: '' };
+    return { name: title || url, description: title ? url : '' };
+  }
+}
+
+/** True only when the file is reported as not found; other errors keep the entry (R6). */
+export async function fileIsMissing(url: string): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(vscode.Uri.parse(url));
+    return false;
+  } catch (err) {
+    return err instanceof vscode.FileSystemError && err.code === 'FileNotFound';
   }
 }
 
@@ -60,10 +73,14 @@ export class BrowserPanelProvider
     webviewView.webview.html = this.renderHtml(webviewView.webview);
 
     this.subscriptions.push(
+      webviewView.onDidChangeVisibility(() => {
+        if (webviewView.visible) void this.pruneMissingFiles();
+      }),
       webviewView.webview.onDidReceiveMessage((msg: { type?: string; url?: string }) => {
         switch (msg?.type) {
           case 'ready':
             this.postItems();
+            void this.pruneMissingFiles();
             break;
           case 'open':
             if (typeof msg.url === 'string') {
@@ -80,10 +97,19 @@ export class BrowserPanelProvider
     );
   }
 
+  /** Local files that are gone drop out when Recent is shown; the store's change event re-posts the list. */
+  private async pruneMissingFiles(): Promise<void> {
+    try {
+      await this.history.pruneMissingFiles(fileIsMissing);
+    } catch {
+      // Keep the list as it is.
+    }
+  }
+
   private postItems(): void {
     if (!this.webviewView) return;
     const items: RecentItem[] = this.history.getAll().map((e: BrowserHistoryEntry) => {
-      const { name, description } = describe(e.url);
+      const { name, description } = describe(e.url, e.title);
       return { url: e.url, name, description, visitedAt: e.visitedAt };
     });
     void this.webviewView.webview.postMessage({ type: 'items', items });
