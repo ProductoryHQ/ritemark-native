@@ -18,6 +18,10 @@
   powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Round 2 -Clips "$HOME\Downloads\whisper-bench-audio-et.zip"
 
 .EXAMPLE
+  # Round 3: the same clips on the GPU (Vulkan), with the config VK engine, plus ten minutes of Transcribe
+  powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-VK.zip" -Round 3 -Clips "$HOME\Downloads\whisper-bench-audio-et.zip"
+
+.EXAMPLE
   # also an Estonian recording of your own (wav, mp3, flac or ogg)
   powershell -ExecutionPolicy Bypass -File .\windows-whisper-bench.ps1 -Zip "$HOME\Downloads\whisper-win32-x64-V.zip" -Audio "$HOME\Desktop\eesti.wav"
 #>
@@ -27,7 +31,7 @@ param(
   [Parameter(Mandatory)][string]$Zip,
   [string]$Audio,
   [string]$Language = 'et',
-  [ValidateSet(1, 2)][int]$Round = 1,
+  [ValidateSet(1, 2, 3)][int]$Round = 1,
   [string]$Clips
 )
 
@@ -68,7 +72,7 @@ Write-Host 'Unpacking the engine...'
 Unblock-File -LiteralPath $Zip
 Expand-Archive -LiteralPath $Zip -DestinationPath $work
 $exe = Join-Path $work 'win32-x64\whisper-cli.exe'
-if (-not (Test-Path -LiteralPath $exe)) { throw "No win32-x64\whisper-cli.exe in $Zip. Use the whisper-win32-x64-V or -S zip from the workflow run." }
+if (-not (Test-Path -LiteralPath $exe)) { throw "No win32-x64\whisper-cli.exe in $Zip. Use the whisper-win32-x64-V, -S or -VK zip from the workflow run." }
 $sums = Join-Path $work 'info\SHA256SUMS'
 foreach ($line in (Get-Content -LiteralPath $sums)) {
   $hash, $name = $line -split '\s+', 2
@@ -152,8 +156,23 @@ function Get-DictationArgs([string]$File, [string]$Lang, [int]$Threads, [int]$Be
   $list + @($File)
 }
 
-if ($Round -eq 2) {
-  if (-not $Clips) { throw 'Round 2 needs -Clips: the whisper-bench-audio-et zip from the same workflow run.' }
+if ($Round -ge 2) {
+  if (-not $Clips) { throw "Round $Round needs -Clips: the whisper-bench-audio-et zip from the same workflow run." }
+  $gpuLines = @()
+  if ($Round -eq 3) {
+    # Round 3 (Sprint 129 W12, Jarmo 2026-10-12: Windows GPU "if it can be done"): config VK only.
+    if (-not (Test-Path -LiteralPath (Join-Path $work 'win32-x64\ggml-vulkan.dll'))) { throw 'Round 3 needs the whisper-win32-x64-VK zip (it has ggml-vulkan.dll).' }
+    Write-Host 'Looking for a Vulkan GPU...'
+    $probe = Invoke-Whisper @('--model', $model, '--language', 'en', $jfk)
+    $gpuLines = @(($probe.stderr -split "`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -match 'ggml_vulkan|Vulkan|backend_init_gpu' })
+    $gpuLines | ForEach-Object { Write-Host "  $_" }
+    if ($probe.exit -ne 0) { Write-Host $probe.stderr; throw "whisper-cli exited with $($probe.exit) on the GPU check." }
+    if (-not ($probe.stderr -match 'using Vulkan\d* backend')) { throw 'whisper-cli did not use a Vulkan GPU on this computer (lines above). Please send this output.' }
+    Write-Host 'Checking that the same engine still works without the GPU (--no-gpu)...'
+    $cpuOnly = Invoke-Whisper @('--model', $model, '--language', 'en', '--no-gpu', $jfk)
+    if ($cpuOnly.exit -ne 0 -or -not $cpuOnly.text) { Write-Host $cpuOnly.stderr; throw "The engine failed without the GPU (exit $($cpuOnly.exit))." }
+    Write-Host ("  CPU only: exit 0, {0:N0} ms: {1}" -f $cpuOnly.wallMs, $cpuOnly.text)
+  }
 
   $clipDir = Join-Path $work 'clips'
   Unblock-File -LiteralPath $Clips
@@ -203,27 +222,41 @@ if ($Round -eq 2) {
   Write-Host ("CPU: {0}, {1} cores / {2} threads. {3} Estonian clips, {4:N0} s of audio (FLEURS, CC BY 4.0)." -f $cpu.Name.Trim(), $cores, $threads, $clipRows.Count, $clipSeconds)
 
   # Whisper: one process per clip with dictation's flags, the way Ritemark runs it today.
-  foreach ($m in @(@('whisper-turbo-q8_0', $q8), @('whisper-turbo-f16', $model))) {
+  $device = if ($Round -eq 3) { 'gpu' } else { 'cpu' }
+  foreach ($m in @(@("whisper-turbo-q8_0-$device", $q8), @("whisper-turbo-f16-$device", $model))) {
     Write-Host "$($m[0]) (one process per clip, as dictation runs today)..."
     $null = Invoke-Whisper @('--model', $m[1], '--language', 'et', '--threads', "$threads", $jfk)
-    $wTexts = @(); $wWall = 0; $wLoad = 0
+    $wTexts = @(); $wWall = 0; $wLoad = 0; $wEncode = 0
     foreach ($c in $clipRows) {
       $r = Invoke-Whisper @('--model', $m[1], '--language', 'et', '--threads', "$threads", '--no-timestamps', '--no-fallback',
         '--beam-size', '8', '--entropy-thold', '2.4', '--logprob-thold', '-1.0', '--max-len', '0', $c.file)
-      $wTexts += , $r.text; $wWall += $r.wallMs; $wLoad += [double]$r.loadMs
+      $wTexts += , $r.text; $wWall += $r.wallMs; $wLoad += [double]$r.loadMs; $wEncode += [double]$r.encodeMs
     }
     $results.Add([pscustomobject]@{ engine = $m[0]; threads = $threads; wer = (Measure-Wer $wTexts); wallMs = $wWall; loadMs = [int]$wLoad
-      perClipMs = [int]($wWall / $clipRows.Count); rtf = [Math]::Round($wWall / 1000.0 / $clipSeconds, 3); texts = $wTexts })
+      encodeMs = [int]$wEncode; perClipMs = [int]($wWall / $clipRows.Count); rtf = [Math]::Round($wWall / 1000.0 / $clipSeconds, 3); texts = $wTexts })
+  }
+  $transcribe = $null
+  if ($Round -eq 3) {
+    Write-Host 'Transcribe: ten minutes of audio on the GPU...'
+    # Transcribe's flags (speech/engines/whisperLocalEngine.ts transcribeArgs).
+    $t10 = Invoke-Whisper @('-m', $model, '-f', $long, '-ojf', '-of', (Join-Path $work 'transcript'), '-pp', '-t', "$threads", '-l', 'en')
+    $transcribe = [pscustomobject]@{ exit = $t10.exit; wallMs = $t10.wallMs; loadMs = $t10.loadMs; encodeMs = $t10.encodeMs; decodeMs = $t10.decodeMs
+      realTime = [Math]::Round($t10.wallMs / 600000.0, 3) }
   }
 
   Write-Host ''
-  Write-Host ('{0,-22} {1,7} {2,7} {3,10} {4,9} {5,10} {6,7}' -f 'engine', 'threads', 'WER %', 'per clip', 'load', 'total', 'RTF')
+  Write-Host ('{0,-26} {1,7} {2,7} {3,10} {4,9} {5,10} {6,10} {7,7}' -f 'engine', 'threads', 'WER %', 'per clip', 'load', 'encode', 'total', 'RTF')
   foreach ($r in $results) {
-    Write-Host ('{0,-22} {1,7} {2,7} {3,8:N0}ms {4,7:N0}ms {5,8:N0}ms {6,7}' -f $r.engine, $r.threads, $r.wer, $r.perClipMs, $r.loadMs, $r.wallMs, $r.rtf)
+    Write-Host ('{0,-26} {1,7} {2,7} {3,8:N0}ms {4,7:N0}ms {5,8:N0}ms {6,8:N0}ms {7,7}' -f $r.engine, $r.threads, $r.wer, $r.perClipMs, $r.loadMs, $r.encodeMs, $r.wallMs, $r.rtf)
   }
-  Write-Host '(Per clip includes loading the model each time, as dictation does today; load is the total of those.)'
-  $reportPath = Join-Path (Get-Location) "asr-bench-round2-$($env:COMPUTERNAME).json"
-  [ordered]@{ computer = $env:COMPUTERNAME; cpu = $cpu.Name.Trim(); cores = $cores; threads = $threads; build = $buildInfo.runId
+  Write-Host '(Per clip includes loading the model each time, as dictation does today; load and encode are the totals of those.)'
+  if ($transcribe) {
+    Write-Host ('Transcribe, ten minutes on the GPU: {0:N0} ms ({1}x real time), load {2:N0}, encode {3:N0}, decode {4:N0}, exit {5}' -f
+      $transcribe.wallMs, $transcribe.realTime, $transcribe.loadMs, $transcribe.encodeMs, $transcribe.decodeMs, $transcribe.exit)
+  }
+  $reportPath = Join-Path (Get-Location) "asr-bench-round$Round-$($env:COMPUTERNAME).json"
+  [ordered]@{ computer = $env:COMPUTERNAME; cpu = $cpu.Name.Trim(); cores = $cores; threads = $threads; build = $buildInfo.runId; config = $buildInfo.config
+    gpu = $gpuLines; transcribe = $transcribe
     clips = @($clipRows | ForEach-Object { $_.name }); references = @($clipRows | ForEach-Object { $_.reference }); results = $results } |
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $reportPath -Encoding UTF8
   Write-Host ''

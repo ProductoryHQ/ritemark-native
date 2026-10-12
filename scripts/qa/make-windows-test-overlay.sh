@@ -46,6 +46,7 @@ console.log("Test version " + pkg.version);
 ' "$EXT/package.json" "$STAGE/package.json"
 
 mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"  # zip runs inside the staging folder, so the path must be absolute
 ZIP="$OUT/ritemark-windows-test-overlay-$SHA.zip"
 rm -f "$ZIP"
 (cd "$STAGE" && zip -qr "$ZIP" .)
