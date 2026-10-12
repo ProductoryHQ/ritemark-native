@@ -53,6 +53,10 @@ Windows users can dictate into documents and transcribe recordings on their own 
   - Parakeet (poor Estonian) and the TalTech Zipformer (Estonian and English only) are out, so no sherpa-onnx runtime is needed.
   - Bench round 2 runs Whisper large-v3-turbo q8_0 against f16 only.
   - TalTech's Estonian-tuned Whisper (11.4% WER) was not part of this cut and stays open as an accuracy option.
+- **2026-10-12 (Jarmo, in the "Ritemark on Windows" session, relayed by the Development manager), answering ship-or-hold:** "mõõda lühema akna ja mällu jääva mudeliga. 2 - väiksem mudel vaid siis kui kvaliteet ei kannata. 3 - kui saab siis jah..."
+  1. **Measure the shorter window with the model kept in memory** (round 3, on the Windows PC): fixed 5 s and 10 s chunks cut the way dictation cuts them, all through one whisper-cli process.
+  2. **q8_0 only if quality does not suffer.**
+  3. **GPU on Windows: "if it can be done, yes".** A Vulkan build (config VK) is added to `build-whisper.yml` for measuring. Before it goes into the product, Jarmo gets what it changes: download size, the GPU-driver dependency (`vulkan-1.dll`), and the CPU fallback.
 
 Proposed 2026-10-11 and approved with the plan:
 

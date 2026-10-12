@@ -10,6 +10,9 @@
             processor gets a slower code path instead of a crash. Shared libraries; dynamic C
             runtime with the Microsoft-signed VC++ runtime DLLs copied beside the exe.
   Config S  One static whisper-cli.exe, AVX2 baseline, static C runtime.
+  Config VK Config V plus the Vulkan GPU backend (ggml-vulkan.dll), loaded only where the GPU
+            driver provides vulkan-1.dll; elsewhere the CPU variants run. Needs the Vulkan SDK
+            (VULKAN_SDK) at build time. For measuring (Jarmo, 2026-10-12), not shipped yet.
 
   Both      GGML_NATIVE off (the build machine's CPU never leaks into the binary), OpenMP off
             (no vcomp140.dll), and scripts/build-whisper-utf8.manifest embedded so paths with
@@ -21,7 +24,7 @@
 
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)][ValidateSet('V', 'S')][string]$Config,
+  [Parameter(Mandatory)][ValidateSet('V', 'S', 'VK')][string]$Config,
   [Parameter(Mandatory)][string]$Source,
   [Parameter(Mandatory)][string]$Out,
   [string]$Info
@@ -72,9 +75,13 @@ $flags = @(
   '-DWHISPER_BUILD_TESTS=OFF',
   '-DWHISPER_BUILD_SERVER=OFF'
 )
-if ($Config -eq 'V') {
+if ($Config -eq 'V' -or $Config -eq 'VK') {
   $flags += @('-DBUILD_SHARED_LIBS=ON', '-DGGML_BACKEND_DL=ON', '-DGGML_CPU_ALL_VARIANTS=ON',
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL')
+  if ($Config -eq 'VK') {
+    if (-not $env:VULKAN_SDK) { throw 'Config VK needs the Vulkan SDK (VULKAN_SDK is not set).' }
+    $flags += '-DGGML_VULKAN=ON'
+  }
 } else {
   $flags += @('-DBUILD_SHARED_LIBS=OFF', '-DGGML_AVX=ON', '-DGGML_AVX2=ON', '-DGGML_FMA=ON', '-DGGML_F16C=ON',
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded')
@@ -95,7 +102,7 @@ if (-not (Test-Path -LiteralPath $exe)) { throw "The build produced no $exe." }
 if (Test-Path -LiteralPath $Out) { Remove-Item -LiteralPath $Out -Recurse -Force }
 New-Item -ItemType Directory -Path $Out -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination $Out
-if ($Config -eq 'V') {
+if ($Config -ne 'S') {
   Get-ChildItem -LiteralPath $binDir -Filter *.dll | Copy-Item -Destination $Out
 }
 $outExe = Join-Path $Out 'whisper-cli.exe'
@@ -114,9 +121,9 @@ function Get-Dependents {
   @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^[\w.-]+\.dll$' })
 }
 
-# Config V: copy each VC++ runtime DLL the payload links, from the newest redist folder.
+# Config V/VK: copy each VC++ runtime DLL the payload links, from the newest redist folder.
 $vcRedist = '^(vcruntime|msvcp|vcomp|concrt)\d.*\.dll$'
-if ($Config -eq 'V') {
+if ($Config -ne 'S') {
   $needed = @(Get-ChildItem -LiteralPath $Out -File | ForEach-Object { Get-Dependents $_.FullName } |
     Where-Object { $_ -match $vcRedist } | Sort-Object -Unique)
   $crtDir = Get-ChildItem -LiteralPath (Join-Path $vs 'VC\Redist\MSVC') -Directory |

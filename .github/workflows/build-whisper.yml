@@ -45,7 +45,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        config: [V, S]
+        # VK = V + the Vulkan GPU backend, for measuring on Jarmo's PC (2026-10-12); not shipped yet.
+        config: [V, S, VK]
+    env:
+      VULKAN_VERSION: 1.4.357.0
     steps:
       - name: Checkout Ritemark
         uses: actions/checkout@v4
@@ -63,6 +66,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install the Vulkan SDK (LunarG, config VK only)
+        if: matrix.config == 'VK'
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK install failed ($LASTEXITCODE)" }
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
 
       - name: Build
         id: build
@@ -84,6 +97,7 @@ jobs:
             --model-cache model-cache `
             --arch x64 `
             --dumpbin '${{ steps.build.outputs.dumpbin }}' `
+            --driver-dll vulkan-1.dll `
             --report out/info/contract-report.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

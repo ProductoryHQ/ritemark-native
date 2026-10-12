@@ -11,6 +11,7 @@
 //   npx --yes tsx@4.21.0 scripts/qa/whisper-contract-test.mjs \
 //     --binary <dir>/whisper-cli[.exe] --sample <jfk.wav> --model-cache <dir> \
 //     [--arch x64|arm64] [--min-macos 12.0] [--dumpbin <dumpbin.exe>] [--report <file.json>]
+//     [--driver-dll vulkan-1.dll]   (a GPU-driver DLL that may be absent; the backend then stays unloaded)
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -129,6 +130,7 @@ function foreignDependencies(binary, options) {
         const lower = dep.toLowerCase();
         if (besides.has(lower)) continue;
         if (/^(api|ext)-ms-/.test(lower)) continue; // API sets: resolved by the Windows loader
+        if (options['driver-dll'] && lower === options['driver-dll'].toLowerCase()) continue; // installed with the GPU driver
         if (VC_REDIST.test(dep)) problems.push(`${path.basename(file)} needs ${dep}, which a clean Windows does not have`);
         else if (!fs.existsSync(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', dep))) {
           problems.push(`${path.basename(file)} needs ${dep}, found neither beside it nor in System32`);

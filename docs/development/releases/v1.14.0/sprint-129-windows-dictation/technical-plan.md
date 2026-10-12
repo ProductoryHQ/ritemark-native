@@ -178,6 +178,12 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - A non-Whisper engine would be a new runtime (ONNX Runtime via sherpa-onnx); adopting one is Jarmo's separate decision after the numbers.
 - *(Revised 2026-10-12, Jarmo's decision)* Parakeet and the Zipformer are out, so no sherpa-onnx. Round 2 on Windows measures Whisper q8_0 against f16 only (`windows-whisper-bench.ps1 -Round 2`, trimmed to match). `asr-wer.mjs` keeps its sherpa mode for the accuracy record.
 
+## W12 — Speed paths still open (added 2026-10-12, Jarmo's answers)
+
+- **Round 3 (Windows session):** fixed 5 s and 10 s chunks of the FLEURS clips through one resident whisper-cli process, with the full window and `--audio-ctx` 576/320, f16 and q8_0. A Mac cross-check on the same chunking runs `asr-wer.mjs --chunk-seconds N --resident on`, which shows whether a different result comes from chunking, the flags or the resident process.
+- **Vulkan (config VK):** `build-whisper-windows.ps1 -Config VK` = config V plus `-DGGML_VULKAN=ON`, built with the LunarG Vulkan SDK 1.4.357.0 on `windows-latest`. `ggml-vulkan.dll` is one more backend chosen at run time. It loads only where the GPU driver installs `vulkan-1.dll`; otherwise the CPU variants run. The contract test treats `vulkan-1.dll` as a driver DLL. The artifact is measured on Jarmo's PC first; shipping it is his decision once size, driver dependency and fallback are in front of him.
+- **A resident process in the product** (the model stays loaded between dictation calls) would replace the per-chunk spawn in `DictationController`. It is designed only if round 3 shows it matters.
+
 ## W9 — Docs, tiers and release notes (R10)
 
 - Tiers: the `CLAUDE.md` shell-tier list, the `scripts/release-extension-preflight.sh` denylist and `SHELL_TIER` in `scripts/list-unshipped-extension-changes.mjs` move from `extensions/ritemark/binaries/agents/` to `extensions/ritemark/binaries/`, in one commit, with `release-tier-paths.test.mjs` and `list-unshipped-extension-changes.test.mjs` updated. The patch 008 line in `CLAUDE.md` is corrected.
