@@ -146,8 +146,11 @@ export function NoteBox({
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) send(runtime)
         }}
       />
-      <div className="mt-2 flex gap-2">
+      {/* The row wraps inside the panel: at side-bar width Cancel goes under
+          Send to instead of past the panel's edge. */}
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
         <AgentSplitButton
+          className="min-w-0 max-w-full"
           verb="Send to"
           runtimes={snapshot.runtimes}
           selected={runtime}

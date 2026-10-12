@@ -64,8 +64,8 @@ export function AgentSplitButton({
       : (current?.message ?? `${name} is not ready.`)
   return (
     <span className={cn('tb-split', variant === 'outline' && 'tb-split-outline', className)}>
-      <Tooltip label={mainTip}>
-        <Button type="button" size="sm" variant={variant} disabled={disabled || !usable} onClick={() => onRun(selected)}>
+      <Tooltip label={mainTip} className="min-w-0">
+        <Button type="button" size="sm" variant={variant} className="min-w-0" disabled={disabled || !usable} onClick={() => onRun(selected)}>
           <span className="truncate">{label ?? (anyUsable ? `${verb} ${name}` : `${verb} agent`)}</span>
         </Button>
       </Tooltip>

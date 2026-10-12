@@ -253,7 +253,8 @@ export class AcpSession implements RuntimeSession {
           : result.stopReason === 'cancelled'
             ? 'interrupted'
             : result.stopReason;
-        config.onCodexComplete?.({ status });
+        const lastAgentMessage = manager.lastAgentMessage(this.acpSessionId);
+        config.onCodexComplete?.({ status, ...(lastAgentMessage ? { lastAgentMessage } : {}) });
       } catch (err) {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.

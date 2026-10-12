@@ -155,7 +155,12 @@ export interface RuntimeSessionConfig {
   /** Called when a turn completes with its final result (Claude Code) */
   onComplete?: (result: RuntimeTurnResult) => void;
   /** Called when a Codex turn completes with its status and optional error */
-  onCodexComplete?: (result: { status: string; error?: string }) => void;
+  /**
+   * `lastAgentMessage` (Sprint 130, G4): the turn's final assistant message on
+   * its own, so a task's result is the agent's conclusion rather than the
+   * first sentence it streamed. Absent when the runtime cannot tell messages apart.
+   */
+  onCodexComplete?: (result: { status: string; error?: string; lastAgentMessage?: string }) => void;
   /** Codex approval policy (passed to threadStart) */
   codexApprovalPolicy?: string;
   /** Codex sandbox mode (passed to threadStart) */

@@ -300,6 +300,32 @@ async function run() {
     console.log('✓ Test 7: B2 — turn/completed clears only the completing thread');
   }
 
+  // ── Test 7b: Sprint 130 (G4) — the completion carries the LAST assistant
+  // message, so a task's result is the conclusion, not the opening narration.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a']);
+    let completed: { status: string; lastAgentMessage?: string } | null = null;
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, onCodexComplete: (result) => { completed = result; } });
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-thread-a' } });
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-thread-a', item: { type: 'agentMessage', id: 'm1' } });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'm1', delta: 'Let me read the notes.' });
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-thread-a', item: { type: 'agentMessage', id: 'm2' } });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'm2', delta: 'The answer ' });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'm2', delta: 'is 42.' });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-thread-a', status: 'completed', error: null } });
+    assert.strictEqual(completed?.lastAgentMessage, 'The answer is 42.', `got ${JSON.stringify(completed)}`);
+
+    // The finished item's own text, when sent, wins over the deltas.
+    completed = null;
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-2' } });
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-2', item: { type: 'agentMessage', id: 'm3' } });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'm3', delta: 'Partial' });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'agentMessage', id: 'm3', text: 'Complete text.' } });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-2', status: 'completed', error: null } });
+    assert.strictEqual(completed?.lastAgentMessage, 'Complete text.');
+    console.log('✓ Test 7b: G4 — completion carries the last assistant message');
+  }
+
   // ── Test 8: B1 REGRESSION — switching approval mode in one conversation must
   // not reset another's thread. `_threadApprovalKey` and
   // `_browserToolsEnabledForThread` were adapter scalars, so chat B switching

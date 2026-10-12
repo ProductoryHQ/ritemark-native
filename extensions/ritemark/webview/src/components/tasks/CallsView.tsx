@@ -38,7 +38,7 @@ export function CallsView({ snapshot }: { snapshot: BoardSnapshot }) {
           detail = (
             <>
               <div className="tb-sub">
-                {finishedLine(card)}. {modifiedLine(card.result.files)}
+                {finishedLine(card)}.{card.result.files.length ? ` ${modifiedLine(card.result.files)}` : ''}
               </div>
               <div className="tb-summary" style={{ fontSize: 13 }}>
                 {card.result.summary}

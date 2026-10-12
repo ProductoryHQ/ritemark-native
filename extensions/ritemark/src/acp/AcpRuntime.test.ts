@@ -65,6 +65,8 @@ const mockManager = {
     return { stopReason: 'end_turn', usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 } };
   },
   setModel: async (_sessionId: string, _model: string) => { calls.push('setModel'); },
+  // Sprint 130 (G4): the turn's last assistant message, by ACP messageId.
+  lastAgentMessage: (_sessionId: string) => 'The final answer.',
   getThinkingEffortCapability: () => ({
     selectable: ['low', 'medium', 'high'],
     defaultLevel: 'medium',
@@ -254,10 +256,14 @@ async function run() {
     const runtime = new AcpRuntime();
     calls.length = 0;
     let completionStatus: string | undefined;
+    let lastAgentMessage: string | undefined;
     const session = addSession(runtime, 'conv-a', {
       ...dummyConfig,
       model: 'openai/gpt-4o',
-      onCodexComplete: (result) => { completionStatus = result.status; },
+      onCodexComplete: (result) => {
+        completionStatus = result.status;
+        lastAgentMessage = result.lastAgentMessage;
+      },
     });
     await session.prompt({ prompt: 'Hello' });
     assert.ok(calls.includes('setModel'), 'prompt() must call setModel when config.model is set');
@@ -267,6 +273,7 @@ async function run() {
       'completed',
       'ACP end_turn must be normalized to the shared completed status',
     );
+    assert.strictEqual(lastAgentMessage, 'The final answer.', 'the turn reports its last assistant message (G4)');
     console.log('✓ Test 6: prompt() calls setModel and normalizes end_turn to completed');
   }
 

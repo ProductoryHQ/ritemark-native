@@ -32,7 +32,8 @@ export interface QueueItem {
   prompt: string;
   /** What the user typed — shown in the queue row. */
   displayText: string;
-  source: 'composer' | 'comment';
+  /** Sprint 130: `card` is a task-board card (its queue row shows the board icon). */
+  source: 'composer' | 'comment' | 'card';
   attachments?: FileAttachment[];
   skipActiveFile?: boolean;
   skipBrowserContext?: boolean;

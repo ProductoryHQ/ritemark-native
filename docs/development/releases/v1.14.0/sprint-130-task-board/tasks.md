@@ -45,20 +45,20 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 4: Give to agent (W4, R5, R6, R7, R12)
 
-- [ ] T4.1 `src/taskBoard/CardTaskStore.ts` + test (lifecycle from `commentTasks/types.ts`, prune at activation)
-- [ ] T4.2 `src/taskBoard/boardPrompt.ts` + test: `displayText` is the user's request only; `prompt` adds the card line only with board tools; follow-up and answer turns
-- [ ] T4.3 `UnifiedViewProvider`: task listener list (G1); comment-task controller registered through it; its tests stay green
-- [ ] T4.4 Enqueue `newConversation` + `sourceKind` (G2): protocol, host, sidebar store (insert without activating), manual title after the first turn, queue icon
-- [ ] T4.4a History-only destination (P1): store loads the conversation with `conversation/get` under a remembered request id, adds it without activating, focusing or `ai-select-agent`, then queues
-- [ ] T4.5 G3: answered approval/question → `running`
-- [ ] T4.6 G4: last-message summary for Codex (`agentMessage` item + `itemId`) and OpenCode (ACP `messageId`), passed in `onCodexComplete`; capture one Codex `item/completed` trace
-- [ ] T4.7 G5: queued task items are not editable
-- [ ] T4.8 G6: `comment-task/dispatch-failed` → `failed`
+- [x] T4.1 `src/taskBoard/CardTaskStore.ts` (one record per card; records of deleted cards dropped at activation), covered by the ledger test
+- [x] T4.2 `src/taskBoard/boardPrompt.ts` + test: `displayText` is the user's request only; `prompt` adds the card line only with board tools; follow-up and answer turns
+- [x] T4.3 `UnifiedViewProvider`: task listener list (G1); comment-task controller registered through it; its tests stay green
+- [x] T4.4 Enqueue `newConversation` + `sourceKind` (G2): protocol, host, sidebar store (insert without activating), manual title after the first turn, queue icon
+- [x] T4.4a History-only destination (P1): store loads the conversation with `conversation/get` under a remembered request id, adds it without activating, focusing or `ai-select-agent`, then queues
+- [x] T4.5 G3: answered approval/question → `running`
+- [x] T4.6 G4: last-message summary for Codex (`agentMessage` item + `itemId`) and OpenCode (ACP `messageId`), passed in `onCodexComplete`; capture one Codex `item/completed` trace
+- [x] T4.7 G5: queued task items are not editable
+- [x] T4.8 G6: `comment-task/dispatch-failed` → `failed`
 - [x] T4.8a F1: neutral shadcn role tokens re-declared under `body.vscode-dark` in `webview/src/index.css`; outline/secondary buttons checked in dark mode on Settings, dialogs and the board
-- [ ] T4.0 Replace the interim `NOT_CONNECTED_LEDGER` in `taskBoardHost.ts` with the W4 ledger (it must not ship)
-- [ ] T4.9 Controller: give, follow-up, answer, stop, retry, open conversation, recover; result onto the card (report first, summary fallback, changed files, seconds); interrupted on restart; deleted conversation; locks while working
-- [ ] T4.9a Focus: the card path shows the sidebar only with `ritemark.unifiedView.focus` + `{ preserveFocus: true }`, including `_awaitActiveConversation` (P7)
-- [ ] T4.10 `BoardController.test.ts`: handoff lifecycle end to end with injected sidebar fakes
+- [x] T4.0 Replace the interim `NOT_CONNECTED_LEDGER` in `taskBoardHost.ts` with the W4 ledger (it must not ship)
+- [x] T4.9 Controller: give, follow-up, answer, stop, retry, open conversation, recover; result onto the card (report first, summary fallback, changed files, seconds); interrupted on restart; deleted conversation; locks while working
+- [x] T4.9a Focus: the card path shows the sidebar only with `ritemark.unifiedView.focus` + `{ preserveFocus: true }`, including `_awaitActiveConversation` (P7)
+- [x] T4.10 Handoff lifecycle end to end with injected sidebar fakes (`CardHandoffLedger.test.ts`), plus G4 tests in `CodexRuntime.test.ts` and `acpManager.test.ts`
 
 ## Phase 5: Agent tools (W5, R8)
 

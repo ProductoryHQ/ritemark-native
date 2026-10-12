@@ -131,6 +131,11 @@ And the AI sidebar's rail shows a new conversation titled "Draft the workshop ag
 And its first message is the card's title, description and file paths, with no instructions to the agent in it
 And the conversation I had open stays open, and focus stays on the Give button
 
+### S16b: The side bar stays
+Given I gave a card to an agent from the Tasks side bar
+When the agent finishes
+Then the side bar still shows Tasks (not the Explorer), and the card is in Your calls as Ready to review
+
 ### S16a: AI sidebar hidden
 Given I closed the AI sidebar
 When I press Give to Claude
@@ -154,9 +159,9 @@ When I press Mark done after the next result
 Then the card moves to Done and leaves Your calls
 
 ### S19: Needs you mid-turn
-Given the conversation is in Manual mode and the agent asks to write a file
-Then the card reads "Needs you · approval", there is no Approve button on the board, and Your calls offers Open conversation
-When I approve in the sidebar
+Given the agent asks a question mid-turn (card turns run with autonomy `auto`, as comment tasks do: G7 is out of scope, so a file-write approval does not happen on a card turn)
+Then the card reads "Needs you · question", there is no answer box on the board, and Your calls offers Open conversation
+When I answer in the sidebar
 Then the card reads Working again before the turn ends
 
 ### S20: Agent not available

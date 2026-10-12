@@ -337,14 +337,16 @@ function CardDetailBody({ card, snapshot, narrow, onShowCalls }: { card: BoardCa
             <div className="tb-result">
               {card.result.summary}
               <CheckList card={card} />
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-muted">
-                {card.result.files.length
-                  ? `Modified ${card.result.files.length} file${card.result.files.length === 1 ? '' : 's'}`
-                  : 'No files changed'}
-                {card.result.files.map((file) => (
-                  <FileChip key={file} path={file} />
-                ))}
-              </div>
+              {/* Only Claude reports the files a turn changed; an empty list is
+                  "not known", never "nothing changed". */}
+              {card.result.files.length ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-muted">
+                  {`Modified ${card.result.files.length} file${card.result.files.length === 1 ? '' : 's'}`}
+                  {card.result.files.map((file) => (
+                    <FileChip key={file} path={file} />
+                  ))}
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}

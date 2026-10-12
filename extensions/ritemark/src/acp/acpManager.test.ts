@@ -43,6 +43,15 @@ rl.on('line',(line)=>{
       pending.set(sid,{id:msg.id,timer:t});
       return;
     }
+    if(process.env.AGENT_MESSAGES==='1'){
+      // Two assistant messages in one turn, told apart by messageId (G4).
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',messageId:'m1',content:{type:'text',text:'Let me look at the notes.'}}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'t2',title:'read',status:'pending',kind:'read'}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',messageId:'m2',content:{type:'text',text:'The answer '}}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',messageId:'m2',content:{type:'text',text:'is 42.'}}});
+      result(msg.id,{stopReason:'end_turn',usage:{inputTokens:5,outputTokens:3,totalTokens:8}});
+      return;
+    }
     if(process.env.AGENT_EMPTY==='1'){
       // Bad-key style empty turn: no content, 0 tokens.
       result(msg.id,{stopReason:'end_turn',usage:{inputTokens:0,outputTokens:0,totalTokens:0}});
@@ -163,6 +172,22 @@ async function run() {
     assert.ok(byType('done').length === 1, 'a successful turn emits exactly one done event');
     assert.ok(byType('error').length === 0, 'no error on a normal turn');
     mgr.dispose();
+  }
+
+  // ── Sprint 130 (G4): the turn's last assistant message, by messageId ──
+  {
+    const events: AgentProgress[] = [];
+    const mgr = makeManager(events, { AGENT_MESSAGES: '1' });
+    const sid = await mgr.start();
+    await mgr.prompt(sid, 'summarise');
+    assert.strictEqual(mgr.lastAgentMessage(sid), 'The answer is 42.', 'only the last message, not the narration before it');
+    mgr.dispose();
+    const plainEvents: AgentProgress[] = [];
+    const plain = makeManager(plainEvents);
+    const plainSid = await plain.start();
+    await plain.prompt(plainSid, 'do it');
+    assert.strictEqual(plain.lastAgentMessage(plainSid), 'Done', 'without message ids, the streamed text');
+    plain.dispose();
   }
 
   // ── 0-token end_turn with empty content → soft error (audit R-1) ──

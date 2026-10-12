@@ -16,7 +16,7 @@ import { act, useBoardUi } from './boardUi'
 import { CardDetail, DeleteConfirm } from './CardDetail'
 import { CardMenu } from './CardMenu'
 import { CallActions, CardGlyph, GivePromptPanel, INPUT, SECTION, toneClass, useNow, usePresenter } from './CardParts'
-import { waited } from './taskCopy'
+import { STAGE_NAMES, waited } from './taskCopy'
 import { Notice } from './Notice'
 import './tasks.css'
 
@@ -263,7 +263,7 @@ function SideRow({
       <button
         type="button"
         className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-        aria-label={`${card.title}, ${p.row || card.stage}`}
+        aria-label={`${card.title}, ${p.row || STAGE_NAMES[card.stage]}`}
         onClick={() => openCard(card.id)}
       />
       <CardGlyph card={card} p={p} />

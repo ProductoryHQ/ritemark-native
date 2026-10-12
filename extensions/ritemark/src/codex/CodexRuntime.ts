@@ -458,7 +458,11 @@ export class CodexSession implements RuntimeSession {
   // ── Internal (adapter-facing) ──────────────────────────────────────────────
 
   /** @internal — event listeners on the shared app-server call these. */
+  /** Sprint 130 (G4): the turn's latest assistant message, by item id. */
+  _lastAgentMessage: { itemId: string | null; text: string } = { itemId: null, text: '' };
+
   _onTurnStarted(turnId: string): void {
+    this._lastAgentMessage = { itemId: null, text: '' };
     this._lastStartedTurnId = turnId;
     for (const waiter of this._turnStateWaiters) waiter(turnId, 'started');
   }
@@ -800,9 +804,12 @@ export class CodexRuntime implements AgentRuntime {
     this._appServer.on(
       'item/started',
       (params: { item: { type: string; id: string }; threadId: string; turnId: string }) => {
-        const config = this._sessionForThread(params.threadId, 'item/started')?.config;
-        if (!config) return;
+        const session = this._sessionForThread(params.threadId, 'item/started');
+        const config = session?.config;
+        if (!session || !config) return;
         const itemType = params.item?.type;
+        // A new assistant message starts: the last one is no longer the last.
+        if (itemType === 'agentMessage') session._lastAgentMessage = { itemId: params.item.id ?? null, text: '' };
         if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
           const label = itemType === 'agentMessage' ? 'Thinking...' : `Running: ${itemType}`;
           config.onProgress({ type: 'tool_use', message: label, tool: itemType, timestamp: Date.now() });
@@ -812,9 +819,14 @@ export class CodexRuntime implements AgentRuntime {
 
     // The main streaming path. Before Sprint 99 this did not even destructure
     // threadId, so every chat's text landed in whichever config was last set.
-    this._appServer.on('item/agentMessage/delta', (params: { delta: string; threadId?: string }) => {
-      const config = this._sessionForThread(params.threadId, 'item/agentMessage/delta')?.config;
-      config?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
+    this._appServer.on('item/agentMessage/delta', (params: { delta: string; threadId?: string; itemId?: string }) => {
+      const session = this._sessionForThread(params.threadId, 'item/agentMessage/delta');
+      if (session) {
+        const last = session._lastAgentMessage;
+        if (params.itemId && last.itemId !== params.itemId) session._lastAgentMessage = { itemId: params.itemId, text: params.delta };
+        else last.text += params.delta;
+      }
+      session?.config?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
     });
 
     this._appServer.on('item/plan/delta', (params: { delta: string; threadId?: string }) => {
@@ -832,10 +844,15 @@ export class CodexRuntime implements AgentRuntime {
       config?.onCodexPlanUpdate?.(params.explanation, params.plan);
     });
 
-    this._appServer.on('item/completed', (params: { item: { type: string; id: string }; threadId?: string }) => {
-      const config = this._sessionForThread(params.threadId, 'item/completed')?.config;
-      if (!config) return;
+    this._appServer.on('item/completed', (params: { item: { type: string; id: string; text?: unknown }; threadId?: string }) => {
+      const session = this._sessionForThread(params.threadId, 'item/completed');
+      const config = session?.config;
+      if (!session || !config) return;
       const itemType = params.item?.type;
+      // The finished message's own text, when Codex sends it, beats the deltas.
+      if (itemType === 'agentMessage' && typeof params.item.text === 'string' && params.item.text.trim()) {
+        session._lastAgentMessage = { itemId: params.item.id ?? null, text: params.item.text };
+      }
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
         config.onProgress({ type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now() });
       }
@@ -852,7 +869,8 @@ export class CodexRuntime implements AgentRuntime {
         session._onTurnCompleted(params.turn.id);
         const config = session.config;
         const errorMsg = formatCodexTurnError(params.turn.error);
-        config.onCodexComplete?.({ status: params.turn.status, error: errorMsg });
+        const lastAgentMessage = session._lastAgentMessage.text.trim();
+        config.onCodexComplete?.({ status: params.turn.status, error: errorMsg, ...(lastAgentMessage ? { lastAgentMessage } : {}) });
         config.onProgress({ type: 'done', message: '', timestamp: Date.now() });
       },
     );

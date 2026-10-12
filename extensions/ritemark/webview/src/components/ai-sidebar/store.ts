@@ -499,6 +499,9 @@ function postConversationRequest(message: ConversationRequestWithoutId): void {
 
 const initialConversation = createConversationState(generateId());
 
+/** Sprint 130: `conversation/get` requests made for a card's background load, by request id. */
+const backgroundLoads = new Map<string, (projection: ConversationProjectionV1 | null) => void>();
+
 let legacyInventorySent = false;
 type LegacyMigrationBatch = ReturnType<typeof discoverLegacyConversationCandidates>;
 let pendingLegacyMigrationBatches: LegacyMigrationBatch[] = [];
@@ -738,6 +741,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // its own document. Composer items send neither, so the host keeps
           // resolving the active file for them exactly as before.
           ...(item.taskId ? { taskId: item.taskId } : {}),
+          ...(item.source === 'card' ? { taskKind: 'card' } : {}),
           ...(item.sourceDisplayPath ? { sourceDisplayPath: item.sourceDisplayPath } : {}),
         });
       } else {
@@ -782,6 +786,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           skipBrowserContext: item.skipBrowserContext,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
           ...(item.taskId ? { taskId: item.taskId } : {}),
+          ...(item.source === 'card' ? { taskKind: 'card' } : {}),
           ...(item.sourceDisplayPath ? { sourceDisplayPath: item.sourceDisplayPath } : {}),
         });
       }
@@ -790,12 +795,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       // conversation record for this exact turn (Sprint 117 D7).
     } catch (err) {
       // Keep the item visible with its error — never silently discard (R3).
+      const reason = err instanceof Error ? err.message : String(err);
       set({
-        promptQueues: markQueueStatus(
-          get().promptQueues, item.conversationId, item.id, 'failed',
-          err instanceof Error ? err.message : String(err),
-        ),
+        promptQueues: markQueueStatus(get().promptQueues, item.conversationId, item.id, 'failed', reason),
       });
+      // Sprint 130 (G6): a task's owner hears it, so its comment or card says
+      // Failed instead of Queued forever.
+      if (item.taskId) vscode.postMessage({ type: 'comment-task/dispatch-failed', taskId: item.taskId, message: reason });
     }
   }
 
@@ -807,19 +813,73 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
    * binds the conversation that is open in this sidebar at acceptance time.
    */
   function handleCommentTaskEnqueue(message: CommentTaskEnqueueMessage): void {
-    const answer = (outcome: CommentTaskEnqueueOutcome): void => {
-      vscode.postMessage({ type: 'comment-task/enqueue-result', taskId: message.taskId, outcome });
+    const answer = (outcome: CommentTaskEnqueueOutcome, conversationId?: string): void => {
+      vscode.postMessage({
+        type: 'comment-task/enqueue-result',
+        taskId: message.taskId,
+        outcome,
+        ...(conversationId ? { conversationId } : {}),
+      });
     };
 
-    // The named conversation, never the visible one. An id this sidebar does
-    // not hold is reported honestly rather than redirected (R1).
-    if (!get().conversations[message.conversationId]) {
-      answer('no-conversation');
+    // Sprint 130 (G2): a task-board card on its first handoff gets a NEW
+    // conversation of its own. It joins the open set (the rail shows it while
+    // it works) without becoming the open one, so the user's conversation and
+    // focus stay where they are.
+    if (message.newConversation) {
+      const conversation = createConversationState(generateId(), {
+        selectedAgent: message.runtimeId,
+        pendingRuntime: { runtimeId: message.runtimeId, modelId: message.modelId ?? '', mode: message.autonomy === 'ask' ? 'ask' : 'auto' },
+      });
+      set({ conversations: { ...get().conversations, [conversation.id]: conversation } });
+      queueCommentTask(message, conversation.id, answer);
       return;
     }
 
+    // The named conversation, never the visible one.
+    if (get().conversations[message.conversationId]) {
+      queueCommentTask(message, message.conversationId, answer);
+      return;
+    }
+    // Sprint 130 (P1): a card's conversation is usually only in history after
+    // a restart. Load it in the background (no switch, no focus) and queue
+    // there. A comment's destination that this sidebar does not hold is still
+    // reported honestly rather than redirected (R1).
+    if (message.sourceKind === 'card' && get().conversationRolloutMode !== 'legacy') {
+      loadConversationInBackground(message.conversationId, (loaded) => {
+        if (loaded) queueCommentTask(message, message.conversationId, answer);
+        else answer('no-conversation');
+      });
+      return;
+    }
+    answer('no-conversation');
+  }
+
+  /** Load a conversation from durable history into the open set without opening it. */
+  function loadConversationInBackground(conversationId: string, done: (loaded: boolean) => void): void {
+    const requestId = nextId();
+    backgroundLoads.set(requestId, (projection) => {
+      if (!projection) {
+        done(false);
+        return;
+      }
+      const restored = projectionToConversation(projection, undefined);
+      // The user may have opened it meanwhile; never replace a live copy.
+      if (!get().conversations[restored.id]) {
+        set({ conversations: { ...get().conversations, [restored.id]: restored } });
+      }
+      done(Boolean(get().conversations[conversationId]));
+    });
+    sendConversationRequest({ type: 'conversation/get', conversationId, requestId } as ConversationRequest);
+  }
+
+  function queueCommentTask(
+    message: CommentTaskEnqueueMessage,
+    conversationId: string,
+    answer: (outcome: CommentTaskEnqueueOutcome, conversationId?: string) => void,
+  ): void {
     const { outcome, item } = enqueueCaptured({
-      conversationId: message.conversationId,
+      conversationId,
       runtimeId: message.runtimeId,
       autonomy: message.autonomy,
       planFirst: false,
@@ -827,15 +887,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       thinkingEffort: (message.thinkingEffort as ThinkingEffort) ?? 'auto',
       prompt: message.prompt,
       displayText: message.displayText,
-      source: 'comment',
+      source: message.sourceKind === 'card' ? 'card' : 'comment',
       taskId: message.taskId,
       conversationTurnId: message.conversationTurnId,
-      sourceDisplayPath: message.sourceDisplayPath,
+      ...(message.sourceDisplayPath ? { sourceDisplayPath: message.sourceDisplayPath } : {}),
     });
 
     // Audit F17: the queue's `full` answer used to be dropped on the floor and
     // the user was told the work was queued. It is now the reply.
-    answer(outcome);
+    // The conversation id says where it was queued, so only a queued answer carries it.
+    answer(outcome, outcome === 'queued' ? conversationId : undefined);
     if (outcome === 'queued') get().maybeDrainQueue(item.conversationId);
   }
 
@@ -2254,6 +2315,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'conversation/result': {
+          // Sprint 130: the answer to a card's background load is the card's,
+          // never a reason to switch conversations.
+          const backgroundLoad = backgroundLoads.get(message.requestId)
+          if (backgroundLoad) {
+            backgroundLoads.delete(message.requestId)
+            const loaded = message.ok ? (message.data as { conversation?: ConversationProjectionV1 | null }).conversation ?? null : null
+            backgroundLoad(loaded)
+            break
+          }
           if (!message.ok) {
             if (message.operation === 'legacy/import-batch') {
               // A later initialize may retry safely: host migration is

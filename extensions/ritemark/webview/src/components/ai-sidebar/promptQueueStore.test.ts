@@ -192,8 +192,8 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
   assert.equal(active.pendingRuntime.runtimeId, 'claude-code', 'visible thread runtime NOT retargeted');
   assert.deepEqual(
     posted.find((m) => m.type === 'comment-task/enqueue-result'),
-    { type: 'comment-task/enqueue-result', taskId: 'task-5', outcome: 'queued' },
-    'the queue verdict is reported back to the host',
+    { type: 'comment-task/enqueue-result', taskId: 'task-5', outcome: 'queued', conversationId: 'codex-b' },
+    'the queue verdict, and the conversation it was queued in, are reported back to the host',
   );
 }
 

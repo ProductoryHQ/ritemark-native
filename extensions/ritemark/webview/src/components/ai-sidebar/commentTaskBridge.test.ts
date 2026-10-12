@@ -119,7 +119,11 @@ function deliver(message: Record<string, unknown>): void {
 
   const results = postedOf('comment-task/enqueue-result');
   assert.equal(results.length, 1, 'exactly one acknowledgement');
-  assert.deepEqual(results[0], { type: 'comment-task/enqueue-result', taskId: 'task-1', outcome: 'queued' });
+  assert.deepEqual(
+    results[0],
+    { type: 'comment-task/enqueue-result', taskId: 'task-1', outcome: 'queued', conversationId: 'dest' },
+    'the acknowledgement names the conversation it was queued in',
+  );
 }
 
 // ── 2. F17: a full queue is reported as full, never as queued ──

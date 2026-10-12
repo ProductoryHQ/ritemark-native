@@ -17,10 +17,13 @@ import type { AgentId } from '../agent/types';
 import { isEnabled } from '../features/featureGate';
 import type { RuntimeAvailabilities, RuntimeAvailability } from '../runtime/availability';
 import { TasksViewProvider } from '../views/TasksViewProvider';
-import { BoardController, type HandoffLedger } from './BoardController';
+import type { AgentTaskListener } from '../views/UnifiedViewProvider';
+import { BoardController } from './BoardController';
+import { CardHandoffLedger, type CardTaskSidebar } from './CardHandoffLedger';
+import { CardTaskStore, cardTaskStoreDir } from './CardTaskStore';
 import { BoardStore, nodeBoardStoreFileSystem } from './BoardStore';
 import { TaskBoardPanel } from './TaskBoardPanel';
-import type { BoardAnswer, BoardSnapshot, CardHandoffView } from './protocol';
+import type { BoardAnswer, BoardSnapshot } from './protocol';
 import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
 import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
@@ -28,8 +31,12 @@ import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
 export interface TaskBoardHostDependencies {
   context: vscode.ExtensionContext;
   runtimeAvailability: (runtimeId: AgentId) => Promise<RuntimeAvailability>;
-  /** The machine-local side of Give to agent (W4). */
-  ledger?: HandoffLedger;
+  /** The AI sidebar's side of Give to agent (UnifiedViewProvider). */
+  cardSidebar: CardTaskSidebar;
+  /** Hear turn events next to the comment tasks (G1). */
+  attachTaskListener: (listener: AgentTaskListener) => void;
+  /** Whether a runtime gets the board tools (W5); the prompt then names the card. */
+  hasBoardTools?: (runtimeId: AgentId) => boolean;
 }
 
 export interface TaskBoardHost {
@@ -42,22 +49,6 @@ const RECOVER_COMMANDS: Record<string, string> = {
   'sign-in-codex': 'ritemark.codexLogin',
   settings: 'ritemark.aiSettings',
   'open-folder': 'workbench.action.files.openFolder',
-};
-
-/**
- * Interim until W4 (CardTaskStore + the AI sidebar) is composed in: no agent
- * work on this computer, and Give to says it is not connected. Never shipped:
- * W4 replaces it before the sprint PR leaves draft.
- */
-const NOT_CONNECTED_LEDGER: HandoffLedger = {
-  list: () => new Map<string, CardHandoffView>(),
-  start: async () => ({ ok: false, code: 'sidebar-unreachable', message: 'Give to agent is not connected in this build yet.' }),
-  wait: async () => undefined,
-  unwait: async () => undefined,
-  stop: async () => undefined,
-  openConversation: async () => false,
-  canAttach: async () => true,
-  onDidChange: () => () => undefined,
 };
 
 function insideFolder(folder: string, candidate: string): string | null {
@@ -114,9 +105,16 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
         },
       },
     });
+    const ledger = new CardHandoffLedger({
+      store: new CardTaskStore(cardTaskStoreDir(context.globalStorageUri.fsPath, root)),
+      board: store,
+      sidebar: deps.cardSidebar,
+      folderPath: root,
+      hasBoardTools: deps.hasBoardTools,
+    });
     controller = new BoardController({
       store,
-      ledger: deps.ledger ?? NOT_CONNECTED_LEDGER,
+      ledger,
       folderName: folder.name,
       settings: {
         get: <T>(key: string) => context.workspaceState.get<T>(key),
@@ -134,6 +132,14 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     });
     const boardController = controller;
     context.subscriptions.push({ dispose: () => boardController.dispose() });
+    deps.attachTaskListener(ledger);
+    // Work a quit or crash left in flight becomes Interrupted (with Retry);
+    // records of cards that are gone are dropped.
+    void store
+      .list()
+      .then((entries) => ledger.recover(new Set(entries.flatMap((entry) => (entry.kind === 'card' ? [entry.card.id] : [])))))
+      .then(() => boardController.scheduleRefresh())
+      .catch((error) => console.warn('[taskBoard] recovery failed', error));
 
     // Edits from git, sync tools, other editors and agents' own file tools.
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, `${CARD_FOLDER}/*.md`));

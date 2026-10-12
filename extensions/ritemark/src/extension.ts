@@ -417,6 +417,8 @@ export function activate(context: vscode.ExtensionContext) {
   registerTaskBoard({
     context,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
+    cardSidebar: unifiedViewProvider.cardTaskHostDependencies(),
+    attachTaskListener: (listener) => unifiedViewProvider.attachTaskListener(listener),
   });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
