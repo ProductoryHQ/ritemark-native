@@ -10,6 +10,7 @@ import {
   type DictationProblem,
   type ProblemStage,
 } from '../components/dictationProblems'
+import { MUTED_SECONDS, reachesLiveLevel } from './dictationLevel'
 
 /**
  * preparing: the host checks the engine and model, the microphone starts.
@@ -22,15 +23,6 @@ export type DictationState = 'idle' | 'preparing' | 'listening' | 'processing' |
 const DEFERRED_SEND_MS = 5000
 /** With no estimate yet, "This can take up to a minute" turns into "Still processing" after this. */
 const UNMEASURED_WAIT_SECONDS = 60
-/**
- * A muted or blocked microphone delivers (near-)silence: Jarmo's hardware-muted
- * Realtek mic peaked at 2.6e-5 (about -92 dBFS), not exact zeros. Below this
- * peak for MUTED_SECONDS, dictation stops at once instead of recording nothing
- * (Windows test, bugs B and C). Real speech is far above it: the quietest of 100
- * FLEURS Estonian clips peaks at -42 dBFS within its first 3 s.
- */
-const MUTED_PEAK = 1e-4 // -80 dBFS
-const MUTED_SECONDS = 3
 
 /**
  * Get chunk duration from localStorage settings
@@ -214,7 +206,7 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
   /** True from microphone start to Stop, whatever the button shows meanwhile. */
   const recordingRef = useRef<boolean>(false)
   const startCancelledRef = useRef<boolean>(false)
-  /** Samples seen so far, and whether any reached MUTED_PEAK. */
+  /** Samples seen so far, and whether any reached a live microphone's level (dictationLevel.ts). */
   const silenceRef = useRef({ samples: 0, heard: false })
   const stopRef = useRef<() => void>(() => undefined)
   const modeRef = useRef<DictationMode>('live')
@@ -319,7 +311,7 @@ export function useVoiceDictation(languageName: (code: string) => string = code 
         audioBufferRef.current.push(new Float32Array(inputData))
         const silence = silenceRef.current
         if (!silence.heard) {
-          silence.heard = inputData.some(sample => Math.abs(sample) >= MUTED_PEAK)
+          silence.heard = reachesLiveLevel(inputData)
           silence.samples += inputData.length
           if (!silence.heard && silence.samples >= actualSampleRateRef.current * MUTED_SECONDS) {
             // Muted or blocked: stop now. The host finds only silence and says so.

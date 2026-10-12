@@ -51,8 +51,12 @@ const CALL_MS_KEY = 'ritemark.dictation.lastCallMs';
 
 /** 100 ms of 16 kHz audio. */
 const FRAME_SAMPLES = 1600;
-/** RMS of -65 dBFS: above it a frame is audible. A muted microphone sits near -92 dBFS. */
-const AUDIBLE_FRAME_RMS = 18;
+/**
+ * RMS of -72 dBFS: above it a frame is audible. A hardware-muted microphone
+ * (about -92 dBFS) arrives here as exact zeros after the webview's 16-bit
+ * conversion; a whisper at -50 dBFS peak still has audible frames.
+ */
+const AUDIBLE_FRAME_RMS = 8;
 /** RMS of -50 dBFS: above it a frame is clearly voiced. Quiet real speech peaks near -49 dBFS. */
 const VOICED_FRAME_RMS = 104;
 /** Fewer audible 100 ms frames than this: silence, never sent to whisper. */
@@ -61,7 +65,7 @@ const MIN_AUDIBLE_FRAMES = 3;
 const STRONG_VOICED_FRAMES = 10;
 
 export interface AudioLevel {
-  /** 100 ms frames above -65 dBFS RMS. */
+  /** 100 ms frames above -72 dBFS RMS. */
   audible: number;
   /** 100 ms frames above -50 dBFS RMS. */
   voiced: number;

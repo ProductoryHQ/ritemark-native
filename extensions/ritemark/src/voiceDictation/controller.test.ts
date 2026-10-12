@@ -403,6 +403,17 @@ async function run(): Promise<void> {
     assert.equal(audioLevel(noise(10, 1)).audible, 0, 'a hardware-muted mic (about -92 dBFS)');
     const hiss = audioLevel(noise(10, 60));
     assert.ok(hiss.audible > 0 && hiss.voiced === 0, 'faint hiss (about -60 dBFS) is audible but not voiced');
+    // The measured floor of Jarmo's hardware-muted Realtek mic (99.2% non-zero, max
+    // |x| 2.6e-5, min 3.9e-11), converted to 16-bit exactly as the webview does.
+    const mutedFloat = new Float32Array(10 * 16000);
+    for (let i = 0; i < mutedFloat.length; i += 1) {
+      if (i % 125 === 0) continue;
+      const magnitude = 3.9e-11 + Math.random() * (2.6e-5 - 3.9e-11);
+      mutedFloat[i] = Math.random() < 0.5 ? -magnitude : magnitude;
+    }
+    const view = new DataView(new ArrayBuffer(mutedFloat.length * 2));
+    mutedFloat.forEach((x, i) => view.setInt16(i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true));
+    assert.equal(audioLevel(Buffer.from(view.buffer)).audible, 0, 'the measured muted Realtek floor is silence');
     // FLEURS: the quietest real speech peaks near -49 dBFS RMS; a -48 dBFS tone stands in for it.
     assert.ok(audioLevel(tone(2, 170)).voiced >= 10, 'quiet speech is voiced (a -40 dBFS bar would have dropped it)');
   }
