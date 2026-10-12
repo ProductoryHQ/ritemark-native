@@ -77,7 +77,7 @@ Each probe is a short script or dev-instance check, recorded in `research/phase-
 | P3 | Does a call to an MCP tool trigger OpenCode's `session/request_permission`? (Keyless probe as in the 2026-09-26 browser probe, with isolated XDG folders) | If yes: auto-allow only the `ritemark_board_*` tool titles in `AcpRuntime._handlePermission`, documented |
 | P4 | Does the Claude Agent SDK 0.3.289 `tool()` accept zod v4 raw shapes from our `zod` 4, and does `z.toJSONSchema` give Codex/OpenCode schemas equal to today's hand-written browser schemas? | Keep zod for Claude and hand-written JSON Schema for the other two, generated from one table of fields |
 | P5 | Can Codex and OpenCode give the turn's last assistant message separately from the whole stream (G4)? | Summarise the last paragraph of the stream |
-| P6 | Does a fifth activity-bar container declared first among Ritemark's land right after Home (patch 002 pins Home at -1), carry a badge, and does a 256-viewBox Phosphor SVG render at the 16 px size patch 002 sets? | Declare it where it lands correctly; no patch |
+| P6 | Does a fifth container declared first among Ritemark's land just above Transcribe (after VS Code's built-ins; measured 2026-10-12), carry a badge, and does a 256-viewBox Phosphor SVG render at the 16 px size patch 002 sets? | Adjust the declaration or the icon; no patch |
 | P7 | Can the host show a hidden or never-opened AI sidebar without taking focus (the agent runs in its webview)? | Show it, then return focus to the editor or view that had it |
 
 ## W1 — Card files and the board store
@@ -142,7 +142,7 @@ The Log is derived in the webview from the cards' history (it is in the snapshot
 Host:
 - `src/views/TasksViewProvider.ts`: `WebviewViewProvider`, `viewType` `ritemark.tasksView`, `<div id="root" data-editor-type="tasks-panel">`, `retainContextWhenHidden: true`. Flag off → one-line notice (Home's pattern).
 - `src/taskBoard/TaskBoardPanel.ts`: one panel per window, `viewType` `ritemark.taskBoard`, title "Task board", `reveal` if open, serializer for restore, `data-editor-type="task-board"`. Command `ritemark.openTaskBoard` (optional `cardId`).
-- `package.json`: container `ritemark-tasks` ("Tasks", `media/tasks-icon.svg`, declared **first** among Ritemark's containers so it lands right after Home, per P6), view `ritemark.tasksView`, commands `ritemark.openTaskBoard` ("Tasks: Open Board") and `ritemark.addTask` ("Tasks: Add a Task…", VS Code input box, no default keybinding), `onWebviewPanel:ritemark.taskBoard`, `ritemark.features.task-board` default `true`. No `view/title` button: Open board is an icon button inside the view, beside the add field (design §3).
+- `package.json`: container `ritemark-tasks` ("Tasks", `media/tasks-icon.svg`, declared **first** among Ritemark's containers so it lands just above Transcribe, per P6), view `ritemark.tasksView`, commands `ritemark.openTaskBoard` ("Tasks: Open Board") and `ritemark.addTask` ("Tasks: Add a Task…", VS Code input box, no default keybinding), `onWebviewPanel:ritemark.taskBoard`, `ritemark.features.task-board` default `true`. No `view/title` button: Open board is an icon button inside the view, beside the add field (design §3).
 - `src/views/HomeViewProvider.ts`: the quick action label "New AI task" → "New AI conversation" (R14); the command is unchanged.
 - `extension.ts`: compose `BoardStore`, `CardTaskStore`, `BoardController`, both surfaces, the watcher, `registerWebviewPanelSerializer`, and register the controller as a task listener on `UnifiedViewProvider`.
 
@@ -224,6 +224,10 @@ Later handoffs on the same card (Give to agent again, Ask for changes, answering
 | G6: a dispatch exception tells the host, which records `failed` | `store.ts:791-798`, new `comment-task/dispatch-failed` | Yes |
 
 Out of scope and unchanged: G7 (`approvalMode` frozen to `auto`), the ready-queue gap, deleted-destination detection (Sprint 117 TO BE list).
+
+**F1, found while building the prototype (2026-10-12), fixed in this sprint:** shadcn's role tokens (`--background`, `--secondary`, `--muted`, `--border`, `--input`, `--accent` and their foregrounds) are declared on `:root` in `webview/src/index.css` and reference `--r-*` tokens that flip only on `body.vscode-dark`. A custom property resolves where it is declared, so in dark mode `bg-background` stays `#ffffff` and `bg-secondary` `#f1f5f9`: an outline button is white with near-white text (checked in the installed 1.13.0 over CDP). The board uses outline buttons in every row, so the fix belongs here: re-declare the neutral role tokens under `body.vscode-dark` (as the prototype does). `--primary` stays as it ships. Check the existing surfaces that use outline or secondary buttons (Settings, dialogs) in dark mode after the change.
+
+**Menus in the card dialog** take the z-90 popover layer of Sprint 126, so the Give menu and More actions show above the dialog (z-80). "Move to…" expands in place inside the menu rather than as a side submenu.
 
 ## W5 — Agent tools in all three runtimes
 

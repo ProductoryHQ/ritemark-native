@@ -20,7 +20,7 @@ A writer, trainer or consultant keeps the work of one project in one place: what
 As a user, I want a Tasks button next to Home, Transcribe, Agent Library and Browser, so the board is one click away like the other Ritemark tools.
 
 Acceptance criteria:
-- The activity bar shows **Tasks** with the Phosphor `kanban` icon, right after Home (D7), in a fresh profile.
+- The activity bar shows **Tasks** with the Phosphor `kanban` icon as the first of Ritemark's own tools, just above Transcribe (D7), in a fresh profile.
 - Its side-bar view has an "Add a task…" field with an **Open board** icon button beside it, then Your calls (when any), Doing, To do, Ideas (collapsed) and Done (collapsed, latest 5), as in [design.md §3](./design.md#3-the-side-bar-daily-surface). A card shows once, under the first section that applies.
 - The activity-bar icon carries a badge with the number of Your calls ("3 tasks need you"); no badge when there are none.
 - The command **Tasks: Add a Task…** asks for one line in VS Code's input box and returns focus to where it was.
@@ -145,6 +145,7 @@ Acceptance criteria:
 Acceptance criteria:
 - Comment tasks (Sprint 117) and `- [ ]` checkboxes in documents are unchanged and do not appear on the board (D4).
 - The Sprint 117 path gets the fixes it shares with cards: answered approvals return to Working (G3), Codex/OpenCode summaries come from the last message (G4), queued tasks keep their prompt (G5), a failed dispatch is reported (G6).
+- Outline and secondary buttons follow the dark theme (F1, found while building the prototype: today they are white and light grey in dark mode).
 
 ### R13: Flag and release
 
@@ -175,7 +176,7 @@ Acceptance criteria:
 - **D4 Comment tasks and checkboxes:** separate in this sprint; candidates for later: "Add to board" from a comment, and comment tasks that need you listed under Your calls.
 - **D5 Tool approvals:** board tools run without approval, as browser tools do; agents cannot finish or delete cards.
 - **D6 Idea review:** on request, never automatic (it uses the user's agent and its quota). Drop hides an idea; Delete deletes it.
-- **D7 Position:** the Tasks button right after Home (the issue lists it among Home, Transcribe, Agent Library and Browser; after Home it is the most visited tool and the one with a badge). Declaration order in `package.json`, no patch.
+- **D7 Position:** the Tasks button first among Ritemark's own tools, just above Transcribe. (Revised 2026-10-12: the real app lists VS Code's built-in entries between Home and every extension container; right after Home would need a patch 002 change and make the sprint shell-tier.) Declaration order in `package.json`, no patch.
 - **D8 Words:** Home's "New AI task" becomes "New AI conversation".
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 

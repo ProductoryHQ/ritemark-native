@@ -11,6 +11,7 @@ Issue: [#119](https://github.com/ProductoryHQ/ritemark-native/issues/119), decid
 ## SDD Artifacts
 
 - [design.md](./design.md) — **the UX design, first**: behaviour model, side bar, editor-area board, card, Give to agent, narrow width, state words.
+- [prototype/task-board-prototype.html](./prototype/task-board-prototype.html) — clickable prototype built from the real 1.13.0 styles, light and dark (Jarmo asked for it before approving, 2026-10-12).
 - [spec.md](./spec.md) — behaviour contract R1–R14 and the proposed decisions D1–D9.
 - [scenarios.md](./scenarios.md) — S1–S37 (43 scenarios), the dev-instance QA matrix.
 - [technical-plan.md](./technical-plan.md) — workstreams W0–W8, message shapes, files, tests, architecture-gate note.
@@ -30,7 +31,7 @@ A simple task board in each project folder: capture work in one line, see what w
 
 In scope:
 
-- **Tasks** in the activity bar (right after Home), its side-bar view, a quick-add command, and a **Task board** tab in the editor area with Your calls, Board, Ideas and Log, modelled on the Dev Dashboard.
+- **Tasks** in the activity bar (first of Ritemark's own tools, above Transcribe), its side-bar view, a quick-add command, and a **Task board** tab in the editor area with Your calls, Board, Ideas and Log, modelled on the Dev Dashboard.
 - Cards with title, description, the files they name, a fixed stage (Idea, To do, Doing, Done), a short history and the latest agent result; drag and drop plus a keyboard Move to….
 - Storage as one Markdown file per card in `.ritemark/tasks/`, written atomically, refreshed from outside edits, a broken file never overwritten.
 - **Give to agent**: a new AI-sidebar conversation per card with the chosen runtime, the card's context and file paths; live state on the card; the result written back to the card; review with Mark done or Ask for changes; agent decisions answered with buttons under Your calls.
@@ -51,13 +52,13 @@ Out of scope: cloud sync of any kind, user-set columns, labels/priorities/dates,
 - **2026-10-11, D4 — Comment tasks and checkboxes:** stay separate; a card shows the progress of its own checkboxes. Linking them is a later issue.
 - **2026-10-11, D5 — Agent rights:** board tools need no approval; agents cannot mark a card done or delete one.
 - **2026-10-11, D6 — Ideas:** reviewed only when the user presses Review; Drop hides an idea, Delete deletes it.
-- **2026-10-11, D7 — Position:** the Tasks button right after Home (the issue lists it among Home, Transcribe, Agent Library and Browser).
+- **2026-10-11, D7 — Position:** the Tasks button right after Home. **Revised 2026-10-12:** first of Ritemark's own tools, just above Transcribe. The real app lists VS Code's built-in entries between Home and every extension container, so right after Home would need a VS Code patch (shell-tier).
 - **2026-10-11, D8 — Words:** Home's "New AI task" becomes "New AI conversation", so "task" means a board card.
 - **2026-10-11, D9 — Review step:** a finished card waits in Doing as "Ready to review" until the user presses Mark done; no Review column.
 
 ## Success criteria
 
-- [ ] Tasks sits in the activity bar right after Home with a badge for Your calls; the side bar works at 280 px; Tasks: Add a Task… captures without leaving the document (R1, R11).
+- [ ] Tasks sits in the activity bar above Transcribe with a badge for Your calls; the side bar works at 280 px; Tasks: Add a Task… captures without leaving the document (R1, R11).
 - [ ] One Task board tab with Your calls, Board, Ideas and Log, restored after restart (R2).
 - [ ] Cards can be added, edited, moved (drag, Move to…, Stage), ticked off, reopened, opened as a document and deleted to the trash (R3).
 - [ ] Each card is one Markdown file in `.ritemark/tasks/`; outside edits show within a second; a broken file is never overwritten (R4).
