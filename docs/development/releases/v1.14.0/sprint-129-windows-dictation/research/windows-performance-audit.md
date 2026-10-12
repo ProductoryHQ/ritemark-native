@@ -100,3 +100,19 @@ The pre-approved levers are used up (threads) or do nothing (beam, chunk length)
 - **A resident whisper process:** saves the 1.3–2.4 s load per call, about 10%.
 
 This is a decision for Jarmo (sprint-plan.md, open decisions).
+
+## Round 3 accuracy, cross-checked on the Mac (2026-10-12)
+
+Jarmo asked for the shorter window to be measured with the model kept in memory (round 3, on the Windows PC, speed still to come). Accuracy does not depend on the computer, so the same method was repeated on the Mac: the same 20 FLEURS clips, cut into fixed chunks the way dictation's timer cuts them, all through one whisper-cli process (`asr-wer.mjs --chunk-seconds N --resident on [--audio-ctx N]`).
+
+| Configuration | WER |
+|---|---:|
+| Whole clip, full window (Windows round 2 measured 14.2% too) | 14.2% |
+| 10 s chunks, full window | 22.5% |
+| 10 s chunks, `--audio-ctx 576` — f16 / q8_0 | 42.3% / 42.6% |
+| 5 s chunks, full window (**dictation's default today**) | 35.8% |
+| 5 s chunks, `--audio-ctx 320` — f16 / q8_0 | 85.5% / 89.6% |
+
+- **The shorter window** costs about 20 points even at 10 s, and makes 5 s unusable. This agrees with the whole-clip test (59–73%). Chunking, flags and the resident process do not change the conclusion.
+- **q8_0 ≈ f16** in every configuration, so on quality q8_0 passes Jarmo's condition.
+- **New finding: fixed chunks cost accuracy by themselves.** Cutting at 5 s takes Estonian from 14% to 36% WER, because words are split at the chunk boundaries. 10 s chunks halve that loss. R8's joining of waiting audio lengthens calls on slow computers, which helps accuracy too. Chunking at pauses (voice activity detection, a #117 item) is the real fix and is not in this sprint.

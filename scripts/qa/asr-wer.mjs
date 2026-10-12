@@ -12,12 +12,16 @@
 //     --engine whisper --binary <whisper-cli> --model <ggml.bin> [--language et] [--threads N] [--timestamps on] [--report out.json]
 //   (--timestamps on: TalTech's fine-tuned Whisper only stops decoding with timestamps on.)
 //   [--audio-ctx-margin N]: shorten Whisper's 30 s window to each clip's length plus N frames
-//   (50 frames per second), to test that speed-up's accuracy.
+//   (50 frames per second), to test that speed-up's accuracy. [--audio-ctx N]: a fixed window.
+//   [--chunk-seconds N]: cut each clip into fixed N-second chunks, as dictation's timer does,
+//   and score the joined text. [--resident on]: one whisper-cli process for every chunk/clip,
+//   so the model loads once (what a model kept in memory would cost).
 //   npx --yes tsx@4.21.0 scripts/qa/asr-wer.mjs --clips <dir> --label "parakeet v3 int8" \
 //     --engine sherpa --binary <sherpa-onnx-offline> [--report out.json] -- --tokens=... --encoder=... ...
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -61,36 +65,96 @@ function seconds(wav) {
   return (fs.statSync(wav).size - 44) / 32000;
 }
 
+/** Fixed-length chunks of a 16 kHz mono 16-bit WAV (dictation's timer has no VAD). */
+function chunkWav(file, chunkSeconds, dir) {
+  const pcm = fs.readFileSync(file).subarray(44);
+  const size = chunkSeconds * 32000;
+  const out = [];
+  for (let offset = 0, i = 0; offset < pcm.length; offset += size, i += 1) {
+    const data = pcm.subarray(offset, Math.min(pcm.length, offset + size));
+    if (data.length < 1000) break; // what DictationController skips as near-empty
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0); header.writeUInt32LE(36 + data.length, 4); header.write('WAVEfmt ', 8);
+    header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(1, 22);
+    header.writeUInt32LE(16000, 24); header.writeUInt32LE(32000, 28); header.writeUInt16LE(2, 32);
+    header.writeUInt16LE(16, 34); header.write('data', 36); header.writeUInt32LE(data.length, 40);
+    const target = path.join(dir, `${path.basename(file, '.wav')}-c${i}.wav`);
+    fs.writeFileSync(target, Buffer.concat([header, data]));
+    out.push(target);
+  }
+  return out;
+}
+
 async function runWhisper(clips, options) {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const { dictationArgs, parseDictationStdout } = await import(
     pathToFileURL(path.join(repoRoot, 'extensions/ritemark/src/voiceDictation/whisperCpp.ts')).href);
-  return clips.map(clip => {
+
+  const baseArgs = (audioPath) => {
     const args = dictationArgs({
-      modelPath: options.model, audioPath: clip.file, language: options.language,
+      modelPath: options.model, audioPath, language: options.language,
       threads: options.threads ? Number(options.threads) : undefined,
-    }).filter(arg => arg !== '--output-txt' && !(options.timestamps === 'on' && arg === '--no-timestamps'));
+    }).filter(arg => !(options.timestamps === 'on' && arg === '--no-timestamps'));
+    args.pop(); // the audio path: callers add the file(s)
+    if (options['audio-ctx']) args.push('--audio-ctx', String(options['audio-ctx']));
+    return args;
+  };
+  const env = { ...process.env, DYLD_LIBRARY_PATH: path.dirname(options.binary) };
+  const clean = (text) => parseDictationStdout(options.timestamps === 'on' ? text.replace(/^\[[^\]]*\]\s*/gm, '') : text);
+
+  // Every unit of audio whisper-cli is given: whole clips, or their fixed chunks.
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'asr-wer-'));
+  const units = clips.map(clip => (options['chunk-seconds']
+    ? chunkWav(clip.file, Number(options['chunk-seconds']), work)
+    : [clip.file]));
+  const textOf = (file) => {
+    const txt = `${file}.txt`; // --output-txt writes beside the input
+    if (!fs.existsSync(txt)) return '';
+    const text = fs.readFileSync(txt, 'utf8');
+    fs.rmSync(txt, { force: true });
+    return clean(text);
+  };
+  const perFileArgs = (file) => {
+    const args = baseArgs(file);
     if (options['audio-ctx-margin']) {
-      const frames = Math.min(1500, Math.ceil(seconds(clip.file) * 50) + Number(options['audio-ctx-margin']));
-      args.splice(args.length - 1, 0, '--audio-ctx', String(frames));
+      const frames = Math.min(1500, Math.ceil(seconds(file) * 50) + Number(options['audio-ctx-margin']));
+      args.push('--audio-ctx', String(frames));
     }
+    return [...args, file];
+  };
+
+  let rows;
+  if (options.resident === 'on') {
+    const all = units.flat();
     const started = Date.now();
-    const result = spawnSync(options.binary, args, {
-      encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
-      env: { ...process.env, DYLD_LIBRARY_PATH: path.dirname(options.binary) },
-    });
+    const result = spawnSync(options.binary, [...baseArgs(all[0]), ...all], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env });
+    const wall = Date.now() - started;
     const load = /load time\s*=\s*([\d.]+) ms/.exec(result.stderr ?? '');
-    const stdout = options.timestamps === 'on'
-      ? (result.stdout ?? '').replace(/^\[[^\]]*\]\s*/gm, '')
-      : (result.stdout ?? '');
-    return {
+    rows = clips.map((clip, i) => ({
       ...clip,
-      hypothesis: parseDictationStdout(stdout),
-      wallMs: Date.now() - started,
-      loadMs: load ? Number(load[1]) : null,
+      hypothesis: units[i].map(textOf).filter(Boolean).join(' '),
+      wallMs: Math.round(wall / clips.length),
+      loadMs: i === 0 && load ? Number(load[1]) : 0,
       exit: result.status,
-    };
-  });
+    }));
+  } else {
+    rows = clips.map((clip, i) => {
+      let wall = 0;
+      let loadMs = 0;
+      let exit = 0;
+      for (const file of units[i]) {
+        const started = Date.now();
+        const result = spawnSync(options.binary, perFileArgs(file), { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, env });
+        wall += Date.now() - started;
+        const load = /load time\s*=\s*([\d.]+) ms/.exec(result.stderr ?? '');
+        loadMs += load ? Number(load[1]) : 0;
+        if (result.status !== 0) exit = result.status;
+      }
+      return { ...clip, hypothesis: units[i].map(textOf).filter(Boolean).join(' '), wallMs: wall, loadMs, exit };
+    });
+  }
+  fs.rmSync(work, { recursive: true, force: true });
+  return rows;
 }
 
 function runSherpa(clips, options) {
