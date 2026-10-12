@@ -162,6 +162,7 @@ Acceptance criteria:
 - **Wait:** about 20 s after Stop on Jarmo's laptop, for a short phrase and a long dictation alike; longer on slower computers. Nothing is ever dropped.
 - **No backlog stop:** nothing is live, so R8's 60-second stop applies to live dictation only. A slow computer only makes the wait after Stop longer.
 - **Failure:** if the engine fails part-way, the text already transcribed is inserted first, then the problem dialog (R6) explains.
+- **The note is not text:** the recording and processing notes at the cursor are never part of the document, so autosave never writes them into the file. The same applies in live mode.
 - **Settings:** the dictation settings say nothing that implies live text in this mode (chunk length has no visible effect here).
 
 ### R13: The 8-bit model on Windows (added 2026-10-12)

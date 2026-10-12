@@ -46,6 +46,7 @@ Implementation checklist for [technical-plan.md](./technical-plan.md). Tick `[x]
 - [x] Host: `dictationModeFor`, `defaultModelFile`, model table in `whisperCpp.ts` with the q8_0 entry; deferred mode in `DictationController` (background pieces, held text, finishing + wait estimate, no backlog stop, failure order); `dictation:getMode`; Stop always answered.
 - [x] Webview: `preparing` (cancel) and `finishing` states, placeholder from state, text inserted where the placeholder is, `dictationStateCopy`, settings row per mode, model size in the model-missing dialog.
 - [x] Unit tests for both (controller, whisperCpp, modelManager, dictationProblems).
+- [x] The dictation note is a decoration (`extensions/DictationPlaceholder.ts` + `dictationPlaceholder.test.ts`): autosave wrote the text placeholder into the file, for the whole recording in deferred mode (found in the Mac check, fixed and re-checked on disk).
 - [x] Mac dev instance: deferred mode (QA switch) and live mode, with screenshots → [qa-evidence.md](./qa-evidence.md). *(2026-10-12)*
 
 ## Phase 3: Webview (W7, R5)

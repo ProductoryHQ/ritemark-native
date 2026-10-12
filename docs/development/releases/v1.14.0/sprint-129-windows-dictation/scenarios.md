@@ -179,6 +179,11 @@ Then the button shows a spinner and is disabled, with the tooltip "Processing yo
 And the document says "⏳ Processing your recording." and how long it usually takes
 And about 20 s later (Jarmo's laptop) all the text appears where the placeholder was, in the order I spoke, and the button is idle again
 
+### Scenario: The note never reaches the file (M, U)
+Given autosave is on (Ritemark's default, 1 s)
+When I record for half a minute and look at the file on disk
+Then the file does not contain "Recording..." or "Processing", and after Stop it holds only my text
+
 ### Scenario: Work elsewhere while it processes (B, M)
 Given I clicked Stop and the placeholder is showing
 When I click into another paragraph and type

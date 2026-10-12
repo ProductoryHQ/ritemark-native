@@ -136,8 +136,9 @@ export function getState<T>(): T | undefined {
 // Example flow for dictation:
 // 1. useVoiceDictation emits 'dictation:placeholder' with the text for its state
 //    ("Listening...", "Processing your recording...") or 'dictation:placeholder-clear'
-// 2. App.tsx receives this via onInternalEvent and shows that placeholder at the cursor
-// 3. When transcription arrives, the text goes where the placeholder is
+// 2. App.tsx receives this via onInternalEvent and shows that note at the cursor
+//    (extensions/DictationPlaceholder.ts: a decoration, not document text)
+// 3. When transcription arrives, the text goes where the note is
 // ============================================================================
 
 /**

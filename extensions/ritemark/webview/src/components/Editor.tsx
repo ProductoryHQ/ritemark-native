@@ -26,6 +26,7 @@ import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
 import { HeadingLevelShortcuts } from '../extensions/HeadingLevelShortcuts'
 import { SelectionBoundaryKeys } from '../extensions/SelectionBoundaryKeys'
 import { SearchExtension } from '../extensions/SearchExtension'
+import { DictationPlaceholder } from '../extensions/DictationPlaceholder'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
@@ -430,6 +431,7 @@ export function Editor({
       SlashCommands,
       FileLinkSuggestions,
       SearchExtension,
+      DictationPlaceholder,
       GlobalDragHandle.configure({
         dragHandleWidth: 24,
         scrollTreshold: 100,

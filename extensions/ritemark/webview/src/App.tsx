@@ -17,6 +17,7 @@ import { PropertiesSidePanel } from './components/properties'
 import { AgentConfiguratorPanel } from './components/agent'
 import type { AgentFrontmatter, AgentSkill } from './components/agent'
 import { FindBar } from './components/FindBar'
+import { dictationPlaceholderPos } from './extensions/DictationPlaceholder'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { inlineSvgImagesForExport } from './lib/svgRasterExport'
@@ -50,53 +51,6 @@ type SidePanel = 'none' | 'toc' | 'properties' | 'agent'
 
 // Minimum container width (px) at which the inline ToC panel is shown.
 // Tunable in T7 during live testing.
-
-// Sprint 129 R12: the dictation placeholder at the cursor. Its text comes from
-// useVoiceDictation (dictationStateCopy) and changes with the state, so the one
-// on the page is remembered here to find it again.
-let shownDictationPlaceholder: string | null = null
-
-/**
- * Find and remove the dictation placeholder from the editor.
- * Returns where it was, or null if it is not in the document.
- */
-function removeDictationPlaceholder(editor: TipTapEditor): number | null {
-  const placeholder = shownDictationPlaceholder
-  shownDictationPlaceholder = null
-  if (!placeholder) return null
-
-  let found: number | null = null
-  editor.state.doc.descendants((node, pos) => {
-    if (found !== null) return false
-    if (node.isText) {
-      const index = (node.text || '').indexOf(placeholder)
-      if (index !== -1) {
-        found = pos + index
-        return false
-      }
-    }
-  })
-  if (found !== null) {
-    editor.chain().deleteRange({ from: found, to: found + placeholder.length }).run()
-  }
-  return found
-}
-
-/**
- * Show a dictation placeholder: at `at` when given (after inserted text),
- * otherwise where the old one was, or at the cursor.
- */
-function insertDictationPlaceholder(editor: TipTapEditor, placeholder: string, at?: number) {
-  const previous = removeDictationPlaceholder(editor)
-  const html = `<span style="color: var(--vscode-descriptionForeground, #888); font-style: italic;">${placeholder}</span>`
-  const position = at ?? previous
-  if (position === null) {
-    editor.chain().focus().insertContent(html).run()
-  } else {
-    editor.chain().insertContentAt(position, html, { updateSelection: false }).run()
-  }
-  shownDictationPlaceholder = placeholder
-}
 
 // Feature flags sent from extension
 interface Features {
@@ -321,22 +275,17 @@ function App() {
           break
 
         case 'dictation:transcription': {
-          // Insert the text where the placeholder is (the user may be working
-          // elsewhere meanwhile), or at the cursor; then put the placeholder
-          // back after it while dictation goes on.
+          // Insert the text where the dictation note is (the user may be working
+          // elsewhere meanwhile), or at the cursor. The note moves on after it.
           const transcribedText = message.text as string
           const editor = editorRef.current
           if (transcribedText && editor) {
-            const placeholder = shownDictationPlaceholder
-            const at = removeDictationPlaceholder(editor)
+            const at = dictationPlaceholderPos(editor.state)
             const text = transcribedText + ' '
             if (at === null) {
               editor.chain().focus().insertContent(text).run()
             } else {
               editor.chain().insertContentAt(at, text, { updateSelection: false }).run()
-            }
-            if (placeholder) {
-              insertDictationPlaceholder(editor, placeholder, at === null ? undefined : at + text.length)
             }
           }
           break
@@ -357,19 +306,18 @@ function App() {
     onInternalEvent((event: InternalEvent) => {
       switch (event.type) {
         case 'dictation:placeholder': {
-          // The dictation state changed: show its placeholder (Sprint 129 R12)
+          // The dictation state changed: show its note at the cursor. A
+          // decoration, not text, so autosave never writes it (Sprint 129 R12).
           const text = (event.data as { text?: string } | undefined)?.text
-          if (editorRef.current && text && text !== shownDictationPlaceholder) {
-            insertDictationPlaceholder(editorRef.current, text)
+          if (editorRef.current && text) {
+            editorRef.current.commands.showDictationPlaceholder(text)
           }
           break
         }
 
         case 'dictation:placeholder-clear':
           // Dictation ended or stopped with a problem
-          if (editorRef.current) {
-            removeDictationPlaceholder(editorRef.current)
-          }
+          editorRef.current?.commands.clearDictationPlaceholder()
           break
       }
     })

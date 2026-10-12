@@ -194,7 +194,8 @@ Implementation: `whisperCpp.ts` exports `cpuOnlyDefaults(platform, arch)` → `{
 - **Webview:**
   - `useVoiceDictation` has the states `preparing` (a click cancels the start) and `finishing` (button disabled until the host's `idle`). It asks for the mode on mount, sends audio every 5 s in deferred mode, and keeps a `recordingRef` so the unmount cleanup also stops a recording shown as "processing".
   - The placeholder follows the state: `dictation:placeholder {text}` and `dictation:placeholder-clear`.
-  - `App.tsx` inserts the text where the placeholder is (`insertContentAt`, without moving the user's cursor), then puts the placeholder back after it while dictation goes on.
+  - The placeholder is a ProseMirror widget decoration (`extensions/DictationPlaceholder.ts`), not document text. Ritemark autosaves after 1 s (`files.autoSaveDelay`), so the old text placeholder was written into the file, for the whole recording in deferred mode. The widget's position is mapped through edits.
+  - `App.tsx` inserts the text where the placeholder is (`insertContentAt`, without moving the user's cursor). The widget moves on after it while dictation goes on.
   - The wording lives in `dictationStateCopy()` in `dictationProblems.ts`.
   - `DictationSettingsModal` hides the chunk row in deferred mode, and renames it "Update text every" in live mode.
 - Tests: `controller.test.ts` (deferred pieces, one insertion, estimate, no backlog stop, failure order, Stop answers), `whisperCpp.test.ts` (mode and model matrix, QA switch), `dictationProblems.test.ts` (state copy).
