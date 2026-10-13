@@ -421,6 +421,9 @@ for f in target["files"]:
     whisper_rows=""
   }
   while IFS=$'\t' read -r rel expected_sha; do
+    # Windows Python prints CRLF and Git Bash keeps the \r on every row but the
+    # last, so each hash compared unequal to an identical one (v1.14.0 CI).
+    expected_sha="${expected_sha%$'\r'}"
     [[ -z "$rel" ]] && continue
     file_path="$WHISPER_DIR/$rel"
     printf "  %-40s " "$TARGET/$rel"
