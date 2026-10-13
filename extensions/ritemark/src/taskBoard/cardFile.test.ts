@@ -234,6 +234,11 @@ function main(): void {
     assert.equal(cardSlug('Rewrite the launch plan intro'), 'rewrite-the-launch-plan-intro');
     assert.equal(cardSlug('Õppekava ülevaade — šokk!'), 'oppekava-ulevaade-sokk');
     assert.equal(cardSlug('🎉🎉'), 'task');
+    // Windows reserves device names even with an extension (con.md, nul.md…).
+    assert.equal(cardSlug('Con'), 'con-task');
+    assert.equal(cardSlug('NUL'), 'nul-task');
+    assert.equal(cardSlug('com1'), 'com1-task');
+    assert.equal(cardSlug('Con call with Maria'), 'con-call-with-maria', 'only a whole name is reserved');
     assert.equal(cardSlug('Supercalifragilisticexpialidocious-and-even-longer-words-here'), 'supercalifragilisticexpialidocious-and');
     assert.ok(cardSlug('word '.repeat(30)).length <= 40);
     assert.equal(cardFileName('Call Maria'), 'call-maria.md');

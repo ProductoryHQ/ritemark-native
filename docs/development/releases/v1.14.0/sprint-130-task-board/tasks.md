@@ -37,7 +37,7 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T3.7 `extension.ts` composition: store, controller, watcher, both surfaces, serializer
 - [x] T3.8 `webview/src/main.tsx`: `tasks-panel` and `task-board` branches, side-bar background list
 - [x] T3.9a `ui/tabs.tsx` (shadcn Radix Tabs) + `@radix-ui/react-tabs` in `webview/package.json` and the lockfile; export `RowMenus` from `ConversationsPanel.tsx`
-- [x] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardRow`, `CardDetail`, `NoteBox`, `CallsView`, `IdeasView`, `LogView`, `AgentSplitButton` (used by every agent action: Give to, Review with, Retry with, Send to), `taskCopy.ts`
+- [x] T3.9 `webview/src/components/tasks/`: `TasksPanel`, `TaskBoard`, `BoardColumns`, `CardParts` (rows' glyphs, file chips, `NoteBox`), `CallsView`, `IdeasView`, `LogView`, `AgentSplitButton` (used by every agent action: Give to, Review with, Retry with, Send to), `taskCopy.ts`
 - [x] T3.9b `ritemark.addTask` (input box, top of To do, focus returns)
 - [x] T3.9c Home: "New AI task" → "New AI conversation" (R14); `HomeViewProvider.test.ts` updated
 - [x] T3.10 `taskCopy.test.ts`: every state in design.md §10 has its words and glyph
@@ -112,5 +112,5 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T8.1 `npm test` (extension) and the webview tests green
 - [x] T8.2 `npm run compile` and the webview build; run the pre-commit validator by hand in the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [x] T8.3 Dev instance: scenarios S1–S37 (with S20a, S23c), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md` (Claude live; Codex, OpenCode and the rows this run could not drive are on its Gate 2 list)
-- [ ] T8.4 `qa-validator` review
+- [x] T8.4 `qa-validator` review (2026-10-13: FAIL on `scripts/validate-qa.sh` still naming the deleted injector test; fixed with its minor findings, see qa-evidence)
 - [ ] T8.5 PR with the QA evidence; issue #119 linked; Jarmo's admin-merge yes naming the PR

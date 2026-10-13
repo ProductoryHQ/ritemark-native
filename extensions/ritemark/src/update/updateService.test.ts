@@ -8,7 +8,7 @@
 // ── Minimal vscode stub ──────────────────────────────────────────────────────
 // UpdateService/UpdateStorage/UserExtensionInstaller all import vscode.
 // Pre-populate the require cache before any other imports (same pattern as
-// BrowserToolsInjector.test.ts).
+// CodexRuntime.test.ts).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Module = require('module') as {
   _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
@@ -73,7 +73,7 @@ fs.writeFileSync(
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 // Runtime require() (not a static import) so tsx's ESM-aware resolver doesn't
 // bypass the Module._resolveFilename stub above — matches
-// BrowserToolsInjector.test.ts's working precedent.
+// CodexRuntime.test.ts's working precedent.
 import * as assert from 'assert';
 import type { UpdateManifest } from './updateManifest';
 import type { ResolvedUpdateResult } from './updateResolver';

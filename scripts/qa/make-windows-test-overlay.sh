@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # build-windows.yml builds only the exact main commit, so a sprint branch cannot
 # produce a Windows installer. This zip holds what differs on the branch:
-# compiled out/, the webview bundles, package.json with a test version (higher
+# compiled out/, the webview bundles, the media icons, package.json with a test version (higher
 # than any release, so it wins over the built-in copy), and the Windows whisper
 # engine. scripts/qa/windows-branch-test.ps1 lays it over a copy of the installed
 # extension and starts the installed Ritemark with that copy and a fresh profile.
@@ -34,6 +34,9 @@ trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/media" "$STAGE/binaries"
 cp -R "$EXT/out" "$STAGE/out"
 cp "$EXT/media/webview.js" "$EXT/media/office-preview.js" "$STAGE/media/"
+# The view and tab icons (44 KB): a branch that adds a view container or panel
+# icon (Sprint 130's Tasks) shows it only if the icon file comes along.
+cp "$EXT"/media/*.svg "$STAGE/media/"
 cp -R "$EXT/binaries/win32-x64" "$STAGE/binaries/win32-x64"
 cp "$EXT/binaries/whisper-manifest.json" "$STAGE/binaries/"
 # 1.99.x sorts above every release, so VS Code picks this copy over the built-in one.

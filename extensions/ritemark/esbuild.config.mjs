@@ -61,7 +61,8 @@ const options = {
   entryPoints: {
     // package.json "main"
     'extension': 'src/extension.ts',
-    // Standalone subprocess spawned by BrowserToolsInjector (its own bundle, never
+    // Standalone subprocess OpenCode spawns for Ritemark's tool groups, wired by
+    // RitemarkToolsInjector (its own bundle, never
     // inlined — a child process can't require() code loaded in the host process).
     'browser/browserMcpAdapter': 'src/browser/browserMcpAdapter.ts',
   },

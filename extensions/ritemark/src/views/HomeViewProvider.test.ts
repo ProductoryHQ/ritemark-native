@@ -7,7 +7,7 @@
 // ── Minimal vscode stub ──────────────────────────────────────────────────────
 // HomeViewProvider imports vscode for workspace.findFiles/fs.stat.
 // Pre-populate the require cache before any other imports (same pattern as
-// BrowserToolsInjector.test.ts).
+// CodexRuntime.test.ts).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Module = require('module') as {
   _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;

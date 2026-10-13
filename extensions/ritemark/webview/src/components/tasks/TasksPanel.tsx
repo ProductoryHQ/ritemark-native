@@ -228,11 +228,17 @@ function Collapsible({
     <div className="mb-1">
       <div className={SECTION}>
         <Tooltip label={`${open ? 'Hide' : 'Show'} the ${count} ${what}`}>
-          <button type="button" className="tb-sec-btn" aria-expanded={open} onClick={onToggle}>
-            <Icon name="caret-right" size={12} tone="inherit" />
+          <Button
+            type="button"
+            variant="ghost"
+            className="tb-sec-btn h-auto gap-1.5 rounded-sm p-0 text-[10px] font-bold uppercase tracking-wider text-inherit hover:bg-transparent hover:text-[var(--r-ink-muted)] has-[>svg]:px-0"
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <Icon name="caret-right" size={12} tone="inherit" className="size-3" />
             <span>{title}</span>
             <span className="font-semibold normal-case tracking-normal">· {count}</span>
-          </button>
+          </Button>
         </Tooltip>
         {onAdd ? (
           <HeaderIconButton icon="plus" label="Add an idea" tip="Add an idea on the board" className="ml-auto" onClick={onAdd} />

@@ -44,7 +44,7 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/flows/|e
   )
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/(agent/|codex/|acp/|runtime/BrowserToolsInjector)|extensions/ritemark/src/views/UnifiedViewProvider\.ts|extensions/ritemark/webview/src/components/ai-sidebar/)'; then
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/(agent/|codex/|acp/|runtime/(RitemarkToolsInjector|ritemarkTools|RitemarkIpcServer))|extensions/ritemark/src/views/UnifiedViewProvider\.ts|extensions/ritemark/webview/src/components/ai-sidebar/)'; then
   echo "Agent lifecycle changes detected; running targeted lifecycle tests..."
   (
     cd "$PROJECT_ROOT/extensions/ritemark"
@@ -54,7 +54,7 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(extensions/ritemark/src/(agent/|
     npx tsx src/codex/CodexRuntime.test.ts
     npx tsx src/acp/acpManager.test.ts
     npx tsx src/acp/AcpRuntime.test.ts
-    npx tsx src/runtime/BrowserToolsInjector.test.ts
+    npx tsx src/runtime/ritemarkTools.test.ts
     npx tsx src/browser/browserActionTools.test.ts
     npx tsx src/conversations/types.test.ts
     npx tsx src/codex/codexApproval.test.ts

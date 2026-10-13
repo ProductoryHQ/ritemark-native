@@ -14,7 +14,7 @@ The Ritemark extension architecture is documented in `docs/development/architect
 - **Three agent runtimes** (`src/agent/`, `src/codex/`, `src/acp/`) share the `AgentRuntime` interface (defined in Sprint 79). Do not add a fourth runtime without implementing this interface.
 - **All model identifiers** live in `src/ai/modelConfig.ts`. Never hardcode model IDs elsewhere.
 - **Approval gating** is handled through `UnifiedApprovalGate` (post Sprint 79). Never add a new runtime-specific approval message type.
-- **Browser tools** are injected via `BrowserToolsInjector` → MCP server path. Do not add new runtime-specific browser tool implementations.
+- **Ritemark tools** (browser, task board) are defined once in `src/runtime/ritemarkTools.ts` and injected into all runtimes via `RitemarkToolsInjector` (Sprint 130). No runtime-specific tool implementations or hand copies of a tool.
 - **Feature flags** are defined in `src/features/flags.ts`. New features require a flag entry. Deleted features require the flag to be removed or set `disabled`.
 
 **Sprint Architecture Gate:** If a sprint changes module structure, webview message contracts, feature flags, or the binary manifest, update `docs/development/architecture.md` as part of the sprint close. The `Last updated` date in that document must be ≥ the sprint branch creation date.

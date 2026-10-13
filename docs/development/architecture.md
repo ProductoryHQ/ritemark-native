@@ -654,6 +654,8 @@ Each runtime was integrated independently. The result is three structurally simi
 | **Webview execute message** | `ai-execute-agent` | `codex-execute` | `acp-execute` |
 | **Webview cancel message** | `ai-cancel-agent` | `codex-cancel` | `acp-cancel` |
 
+Sprint 130 replaced the browser-tools row with one registry for all Ritemark tools (see *Ritemark Tool Injection*).
+
 **Dispatch (post-Sprint 79 AS IS):** `UnifiedViewProvider.ts` is 1097 LOC. Three unified switch cases replace the previous 9 runtime-specific variants. Adding a fourth runtime requires only a new adapter class + a registry entry.
 
 ### AS IS (Sprint 79) — Runtime Adapter Pattern

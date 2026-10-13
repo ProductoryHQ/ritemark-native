@@ -85,18 +85,20 @@ export function CardGlyph({ card, p }: { card: BoardCardView; p: CardPresentatio
   if (p.plain && card.stage !== 'done' && card.stage !== 'idea') {
     return (
       <Tooltip label={`Mark “${card.title}” done`} className="relative z-10">
-        <button
+        <Button
           type="button"
-          className="tb-tick mt-[0.75px]"
+          variant="ghost"
+          size="icon-sm"
+          className="tb-tick mt-[0.75px] size-5 rounded-full p-0 text-[var(--r-ink-faint)] hover:bg-transparent hover:text-[var(--r-accent)]"
           aria-label={`Mark ${card.title} done`}
           onClick={(event) => {
             event.stopPropagation()
             void act({ type: 'board/mark-done', cardId: card.id })
           }}
         >
-          <Icon name="circle" size={16} tone="inherit" className="off" />
-          <Icon name="check-circle" size={16} tone="inherit" className="on" />
-        </button>
+          <Icon name="circle" size={16} tone="inherit" className="off size-4" />
+          <Icon name="check-circle" size={16} tone="inherit" className="on size-4" />
+        </Button>
       </Tooltip>
     )
   }
@@ -123,17 +125,21 @@ export function CheckList({ card }: { card: BoardCardView }) {
 export function FileChip({ path, exists = true }: { path: string; exists?: boolean }) {
   return (
     <Tooltip label={exists ? path : `${path} is no longer in the project`} className="min-w-0 max-w-full">
-      <button
+      <Button
         type="button"
-        className={cn('tb-file', !exists && 'missing')}
+        variant="outline"
+        className={cn(
+          'tb-file h-auto shrink justify-start gap-1 rounded-[6px] border-[var(--r-hairline)] bg-[var(--r-surface)] px-2 py-0.5 text-[12px] font-normal text-[var(--r-ink-body)] shadow-none hover:border-[var(--r-hairline-strong)] hover:bg-[var(--r-surface)] hover:text-[var(--r-ink-strong)] has-[>svg]:px-2',
+          !exists && 'missing text-[var(--r-ink-faint)]',
+        )}
         onClick={(event) => {
           event.stopPropagation()
           notify({ type: 'board/open-file', path })
         }}
       >
-        <Icon name="file-text" size={12} tone="inherit" />
+        <Icon name="file-text" size={12} tone="inherit" className="size-3" />
         <span>{path.split('/').pop()}</span>
-      </button>
+      </Button>
     </Tooltip>
   )
 }

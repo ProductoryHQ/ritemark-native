@@ -12,7 +12,7 @@
  */
 
 // ── Minimal vscode stub ──────────────────────────────────────────────────────
-// AcpRuntime pulls in BrowserToolsInjector → browserMcpServer → BrowserActionTools,
+// AcpRuntime pulls in RitemarkToolsInjector → ritemarkTools → BrowserActionTools,
 // which does `import * as vscode from 'vscode'` at module load. Pre-populate the
 // require cache with a stub (same technique as CodexRuntime.test.ts) so the test
 // runs outside the extension host. Without this the file could not even load.

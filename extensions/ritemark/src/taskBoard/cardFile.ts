@@ -384,8 +384,9 @@ export function mintCardId(taken: ReadonlySet<string>, random: (max: number) => 
 }
 
 /** File-name part from the title at creation: ASCII, lowercase, hyphens, at
- *  most 40 characters, cut at a word. The file is never renamed afterwards;
- *  a card's identity is its `id`. */
+ *  most 40 characters, cut at a word. Windows device names (`con`, `nul`,
+ *  `com1`…) are reserved even with an extension, so they get `-task`. The file
+ *  is never renamed afterwards; a card's identity is its `id`. */
 export function cardSlug(title: string): string {
   const words = title
     .normalize('NFKD')
@@ -404,7 +405,8 @@ export function cardSlug(title: string): string {
     }
     slug = next;
   }
-  return slug || 'task';
+  if (!slug) return 'task';
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(slug) ? `${slug}-task` : slug;
 }
 
 /** A new card's file name: the title alone, so the editor tab that shows the
