@@ -23,3 +23,8 @@
 - **The download prompt stays in view.** The voice-model download and resume prompts are dialogs, so they can't slide out of sight.
 
 New: a guide to [voice dictation](../../user/features/dictation.md).
+
+## Codex
+
+- **GPT-6.1 Sol is the default Codex model.** New Codex conversations start on GPT-6.1 Sol, the model Ritemark's built-in Codex recommends. GPT-5.6 Sol is still in the Codex model menu as the previous Sol.
+- **Existing Codex conversations continue on GPT-6.1 Sol.** After the update, a conversation that ran on GPT-5.6 Sol carries on, with its earlier messages, on GPT-6.1 Sol. To go back, pick GPT-5.6 Sol in the model menu. Ritemark doesn't keep that pick across a restart yet.

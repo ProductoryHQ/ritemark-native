@@ -8,7 +8,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { validateCatalog, type ModelCatalog } from './schema';
 import { BUNDLED_CATALOG } from './bundledCatalog';
-import { CLAUDE_MODEL_IDS } from '../modelConfig';
+import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS } from '../modelConfig';
+import { parseCodexModelsCache } from './providerDiscovery';
 import {
   canonicalizeModelAliases,
   findModelEntry,
@@ -563,6 +564,78 @@ test('S127 S28: the provider remembers the notice under the accepted conversatio
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'UnifiedViewProvider.ts'), 'utf8');
   const keys = [...source.matchAll(/_modelSubstitutionNamed\.(has|add)\((\w+)\)/g)].map((match) => `${match[1]}(${match[2]})`);
   assert.deepStrictEqual(keys, ['has(conversationId)', 'add(conversationId)']);
+});
+
+// ── GH #398: GPT-6.1 Sol is the Codex default ──────────────────────────────
+
+// The shape of `~/.codex/models_cache.json` as the bundled Codex 0.160.0 writes it.
+const CODEX_0_160_CACHE = {
+  client_version: '0.160.0',
+  models: [
+    { slug: 'gpt-6.1-sol', display_name: 'GPT-6.1-Sol', visibility: 'list', priority: 1 },
+    { slug: 'gpt-6-astra', display_name: 'GPT-6-Astra', visibility: 'list', priority: 2 },
+    { slug: 'gpt-6-sol', display_name: 'GPT-6-Sol', visibility: 'list', priority: 3 },
+    { slug: 'gpt-5.6-sol', display_name: 'GPT-5.6-Sol', visibility: 'list', priority: 5 },
+    { slug: 'gpt-5.5', display_name: 'GPT-5.5', visibility: 'hide', priority: 13 },
+  ],
+};
+// `feeds/model-catalog.json` as published before the v1.14.0 refresh.
+const FEED_BEFORE_398: ModelCatalog = {
+  schemaVersion: 1,
+  updatedAt: '2026-09-29T17:45:33Z',
+  providers: {
+    codex: {
+      defaults: { codex: CODEX_MODEL_IDS.SOL },
+      models: [
+        { id: CODEX_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: '', tier: 'high', deprecated: false, order: 0 },
+        { id: CODEX_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Reliable agentic workhorse', tier: 'high', deprecated: false, order: 1 },
+      ],
+    },
+  },
+};
+
+test('GH #398: the bundled Codex default is GPT-6.1 Sol, and GPT-5.6 Sol stays selectable', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(r.codex.models[0].id, CODEX_MODEL_IDS.SOL_6_1, 'the default is the first row');
+  assert.deepStrictEqual(r.codex.models[0].thinkingEffort, {
+    levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low',
+  }, 'effort levels as Codex 0.160.0 lists them');
+  const previous = r.codex.models.find((model) => model.id === CODEX_MODEL_IDS.SOL);
+  assert.ok(previous && !previous.deprecated, 'GPT-5.6 Sol is a selectable row');
+});
+
+test('GH #398: a Codex 0.160.0 live list keeps the default and takes the curated label', () => {
+  const live = parseCodexModelsCache(CODEX_0_160_CACHE, '0.160.0');
+  const r = resolveAll({ codex: live }, null, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.codex.source, 'live');
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(findModelEntry(r.codex.models, CODEX_MODEL_IDS.SOL_6_1)?.label, 'GPT-6.1 Sol');
+  assert.strictEqual(r.codex.models[0].id, CODEX_MODEL_IDS.SOL_6_1);
+  assert.ok(r.codex.models.some((model) => model.id === CODEX_MODEL_IDS.SOL));
+});
+
+test('GH #398 + #375: a cache from another Codex version leaves the bundled default in charge', () => {
+  const live = parseCodexModelsCache({ ...CODEX_0_160_CACHE, client_version: '0.161.0' }, '0.160.0');
+  assert.strictEqual(live, null);
+  const r = resolveAll({ codex: live }, null, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.codex.source, 'bundled');
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+});
+
+test('GH #398: the feed published before v1.14.0 cannot bring back the GPT-5.6 Sol default', () => {
+  for (const discovery of [{}, { codex: parseCodexModelsCache(CODEX_0_160_CACHE, '0.160.0') }]) {
+    const r = resolveAll(discovery, FEED_BEFORE_398, FEED_BEFORE_398, BUNDLED_CATALOG, APP);
+    assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+    assert.strictEqual(findModelEntry(r.codex.models, CODEX_MODEL_IDS.SOL)?.description, 'Previous agentic workhorse');
+  }
+});
+
+test('GH #398: a conversation saved on GPT-5.6 Sol keeps it', () => {
+  for (const discovery of [{}, { codex: parseCodexModelsCache(CODEX_0_160_CACHE, '0.160.0') }]) {
+    const r = resolveAll(discovery, FEED_BEFORE_398, null, BUNDLED_CATALOG, APP);
+    assert.deepStrictEqual(resolveRequestedModelIn(r.codex, CODEX_MODEL_IDS.SOL, 'codex'), { id: CODEX_MODEL_IDS.SOL });
+  }
 });
 
 test('versionLt compares dotted-numeric versions correctly', () => {

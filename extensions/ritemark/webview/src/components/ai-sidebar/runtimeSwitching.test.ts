@@ -657,6 +657,45 @@ function testACatalogFallbackMovesEveryComposerSurfaceTogether() {
   }
 }
 
+// GH #398: the catalog declares GPT-6.1 Sol the Codex default instead of GPT-5.6 Sol.
+const CODEX_CATALOG_398 = [
+  { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', description: 'Latest agentic workhorse (recommended)', tier: 'high' as const, deprecated: false, order: 0, isDefault: true },
+  { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Most capable Codex model', tier: 'high' as const, deprecated: false, order: 1 },
+  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Previous agentic workhorse', tier: 'high' as const, deprecated: false, order: 2 },
+];
+
+function codexModelSent(posted: unknown[]): string | undefined {
+  posted.length = 0;
+  useAISidebarStore.getState().sendCodexMessage('Which model answers?');
+  const execute = posted.find((message) => (message as { type?: string }).type === 'agent-execute') as { model?: string } | undefined;
+  return execute?.model;
+}
+
+function testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes() {
+  const posted: unknown[] = [];
+  const originalPostMessage = vscode.postMessage;
+  vscode.postMessage = (message: unknown) => { posted.push(message); };
+  try {
+    // A fresh start: the blank thread takes the declared default, not the first row.
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: [...CODEX_CATALOG_398].reverse() });
+    assert.equal(selectActiveConversation(useAISidebarStore.getState()).codexSelectedModel, 'gpt-6.1-sol');
+    assert.equal(codexModelSent(posted), 'gpt-6.1-sol');
+    resetStore();
+
+    // A thread already on the previous default keeps it when the catalog
+    // switches defaults under it (a feed or live-probe refresh).
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: CODEX_CATALOG.map((model) => ({ ...model, isDefault: true })) });
+    const openId = useAISidebarStore.getState().activeConversationId!;
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: CODEX_CATALOG_398 });
+    const open = useAISidebarStore.getState().conversations[openId];
+    assert.equal(open.codexSelectedModel, 'gpt-5.6-sol');
+    assert.equal(open.pendingRuntime.modelId, 'gpt-5.6-sol');
+    assert.equal(codexModelSent(posted), 'gpt-5.6-sol');
+  } finally {
+    vscode.postMessage = originalPostMessage;
+    resetStore();
+  }
+}
 
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
@@ -676,6 +715,7 @@ function main() {
   testClaudePickAfterCodexSurvivesTheHostsLateEcho();
   testALaterBootstrapKeepsTheThreadsOwnClaudeModel();
   testACatalogFallbackMovesEveryComposerSurfaceTogether();
+  testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes();
   console.log('Runtime switching tests passed.');
 }
 
