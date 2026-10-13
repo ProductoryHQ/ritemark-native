@@ -38,6 +38,8 @@ export interface ConversationControllerDependencies {
   dispatchAcceptedTurn?: (request: Extract<ConversationRequest, { type: 'conversation/accept-turn' }>, record: ConversationRecordV1) => Promise<void>;
   stopConversation?: (conversationId: string) => Promise<void>;
   emit?: (event: ConversationHostEvent) => void;
+  /** A turn in this conversation is active in this host (see `TurnOwners`). */
+  onTurnActive?: (conversationId: string) => void;
   rolloutMode?: () => Promise<ConversationRolloutMode>;
   markHostAuthority?: () => Promise<void>;
   migrator?: LegacyConversationMigrator;
@@ -629,39 +631,78 @@ export class ConversationController {
         throw error;
       }
       if (current.lifecycle.state !== 'working' && current.lifecycle.state !== 'needs-user') continue;
-      const turnId = current.lifecycle.activeTurnId;
       const lastEvent = current.events[current.events.length - 1];
-      const lastRuntime = current.runtimeSummary[current.runtimeSummary.length - 1];
-      const interruptedRuntime = lastEvent?.runtimeId ?? lastRuntime;
+      const interruptedRuntime = lastEvent?.runtimeId ?? current.runtimeSummary[current.runtimeSummary.length - 1];
       if (runtimeId && interruptedRuntime !== runtimeId) continue;
-      const continuationRuntime = interruptedRuntime === 'claude-code'
-        || interruptedRuntime === 'codex'
-        || interruptedRuntime === 'opencode'
-        ? interruptedRuntime
-        : null;
-      const interrupted = await this.dependencies.store.checkpoint({
-        conversationId,
-        bindingGeneration: current.bindingGeneration,
-        expectedRevision: current.revision,
-        lifecycle: { state: 'interrupted', turnId, reason },
-        appendEvents: [{
-          kind: 'boundary',
-          eventId: this.randomId(),
-          turnId,
-          sequence: (lastEvent?.sequence ?? -1) + 1,
-          occurredAt: this.now().toISOString(),
-          runtimeId: lastEvent?.runtimeId ?? lastRuntime ?? 'legacy-ritemark',
-          boundaryKind: 'interrupted',
-          message: reason === 'restart'
-            ? 'Ritemark closed while this turn was running.'
-            : 'The live agent context was released.',
-        }],
-        ...(continuationRuntime && current.continuations?.[continuationRuntime]
-          ? { continuationUpdate: { runtimeId: continuationRuntime, descriptor: null } }
-          : {}),
-      });
-      this.emitChanged(interrupted);
+      this.emitChanged(await this.checkpointInterrupted(current, reason));
     }
+  }
+
+  /**
+   * Startup (Sprint 130, W13): a turn that a crash, a forced quit or a killed
+   * extension host left `working` or `needs-user` has no runtime behind it any
+   * more, because only a clean shutdown records that (`prepareForShutdown`).
+   * Record it now as that shutdown would have. Otherwise the AI sidebar reads
+   * the turn as running and holds the conversation's queue behind it for good:
+   * a task-board card's Retry stayed Queued. Only this scope's conversations
+   * (this window runs them), never one with a live runtime session here, and
+   * never a turn that started after the list was read.
+   */
+  async interruptTurnsLeftByRestart(isLive: (conversationId: string) => boolean): Promise<string[]> {
+    if (this.disposed) return [];
+    const interrupted: string[] = [];
+    for (const summary of await this.dependencies.store.list(this.dependencies.currentScope().scopeId)) {
+      const left = summary.lifecycle;
+      if ((left.state !== 'working' && left.state !== 'needs-user') || isLive(summary.conversationId)) continue;
+      try {
+        const current = await this.requireCurrentScope(summary.conversationId);
+        if ((current.lifecycle.state !== 'working' && current.lifecycle.state !== 'needs-user')
+          || current.lifecycle.activeTurnId !== left.activeTurnId
+          || isLive(current.conversationId)) continue;
+        this.emitChanged(await this.checkpointInterrupted(current, 'restart'));
+        interrupted.push(current.conversationId);
+      } catch (error) {
+        // A record that changed meanwhile or cannot be read stays as it is;
+        // the others are still recorded.
+        console.warn('[Conversations] Could not record a turn left by a restart:', summary.conversationId, error);
+      }
+    }
+    return interrupted;
+  }
+
+  /** Close the active turn of `current` with an `interrupted` boundary. */
+  private checkpointInterrupted(current: ConversationRecordV1, reason: 'restart' | 'runtime-released'): Promise<ConversationRecordV1> {
+    if (current.lifecycle.state !== 'working' && current.lifecycle.state !== 'needs-user') return Promise.resolve(current);
+    const turnId = current.lifecycle.activeTurnId;
+    const lastEvent = current.events[current.events.length - 1];
+    const lastRuntime = current.runtimeSummary[current.runtimeSummary.length - 1];
+    const interruptedRuntime = lastEvent?.runtimeId ?? lastRuntime;
+    const continuationRuntime = interruptedRuntime === 'claude-code'
+      || interruptedRuntime === 'codex'
+      || interruptedRuntime === 'opencode'
+      ? interruptedRuntime
+      : null;
+    return this.dependencies.store.checkpoint({
+      conversationId: current.conversationId,
+      bindingGeneration: current.bindingGeneration,
+      expectedRevision: current.revision,
+      lifecycle: { state: 'interrupted', turnId, reason },
+      appendEvents: [{
+        kind: 'boundary',
+        eventId: this.randomId(),
+        turnId,
+        sequence: (lastEvent?.sequence ?? -1) + 1,
+        occurredAt: this.now().toISOString(),
+        runtimeId: lastEvent?.runtimeId ?? lastRuntime ?? 'legacy-ritemark',
+        boundaryKind: 'interrupted',
+        message: reason === 'restart'
+          ? 'Ritemark closed while this turn was running.'
+          : 'The live agent context was released.',
+      }],
+      ...(continuationRuntime && current.continuations?.[continuationRuntime]
+        ? { continuationUpdate: { runtimeId: continuationRuntime, descriptor: null } }
+        : {}),
+    });
   }
 
   dispose(): void {
@@ -851,6 +892,9 @@ export class ConversationController {
   }
 
   private emitChanged(record: ConversationRecordV1): void {
+    if (record.lifecycle.state === 'working' || record.lifecycle.state === 'needs-user') {
+      this.dependencies.onTurnActive?.(record.conversationId);
+    }
     this.dependencies.emit?.({
       type: 'conversation/changed',
       conversationId: record.conversationId,

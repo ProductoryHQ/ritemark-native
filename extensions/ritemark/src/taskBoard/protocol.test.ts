@@ -34,6 +34,11 @@ function main(): void {
     { type: 'board/open-card', fileName: 'broken.md' },
   );
   assert.deepEqual(decodeBoardRequest({ type: 'board/open-card', cardId: 'k3f9x2' }), { type: 'board/open-card', cardId: 'k3f9x2' });
+  assert.deepEqual(
+    decodeBoardRequest({ type: 'board/open-card', cardId: 'k3f9x2', focus: true }),
+    { type: 'board/open-card', cardId: 'k3f9x2', focus: true },
+    'an open from the keyboard takes the focus to the page (W16)',
+  );
   assert.deepEqual(decodeBoardRequest({ type: 'board/ready', surface: 'page' }), { type: 'board/ready', surface: 'page' });
   assert.deepEqual(decodeBoardRequest({ type: 'board/archive', requestId: 'r7', cardId: 'k3f9x2' }), { type: 'board/archive', requestId: 'r7', cardId: 'k3f9x2' });
   assert.deepEqual(decodeBoardRequest({ type: 'board/restore', requestId: 'r8', cardId: 'k3f9x2' }), { type: 'board/restore', requestId: 'r8', cardId: 'k3f9x2' });
@@ -60,6 +65,7 @@ function main(): void {
   rejects({ type: 'board/open-card' }, /exactly one of cardId or fileName/);
   rejects({ type: 'board/open-card', cardId: 'k3f9x2', fileName: 'a.md' }, /exactly one/);
   rejects({ type: 'board/open-card', fileName: '../escape.md' }, /card file name/);
+  rejects({ type: 'board/open-card', cardId: 'k3f9x2', focus: 'yes' }, /focus must be true or false/);
   rejects({ type: 'board/open-as-document', cardId: 'k3f9x2' }, /known board request/);
   rejects({ type: 'board/open', cardId: 'k3f9x2' }, /cardId is not part of board\/open/);
   rejects({ type: 'board/ready', surface: 'window' }, /sidebar, panel or page/);

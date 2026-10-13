@@ -168,7 +168,13 @@ function readReview(value: unknown): CardReview | undefined {
     size: oneOf(value.size, REVIEW_SIZES, 'review.size'),
     title: textOf(value.title ?? '', 'review.title'),
     description: textOf(value.description ?? '', 'review.description'),
+    ...reviewDoneWhen(optionalText(value.done_when, 'review.done_when')),
   };
+}
+
+function reviewDoneWhen(value: string | undefined): { doneWhen?: string } {
+  const text = value?.trim();
+  return text ? { doneWhen: text } : {};
 }
 
 function readHistory(value: unknown): CardHistoryEntry[] {
@@ -285,7 +291,11 @@ function frontMatterOf(card: Card): Record<string, unknown> {
     };
   }
   if (card.ask) out.ask = { ...card.ask, at: yamlTime(card.ask.at), options: [...card.ask.options] };
-  if (card.review) out.review = { ...card.review, at: yamlTime(card.review.at) };
+  if (card.review) {
+    const { doneWhen, ...review } = card.review;
+    // `done_when`, as the card's own key.
+    out.review = { ...review, at: yamlTime(card.review.at), ...(doneWhen ? { done_when: doneWhen } : {}) };
+  }
   if (card.dropped) out.dropped = true;
   if (card.archived !== undefined) out.archived = card.archived ? yamlTime(card.archived) : true;
   out.history = card.history.map((entry) => ({ at: yamlTime(entry.at), by: entry.by, what: entry.what }));
@@ -312,8 +322,18 @@ export function serializeCard(card: Card, source?: CardSource): string {
   for (const key of KNOWN_KEYS) {
     if (key in fresh && !(key in data)) data[key] = fresh[key];
   }
-  const yaml = yamlEngine.stringify(data, { ...YAML_DUMP_OPTIONS });
+  const yaml = quoteRank(yamlEngine.stringify(data, { ...YAML_DUMP_OPTIONS }));
   return `---\n${yaml.endsWith('\n') ? yaml : `${yaml}\n`}---\n${card.description}`;
+}
+
+/**
+ * The rank is text that can look like a number (`09`, `5`). js-yaml quotes
+ * only what it would misread itself, so it wrote `rank: 09`, which a YAML 1.2
+ * reader (another editor, a sync tool) reads as 9, reordering the stage
+ * (Windows test, Sprint 130). Always single-quote it.
+ */
+function quoteRank(yaml: string): string {
+  return yaml.replace(/^rank: (?!['"])(.*)$/m, (_line, value: string) => `rank: '${value.replace(/'/g, "''")}'`);
 }
 
 // ── Ranks ───────────────────────────────────────────────────────────────────

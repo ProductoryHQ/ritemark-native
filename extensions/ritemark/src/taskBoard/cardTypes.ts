@@ -72,6 +72,8 @@ export interface CardReview {
   size: ReviewSize;
   title: string;
   description: string;
+  /** What done looks like; Make it a task puts it in the card's Done when. */
+  doneWhen?: string;
 }
 
 export interface Card {

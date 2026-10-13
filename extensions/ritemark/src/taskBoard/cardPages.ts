@@ -105,6 +105,15 @@ function findTab(uri: string): vscode.Tab | undefined {
   return undefined;
 }
 
+/**
+ * Put the keyboard in the page just opened (W16). Opening it from the Tasks
+ * side bar left the focus nowhere, so the user needed Ctrl+1 first; this is
+ * what Ctrl+1 does.
+ */
+async function focusPage(): Promise<void> {
+  await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+}
+
 export class CardPages implements vscode.Disposable {
   /** The page the board opened last, while it is open. */
   private lastOpened: string | null = null;
@@ -113,6 +122,11 @@ export class CardPages implements vscode.Disposable {
   private active: string | null = null;
   private readonly activeListeners = new Set<(cardId: string | null) => void>();
   private readonly invalidateTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Cards whose next page to load takes the focus: one renamed by Make it a
+   *  task, or one just opened from the keyboard. */
+  private readonly returning = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Card files being moved, by their old URI (see `noteMoving`). */
+  private readonly moving = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -183,11 +197,31 @@ export class CardPages implements vscode.Disposable {
   /** Connect a page's webview to the board. */
   connect(document: vscode.TextDocument, webview: vscode.Webview): vscode.Disposable {
     const uri = document.uri.toString();
-    return connectBoardSurface(webview, 'page', this.surfaceContext(), {
+    const cardId = this.cardModeFor(document)?.cardId ?? null;
+    const connection = connectBoardSurface(webview, 'page', this.surfaceContext(), {
       onRequest: (request) => {
         if (EDITING_REQUESTS.has(request.type)) this.edited.add(uri);
+        // Make it a task renames the file, and the page comes back as a new
+        // webview without the keyboard focus it was clicked with (W16).
+        if (request.type === 'board/accept-review') this.focusWhenBack(request.cardId);
+      },
+      onReady: () => {
+        const timer = cardId ? this.returning.get(cardId) : undefined;
+        if (!cardId || !timer) return;
+        clearTimeout(timer);
+        this.returning.delete(cardId);
+        // The editor takes the focus; the page then pulls it into its own
+        // document, where it can stop short (seen once on Windows and the Mac).
+        void focusPage().then(() => connection.focus({}));
       },
     });
+    return connection;
+  }
+
+  /** The next page of this card to load takes the focus, within a few seconds. */
+  private focusWhenBack(cardId: string): void {
+    clearTimeout(this.returning.get(cardId));
+    this.returning.set(cardId, setTimeout(() => this.returning.delete(cardId), 5000));
   }
 
   /**
@@ -196,10 +230,11 @@ export class CardPages implements vscode.Disposable {
    * clicking through cards keeps one tab. A card file that won't read opens as
    * plain text, where the broken front matter can be fixed.
    */
-  async open(target: { cardId?: string; fileName?: string }): Promise<void> {
+  async open(target: { cardId?: string; fileName?: string; focus?: boolean }): Promise<void> {
     if (!target.cardId && target.fileName) {
       const file = path.join(this.store.tasksDir, path.basename(target.fileName));
       await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), 'default', { preview: false });
+      if (target.focus) await focusPage();
       return;
     }
     const file = target.cardId ? this.store.filePathOf(target.cardId) : null;
@@ -208,10 +243,14 @@ export class CardPages implements vscode.Disposable {
     const key = uri.toString();
     const existing = findTab(key);
     const previous = this.lastOpened;
+    // A new page's webview loads after the editor took the focus, and could
+    // leave it on the page body (seen once on Windows): focus it again then.
+    if (target.focus && !existing && target.cardId) this.focusWhenBack(target.cardId);
     await vscode.commands.executeCommand('vscode.openWith', uri, RITEMARK_EDITOR_VIEW_TYPE, {
       preview: false,
       ...(existing ? { viewColumn: existing.group.viewColumn } : {}),
     });
+    if (target.focus) await focusPage();
     if (existing) return;
     if (previous && previous !== key && !this.edited.has(previous)) {
       const tab = findTab(previous);
@@ -239,6 +278,9 @@ export class CardPages implements vscode.Disposable {
   dispose(): void {
     for (const timer of this.invalidateTimers.values()) clearTimeout(timer);
     this.invalidateTimers.clear();
+    for (const timer of [...this.returning.values(), ...this.moving.values()]) clearTimeout(timer);
+    this.returning.clear();
+    this.moving.clear();
     for (const disposable of this.disposables) disposable.dispose();
     this.activeListeners.clear();
   }
@@ -267,12 +309,24 @@ export class CardPages implements vscode.Disposable {
     );
   }
 
+  /**
+   * The board is moving this card file (Make it a task). Its page moves with
+   * it, so for a moment the old path is gone while its tab is still there:
+   * that tab is not a deleted card's.
+   */
+  noteMoving(file: string): void {
+    const key = vscode.Uri.file(file).toString();
+    clearTimeout(this.moving.get(key));
+    this.moving.set(key, setTimeout(() => this.moving.delete(key), 5000));
+  }
+
   /** A deleted card takes its page with it, unless the page holds unsaved typing. */
   private async closeDeletedPages(): Promise<void> {
     for (const group of vscode.window.tabGroups.all) {
       for (const tab of group.tabs) {
         const uri = tabUri(tab);
         if (!uri || uri.scheme !== 'file' || tab.isDirty || !this.isCardPath(uri.fsPath)) continue;
+        if (this.moving.has(uri.toString())) continue;
         try {
           await vscode.workspace.fs.stat(uri);
         } catch {

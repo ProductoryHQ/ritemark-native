@@ -65,14 +65,15 @@ export function ideaReviewPrompt(input: Pick<IdeaReviewInput, 'idea' | 'openTitl
     'Decide whether the IDEA below is worth turning into a task, and suggest the task.',
     '',
     'Answer with exactly one JSON object and no other text:',
-    '{"verdict": "...", "why": "...", "size": "...", "title": "...", "description": "..."}',
+    '{"verdict": "...", "why": "...", "size": "...", "title": "...", "description": "...", "doneWhen": "..."}',
     '',
     '- verdict: "ready" (clear and worth doing), "unclear" (needs more detail before anyone can do it), "already-on-board" (one of the OPEN CARDS already covers it) or "not-a-task" (a note or a wish, not work someone can do).',
     '- why: one sentence.',
     '- size: "small" (a quick change), "medium" (a focused piece of work) or "large" (several steps or sittings).',
     '- title: a short task title that starts with a verb, at most 80 characters.',
-    '- description: one or two sentences: the first step, and what done looks like.',
-    'Write why, title and description in the same language as the IDEA, not the language of any other context.',
+    '- description: one or two sentences: the first step.',
+    '- doneWhen: one sentence: what done looks like, at most 200 characters.',
+    'Write why, title, description and doneWhen in the same language as the IDEA, not the language of any other context.',
     '',
     'IDEA:',
     idea,
@@ -112,12 +113,15 @@ export function parseIdeaReview(text: string): ReviewFields | null {
   if (!why || !title) return null;
   if (answer.description !== undefined && typeof answer.description !== 'string') return null;
   const description = typeof answer.description === 'string' ? answer.description.trim().slice(0, MAX_DESCRIPTION_CHARS) : '';
+  // Make it a task puts this in the card's Done when (Windows test, Sprint 130).
+  const doneWhen = line(answer.doneWhen, CARD_LIMITS.doneWhen);
   return {
     verdict: answer.verdict as ReviewVerdict,
     why,
     size: answer.size as ReviewSize,
     title,
     description,
+    ...(doneWhen ? { doneWhen } : {}),
   };
 }
 

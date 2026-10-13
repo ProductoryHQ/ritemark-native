@@ -32,6 +32,10 @@ class FakeSidebar implements CardTaskSidebar {
     this.enqueued.push(message);
     return this.answer;
   }
+  dropped: string[] = [];
+  async dropQueued(taskId: string) {
+    this.dropped.push(taskId);
+  }
   async canAttach() {
     return this.capacity;
   }
@@ -182,9 +186,11 @@ async function main(): Promise<void> {
     assert.equal(sidebar.enqueued[1].conversationId, 'conv-C');
     assert.ok(sidebar.enqueued[1].displayText.startsWith('Failing card'));
 
-    // Stopped while queued: the turn is cancelled the moment it starts.
+    // Stopped while queued: the sidebar drops the prompt (W13), and should it
+    // start anyway, the turn is cancelled the moment it does.
     await ledger.stop(card.id);
     assert.equal(ledger.list().get(card.id)?.state, 'cancelled');
+    assert.deepEqual(sidebar.dropped, [sidebar.enqueued[1].taskId], 'the queued prompt leaves the queue');
     await ledger.applyTurnStarted('conv-C', sidebar.enqueued[1].conversationTurnId);
     assert.deepEqual(sidebar.cancelled, [['conv-C', sidebar.enqueued[1].conversationTurnId]]);
     assert.equal(ledger.list().get(card.id)?.state, 'cancelled');
@@ -245,6 +251,29 @@ async function main(): Promise<void> {
     assert.deepEqual(seen, ['interrupted']);
     assert.equal(reborn.list().has('zzzzzz'), false, 'records of cards that are gone are dropped');
     assert.ok(events.length > 0);
+
+    // W13: Retry after the restart goes to the card's own conversation and runs
+    // (the sidebar side: conversations/turnsLeftByRestart.test.ts).
+    const sent = sidebar.enqueued.length;
+    assert.deepEqual(await reborn.start({ card: running, runtimeId: 'claude-code', kind: 'retry' }), { ok: true });
+    const retry = sidebar.enqueued[sent];
+    assert.equal(retry.conversationId, 'conv-E', 'the same conversation');
+    assert.equal(retry.displayText, sidebar.enqueued[0].displayText, 'the same ask');
+    assert.equal(reborn.list().get(running.id)?.state, 'queued');
+    await reborn.applyTurnStarted('conv-E', retry.conversationTurnId);
+    assert.equal(reborn.list().get(running.id)?.state, 'running', 'Retry starts');
+
+    // Stop while queued, then Give again: only the new prompt runs.
+    await reborn.applyTurnTerminal('conv-E', retry.conversationTurnId, { status: 'interrupted' });
+    await reborn.start({ card: running, runtimeId: 'claude-code', kind: 'retry' });
+    const stoppedRetry = sidebar.enqueued.at(-1)!;
+    await reborn.stop(running.id);
+    assert.equal(sidebar.dropped.at(-1), stoppedRetry.taskId, 'the stopped prompt leaves the queue');
+    await reborn.start({ card: running, runtimeId: 'claude-code', kind: 'give' });
+    const given = sidebar.enqueued.at(-1)!;
+    assert.notEqual(given.taskId, stoppedRetry.taskId);
+    await reborn.applyTurnStarted('conv-E', given.conversationTurnId);
+    assert.equal(reborn.list().get(running.id)?.state, 'running', 'Give again starts');
   }
 
   console.log('taskBoard/CardHandoffLedger: all assertions passed');

@@ -17,7 +17,7 @@ import { Tooltip } from '../ui/tooltip'
 import { act, moveCard, useBoardUi } from './boardUi'
 import type { BoardTab } from '../../../../src/taskBoard/protocol'
 import { CardMenu } from './CardMenu'
-import { CardGlyph, GivePromptPanel, HeaderIconButton, INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
+import { CardGlyph, GivePromptPanel, HeaderIconButton, StateGlyph, TitleField, toneClass, useNow, usePresenter } from './CardParts'
 import { Button } from '../ui/button'
 import { DONE_WINDOW_DAYS, STAGE_NAMES, finishedRecently, type CardPresentation } from './taskCopy'
 import { UnreadableCards } from './UnreadableCards'
@@ -174,25 +174,22 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
   )
 }
 
+/** The column's add field, below its header. */
 function AddRow({ stage, onDone }: { stage: CardStage; onDone: () => void }) {
   const [title, setTitle] = useState('')
   return (
     <div className="tb-addrow">
-      <input
+      <TitleField
         autoFocus
-        className={cn(INPUT, 'h-8')}
         placeholder={stage === 'idea' ? 'Write an idea…' : 'Add a task…'}
-        aria-label="New card title"
+        label="New card title"
         value={title}
-        maxLength={200}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={setTitle}
         onBlur={() => !title.trim() && onDone()}
-        onKeyDown={async (event) => {
-          if (event.key === 'Escape') onDone()
-          if (event.key === 'Enter' && title.trim()) {
-            const answer = await act({ type: 'board/add', title, stage })
-            if (answer.ok) setTitle('')
-          }
+        onEscape={onDone}
+        onSubmit={async () => {
+          const answer = await act({ type: 'board/add', title, stage })
+          if (answer.ok) setTitle('')
         }}
       />
     </div>
@@ -279,7 +276,7 @@ function Tile({
         type="button"
         className="absolute inset-0 rounded-lg border-0 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         aria-label={`${card.title}, ${p.row || STAGE_NAMES[card.stage]}`}
-        onClick={() => openCard(card.id)}
+        onClick={(event) => openCard(card.id, event.detail === 0)}
       />
       <div className="pointer-events-none relative flex items-start gap-2 pr-5">
         {p.plain ? <CardGlyph card={card} p={p} /> : <StateGlyph p={p} />}

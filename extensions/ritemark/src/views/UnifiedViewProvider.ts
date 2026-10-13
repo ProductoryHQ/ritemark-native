@@ -106,6 +106,7 @@ import {
 } from '../runtime/continuation';
 import { ConversationController } from '../conversations/ConversationController';
 import { ConversationStore, ConversationStoreError, conversationStoreDir } from '../conversations/ConversationStore';
+import { TurnOwners, turnOwnersDir } from '../conversations/turnOwners';
 import { ConversationCutoverState } from '../conversations/ConversationCutoverState';
 import { LegacyConversationMigrator } from '../conversations/LegacyConversationMigrator';
 import { isConversationRequestMessage } from '../conversations/protocol';
@@ -283,6 +284,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
   private readonly _conversationController: ConversationController;
+  /** Startup: turns a crash left running are recorded as interrupted (W13). */
+  private readonly _turnsLeftByRestart: Promise<void>;
+  /** The conversations this window runs turns in, for other windows' sweeps. */
+  private readonly _turnOwners: TurnOwners;
   private readonly _conversationTitleGenerator: ConversationTitleGenerator;
   private _continuationHostSecretPromise: Promise<string> | null = null;
 
@@ -317,8 +322,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     );
     const conversationStore = new ConversationStore(conversationStoreDir(globalStorageUri.fsPath));
     const conversationCutover = new ConversationCutoverState(conversationStore);
+    this._turnOwners = new TurnOwners(turnOwnersDir(globalStorageUri.fsPath));
     this._conversationController = new ConversationController({
       store: conversationStore,
+      onTurnActive: (conversationId) => this._turnOwners.claim(conversationId),
       currentScope: () => resolveProjectScope({
         workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,
         folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),
@@ -330,6 +337,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       markHostAuthority: () => conversationCutover.establishHostAuthority(),
       migrator: new LegacyConversationMigrator(conversationStore),
     });
+    // Sprint 130 (W13): turns a crash or forced quit left running. Conversation
+    // requests and new turns wait for it, so none reads such a turn as live.
+    // A turn another window still runs is live (windows without a folder share
+    // one scope).
+    this._turnsLeftByRestart = this._conversationController
+      .interruptTurnsLeftByRestart((conversationId) => (
+        this._runtimeSessions.has(conversationId) || this._turnOwners.isClaimedElsewhere(conversationId)
+      ))
+      .then(
+        () => undefined,
+        (error) => { console.error('[Agent Chat] Could not record turns left by a restart:', error); },
+      );
   }
 
   public resolveWebviewView(
@@ -352,6 +371,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (isConversationRequestMessage(message)) {
+        await this._turnsLeftByRestart;
         const response = await this._conversationController.handle(message);
         try {
           await webviewView.webview.postMessage(response);
@@ -656,6 +676,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
           try {
+            await this._turnsLeftByRestart;
             hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
             if (hostConversationEnabled) {
               if (message.conversationContinuation === true) {
@@ -1706,6 +1727,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       ),
       runtimeSettings: (runtimeId) => this._commentTaskRuntimeSettings('', runtimeId as AgentId),
       enqueue: (message) => this._enqueueCardTask(message),
+      dropQueued: async (taskId) => {
+        await this._view?.webview.postMessage({ type: 'comment-task/drop', taskId });
+      },
       canAttach: (conversationId) => this._canAttachRuntime(conversationId),
       revealConversation: (conversationId) => this._revealConversation(conversationId),
       cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),
@@ -2094,6 +2118,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public dispose() {
     this._disposeAllRuntimeSessions();
     this._conversationController.dispose();
+    this._turnOwners.dispose();
     this._runtimeRegistry.get('opencode')?.dispose();
     (this._runtimeRegistry.get('codex') as CodexRuntime).stopLoginPolling();
     this._stopClaudeLoginPolling();

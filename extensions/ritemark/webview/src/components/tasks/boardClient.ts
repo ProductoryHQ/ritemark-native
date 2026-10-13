@@ -25,6 +25,7 @@ let activePage: string | null = null
 const activeListeners = new Set<() => void>()
 let installed = false
 let counter = 0
+let surfaceKind: BoardSurface | null = null
 
 function install(): void {
   if (installed) return
@@ -42,6 +43,9 @@ function install(): void {
         resolve(message.answer)
       }
     } else if (message.type === 'board/focus') {
+      // A card page asked to take the keyboard (W16): the editor holds the
+      // focus, but it can stop at the webview's frame, short of this page.
+      if (surfaceKind === 'page') window.focus()
       for (const listener of focusListeners) listener({ tab: message.tab })
     } else if (message.type === 'board/active-page') {
       activePage = message.cardId
@@ -52,6 +56,7 @@ function install(): void {
 
 /** Tell the host this surface is up; it answers with a snapshot. */
 export function startBoard(surface: BoardSurface): void {
+  surfaceKind = surface
   install()
   vscode.postMessage({ type: 'board/ready', surface })
 }

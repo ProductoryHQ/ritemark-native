@@ -111,6 +111,13 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
         async trash(file) {
           await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true });
         },
+        // A workspace edit, so a card page open on the file moves with it.
+        async move(from, to) {
+          cardPages?.noteMoving(from);
+          const edit = new vscode.WorkspaceEdit();
+          edit.renameFile(vscode.Uri.file(from), vscode.Uri.file(to), { overwrite: false });
+          if (!(await vscode.workspace.applyEdit(edit))) throw new Error('the rename was refused');
+        },
       },
       // A card open as a page is read and written through its document.
       documents: workspaceCardDocuments(),

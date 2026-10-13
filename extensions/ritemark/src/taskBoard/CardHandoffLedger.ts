@@ -40,6 +40,8 @@ export interface CardTaskSidebar {
   runtimeSettings(runtimeId: string): CommentTaskRuntimeSettings;
   /** Queue a turn; for `newConversation`, the answer names the new conversation. */
   enqueue(message: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string }>;
+  /** Take a task's prompt out of its conversation's queue if it has not started. */
+  dropQueued(taskId: string): Promise<void>;
   canAttach(conversationId: string | null): Promise<boolean>;
   revealConversation(conversationId: string): Promise<void>;
   cancelTurn(conversationId: string, conversationTurnId: string): Promise<void>;
@@ -242,9 +244,11 @@ export class CardHandoffLedger implements HandoffLedger, AgentTaskListener {
     const record = this.deps.store.get(cardId);
     if (!record) return;
     if (record.state === 'accepting' || record.state === 'queued') {
-      // Not running yet: the sidebar drops the queued item when told (G5);
-      // until then the turn would start, so ask the runtime too when it does.
+      // Not running yet: the sidebar drops the queued prompt (W13), or a later
+      // Give would run it too, untracked. Should it start anyway, the turn is
+      // stopped when it does (applyTurnStarted).
       await this.transition(cardId, { state: 'cancelled' });
+      await this.deps.sidebar.dropQueued(record.taskId).catch(() => undefined);
       return;
     }
     if ((record.state === 'running' || record.state === 'needs-user') && record.conversationId && record.turnId) {

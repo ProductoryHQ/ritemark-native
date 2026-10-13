@@ -65,7 +65,7 @@ export function LogView({ snapshot }: { snapshot: BoardSnapshot }) {
                   <span className="w">{timeOfDay(event.at)}</span>
                   <span className="what">{quoted ? head : event.what}</span>
                   <Tooltip label="Open this task as a page">
-                    <button type="button" className="card" onClick={() => openCard(event.cardId)}>
+                    <button type="button" className="card" onClick={(click) => openCard(event.cardId, click.detail === 0)}>
                       {event.title}
                     </button>
                   </Tooltip>

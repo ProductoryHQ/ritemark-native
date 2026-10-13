@@ -128,6 +128,7 @@ function main(): void {
         size: 'small',
         title: 'Draft the agenda',
         description: 'Three themes.',
+        doneWhen: 'The agenda fits on one page.',
       },
       dropped: true,
       history: [{ at: '2026-10-12T08:00:00.000Z', by: 'you', what: 'Created: "quoted", #hash, colon: yes' }],
@@ -136,6 +137,7 @@ function main(): void {
     const text = serializeCard(card);
     assert.ok(text.startsWith('---\nritemark: task/1\nid: a1b2c3\n'), 'a new file starts with the marker');
     assert.ok(text.includes('history:\n  - {'), 'history entries are one line each');
+    assert.ok(text.includes('done_when: The agenda fits on one page.'), 'a review’s Done when is written as done_when');
     assert.deepEqual(parsedCard(text).card, card, 'every field round-trips, including awkward text');
   }
 
@@ -145,6 +147,14 @@ function main(): void {
     assert.ok(!text.includes('files:') && !text.includes('result:') && !text.includes('dropped:'));
     assert.ok(text.endsWith('---\n'), 'an empty body stays empty');
     assert.equal(parsedCard(text).card.title, 'Call Maria');
+  }
+
+  // ── The rank is always quoted text (Windows test: `rank: 09`) ──────────────
+  // js-yaml wrote `09` and `0i` plain; a YAML 1.2 reader takes `09` for 9.
+  for (const rank of ['09', '0i', 'i', '9', '010', 'zz']) {
+    const text = serializeCard({ id: 'zz9zz9', title: 'Call Maria', stage: 'todo', rank, files: [], history: [], description: '' });
+    assert.ok(text.includes(`\nrank: '${rank}'\n`), `rank ${rank} is written quoted`);
+    assert.equal(parsedCard(text).card.rank, rank, `rank ${rank} reads back unchanged`);
   }
 
   // ── What is not a card, and what is a broken one ───────────────────────────

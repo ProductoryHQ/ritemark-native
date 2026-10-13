@@ -409,6 +409,31 @@ async function main(): Promise<void> {
     assert.equal(!(await controller.setWipLimit(9)).ok, true);
   }
 
+  // ── W13: Interrupted by a quit while Doing was over its limit (4/3) ────────
+  {
+    const { ledger, controller } = setup();
+    for (const title of ['D1', 'D2', 'D3']) await card(controller, title, 'doing');
+    const slides = await card(controller, 'Draft the slides', 'todo', ['meeting.md']);
+    assert.ok((await controller.give(slides, 'claude-code', { overLimit: true })).ok, 'Start anyway');
+    assert.deepEqual((await controller.snapshot()).doing, { count: 4, limit: 3 });
+    ledger.finish(slides, 'interrupted');
+
+    // Nothing holds an interrupted card: another card naming the same file starts.
+    const room = await card(controller, 'Book the room', 'todo', ['meeting.md']);
+    assert.equal((await controller.give(room, 'claude-code', { overLimit: true })).ok, true, 'no conflict with an interrupted card');
+    ledger.finish(room);
+
+    // Retry starts at once: the Doing limit holds back cards entering Doing, not one in it.
+    ledger.started.length = 0;
+    assert.deepEqual(await controller.retry(slides), { ok: true, cardId: slides });
+    assert.deepEqual(ledger.started.map((turn) => [turn.card.id, turn.kind]), [[slides, 'retry']]);
+
+    // Stop, then Give again: also at once.
+    assert.ok((await controller.stop(slides)).ok);
+    assert.deepEqual(await controller.give(slides, 'claude-code'), { ok: true, cardId: slides });
+    assert.deepEqual(ledger.started.map((turn) => turn.kind), ['retry', 'give']);
+  }
+
   // ── The AI sidebar is full: the card waits for room ────────────────────────
   {
     const { ledger, controller } = setup();
@@ -525,6 +550,7 @@ async function main(): Promise<void> {
       size: 'small',
       title: 'Write the workshop follow-up email template',
       description: 'Draft one email with placeholders.',
+      doneWhen: 'The template is in the shared folder.',
     };
     const { store, settings, controller } = setup({ reviewer });
     const view = async (id: string) => (await controller.snapshot()).cards.find((c) => c.id === id)!;
@@ -577,8 +603,12 @@ async function main(): Promise<void> {
     assert.equal(snapshot.cards.filter((c) => c.stage === 'todo')[0].id, idea, 'on top of To do');
     assert.equal(current.title, 'Write the workshop follow-up email template');
     assert.equal(current.description, 'Draft one email with placeholders.\n\nNotes: keep it short.\n', 'the suggestion above the user’s notes');
+    assert.equal(current.doneWhen, 'The template is in the shared folder.', 'the suggested Done when fills the field, not the body');
     assert.equal(current.history.at(-1)?.what, 'Made it a task from “workshop follow-up email template”');
     assert.equal(!(await controller.reviewIdea(idea, 'claude-code')).ok, true, 'only ideas are reviewed');
+    // The file is named after the task now, not the idea (Windows test).
+    assert.equal(path.basename(store.filePathOf(idea)!), 'write-the-workshop-follow-up-email.md', 'the slug a new card with this title gets');
+    assert.equal(fs.existsSync(path.join(store.tasksDir, 'workshop-follow-up-email-template.md')), false, 'the idea’s file is gone');
 
     // An empty idea body takes the suggestion as it is.
     const plain = await card(controller, 'Glossary page', 'idea');
@@ -586,8 +616,12 @@ async function main(): Promise<void> {
     answer({ ...proposal, title: 'Add a client glossary page', verdict: 'unclear' });
     await controller.settled();
     assert.equal((await view(plain)).history.at(-1)?.what, 'Reviewed: Needs detail');
+    await card(controller, 'Add a client glossary page');
+    await store.mutate(plain, null, (c) => ({ ...c, doneWhen: 'My own line' }));
     await controller.acceptReview(plain);
+    assert.equal((await view(plain)).doneWhen, 'My own line', 'never over the user’s own Done when');
     assert.equal((await view(plain)).description, 'Draft one email with placeholders.\n');
+    assert.equal(path.basename(store.filePathOf(plain)!), 'add-a-client-glossary-page-2.md', 'a name another card has gets a number');
 
     // A review for an idea that moved on meanwhile is not stored.
     const moved = await card(controller, 'Run a pilot', 'idea');

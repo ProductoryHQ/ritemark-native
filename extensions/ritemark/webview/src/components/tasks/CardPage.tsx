@@ -11,7 +11,7 @@
  * saved by the editor; the board's front matter never reaches this view.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { BoardCardView, BoardSnapshot } from '../../../../src/taskBoard/protocol'
 import { CARD_STAGES } from '../../../../src/taskBoard/cardTypes'
@@ -61,6 +61,53 @@ function ConversationLink({ card }: { card: BoardCardView }) {
   )
 }
 
+/** The strip and the state's block: controls there replace themselves. */
+const KEEPS_FOCUS = '.cp-strip button, .cp-block button'
+/** Where the focus goes when the control that had it is gone, in this order. */
+const FOCUS_FALLBACKS = ['[data-keep-focus] button:not(:disabled)', '.cp-block button:not(:disabled)', '.cp-stage:not(:disabled)', '.cp-showboard']
+
+/**
+ * W16 (Windows keyboard test): a button that replaces itself takes the focus
+ * with it. Give to … becomes Stop, and Mark done becomes Reopen. The focus
+ * then falls to the page body, and Tab starts over from the top. Put it on the
+ * control that took the button's place. Chrome fires no blur when a focused
+ * element is removed, so the page watches its DOM. Only for the strip's and
+ * the block's buttons, and a frame later, so a menu, a dialog or the editor
+ * that puts the focus back itself goes first.
+ */
+function useKeepFocus(): void {
+  useEffect(() => {
+    let last: HTMLElement | null = null
+    let frame = 0
+    const onFocusIn = (event: FocusEvent) => {
+      last = event.target instanceof HTMLElement && event.target.matches(KEEPS_FOCUS) ? event.target : null
+    }
+    const observer = new MutationObserver(() => {
+      if (!last || last.isConnected || frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        if (!last || last.isConnected) return
+        last = null
+        if (document.activeElement && document.activeElement !== document.body) return
+        for (const selector of FOCUS_FALLBACKS) {
+          const next = document.querySelector<HTMLElement>(selector)
+          if (next) {
+            next.focus()
+            return
+          }
+        }
+      })
+    })
+    document.addEventListener('focusin', onFocusIn)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => {
+      document.removeEventListener('focusin', onFocusIn)
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [])
+}
+
 export function CardStrip({
   card,
   snapshot,
@@ -79,6 +126,7 @@ export function CardStrip({
   const historyOpen = usePageUi((state) => state.historyOpen)
   const toggleHistory = usePageUi((state) => state.toggleHistory)
   const prompt = useBoardUi((state) => state.prompt)
+  useKeepFocus()
   const p = card && snapshot ? presentCard(card, { now, titleOf: (id) => snapshot.cards.find((item) => item.id === id)?.title ?? null }) : null
 
   let primary: React.ReactNode = null
@@ -161,7 +209,7 @@ export function CardStrip({
         ) : null}
         <div className="min-w-2 flex-1" />
         <div className="flex shrink-0 items-center gap-1.5">
-          {primary}
+          <span data-keep-focus className="contents">{primary}</span>
           {card ? (
             <Tooltip label={historyOpen ? 'Hide the history' : 'Show the history'}>
               <Button
@@ -193,6 +241,15 @@ export function CardStrip({
 
 function StageMenu({ card }: { card: BoardCardView }) {
   const fixed = card.locked || card.archived !== null
+  // The menu opens on the current stage (W16): the arrows start from where the
+  // card is, and choosing it again just closes the menu.
+  const [open, setOpen] = useState(false)
+  const current = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const frame = requestAnimationFrame(() => current.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [open])
   const trigger = (
     <Button type="button" variant="toolbar" size="sm" className="cp-stage" disabled={fixed} aria-label={`Stage: ${STAGE_NAMES[card.stage]}`}>
       {STAGE_NAMES[card.stage]}
@@ -207,7 +264,7 @@ function StageMenu({ card }: { card: BoardCardView }) {
     )
   }
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <Tooltip label="Move this task to another stage">
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       </Tooltip>
@@ -215,10 +272,12 @@ function StageMenu({ card }: { card: BoardCardView }) {
         {CARD_STAGES.map((stage) => (
           <DropdownMenuItem
             key={stage}
+            ref={card.stage === stage ? current : undefined}
             role="menuitemradio"
             aria-checked={card.stage === stage}
-            disabled={card.stage === stage}
-            onSelect={() => void moveCard(card.id, stage)}
+            onSelect={() => {
+              if (card.stage !== stage) void moveCard(card.id, stage)
+            }}
           >
             {card.stage === stage ? <Icon name="check" size={14} tone="inherit" /> : <span className="w-[14px]" />}
             <span>{STAGE_NAMES[stage]}</span>
@@ -413,6 +472,7 @@ function CardBlock({ card, snapshot, p }: { card: BoardCardView; snapshot: Board
           </div>
           <div className="text-[14px] font-medium text-ink-strong">{card.review.title}</div>
           {card.review.description ? <div className="tb-sub">{card.review.description}</div> : null}
+          {card.review.doneWhen ? <div className="tb-sub">Done when: {card.review.doneWhen}</div> : null}
           <div className="tb-sub">How big: {card.review.size}.</div>
         </div>
         <div className="tb-actions" style={{ marginTop: 12 }}>

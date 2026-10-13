@@ -697,9 +697,16 @@ export class BoardController {
           rank,
           title: title.ok ? title.value : latest.title,
           description: !suggestion ? latest.description : notes.trim() ? `${suggestion}\n\n${notes}` : `${suggestion}\n`,
+          // The suggested Done when fills the field, never over the user's own.
+          ...(review.doneWhen && !latest.doneWhen ? { doneWhen: review.doneWhen } : {}),
         };
         delete next.dropped;
         return next;
+      });
+      // The task's file is named after the task, not the idea. A rename that
+      // fails leaves the idea's name; the task itself is made.
+      await this.store.renameToTitle(cardId).catch((error) => {
+        console.warn('[taskBoard] could not rename the task’s file after its title', error);
       });
       return { ok: true, cardId };
     } catch (error) {

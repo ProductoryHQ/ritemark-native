@@ -25,7 +25,19 @@
 .tb-actions.stack { flex-direction: column; gap: 6px; }
 .tb-opt { width: 100%; justify-content: flex-start !important; }
 .tb-opt span { overflow: hidden; text-overflow: ellipsis; }
-.tb-split { display: inline-flex; }
+/* A side bar below 240 px (VS Code goes down to 170): a call's buttons take the
+   whole row, under the glyph (26 px) and the menu (28 px) too, so their words
+   fit (W15). */
+@media (max-width: 239px) {
+  .tb-side-actions { margin-left: -26px; margin-right: -28px; }
+  .tb-side-actions .tb-opt { padding-left: 8px; padding-right: 8px; }
+}
+/* The split button stays inside its column: the label shrinks to an ellipsis
+   (its tooltip says it in full) and the arrow stays whole (W15, 170 px). */
+.tb-split { display: inline-flex; min-width: 0; max-width: 100%; }
+.tb-split > :first-child { display: flex; min-width: 0; }
+.tb-split > :first-child > button { max-width: 100%; }
+.tb-split > :last-child { flex-shrink: 0; }
 .tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .tb-split > :last-child > button { border-left: 1px solid rgba(255,255,255,.24); padding-left: 8px !important; padding-right: 8px !important; }
@@ -66,7 +78,7 @@
 .tb-tile .mt { position: absolute; right: 6px; top: 6px; opacity: 0; }
 .tb-tile:hover .mt, .tb-tile .mt:has([data-state="open"]) { opacity: 1; }
 .tb-dropline { height: 2px; border-radius: 2px; background: var(--r-accent); margin: -5px 2px 3px; }
-.tb-addrow { margin-bottom: 8px; }
+.tb-addrow { margin: 6px 0 8px; } /* clear of the column header */
 .tb-foot { padding: 4px 24px 16px; font-size: 12px; color: var(--r-ink-faint); }
 .tb-callcard { border: 1px solid var(--r-hairline); background: var(--r-surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .tb-callcard:hover { border-color: var(--r-hairline-strong); }
