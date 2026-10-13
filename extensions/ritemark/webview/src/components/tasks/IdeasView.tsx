@@ -136,13 +136,15 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
         <StateGlyph p={p} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <button
-              type="button"
-              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left font-ui text-[13px] font-semibold text-ink-strong hover:underline"
-              onClick={() => openCard(card.id)}
-            >
-              {card.title}
-            </button>
+            <Tooltip label="Open this idea as a page" className="min-w-0 flex-1">
+              <button
+                type="button"
+                className="w-full border-0 bg-transparent p-0 text-left font-ui text-[13px] font-semibold text-ink-strong hover:underline"
+                onClick={() => openCard(card.id)}
+              >
+                {card.title}
+              </button>
+            </Tooltip>
             <CardMenu card={card} p={p} snapshot={snapshot} />
           </div>
           <div className={cn('mt-0.5 text-[11px]', toneClass(card.dropped ? 'faint' : p.tone === 'faint' ? 'muted' : p.tone))}>{status}</div>

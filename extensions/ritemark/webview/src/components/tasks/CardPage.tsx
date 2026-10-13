@@ -270,10 +270,15 @@ export function CardHead({ card, snapshot }: { card: BoardCardView; snapshot: Bo
           <FileChip key={file.path} path={file.path} exists={file.exists} />
         ))}
         <Tooltip label="Choose files in this folder for the agent to work on">
-          <button type="button" className="tb-linkbtn cp-addfiles" onClick={() => notify({ type: 'board/add-files', cardId: card.id })}>
-            <Icon name="plus" size={12} tone="inherit" />
+          <Button
+            type="button"
+            variant="link"
+            className="cp-addfiles h-[26px] gap-1 p-0 text-[12.5px] font-semibold has-[>svg]:px-0"
+            onClick={() => notify({ type: 'board/add-files', cardId: card.id })}
+          >
+            <Icon name="plus" size={12} tone="inherit" className="size-3" />
             Add files…
-          </button>
+          </Button>
         </Tooltip>
       </div>
       {historyOpen ? (

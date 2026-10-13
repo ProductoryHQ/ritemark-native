@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-12 (Sprint 131: Browser Recent — the browser bridge's first workbench→extension push)
+**Last updated:** 2026-10-13 (Sprint 130: Task board — cards in the project folder, Give to agent, one registry for Ritemark's agent tools)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -138,7 +138,9 @@ extensions/ritemark/src/
 ├── agent/           Claude Code runtime — SDK-based, in-process + bundled binary
 ├── codex/           Codex runtime — JSON-RPC 2.0 / stdio binary, custom protocol
 ├── acp/             ACP runtime — JSON-RPC 2.0 / stdio, @agentclientprotocol/sdk
-├── browser/         Integrated browser — CDP panel, MCP server, action tools
+├── runtime/         AgentRuntime interface, registry, approval gate, availability; Ritemark tool registry + injector + IPC server; one-shot turns
+├── browser/         Integrated browser — CDP panel, action functions behind the browser tools, Recent
+├── taskBoard/       Task board (Sprint 130) — card files, store, controller, handoff ledger, card pages, idea review, surfaces
 ├── flows/           Flow engine — scheduler, executor, storage, test runner
 ├── features/        Feature flags — flags.ts registry, featureGate.ts
 ├── conversations/   Durable project-scoped agent conversations, migration, typed protocol/controller
@@ -146,7 +148,7 @@ extensions/ritemark/src/
 ├── googleDocs/      Publish to Google Docs — OAuth, account, link store, Docs API mapper, publisher, controller
 ├── editorSync/      Markdown/CSV disk-model-view coordinator, typed protocol, retry and three-way state
 ├── ai/              Shared AI utilities — modelConfig.ts (model IDs), modelCatalog/ (model lists), connectivity
-├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider
+├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider, TasksViewProvider
 ├── settings/        Settings page bridge
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
 ├── voiceDictation/  On-device dictation (Whisper): engine resolver + readiness, model download, controller (macOS and Windows)
@@ -263,6 +265,8 @@ comment-task/accept  ──────────→   validate ids in the Tex
 | Cancel normalisation (F24) has no automated test | The decision lives inside `UnifiedViewProvider`'s `agent-execute` closure with no pure-function seam. Needs the three-runtime manual cancel matrix and a `debugTrace` of what Claude's `session.cancel()` delivers to `onComplete`. |
 | No live end-to-end pass | Verification is compile plus unit tests. The narrow-width marker geometry is arithmetic against the current `.ProseMirror` layout, not measured on RunDev, and no React rendering harness exists for the picker/composer keyboard matrix. |
 
+Sprint 130 (task board) built Give to agent on this path and closed four audit gaps for comment tasks too: an answered approval or question reports `running` again (G3); Codex and OpenCode results come from the turn's last message, not everything streamed (G4); a queued task can only be removed, not edited (G5); a dispatch exception records `failed` (G6). Turn events now go to a list of task listeners (G1) and `comment-task/enqueue` can open a new conversation without activating it (G2). The gaps in the table above are unchanged.
+
 ### AI output reporting (Sprint 126)
 
 Microsoft Store policy 11.16 requires a working way for a user to report inappropriate generated output. Two entry points — a status bar item at right/priority 99 (between the AI status at 100 and scheduled tasks at 98) and an entry in the AI Information dialog — open one webview dialog. Both route through the host: the AI Information entry sends `report/request-open` rather than opening locally, because the host is the only side that knows the app version.
@@ -357,6 +361,62 @@ extension  browser/browserNavigationRecorder.ts (no vscode import; every rule un
 - **Version skew.** A missing listener is a caught `executeCommand` rejection, logged at trace level. The extension never runs without the bridge: extension updates require their own app version (`minimumAppVersion`), and the extension preflight refuses any diff that touches `patches/`.
 - **One entry per page.** `historyKey` = normalized address without its `#fragment`; entries saved by earlier versions merge on the next visit. `openInIntegratedBrowser()` no longer writes to the store; the page is recorded when it loads, at the address it ends on.
 - **Pages loading in hidden tabs** are recorded when the tab is first shown, not while hidden. Deleted `file:` entries are pruned when Recent is shown (only `FileNotFound` removes one).
+
+### Task board (Sprint 130, #119)
+
+Each project folder has one task board. Its cards are Markdown files in the folder, `.ritemark/tasks/<slug>.md`, so the board travels with the folder (git, sync tools, a copy on another computer). What happens on this computer (which conversation a card runs in, the state of its turn) is a separate, machine-local ledger. Two surfaces show the board: the Tasks side bar (`views/TasksViewProvider.ts`) and the Task board tab (`taskBoard/TaskBoardPanel.ts`). A third, the card page, is the Ritemark editor in card mode.
+
+| Module | Owns |
+|---|---|
+| `taskBoard/cardTypes.ts` | The card model and limits, with no imports, so the webview can share it |
+| `taskBoard/cardFile.ts` | Parse and serialize (`ritemark: task/1` front matter + the Markdown body byte for byte), unknown keys kept, `rankBetween`, ids, `cardFileName(title)`, `splitCardText` / `spliceCardBody` |
+| `taskBoard/BoardStore.ts` | The folder: injected file system, cache, one serialized mutation tail, atomic write, exclusive create, trash, echo suppression. Reads and writes a card that is open as a page through its `TextDocument` (`CardDocuments`) |
+| `taskBoard/BoardController.ts` | The rules, with no `vscode` import: who moves next (derived, never stored), Your calls, the badge, the Doing limit, the conflict guard, waits that start by themselves, archive and the Done window, idea review, and the operations behind the agents' board tools. Agents cannot mark a card done or delete it |
+| `taskBoard/CardTaskStore.ts` + `CardHandoffLedger.ts` | Give to agent: one record per card under `<globalStorage>/task-board/v1/<project key>/`, the turn's lifecycle from the AI sidebar's task events, the result written back onto the card |
+| `taskBoard/boardPrompt.ts` | The one card prompt: `displayText` (the user's request) and `prompt` (adds the card line when the runtime has the board tools) |
+| `taskBoard/ideaReview.ts` | Review with {Agent}: one tool-free call through `runtime/oneShotTurn.ts` (shared with conversation titles), strict JSON parsing |
+| `taskBoard/protocol.ts` + `boardSurface.ts` | The exact-field `board/*` request union and decoder, snapshots, and the routing shared by all three surfaces |
+| `taskBoard/cardPages.ts` | Card pages: one reused tab, `cardModeFor`, the active page for the side bar's highlight, pages of deleted cards closed |
+| `taskBoard/taskBoardHost.ts` | Composition: store, ledger, controller, reviewer, watcher, badge, commands, surfaces; sets the board-tool controller |
+
+**Handoff** (Give to agent on a card with no conversation yet):
+
+```text
+board / side bar / card page        BoardController + CardHandoffLedger           UnifiedViewProvider → AI sidebar
+board/give ───────────────────→     shared availability gate, conflict guard,
+                                    Doing limit, sidebar capacity (else `waiting`)
+                                    record `accepting`; card → Doing + history
+                                    ── comment-task/enqueue {taskId, prompt,
+                                       newConversation: {title}, sourceKind: card} ──→ new conversation, not activated;
+                                                                                        turn queued
+                                    ←── enqueue result {queued, conversationId}
+                                    record `queued`; snapshot to every surface
+                                    ←── task events (started, needs you, terminal), matched by host turn id
+                                    result onto the card: report_result's words, else the last
+                                    message; seconds; changed files (Claude only)
+```
+
+**Invariants.**
+
+- **The folder holds what the user owns, the machine holds the rest.** Card files carry title, stage, rank, Done when, files, result, decision, review, history and the body. Conversation ids, turn state and waits live only in the ledger, so a card copied to another computer has no running agent.
+- **Who moves next is derived.** From the card and its handoff, every time a snapshot is built; it is never written to a file.
+- **A card page never loses typing.** While the page has unsaved edits, the board writes only the front matter through a `WorkspaceEdit` on the document; when it is clean, it edits and saves. The body is spliced under the untouched front matter on every save from the page.
+- **One tool definition, three runtimes.** The agents' board tools come from the same registry as the browser tools (see *Ritemark Tool Injection*). None asks for approval: each change is a history line, and no tool can finish, delete or archive a card.
+- **Card turns reuse the Sprint 117 queue.** `comment-task/enqueue` carries cards too (`newConversation`, `sourceKind: 'card'`); the message keeps its name, which is naming debt. Turn events reach every task listener (`attachTaskListener`); each ignores turns it does not own.
+- **A host task is the user's "run this now".** A stopped or failed turn pauses its conversation's queue; a comment or card task that heads that queue runs as Resume would, while prompts the user queued earlier keep waiting for Resume.
+- **Capacity counts a turn that just ended as finished.** Task listeners hear a turn end before its conversation record is checkpointed, so `_canAttachRuntime` treats a record still showing that conversation's last ended turn as idle, and a card waiting for room starts at once.
+- **A named file's presence is live.** The board re-checks the files cards name when a project file is created or deleted.
+- **Archived cards are off the board** (`archived: <time>` in the file): out of the columns, Your calls, Doing and Next up, refused for moves and agent work until restored. Done shows the last 28 days.
+- **The `task-board` flag** is default on. Off, the surfaces say so, no board tools are injected and no file is written.
+
+#### TO BE — known limits carried out of Sprint 130
+
+| Gap | Where it bites |
+|---|---|
+| Changed files are known only for Claude | Codex and OpenCode results list no changed files |
+| A card's conversation runs with `approvalMode: 'auto'` | As for comment tasks (G7): the per-conversation Ask/Auto toggle is webview state the host cannot read |
+| One user per board | A shared folder shows everyone as "You" |
+| Idea review state is in memory | "Reviewing · {Agent}" and a failed review do not survive a reload; the stored review does |
 
 ## Agent Runtime Architecture
 
@@ -554,7 +614,7 @@ from minting or copying one. A capability the agent is told about must be kept t
 the on-disk form changes — the sprint that changes a carrier owns this text.
 
 Each runtime delivers the same context through its own native mechanism — `UnifiedViewProvider` is
-the single injection point, rendering `capabilityDescriptorFor(runtime, browserToolsAvailable)` into
+the single injection point, rendering `capabilityDescriptorFor(runtime, { browser, board })` into
 `RuntimeSessionConfig.extraSystemPrompt`:
 
 | Runtime | Mechanism | Notes |
@@ -570,6 +630,13 @@ tools for every runtime: `capabilityDescriptorFor` sets `hasBrowserTools` from t
 OpenCode: the `ritemark_browser` stdio MCP adapter on `session/new` and `session/resume`, whose tools
 the model sees as `ritemark_browser_browser_*`). OpenCode has had the tools since Sprint 79, but its
 descriptor said it had none until 2026-09 — Sprint 101's inventory missed the ACP adapter.
+
+Sprint 130 adds `hasBoardTools` and a TASK BOARD section, on whenever the window has a task board:
+read and change the board only with the `ritemark_board` tools (never by editing `.ritemark/tasks/`
+files), finish a card's turn with `report_result` (up to three things for the user to check), work
+toward the card's Done when, put decisions that would change the result to the user with `ask_user`
+before long work, and leave marking done to the user. How to report is in this context, not in the
+card's message, so the conversation shows the user's own request.
 
 ### AS IS (Sprints 1–78) — Three Parallel Worlds
 
@@ -597,7 +664,8 @@ src/runtime/                          ← added Sprint 79
 ├── RuntimeRegistry.ts                holds the shared interactive instances (lookup, lifecycle)
 ├── runtimeFactory.ts                 createRuntime(id) — single runtime construction source (Sprint 80)
 ├── UnifiedApprovalGate.ts            single approval path for all runtimes
-└── BrowserToolsInjector.ts           browser MCP injection config
+└── BrowserToolsInjector.ts           browser MCP injection config (Sprint 130: replaced by ritemarkTools.ts +
+                                      RitemarkToolsInjector.ts + RitemarkIpcServer.ts, see Ritemark Tool Injection)
 
 src/agent/ClaudeCodeRuntime.ts   → implements AgentRuntime, wraps AgentRunner/AgentSession
 src/codex/CodexRuntime.ts        → implements AgentRuntime, wraps CodexAppServer+CodexAuth
@@ -702,20 +770,25 @@ Mechanics & constraints:
 
 ---
 
-## Browser Tool Injection
+## Ritemark Tool Injection (Sprint 130)
 
-**Target:** All runtimes receive browser tools through a single `BrowserToolsInjector` that produces an MCP server spec. Each adapter knows how to inject an MCP server into its runtime.
+Ritemark's own agent tools are defined **once**, in `src/runtime/ritemarkTools.ts`: a tool is a name, a description, a zod input shape and a `run`, in a named group. Two groups exist: `ritemark_browser` (navigate, click, fill, type, scroll, snapshot; with the `browser-agent-control` flag, macOS) and `ritemark_board` (list_cards, read_card, add_card, update_card, move_card, report_result, ask_user; whenever the window has a task board). `toolGroupsFor({ browser })` picks a turn's groups; `RitemarkToolsInjector` turns them into each runtime's wiring:
 
 ```
-BrowserToolsInjector.getServers() → MCP server config
-  → ClaudeCodeRuntime: mcpServers field (already works this way)
-  → CodexRuntime: replaces codexBrowserTools.ts with MCP injection via Codex protocol
-  → AcpRuntime: MCP server list in ACP initialize request
+ritemarkTools.ts (one definition per tool, zod)
+  → Claude:   claudeMcpServers(groups) — a new in-process SDK MCP server per group per session
+              (a server serves one connection at a time); allowed names mcp__<server>__<tool>
+  → Codex:    codexDynamicTools(groups) — dynamic tools with JSON Schema from zod; calls come back
+              through onDynamicToolCall; toolSetKey (sha256 of the tool set) resets the thread when the
+              tools change and is part of Codex's continuation fingerprint
+  → OpenCode: acpMcpServers(groups) — the generic stdio adapter (out/browser/browserMcpAdapter.js, its
+              own esbuild entry) per group; it asks RitemarkIpcServer {op: 'list' | 'call', group} for
+              the tools and forwards calls; OpenCode names them <server>_<tool>
 ```
 
-`codexBrowserTools.ts` is deleted in Sprint 79 (Path A) if the Phase 0 Codex MCP injection audit confirms support. If not (Path B), the logic moves inside `CodexRuntime` and is tracked as ARCH-5 debt for a future sprint.
-
----
+- **Names are a contract.** The browser tools keep their v1.13.0 names, descriptions and schemas byte for byte (tested against the old adapter's copy). Before Sprint 130 they existed three times (Claude zod, Codex JSON, adapter JSON) and the copies had drifted; `browserMcpServer.ts`, `codexBrowserTools.ts` and `BrowserToolsInjector.ts` are gone.
+- **Approval.** Browser and board tools never ask, in any autonomy mode. OpenCode's `session/request_permission` for `ritemark_board_*` (and its `doom_loop` on a board tool) is allowed by `AcpRuntime`; documents still change only through each runtime's own gated file tools.
+- **Adding a tool** is a definition in the registry and a test; no runtime file changes.
 
 ## Flows Architecture
 
@@ -1248,6 +1321,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 - **Features ON by default, gated by flags** — never delete code to disable (broke Settings in v1.3.0). Disable only via `src/features/flags.ts` and only on explicit instruction.
 - **Layout invariants owned by patch 002** — sidebar, terminal, titlebar placement is contractual; enforced by `.claude/hooks/pre-commit-validator.sh`.
 - **darwin-arm64 is the primary target** — Apple Silicon first; x64/Windows follow.
+- **Ritemark's agent tools are defined once** (Sprint 130) — `src/runtime/ritemarkTools.ts` holds every Ritemark tool (browser, task board), and `RitemarkToolsInjector` projects it into Claude, Codex and OpenCode. No runtime-specific tool implementation or hand copy of a tool.
 - **Three distinct AI execution shapes** — autonomous agent runtimes (Claude Code, Codex, ACP) vs. single-shot flow nodes are genuinely different and must stay so. Sprint 79 unifies the plumbing, not the behavior. The distinction is why `AgentRuntime.prompt()` is separate from `FlowExecutor` node execution.
 
 ---
@@ -1271,6 +1345,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-13 | Sprint 130 | **Task board (v1.14.0, #119).** New `src/taskBoard/`: card files in `.ritemark/tasks/` (`cardFile.ts`, `BoardStore.ts`, reads and writes an open card page through its document), `BoardController.ts` (derived who-moves-next, Your calls, Doing limit, conflict guard, auto-start, archive + 28-day Done window, idea review), `CardTaskStore.ts` + `CardHandoffLedger.ts` (Give to agent through the Sprint 117 queue: `newConversation`, `sourceKind: 'card'`, `attachTaskListener`; G1–G6), `cardPages.ts` (the Ritemark editor's card mode: `cardMode` in `editorSync/protocol.ts`, body spliced under the front matter), `ideaReview.ts` on the new shared `runtime/oneShotTurn.ts` (conversation titles moved onto it), surfaces `TasksViewProvider.ts` + `TaskBoardPanel.ts`. **Ritemark tool registry:** `runtime/ritemarkTools.ts` + `RitemarkToolsInjector.ts` + `RitemarkIpcServer.ts` replace `BrowserToolsInjector.ts`, `browserMcpServer.ts`, `codexBrowserTools.ts` and `browser/BrowserIpcServer.ts`; the OpenCode adapter is generic; Codex gets `codexDynamicTools` / `onDynamicToolCall` and a `toolSet` key in its continuation fingerprint; Claude gets a new MCP server per session (fixes browser tools reaching only the first open Claude conversation). `capabilityContext.ts` v2: `hasBoardTools` + TASK BOARD section. Flag `task-board` (default on). No patch change. |
 | 2026-10-12 | Sprint 131 | **Browser Recent records in-panel browsing (v1.14.0, #195).** Patch 009 gains `RitemarkBrowserHistoryContribution`, the browser bridge's first workbench→extension push (`ritemark.browser.didNavigate`), with no new hunk in upstream VS Code files. New `browser/browserNavigationRecorder.ts` owns every rule (validation, private sessions, failed loads, schemes, 1 s settle for client redirects, 10 s title window, fallback titles). `BrowserHistoryStore` gains titles, `historyKey` dedupe (case, slash, default port, fragment), `setTitle` and `pruneMissingFiles`. `openInIntegratedBrowser()` stops writing to the store. See *Browser Recent* under the subsystem map. |
 | 2026-10-05 | Sprint 128 | **Claude background work (v1.13.0, #393).** New conversation-scoped `AgentLiveHooks` on `RuntimeSessionConfig.live` (Claude only) and optional `RuntimeSession.stopBackgroundTask` / `backgroundTaskCount`; new pure `agent/backgroundTasks.ts`; `AgentSession` declares `perTaskStopAffordance`, tags prompts `origin: human`, tracks the turn Claude opens itself after background work and matches results by origin; the inactivity timer no longer runs with no turn open; Ask-mode approvals outside a human turn reach the gate instead of failing open. `ConversationController.beginRuntimeInitiatedTurn` + optional `UserMessageEventV1.origin`; context packs skip it. Webview: `agent-task-progress`, `agent-background-tasks`, `agent-turn-started`, `agent-stop-task`; cards keyed by tool_use id and updated across turns; `done-background` / `stopped-background` states; switch confirmation. Capability `backgroundWork`. No patch, flag or shell-tier change. |
 | 2026-09-28 | v1.12.0 RC3 | **Probes off the extension host's thread; a browser-context capability (#366, #367, #358).** New `utils/runProcess.ts`, the async stand-in for `spawnSync`, runs the Claude (`agent/setup.ts`) and Codex (`codex/codexManager.ts`) setup probes and the Welcome page's Node and Git checks; a timed-out or runaway child is stopped (SIGTERM, then SIGKILL; on Windows the whole tree) before the caller gets its answer, and output is capped at 1 MiB. `runtime/capabilities.ts` gains `browserContext`: the composer chip, the AI information dialog and the per-turn page context follow it instead of runtime ids, and per-turn page context no longer needs the macOS-only `browser-agent-control` flag (that flag still gates the browser tools). |

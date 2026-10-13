@@ -156,7 +156,10 @@ function main(): void {
 
     const broken = parseCardFile('---\nritemark: task/1\nid: k3f9x2\ntitle: [unclosed\n---\n');
     assert.equal(broken.kind, 'error');
-    if (broken.kind === 'error') assert.match(broken.message, /not valid YAML/);
+    if (broken.kind === 'error') {
+      assert.match(broken.message, /not valid YAML/);
+      assert.doesNotMatch(broken.message, /:\)\.$/, 'no stray colon from the parser’s code excerpt');
+    }
 
     const badStage = parseCardFile('---\nritemark: task/1\nid: k3f9x2\ntitle: T\nstage: waiting\n---\n');
     assert.equal(badStage.kind, 'error');

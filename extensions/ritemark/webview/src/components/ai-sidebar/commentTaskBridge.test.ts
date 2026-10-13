@@ -371,4 +371,42 @@ function deliver(message: Record<string, unknown>): void {
   assert.equal(useAISidebarStore.getState().activeConversationId, 'there', 'no blind retarget');
 }
 
+// ── 10. Sprint 130: a host task is the user's own "run this now" ──
+// Stopping a turn (or one failing) pauses the conversation's queue. A card's
+// Give again or Retry, or a comment's Send, used to sit at Queued until the
+// user found Resume in the sidebar.
+function endedTurn(conversationId: string, error: string) {
+  return { ...runningClaudeTurn(conversationId), id: `ended-${conversationId}`, isRunning: false, result: { text: '', error } };
+}
+for (const [label, error] of [['stopped', 'Execution cancelled'], ['failed', 'usage limit reached']] as const) {
+  resetAll();
+  seed('dest', { selectedModel: 'claude-test-model', agentConversation: [endedTurn('dest', error) as never] });
+  posted.length = 0;
+
+  deliver(enqueueMessage({ taskId: `task-after-${label}`, sourceKind: 'card' }));
+  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'dest').length, 0, `runs after a ${label} turn, not held at Queued`);
+  assert.equal(postedOf('agent-execute')[0]?.taskId, `task-after-${label}`, `the task's own turn starts after a ${label} turn`);
+}
+{
+  // A prompt the user queued before the stop still waits for their Resume,
+  // and the task waits behind it.
+  resetAll();
+  seed('dest', { selectedModel: 'claude-test-model', agentConversation: [endedTurn('dest', 'Execution cancelled') as never] });
+  useAISidebarStore.getState().enqueuePrompt({
+    conversationId: 'dest',
+    runtimeId: 'claude-code',
+    autonomy: 'auto',
+    planFirst: false,
+    thinkingEffort: 'auto',
+    prompt: 'my own queued prompt',
+    displayText: 'my own queued prompt',
+    source: 'composer',
+  } as never);
+  posted.length = 0;
+
+  deliver(enqueueMessage({ taskId: 'task-behind' }));
+  assert.equal(postedOf('agent-execute').length, 0, 'nothing jumps the user’s paused prompt');
+  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'dest').length, 2);
+}
+
 console.log('commentTaskBridge tests: all assertions passed');

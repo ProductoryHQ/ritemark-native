@@ -135,6 +135,11 @@ async function main(): Promise<void> {
     ledger.set(stopped, { state: 'cancelled', runtimeId: 'claude-code', since: at(-3), canOpen: true });
     const working = await card(controller, 'Working card', 'doing');
     ledger.set(working, { state: 'running', runtimeId: 'claude-code', since: at(-1), canOpen: true });
+    // A follow-up stopped (or removed from the queue) after an earlier result:
+    // the card is Stopped, not that older result waiting for review (spec R5).
+    const stoppedAfterResult = await card(controller, 'Stopped follow-up', 'doing');
+    await store.mutate(stoppedAfterResult, null, (c) => ({ ...c, result: { by: 'claude', at: at(-60), summary: 'First go.', files: [], check: [] } }));
+    ledger.set(stoppedAfterResult, { state: 'cancelled', runtimeId: 'claude-code', since: at(-2), canOpen: true });
     const todoTop = await card(controller, 'Top of To do');
 
     const snapshot = await controller.refresh();
@@ -150,6 +155,8 @@ async function main(): Promise<void> {
     assert.equal(view(working).locked, true);
     assert.equal(view(stopped).move, 'you');
     assert.equal(view(stopped).call, null);
+    assert.equal(view(stoppedAfterResult).call, null, 'a stopped follow-up is not a call, even with an earlier result');
+    assert.equal(view(stoppedAfterResult).move, 'you');
     assert.equal(view(decision).call, 'decision');
     assert.equal(view(todoTop).nextUp, true, 'the top To do card without agent work is Next up');
     // A decision on top of To do is a call, not Next up.
@@ -162,7 +169,7 @@ async function main(): Promise<void> {
       return next;
     });
     assert.equal(view(decision).nextUp, false);
-    assert.equal(snapshot.doing.count, 6);
+    assert.equal(snapshot.doing.count, 7);
     assert.equal(snapshot.doing.limit, 3, 'the Doing limit defaults to 3');
     assert.equal(snapshot.defaultRuntime, 'claude-code');
     assert.equal(snapshot.runtimes.find((r) => r.id === 'codex')?.message, 'Codex is signed out. Sign in and try again.');

@@ -199,7 +199,8 @@ export function parseCardFile(text: string): ParsedCardFile {
     // Only a card's broken YAML is our business; anything else in the folder
     // without our marker is not a card.
     if (/^\s*---[\s\S]*?\britemark\s*:\s*['"]?task\//.test(text)) {
-      const reason = error instanceof Error ? error.message.split('\n')[0] : String(error);
+      // The parser's first line ends with a colon before its code excerpt.
+      const reason = (error instanceof Error ? error.message.split('\n')[0] : String(error)).replace(/:\s*$/, '');
       return { kind: 'error', message: `The front matter is not valid YAML (${reason}).` };
     }
     return { kind: 'not-a-card' };

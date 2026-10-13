@@ -170,7 +170,8 @@ export function countCheckboxes(description: string): { done: number; total: num
 /**
  * Who moves next and which call, if any, a card is. Order of precedence:
  * agent work in flight; an agent blocked in its conversation; a decision the
- * agent left; a failed handoff; a result waiting in Doing.
+ * agent left; a failed handoff; a turn the user stopped (not a call, even when
+ * an earlier result is on the card); a result waiting in Doing.
  */
 export function deriveWho(card: Card, handoff: CardHandoffView | null): { move: WhoMoves; call: CallKind | null; since: string | null } {
   const state = handoff?.state;
@@ -182,8 +183,8 @@ export function deriveWho(card: Card, handoff: CardHandoffView | null): { move: 
     return { move: 'you', call: 'failed', since: handoff!.since };
   }
   if (state === 'waiting') return { move: 'agent', call: null, since: null };
-  if (card.result && card.stage === 'doing') return { move: 'you', call: 'review', since: card.result.at };
   if (state === 'cancelled') return { move: 'you', call: null, since: null };
+  if (card.result && card.stage === 'doing') return { move: 'you', call: 'review', since: card.result.at };
   return { move: null, call: null, since: null };
 }
 

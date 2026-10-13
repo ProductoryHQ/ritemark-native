@@ -9,6 +9,7 @@ import type { BoardCardView, BoardSnapshot } from '../../../../src/taskBoard/pro
 import { cn } from '../../lib/utils'
 import { Icon } from '../ui/Icon'
 import { useBoardUi } from './boardUi'
+import { Tooltip } from '../ui/tooltip'
 import { CallActions, CheckList, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
 import { NEEDS, agentName, cardAgent, finishedLine, modifiedLine } from './taskCopy'
 
@@ -61,13 +62,15 @@ export function CallsView({ snapshot }: { snapshot: BoardSnapshot }) {
               <StateGlyph p={p} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left font-ui text-[13px] font-semibold text-ink-strong hover:underline"
-                    onClick={() => openCard(card.id)}
-                  >
-                    {card.title}
-                  </button>
+                  <Tooltip label="Open this task as a page" className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      className="w-full border-0 bg-transparent p-0 text-left font-ui text-[13px] font-semibold text-ink-strong hover:underline"
+                      onClick={() => openCard(card.id)}
+                    >
+                      {card.title}
+                    </button>
+                  </Tooltip>
                   <span className={cn('shrink-0 text-[11px]', toneClass(p.tone))}>{p.row}</span>
                 </div>
                 {detail}

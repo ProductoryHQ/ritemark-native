@@ -136,9 +136,16 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
                 : <div className="tb-colhint">{stage === 'done' && olderDone ? `Nothing finished in the last ${DONE_WINDOW_DAYS / 7} weeks.` : HINTS[stage]}</div>}
               {drop?.stage === stage && drop.beforeId === null && cards.length ? <div className="tb-dropline" /> : null}
               {stage === 'done' && all.length > DONE_SHOWN ? (
-                <button type="button" className="tb-more" onClick={() => setAllDone(!allDone)}>
-                  {allDone ? 'Show fewer' : `Show all ${all.length}`}
-                </button>
+                <Tooltip label={allDone ? 'Show only the latest finished tasks' : 'Show every task finished in the last four weeks'}>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto px-1.5 py-1 text-[12px] font-semibold"
+                    onClick={() => setAllDone(!allDone)}
+                  >
+                    {allDone ? 'Show fewer' : `Show all ${all.length}`}
+                  </Button>
+                </Tooltip>
               ) : null}
               {stage === 'done' && olderDone ? (
                 <div className="tb-colnote">
@@ -201,11 +208,21 @@ function DoingLimit({ snapshot }: { snapshot: BoardSnapshot }) {
     <DropdownMenu modal={false}>
       <Tooltip label={tip} className="ml-auto" >
         <DropdownMenuTrigger asChild>
-          <button type="button" className={cn('tb-wip', state)} aria-label="Doing limit" style={{ marginTop: -2, marginBottom: -2, marginRight: 3 }}>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Doing limit"
+            className={cn(
+              'tb-wip h-5 gap-1 rounded-[6px] px-1.5 py-0 text-[11px] font-normal text-[var(--r-ink-faint)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] has-[>svg]:px-1.5',
+              state === 'full' && 'bg-[var(--r-accent-soft)] font-semibold text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent-deep)]',
+              state === 'over' && 'bg-[var(--r-warning-soft)] font-semibold text-[var(--r-warning)] hover:bg-[var(--r-warning-soft)] hover:text-[var(--r-warning)]',
+            )}
+            style={{ marginTop: -2, marginBottom: -2, marginRight: 3 }}
+          >
             {limit === null ? `${count}` : `${count}/${limit}`}
             {state ? <span>{state}</span> : null}
-            <Icon name="caret-down" size={12} tone="inherit" />
-          </button>
+            <Icon name="caret-down" size={12} tone="inherit" className="size-3" />
+          </Button>
         </DropdownMenuTrigger>
       </Tooltip>
       <DropdownMenuContent align="end" className="min-w-[200px]">

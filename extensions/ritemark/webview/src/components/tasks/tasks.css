@@ -42,8 +42,6 @@
 .tb-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tb-hist { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 6px 10px; font-size: 12px; color: var(--r-ink-body); }
 .tb-hist .t { color: var(--r-ink-faint); font-variant-numeric: tabular-nums; }
-.tb-linkbtn { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--r-accent); margin-top: 8px; }
-.tb-linkbtn:hover { text-decoration: underline; }
 .tb-note { margin-top: 10px; border: 1px solid var(--r-hairline); border-radius: 8px; padding: 10px; background: var(--r-surface); }
 .tb-note label { display: block; font-size: 12px; font-weight: 600; color: var(--r-ink-strong); margin-bottom: 6px; }
 .tb-note textarea { min-height: 64px; }
@@ -68,7 +66,6 @@
 .tb-tile .mt { position: absolute; right: 6px; top: 6px; opacity: 0; }
 .tb-tile:hover .mt, .tb-tile .mt:has([data-state="open"]) { opacity: 1; }
 .tb-dropline { height: 2px; border-radius: 2px; background: var(--r-accent); margin: -5px 2px 3px; }
-.tb-more { border: 0; background: none; font: 600 12px var(--ritemark-ui-font-family); color: var(--r-accent); padding: 4px 6px; }
 .tb-addrow { margin-bottom: 8px; }
 .tb-foot { padding: 4px 24px 16px; font-size: 12px; color: var(--r-ink-faint); }
 .tb-callcard { border: 1px solid var(--r-hairline); background: var(--r-surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
@@ -99,21 +96,14 @@
 .tb-tile.tb-blocked { box-shadow: inset 3px 0 0 var(--r-warning); border-color: var(--r-warning-soft); }
 .tb-yourmove { margin-top: 6px; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; background: var(--r-accent-soft); color: var(--r-accent-deep); }
 .tb-tile.tb-blocked .tb-yourmove { background: var(--r-warning-soft); color: var(--r-warning); }
-.tb-waitpill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--r-accent-soft); color: var(--r-accent-deep); font: 500 12px var(--ritemark-ui-font-family); }
 .tb-waitpill b { font-weight: 700; }
 .tb-waitpill span { color: var(--r-ink-muted); }
-.tb-waitpill.blocked { background: var(--r-warning-soft); color: var(--r-warning); }
-.tb-waitpill:hover { filter: brightness(.97); }
 .tb-check { margin-top: 10px; border-top: 1px dashed var(--r-hairline); padding-top: 8px; }
 .tb-check-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--r-ink-strong); }
 .tb-check ul { list-style: disc; padding-left: 20px; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--r-ink-body); }
 .tb-conflict { margin-top: 12px; border: 1px solid var(--r-warning-soft); background: color-mix(in srgb, var(--r-warning-soft) 45%, var(--r-surface)); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--r-ink-body); }
 .tb-conflict b { color: var(--r-ink-strong); font-weight: 600; }
-.tb-wip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; font: 400 11px var(--ritemark-ui-font-family); color: var(--r-ink-faint); letter-spacing: 0; text-transform: none; }
-.tb-wip:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
 .tb-wip span { font-weight: 600; }
-.tb-wip.full { color: var(--r-accent-deep); background: var(--r-accent-soft); font-weight: 600; }
-.tb-wip.over { color: var(--r-warning); background: var(--r-warning-soft); font-weight: 600; }
 .tb-wiptext-full { color: var(--r-accent-deep); } .tb-wiptext-over { color: var(--r-warning); }
 .tb-slot { border-color: var(--r-accent-soft) !important; background: color-mix(in srgb, var(--r-accent-soft) 40%, var(--r-surface)) !important; }
 .tb-inlink { color: var(--r-accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
@@ -121,8 +111,6 @@
 .tb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .tb-row-active { background: var(--r-surface-soft); }
 .tb-toast { position: fixed; left: 50%; bottom: 16px; z-index: 95; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
-.tb-toast button { border: 0; background: none; color: inherit; opacity: .7; padding: 0; }
-.tb-toast button:hover { opacity: 1; }
 /* The card page (design.md §5): a card open in the Ritemark editor. The strip
    takes DocumentHeader's place; the head sits in the editor's column, which
    follows .wysiwyg-editor .ProseMirror (max-width 900px, 2rem 2rem 0 4rem). */

@@ -171,6 +171,19 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     watcher.onDidCreate(changed);
     watcher.onDidDelete(changed);
     context.subscriptions.push(watcher);
+    // A file a card names can come and go (S9): the board re-checks named
+    // files when a project file is created or deleted, at most every 400 ms.
+    const projectFiles = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, '**/*'), false, true, false);
+    let recheck: ReturnType<typeof setTimeout> | null = null;
+    const filesChanged = () => {
+      recheck ??= setTimeout(() => {
+        recheck = null;
+        boardController.scheduleRefresh();
+      }, 400);
+    };
+    projectFiles.onDidCreate(filesChanged);
+    projectFiles.onDidDelete(filesChanged);
+    context.subscriptions.push(projectFiles, { dispose: () => recheck && clearTimeout(recheck) });
     // The badge is right from the start, not only once a surface opens.
     void boardController.refresh().catch((error) => console.warn('[taskBoard] first refresh failed', error));
   }

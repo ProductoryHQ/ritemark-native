@@ -177,9 +177,16 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
               {done.slice(0, DONE_SHOWN).map((card) => row(card, false))}
               {done.length > DONE_SHOWN ? (
                 <div className="px-4 pt-1">
-                  <button type="button" className="tb-linkbtn" onClick={() => notify({ type: 'board/open', tab: 'board' })}>
-                    Show all {done.length}
-                  </button>
+                  <Tooltip label="Open the board to see every task finished in the last four weeks">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="mt-2 h-auto p-0 text-[12px] font-semibold"
+                      onClick={() => notify({ type: 'board/open', tab: 'board' })}
+                    >
+                      Show all {done.length}
+                    </Button>
+                  </Tooltip>
                 </div>
               ) : null}
             </Collapsible>

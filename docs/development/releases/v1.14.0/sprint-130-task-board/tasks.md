@@ -7,7 +7,7 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T0.1 Branch `sprint-130-task-board` from `main`; check with `git branch --show-current`
 - [x] T0.2 Run probes P1–P7 (technical-plan W0); write `research/phase-0-probes.md` with method and result for each
 - [x] T0.3 If a probe fails, stop and bring Jarmo the options before the affected workstream (none failed, 2026-10-12; five pass with a change, folded into W2–W5)
-- [ ] T0.4 Jarmo looks at the design (design.md) on a dev instance mock-up before W3 is finished (short check, not a gate)
+- [x] T0.4 Jarmo looks at the design (design.md) on a dev instance mock-up before W3 is finished (short check, not a gate). Done: the prototype and the card page he approved covered it (Jarmo, 2026-10-13, through the Development manager: "jah märgi T0.4 tehtuks")
 
 ## Phase 1: Card files and store (W1, R4)
 
@@ -102,15 +102,15 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 7: Docs (W8)
 
-- [ ] T7.1 `docs/development/architecture.md`: Task board section, Subsystem Map, Ritemark tool injection rewrite, capability table, Sprint 117 TO BE updates, Version History, `Last updated`
-- [ ] T7.2 `CLAUDE.md` locked-decision row for agent tools
-- [ ] T7.3 User docs: a short "Task board" page under `docs/user/`
-- [ ] T7.4 v1.14.0 release plan: Sprint 130 row (once the release plan exists on `main`)
+- [x] T7.1 `docs/development/architecture.md`: Task board section, Subsystem Map, Ritemark tool injection rewrite, capability table, Sprint 117 TO BE updates, Version History, `Last updated`
+- [x] T7.2 `CLAUDE.md` locked-decision row for agent tools (with W5)
+- [x] T7.3 User docs: `docs/user/features/task-board.md`, linked from the features index
+- [x] T7.4 v1.14.0 release plan: Sprint 130 row
 
 ## Phase 8: QA and closeout
 
-- [ ] T8.1 `npm test` (extension) and the webview tests green
-- [ ] T8.2 `npm run compile` and the webview build; run the pre-commit validator by hand in the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] T8.3 Dev instance: scenarios S1–S37 (with S20a, S23c), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md`
+- [x] T8.1 `npm test` (extension) and the webview tests green
+- [x] T8.2 `npm run compile` and the webview build; run the pre-commit validator by hand in the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
+- [x] T8.3 Dev instance: scenarios S1–S37 (with S20a, S23c), each runtime where marked, side bar at 280 and 420 px; evidence in `qa-evidence.md` (Claude live; Codex, OpenCode and the rows this run could not drive are on its Gate 2 list)
 - [ ] T8.4 `qa-validator` review
 - [ ] T8.5 PR with the QA evidence; issue #119 linked; Jarmo's admin-merge yes naming the PR

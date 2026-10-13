@@ -257,6 +257,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** The turn currently running in each conversation, so a cancel that carries
    *  no turn id can still be attributed to the exact turn. */
   private readonly _activeConversationTurnIds = new Map<string, string>();
+  /**
+   * The last turn that ended in each conversation. Its record is written by a
+   * queued checkpoint, so for a moment it can still say the turn is working;
+   * the capacity check must not count it (a card waiting for room in the AI
+   * sidebar would otherwise wait for the next, unrelated turn event).
+   */
+  private readonly _endedConversationTurnIds = new Map<string, string>();
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
@@ -1741,7 +1748,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const attachments = await Promise.all(Array.from(this._runtimeSessions.keys()).map(async (id) => {
       try {
         const record = await this._conversationController.runtimeConversation(id);
-        return { conversationId: id, lifecycle: record.lifecycle, lastUsedAt: this._runtimeSessionLastUsed.get(id) ?? 0 };
+        const lifecycle = record.lifecycle;
+        const ended = 'activeTurnId' in lifecycle && this._endedConversationTurnIds.get(id) === lifecycle.activeTurnId;
+        return { conversationId: id, lifecycle: ended ? ({ state: 'idle' } as const) : lifecycle, lastUsedAt: this._runtimeSessionLastUsed.get(id) ?? 0 };
       } catch {
         return { conversationId: id, lifecycle: { state: 'idle' } as const, lastUsedAt: this._runtimeSessionLastUsed.get(id) ?? 0 };
       }
@@ -2041,6 +2050,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   ): void {
     this._activeConversationTurnIds.delete(conversationId);
     if (!conversationTurnId) return;
+    this._endedConversationTurnIds.set(conversationId, conversationTurnId);
     this._forEachTaskListener((listener) => listener.applyTurnTerminal(conversationId, conversationTurnId, outcome));
   }
 

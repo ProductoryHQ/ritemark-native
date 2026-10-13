@@ -6,6 +6,7 @@
 
 import type { BoardSnapshot } from '../../../../src/taskBoard/protocol'
 import { useBoardUi } from './boardUi'
+import { Tooltip } from '../ui/tooltip'
 import { useNow } from './CardParts'
 import { logDay, timeOfDay } from './taskCopy'
 
@@ -63,9 +64,11 @@ export function LogView({ snapshot }: { snapshot: BoardSnapshot }) {
                 <div key={`${event.cardId}-${event.at}-${index}`} className="tb-ev" style={{ ['--kind' as string]: kindColour(event.what) }}>
                   <span className="w">{timeOfDay(event.at)}</span>
                   <span className="what">{quoted ? head : event.what}</span>
-                  <button type="button" className="card" onClick={() => openCard(event.cardId)}>
-                    {event.title}
-                  </button>
+                  <Tooltip label="Open this task as a page">
+                    <button type="button" className="card" onClick={() => openCard(event.cardId)}>
+                      {event.title}
+                    </button>
+                  </Tooltip>
                   {quoted ? <div className="quote">“{rest.join(': ')}”</div> : null}
                 </div>
               )

@@ -897,7 +897,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // the user was told the work was queued. It is now the reply.
     // The conversation id says where it was queued, so only a queued answer carries it.
     answer(outcome, outcome === 'queued' ? conversationId : undefined);
-    if (outcome === 'queued') get().maybeDrainQueue(item.conversationId);
+    if (outcome !== 'queued') return;
+    // A host task is the user's own "run this now" (a comment's Send; a card's
+    // Give, Retry, Ask for changes or answer). A turn the user stopped, or one
+    // that failed, pauses this conversation's queue, which would otherwise hold
+    // the task at Queued until Resume. When the task is next in line it runs
+    // as Resume would; prompts the user queued earlier still wait for Resume.
+    if (nextDispatchable(get().promptQueues, item.conversationId)?.id === item.id) get().resumeQueue(item.conversationId);
+    else get().maybeDrainQueue(item.conversationId);
   }
 
   /**

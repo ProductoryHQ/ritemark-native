@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { BOARD_TABS, type BoardSnapshot, type BoardTab } from '../../../../src/taskBoard/protocol'
 import { vscode } from '../../lib/vscode'
 import { cn } from '../../lib/utils'
+import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Tooltip } from '../ui/tooltip'
@@ -70,8 +71,18 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
             <span className="text-[13px] text-ink-muted">{snapshot.folder}</span>
             {count ? (
               <Tooltip label="Open Your calls" className="ml-auto">
-                <button type="button" className={cn('tb-waitpill', blocked && 'blocked')} onClick={() => setTab('calls')}>
-                  <Icon name={blocked ? 'warning' : 'hand-pointing'} size={14} tone="inherit" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={cn(
+                    'tb-waitpill h-7 gap-1.5 rounded-full px-3 py-0 text-[12px] font-medium hover:brightness-[.97] has-[>svg]:px-3',
+                    blocked
+                      ? 'bg-[var(--r-warning-soft)] text-[var(--r-warning)] hover:bg-[var(--r-warning-soft)] hover:text-[var(--r-warning)]'
+                      : 'bg-[var(--r-accent-soft)] text-[var(--r-accent-deep)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent-deep)]',
+                  )}
+                  onClick={() => setTab('calls')}
+                >
+                  <Icon name={blocked ? 'warning' : 'hand-pointing'} size={14} tone="inherit" className="size-3.5" />
                   <b>
                     {count} wait{count === 1 ? 's' : ''} on you
                   </b>
@@ -79,7 +90,7 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
                     · oldest {waited(oldestSince, now)}
                     {blocked ? ` · ${blocked} agent${blocked > 1 ? 's' : ''} blocked` : ''}
                   </span>
-                </button>
+                </Button>
               </Tooltip>
             ) : null}
           </div>
