@@ -14,7 +14,8 @@ import { AgentSplitButton } from './AgentSplitButton'
 import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
-import { VERDICTS, agentName, waited } from './taskCopy'
+import { VERDICTS, agentName, ago } from './taskCopy'
+import type { AgentId } from '../../../../src/agent/types'
 
 export function IdeasView({ snapshot }: { snapshot: BoardSnapshot }) {
   const now = useNow()
@@ -73,8 +74,12 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
       tip={(name) => `${name} reads this idea and says whether it is worth doing`}
     />
   )
+  const failure = card.reviewFailure ? <div className="tb-sub tone-red">{card.reviewFailure}</div> : null
   let body: React.ReactNode
-  if (card.dropped) {
+  if (card.reviewing) {
+    // "Reviewing · {Agent}" on the status line is the whole card until it answers.
+    body = null
+  } else if (card.dropped) {
     body = (
       <div className="tb-actions">
         <Tooltip label="Show this idea again">
@@ -87,6 +92,7 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
   } else if (review) {
     body = (
       <>
+        {failure}
         <div className="tb-summary" style={{ WebkitLineClamp: 6, fontSize: 13, marginTop: 8 }}>
           {review.why}
         </div>
@@ -112,10 +118,18 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
       </>
     )
   } else {
-    body = <div className="tb-actions">{reviewButton(false)}</div>
+    body = (
+      <>
+        {failure}
+        <div className="tb-actions">{reviewButton(Boolean(card.reviewFailure))}</div>
+      </>
+    )
   }
-  const by = review?.by === 'codex' ? 'codex' : review?.by === 'opencode' ? 'opencode' : 'claude-code'
-  const status = card.dropped ? 'Dropped' : review ? `${VERDICTS[review.verdict].label} · reviewed by ${agentName(by)} ${waited(review.at, now)} ago` : p.row
+  const by: AgentId = review?.by === 'codex' ? 'codex' : review?.by === 'opencode' ? 'opencode' : 'claude-code'
+  const status =
+    card.dropped || card.reviewing || card.reviewFailure || !review
+      ? p.row
+      : `${VERDICTS[review.verdict].label} · reviewed by ${agentName(by)} ${ago(review.at, now)}`
   return (
     <div className="tb-callcard">
       <div className="flex items-start gap-2.5">

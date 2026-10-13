@@ -104,10 +104,11 @@ export function CardStrip({
     } else if (card.stage === 'idea') {
       primary = (
         <AgentSplitButton
-          verb={card.review ? 'Review again with' : 'Review with'}
+          verb={card.review || card.reviewFailure ? 'Review again with' : 'Review with'}
           variant="outline"
           runtimes={snapshot.runtimes}
-          selected={snapshot.defaultRuntime}
+          selected={card.reviewing?.runtimeId ?? snapshot.defaultRuntime}
+          disabledReason={card.reviewing ? `${agentName(card.reviewing.runtimeId)} is already reviewing this` : undefined}
           onRun={(runtimeId) => void act({ type: 'board/review-idea', cardId: card.id, runtimeId })}
           tip={(name) => `${name} reads this idea and says whether it is worth doing`}
         />
@@ -375,10 +376,24 @@ function CardBlock({ card, snapshot, p }: { card: BoardCardView; snapshot: Board
   }
 
   if (card.stage === 'idea') {
+    // While an agent reviews, the strip's "Reviewing · {Agent}" says it all.
+    if (card.reviewing) return null
+    if (card.reviewFailure && !card.review) {
+      return (
+        <div className="cp-block">
+          <div className="cp-block-h">
+            <StateGlyph p={p} />
+            <span className="tone-red">{p.full}</span>
+          </div>
+          <div className="cp-say">{card.reviewFailure}</div>
+        </div>
+      )
+    }
     if (!card.review) return null
     const verdict = VERDICTS[card.review.verdict]
     return (
       <div className={cn('cp-block', card.review.verdict === 'ready' && 'you')}>
+        {card.reviewFailure ? <div className="cp-say tone-red" style={{ marginTop: 0, marginBottom: 8 }}>{card.reviewFailure}</div> : null}
         <div className="cp-block-h">
           <span className={cn('inline-flex items-center gap-1.5', toneClass(verdict.tone))}>
             <Icon name={verdict.glyph} size={16} tone="inherit" />

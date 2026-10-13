@@ -187,6 +187,8 @@ function card(partial: Partial<BoardCardView> & { id: string; title: string }): 
     archived: null,
     history: [],
     copiedFrom: null,
+    reviewing: null,
+    reviewFailure: null,
     handoff: null,
     move: null,
     call: null,

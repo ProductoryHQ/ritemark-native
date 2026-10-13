@@ -37,6 +37,7 @@ export function AgentSplitButton({
   tip,
   variant = 'default',
   disabled = false,
+  disabledReason,
   className,
 }: {
   verb: string
@@ -48,13 +49,18 @@ export function AgentSplitButton({
   tip: (agent: string) => string
   variant?: 'default' | 'outline'
   disabled?: boolean
+  /** Turns the button off and says why in its tooltip. */
+  disabledReason?: string
   className?: string
 }) {
   const current = runtimes.find((runtime) => runtime.id === selected)
   const name = current?.label ?? 'agent'
   const anyUsable = runtimes.some((runtime) => runtime.usable)
   const usable = Boolean(current?.usable)
-  const mainTip = !anyUsable
+  if (disabledReason) disabled = true
+  const mainTip = disabledReason
+    ? disabledReason
+    : !anyUsable
     ? 'Set up Claude, Codex or OpenCode in the AI sidebar first'
     : usable
       ? tip(name)

@@ -159,6 +159,8 @@
 .cp-block-h .tb-glyph, .cp-line .tb-glyph { margin-top: 0; }
 .cp-say { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--r-ink-strong); }
 .cp-say.small { font-size: 14px; color: var(--r-ink-body); }
+/* A review that did not come back (W6). */
+.tb-sub.tone-red, .cp-say.tone-red { color: var(--r-error); }
 .cp-block .tb-check ul { font-size: 13.5px; }
 .cp-block .tb-actions { margin-top: 14px; flex-wrap: wrap; }
 .cp-changed { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--r-ink-muted); }

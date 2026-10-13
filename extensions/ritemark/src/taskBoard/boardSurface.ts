@@ -32,8 +32,6 @@ export interface BoardHostActions {
   openCard(target: { cardId?: string; fileName?: string }): Promise<void>;
   addFiles(cardId: string): Promise<void>;
   recover(action: BoardRecoverAction): Promise<void>;
-  reviewIdea(cardId: string, runtimeId: string): Promise<BoardAnswer>;
-  acceptReview(cardId: string): Promise<BoardAnswer>;
 }
 
 export interface BoardSurfaceContext {
@@ -186,9 +184,9 @@ async function route(request: Exclude<BoardRequest, { type: 'board/ready' }>, co
     case 'board/open-conversation':
       return controller.openConversation(request.cardId);
     case 'board/review-idea':
-      return actions.reviewIdea(request.cardId, request.runtimeId);
+      return controller.reviewIdea(request.cardId, request.runtimeId);
     case 'board/accept-review':
-      return actions.acceptReview(request.cardId);
+      return controller.acceptReview(request.cardId);
     case 'board/set-wip':
       return controller.setWipLimit(request.limit);
   }

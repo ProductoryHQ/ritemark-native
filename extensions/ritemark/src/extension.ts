@@ -421,6 +421,7 @@ export function activate(context: vscode.ExtensionContext) {
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     cardSidebar: unifiedViewProvider.cardTaskHostDependencies(),
     attachTaskListener: (listener) => unifiedViewProvider.attachTaskListener(listener),
+    oneShotSettings: (runtimeId) => unifiedViewProvider.oneShotSettings(runtimeId),
   });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────

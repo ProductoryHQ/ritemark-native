@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import type { BoardCardView, CardHandoffView } from '../../../../src/taskBoard/protocol'
-import { duration, finishedLine, finishedRecently, historyTime, logDay, modifiedLine, presentCard, shortDay, waited } from './taskCopy'
+import { ago as agoPhrase, duration, finishedLine, finishedRecently, historyTime, logDay, modifiedLine, presentCard, shortDay, waited } from './taskCopy'
 
 const now = new Date('2026-10-14T12:00:00') // a Wednesday, local time
 const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString()
@@ -23,6 +23,8 @@ function card(overrides: Partial<BoardCardView> = {}): BoardCardView {
     archived: null,
     history: [],
     copiedFrom: null,
+    reviewing: null,
+    reviewFailure: null,
     handoff: null,
     move: null,
     call: null,
@@ -87,6 +89,22 @@ function main(): void {
     ['copy', 'muted', 'Already on the board'],
   )
   assert.deepEqual(words(card({ stage: 'idea', dropped: true }))[2], 'Dropped')
+  assert.equal(agoPhrase(ago(0), now), 'just now', 'never “just now ago”')
+  assert.equal(agoPhrase(ago(12), now), '12 min ago')
+  // Idea review (W6): reviewing comes first, then a review that did not come back.
+  const reviewed = { by: 'claude', at: ago(3), verdict: 'ready', why: 'x', size: 'small', title: 't', description: 'd' } as const
+  assert.deepEqual(words(card({ stage: 'idea', review: reviewed, reviewing: { runtimeId: 'codex', since: ago(0) } })), [
+    'circle-notch',
+    'accent',
+    'Reviewing · Codex',
+    'Reviewing · Codex',
+  ])
+  assert.equal(presentCard(card({ stage: 'idea', reviewing: { runtimeId: 'claude-code', since: ago(0) } }), context).spin, true)
+  assert.deepEqual(words(card({ stage: 'idea', review: reviewed, reviewFailure: 'The review didn’t come back. Try again.' })).slice(0, 3), [
+    'x-circle',
+    'red',
+    'Review didn’t come back',
+  ])
 
   // Waiting cards say what they wait for.
   assert.deepEqual(

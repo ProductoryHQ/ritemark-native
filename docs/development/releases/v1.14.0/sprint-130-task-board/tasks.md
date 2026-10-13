@@ -97,8 +97,8 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 
 ## Phase 6: Ideas (W6, R9)
 
-- [ ] T6.1 `src/taskBoard/ideaReview.ts` (one-shot runtime) + `ideaReview.test.ts` (strict parsing, failure copy)
-- [ ] T6.2 Review / Make it a task / Drop / Bring back wired through the controller
+- [x] T6.1 `src/taskBoard/ideaReview.ts` (one-shot runtime, shared `runtime/oneShotTurn.ts`) + `ideaReview.test.ts` (strict parsing, failure copy)
+- [x] T6.2 Review / Make it a task / Drop / Bring back wired through the controller (reviewing and failure states in the card view)
 
 ## Phase 7: Docs (W8)
 

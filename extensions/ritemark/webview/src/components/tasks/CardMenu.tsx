@@ -13,7 +13,7 @@ import { cn } from '../../lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { Icon, type PhosphorIconName } from '../ui/Icon'
 import { act, giveCard, moveCard, useBoardUi } from './boardUi'
-import { STAGE_NAMES, type CardPresentation } from './taskCopy'
+import { STAGE_NAMES, agentName, type CardPresentation } from './taskCopy'
 
 const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', opencode: 'OpenCode' }
 type Sub = 'give' | 'retry' | 'review' | 'move'
@@ -53,13 +53,18 @@ export function CardMenu({
     items.push({ label: 'Restore', icon: 'arrow-counter-clockwise', run: () => void act({ type: 'board/restore', cardId: card.id }) })
     if (canOpen) items.push(conversation)
   } else if (card.stage === 'idea') {
+    const reviewing = card.reviewing ? agentName(card.reviewing.runtimeId) : null
     items.push(
-      { label: 'Review with…', icon: 'sparkle', sub: 'review' },
-      {
-        label: 'Make it a task',
-        icon: 'arrow-up-right',
-        run: () => void (card.review ? act({ type: 'board/accept-review', cardId: card.id }) : moveCard(card.id, 'todo')),
-      },
+      reviewing
+        ? { label: `Review with… (${reviewing} is reviewing)`, icon: 'sparkle', disabled: true }
+        : { label: 'Review with…', icon: 'sparkle', sub: 'review' },
+      reviewing
+        ? { label: `Make it a task (${reviewing} is reviewing)`, icon: 'arrow-up-right', disabled: true }
+        : {
+            label: 'Make it a task',
+            icon: 'arrow-up-right',
+            run: () => void (card.review ? act({ type: 'board/accept-review', cardId: card.id }) : moveCard(card.id, 'todo')),
+          },
       card.dropped
         ? { label: 'Bring back', icon: 'eye', run: () => void act({ type: 'board/bring-back', cardId: card.id }) }
         : { label: 'Drop', icon: 'eye-slash', run: () => void act({ type: 'board/drop', cardId: card.id }) },

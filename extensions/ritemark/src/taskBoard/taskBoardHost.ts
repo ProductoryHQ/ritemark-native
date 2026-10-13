@@ -26,7 +26,10 @@ import { BoardStore, nodeBoardStoreFileSystem } from './BoardStore';
 import { TaskBoardPanel } from './TaskBoardPanel';
 import { CardPages, workspaceCardDocuments } from './cardPages';
 import { setBoardToolController } from '../runtime/ritemarkTools';
-import type { BoardAnswer, BoardSnapshot } from './protocol';
+import type { OneShotSettings } from '../runtime/oneShotTurn';
+import { createRuntime } from '../runtime/runtimeFactory';
+import { IdeaReviewer } from './ideaReview';
+import type { BoardSnapshot } from './protocol';
 import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
 import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
@@ -38,6 +41,8 @@ export interface TaskBoardHostDependencies {
   cardSidebar: CardTaskSidebar;
   /** Hear turn events next to the comment tasks (G1). */
   attachTaskListener: (listener: AgentTaskListener) => void;
+  /** The folder, model and keys a one-shot call (idea review) uses for an agent. */
+  oneShotSettings: (runtimeId: AgentId) => Promise<OneShotSettings>;
 }
 
 export interface TaskBoardHost {
@@ -136,6 +141,12 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
         return fsp.stat(path.join(root, inside)).then(() => true, () => false);
       },
       setBadge,
+      // Review with {Agent} (W6): a one-shot runtime with the AI sidebar's
+      // model and keys for that agent; it creates no conversation.
+      reviewer: new IdeaReviewer({
+        createRuntime: (runtimeId) => createRuntime(runtimeId),
+        settings: (runtimeId) => deps.oneShotSettings(runtimeId),
+      }),
     });
     const boardController = controller;
     context.subscriptions.push({ dispose: () => boardController.dispose() });
@@ -176,8 +187,6 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     runtimes: [],
     defaultRuntime: 'claude-code',
   });
-
-  const notYet = async (): Promise<BoardAnswer> => ({ ok: false, code: 'invalid', message: 'Idea review is not connected in this build yet.' });
 
   let cardPages: CardPages | null = null;
   const actions: BoardHostActions = {
@@ -234,8 +243,6 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
       const command = RECOVER_COMMANDS[action];
       if (command) await vscode.commands.executeCommand(command);
     },
-    reviewIdea: notYet,
-    acceptReview: notYet,
   };
 
   const surfaceContext: BoardSurfaceContext = {

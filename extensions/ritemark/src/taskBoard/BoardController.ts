@@ -29,6 +29,7 @@ import {
   type RuntimeAvailability,
 } from '../runtime/availability';
 import { BoardStoreError, type BoardEntry, type BoardStore } from './BoardStore';
+import { REVIEW_FAILED, type IdeaReviewInput, type ReviewFields } from './ideaReview';
 import {
   CARD_LIMITS,
   checkDoneWhen,
@@ -39,6 +40,7 @@ import {
   rankBetween,
   type Card,
   type CardStage,
+  type ReviewVerdict,
 } from './cardFile';
 import {
   ACTIVE_HANDOFF_STATES,
@@ -121,6 +123,8 @@ export interface BoardControllerDependencies {
   enabled: () => boolean;
   fileExists: (relativePath: string) => Promise<boolean>;
   setBadge?: (count: number) => void;
+  /** Idea review (W6): one tool-free call to an agent; rejects with the copy to show. */
+  reviewer?: { review(input: IdeaReviewInput): Promise<ReviewFields> };
   now?: () => Date;
 }
 
@@ -128,6 +132,12 @@ export const WIP_LIMIT_KEY = 'ritemark.taskBoard.wipLimit';
 export const DEFAULT_RUNTIME_KEY = 'ritemark.taskBoard.runtime';
 
 const STAGE_WORDS: Record<CardStage, string> = { idea: 'Ideas', todo: 'To do', doing: 'Doing', done: 'Done' };
+const VERDICT_WORDS: Record<ReviewVerdict, string> = {
+  ready: 'Good to go',
+  unclear: 'Needs detail',
+  'already-on-board': 'Already on the board',
+  'not-a-task': 'Not a task',
+};
 const CALL_ORDER: Record<CallKind, number> = { 'needs-you': 0, decision: 1, review: 2, failed: 3 };
 
 function answerError(code: BoardErrorCode, message: string): BoardAnswer {
@@ -190,6 +200,12 @@ export class BoardController {
   /** Cards between "start this" and the ledger recording it: a second Give to
    *  (a double click, an auto-start racing the user) is refused as busy. */
   private readonly starting = new Set<string>();
+  /** Ideas an agent is reviewing now. In memory: a review takes under a minute
+   *  and is never resumed. */
+  private readonly reviewing = new Map<string, { runtimeId: AgentId; since: string }>();
+  /** Why an idea's last review did not come back, until the next one starts. */
+  private readonly reviewFailures = new Map<string, string>();
+  private readonly reviewRuns = new Set<Promise<void>>();
 
   constructor(private readonly deps: BoardControllerDependencies) {
     this.store = deps.store;
@@ -222,9 +238,10 @@ export class BoardController {
     return () => this.listeners.delete(listener);
   }
 
-  /** Waits until queued auto-starts have run (tests, and the host on dispose). */
-  settled(): Promise<void> {
-    return this.autoTail;
+  /** Waits until queued auto-starts and running reviews are over (tests, and
+   *  the host on dispose). */
+  async settled(): Promise<void> {
+    await Promise.all([this.autoTail, ...this.reviewRuns]);
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -266,6 +283,8 @@ export class BoardController {
         result: card.result ?? null,
         ask: card.ask ?? null,
         review: card.review ?? null,
+        reviewing: this.reviewing.get(card.id) ?? null,
+        reviewFailure: this.reviewFailures.get(card.id) ?? null,
         dropped: card.dropped === true,
         archived: card.archived ?? null,
         history: card.history,
@@ -562,6 +581,123 @@ export class BoardController {
         const next: Card = { ...current };
         if (dropped) next.dropped = true;
         else delete next.dropped;
+        return next;
+      });
+      return { ok: true, cardId };
+    } catch (error) {
+      return fromStoreError(error);
+    }
+  }
+
+  // ── Idea review (W6) ──────────────────────────────────────────────────────
+
+  /**
+   * Review with {Agent}: a short, tool-free check of an idea that starts no
+   * conversation. Answers at once; the idea shows "Reviewing · {Agent}" until
+   * the review is stored on the card, or says why it did not come back.
+   */
+  async reviewIdea(cardId: string, runtimeId: AgentId): Promise<BoardAnswer> {
+    const reviewer = this.deps.reviewer;
+    if (!reviewer) return answerError('invalid', 'Idea review is not available in this window.');
+    const entries = await this.store.list();
+    const card = this.cardOf(entries, cardId);
+    if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
+    if (card.stage !== 'idea') return answerError('invalid', 'Only ideas are reviewed.');
+    const busy = () => {
+      const current = this.reviewing.get(cardId);
+      return current ? answerError('busy', `${RUNTIME_LABELS[current.runtimeId]} is already reviewing this idea.`) : null;
+    };
+    const already = busy();
+    if (already) return already;
+    await this.rememberRuntime(runtimeId);
+    const gate = await this.availability(runtimeId);
+    if (gate) return gate;
+    // A second press while the first one checked the agent.
+    const raced = busy();
+    if (raced) return raced;
+
+    this.reviewing.set(cardId, { runtimeId, since: this.now().toISOString() });
+    this.reviewFailures.delete(cardId);
+    this.scheduleRefresh();
+    const openTitles = entries.flatMap((entry) =>
+      entry.kind === 'card' &&
+      entry.card.id !== cardId &&
+      entry.card.archived === undefined &&
+      entry.card.stage !== 'done' &&
+      !entry.card.dropped
+        ? [entry.card.title]
+        : [],
+    );
+    const run = this.runReview(reviewer, cardId, {
+      runtimeId,
+      idea: { title: card.title, description: card.description },
+      openTitles,
+    });
+    this.reviewRuns.add(run);
+    void run.finally(() => this.reviewRuns.delete(run));
+    return { ok: true, cardId };
+  }
+
+  private async runReview(reviewer: NonNullable<BoardControllerDependencies['reviewer']>, cardId: string, input: IdeaReviewInput): Promise<void> {
+    try {
+      let fields: ReviewFields;
+      try {
+        fields = await reviewer.review(input);
+      } catch (error) {
+        this.reviewFailures.set(cardId, error instanceof Error && error.message ? error.message : REVIEW_FAILED);
+        return;
+      }
+      // An idea deleted, archived or moved on meanwhile keeps no review.
+      const card = await this.store.get(cardId);
+      if (!card || card.stage !== 'idea' || card.archived !== undefined) return;
+      const by = ACTOR_OF_RUNTIME[input.runtimeId];
+      const at = this.now().toISOString();
+      try {
+        await this.store.mutate(cardId, { by, what: `Reviewed: ${VERDICT_WORDS[fields.verdict]}` }, (current) => ({
+          ...current,
+          review: { by, at, ...fields },
+        }));
+      } catch (error) {
+        const why = error instanceof BoardStoreError ? ` ${error.message}` : '';
+        this.reviewFailures.set(cardId, `The review came back, but it could not be saved on the card.${why}`);
+      }
+    } finally {
+      this.reviewing.delete(cardId);
+      this.scheduleRefresh();
+    }
+  }
+
+  /**
+   * Make it a task: the idea moves to the top of To do with the suggested
+   * title, the suggested description above the user's own notes, and a history
+   * line that keeps the original title.
+   */
+  async acceptReview(cardId: string): Promise<BoardAnswer> {
+    const card = await this.store.get(cardId);
+    if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
+    if (card.stage !== 'idea') return answerError('invalid', 'Only an idea is made into a task.');
+    const review = card.review;
+    if (!review) return answerError('invalid', 'This idea has no review yet. Review it first, or move it to To do.');
+    const current = this.reviewing.get(cardId);
+    if (current) return answerError('busy', `${RUNTIME_LABELS[current.runtimeId]} is still reviewing this idea.`);
+    const title = checkTitle(review.title);
+    const rank = await this.rankFor('todo', cardId, {});
+    if (rank === null) return answerError('not-found', 'That card is no longer on the board.');
+    const original = card.title;
+    try {
+      await this.store.mutate(cardId, { by: 'you', what: `Made it a task from “${original}”` }, (latest) => {
+        const suggestion = review.description.trim();
+        const notes = latest.description.replace(/^\s*\n/, '');
+        const next: Card = {
+          ...latest,
+          stage: 'todo',
+          rank,
+          title: title.ok ? title.value : latest.title,
+          description: !suggestion ? latest.description : notes.trim() ? `${suggestion}\n\n${notes}` : `${suggestion}\n`,
+        };
+        delete next.dropped;
         return next;
       });
       return { ok: true, cardId };

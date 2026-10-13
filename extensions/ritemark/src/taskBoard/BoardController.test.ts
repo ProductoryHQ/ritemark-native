@@ -15,6 +15,7 @@ import {
   type StartTurn,
 } from './BoardController';
 import type { BoardAnswer, CardHandoffView, HandoffState, WaitReason } from './protocol';
+import type { IdeaReviewInput, ReviewFields } from './ideaReview';
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ class FakeLedger implements HandoffLedger {
 
 const READY = { state: 'ready', usable: true, detail: null } as const;
 
-function setup(options: { codex?: 'ready' | 'needs-auth' } = {}) {
+function setup(options: { codex?: 'ready' | 'needs-auth'; reviewer?: { review(input: IdeaReviewInput): Promise<ReviewFields> } } = {}) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-controller-'));
   const store = new BoardStore(folder, {
     fileSystem: { ...nodeBoardStoreFileSystem, async trash(file) { fs.rmSync(file); } },
@@ -101,6 +102,7 @@ function setup(options: { codex?: 'ready' | 'needs-auth' } = {}) {
     enabled: () => true,
     fileExists: async (file) => !file.startsWith('missing/'),
     setBadge: (count) => badges.push(count),
+    ...(options.reviewer ? { reviewer: options.reviewer } : {}),
     now,
   });
   return { folder, store, ledger, settings, badges, controller };
@@ -494,6 +496,111 @@ async function main(): Promise<void> {
     );
     assert.ok((await controller.remove(idea)).ok);
     assert.equal((await controller.snapshot()).cards.some((x) => x.id === idea), false);
+  }
+
+  // ── Idea review (W6) ───────────────────────────────────────────────────────
+  {
+    const asked: IdeaReviewInput[] = [];
+    let answer: (fields: ReviewFields) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    const reviewer = {
+      review(input: IdeaReviewInput): Promise<ReviewFields> {
+        asked.push(input);
+        return new Promise<ReviewFields>((resolve, reject) => {
+          answer = resolve;
+          fail = reject;
+        });
+      },
+    };
+    const proposal: ReviewFields = {
+      verdict: 'ready',
+      why: 'A template saves an hour after every workshop.',
+      size: 'small',
+      title: 'Write the workshop follow-up email template',
+      description: 'Draft one email with placeholders.',
+    };
+    const { store, settings, controller } = setup({ reviewer });
+    const view = async (id: string) => (await controller.snapshot()).cards.find((c) => c.id === id)!;
+    await card(controller, 'Send the workshop invites');
+    await card(controller, 'Finished long ago', 'done');
+    const dropped = await card(controller, 'A dropped idea', 'idea');
+    await controller.setDropped(dropped, true);
+    const idea = await card(controller, 'workshop follow-up email template', 'idea');
+    await store.mutate(idea, null, (c) => ({ ...c, description: 'Notes: keep it short.\n' }));
+
+    assert.equal(!(await controller.acceptReview(idea)).ok, true, 'nothing to make into a task before a review');
+    assert.ok((await controller.reviewIdea(idea, 'opencode')).ok, 'answers at once');
+    assert.equal(settings.get(DEFAULT_RUNTIME_KEY), 'opencode', 'the agent chosen becomes the board’s default');
+    assert.equal((await view(idea)).reviewing?.runtimeId, 'opencode', 'the idea shows Reviewing · OpenCode');
+    assert.deepEqual(asked[0].idea, { title: 'workshop follow-up email template', description: 'Notes: keep it short.\n' });
+    assert.deepEqual(asked[0].openTitles, ['Send the workshop invites'], 'open cards only: not done, not dropped, not itself');
+    const twice = await controller.reviewIdea(idea, 'claude-code');
+    assert.equal(!twice.ok && twice.code, 'busy');
+    assert.equal(!twice.ok && twice.message, 'OpenCode is already reviewing this idea.');
+    assert.equal(!(await controller.acceptReview(idea)).ok, true);
+
+    answer(proposal);
+    await controller.settled();
+    let current = await view(idea);
+    assert.equal(current.reviewing, null);
+    assert.deepEqual(current.review, { by: 'opencode', at: current.review?.at, ...proposal });
+    assert.equal(current.title, 'workshop follow-up email template', 'the idea itself is unchanged');
+    assert.equal(current.description, 'Notes: keep it short.\n');
+    assert.equal(current.stage, 'idea');
+    assert.deepEqual(current.history.at(-1), { at: current.history.at(-1)?.at, by: 'opencode', what: 'Reviewed: Good to go' });
+
+    // A review that does not come back: the idea says so, the earlier one stays.
+    assert.ok((await controller.reviewIdea(idea, 'claude-code')).ok);
+    fail(new Error('The review didn’t come back. It took longer than 45 seconds.'));
+    await controller.settled();
+    current = await view(idea);
+    assert.equal(current.reviewFailure, 'The review didn’t come back. It took longer than 45 seconds.');
+    assert.equal(current.review?.by, 'opencode');
+    assert.ok((await controller.reviewIdea(idea, 'claude-code')).ok);
+    assert.equal((await view(idea)).reviewFailure, null, 'the next review clears it');
+    fail(new Error(''));
+    await controller.settled();
+    assert.equal((await view(idea)).reviewFailure, 'The review didn’t come back. Try again.');
+
+    // Make it a task.
+    assert.ok((await controller.acceptReview(idea)).ok);
+    const snapshot = await controller.snapshot();
+    current = snapshot.cards.find((c) => c.id === idea)!;
+    assert.equal(current.stage, 'todo');
+    assert.equal(snapshot.cards.filter((c) => c.stage === 'todo')[0].id, idea, 'on top of To do');
+    assert.equal(current.title, 'Write the workshop follow-up email template');
+    assert.equal(current.description, 'Draft one email with placeholders.\n\nNotes: keep it short.\n', 'the suggestion above the user’s notes');
+    assert.equal(current.history.at(-1)?.what, 'Made it a task from “workshop follow-up email template”');
+    assert.equal(!(await controller.reviewIdea(idea, 'claude-code')).ok, true, 'only ideas are reviewed');
+
+    // An empty idea body takes the suggestion as it is.
+    const plain = await card(controller, 'Glossary page', 'idea');
+    await controller.reviewIdea(plain, 'claude-code');
+    answer({ ...proposal, title: 'Add a client glossary page', verdict: 'unclear' });
+    await controller.settled();
+    assert.equal((await view(plain)).history.at(-1)?.what, 'Reviewed: Needs detail');
+    await controller.acceptReview(plain);
+    assert.equal((await view(plain)).description, 'Draft one email with placeholders.\n');
+
+    // A review for an idea that moved on meanwhile is not stored.
+    const moved = await card(controller, 'Run a pilot', 'idea');
+    await controller.reviewIdea(moved, 'claude-code');
+    await controller.move(moved, 'todo');
+    answer(proposal);
+    await controller.settled();
+    assert.equal((await view(moved)).review, null);
+
+    // Archived, unavailable, no reviewer.
+    const later = await card(controller, 'Later', 'idea');
+    await controller.archive(later);
+    assert.equal(!(await controller.reviewIdea(later, 'claude-code')).ok, true, 'restore it first');
+    await controller.restore(later);
+    const before = asked.length;
+    assert.equal(!(await controller.reviewIdea(later, 'codex')).ok, true, 'Codex is not signed in');
+    assert.equal(asked.length, before, 'nothing runs for an unavailable agent');
+    const bare = setup();
+    const lone = await card(bare.controller, 'Lone idea', 'idea');
+    assert.equal(!(await bare.controller.reviewIdea(lone, 'claude-code')).ok, true);
   }
 
   // ── A chain of waits: the next blocker is waited for in turn ──────────────

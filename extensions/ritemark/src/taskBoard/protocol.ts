@@ -91,6 +91,10 @@ export interface BoardCardView {
   result: CardResult | null;
   ask: CardAsk | null;
   review: CardReview | null;
+  /** An agent is reviewing this idea now (machine-local, under a minute). */
+  reviewing: { runtimeId: AgentId; since: string } | null;
+  /** Why the last review did not come back; cleared when the next one starts. */
+  reviewFailure: string | null;
   dropped: boolean;
   /** When it was archived ('' when unknown); null for a card on the board. */
   archived: string | null;

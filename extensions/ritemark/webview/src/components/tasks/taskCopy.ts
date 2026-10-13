@@ -61,6 +61,12 @@ export function waited(sinceIso: string | null | undefined, now: Date): string {
   return `${Math.floor(hours / 24)}d`
 }
 
+/** When something happened, as a phrase: "just now", "12 min ago", "2h ago". */
+export function ago(sinceIso: string | null | undefined, now: Date): string {
+  const span = waited(sinceIso, now)
+  return span === 'just now' ? span : `${span} ago`
+}
+
 /** A turn's length: "52s", "4m 12s". */
 export function duration(seconds: number): string {
   const whole = Math.max(0, Math.round(seconds))
@@ -160,6 +166,13 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
   }
   if (card.stage === 'idea' && !h) {
     if (card.dropped) return { ...base, glyph: 'eye-slash', tone: 'faint', row: 'Dropped', full: 'Dropped', call: null }
+    if (card.reviewing) {
+      const words = `Reviewing · ${agentName(card.reviewing.runtimeId)}`
+      return { ...base, glyph: 'circle-notch', spin: true, tone: 'accent', row: words, full: words }
+    }
+    if (card.reviewFailure) {
+      return { ...base, glyph: 'x-circle', tone: 'red', row: 'Review didn’t come back', full: 'Review didn’t come back' }
+    }
     if (card.review) {
       const verdict = VERDICTS[card.review.verdict]
       return { ...base, glyph: verdict.glyph, tone: verdict.tone, row: verdict.label, full: verdict.label }

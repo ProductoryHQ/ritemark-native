@@ -89,6 +89,7 @@ import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../co
 import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
 import {
   isThinkingEffort,
@@ -1654,6 +1655,36 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
       },
     };
+  }
+
+  /**
+   * Sprint 130 (W6): what a one-shot call such as idea review runs with for an
+   * agent — the project folder, the model this sidebar would start it on and
+   * the same keys. Claude: the selected model; Codex: its default; OpenCode
+   * (which has no default): the first model a saved key opens, in the
+   * sidebar's provider order.
+   */
+  public async oneShotSettings(runtimeId: AgentId): Promise<OneShotSettings> {
+    const workspacePath = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const byokKeys = await this._readByokKeys();
+    const byokEnv = buildByokEnv(byokKeys);
+    if (runtimeId === 'claude-code') {
+      const model = this._reconciledClaudeModel();
+      const claudeModelDeclaration = modelCatalog.getClaudeSessionDeclaration(model);
+      const anthropicApiKey = (await getSetupStatus()).authMethod === 'api-key' ? byokKeys.anthropic : undefined;
+      return {
+        workspacePath,
+        model,
+        byokEnv,
+        ...(anthropicApiKey ? { anthropicApiKey } : {}),
+        ...(claudeModelDeclaration ? { claudeModelDeclaration } : {}),
+      };
+    }
+    if (runtimeId === 'codex') return { workspacePath, model: modelCatalog.getDefault('codex', 'codex'), byokEnv };
+    const flags = byokProviderFlags(byokKeys);
+    const models = modelCatalog.getByokProviderModels();
+    const provider = (['google', 'openai', 'anthropic', 'openrouter'] as const).find((id) => flags[id] && models[id]?.length);
+    return { workspacePath, byokEnv, ...(provider ? { model: `${provider}/${models[provider][0].id}` } : {}) };
   }
 
   /**
