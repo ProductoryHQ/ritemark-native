@@ -66,7 +66,7 @@ What follows from it: capture must not leave the document (a quick-add command, 
 | # | Decision | Why |
 |---|---|---|
 | 1 | Activity-bar entry **Tasks**, Phosphor `kanban`, badge = number of Your calls | `kanban` reads as "board" and differs from the four neighbours; the badge answers "is it done?" without switching |
-| 2 | **Place it right below the File browser** (revised 2026-10-13, Jarmo: the task board is where the work is planned; patch 002). Before that: first among Ritemark's own tools, just above Transcribe (2026-10-12) | Measured in the real app: VS Code's built-in entries (File Browser, Search, Source Control, Extensions) always come between Home and the extension containers, and only patch 002 can move a container next to Home. Above Transcribe needs no patch |
+| 2 | **Place it right below the File browser, with Agent Library last of Ritemark's tools** (revised 2026-10-13, Jarmo: the task board is where the work is planned; patch 002). Before that: first among Ritemark's own tools, just above Transcribe (2026-10-12) | Measured in the real app: VS Code's built-in entries (File Browser, Search, Source Control, Extensions) always come between Home and the extension containers, and only patch 002 can move a container next to Home. Above Transcribe needs no patch |
 | 3 | Side bar = daily glance; editor area = planning | Four columns cannot fit 280–480 px; a glance cannot wait for a tab. Same split as Transcribe |
 | 4 | Side bar as vertical sections; **a card shows once**, under the first section that applies (Your calls, else its stage) | Counts add up to what the user sees |
 | 5 | "Open board" is an icon button (`kanban`) beside the add field | Transcribe's one-row pattern; a title-bar icon is easy to miss for non-technical users |

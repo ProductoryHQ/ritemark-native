@@ -116,15 +116,16 @@ The `qa-validator` review (T8.4) of `bb3c5005` returned FAIL on one item, fixed:
 | W15 | S34 | Drag the side bar to its narrowest (about 280 px) with some decisions in Your calls | No horizontal scroll, no button row wraps, long options cut to one line and show their full text on hover |
 | W16 | S35 | Keyboard only: add a card, open it, move it to Doing, give it to Claude, open its conversation, mark it done | All reachable by Tab, Enter and the arrow keys, with visible focus |
 
-## Follow-up, 2026-10-13: Tasks below the File browser, Task board on Home
+## Follow-up, 2026-10-13: Activity Bar order, Task board on Home
 
-Jarmo, through the Development manager: "Taskboard võiks olla activvity baris kohe File browseri all -- sest see on ju töö planeerimise keskus. Home tabis võiks olla nupp task boardile". Dev build of `fix/tasks-below-explorer` (patch 002 changed, workbench transpiled):
+Jarmo, through the Development manager: "Taskboard võiks olla activvity baris kohe File browseri all -- sest see on ju töö planeerimise keskus. Home tabis võiks olla nupp task boardile", then "agent lbrary should be on bottom - not on top 2". Dev build of `fix/tasks-below-explorer` (patch 002 changed, workbench transpiled). Agent Library was second in the build he saw because that profile's saved order had it above the File browser; no code places it there (a fresh profile has it after Transcribe). That saved order is the case the first version of this PR simulated.
 
 | Check | Result |
 |---|---|
-| Fresh profile | Home, Folder, **Tasks**, then the built-ins and Ritemark's other tools ([qa/activity-bar-tasks-below-explorer.png](qa/activity-bar-tasks-below-explorer.png), left) |
-| Profile updated from 1.13, Agent Library dragged above the File browser (saved order without Tasks) | Home, Agent Library, Folder, **Tasks**: Tasks right below the File browser, Agent Library and the rest where they were (same image, right). With order 0.5 alone Tasks would have gone above Agent Library |
-| The user's own placement of Tasks | Tasks moved to the end of the saved order stays at the end after a restart |
+| Fresh profile | Home, Folder, Tasks, Search, Source Control, Extensions, Transcribe, Browser, Agent Library ([qa/activity-bar-order.png](qa/activity-bar-order.png), left) |
+| Profile from v1.13 as shipped (saved order without Tasks) | The same order (middle) |
+| Profile from v1.13 with Agent Library dragged to second | The same order (right): the v1.14 order is applied once, on the first start |
+| A later move by the user | Agent Library dragged back to the top after the update stays there after a restart |
 | Home | "Task board" with the kanban icon right after "New AI conversation"; tooltip "Open the task board for this folder" on hover, in the app tooltip's colours light and dark ([light](qa/home-task-board-light.jpg), [dark](qa/home-task-board-dark.jpg)); a click opens the Task board tab. Hidden without a folder and with the flag off (`HomeViewProvider.test.ts`) |
 | Patch stack | All 17 patches apply to a pristine checkout of the gitlink; the results equal the dev tree; `apply-patches.sh --dry-run` clean; patch 002 lists 31 files (30 + `compositeBar.ts`) |
 
