@@ -57,7 +57,7 @@ Acceptance criteria:
 - The page shows no front matter. Body edits save like any document. Title, Done when, stage and files go through the board and are recorded in the history. The page never rewrites the board's front matter, and a board write while the card is open goes through the open document.
 - **Files:** **Add files…** opens a picker rooted in the project; only files inside the project can be added; a file that no longer exists is shown as missing, not removed; clicking a file opens it in its usual editor.
 - **Delete…** asks once (Enter confirms, Escape cancels), then moves the card file to the system trash.
-- **Archive** (D15, design.md §4b): any card no agent is working on can be archived from its `…` menu, and every Done card at once with Archive all done on the Done column. An archived card leaves the board, the side bar and Your calls, keeps its file (`archived: <time>` in the front matter) and history, and is listed in the board's **Archive** tab, where **Restore** puts it back in its stage and **Delete…** deletes it. It cannot be moved or given to an agent until restored. Agents cannot archive or delete; `list_cards` leaves archived cards out.
+- **Archive** (D15, design.md §4b): any card no agent is working on can be archived from its `…` menu, and every Done card at once with Archive all done on the Done column. An archived card leaves the board, the side bar and Your calls, keeps its file (`archived: <time>` in the front matter) and history, and is listed in a collapsed **Archived** section at the bottom of the Tasks side bar, where its `…` menu has **Restore** (back to its stage) and **Delete…**. It cannot be moved or given to an agent until restored. Agents cannot archive or delete; `list_cards` leaves archived cards out.
 - **Done shows the last four weeks** on the board and in the side bar; a note under the column counts the older ones and links to the Log.
 - A card's own `- [ ]` checkboxes show as progress on the card ("2 of 5").
 
@@ -195,7 +195,7 @@ Acceptance criteria:
 - **D10 Agent choice:** every action that starts agent work names the agent and has a dropdown with Claude Code, Codex and OpenCode (Jarmo, 2026-10-12).
 - **D13 Doing limit (2026-10-12):** Doing holds at most 3 cards by default, set from its header; Give to past the limit offers Queue it or Start anyway; autopilot will later fill free slots up to the same limit.
 - **D14 A card opens as a page (2026-10-12, approved by Jarmo):** clicking a card opens its Markdown file in the editor as a Ritemark document with a slim strip; replaces the card dialog; card files are named `<slug>.md` (design.md §5).
-- **D15 Archive, and Done shows four weeks (2026-10-13, approved by Jarmo):** Archive takes a card off the board without deleting it; the Archive tab restores or deletes; Done shows the last 28 days (design.md §4b).
+- **D15 Archive, and Done shows four weeks (2026-10-13, approved by Jarmo):** Archive takes a card off the board without deleting it; the side bar's collapsed Archived section restores or deletes; Done shows the last 28 days (design.md §4b).
 - **D11 Attention first:** Your calls is the most visible part of both surfaces, with wait times and blocked agents; To do order is priority; Done when, Check these and the conflict guard are in this sprint; autopilot is later (Jarmo, 2026-10-12).
 - **D9 Review step:** a finished card waits in Doing as "Ready to review" until the user marks it done; there is no Review column.
 

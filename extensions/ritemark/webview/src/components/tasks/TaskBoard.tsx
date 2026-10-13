@@ -7,13 +7,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import type { BoardSnapshot, BoardTab } from '../../../../src/taskBoard/protocol'
+import { BOARD_TABS, type BoardSnapshot, type BoardTab } from '../../../../src/taskBoard/protocol'
 import { vscode } from '../../lib/vscode'
 import { cn } from '../../lib/utils'
 import { Icon } from '../ui/Icon'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Tooltip } from '../ui/tooltip'
-import { ArchiveView } from './ArchiveView'
 import { BoardColumns } from './BoardColumns'
 import { onFocus, startBoard, useBoardSnapshot } from './boardClient'
 import { CallsView } from './CallsView'
@@ -27,7 +26,8 @@ import './tasks.css'
 
 function savedTab(): BoardTab {
   const state = vscode.getState() as { tab?: BoardTab } | null
-  return state?.tab ?? 'board'
+  // A view this build no longer has (the short-lived Archive tab) falls back to the board.
+  return state?.tab && (BOARD_TABS as readonly string[]).includes(state.tab) ? state.tab : 'board'
 }
 
 export function TaskBoard() {
@@ -92,9 +92,6 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
               Ideas<span className="tb-count">{ideas}</span>
             </TabsTrigger>
             <TabsTrigger value="log">Log</TabsTrigger>
-            <TabsTrigger value="archive">
-              Archive<span className="tb-count">{snapshot.archived.length}</span>
-            </TabsTrigger>
           </TabsList>
         </div>
         <div className="tb-scroll min-h-0 flex-1" style={{ overflow: 'auto' }}>
@@ -109,9 +106,6 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
           </TabsContent>
           <TabsContent value="log">
             <LogView snapshot={snapshot} />
-          </TabsContent>
-          <TabsContent value="archive">
-            <ArchiveView snapshot={snapshot} />
           </TabsContent>
         </div>
       </Tabs>

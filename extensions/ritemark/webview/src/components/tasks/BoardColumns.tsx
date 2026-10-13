@@ -48,7 +48,7 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
   const archiveAllDone = async () => {
     const answer = await act({ type: 'board/archive-done' })
     if (answer.ok && answer.count) {
-      useBoardUi.getState().showNotice(`Archived ${answer.count} card${answer.count === 1 ? '' : 's'}. They are under Archive.`)
+      useBoardUi.getState().showNotice(`Archived ${answer.count} card${answer.count === 1 ? '' : 's'}. They are at the bottom of the Tasks side bar.`)
     }
   }
 
@@ -109,7 +109,7 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
                   <HeaderIconButton
                     icon="archive"
                     label="Archive all done cards"
-                    tip={`Archive all ${allDoneCards.length} done cards. You find them under Archive`}
+                    tip={`Archive all ${allDoneCards.length} done cards. They go to Archived, at the bottom of the Tasks side bar`}
                     className="ml-auto"
                     onClick={() => void archiveAllDone()}
                   />

@@ -132,7 +132,8 @@ export interface BoardSnapshot {
   enabled: boolean;
   /** The cards on the board; archived ones are in `archived`. */
   cards: BoardCardView[];
-  /** Archived cards, the most recently archived first (D15). */
+  /** Archived cards, the most recently archived first (D15): listed at the
+   *  bottom of the Tasks side bar, off the board. */
   archived: BoardCardView[];
   unreadable: Array<{ fileName: string; message: string }>;
   calls: BoardCall[];
@@ -185,8 +186,8 @@ export type BoardHostMessage =
 export type BoardSurface = 'sidebar' | 'panel' | 'page';
 
 /** The Task board tab's views. */
-export type BoardTab = 'calls' | 'board' | 'ideas' | 'log' | 'archive';
-export const BOARD_TABS: readonly BoardTab[] = ['calls', 'board', 'ideas', 'log', 'archive'];
+export type BoardTab = 'calls' | 'board' | 'ideas' | 'log';
+export const BOARD_TABS: readonly BoardTab[] = ['calls', 'board', 'ideas', 'log'];
 
 export type BoardRequest =
   | { type: 'board/ready'; surface: BoardSurface }

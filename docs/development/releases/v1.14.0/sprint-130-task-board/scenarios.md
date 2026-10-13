@@ -121,15 +121,16 @@ Then the file is in the system trash and the card is gone from both surfaces and
 ### S10a: Archive (D15)
 Given three cards in Done and one card Ready to review
 When I choose Archive in the review card's … menu
-Then it leaves Doing and Your calls, the badge goes down by one, and the Archive tab counts 1
+Then it leaves Doing and Your calls, the badge goes down by one, and a collapsed Archived · 1 section appears at the bottom of the side bar
 When I press Archive all done on the Done column
-Then the three Done cards move to the Archive tab and a notice says "Archived 3 cards. They are under Archive."
-When I press Restore on the review card in the Archive tab
+Then the three Done cards move to Archived and a notice says "Archived 3 cards. They are at the bottom of the Tasks side bar."
+When I choose Restore in the review card's … menu under Archived
 Then it is back in Doing as Ready to review, and its history says "Restored"
 When an agent is working on a card
 Then Archive in its … menu is disabled and says why
 When I open an archived card
 Then its page says Archived, with Restore as the action
+And the board has no Archive tab
 
 ### S10b: Done shows four weeks
 Given a card was marked done 40 days ago and four cards this week

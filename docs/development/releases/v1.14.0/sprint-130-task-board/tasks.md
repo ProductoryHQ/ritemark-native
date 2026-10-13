@@ -61,11 +61,11 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T3c.1 Jarmo's OK (2026-10-13: "yes, build archive like that and keep 28days Done limit also")
 - [x] T3c.2 `archived: <time>` in the card format (`true` from a hand edit reads too); tests
 - [x] T3c.3 `BoardController.archive`, `restore`, `archiveDone`; archived cards out of the board, Your calls, Doing and Next up (`snapshot.archived`); move and agent work refused until restored; tests
-- [x] T3c.4 Protocol: `board/archive`, `board/restore`, `board/archive-done`, the `archive` tab; tests
-- [x] T3c.5 Webview: Archive in `CardMenu`, Archive all done on the Done column, the Archive tab (`ArchiveView`), an archived card's page, Done and the side bar's Done limited to 28 days with the Log note; header icon buttons on shadcn `Button`
+- [x] T3c.4 Protocol: `board/archive`, `board/restore`, `board/archive-done`; tests
+- [x] T3c.5 Webview: Archive in `CardMenu`, Archive all done on the Done column, a collapsed Archived section at the bottom of the side bar (revised from an Archive tab, Jarmo 2026-10-13), an archived card's page, Done and the side bar's Done limited to 28 days with the Log note; header icon buttons on shadcn `Button`
 - [x] T3c.6 Delete… confirms with Enter
 - [x] T3c.7 `read_card` reads an archived card; `list_cards` leaves them out
-- [x] T3c.8 Live check on a dev instance: the 28-day note, Archive all done, the Archive tab, Restore, Enter to delete
+- [x] T3c.8 Live check on a dev instance: the 28-day note, Archive all done, the Archived section, Restore, Enter to delete
 
 ## Phase 4: Give to agent (W4, R5, R6, R7, R12)
 

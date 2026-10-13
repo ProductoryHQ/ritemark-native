@@ -90,7 +90,8 @@ export interface Card {
   dropped?: boolean;
   /**
    * When the user archived the card (Sprint 130, D15): off the board, the side
-   * bar and Your calls, listed under Archive, restorable. '' when a hand-edited
+   * bar's lists and Your calls, listed in a collapsed Archived section at the
+   * bottom of the Tasks side bar, restorable. '' when a hand-edited
    * file says `archived: true` without a time.
    */
   archived?: string;

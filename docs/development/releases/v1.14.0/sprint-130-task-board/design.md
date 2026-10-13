@@ -249,9 +249,9 @@ One "Task board" tab per window, with the folder name in muted text after the ti
 **Approved by Jarmo, 2026-10-13 (D15).** Delete stays the real delete; Archive is the tidy-up that loses nothing.
 
 - **Archive** is in every card's `…` menu, just above Delete…. It is disabled while an agent works on the card ("Archive (stop the agent first)"); a card waiting to start stops waiting.
-- **Archive all done** is an icon button (`archive`) in the Done column's header. One click archives every card in Done; a notice says how many and where they went.
+- **Archive all done** is an icon button (`archive`) in the Done column's header. One click archives every card in Done; a notice says how many, and that they are at the bottom of the Tasks side bar.
 - An archived card leaves the board, the side bar and Your calls, and does not count in Doing. Its file stays, marked `archived: <time>`, and its history gets "Archived". The Log keeps it.
-- **The Archive tab** (fifth, after Log) lists archived cards, the most recently archived first: title (opens the card's page), "Archived · Today · was in Done", **Restore** and **Delete…**. Empty: "Nothing archived. Archive a card from its … menu, or all done cards from the Done column."
+- **Archived** is the last section of the Tasks side bar, collapsed, and shown only when something is archived (Jarmo, 2026-10-13: out of view is the point; a board tab was too prominent). Its rows read "Archived · Today"; clicking one opens the card's page, and its `…` menu has **Restore** and **Delete…**. The board has no Archive tab.
 - An archived card's page shows "Archived" in its strip with **Restore** as the one action; the stage menu is disabled ("The card is archived. Restore it to move it").
 - **The Done column shows the last four weeks** (28 days, by when a card was marked done). Below it: "12 finished more than 4 weeks ago · See the Log". The side bar's Done section counts and lists the same four weeks.
 - **Delete…** asks once; Enter confirms and Escape cancels.

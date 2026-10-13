@@ -68,6 +68,7 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
   const [title, setTitle] = useState('')
   const [ideasOpen, setIdeasOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
+  const [archivedOpen, setArchivedOpen] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const callIds = new Set(snapshot.calls.map((call) => call.cardId))
   const byId = new Map(snapshot.cards.map((card) => [card.id, card]))
@@ -183,6 +184,13 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
               ) : null}
             </Collapsible>
             <UnreadableCards snapshot={snapshot} />
+            {/* Out of the way on purpose (Jarmo, 2026-10-13): last, collapsed, and
+                only when something is archived. Restore and Delete… are in each row's … menu. */}
+            {snapshot.archived.length ? (
+              <Collapsible title="Archived" count={snapshot.archived.length} open={archivedOpen} onToggle={() => setArchivedOpen(!archivedOpen)} what="archived tasks">
+                {snapshot.archived.map((card) => row(card, false))}
+              </Collapsible>
+            ) : null}
           </>
         )}
       </div>
