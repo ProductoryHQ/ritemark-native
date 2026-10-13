@@ -501,6 +501,8 @@ const initialConversation = createConversationState(generateId());
 
 /** Sprint 130: `conversation/get` requests made for a card's background load, by request id. */
 const backgroundLoads = new Map<string, (projection: ConversationProjectionV1 | null) => void>();
+/** Sprint 130 (W13): host tasks stopped before their prompt reached a queue. */
+const droppedTasks = new Set<string>();
 
 let legacyInventorySent = false;
 type LegacyMigrationBatch = ReturnType<typeof discoverLegacyConversationCandidates>;
@@ -878,6 +880,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     conversationId: string,
     answer: (outcome: CommentTaskEnqueueOutcome, conversationId?: string) => void,
   ): void {
+    // Stopped while its conversation loaded (W13): taken as queued, then
+    // removed at once, as a drop of a queued prompt would be.
+    if (droppedTasks.delete(message.taskId)) {
+      answer('queued', conversationId);
+      vscode.postMessage({ type: 'comment-task/dequeued', taskId: message.taskId });
+      return;
+    }
     const { outcome, item } = enqueueCaptured({
       conversationId,
       runtimeId: message.runtimeId,
@@ -921,11 +930,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // A stopped card's prompt that has not started yet leaves its queue, as if
     // the user had removed it there (the host hears `comment-task/dequeued`).
+    // A prompt still on its way (its conversation loading from history) is
+    // dropped when it arrives.
     if (message.type === 'comment-task/drop') {
+      let found = false;
       for (const [conversationId, items] of Object.entries(get().promptQueues)) {
         const item = items.find((candidate) => candidate.taskId === message.taskId && candidate.status === 'queued');
-        if (item) get().removeQueued(conversationId, item.id);
+        if (item) {
+          found = true;
+          get().removeQueued(conversationId, item.id);
+        }
       }
+      if (!found) droppedTasks.add(message.taskId);
       return true;
     }
 

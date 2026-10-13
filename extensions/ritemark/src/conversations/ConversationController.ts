@@ -38,6 +38,8 @@ export interface ConversationControllerDependencies {
   dispatchAcceptedTurn?: (request: Extract<ConversationRequest, { type: 'conversation/accept-turn' }>, record: ConversationRecordV1) => Promise<void>;
   stopConversation?: (conversationId: string) => Promise<void>;
   emit?: (event: ConversationHostEvent) => void;
+  /** A turn in this conversation is active in this host (see `TurnOwners`). */
+  onTurnActive?: (conversationId: string) => void;
   rolloutMode?: () => Promise<ConversationRolloutMode>;
   markHostAuthority?: () => Promise<void>;
   migrator?: LegacyConversationMigrator;
@@ -890,6 +892,9 @@ export class ConversationController {
   }
 
   private emitChanged(record: ConversationRecordV1): void {
+    if (record.lifecycle.state === 'working' || record.lifecycle.state === 'needs-user') {
+      this.dependencies.onTurnActive?.(record.conversationId);
+    }
     this.dependencies.emit?.({
       type: 'conversation/changed',
       conversationId: record.conversationId,

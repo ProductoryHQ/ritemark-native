@@ -229,8 +229,8 @@ export type BoardRequest =
   | { type: 'board/open'; tab?: BoardTab }
   | { type: 'board/add-files'; cardId: string }
   | { type: 'board/open-file'; path: string }
-  /** Open a card's page; `fileName` names a card file that won't read, which opens as a plain document. */
-  /** `focus`: opened from the keyboard, so the page takes the focus (W16). */
+  /** Open a card's page; `fileName` names a card file that won't read, which opens as a plain document.
+   *  `focus`: opened from the keyboard, so the page takes the focus (W16). */
   | { type: 'board/open-card'; cardId?: string; fileName?: string; focus?: boolean }
   | { type: 'board/recover'; action: BoardRecoverAction };
 

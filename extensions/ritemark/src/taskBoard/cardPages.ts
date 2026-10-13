@@ -124,6 +124,8 @@ export class CardPages implements vscode.Disposable {
   private readonly invalidateTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Cards whose page is coming back under a new file name (Make it a task). */
   private readonly returning = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Card files being moved, by their old URI (see `noteMoving`). */
+  private readonly moving = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -269,8 +271,9 @@ export class CardPages implements vscode.Disposable {
   dispose(): void {
     for (const timer of this.invalidateTimers.values()) clearTimeout(timer);
     this.invalidateTimers.clear();
-    for (const timer of this.returning.values()) clearTimeout(timer);
+    for (const timer of [...this.returning.values(), ...this.moving.values()]) clearTimeout(timer);
     this.returning.clear();
+    this.moving.clear();
     for (const disposable of this.disposables) disposable.dispose();
     this.activeListeners.clear();
   }
@@ -299,12 +302,24 @@ export class CardPages implements vscode.Disposable {
     );
   }
 
+  /**
+   * The board is moving this card file (Make it a task). Its page moves with
+   * it, so for a moment the old path is gone while its tab is still there:
+   * that tab is not a deleted card's.
+   */
+  noteMoving(file: string): void {
+    const key = vscode.Uri.file(file).toString();
+    clearTimeout(this.moving.get(key));
+    this.moving.set(key, setTimeout(() => this.moving.delete(key), 5000));
+  }
+
   /** A deleted card takes its page with it, unless the page holds unsaved typing. */
   private async closeDeletedPages(): Promise<void> {
     for (const group of vscode.window.tabGroups.all) {
       for (const tab of group.tabs) {
         const uri = tabUri(tab);
         if (!uri || uri.scheme !== 'file' || tab.isDirty || !this.isCardPath(uri.fsPath)) continue;
+        if (this.moving.has(uri.toString())) continue;
         try {
           await vscode.workspace.fs.stat(uri);
         } catch {

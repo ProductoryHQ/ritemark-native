@@ -16,6 +16,7 @@ import { ConversationController } from './ConversationController';
 import { ConversationStore } from './ConversationStore';
 import { resolveProjectScope } from './projectScope';
 import type { ConversationProjectionV1 } from './protocol';
+import { TurnOwners } from './turnOwners';
 import { projectionToConversation } from '../../webview/src/components/ai-sidebar/conversationProjection';
 import { deriveActivityState } from '../../webview/src/components/ai-sidebar/activityState';
 import { isReadyToDrain } from '../../webview/src/components/ai-sidebar/promptQueue';
@@ -77,6 +78,26 @@ async function main(): Promise<void> {
     const retried = await after.acceptRuntimeTurn({ conversationId: working.conversationId, agentId: 'claude-code', text: 'Draft the slides' });
     assert.equal(retried.conversationId, working.conversationId);
     assert.equal(retried.lifecycle.state, 'working');
+
+    // ── Two windows in one scope (windows without a folder share it) ─────────
+    // A second window's sweep leaves alone a turn the first window still runs,
+    // and takes it once that window's process is gone.
+    const noFolder = resolveProjectScope({ folderUris: [], platform: 'win32' });
+    const ownersDir = path.join(temp, 'owners');
+    const alive = new Set([111, 222]);
+    const ownersA = new TurnOwners(ownersDir, 111, (pid) => alive.has(pid));
+    const ownersB = new TurnOwners(ownersDir, 222, (pid) => alive.has(pid));
+    const windowA = new ConversationController({ store, currentScope: () => noFolder, onTurnActive: (id) => ownersA.claim(id) });
+    const running = await windowA.acceptRuntimeTurn({ agentId: 'claude-code', text: 'A chat in the first window' });
+    const windowB = new ConversationController({ store, currentScope: () => noFolder, onTurnActive: (id) => ownersB.claim(id) });
+    const sweepB = () => windowB.interruptTurnsLeftByRestart((id) => ownersB.isClaimedElsewhere(id));
+    assert.deepEqual(await sweepB(), [], 'the first window’s turn is live');
+    assert.equal((await store.get(running.conversationId))?.lifecycle.state, 'working');
+    alive.delete(111);
+    assert.deepEqual(await sweepB(), [running.conversationId], 'its window is gone: the turn was left by a crash');
+    assert.equal(fs.existsSync(path.join(ownersDir, '111.json')), false, 'the gone window’s claims are removed');
+    assert.deepEqual(await sweepB(), [], 'a second sweep finds nothing more');
+    ownersB.dispose();
 
     console.log('conversations/turnsLeftByRestart: all assertions passed');
   } finally {

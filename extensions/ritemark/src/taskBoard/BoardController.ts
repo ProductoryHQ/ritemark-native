@@ -703,7 +703,9 @@ export class BoardController {
       });
       // The task's file is named after the task, not the idea. A rename that
       // fails leaves the idea's name; the task itself is made.
-      await this.store.renameToTitle(cardId).catch(() => undefined);
+      await this.store.renameToTitle(cardId).catch((error) => {
+        console.warn('[taskBoard] could not rename the task’s file after its title', error);
+      });
       return { ok: true, cardId };
     } catch (error) {
       return fromStoreError(error);

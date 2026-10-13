@@ -294,13 +294,16 @@ export class BoardStore {
         other.fileName !== entry.fileName && other.parsed.kind === 'card' && ownId?.kind === 'card' && other.parsed.card.id === ownId.card.id
       ));
       if (shared) return;
+      // A name that differs only in case is the file itself on a
+      // case-insensitive disk (macOS, Windows): it fits.
+      const own = (name: string) => name.toLowerCase() === entry.fileName.toLowerCase();
       let copy = 1;
       let fileName = cardFileName(entry.card.title);
-      while (fileName !== entry.fileName && (this.entries.has(fileName) || (await this.exists(fileName)))) {
+      while (!own(fileName) && (this.entries.has(fileName) || (await this.exists(fileName)))) {
         copy += 1;
         fileName = cardFileName(entry.card.title, copy);
       }
-      if (fileName === entry.fileName) return;
+      if (own(fileName)) return;
       try {
         await this.fs.move(path.join(this.tasksDir, entry.fileName), path.join(this.tasksDir, fileName));
       } catch (error) {

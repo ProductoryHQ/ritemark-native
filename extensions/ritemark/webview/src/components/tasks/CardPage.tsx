@@ -61,6 +61,8 @@ function ConversationLink({ card }: { card: BoardCardView }) {
   )
 }
 
+/** The strip and the state's block: controls there replace themselves. */
+const KEEPS_FOCUS = '.cp-strip button, .cp-block button'
 /** Where the focus goes when the control that had it is gone, in this order. */
 const FOCUS_FALLBACKS = ['[data-keep-focus] button:not(:disabled)', '.cp-block button:not(:disabled)', '.cp-stage:not(:disabled)', '.cp-showboard']
 
@@ -69,31 +71,39 @@ const FOCUS_FALLBACKS = ['[data-keep-focus] button:not(:disabled)', '.cp-block b
  * with it. Give to … becomes Stop, and Mark done becomes Reopen. The focus
  * then falls to the page body, and Tab starts over from the top. Put it on the
  * control that took the button's place. Chrome fires no blur when a focused
- * element is removed, so the page watches its DOM.
+ * element is removed, so the page watches its DOM. Only for the strip's and
+ * the block's buttons, and a frame later, so a menu, a dialog or the editor
+ * that puts the focus back itself goes first.
  */
 function useKeepFocus(): void {
   useEffect(() => {
     let last: HTMLElement | null = null
+    let frame = 0
     const onFocusIn = (event: FocusEvent) => {
-      last = event.target instanceof HTMLElement ? event.target : null
+      last = event.target instanceof HTMLElement && event.target.matches(KEEPS_FOCUS) ? event.target : null
     }
     const observer = new MutationObserver(() => {
-      if (!last || last.isConnected) return
-      if (document.activeElement && document.activeElement !== document.body) return
-      last = null
-      for (const selector of FOCUS_FALLBACKS) {
-        const next = document.querySelector<HTMLElement>(selector)
-        if (next) {
-          next.focus()
-          return
+      if (!last || last.isConnected || frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        if (!last || last.isConnected) return
+        last = null
+        if (document.activeElement && document.activeElement !== document.body) return
+        for (const selector of FOCUS_FALLBACKS) {
+          const next = document.querySelector<HTMLElement>(selector)
+          if (next) {
+            next.focus()
+            return
+          }
         }
-      }
+      })
     })
     document.addEventListener('focusin', onFocusIn)
     observer.observe(document.body, { childList: true, subtree: true })
     return () => {
       document.removeEventListener('focusin', onFocusIn)
       observer.disconnect()
+      cancelAnimationFrame(frame)
     }
   }, [])
 }

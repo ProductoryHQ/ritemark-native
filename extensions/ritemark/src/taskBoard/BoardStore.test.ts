@@ -224,6 +224,43 @@ async function main(): Promise<void> {
     assert.equal(after.find((entry) => entry.kind === 'card' && entry.card.id === copy.card.id && 'copiedFrom' in entry), undefined);
   }
 
+  // ── A card's file takes its title's name (Make it a task, Windows test) ────
+  {
+    const folder = tempFolder();
+    const store = newStore(folder);
+    const idea = await store.create({ title: 'coffee?', stage: 'idea', by: 'you' });
+    await store.mutate(idea.id, null, (card) => ({ ...card, title: 'Order coffee for the workshop' }));
+    await store.renameToTitle(idea.id);
+    assert.deepEqual(filesIn(folder), ['order-coffee-for-the-workshop.md']);
+    assert.equal(path.basename(store.filePathOf(idea.id)!), 'order-coffee-for-the-workshop.md');
+    assert.equal((await store.get(idea.id))?.title, 'Order coffee for the workshop', 'the same card');
+    assert.equal(await store.invalidate('coffee.md'), false, 'the watcher’s echo of the old name changes nothing');
+    assert.equal(await store.invalidate('order-coffee-for-the-workshop.md'), false, 'nor that of the new one');
+    await store.renameToTitle(idea.id);
+    assert.deepEqual(filesIn(folder), ['order-coffee-for-the-workshop.md'], 'a name that fits stays');
+
+    // A name that differs only in case is the file itself on macOS and Windows.
+    writeCard(folder, 'Slides.md', { id: 'a1b2c3', title: 'Slides' });
+    // A copy carrying the same id: the file names decide which is the original.
+    writeCard(folder, 'k3f9x2-plan.md', { id: 'k3f9x2', title: 'Plan the day' });
+    fs.copyFileSync(path.join(tasksDir(folder), 'k3f9x2-plan.md'), path.join(tasksDir(folder), 'k3f9x2-plan copy.md'));
+    await store.reload();
+    await store.renameToTitle('a1b2c3');
+    await store.renameToTitle('k3f9x2');
+    assert.deepEqual(filesIn(folder), ['Slides.md', 'k3f9x2-plan copy.md', 'k3f9x2-plan.md', 'order-coffee-for-the-workshop.md'], 'neither is moved');
+
+    // A move that fails leaves the file and the card where they were.
+    const failing = newStore(folder, {
+      async move() {
+        throw new Error('the file is locked');
+      },
+    });
+    await failing.mutate(idea.id, null, (card) => ({ ...card, title: 'Book the coffee' }));
+    await assert.rejects(() => failing.renameToTitle(idea.id), (error: BoardStoreError) => error.code === 'write-failed');
+    assert.equal(path.basename(failing.filePathOf(idea.id)!), 'order-coffee-for-the-workshop.md');
+    assert.equal((await failing.get(idea.id))?.title, 'Book the coffee');
+  }
+
   // ── Delete goes to the trash ───────────────────────────────────────────────
   {
     const folder = tempFolder();

@@ -201,7 +201,6 @@ export function VoiceDictationButton() {
         <button
           className="dictation-dropdown-trigger"
           aria-label="Dictation language"
-          aria-haspopup="menu"
           aria-expanded={showDropdown}
           onClick={handleDropdownClick}
           disabled={isActive}
