@@ -112,6 +112,31 @@ async function main() {
     assert.ok(!html.includes('New AI task'), 'no "New AI task" left');
   });
 
+  await test('Task board sits next to New AI conversation, with its icon and a tooltip (Jarmo 2026-10-13)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = provider as any;
+    view._view = { webview: { asWebviewUri: (uri: unknown) => uri, cspSource: 'csp' } };
+    const html: string = view._html(true, [], []);
+    const order = [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(order.slice(0, 2), ['new-ai-conversation', 'task-board'], 'right after New AI conversation');
+    assert.ok(/data-command="ritemark\.openTaskBoard"[^>]*aria-label="Task board"/.test(html), 'opens the board, named "Task board"');
+    assert.ok(html.includes('id="tip-task-board" role="tooltip">Open the task board for this folder<'), 'a tooltip says what it does');
+    assert.ok(html.includes('viewBox="0 0 256 256"'), 'the Phosphor kanban icon');
+    assert.ok(!/ title="/.test(html.split('<button class="row" data-command')[1] ?? ''), 'no native title on quick actions');
+  });
+
+  await test('Task board is hidden with the task-board flag off, and without a folder', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const flagOff = new (HomeViewProvider as any)(fakeUri('/ext'), true, false);
+    flagOff._view = { webview: { asWebviewUri: (uri: unknown) => uri, cspSource: 'csp' } };
+    assert.ok(!flagOff._html(true, [], []).includes('data-action="task-board"'), 'flag off');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = provider as any;
+    const folderless: string = view._html(false, [], []);
+    assert.ok(!folderless.includes('data-action="task-board"'), 'no folder');
+    assert.ok(folderless.includes('data-action="open-folder"'), 'the folderless launcher still offers Open folder…');
+  });
+
   console.log(`\n${passed} passed`);
 }
 

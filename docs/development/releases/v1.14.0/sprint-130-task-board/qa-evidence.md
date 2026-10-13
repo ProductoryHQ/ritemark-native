@@ -116,6 +116,20 @@ The `qa-validator` review (T8.4) of `bb3c5005` returned FAIL on one item, fixed:
 | W15 | S34 | Drag the side bar to its narrowest (about 280 px) with some decisions in Your calls | No horizontal scroll, no button row wraps, long options cut to one line and show their full text on hover |
 | W16 | S35 | Keyboard only: add a card, open it, move it to Doing, give it to Claude, open its conversation, mark it done | All reachable by Tab, Enter and the arrow keys, with visible focus |
 
+## Follow-up, 2026-10-13: Tasks below the File browser, Task board on Home
+
+Jarmo, through the Development manager: "Taskboard võiks olla activvity baris kohe File browseri all -- sest see on ju töö planeerimise keskus. Home tabis võiks olla nupp task boardile". Dev build of `fix/tasks-below-explorer` (patch 002 changed, workbench transpiled):
+
+| Check | Result |
+|---|---|
+| Fresh profile | Home, Folder, **Tasks**, then the built-ins and Ritemark's other tools ([qa/activity-bar-tasks-below-explorer.png](qa/activity-bar-tasks-below-explorer.png), left) |
+| Profile updated from 1.13, Agent Library dragged above the File browser (saved order without Tasks) | Home, Agent Library, Folder, **Tasks**: Tasks right below the File browser, Agent Library and the rest where they were (same image, right). With order 0.5 alone Tasks would have gone above Agent Library |
+| The user's own placement of Tasks | Tasks moved to the end of the saved order stays at the end after a restart |
+| Home | "Task board" with the kanban icon right after "New AI conversation"; tooltip "Open the task board for this folder" on hover, in the app tooltip's colours light and dark ([light](qa/home-task-board-light.jpg), [dark](qa/home-task-board-dark.jpg)); a click opens the Task board tab. Hidden without a folder and with the flag off (`HomeViewProvider.test.ts`) |
+| Patch stack | All 17 patches apply to a pristine checkout of the gitlink; the results equal the dev tree; `apply-patches.sh --dry-run` clean; patch 002 lists 31 files (30 + `compositeBar.ts`) |
+
+"Chat" and "Chat Debug" in the dev build's bar come from the dev-only Copilot extension, as in probe P6.
+
 ## Gate 2 list (v1.14.0)
 
 - Give to agent, follow-ups and results with **Codex** and **OpenCode** (S16–S19, S21–S23, S27, S30, S36's last-message summary), and Review with either (S20a's choice).
