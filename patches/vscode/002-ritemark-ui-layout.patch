@@ -3,8 +3,9 @@ Sprint 38+: Original consolidated UI layout patch.
 Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
 Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
 Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
+v1.14.0 (Jarmo, 2026-10-13): Activity Bar order Home, Explorer, Tasks, ..., Agent Library last of Ritemark's: orders in viewsExtensionPoint.ts (ritemark-tasks 0.5, ritemark-agent-library 1000); compositeBar.ts applies the same once to a profile from before Tasks (Tasks after the Explorer, Agent Library to the bottom of Ritemark's group).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index 833787070f3..edda964f30d 100644
+index 833787070f3..9c97beb08de 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 @@ -323,6 +323,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
@@ -17,22 +18,29 @@ index 833787070f3..edda964f30d 100644
  				}
  			});
  		}
-@@ -382,7 +385,13 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -382,7 +385,20 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  			const icon = themeIcon || resources.joinPath(extension.extensionLocation, descriptor.icon);
  			const id = `workbench.view.extension.${descriptor.id}`;
  			const title = descriptor.title || id;
 -			const viewContainer = this.registerCustomViewContainer(id, title, icon, order++, extension.identifier, location);
-+			// Ritemark: pin ritemark-ai first in the auxiliary bar and ritemark-home
-+			// FIRST in the primary Activity Bar (before the built-in Explorer at 0).
++			// Ritemark: pin ritemark-ai first in the auxiliary bar. In the primary
++			// Activity Bar (Jarmo, 2026-10-13): ritemark-home FIRST (before the
++			// built-in Explorer at 0), ritemark-tasks right below the Explorer
++			// (before Search at 1) because the task board is where the work is
++			// planned, and ritemark-agent-library after every other container.
++			// The other Ritemark containers keep their declaration order.
++			// compositeBar.ts applies the same order to profiles from before Tasks.
 +			const effectiveOrder = location === ViewContainerLocation.AuxiliaryBar && descriptor.id === 'ritemark-ai' ? 0
 +				: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-home' ? -1
-+					: order;
++					: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-tasks' ? 0.5
++						: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-agent-library' ? 1000
++							: order;
 +			const viewContainer = this.registerCustomViewContainer(id, title, icon, effectiveOrder, extension.identifier, location);
 +			order++;
  
  			// Move those views that belongs to this container
  			if (existingViewContainers.length) {
-@@ -413,7 +422,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -413,7 +429,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
@@ -619,6 +627,66 @@ index 4c7da5f5466..06c584c57ed 100644
  }
  
  .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
+diff --git a/src/vs/workbench/browser/parts/compositeBar.ts b/src/vs/workbench/browser/parts/compositeBar.ts
+index 8d1020b6621..723f65644ee 100644
+--- a/src/vs/workbench/browser/parts/compositeBar.ts
++++ b/src/vs/workbench/browser/parts/compositeBar.ts
+@@ -23,6 +23,13 @@ import { CompositeDragAndDropData, CompositeDragAndDropObserver, IDraggedComposi
+ import { Gesture, EventType as TouchEventType, GestureEvent } from '../../../base/browser/touch.js';
+ import { MutableDisposable } from '../../../base/common/lifecycle.js';
+ 
++// Ritemark: the Activity Bar containers that the v1.14 order moves (see
++// CompositeBarModel.add).
++const EXPLORER_CONTAINER = 'workbench.view.explorer';
++const RITEMARK_CONTAINER_PREFIX = 'workbench.view.extension.ritemark-';
++const RITEMARK_TASKS_CONTAINER = 'workbench.view.extension.ritemark-tasks';
++const RITEMARK_AGENT_LIBRARY_CONTAINER = 'workbench.view.extension.ritemark-agent-library';
++
+ export interface ICompositeBarItem {
+ 
+ 	readonly id: string;
+@@ -758,7 +765,18 @@ class CompositeBarModel {
+ 			return changed;
+ 		} else {
+ 			const item = this.createCompositeBarItem(id, name, order, true, true);
+-			if (!isUndefinedOrNull(requestedIndex)) {
++			// Ritemark (Jarmo, 2026-10-13): Tasks new to the bar marks a profile
++			// from before v1.14 (or a fresh one). Tasks goes right below the
++			// Explorer wherever the user has put it, and Agent Library moves once
++			// to the bottom of Ritemark's group, as in a fresh profile. Nothing
++			// else moves, and from then on the user's own placement is kept.
++			const explorerIndex = id === RITEMARK_TASKS_CONTAINER && isUndefinedOrNull(requestedIndex)
++				? this.items.findIndex(candidate => candidate.id === EXPLORER_CONTAINER && candidate.visible)
++				: -1;
++			if (explorerIndex !== -1) {
++				this.items.splice(explorerIndex + 1, 0, item);
++				this.moveAgentLibraryBelowRitemarkGroup();
++			} else if (!isUndefinedOrNull(requestedIndex)) {
+ 				let index = 0;
+ 				let rIndex = requestedIndex;
+ 				while (rIndex > 0 && index < this.items.length) {
+@@ -782,6 +800,21 @@ class CompositeBarModel {
+ 		}
+ 	}
+ 
++	/** Ritemark: Agent Library right after the last other Ritemark container. */
++	private moveAgentLibraryBelowRitemarkGroup(): void {
++		const from = this.items.findIndex(candidate => candidate.id === RITEMARK_AGENT_LIBRARY_CONTAINER);
++		let last = -1;
++		this.items.forEach((candidate, index) => {
++			if (candidate.id.startsWith(RITEMARK_CONTAINER_PREFIX) && candidate.id !== RITEMARK_AGENT_LIBRARY_CONTAINER) {
++				last = index;
++			}
++		});
++		if (from !== -1 && last > from) {
++			const [agentLibrary] = this.items.splice(from, 1);
++			this.items.splice(last, 0, agentLibrary);
++		}
++	}
++
+ 	remove(id: string): boolean {
+ 		for (let index = 0; index < this.items.length; index++) {
+ 			if (this.items[index].id === id) {
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
 index 48220d63dc3..d5b081e981f 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts

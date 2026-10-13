@@ -19,7 +19,7 @@ Every project folder gets its own task board. Write down what you want done, giv
 
 ## Opening the board
 
-Click the **Tasks** icon in the activity bar on the left. The side bar lists your tasks:
+Click the **Tasks** icon in the activity bar on the left, right below the File browser. The side bar lists your tasks:
 
 | Section | What it holds |
 |---|---|
@@ -32,7 +32,7 @@ Click the **Tasks** icon in the activity bar on the left. The side bar lists you
 
 The number on the Tasks icon counts the tasks that wait on you.
 
-For the full board, click **Open the task board** at the top of the side bar. The board has four tabs: **Your calls**, **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
+For the full board, click **Open the task board** at the top of the side bar, or **Task board** on the Home tab. The board has four tabs: **Your calls**, **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
 
 The board needs a project folder. With no folder open, the side bar offers to open one.
 

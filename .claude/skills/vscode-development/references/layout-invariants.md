@@ -6,6 +6,9 @@ These layout rules are enforced by patch `002-ritemark-ui-layout.patch` and must
 
 | Element | Required position | Enforced by |
 | --- | --- | --- |
+| Home | First in the Activity Bar | `viewsExtensionPoint.ts`: `ritemark-home` registers with order -1 (the Explorer is 0) |
+| Tasks | Right below the Explorer in the Activity Bar (v1.14.0) | `viewsExtensionPoint.ts`: `ritemark-tasks` registers with order 0.5; `compositeBar.ts` (`CompositeBarModel.add`) places Tasks after the Explorer when it is new to a saved layout, so profiles from before Tasks get it there too |
+| Agent Library | Last of Ritemark's containers (v1.14.0) | `viewsExtensionPoint.ts`: `ritemark-agent-library` registers with order 1000; in a profile from before Tasks, `compositeBar.ts` moves it once below the last other Ritemark container when it places Tasks |
 | Ritemark AI panel | Right sidebar (auxiliary bar) | `viewDescriptorService.ts` deletes the cached override for `workbench.view.extension.ritemark-ai` |
 | Terminal | Right sidebar (auxiliary bar) | `terminal.contribution.ts`: `ViewContainerLocation.AuxiliaryBar` |
 | Terminal editor area | Never used in Ritemark | `terminalConfigurationService.ts` ignores `terminal.integrated.defaultLocation = editor`; `terminalEditorSerializer.ts` restores old terminal editors into the terminal view instead of editor tabs |

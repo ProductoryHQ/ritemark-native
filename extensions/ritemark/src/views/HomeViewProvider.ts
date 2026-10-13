@@ -20,14 +20,21 @@ const MAX_CANDIDATE_FILES = 5000;
 // touching several files) don't re-render on every single one.
 const SAVE_REFRESH_DEBOUNCE_MS = 2000;
 
-const QUICK_ACTIONS: Array<{ id: string; label: string; icon: string; command: string }> = [
+const QUICK_ACTIONS: Array<{ id: string; label: string; icon: string; command: string; tip: string }> = [
   // "New AI conversation", not "task": since Sprint 130 a task is a card on the
   // task board (R14), and this action starts a conversation.
-  { id: 'new-ai-conversation', label: 'New AI conversation', icon: 'sparkle', command: 'ritemark.newChat' },
-  { id: 'open-document', label: 'Open document…', icon: 'file', command: 'workbench.action.files.openFile' },
-  { id: 'new-table', label: 'New table', icon: 'grid', command: 'ritemark.newTable' },
-  { id: 'open-folder', label: 'Open folder…', icon: 'folder', command: 'workbench.action.files.openFolder' },
+  { id: 'new-ai-conversation', label: 'New AI conversation', icon: 'sparkle', command: 'ritemark.newChat', tip: 'Start a conversation with an agent in the AI sidebar' },
+  // The task board is where the work in this folder is planned (Jarmo,
+  // 2026-10-13), so it sits next to starting a conversation.
+  { id: 'task-board', label: 'Task board', icon: 'kanban', command: 'ritemark.openTaskBoard', tip: 'Open the task board for this folder' },
+  { id: 'open-document', label: 'Open document…', icon: 'file', command: 'workbench.action.files.openFile', tip: 'Open a document from your computer' },
+  { id: 'new-table', label: 'New table', icon: 'grid', command: 'ritemark.newTable', tip: 'Create a new spreadsheet (CSV)' },
+  { id: 'open-folder', label: 'Open folder…', icon: 'folder', command: 'workbench.action.files.openFolder', tip: 'Open a folder to work in' },
 ];
+
+/** Actions that need an open folder: an agent run refuses without one, and the
+ *  task board keeps its cards in the folder. */
+const FOLDER_ACTIONS = new Set(['new-ai-conversation', 'task-board']);
 
 /**
  * Inline SVG icons (Phosphor-style outlines, currentColor, 1.7 stroke) — the
@@ -43,7 +50,17 @@ const ICON_PATHS: Record<string, string> = {
   'folder': 'M3.5 7A1.5 1.5 0 0 1 5 5.5h4l2 2.2h8A1.5 1.5 0 0 1 20.5 9.2v8.3A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5V7Z',
 };
 
+/** Filled Phosphor icons (256 viewBox), as in the activity bar. */
+const FILLED_ICON_PATHS: Record<string, string> = {
+  // Phosphor `kanban` (regular), the Tasks activity-bar icon (media/tasks-icon.svg).
+  'kanban': 'M216,48H40a8,8,0,0,0-8,8V208a16,16,0,0,0,16,16H88a16,16,0,0,0,16-16V160h48v16a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V56A8,8,0,0,0,216,48ZM88,208H48V128H88Zm0-96H48V64H88Zm64,32H104V64h48Zm56,32H168V128h40Zm0-64H168V64h40Z',
+};
+
 function svgIcon(name: string, size: number): string {
+  const filled = FILLED_ICON_PATHS[name];
+  if (filled) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="${filled}"/></svg>`;
+  }
   const d = ICON_PATHS[name] ?? ICON_PATHS['file'];
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 }
@@ -56,6 +73,8 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _enabled: boolean = true,
+    /** The `task-board` flag: the Task board action shows only when it is on. */
+    private readonly _taskBoardEnabled: boolean = true,
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -193,13 +212,14 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
         <span class="row-ico">${svgIcon('folder', 16)}</span>
         <span class="row-main"><span class="row-label">${esc(r.label)}</span><span class="row-detail">${esc(r.detail)}</span></span>
       </button>`).join('');
-    // New AI conversation needs a workspace folder (agent runs refuse without one) —
-    // every other action works folderless, so the launcher stays the same.
-    const actions = hasFolder ? QUICK_ACTIONS : QUICK_ACTIONS.filter((a) => a.id !== 'new-ai-conversation');
+    // New AI conversation and the task board need a workspace folder; every other
+    // action works folderless, so the launcher stays the same.
+    const actions = QUICK_ACTIONS.filter((a) => (hasFolder || !FOLDER_ACTIONS.has(a.id)) && (a.id !== 'task-board' || this._taskBoardEnabled));
     const quickRows = actions.map((a) => `
-      <button class="row" data-command="${esc(a.command)}">
+      <button class="row" data-command="${esc(a.command)}" data-action="${esc(a.id)}" aria-label="${esc(a.label)}" aria-describedby="tip-${esc(a.id)}">
         <span class="row-ico">${svgIcon(a.icon, 16)}</span>
         <span class="row-main"><span class="row-label">${esc(a.label)}</span></span>
+        <span class="tip" id="tip-${esc(a.id)}" role="tooltip">${esc(a.tip)}</span>
       </button>`).join('');
 
     return /* html */ `<!DOCTYPE html>
@@ -228,11 +248,16 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     --accent: #4338CA;
     --accent-deep: #3730A3;
     --ring: rgba(67,56,202,0.28);
+    /* The app tooltip's colours (ui/tooltip.tsx: --r-ink-strong on --r-surface). */
+    --tip-bg: #1E1B4B;
+    --tip-fg: #FFFFFF;
   }
   body.vscode-dark, body.vscode-high-contrast:not(.vscode-high-contrast-light) {
     --accent: #6366F1;
     --accent-deep: #818CF8;
     --ring: rgba(129,140,248,0.38);
+    --tip-bg: #F8FAFC;
+    --tip-fg: #0F172A;
   }
   * { box-sizing: border-box; margin: 0; }
   body { font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: var(--ink-strong); padding: 14px 10px 16px; }
@@ -269,6 +294,22 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   .row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-detail { font-size: 11px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .empty { font-size: 12px; color: var(--ink-muted); padding: 4px 2px; line-height: 1.5; }
+  /* Quick-action tooltips, styled like the app's own (ui/tooltip.tsx): an
+     inverted pill on hover and keyboard focus. Native title shows late and
+     never on focus. */
+  .row { position: relative; }
+  .tip {
+    position: absolute; left: 32px; top: calc(100% + 4px); z-index: 10;
+    max-width: min(240px, calc(100% - 40px)); padding: 6px 10px; border-radius: 8px;
+    background: var(--tip-bg); color: var(--tip-fg);
+    font-size: 12px; line-height: 1.35; white-space: normal; text-align: left;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+    pointer-events: none; opacity: 0; visibility: hidden;
+    transition: opacity 120ms ease, visibility 0s linear 120ms;
+  }
+  .row:hover .tip, .row:focus-visible .tip {
+    opacity: 1; visibility: visible; transition: opacity 120ms ease 400ms, visibility 0s linear 400ms;
+  }
 </style></head>
 <body>
   ${hasFolder ? `
