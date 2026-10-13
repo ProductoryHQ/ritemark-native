@@ -27,8 +27,9 @@ interface BoardUiState {
   notice: string | null
   /** Cards with a request in flight: their agent buttons wait. */
   pending: Record<string, true>
-  /** Open the card's page in the editor (design.md §5). */
-  openCard(cardId: string): void
+  /** Open the card's page in the editor (design.md §5); `focus` moves the
+   *  keyboard there (an open from the keyboard, W16). */
+  openCard(cardId: string, focus?: boolean): void
   openNote(cardId: string, where: string, kind: NoteKind): void
   closeNote(): void
   clearPrompt(): void
@@ -44,7 +45,7 @@ export const useBoardUi = create<BoardUiState>((set) => ({
   confirmDeleteId: null,
   notice: null,
   pending: {},
-  openCard: (cardId) => notify({ type: 'board/open-card', cardId }),
+  openCard: (cardId, focus) => notify({ type: 'board/open-card', cardId, ...(focus ? { focus: true } : {}) }),
   openNote: (cardId, where, kind) => set({ note: { cardId, where, kind } }),
   closeNote: () => set({ note: null }),
   clearPrompt: () => set({ prompt: null }),

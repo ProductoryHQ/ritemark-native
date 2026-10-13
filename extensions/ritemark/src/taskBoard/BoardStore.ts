@@ -50,6 +50,9 @@ import {
 export interface BoardStoreFileSystem extends ConversationStoreFileSystem {
   /** Move a file to the system trash. */
   trash(file: string): Promise<void>;
+  /** Rename a card's file; an editor showing it follows (the host moves it
+   *  with a workspace edit). */
+  move(from: string, to: string): Promise<void>;
 }
 
 export const nodeBoardStoreFileSystem: BoardStoreFileSystem = {
@@ -57,6 +60,7 @@ export const nodeBoardStoreFileSystem: BoardStoreFileSystem = {
   async trash() {
     throw new Error('No system trash outside VS Code; compose BoardStore with workspace.fs.');
   },
+  move: nodeConversationStoreFileSystem.rename,
 };
 
 /**
@@ -268,6 +272,50 @@ export class BoardStore {
       const changed = await this.rewrite(cardId, history, apply);
       this.emit();
       return structuredClone(changed);
+    });
+  }
+
+  /**
+   * Give a card's file the name a new card with its title would get. Make it a
+   * task changes an idea's title, and the file kept the idea's name (Windows
+   * test, Sprint 130). The file is moved, so an open card page follows; a name
+   * another file has gets a number, as for a new card. Nothing happens when
+   * the name already fits.
+   */
+  renameToTitle(cardId: string): Promise<void> {
+    return this.serialized(async () => {
+      await this.ensureLoaded();
+      const entry = this.cardEntry(cardId);
+      if (!entry) throw new BoardStoreError('not-found', 'That card is no longer on the board.');
+      // A copy carrying the same id (not written since) decides by file name
+      // which file is the original: a new name could swap them.
+      const ownId = this.entries.get(entry.fileName)?.parsed;
+      const shared = [...this.entries.values()].some((other) => (
+        other.fileName !== entry.fileName && other.parsed.kind === 'card' && ownId?.kind === 'card' && other.parsed.card.id === ownId.card.id
+      ));
+      if (shared) return;
+      let copy = 1;
+      let fileName = cardFileName(entry.card.title);
+      while (fileName !== entry.fileName && (this.entries.has(fileName) || (await this.exists(fileName)))) {
+        copy += 1;
+        fileName = cardFileName(entry.card.title, copy);
+      }
+      if (fileName === entry.fileName) return;
+      try {
+        await this.fs.move(path.join(this.tasksDir, entry.fileName), path.join(this.tasksDir, fileName));
+      } catch (error) {
+        throw new BoardStoreError('write-failed', `Couldn't rename ${entry.fileName}: ${messageOf(error)}`, error);
+      }
+      const cached = this.entries.get(entry.fileName)!;
+      this.entries.delete(entry.fileName);
+      this.entries.set(fileName, { ...cached, fileName });
+      const provisional = this.provisionalIds.get(entry.fileName);
+      if (provisional) {
+        this.provisionalIds.delete(entry.fileName);
+        this.provisionalIds.set(fileName, provisional);
+      }
+      this.resolveIds();
+      this.emit();
     });
   }
 

@@ -230,7 +230,8 @@ export type BoardRequest =
   | { type: 'board/add-files'; cardId: string }
   | { type: 'board/open-file'; path: string }
   /** Open a card's page; `fileName` names a card file that won't read, which opens as a plain document. */
-  | { type: 'board/open-card'; cardId?: string; fileName?: string }
+  /** `focus`: opened from the keyboard, so the page takes the focus (W16). */
+  | { type: 'board/open-card'; cardId?: string; fileName?: string; focus?: boolean }
   | { type: 'board/recover'; action: BoardRecoverAction };
 
 export type BoardRecoverAction = 'sign-in-claude' | 'sign-in-codex' | 'settings' | 'open-folder';
@@ -293,7 +294,7 @@ const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; op
   'board/open': { required: {}, optional: { tab: 'tab' } },
   'board/add-files': { required: { cardId: 'cardId' } },
   'board/open-file': { required: { path: 'path' } },
-  'board/open-card': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName' } },
+  'board/open-card': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName', focus: 'bool' } },
   'board/recover': { required: { action: 'recover' } },
 };
 

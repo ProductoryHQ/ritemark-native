@@ -29,7 +29,7 @@ export interface BoardHostActions {
   openBoard(target: { tab?: BoardTab }): Promise<void>;
   openFile(relativePath: string): Promise<void>;
   /** A card's page in the editor; a card file that won't read opens as a plain document. */
-  openCard(target: { cardId?: string; fileName?: string }): Promise<void>;
+  openCard(target: { cardId?: string; fileName?: string; focus?: boolean }): Promise<void>;
   addFiles(cardId: string): Promise<void>;
   recover(action: BoardRecoverAction): Promise<void>;
 }
@@ -58,7 +58,7 @@ export function connectBoardSurface(
   webview: vscode.Webview,
   surface: BoardSurface,
   context: BoardSurfaceContext,
-  options: { onRequest?: (request: BoardRequest) => void } = {},
+  options: { onRequest?: (request: BoardRequest) => void; onReady?: () => void } = {},
 ): BoardSurfaceConnection {
   let ready = false;
   let pendingFocus: { tab?: BoardTab } | null = null;
@@ -87,6 +87,7 @@ export function connectBoardSurface(
     if (request.type === 'board/ready') {
       ready = true;
       context.onReady?.();
+      options.onReady?.();
       post({ type: 'board/state', snapshot: context.controller ? await context.controller.snapshot() : context.emptySnapshot() });
       if (context.activePage) post({ type: 'board/active-page', cardId: context.activePage.current() });
       if (pendingFocus) {
@@ -124,7 +125,7 @@ async function route(request: Exclude<BoardRequest, { type: 'board/ready' }>, co
       await actions.openFile(request.path);
       return null;
     case 'board/open-card':
-      await actions.openCard({ cardId: request.cardId, fileName: request.fileName });
+      await actions.openCard({ cardId: request.cardId, fileName: request.fileName, focus: request.focus === true });
       return null;
     case 'board/open':
       await actions.openBoard({ tab: request.tab });

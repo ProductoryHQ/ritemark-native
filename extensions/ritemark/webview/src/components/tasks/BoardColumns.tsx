@@ -287,7 +287,7 @@ function Tile({
         type="button"
         className="absolute inset-0 rounded-lg border-0 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         aria-label={`${card.title}, ${p.row || STAGE_NAMES[card.stage]}`}
-        onClick={() => openCard(card.id)}
+        onClick={(event) => openCard(card.id, event.detail === 0)}
       />
       <div className="pointer-events-none relative flex items-start gap-2 pr-5">
         {p.plain ? <CardGlyph card={card} p={p} /> : <StateGlyph p={p} />}

@@ -140,7 +140,7 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
               <button
                 type="button"
                 className="w-full border-0 bg-transparent p-0 text-left font-ui text-[13px] font-semibold text-ink-strong hover:underline"
-                onClick={() => openCard(card.id)}
+                onClick={(event) => openCard(card.id, event.detail === 0)}
               >
                 {card.title}
               </button>

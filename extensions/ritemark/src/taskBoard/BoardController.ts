@@ -701,6 +701,9 @@ export class BoardController {
         delete next.dropped;
         return next;
       });
+      // The task's file is named after the task, not the idea. A rename that
+      // fails leaves the idea's name; the task itself is made.
+      await this.store.renameToTitle(cardId).catch(() => undefined);
       return { ok: true, cardId };
     } catch (error) {
       return fromStoreError(error);

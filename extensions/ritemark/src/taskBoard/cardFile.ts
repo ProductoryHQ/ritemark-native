@@ -312,8 +312,18 @@ export function serializeCard(card: Card, source?: CardSource): string {
   for (const key of KNOWN_KEYS) {
     if (key in fresh && !(key in data)) data[key] = fresh[key];
   }
-  const yaml = yamlEngine.stringify(data, { ...YAML_DUMP_OPTIONS });
+  const yaml = quoteRank(yamlEngine.stringify(data, { ...YAML_DUMP_OPTIONS }));
   return `---\n${yaml.endsWith('\n') ? yaml : `${yaml}\n`}---\n${card.description}`;
+}
+
+/**
+ * The rank is text that can look like a number (`09`, `5`). js-yaml quotes
+ * only what it would misread itself, so it wrote `rank: 09`, which a YAML 1.2
+ * reader (another editor, a sync tool) reads as 9, reordering the stage
+ * (Windows test, Sprint 130). Always single-quote it.
+ */
+function quoteRank(yaml: string): string {
+  return yaml.replace(/^rank: (?!['"])(.*)$/m, (_line, value: string) => `rank: '${value.replace(/'/g, "''")}'`);
 }
 
 // ── Ranks ───────────────────────────────────────────────────────────────────

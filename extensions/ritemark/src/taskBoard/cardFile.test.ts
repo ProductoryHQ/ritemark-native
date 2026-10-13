@@ -147,6 +147,14 @@ function main(): void {
     assert.equal(parsedCard(text).card.title, 'Call Maria');
   }
 
+  // ── The rank is always quoted text (Windows test: `rank: 09`) ──────────────
+  // js-yaml wrote `09` and `0i` plain; a YAML 1.2 reader takes `09` for 9.
+  for (const rank of ['09', '0i', 'i', '9', '010', 'zz']) {
+    const text = serializeCard({ id: 'zz9zz9', title: 'Call Maria', stage: 'todo', rank, files: [], history: [], description: '' });
+    assert.ok(text.includes(`\nrank: '${rank}'\n`), `rank ${rank} is written quoted`);
+    assert.equal(parsedCard(text).card.rank, rank, `rank ${rank} reads back unchanged`);
+  }
+
   // ── What is not a card, and what is a broken one ───────────────────────────
   {
     assert.equal(parseCardFile('# Just notes\n').kind, 'not-a-card');

@@ -329,7 +329,7 @@ export function CallActions({
           ))}
           <Tooltip label="Answer in your own words" className={cn(stacked && 'w-full')}>
             <Button type="button" size="sm" variant="outline" className={cn(stacked && 'w-full tb-opt')} onClick={() => openNote(card.id, where, 'answer')}>
-              Something else…
+              <span className="truncate">Something else…</span>
             </Button>
           </Tooltip>
         </div>

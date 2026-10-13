@@ -129,11 +129,12 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
           <>
             {calls.length ? (
               <div className="tb-callpanel">
-                <div className={cn(SECTION, 'tb-callhead')}>
-                  <span>Your calls</span>
-                  <span className="font-semibold normal-case tracking-normal">· {calls.length}</span>
+                {/* At most two lines in a narrow side bar: the parts wrap, never their words (W15). */}
+                <div className={cn(SECTION, 'tb-callhead flex-wrap gap-y-0.5')}>
+                  <span className="whitespace-nowrap">Your calls</span>
+                  <span className="whitespace-nowrap font-semibold normal-case tracking-normal">· {calls.length}</span>
                   <Tooltip label={`The oldest one has waited ${waited(snapshot.attention.oldestSince, now)}`} className="ml-auto">
-                    <span className="font-semibold normal-case tracking-normal">oldest {waited(snapshot.attention.oldestSince, now)}</span>
+                    <span className="whitespace-nowrap font-semibold normal-case tracking-normal">oldest {waited(snapshot.attention.oldestSince, now)}</span>
                   </Tooltip>
                 </div>
                 {snapshot.attention.blocked ? (
@@ -284,7 +285,8 @@ function SideRow({
         type="button"
         className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         aria-label={`${card.title}, ${p.row || STAGE_NAMES[card.stage]}`}
-        onClick={() => openCard(card.id)}
+        // Enter or Space (a click with no pointer, detail 0) takes the keyboard to the page (W16).
+        onClick={(event) => openCard(card.id, event.detail === 0)}
       />
       <CardGlyph card={card} p={p} />
       <div className="pointer-events-none relative min-w-0 flex-1">
@@ -302,7 +304,7 @@ function SideRow({
           </div>
         ) : null}
         {inCalls ? (
-          <div className="pointer-events-auto">
+          <div className="tb-side-actions pointer-events-auto">
             <CallActions card={card} p={p} snapshot={snapshot} where="side" narrow={narrow} stacked />
           </div>
         ) : null}

@@ -25,6 +25,13 @@
 .tb-actions.stack { flex-direction: column; gap: 6px; }
 .tb-opt { width: 100%; justify-content: flex-start !important; }
 .tb-opt span { overflow: hidden; text-overflow: ellipsis; }
+/* A side bar below 240 px (VS Code goes down to 170): a call's buttons take the
+   whole row, under the glyph (26 px) and the menu (28 px) too, so their words
+   fit (W15). */
+@media (max-width: 239px) {
+  .tb-side-actions { margin-left: -26px; margin-right: -28px; }
+  .tb-side-actions .tb-opt { padding-left: 8px; padding-right: 8px; }
+}
 .tb-split { display: inline-flex; }
 .tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }

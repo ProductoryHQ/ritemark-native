@@ -604,6 +604,9 @@ async function main(): Promise<void> {
     assert.equal(current.description, 'Draft one email with placeholders.\n\nNotes: keep it short.\n', 'the suggestion above the user’s notes');
     assert.equal(current.history.at(-1)?.what, 'Made it a task from “workshop follow-up email template”');
     assert.equal(!(await controller.reviewIdea(idea, 'claude-code')).ok, true, 'only ideas are reviewed');
+    // The file is named after the task now, not the idea (Windows test).
+    assert.equal(path.basename(store.filePathOf(idea)!), 'write-the-workshop-follow-up-email.md', 'the slug a new card with this title gets');
+    assert.equal(fs.existsSync(path.join(store.tasksDir, 'workshop-follow-up-email-template.md')), false, 'the idea’s file is gone');
 
     // An empty idea body takes the suggestion as it is.
     const plain = await card(controller, 'Glossary page', 'idea');
@@ -611,8 +614,10 @@ async function main(): Promise<void> {
     answer({ ...proposal, title: 'Add a client glossary page', verdict: 'unclear' });
     await controller.settled();
     assert.equal((await view(plain)).history.at(-1)?.what, 'Reviewed: Needs detail');
+    await card(controller, 'Add a client glossary page');
     await controller.acceptReview(plain);
     assert.equal((await view(plain)).description, 'Draft one email with placeholders.\n');
+    assert.equal(path.basename(store.filePathOf(plain)!), 'add-a-client-glossary-page-2.md', 'a name another card has gets a number');
 
     // A review for an idea that moved on meanwhile is not stored.
     const moved = await card(controller, 'Run a pilot', 'idea');

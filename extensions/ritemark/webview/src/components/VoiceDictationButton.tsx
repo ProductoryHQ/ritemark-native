@@ -200,6 +200,9 @@ export function VoiceDictationButton() {
       <Tooltip label={isActive ? 'Stop dictation to change the language' : 'Select language'}>
         <button
           className="dictation-dropdown-trigger"
+          aria-label="Dictation language"
+          aria-haspopup="menu"
+          aria-expanded={showDropdown}
           onClick={handleDropdownClick}
           disabled={isActive}
           style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
