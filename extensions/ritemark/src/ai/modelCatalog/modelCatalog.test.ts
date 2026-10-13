@@ -517,6 +517,17 @@ test('S127 S28: an unavailable saved model is replaced by the default and report
   assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-6', 'claude-code'), { id: 'claude-sonnet-5-5', substitutedFrom: 'claude-opus-6' });
   assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-5', 'claude-code'), { id: 'claude-opus-5' });
   assert.deepStrictEqual(resolveRequestedModelIn(r, undefined, 'claude-code'), { id: 'claude-sonnet-5-5' }, 'nothing saved: no notice');
+  assert.deepStrictEqual(resolveRequestedModelIn(r, '', 'claude-code'), { id: 'claude-sonnet-5-5' }, 'the empty contributed default: no notice');
+});
+
+test('an empty saved Claude model runs the catalog default and owes no notice', () => {
+  const r = resolveAll({}, null, null, S127_BUNDLED, S127_APP).anthropic;
+  const same = (a: string, b: string) => a === b;
+  for (const saved of [undefined, '']) {
+    const choice = resolveRequestedModelIn(r, saved, 'claude-code');
+    assert.strictEqual(choice.id, r.defaults['claude-code']);
+    assert.strictEqual(substitutionForTurn(choice, choice.id, same), undefined, `saved ${JSON.stringify(saved)}`);
+  }
 });
 
 test('S127: live alias rows take the curated presentation of the model they resolve to, and keep their ids', () => {

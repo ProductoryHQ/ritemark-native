@@ -80,6 +80,14 @@ function main(): void {
   const stale = buildAgentSidebarBootstrap({ ...input(), persistedClaudeModel: 'removed-model' });
   assert.equal(stale.selectedModel, 'claude-opus-5[1m]', 'stale id must use the canonical default');
 
+  const freshDefault = { ...input(), defaultClaudeModel: 'claude-sonnet-5' };
+  const empty = buildAgentSidebarBootstrap({ ...freshDefault, persistedClaudeModel: '' });
+  assert.equal(empty.selectedModel, 'claude-sonnet-5', 'an empty saved model must use the catalog default');
+  const absent = buildAgentSidebarBootstrap({ ...freshDefault, persistedClaudeModel: undefined });
+  assert.equal(absent.selectedModel, 'claude-sonnet-5', 'no saved model must use the catalog default');
+  const chosen = buildAgentSidebarBootstrap({ ...freshDefault, persistedClaudeModel: 'opus[1m]' });
+  assert.equal(chosen.selectedModel, 'claude-opus-5[1m]', 'a chosen model must win over the catalog default');
+
   const invalidAgent = buildAgentSidebarBootstrap({ ...input(), selectedAgent: 'removed-agent' });
   assert.equal(invalidAgent.selectedAgent, 'claude-code');
 

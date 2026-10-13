@@ -2030,7 +2030,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         codexEnabled,
         opencodeEnabled,
         selectedAgent: config.get<string>('selectedAgent', 'claude-code'),
-        persistedClaudeModel: config.get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code')),
+        persistedClaudeModel: this._savedClaudeModel(),
         defaultClaudeModel: modelCatalog.getDefault('anthropic', 'claude-code'),
         agents: visibleAgents,
         claudeModels: modelCatalog.getModels('anthropic'),
@@ -2667,9 +2667,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _reconciledClaudeModelChoice(): modelCatalog.RequestedModelResolution {
-    const selected = vscode.workspace.getConfiguration('ritemark.ai')
-      .get<string>('selectedModel', modelCatalog.getDefault('anthropic', 'claude-code'));
-    return modelCatalog.resolveRequestedModel('anthropic', selected, 'claude-code');
+    return modelCatalog.resolveRequestedModel('anthropic', this._savedClaudeModel(), 'claude-code');
+  }
+
+  /**
+   * The Claude model the user chose, or undefined when they chose none. The
+   * contributed default is empty: a contributed default always wins over a
+   * `get()` fallback, so a model id there would bypass the catalog default and
+   * be reported as a replaced saved model on a fresh profile.
+   */
+  private _savedClaudeModel(): string | undefined {
+    return vscode.workspace.getConfiguration('ritemark.ai').get<string>('selectedModel') || undefined;
   }
 
   private _sendActiveFile() {

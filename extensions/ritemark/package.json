@@ -405,8 +405,8 @@
           },
           "ritemark.ai.selectedModel": {
             "type": "string",
-            "default": "claude-sonnet-4-5",
-            "description": "Claude model to use (e.g. claude-sonnet-4-5, claude-opus-4, haiku)",
+            "default": "",
+            "description": "Claude model for new chats. Empty uses Ritemark's recommended model; choosing a model in the AI sidebar saves it here.",
             "scope": "application"
           },
           "ritemark.ai.debugTrace": {

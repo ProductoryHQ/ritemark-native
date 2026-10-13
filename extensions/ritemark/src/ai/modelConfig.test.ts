@@ -67,4 +67,18 @@ const walk = (directory: string): void => {
 for (const root of productionRoots) walk(root);
 assert.deepEqual(violations, [], 'canonical model IDs must not be duplicated outside modelConfig.ts');
 
+// A contributed setting default always wins over the reader's `get()` fallback,
+// so a model setting that ships a model id bypasses the catalog default.
+const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, 'package.json'), 'utf8')) as {
+  contributes: { configuration: { properties: Record<string, { default?: unknown }> } | Array<{ properties: Record<string, { default?: unknown }> }> };
+};
+const contributedSettings = ([] as Array<{ properties: Record<string, { default?: unknown }> }>)
+  .concat(manifest.contributes.configuration)
+  .flatMap((section) => Object.entries(section.properties));
+const modelSettings = contributedSettings.filter(([key]) => /model/i.test(key));
+assert.ok(modelSettings.some(([key]) => key === 'ritemark.ai.selectedModel'), 'ritemark.ai.selectedModel must stay contributed');
+for (const [key, schema] of modelSettings) {
+  assert.ok(schema.default === undefined || schema.default === '', `${key} must not contribute a model id as its default`);
+}
+
 console.log('modelConfig.test.ts passed');
