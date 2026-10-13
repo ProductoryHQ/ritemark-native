@@ -42,7 +42,7 @@ Then the Your calls tab opens
 ### S5: Add from the side bar
 When I type "Draft the workshop agenda" in "Add a task…" and press Enter
 Then a card appears at the top of To do on both surfaces and the field keeps focus
-And `.ritemark/tasks/<id>-draft-the-workshop-agenda.md` exists with `ritemark: task/1`, `stage: todo` and a "Created" history entry
+And `.ritemark/tasks/draft-the-workshop-agenda.md` exists (`<slug>.md` since D14) with `ritemark: task/1`, `stage: todo` and a "Created" history entry
 
 ### S6: Open the board
 When I press the Open board button beside the add field, then run "Tasks: Open Board"
@@ -62,7 +62,7 @@ Then it is back in To do
 ### S6c: Next up and Done when
 Then the top card of To do reads "Next up" on both surfaces
 When I open a card without Done when
-Then its state says "Add what done looks like below. Agents finish better with it."
+Then its Done when field says "What does done look like? One line. Agents finish better with it." (the card page, D14)
 When I type "One page, three to five themes" in Done when and press Enter
 Then the card file has `done_when`, and Give to sends it as "Done when: …" in the first message
 
