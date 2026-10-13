@@ -262,6 +262,13 @@ for wf in "$PROJECT_ROOT"/.github/workflows/build-*.yml; do
     if [ ! -f "$wf" ]; then continue; fi
     name=$(basename "$wf")
 
+    # Only app builds carry the release gates below. build-whisper.yml (Sprint 129)
+    # builds the speech engine, which releases stage from the committed output.
+    if ! grep -q "gulp vscode-" "$wf"; then
+        echo "  - $name: not an app build (no gulp vscode-<target>), skipped"
+        continue
+    fi
+
     # Check GITHUB_TOKEN for npm install (ripgrep download needs it)
     if grep -q "GITHUB_TOKEN" "$wf"; then
         check_pass "$name: GITHUB_TOKEN present"
