@@ -1211,6 +1211,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 - The feed is polled every 10 minutes with `If-None-Match`, so an unchanged feed is a 304. It is also polled when a stale sidebar becomes visible.
 - Discovery is probed again only when the declaration signature changes, or every 6 hours.
 - A saved model that is no longer available is replaced visibly: an init line says `X isn't available right now — using Y.` The host compares every Claude turn against the saved `ritemark.ai.selectedModel`, because the sidebar usually sends the replacement itself. It names the substitution once per conversation, keyed by the accepted conversation id: the first turn of a new conversation replaces the sidebar's client id. The setting's contributed default is empty, which means no choice: the turn runs the catalog default and there is no notice.
+- Model menus offer Claude 5 and newer (v1.14.0). The resolver marks an older Claude model from any source `hidden` and sorts it last (`CLAUDE_MENU_MIN_GENERATION` in `resolver.ts`). The row stays resolvable, so a saved selection runs without a substitution notice. The composer's Claude and OpenCode groups skip hidden rows. The catalog keeps Opus 4.8 and Haiku 4.5 as deprecated rows, so a subscription whose live list no longer names them can still run a saved pick.
 - Model-unavailable CLI and API errors name the model and point to the model menu. They add no new `failureKind`.
 
 **Claude Code currency (D4).**

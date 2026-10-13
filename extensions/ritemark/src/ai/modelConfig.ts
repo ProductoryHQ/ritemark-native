@@ -41,6 +41,7 @@ export const CLAUDE_MODEL_IDS = {
   OPUS_4_8: 'claude-opus-4-8',
   FABLE_5_1: 'claude-fable-5-1',
   FABLE_5: 'claude-fable-5',
+  HAIKU_5_5: 'claude-haiku-5-5',
   HAIKU_4_5: 'claude-haiku-4-5-20251001',
 } as const;
 

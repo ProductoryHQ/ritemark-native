@@ -51,6 +51,8 @@ export interface ModelOption {
   aliases?: string[];
   isDefault?: boolean;
   thinkingEffort?: ModelThinkingEffort;
+  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  hidden?: boolean;
 }
 
 export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
@@ -423,6 +425,8 @@ export interface ByokModelOption {
   id: string;
   label: string;
   description: string;
+  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  hidden?: boolean;
 }
 
 /**

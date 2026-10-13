@@ -17,7 +17,7 @@ export interface AgentSidebarBootstrapMessage {
   agents: AgentInfo[];
   models: ModelEntry[];
   codexModels: ModelEntry[];
-  byokProviderModels?: Record<string, Array<{ id: string; label: string; description: string }>>;
+  byokProviderModels?: Record<string, Array<{ id: string; label: string; description: string; hidden?: boolean }>>;
   hasSeenWelcome: boolean;
   workspacePath?: string;
   claudeSdkVersion: string | null;

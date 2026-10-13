@@ -109,7 +109,36 @@ function resolveProvider(
       resolvedDefaults = bundledPC.defaults;
     }
   }
-  return { models: sorted, defaults: resolvedDefaults, source };
+  return { models: hideOlderClaudeModels(sorted), defaults: resolvedDefaults, source };
+}
+
+/**
+ * Model menus offer Claude 5 and newer (Jarmo, 2026-10-13, v1.14.0). An older
+ * Claude model from any source (the catalog, Claude Code's live list, an API
+ * key's `/v1/models`, OpenCode) stays in the resolved list, so a saved
+ * selection still resolves and runs, but it is marked `hidden` and sorted last.
+ */
+export const CLAUDE_MENU_MIN_GENERATION = 5;
+
+/**
+ * The first numeric part after `claude-`, in any path segment: 4 for a
+ * `claude-<family>-4-…` id, 3 for an OpenRouter `…/claude-3.5-…` id; undefined
+ * when the id is not a versioned Claude model.
+ */
+export function claudeGeneration(id: string | undefined): number | undefined {
+  const segment = id?.split('/').find((part) => part.startsWith('claude-'));
+  const token = segment?.slice('claude-'.length).split('-').find((part) => /^\d/.test(part));
+  return token === undefined ? undefined : parseInt(token, 10);
+}
+
+export function isOlderClaudeModel(model: ModelEntry): boolean {
+  const generation = claudeGeneration(model.id) ?? claudeGeneration(model.resolvedModel);
+  return generation !== undefined && generation < CLAUDE_MENU_MIN_GENERATION;
+}
+
+function hideOlderClaudeModels(models: ModelEntry[]): ModelEntry[] {
+  const marked = models.map((model) => (isOlderClaudeModel(model) ? { ...model, hidden: true } : model));
+  return [...marked.filter((model) => !model.hidden), ...marked.filter((model) => model.hidden)];
 }
 
 /** An older or undated remote/cache snapshot is not fresher than the bundled floor. */

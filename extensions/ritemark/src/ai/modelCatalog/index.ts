@@ -250,14 +250,14 @@ export function onUpdate(cb: (resolved: Resolved) => void): vscode.Disposable {
  * The vendor is the first path segment; the remainder is the bare model id
  * (so the first segment is the vendor and the remainder is its provider model id).
  */
-export function getByokProviderModels(): Record<string, { id: string; label: string; description: string }[]> {
-  const grouped: Record<string, { id: string; label: string; description: string }[]> = {};
+export function getByokProviderModels(): Record<string, { id: string; label: string; description: string; hidden?: boolean }[]> {
+  const grouped: Record<string, { id: string; label: string; description: string; hidden?: boolean }[]> = {};
   for (const m of getModels('opencode')) {
     const slash = m.id.indexOf('/');
     if (slash <= 0) continue;
     const vendor = m.id.slice(0, slash);
     const bareId = m.id.slice(slash + 1);
-    (grouped[vendor] ??= []).push({ id: bareId, label: m.label, description: m.description });
+    (grouped[vendor] ??= []).push({ id: bareId, label: m.label, description: m.description, ...(m.hidden ? { hidden: true } : {}) });
   }
   return grouped;
 }
