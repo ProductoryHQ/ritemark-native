@@ -22,6 +22,7 @@ export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
 
 /** Canonical Codex agent model identifiers. */
 export const CODEX_MODEL_IDS = {
+  SOL_6_1: 'gpt-6.1-sol',
   ASTRA: 'gpt-6-astra',
   SOL: 'gpt-5.6-sol',
   TERRA: 'gpt-5.6-terra',
