@@ -19,6 +19,7 @@ import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
+import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
@@ -75,6 +76,8 @@ export let commentTaskController: CommentTaskController | undefined;
  * circular import at load time.
  */
 export let googleDocs: GoogleDocsFeature | undefined;
+/** The task board (Sprint 130): the Ritemark editor asks it which documents are card pages. */
+export let taskBoard: TaskBoardHost | undefined;
 
 // Agent Library view provider
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
@@ -408,6 +411,17 @@ export function activate(context: vscode.ExtensionContext) {
   // are logged, never thrown.
   void commentTaskController.sweepOnActivation((message, error) => {
     console.warn(`[commentTasks] ${message}`, error);
+  });
+
+  // ── Task board (Sprint 130, #119) ───────────────────────────────────────────
+  // One board per window for the project folder: cards in `.ritemark/tasks/`,
+  // the Tasks side bar, the Task board tab, the badge and the two commands.
+  taskBoard = registerTaskBoard({
+    context,
+    runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
+    cardSidebar: unifiedViewProvider.cardTaskHostDependencies(),
+    attachTaskListener: (listener) => unifiedViewProvider.attachTaskListener(listener),
+    oneShotSettings: (runtimeId) => unifiedViewProvider.oneShotSettings(runtimeId),
   });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────

@@ -7,7 +7,7 @@
 // ── Minimal vscode stub ──────────────────────────────────────────────────────
 // HomeViewProvider imports vscode for workspace.findFiles/fs.stat.
 // Pre-populate the require cache before any other imports (same pattern as
-// BrowserToolsInjector.test.ts).
+// CodexRuntime.test.ts).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Module = require('module') as {
   _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
@@ -101,6 +101,15 @@ async function main() {
 
   await test('requests far more than the old 200-file cap (runaway guard only)', () => {
     assert.ok(requestedMaxResults >= 5000, `expected a high cap, got ${requestedMaxResults}`);
+  });
+
+  await test('the AI quick action says "New AI conversation" (Sprint 130 R14: a task is a board card)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = provider as any;
+    view._view = { webview: { asWebviewUri: (uri: unknown) => uri, cspSource: 'csp' } };
+    const html: string = view._html(true, [], []);
+    assert.ok(html.includes('New AI conversation'), 'the quick action names a conversation');
+    assert.ok(!html.includes('New AI task'), 'no "New AI task" left');
   });
 
   console.log(`\n${passed} passed`);

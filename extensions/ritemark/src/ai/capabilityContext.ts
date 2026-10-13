@@ -23,7 +23,7 @@
 import type { AgentId } from '../agent/types';
 
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
-export const CAPABILITY_CONTEXT_VERSION = 1;
+export const CAPABILITY_CONTEXT_VERSION = 2;
 
 /**
  * Per-runtime binding details. NOT capability content — just how a runtime names
@@ -35,19 +35,24 @@ export interface CapabilityDescriptor {
   editTool: string;
   /** Whether this runtime exposes integrated-browser tools (include the hint). */
   hasBrowserTools: boolean;
+  /** Whether this runtime has the task board tools (include the TASK BOARD section). */
+  hasBoardTools: boolean;
 }
 
 export const CLAUDE_DESCRIPTOR: CapabilityDescriptor = {
   editTool: 'your Write/Edit tools',
   hasBrowserTools: true,
+  hasBoardTools: true,
 };
 export const CODEX_DESCRIPTOR: CapabilityDescriptor = {
   editTool: 'apply_patch',
   hasBrowserTools: true,
+  hasBoardTools: true,
 };
 export const ACP_DESCRIPTOR: CapabilityDescriptor = {
   editTool: 'your file-writing tool',
   hasBrowserTools: true,
+  hasBoardTools: true,
 };
 
 const DESCRIPTORS: Record<AgentId, CapabilityDescriptor> = {
@@ -57,15 +62,15 @@ const DESCRIPTORS: Record<AgentId, CapabilityDescriptor> = {
 };
 
 /**
- * The descriptor to render for one session. Browser guidance follows
- * `browserToolsAvailable` the same way for every runtime: pass the same
- * `browser-agent-control` check that gives the runtime its browser tools, so the
- * hint appears exactly when the tools do. OpenCode has had the tools since
- * Sprint 79 (the `ritemark_browser` stdio MCP adapter) yet was the one runtime
- * whose hint did not follow them; routing all three through here keeps it so.
+ * The descriptor to render for one session. Each section follows the same
+ * check that gives the runtime its tools, so the guidance appears exactly when
+ * the tools do: `browser` is the `browser-agent-control` flag, `board` whether
+ * this window has a task board (Sprint 130, W5). OpenCode has had the browser
+ * tools since Sprint 79 yet was the one runtime whose hint did not follow them;
+ * routing all three through here keeps it so.
  */
-export function capabilityDescriptorFor(runtime: AgentId, browserToolsAvailable: boolean): CapabilityDescriptor {
-  return { ...DESCRIPTORS[runtime], hasBrowserTools: browserToolsAvailable };
+export function capabilityDescriptorFor(runtime: AgentId, tools: { browser: boolean; board: boolean }): CapabilityDescriptor {
+  return { ...DESCRIPTORS[runtime], hasBrowserTools: tools.browser, hasBoardTools: tools.board };
 }
 
 interface CapabilitySection {
@@ -135,6 +140,19 @@ const SECTIONS: CapabilitySection[] = [
     render: (d) =>
       d.hasBrowserTools
         ? 'INTEGRATED BROWSER: Ritemark has an integrated browser. When opening URLs or browsing the web, prefer the integrated browser tools over shelling out to `open`/`xdg-open`.'
+        : null,
+  },
+  {
+    id: 'board',
+    render: (d) =>
+      d.hasBoardTools
+        ? [
+            'TASK BOARD: this project has a task board — cards the user and agents work through (Ideas, To do, Doing, Done).',
+            '- Read and change it only with the `ritemark_board` tools (list_cards, read_card, add_card, update_card, move_card, report_result, ask_user). Never edit the files in `.ritemark/tasks/` yourself.',
+            '- When a message says it is a card on the task board, work toward the card\'s "Done when", and finish with report_result for that card: one or two sentences on what you did, plus up to three short things the user should check.',
+            '- Before long work, put the decisions that would change the result to the user with ask_user first, rather than stopping halfway. For any decision that can wait, use ask_user instead of guessing, then end your turn; the answer comes back to the conversation.',
+            '- Only the user marks a card done, and only the user deletes one.',
+          ].join('\n')
         : null,
   },
   {

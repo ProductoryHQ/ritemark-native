@@ -278,6 +278,9 @@ interface EditorProps {
   commentCallouts?: boolean
   syncTarget?: DocumentApplyTarget
   onExternalApplied?: (target: DocumentApplyTarget) => void
+  /** Sprint 130: content above the document inside the same scroll (a task
+   *  card's title, state and files on its page). */
+  header?: React.ReactNode
 }
 
 export function Editor({
@@ -291,6 +294,7 @@ export function Editor({
   commentCallouts = false,
   syncTarget,
   onExternalApplied,
+  header,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -998,6 +1002,7 @@ export function Editor({
       ref={setScrollContainer}
       className={`wysiwyg-editor h-full overflow-y-auto relative ${className}`}
     >
+      {header}
       <EditorContent editor={editor} />
 
       {editor ? (

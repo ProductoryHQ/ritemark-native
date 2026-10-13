@@ -239,7 +239,7 @@ For the release sequence (sign, DMG, notarize, GitHub Release), see the `release
 The extension host is **esbuild-bundled**, not the old ~130 loose `out/*.js` tree (that was the root cause of the Windows EMFILE class, the v1.7.1 0-byte-tsc trap, and DMG bloat — all now resolved).
 
 - `npm run compile` = `tsc --noEmit -p ./` (type-check only) **then** `node esbuild.config.mjs` (emit). Type errors still fail the build; esbuild strips types without checking.
-- Output is **two** self-contained bundles: `out/extension.js` (package.json `main`; first-party code + inlined pure-JS deps) and `out/browser/browserMcpAdapter.js` (a standalone Node subprocess spawned by `BrowserToolsInjector` — its own entry point because a child process can't `require()` code loaded in the host).
+- Output is **two** self-contained bundles: `out/extension.js` (package.json `main`; first-party code + inlined pure-JS deps) and `out/browser/browserMcpAdapter.js` (a standalone Node subprocess that OpenCode starts for Ritemark's tool groups, wired by `RitemarkToolsInjector` — its own entry point because a child process can't `require()` code loaded in the host).
 - `external` (NOT inlined; stay in `node_modules`): `vscode` (host), `fsevents` (native, macOS-only), `pdfkit` (loads its own font data at runtime), and — invisibly, because they're loaded via `new Function('return import(...)')` — the two ESM agent SDKs `@anthropic-ai/claude-agent-sdk` and `@agentclientprotocol/sdk`. So `node_modules` is retained but its footprint is largely inlined away.
 - `npm run watch` runs esbuild in watch mode (fast rebuilds). Run `tsc --noEmit --watch` separately if you want live type-checking during watch.
 
@@ -247,7 +247,7 @@ The extension host is **esbuild-bundled**, not the old ~130 loose `out/*.js` tre
 
 Because the host is one flat bundle, new code must not reintroduce the layout assumptions bundling breaks:
 
-1. **No `__dirname`-depth path math.** Do not compute paths assuming a module's directory depth under `out/` (the whole host is now `out/extension.js`). Derive the extension root from a bundle-independent source — prefer `context.extensionPath` / `vscode.extensions.getExtension('ritemark.ritemark')?.extensionPath`. (Sprint 92 fixed two such landmines: `bundledAgentRuntime.ts`, `BrowserToolsInjector.ts`.)
+1. **No `__dirname`-depth path math.** Do not compute paths assuming a module's directory depth under `out/` (the whole host is now `out/extension.js`). Derive the extension root from a bundle-independent source — prefer `context.extensionPath` / `vscode.extensions.getExtension('ritemark.ritemark')?.extensionPath`. (Sprint 92 fixed two such landmines: `bundledAgentRuntime.ts`, `BrowserToolsInjector.ts`, now `RitemarkToolsInjector.ts`.)
 2. **Native / runtime-asset / dynamically-`require()`d-by-path packages → esbuild `external`.** A new pure-JS dependency is auto-inlined; a package with a `.node` binary, a `binding.gyp`, or one that reads its own data files at runtime (like `pdfkit`) must be added to the `external` list in `esbuild.config.mjs` instead.
 3. **Separately-spawned processes need their own esbuild entry point.** Code launched as its own OS process (like `browserMcpAdapter`) cannot live in the main bundle — add it as a second entry point.
 

@@ -131,14 +131,29 @@ test('browser guidance appears exactly when a runtime has the browser tools', ()
     ['opencode', 'file-writing tool'],
   ] as const;
   for (const [runtime, editTool] of runtimes) {
-    const withTools = renderCapabilityContext(capabilityDescriptorFor(runtime, true));
-    const withoutTools = renderCapabilityContext(capabilityDescriptorFor(runtime, false));
+    const withTools = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: true, board: false }));
+    const withoutTools = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
     assert.ok(/integrated browser/i.test(withTools), `${runtime} with browser tools gets the hint`);
     assert.ok(!/integrated browser/i.test(withoutTools), `${runtime} without browser tools omits it`);
     assert.ok(
       withTools.includes(editTool) && withoutTools.includes(editTool),
       `${runtime} keeps its own edit-tool binding`,
     );
+  }
+});
+
+// ── Sprint 130 W5: the TASK BOARD section follows the board tools ───────────
+test('task board guidance appears exactly when a runtime has the board tools', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: true }));
+    const withoutBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
+    assert.ok(withBoard.includes('TASK BOARD'), `${runtime} with the board gets the section`);
+    assert.ok(!withoutBoard.includes('TASK BOARD'), `${runtime} without a board omits it`);
+    // What the agent must do on a card: the tools, report_result with things to
+    // check, decisions before long work, and never finishing or editing files.
+    for (const needle of ['ritemark_board', 'report_result', 'up to three', 'ask_user', 'Before long work', 'Done when', 'Only the user marks a card done', '.ritemark/tasks/']) {
+      assert.ok(withBoard.includes(needle), `${runtime}: ${needle}`);
+    }
   }
 });
 

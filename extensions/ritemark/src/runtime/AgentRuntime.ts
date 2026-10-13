@@ -11,6 +11,7 @@ import type {
   ThinkingEffortCapability,
 } from './thinkingEffort';
 import type { RuntimeFailureKind } from './runtimeErrorPresentation';
+import type { DynamicToolDefinition } from '../codex/codexProtocol';
 
 export type { AgentId };
 export type {
@@ -155,7 +156,12 @@ export interface RuntimeSessionConfig {
   /** Called when a turn completes with its final result (Claude Code) */
   onComplete?: (result: RuntimeTurnResult) => void;
   /** Called when a Codex turn completes with its status and optional error */
-  onCodexComplete?: (result: { status: string; error?: string }) => void;
+  /**
+   * `lastAgentMessage` (Sprint 130, G4): the turn's final assistant message on
+   * its own, so a task's result is the agent's conclusion rather than the
+   * first sentence it streamed. Absent when the runtime cannot tell messages apart.
+   */
+  onCodexComplete?: (result: { status: string; error?: string; lastAgentMessage?: string }) => void;
   /** Codex approval policy (passed to threadStart) */
   codexApprovalPolicy?: string;
   /** Codex sandbox mode (passed to threadStart) */
@@ -174,8 +180,14 @@ export interface RuntimeSessionConfig {
   onExit?: () => void;
   /** Called with slow-RPC progress (thread/start etc.) to show UI feedback */
   onRpcProgress?: (method: string, message: string) => void;
-  /** Called when Codex requests a browser tool call (dynamic tools) */
-  onBrowserToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean }>;
+  /**
+   * Codex dynamic tools for a new thread: Ritemark's tool groups (browser, task
+   * board; Sprint 130 W5). Fixed when the thread starts, so a turn whose tools
+   * differ starts a fresh thread.
+   */
+  codexDynamicTools?: DynamicToolDefinition[];
+  /** Called when Codex calls one of `codexDynamicTools`. */
+  onDynamicToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean }>;
 }
 
 export interface RuntimeTurnConfig {

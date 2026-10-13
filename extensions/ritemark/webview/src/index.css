@@ -223,6 +223,23 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-conversation-22: #c4b5fd;
   --r-conversation-23: #f0abfc;
   --r-ring-color: var(--ritemark-ring-color-dark);
+
+  /* F1 (Sprint 130): a custom property is resolved where it is declared, so the
+     shadcn role tokens on :root kept their light values in dark mode
+     (bg-background stayed #ffffff, bg-secondary #f1f5f9, measured in 1.13.0).
+     Re-declared here, so outline and secondary buttons follow the theme.
+     --primary is left as it ships. */
+  --background: var(--r-surface);
+  --foreground: var(--r-ink-strong);
+  --muted: var(--r-surface-soft);
+  --muted-foreground: var(--r-ink-muted);
+  --border: var(--r-hairline);
+  --input: var(--r-hairline-strong);
+  --ring: var(--r-accent);
+  --secondary: var(--r-surface-soft);
+  --secondary-foreground: var(--r-ink-strong);
+  --accent: var(--r-accent-soft);
+  --accent-foreground: var(--r-ink-strong);
 }
 
 body {

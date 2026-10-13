@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { Tooltip } from '../ui/tooltip';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { queueFor, isQueuePaused, QUEUE_CAP } from './promptQueue';
 import { deriveActivityState } from './activityState';
@@ -79,7 +80,7 @@ export function QueuePanel({
               {index + 1}
             </span>
             <Icon
-              name={item.source === 'comment' ? 'note-pencil' : 'chat-circle'}
+              name={item.source === 'card' ? 'kanban' : item.source === 'comment' ? 'note-pencil' : 'chat-circle'}
               size={12}
               className="mt-0.5 shrink-0 text-[var(--r-ink-faint)]"
             />
@@ -111,47 +112,62 @@ export function QueuePanel({
             )}
             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               {item.status === 'failed' ? (
-                <button
-                  onClick={() => retryQueued(conversation.id, item.id)}
-                  className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
-                  title="Retry"
-                >
-                  <Icon name="arrow-counter-clockwise" size={12} />
-                </button>
+                <Tooltip label="Retry">
+                  <button
+                    aria-label="Retry"
+                    onClick={() => retryQueued(conversation.id, item.id)}
+                    className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+                  >
+                    <Icon name="arrow-counter-clockwise" size={12} />
+                  </button>
+                </Tooltip>
               ) : (
                 <>
-                  <button
-                    onClick={() => { setEditingId(item.id); setEditText(item.displayText); }}
-                    className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
-                    title="Edit"
-                  >
-                    <Icon name="pencil-simple" size={12} />
-                  </button>
-                  <button
-                    onClick={() => moveQueued(conversation.id, item.id, -1)}
-                    disabled={index === 0}
-                    className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-30"
-                    title="Move up"
-                  >
-                    <Icon name="caret-up" size={12} />
-                  </button>
-                  <button
-                    onClick={() => moveQueued(conversation.id, item.id, 1)}
-                    disabled={index === items.length - 1}
-                    className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-30"
-                    title="Move down"
-                  >
-                    <Icon name="caret-down" size={12} />
-                  </button>
+                  {/* Sprint 130 (G5): a comment's or a card's item carries the
+                      prompt the host built; editing it would replace that with
+                      the display text, so task items can only be removed. */}
+                  {item.taskId ? null : (
+                  <Tooltip label="Edit">
+                    <button
+                      aria-label="Edit"
+                      onClick={() => { setEditingId(item.id); setEditText(item.displayText); }}
+                      className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+                    >
+                      <Icon name="pencil-simple" size={12} />
+                    </button>
+                  </Tooltip>
+                  )}
+                  <Tooltip label="Move up">
+                    <button
+                      aria-label="Move up"
+                      onClick={() => moveQueued(conversation.id, item.id, -1)}
+                      disabled={index === 0}
+                      className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-30"
+                    >
+                      <Icon name="caret-up" size={12} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="Move down">
+                    <button
+                      aria-label="Move down"
+                      onClick={() => moveQueued(conversation.id, item.id, 1)}
+                      disabled={index === items.length - 1}
+                      className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] disabled:opacity-30"
+                    >
+                      <Icon name="caret-down" size={12} />
+                    </button>
+                  </Tooltip>
                 </>
               )}
-              <button
-                onClick={() => removeQueued(conversation.id, item.id)}
-                className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-error)]"
-                title="Remove"
-              >
-                <Icon name="x" size={12} />
-              </button>
+              <Tooltip label="Remove">
+                <button
+                  aria-label="Remove"
+                  onClick={() => removeQueued(conversation.id, item.id)}
+                  className="rounded p-0.5 text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-error)]"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </Tooltip>
             </span>
           </li>
         ))}

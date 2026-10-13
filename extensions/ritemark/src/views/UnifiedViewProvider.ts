@@ -56,8 +56,6 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
-import { BROWSER_TOOL_ALLOW_NAMES } from '../browser/browserMcpServer';
-import { isCodexBrowserToolCall, dispatchCodexBrowserToolCall } from '../browser/codexBrowserTools';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
@@ -67,7 +65,8 @@ import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
-import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
+import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
+import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import * as modelCatalog from '../ai/modelCatalog';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
@@ -77,6 +76,7 @@ import {
   deriveRuntimeAvailabilities,
   messageForRuntimeAvailability,
   recoveryForRuntimeAvailability,
+  type RuntimeAvailability,
 } from '../runtime/availability';
 import type {
   CommentTaskAvailability,
@@ -86,8 +86,10 @@ import type {
   CommentTaskRuntimeSettings,
 } from '../commentTasks/CommentTaskController';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
+import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
+import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
 import {
   isThinkingEffort,
@@ -133,7 +135,7 @@ import {
   type ChatLocalTarget,
 } from './chatLinkTargets';
 
-const _browserToolsInjector = new BrowserToolsInjector();
+const _toolsInjector = new RitemarkToolsInjector();
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -143,6 +145,34 @@ const DEFAULT_CONVERSATION_ID = 'default';
 
 /** Sprint 128: the header line of a turn Claude opened itself (Design G). */
 const RUNTIME_TURN_HEADER = 'A background task finished — Claude is continuing';
+
+/** How a turn ended, as every task listener hears it. */
+export interface AgentTaskTerminalOutcome {
+  status: 'completed' | 'failed' | 'cancelled' | 'interrupted';
+  text?: string;
+  error?: string;
+  interruptReason?: 'restart' | 'sidebar-unreachable' | 'conversation-deleted' | 'runtime-exited';
+  /** Files the turn changed, when the runtime reports them (Claude does). */
+  filesModified?: string[];
+}
+
+/**
+ * Sprint 130 (G1): a kind of task that runs turns in the AI sidebar. Comment
+ * tasks (`CommentTaskController`) and task-board cards each implement it and
+ * ignore turns they do not own.
+ */
+export interface AgentTaskListener {
+  applyEnqueueOutcome?(taskId: string, outcome: CommentTaskEnqueueOutcome): Promise<void> | void;
+  applyDequeued?(taskId: string): Promise<void> | void;
+  applyDispatchFailed?(taskId: string, message: string): Promise<void> | void;
+  applyTurnStarted(conversationId: string, conversationTurnId: string): Promise<void> | void;
+  applyTurnAttention(
+    conversationId: string,
+    conversationTurnId: string,
+    attentionKind: 'approval' | 'question' | 'plan-review',
+  ): Promise<void> | void;
+  applyTurnTerminal(conversationId: string, conversationTurnId: string, outcome: AgentTaskTerminalOutcome): Promise<void> | void;
+}
 
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
@@ -204,8 +234,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** Resolvers waiting for the sidebar's first `conversation/active` report. */
   private _activeConversationWaiters: Array<(conversationId: string | null) => void> = [];
   /** Pending `comment-task/enqueue` handshakes, keyed by taskId. */
-  private readonly _commentTaskEnqueueWaiters = new Map<string, (outcome: CommentTaskEnqueueOutcome) => void>();
-  private _commentTaskController: CommentTaskController | null = null;
+  private readonly _commentTaskEnqueueWaiters = new Map<string, (outcome: CommentTaskEnqueueOutcome, conversationId?: string) => void>();
+  /**
+   * Sprint 130 (G1): every kind of task that runs turns in this sidebar —
+   * comment tasks and task-board cards — hears every turn event. Each one
+   * ignores turns it does not own (it finds its task by the host-minted turn
+   * id), so there is still exactly one owner per turn.
+   */
+  private readonly _taskListeners: AgentTaskListener[] = [];
   /**
    * The destination record read during acceptance, kept only long enough for
    * the synchronous `runtimeSettings()` call that follows it.
@@ -221,6 +257,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** The turn currently running in each conversation, so a cancel that carries
    *  no turn id can still be attributed to the exact turn. */
   private readonly _activeConversationTurnIds = new Map<string, string>();
+  /**
+   * The last turn that ended in each conversation. Its record is written by a
+   * queued checkpoint, so for a moment it can still say the turn is working;
+   * the capacity check must not count it (a card waiting for room in the AI
+   * sidebar would otherwise wait for the next, unrelated turn event).
+   */
+  private readonly _endedConversationTurnIds = new Map<string, string>();
   private _documentContent: string = '';
   private _currentSelection: EditorSelection = { text: '', isEmpty: true, from: 0, to: 0 };
 
@@ -530,7 +573,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
 
         case 'comment-task/enqueue-result':
-        case 'comment-task/dequeued': {
+        case 'comment-task/dequeued':
+        case 'comment-task/dispatch-failed': {
           let sidebarMessage;
           try {
             sidebarMessage = decodeCommentTaskSidebarMessage(message);
@@ -541,14 +585,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             const waiter = this._commentTaskEnqueueWaiters.get(sidebarMessage.taskId);
             if (waiter) {
               this._commentTaskEnqueueWaiters.delete(sidebarMessage.taskId);
-              waiter(sidebarMessage.outcome);
+              waiter(sidebarMessage.outcome, sidebarMessage.conversationId);
             } else {
               // No one is waiting: the acceptance already timed out, so the
               // ledger — not the caller — has to hear the verdict.
-              void this._commentTaskController?.applyEnqueueOutcome(sidebarMessage.taskId, sidebarMessage.outcome);
+              const { taskId, outcome } = sidebarMessage;
+              this._forEachTaskListener((listener) => listener.applyEnqueueOutcome?.(taskId, outcome));
             }
+          } else if (sidebarMessage.type === 'comment-task/dispatch-failed') {
+            const { taskId, message: reason } = sidebarMessage;
+            this._forEachTaskListener((listener) => listener.applyDispatchFailed?.(taskId, reason));
           } else {
-            void this._commentTaskController?.applyDequeued(sidebarMessage.taskId);
+            const { taskId } = sidebarMessage;
+            this._forEachTaskListener((listener) => listener.applyDequeued?.(taskId));
           }
           break;
         }
@@ -671,6 +720,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // frozen at acceptance. The sidebar sends that back on the execute
           // message; using it instead of the active tab is the whole of F11/F12.
           const commentTaskId = typeof message.taskId === 'string' ? message.taskId : undefined;
+          // Sprint 130: a task-board card's turn. The user is likely looking at
+          // the Tasks side bar, so the end of the turn must not switch it away.
+          const cardTurn = message.taskKind === 'card';
           const commentTaskSourcePath = typeof message.sourceDisplayPath === 'string' && message.sourceDisplayPath
             ? message.sourceDisplayPath
             : undefined;
@@ -703,6 +755,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             && capabilitiesFor(agentId as import('../agent/types').AgentId).planFirst;
           const codexTurnMode: 'plan' | 'execute' = planFirst ? 'plan' : 'execute';
           const browserEnabled = isEnabled('browser-agent-control');
+          // Ritemark's own tools this turn (Sprint 130, W5): the browser with its
+          // flag, the task board whenever this window has one. OpenCode gets the
+          // same groups through its adapter, fixed for its process.
+          const toolGroups = toolGroupsFor({ browser: browserEnabled });
+          const codexDynamicTools = isCodex ? _toolsInjector.codexDynamicTools(toolGroups) : undefined;
 
           // ── Per-turn context injection (parity with the pre-Sprint-79 handlers;
           //    Sprint 79 unifies the plumbing, NOT the behavior — see architecture.md) ──
@@ -747,10 +804,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ? { path: commentTaskSourcePath }
               : this._getActiveFileContext();
 
-          // Browser MCP server for Claude Code (in-process server)
+          // Ritemark's tools for Claude Code: one in-process MCP server per group.
           let mcpServers: Record<string, unknown> | undefined;
-          if (isClaudeCode && browserEnabled) {
-            mcpServers = await _browserToolsInjector.getMcpServers(true);
+          if (isClaudeCode) {
+            mcpServers = await _toolsInjector.claudeMcpServers(toolGroups);
           }
 
           const byokKeys = await this._readByokKeys();
@@ -849,6 +906,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   sandboxMode: codexSandboxMode ?? null,
                   approvalPolicy: codexApprovalPolicy ?? null,
                   authBinding,
+                  // A Codex thread resumes only with the tools it started with (P2).
+                  ...(isCodex && codexDynamicTools ? { toolSet: toolSetKey(codexDynamicTools) } : {}),
                 },
               ),
             };
@@ -972,11 +1031,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             // runtime its browser tools (Claude: in-process MCP server, Codex:
             // dynamic tools, OpenCode: the MCP adapter AcpRuntime attaches).
             extraSystemPrompt: renderCapabilityContext(
-              capabilityDescriptorFor(agentId as AgentId, browserEnabled),
+              capabilityDescriptorFor(agentId as AgentId, { browser: browserEnabled, board: boardToolsAvailable() }),
             ),
             mcpServers,
-            allowedTools: isClaudeCode && browserEnabled
-              ? [...DEFAULT_TOOLS, ...BROWSER_TOOL_ALLOW_NAMES]
+            allowedTools: isClaudeCode && toolGroups.length
+              ? [...DEFAULT_TOOLS, ..._toolsInjector.claudeAllowedTools(toolGroups)]
               : undefined,
             live: isClaudeCode
               ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled)
@@ -1020,7 +1079,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 error,
                 failureKind,
               });
-              this._refreshExplorerForAgentWrites(result.filesModified);
+              this._refreshExplorerForAgentWrites(result.filesModified, cardTurn);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 // Cancel normalisation (F24). Claude answers `session.cancel()`
@@ -1046,6 +1105,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   status,
                   text: result.text ?? '',
                   error,
+                  filesModified: result.filesModified ?? [],
                 });
               }
               if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
@@ -1079,7 +1139,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 status: result.status,
                 error: result.error,
               });
-              this._refreshExplorerForAgentWrites(undefined);
+              this._refreshExplorerForAgentWrites(undefined, cardTurn);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 const runtimeCompleted = !result.error && !/error|failed|cancelled/i.test(result.status);
@@ -1104,7 +1164,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
                   status,
-                  text: streamedResponseText,
+                  // G4 (Sprint 130): a task's result is the agent's last
+                  // message (its conclusion), not the opening narration; the
+                  // transcript above keeps the whole stream.
+                  text: result.lastAgentMessage ?? streamedResponseText,
                   error: result.error,
                 });
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
@@ -1174,16 +1237,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (!isCurrentRuntimeTurn()) return;
               this._view?.webview.postMessage({ type: 'codex-rpc-progress', conversationId, method: _method, message: msg });
             },
-            // Codex dynamic browser tools (dispatched in extension host, results sent back to Codex)
-            onBrowserToolCall: (agentId === 'codex' && browserEnabled)
+            // Codex dynamic tools: Ritemark's tool groups, run in the extension
+            // host, results sent back to Codex.
+            codexDynamicTools,
+            onDynamicToolCall: codexDynamicTools
               ? async (toolName, args, _requestId) => {
                 if (!isCurrentRuntimeTurn()) {
                   return { text: 'This agent handoff is no longer active.', success: false };
                 }
-                if (isCodexBrowserToolCall(toolName)) {
-                  return dispatchCodexBrowserToolCall(toolName, args);
-                }
-                return { text: `Unknown browser tool: ${toolName}`, success: false };
+                return _toolsInjector.codexToolCall(toolGroups, toolName, args);
               }
               : undefined,
           };
@@ -1209,7 +1271,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             if (isCurrentRuntimeTurn()) {
               // The task is no longer waiting in the queue — it is running.
               if (commentTaskId && conversationTurnId) {
-                void this._commentTaskController?.applyTurnStarted(conversationId, conversationTurnId);
+                this._forEachTaskListener((listener) => listener.applyTurnStarted(conversationId, conversationTurnId));
               }
               // Keyed by the accepted id: the first turn of a new conversation
               // replaces the sidebar's client id with a canonical one.
@@ -1286,12 +1348,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const session = this._findRuntimeSession(message.conversationId, 'claude-code');
           (session as import('../agent/ClaudeCodeRuntime').ClaudeCodeSession | undefined)
             ?.answerQuestion(message.toolUseId, message.answers || {});
+          this._applyTaskResumed(message.conversationId);
           break;
         }
 
         case 'agent-approve': {
           const { requestId, approved, alwaysAllow, agentId: approveAgentId } = message;
           this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
+          this._applyTaskResumed(message.conversationId);
           if (approveAgentId) {
             const session = this._findRuntimeSession(message.conversationId, approveAgentId as AgentId);
             // Sprint 103 R2: optional feedback rides plan rejections ("Keep planning").
@@ -1406,6 +1470,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const session = this._findRuntimeSession(message.conversationId, 'codex');
           (session as import('../codex/CodexRuntime').CodexSession | undefined)
             ?.answerQuestion(message.requestId, message.answers || {});
+          this._applyTaskResumed(message.conversationId);
           break;
         }
 
@@ -1543,7 +1608,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   // lives in `CommentTaskController`.
 
   public attachCommentTaskController(controller: CommentTaskController): void {
-    this._commentTaskController = controller;
+    this.attachTaskListener(controller);
+  }
+
+  /** Sprint 130 (G1): another task kind (the task board) hears turn events too. */
+  public attachTaskListener(listener: AgentTaskListener): void {
+    if (!this._taskListeners.includes(listener)) this._taskListeners.push(listener);
+  }
+
+  private _forEachTaskListener(apply: (listener: AgentTaskListener) => Promise<void> | void): void {
+    for (const listener of this._taskListeners) {
+      try {
+        void Promise.resolve(apply(listener)).catch((error) => console.warn('[tasks] listener failed', error));
+      } catch (error) {
+        console.warn('[tasks] listener failed', error);
+      }
+    }
   }
 
   /** The dependencies `extension.ts` composes the controller from. */
@@ -1584,6 +1664,137 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
+  /**
+   * Sprint 130 (W6): what a one-shot call such as idea review runs with for an
+   * agent — the project folder, the model this sidebar would start it on and
+   * the same keys. Claude: the selected model; Codex: its default; OpenCode
+   * (which has no default): the first model a saved key opens, in the
+   * sidebar's provider order.
+   */
+  public async oneShotSettings(runtimeId: AgentId): Promise<OneShotSettings> {
+    const workspacePath = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const byokKeys = await this._readByokKeys();
+    const byokEnv = buildByokEnv(byokKeys);
+    if (runtimeId === 'claude-code') {
+      const model = this._reconciledClaudeModel();
+      const claudeModelDeclaration = modelCatalog.getClaudeSessionDeclaration(model);
+      const anthropicApiKey = (await getSetupStatus()).authMethod === 'api-key' ? byokKeys.anthropic : undefined;
+      return {
+        workspacePath,
+        model,
+        byokEnv,
+        ...(anthropicApiKey ? { anthropicApiKey } : {}),
+        ...(claudeModelDeclaration ? { claudeModelDeclaration } : {}),
+      };
+    }
+    if (runtimeId === 'codex') return { workspacePath, model: modelCatalog.getDefault('codex', 'codex'), byokEnv };
+    const flags = byokProviderFlags(byokKeys);
+    const models = modelCatalog.getByokProviderModels();
+    const provider = (['google', 'openai', 'anthropic', 'openrouter'] as const).find((id) => flags[id] && models[id]?.length);
+    return { workspacePath, byokEnv, ...(provider ? { model: `${provider}/${models[provider][0].id}` } : {}) };
+  }
+
+  /**
+   * Sprint 130: what the task board's handoff ledger needs from the sidebar
+   * side of the host. A card runs in its own conversation (a new one on its
+   * first handoff), never the open one, and a handoff never takes focus.
+   */
+  public cardTaskHostDependencies(): CardTaskSidebar {
+    return {
+      areDurableConversationsEnabled: async () => (
+        (await this._conversationController.currentRolloutMode()) !== 'legacy'
+      ),
+      runtimeSettings: (runtimeId) => this._commentTaskRuntimeSettings('', runtimeId as AgentId),
+      enqueue: (message) => this._enqueueCardTask(message),
+      canAttach: (conversationId) => this._canAttachRuntime(conversationId),
+      revealConversation: (conversationId) => this._revealConversation(conversationId),
+      cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),
+      conversationExists: async (conversationId) => {
+        try {
+          await this._conversationController.runtimeConversation(conversationId);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      conversationTitle: async (conversationId) => {
+        try {
+          return (await this._conversationController.runtimeConversation(conversationId)).title || null;
+        } catch {
+          return null;
+        }
+      },
+      setConversationTitle: async (conversationId, title) => {
+        const record = await this._conversationController.runtimeConversation(conversationId);
+        if (record.title === title) return;
+        await this._conversationController.handle({
+          type: 'conversation/rename',
+          requestId: `card-title-${Date.now().toString(36)}`,
+          conversationId,
+          bindingGeneration: record.bindingGeneration,
+          title,
+        });
+      },
+    };
+  }
+
+  /**
+   * Room for one more working conversation (Phase 0, P1): the same capacity
+   * decision as a turn, without evicting or failing. An idle conversation that
+   * would be released counts as room.
+   */
+  private async _canAttachRuntime(conversationId: string | null): Promise<boolean> {
+    const capacity = isEnabled('parallelChats') ? PARALLEL_RUNTIME_ATTACHMENT_LIMIT : SINGLE_RUNTIME_ATTACHMENT_LIMIT;
+    const attachments = await Promise.all(Array.from(this._runtimeSessions.keys()).map(async (id) => {
+      try {
+        const record = await this._conversationController.runtimeConversation(id);
+        const lifecycle = record.lifecycle;
+        const ended = 'activeTurnId' in lifecycle && this._endedConversationTurnIds.get(id) === lifecycle.activeTurnId;
+        return { conversationId: id, lifecycle: ended ? ({ state: 'idle' } as const) : lifecycle, lastUsedAt: this._runtimeSessionLastUsed.get(id) ?? 0 };
+      } catch {
+        return { conversationId: id, lifecycle: { state: 'idle' } as const, lastUsedAt: this._runtimeSessionLastUsed.get(id) ?? 0 };
+      }
+    }));
+    const decision = decideRuntimeAttachmentCapacity({
+      attachments,
+      incomingConversationId: conversationId ?? '__new-card-conversation__',
+      currentConversationId: this._selectedConversationId,
+      capacity,
+    });
+    return decision.kind !== 'blocked';
+  }
+
+  /**
+   * The card variant of `_enqueueCommentTask`: the same handshake, but the
+   * sidebar is shown without focus, and the answer names the conversation the
+   * task was queued in (a new one, or one loaded from history).
+   */
+  private _enqueueCardTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string }> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (outcome: CommentTaskEnqueueOutcome, conversationId?: string): void => {
+        if (settled) return;
+        settled = true;
+        this._commentTaskEnqueueWaiters.delete(enqueueMessage.taskId);
+        clearTimeout(timer);
+        resolve({ outcome, ...(conversationId ? { conversationId } : {}) });
+      };
+      const timer = setTimeout(() => settle('no-conversation'), 15_000);
+      this._commentTaskEnqueueWaiters.set(enqueueMessage.taskId, settle);
+      void this._awaitActiveConversation(5000, true).then((ready) => {
+        const view = this._view;
+        if (!ready || !view) {
+          settle('no-conversation');
+          return;
+        }
+        this.show();
+        void view.webview.postMessage(enqueueMessage).then((delivered) => {
+          if (delivered === false) settle('no-conversation');
+        }, () => settle('no-conversation'));
+      }, () => settle('no-conversation'));
+    });
+  }
+
   private _noteActiveConversation(conversationId: string | null): void {
     this._activeConversationId = conversationId;
     if (this._activeConversationWaiters.length === 0) return;
@@ -1603,13 +1814,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * Reveal the sidebar and wait — bounded — for it to say which conversation is
    * open. Resolves immediately when it already has.
    */
-  private async _awaitActiveConversation(timeoutMs = 5000): Promise<string | null> {
+  private async _awaitActiveConversation(timeoutMs = 5000, preserveFocus = false): Promise<string | null> {
     if (this._activeConversationId) return this._activeConversationId;
     const reported = new Promise<string | null>((resolve) => {
       this._activeConversationWaiters.push(resolve);
     });
-    if (!this._view) await vscode.commands.executeCommand('ritemark.unifiedView.focus');
-    else this.show();
+    // Sprint 130 (P7): a task-board handoff shows the sidebar without taking
+    // focus from the document the user is in.
+    if (!this._view) {
+      await vscode.commands.executeCommand('ritemark.unifiedView.focus', preserveFocus ? { preserveFocus: true } : undefined);
+    } else this.show();
     return Promise.race([
       reported,
       new Promise<string | null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
@@ -1652,6 +1866,33 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * runtime boundary (audit F19).
    */
   private async _checkRuntimeAvailability(runtimeId: AgentId): Promise<CommentTaskAvailability> {
+    const probe = await this._probeRuntimeAvailability(runtimeId);
+    if (!probe.ok) {
+      // A probe that throws is an unknown state, never a usable one.
+      return { usable: false, message: probe.message, recovery: 'retry' };
+    }
+    const result = probe.availability;
+    if (result.usable) return { usable: true };
+    return {
+      usable: false,
+      message: messageForRuntimeAvailability(runtimeId, result),
+      recovery: recoveryForRuntimeAvailability(result.state),
+    };
+  }
+
+  /**
+   * One agent's availability from the same authorities as the comment-task
+   * gate (Sprint 130: the task board's Give to agent). A probe that throws
+   * reads as `error`, never as usable.
+   */
+  public async runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability> {
+    const probe = await this._probeRuntimeAvailability(runtimeId);
+    return probe.ok ? probe.availability : { state: 'error', usable: false, detail: probe.message };
+  }
+
+  private async _probeRuntimeAvailability(
+    runtimeId: AgentId,
+  ): Promise<{ ok: true; availability: RuntimeAvailability } | { ok: false; message: string }> {
     const codexEnabled = isEnabled('codex-integration');
     const opencodeEnabled = isEnabled('opencode-integration');
     let setupStatus: SetupStatus | null = null;
@@ -1667,12 +1908,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         acpProviders = byokProviderFlags(await this._readByokKeys());
       }
     } catch (error) {
-      // A probe that throws is an unknown state, never a usable one.
-      return {
-        usable: false,
-        message: error instanceof Error ? error.message : String(error),
-        recovery: 'retry',
-      };
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
 
     const availabilities = deriveRuntimeAvailabilities({
@@ -1689,13 +1925,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       acpProviders,
       byokProviderModels: opencodeEnabled ? modelCatalog.getByokProviderModels() : undefined,
     });
-    const result = availabilities[runtimeId];
-    if (result.usable) return { usable: true };
-    return {
-      usable: false,
-      message: messageForRuntimeAvailability(runtimeId, result),
-      recovery: recoveryForRuntimeAvailability(result.state),
-    };
+    return { ok: true, availability: availabilities[runtimeId] };
   }
 
   /**
@@ -1797,23 +2027,31 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     conversationTurnId: string | undefined,
     attentionKind: 'approval' | 'question' | 'plan-review',
   ): void {
-    if (!conversationTurnId || !this._commentTaskController) return;
-    void this._commentTaskController.applyTurnAttention(conversationId, conversationTurnId, attentionKind);
+    if (!conversationTurnId) return;
+    this._forEachTaskListener((listener) => listener.applyTurnAttention(conversationId, conversationTurnId, attentionKind));
+  }
+
+  /**
+   * Sprint 130 (G3): the user answered an approval, a question or a plan
+   * review, so the agent works again. The task that owns the turn reads
+   * Working instead of still saying it needs the user.
+   */
+  private _applyTaskResumed(conversationId: unknown): void {
+    if (typeof conversationId !== 'string') return;
+    const conversationTurnId = this._activeConversationTurnIds.get(conversationId);
+    if (!conversationTurnId) return;
+    this._forEachTaskListener((listener) => listener.applyTurnStarted(conversationId, conversationTurnId));
   }
 
   private _applyCommentTaskTerminal(
     conversationId: string,
     conversationTurnId: string | undefined,
-    outcome: {
-      status: 'completed' | 'failed' | 'cancelled' | 'interrupted';
-      text?: string;
-      error?: string;
-      interruptReason?: 'restart' | 'sidebar-unreachable' | 'conversation-deleted' | 'runtime-exited';
-    },
+    outcome: AgentTaskTerminalOutcome,
   ): void {
     this._activeConversationTurnIds.delete(conversationId);
-    if (!conversationTurnId || !this._commentTaskController) return;
-    void this._commentTaskController.applyTurnTerminal(conversationId, conversationTurnId, outcome);
+    if (!conversationTurnId) return;
+    this._endedConversationTurnIds.set(conversationId, conversationTurnId);
+    this._forEachTaskListener((listener) => listener.applyTurnTerminal(conversationId, conversationTurnId, outcome));
   }
 
   /**
@@ -2860,7 +3098,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Bug #33: After an agent finishes writing files, nudge the explorer so it doesn't show stale state. */
-  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
+  /**
+   * `keepSideBar` (Sprint 130): VS Code's refresh command also OPENS the
+   * Explorer, which switched the Tasks side bar away the moment a card's agent
+   * finished. A card's turn keeps the file-provider nudge (the stats, the first
+   * half of the #33 fix) and leaves the side bar alone.
+   */
+  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined, keepSideBar = false): void {
     const parentDirs = new Set<string>();
     if (filesModified) {
       for (const file of filesModified) {
@@ -2872,9 +3116,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       Array.from(parentDirs).map((dir) =>
         vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined)
       )
-    ).then(() =>
-      vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer')
-    );
+    ).then(() => {
+      if (!keepSideBar) void vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+    });
   }
 
   // ── Runtime sessions (Sprint 99) ─────────────────────────────────────

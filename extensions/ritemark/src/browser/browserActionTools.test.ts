@@ -3,7 +3,8 @@
  *
  * Mocks `vscode.commands.executeCommand` to verify each tool dispatches to
  * the correct workbench command, returns typed results, and never throws on
- * workbench errors. Also exercises codexBrowserTools dispatcher routing.
+ * workbench errors. Also exercises the Codex routing of the browser tools,
+ * which since Sprint 130 come from the one registry (runtime/ritemarkTools).
  */
 
 import { strict as assert } from 'node:assert';
@@ -48,7 +49,9 @@ moduleAny._load = (request: string, parent: unknown, isMain?: boolean): unknown 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const actions = require('./BrowserActionTools') as typeof import('./BrowserActionTools');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const codexTools = require('./codexBrowserTools') as typeof import('./codexBrowserTools');
+const registry = require('../runtime/ritemarkTools') as typeof import('../runtime/ritemarkTools');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { RitemarkToolsInjector } = require('../runtime/RitemarkToolsInjector') as typeof import('../runtime/RitemarkToolsInjector');
 
 const {
   browserNavigate,
@@ -61,12 +64,19 @@ const {
   formatActionResultForAgent,
 } = actions;
 
-const {
-  CODEX_BROWSER_TOOL_NAMES,
-  isCodexBrowserToolCall,
-  buildCodexBrowserDynamicTools,
-  dispatchCodexBrowserToolCall,
-} = codexTools;
+const { BROWSER_TOOL_GROUP, codexDynamicTools, findCodexTool } = registry;
+const injector = new RitemarkToolsInjector();
+const isCodexBrowserToolCall = (name: string) => findCodexTool([BROWSER_TOOL_GROUP], name) !== null;
+const dispatchCodexBrowserToolCall = (name: string, args: Record<string, unknown>) => injector.codexToolCall([BROWSER_TOOL_GROUP], name, args);
+/** The Codex names the model has seen since Sprint 69; the registry must keep them. */
+const CODEX_BROWSER_TOOL_NAMES = [
+  'ritemark_browser_navigate',
+  'ritemark_browser_click',
+  'ritemark_browser_fill',
+  'ritemark_browser_type',
+  'ritemark_browser_scroll',
+  'ritemark_browser_snapshot',
+];
 
 function resetCalls() {
   calls.length = 0;
@@ -139,7 +149,7 @@ async function runTests() {
   assert.ok(formattedErr.startsWith('Error: Bad'));
 
   // 5. Codex dynamicTools list shape.
-  const dynamicTools = buildCodexBrowserDynamicTools();
+  const dynamicTools = codexDynamicTools([BROWSER_TOOL_GROUP]);
   assert.equal(dynamicTools.length, 6);
   for (const tool of dynamicTools) {
     assert.match(tool.name, /^[a-zA-Z0-9_-]+$/, `tool name ${tool.name} must match Codex naming rule`);
@@ -176,7 +186,7 @@ async function runTests() {
   assert.ok(snapshotResult.text.includes('snapshot-tree'));
   assert.equal(calls[0].command, 'workbench.action.browser.agentSnapshot');
 
-  // 9. CODEX_BROWSER_TOOL_NAMES is the same set surfaced by buildCodexBrowserDynamicTools().
+  // 9. The registry keeps the Codex names the model has always seen.
   const namesFromTools = dynamicTools.map((t) => t.name);
   assert.deepEqual([...CODEX_BROWSER_TOOL_NAMES].sort(), namesFromTools.slice().sort());
 

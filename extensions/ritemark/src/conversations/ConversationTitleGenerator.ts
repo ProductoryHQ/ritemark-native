@@ -1,6 +1,6 @@
-import { randomUUID } from 'crypto';
 import type { AgentId, ClaudeModelDeclaration } from '../agent/types';
-import type { AgentRuntime, RuntimeSession, RuntimeTurnResult, UnifiedApprovalRequest } from '../runtime/AgentRuntime';
+import type { AgentRuntime } from '../runtime/AgentRuntime';
+import { runOneShotTurn } from '../runtime/oneShotTurn';
 
 const TITLE_TIMEOUT_MS = 45_000;
 const MAX_CONTEXT_CHARS = 4_000;
@@ -43,77 +43,19 @@ function titlePrompt(input: ConversationTitleGenerationInput): string {
 export class ConversationTitleGenerator {
   constructor(private readonly createRuntime: ConversationRuntimeFactory) {}
 
-  async generate(input: ConversationTitleGenerationInput): Promise<string> {
-    const runtime = this.createRuntime(input.runtimeId);
-
-    let session: RuntimeSession | undefined;
-    let settled = false;
-    let streamedText = '';
-    let resolveFinished!: (value: string) => void;
-    let rejectFinished!: (error: Error) => void;
-    const finished = new Promise<string>((resolve, reject) => {
-      resolveFinished = resolve;
-      rejectFinished = reject;
+  generate(input: ConversationTitleGenerationInput): Promise<string> {
+    return runOneShotTurn(this.createRuntime(input.runtimeId), {
+      purpose: 'conversation-title',
+      label: 'Title generation',
+      workspacePath: input.workspacePath,
+      model: input.model,
+      anthropicApiKey: input.anthropicApiKey,
+      ...(input.claudeModelDeclaration ? { claudeModelDeclaration: input.claudeModelDeclaration } : {}),
+      byokEnv: input.byokEnv,
+      systemPrompt: TITLE_SYSTEM_PROMPT,
+      prompt: titlePrompt(input),
+      timeoutMs: TITLE_TIMEOUT_MS,
+      timeoutMessage: 'Title generation timed out',
     });
-    const resolveOnce = (value: string): void => {
-      if (settled) return;
-      settled = true;
-      resolveFinished(value);
-    };
-    const rejectOnce = (error: Error): void => {
-      if (settled) return;
-      settled = true;
-      rejectFinished(error);
-    };
-    const rejectApproval = (request: UnifiedApprovalRequest): void => {
-      session?.respondToApproval(request.requestId, false, false);
-    };
-    const finishAgent = (result: RuntimeTurnResult): void => {
-      if (result.error) rejectOnce(new Error(result.error));
-      else resolveOnce(result.text ?? streamedText);
-    };
-
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-    try {
-      session = await runtime.createSession(`conversation-title-${randomUUID()}`, {
-        workspacePath: input.workspacePath,
-        model: input.model,
-        anthropicApiKey: input.anthropicApiKey,
-        ...(input.claudeModelDeclaration ? { claudeModelDeclaration: input.claudeModelDeclaration } : {}),
-        byokEnv: input.byokEnv,
-        extraSystemPrompt: TITLE_SYSTEM_PROMPT,
-        allowedTools: [],
-        approvalMode: 'ask',
-        codexApprovalPolicy: 'untrusted',
-        codexSandboxMode: 'read-only',
-        onProgress: (progress) => {
-          if (progress.type === 'text') streamedText += progress.message;
-        },
-        onApprovalRequest: rejectApproval,
-        onComplete: finishAgent,
-        onCodexComplete: (result) => {
-          if (result.error || /error|failed|cancelled/i.test(result.status)) {
-            rejectOnce(new Error(result.error ?? `Title generation ${result.status}`));
-          } else {
-            resolveOnce(streamedText);
-          }
-        },
-        onExit: () => rejectOnce(new Error('Title generation runtime exited unexpectedly')),
-      });
-
-      const timeout = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error('Title generation timed out')), TITLE_TIMEOUT_MS);
-      });
-      const execution = (async (): Promise<string> => {
-        await session!.prompt({ prompt: titlePrompt(input), timeoutMinutes: 1, model: input.model });
-        return finished;
-      })();
-      return await Promise.race([execution, timeout]);
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
-      if (!settled) void session?.cancel();
-      session?.dispose();
-      runtime.dispose();
-    }
   }
 }

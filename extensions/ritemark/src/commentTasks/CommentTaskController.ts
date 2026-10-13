@@ -562,6 +562,21 @@ export class CommentTaskController {
     await this.publish(record.source.documentUri);
   }
 
+  /**
+   * Sprint 130 (G6): the sidebar could not dispatch the queued turn at all
+   * (its message threw). Without this the comment said Queued forever.
+   */
+  async applyDispatchFailed(taskId: string, message: string): Promise<void> {
+    const record = await this.dependencies.store.get(taskId);
+    if (!record || (record.lifecycle.state !== 'accepting' && record.lifecycle.state !== 'queued')) return;
+    await this.transitionQuietly(taskId, record.bindingGeneration, {
+      state: 'failed',
+      since: this.timestamp(),
+      safeMessage: safeFailureMessage(message),
+    });
+    await this.publish(record.source.documentUri);
+  }
+
   async applyTurnStarted(conversationId: string, conversationTurnId: string): Promise<void> {
     await this.applyTurnEvent(conversationId, conversationTurnId, () => ({
       state: 'running',

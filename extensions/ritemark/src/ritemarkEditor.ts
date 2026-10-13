@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
+import type { CardPages } from './taskBoard/cardPages';
 import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -242,6 +243,16 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  /**
+   * Sprint 130 (design.md §5): the task board's card pages. A card file opens
+   * here in card mode; the board owns its front matter. Lazy require, as for
+   * the comment tasks, avoids a load-time circular import with ./extension.
+   */
+  private static cardPages(): CardPages | null {
+    const ext = require('./extension') as typeof import('./extension');
+    return ext.taskBoard?.cardPages ?? null;
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {
     this.documentSync = new DocumentSyncCoordinator(context, {
       buildPayload: (document, webview) => this.buildSyncPayload(document, webview),
@@ -297,6 +308,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Markdown: existing flow with added fields
     const parsed = this.extractFrontMatter(document.getText());
+    // A task card shows as a page: the board's front matter never reaches the
+    // view, and the view's strip reads the card from the board (Sprint 130).
+    const cardMode = RitemarkEditorProvider.cardPages()?.cardModeFor(document) ?? null;
     // Views compare host payloads against their own Markdown projection, which
     // never carries the persisted trailing newline or gray-matter's leading one.
     // Send the projection form, or the echo of an accepted edit is mistaken for
@@ -337,8 +351,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       fileType: 'markdown',
       filename,
       content,
-      properties: parsed.properties,
-      hasProperties: parsed.hasProperties,
+      properties: cardMode ? {} : parsed.properties,
+      hasProperties: cardMode ? false : parsed.hasProperties,
       imageMappings,
       features: {
         voiceDictation: isEnabled('voice-dictation'),
@@ -347,6 +361,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         commentCallouts: isEnabled('comment-callouts')
       },
       ...agentFields,
+      ...(cardMode ? { cardMode } : {}),
     };
   }
 
@@ -361,9 +376,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     if (payload.fileType !== fileType) {
       throw new Error('Document edit file type does not match the open editor.');
     }
-    return payload.fileType === 'markdown'
-      ? this.serializeFrontMatter(payload.properties, payload.content)
-      : payload.content;
+    if (payload.fileType === 'markdown') {
+      // A card page saves its body only; the board's front matter stays byte for byte.
+      const card = RitemarkEditorProvider.cardPages()?.spliceBody(document, payload.content);
+      if (card !== null && card !== undefined) return card;
+      return this.serializeFrontMatter(payload.properties, payload.content);
+    }
+    return payload.content;
   }
 
   /**
@@ -689,6 +708,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     documentWebviews.add(webview);
     RitemarkEditorProvider.commentTaskWebviews.set(commentTaskKey, documentWebviews);
 
+    // Sprint 130: a file in the task board's card folder is a card page; its
+    // strip talks to the board over the same webview.
+    const cardPages = RitemarkEditorProvider.cardPages();
+    const cardPage = cardPages && document.uri.scheme === 'file' && cardPages.isCardPath(document.uri.fsPath)
+      ? cardPages.connect(document, webviewPanel.webview)
+      : null;
+
     // Show word count status bar only for markdown files
     const fileType = this.getFileType(document.uri.fsPath);
     if (fileType === 'markdown') {
@@ -796,7 +822,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Legacy fallback for viewers without the Sprint 115 sync bootstrap.
             const fileType = this.getFileType(document.uri.fsPath);
             if (fileType === 'markdown') {
-              const fullContent = this.serializeFrontMatter(
+              const card = RitemarkEditorProvider.cardPages()?.spliceBody(document, message.content as string);
+              const fullContent = card ?? this.serializeFrontMatter(
                 message.properties as DocumentProperties | undefined,
                 message.content as string
               );
@@ -808,6 +835,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           }
 
           case 'propertiesChanged':
+            // A card page has no properties of its own: the board owns them.
+            if (RitemarkEditorProvider.cardPages()?.cardModeFor(document)) return;
             if (this.getFileType(document.uri.fsPath) === 'markdown') {
               const currentParsed = this.extractFrontMatter(document.getText());
               const newContent = this.serializeFrontMatter(
@@ -1057,6 +1086,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         if (remaining.size === 0) { RitemarkEditorProvider.commentTaskWebviews.delete(commentTaskKey); }
       }
       imageWatcher.dispose();
+      cardPage?.dispose();
       this.documentSync.disposeView(document, webview);
       this.dictationControllers.get(webview)?.cleanup();
       this.dictationControllers.delete(webview);

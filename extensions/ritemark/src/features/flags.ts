@@ -24,6 +24,8 @@ export interface FeatureFlag {
 export type FlagId =
   // Sprint 106 (#74): persistent Home / first-task launcher
   | 'home-launcher'
+  // Sprint 130 (#119): task board in each project folder, with Give to agent
+  | 'task-board'
   | 'voice-dictation'
   | 'markdown-export'
   | 'save-as-markdown-from-preview'
@@ -110,12 +112,23 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     platforms: ['darwin', 'win32', 'linux'],
   },
   // Sprint 106 (#74): persistent Home re-entry surface (Activity Bar view with
-  // New document / New AI task / recent work). Experimental = real runtime
+  // New document / New AI conversation / recent work). Experimental = real runtime
   // kill-switch during rollout; ON by default per HARD RULE #2.
   'home-launcher': {
     id: 'home-launcher',
     label: 'Home Launcher',
     description: 'Persistent Home view in the Activity Bar: create a Markdown document, start an AI task, or reopen recent work after the Welcome page is gone.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 130 (#119): a task board per project folder (cards in
+  // `.ritemark/tasks/`), Give to agent, and the board tools for all three
+  // runtimes. Experimental = real runtime kill-switch; ON by default per HARD
+  // RULE #2 through `ritemark.features.task-board`.
+  'task-board': {
+    id: 'task-board',
+    label: 'Task Board',
+    description: 'A task board for each project folder: cards as Markdown files in .ritemark/tasks, Your calls, and Give to agent with Claude Code, Codex or OpenCode.',
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },

@@ -17,17 +17,9 @@ import * as crypto from 'crypto';
 import { AcpManager } from './acpManager';
 import { traceAcp } from './acpTrace';
 import { findBundledAgentRuntime, findBundledOpenCodePathEntries, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
-import { BrowserIpcServer } from '../browser/BrowserIpcServer';
-import { BrowserToolsInjector } from '../runtime/BrowserToolsInjector';
-import {
-  browserNavigate,
-  browserClick,
-  browserFill,
-  browserType,
-  browserScroll,
-  browserSnapshot,
-  formatActionResultForAgent,
-} from '../browser/BrowserActionTools';
+import { RitemarkIpcServer } from '../runtime/RitemarkIpcServer';
+import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
+import { BOARD_TOOL_GROUP, toolGroupsFor } from '../runtime/ritemarkTools';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
 import type {
@@ -35,7 +27,6 @@ import type {
   RequestPermissionResponse,
   WriteTextFileRequest,
 } from '@agentclientprotocol/sdk';
-import type { BrowserIpcRequest } from '../browser/BrowserIpcServer';
 import type {
   AgentRuntime,
   RuntimeSession,
@@ -56,7 +47,25 @@ import { thinkingEffortLabel } from '../runtime/thinkingEffort';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
-const _browserToolsInjector = new BrowserToolsInjector();
+const _toolsInjector = new RitemarkToolsInjector();
+
+/**
+ * A permission request for one of the board tools (Phase 0, P3). With
+ * Ritemark's OpenCode permissions they never ask; this covers a user whose own
+ * OpenCode config asks for everything, and OpenCode's `doom_loop` check on
+ * three identical calls in a row. Edits and shell commands keep asking.
+ */
+export function isBoardToolPermission(params: RequestPermissionRequest): boolean {
+  const call = params.toolCall as { title?: unknown; rawInput?: unknown } | undefined;
+  const title = typeof call?.title === 'string' ? call.title : '';
+  const prefix = `${BOARD_TOOL_GROUP.server}_`;
+  if (title.startsWith(prefix)) return true;
+  if (title === 'doom_loop') {
+    const raw = call?.rawInput as { tool?: unknown } | undefined;
+    return typeof raw?.tool === 'string' && raw.tool.startsWith(prefix);
+  }
+  return false;
+}
 
 /**
  * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
@@ -253,7 +262,8 @@ export class AcpSession implements RuntimeSession {
           : result.stopReason === 'cancelled'
             ? 'interrupted'
             : result.stopReason;
-        config.onCodexComplete?.({ status });
+        const lastAgentMessage = manager.lastAgentMessage(this.acpSessionId);
+        config.onCodexComplete?.({ status, ...(lastAgentMessage ? { lastAgentMessage } : {}) });
       } catch (err) {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.
@@ -343,7 +353,7 @@ export class AcpRuntime implements AgentRuntime {
   /** ONE manager / ONE OpenCode subprocess shared by every conversation (D1). */
   private _manager: AcpManager | null = null;
   private _approvalSeq = 0;
-  private _ipcServer: BrowserIpcServer | null = null;
+  private _ipcServer: RitemarkIpcServer | null = null;
 
   private readonly _sessions = new Map<string, AcpSession>();
   /** Reverse index — ACP notifications and fs requests carry `sessionId`. */
@@ -493,19 +503,21 @@ export class AcpRuntime implements AgentRuntime {
       );
     }
 
-    // Start the browser IPC server when the feature flag is on so OpenCode can
-    // reach the integrated browser through the browserMcpAdapter subprocess.
-    // Under D1 all sessions share one subprocess and therefore one socket and
-    // one browser-tool channel — consistent with decision D2 (one shared
-    // browser). Disposing a single conversation must NOT stop it (C4).
+    // Ritemark's tools reach OpenCode through the stdio adapter, one adapter
+    // process per group (the browser with its feature flag, the task board when
+    // this window has one), all answered over one IPC socket. Under D1 all
+    // sessions share one subprocess and therefore one socket — consistent with
+    // decision D2 (one shared browser). Disposing a single conversation must
+    // NOT stop it (C4). The groups are fixed for the process's life.
     let mcpServers: unknown[] = [];
-    if (isEnabled('browser-agent-control')) {
+    const groups = toolGroupsFor({ browser: isEnabled('browser-agent-control') });
+    if (groups.length) {
       const ipcSessionId = crypto.randomUUID();
-      const ipcServer = new BrowserIpcServer(ipcSessionId);
-      await ipcServer.start((req) => this._handleBrowserIpcRequest(req));
+      const ipcServer = new RitemarkIpcServer(ipcSessionId);
+      await ipcServer.start((req) => _toolsInjector.handleIpc(req));
       this._ipcServer = ipcServer;
-      mcpServers = _browserToolsInjector.getAcpMcpServers(true, ipcServer.socketPath);
-      traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath });
+      mcpServers = _toolsInjector.acpMcpServers(groups, ipcServer.socketPath);
+      traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath, groups: groups.map((group) => group.id) });
     }
 
     this._manager = new AcpManager({
@@ -527,33 +539,6 @@ export class AcpRuntime implements AgentRuntime {
     });
   }
 
-  /**
-   * Dispatch an incoming BrowserIpcRequest from the adapter subprocess to the
-   * appropriate BrowserActionTools function and return a formatted text result.
-   */
-  private async _handleBrowserIpcRequest(req: BrowserIpcRequest): Promise<string> {
-    // Cast through `unknown` so TypeScript accepts the generic params object.
-    const p = req.params as unknown;
-    switch (req.tool) {
-      case 'browser_navigate':
-        return formatActionResultForAgent(await browserNavigate(p as Parameters<typeof browserNavigate>[0]));
-      case 'browser_click':
-        return formatActionResultForAgent(await browserClick(p as Parameters<typeof browserClick>[0]));
-      case 'browser_fill':
-        return formatActionResultForAgent(await browserFill(p as Parameters<typeof browserFill>[0]));
-      case 'browser_type':
-        return formatActionResultForAgent(await browserType(p as Parameters<typeof browserType>[0]));
-      case 'browser_scroll':
-        return formatActionResultForAgent(await browserScroll(p as Parameters<typeof browserScroll>[0]));
-      case 'browser_snapshot':
-        return formatActionResultForAgent(await browserSnapshot());
-      default: {
-        const exhaustive: never = req.tool;
-        return `Error: Unknown browser tool: ${exhaustive as string}`;
-      }
-    }
-  }
-
   private async _handlePermission(
     params: RequestPermissionRequest,
   ): Promise<RequestPermissionResponse> {
@@ -565,6 +550,12 @@ export class AcpRuntime implements AgentRuntime {
     }
     session.markDispatchAccepted();
     const config = session.config;
+
+    // Board tools change only the board, in every mode (Phase 0, P3).
+    if (isBoardToolPermission(params)) {
+      traceAcp('approval', 'board tool allowed', { conversationId: session.conversationId, tool: params.toolCall?.title });
+      return this._selectOutcome(params, true);
+    }
 
     // Unified 'auto' approval mode — allow without prompting the user.
     if (config.approvalMode === 'auto') {

@@ -1,0 +1,163 @@
+/*
+ * Task board (Sprint 130, #119): the parts of the Tasks side bar and the Task
+ * board tab that Tailwind classes do not express (columns, tiles, the call
+ * panel, the split button, the log rail). Ported from the clickable prototype
+ * (docs/development/releases/v1.14.0/sprint-130-task-board/prototype/), whose
+ * values follow the design tokens (--r-*). Scoped by the `tb-` prefix.
+ */
+.tb-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.tb-sec-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; }
+.tb-sec-btn:hover { color: var(--r-ink-muted); }
+.tb-sec-btn svg { transition: transform .15s ease; }
+.tb-sec-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
+.tb-tick { position: relative; z-index: 10; width: 20px; height: 20px; margin: -2px -2px 0; border-radius: 999px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--r-ink-faint); flex-shrink: 0; }
+.tb-tick .on { display: none; }
+.tb-tick:hover { color: var(--r-accent); }
+.tb-tick:hover .off { display: none; } .tb-tick:hover .on { display: block; }
+.tb-tick:disabled:hover .off { display: block; } .tb-tick:disabled:hover .on { display: none; }
+.tb-glyph { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1.75px; }
+.tb-spin { animation: tbspin 1s linear infinite; }
+@keyframes tbspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tb-spin { animation: none; } }
+.tone-accent { color: var(--r-accent); } .tone-amber { color: var(--r-warning); } .tone-red { color: var(--r-error); } .tone-muted { color: var(--r-ink-muted); } .tone-faint { color: var(--r-ink-faint); }
+.tb-summary { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--r-ink-body); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tb-actions { position: relative; z-index: 10; pointer-events: auto; margin-top: 8px; display: flex; gap: 8px; }
+.tb-actions.stack { flex-direction: column; gap: 6px; }
+.tb-opt { width: 100%; justify-content: flex-start !important; }
+.tb-opt span { overflow: hidden; text-overflow: ellipsis; }
+.tb-split { display: inline-flex; }
+.tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.tb-split > :last-child > button { border-left: 1px solid rgba(255,255,255,.24); padding-left: 8px !important; padding-right: 8px !important; }
+.tb-split-outline > :last-child > button { border-left-color: var(--r-hairline-strong); margin-left: -1px; }
+.tb-split > :first-child > button:disabled + *, .tb-split button:disabled { opacity: .6; }
+.tb-label { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); margin: 20px 0 8px; }
+.tb-label:first-child { margin-top: 0; }
+.tb-sub { margin-top: 2px; font-size: 12px; color: var(--r-ink-muted); }
+.tb-sub a { color: var(--r-accent); text-decoration: none; font-weight: 600; }
+.tb-sub a:hover { text-decoration: underline; }
+.tb-file { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; border: 1px solid var(--r-hairline); color: var(--r-ink-body); background: var(--r-surface); }
+.tb-file:hover { border-color: var(--r-hairline-strong); color: var(--r-ink-strong); }
+.tb-file.missing { color: var(--r-ink-faint); }
+.tb-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-hist { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 6px 10px; font-size: 12px; color: var(--r-ink-body); }
+.tb-hist .t { color: var(--r-ink-faint); font-variant-numeric: tabular-nums; }
+.tb-note { margin-top: 10px; border: 1px solid var(--r-hairline); border-radius: 8px; padding: 10px; background: var(--r-surface); }
+.tb-note label { display: block; font-size: 12px; font-weight: 600; color: var(--r-ink-strong); margin-bottom: 6px; }
+.tb-note textarea { min-height: 64px; }
+.tb-progress { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--r-ink-muted); }
+/* Board */
+.tb-board-head { padding: 18px 24px 0; }
+.tb-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--r-hairline); margin-top: 12px; }
+.tb-tab { border: 0; background: none; padding: 8px 0 9px; margin-bottom: -1px; font: 500 13px var(--ritemark-ui-font-family); color: var(--r-ink-muted); border-bottom: 2px solid transparent; display: inline-flex; gap: 6px; align-items: center; }
+.tb-tab:hover { color: var(--r-ink-strong); }
+.tb-tab[aria-selected="true"] { color: var(--r-ink-strong); font-weight: 600; border-bottom-color: var(--r-accent); }
+.tb-count { font-size: 11px; font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--r-surface-soft); color: var(--r-ink-muted); }
+.tb-tab[aria-selected="true"] .tb-count.hot, .tb-count.hot { background: var(--r-accent-soft); color: var(--r-accent-deep); }
+.tb-cols { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; padding: 16px 24px 12px; min-width: 964px; align-items: start; }
+.tb-col { background: var(--r-surface-muted); border-radius: 10px; padding: 8px; min-height: 120px; }
+.tb-col.drop { box-shadow: inset 0 0 0 2px var(--r-accent-soft); }
+.tb-colhead { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; margin: -8px -8px 0; padding: 12px 12px 8px 14px; border-radius: 10px 10px 0 0; background: var(--r-surface-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--r-ink-muted); } /* sticks while a long column scrolls, so its + and count stay in reach */
+.tb-colhead .n { font-weight: 400; color: var(--r-ink-faint); letter-spacing: 0; }
+.tb-colhint { font-size: 12px; color: var(--r-ink-faint); padding: 6px 6px 8px; }
+.tb-tile { position: relative; background: var(--r-surface); border: 1px solid var(--r-hairline); border-radius: 8px; padding: 10px 10px 10px 10px; margin-bottom: 8px; transition: border-color .1s, box-shadow .1s; isolation: isolate; } /* its own layer: the tick and More (z-10) stay inside the tile, under the sticky column header */
+.tb-tile:hover { border-color: var(--r-hairline-strong); box-shadow: 0 1px 2px rgba(30,27,75,.06); }
+.tb-tile.dragging { opacity: .45; }
+.tb-tile .mt { position: absolute; right: 6px; top: 6px; opacity: 0; }
+.tb-tile:hover .mt, .tb-tile .mt:has([data-state="open"]) { opacity: 1; }
+.tb-dropline { height: 2px; border-radius: 2px; background: var(--r-accent); margin: -5px 2px 3px; }
+.tb-addrow { margin-bottom: 8px; }
+.tb-foot { padding: 4px 24px 16px; font-size: 12px; color: var(--r-ink-faint); }
+.tb-callcard { border: 1px solid var(--r-hairline); background: var(--r-surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.tb-callcard:hover { border-color: var(--r-hairline-strong); }
+.tb-calls { max-width: 720px; padding: 16px 24px 24px; }
+.tb-empty { display: flex; align-items: center; gap: 8px; padding: 18px 14px; color: var(--r-ink-muted); font-size: 13px; }
+.tb-ideas { max-width: 760px; padding: 16px 24px 24px; }
+.tb-chips { display: flex; gap: 6px; margin: 12px 0 14px; }
+.tb-suggest { margin-top: 10px; border-top: 1px solid var(--r-hairline); padding-top: 10px; }
+.tb-log { max-width: 760px; padding: 16px 24px 24px; }
+.tb-day { margin-bottom: 18px; }
+.tb-day h3 { font: 600 13px var(--ritemark-ui-font-family); color: var(--r-ink-strong); margin-bottom: 8px; }
+.tb-rail { position: relative; padding-left: 22px; }
+.tb-rail::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--r-hairline); }
+.tb-ev { position: relative; padding: 4px 0 10px; }
+.tb-ev::before { content: ""; position: absolute; left: -20px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--r-surface); box-shadow: inset 0 0 0 2px var(--kind, var(--r-ink-faint)); }
+.tb-ev .w { font-size: 12px; color: var(--r-ink-faint); font-variant-numeric: tabular-nums; margin-right: 8px; }
+.tb-ev .what { font-size: 13px; color: var(--r-ink-strong); font-weight: 500; }
+.tb-ev .card { display: block; border: 0; background: none; padding: 0; font: 13px var(--ritemark-ui-font-family); color: var(--r-ink-muted); text-align: left; }
+.tb-ev .card:hover { color: var(--r-accent); text-decoration: underline; }
+.tb-ev .quote { font-size: 12px; color: var(--r-ink-body); margin-top: 2px; }
+.tb-section-cap { font-size: 12px; color: var(--r-ink-muted); padding: 2px 16px 8px; }
+.tb-firstlook { padding: 4px 16px 12px; font-size: 12px; line-height: 1.5; color: var(--r-ink-muted); }
+.tb-callpanel { background: var(--r-surface); border-top: 1px solid var(--r-hairline); border-bottom: 1px solid var(--r-hairline); margin: 6px 0 10px; padding-bottom: 6px; }
+.tb-callhead { color: var(--r-ink-strong) !important; }
+.tb-blockline { display: flex; align-items: center; gap: 6px; padding: 0 16px 4px; font-size: 11px; font-weight: 600; color: var(--r-warning); }
+.tb-tile.tb-you { box-shadow: inset 3px 0 0 var(--r-accent); border-color: var(--r-accent-fainter); }
+.tb-tile.tb-blocked { box-shadow: inset 3px 0 0 var(--r-warning); border-color: var(--r-warning-soft); }
+.tb-yourmove { margin-top: 6px; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; background: var(--r-accent-soft); color: var(--r-accent-deep); }
+.tb-tile.tb-blocked .tb-yourmove { background: var(--r-warning-soft); color: var(--r-warning); }
+.tb-waitpill b { font-weight: 700; }
+.tb-waitpill span { color: var(--r-ink-muted); }
+.tb-check { margin-top: 10px; border-top: 1px dashed var(--r-hairline); padding-top: 8px; }
+.tb-check-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--r-ink-strong); }
+.tb-check ul { list-style: disc; padding-left: 20px; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--r-ink-body); }
+.tb-conflict { margin-top: 12px; border: 1px solid var(--r-warning-soft); background: color-mix(in srgb, var(--r-warning-soft) 45%, var(--r-surface)); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--r-ink-body); }
+.tb-conflict b { color: var(--r-ink-strong); font-weight: 600; }
+.tb-wip span { font-weight: 600; }
+.tb-wiptext-full { color: var(--r-accent-deep); } .tb-wiptext-over { color: var(--r-warning); }
+.tb-slot { border-color: var(--r-accent-soft) !important; background: color-mix(in srgb, var(--r-accent-soft) 40%, var(--r-surface)) !important; }
+.tb-inlink { color: var(--r-accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.tb-inlink:hover { text-decoration: underline; }
+.tb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.tb-row-active { background: var(--r-surface-soft); }
+.tb-toast { position: fixed; left: 50%; bottom: 16px; z-index: 95; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
+/* The card page (design.md §5): a card open in the Ritemark editor. The strip
+   takes DocumentHeader's place; the head sits in the editor's column, which
+   follows .wysiwyg-editor .ProseMirror (max-width 900px, 2rem 2rem 0 4rem). */
+.cp-strip .cp-stage { gap: 6px; padding: 0 8px 0 10px; height: 28px; font-size: 12px; font-weight: 600; }
+.cp-state { display: inline-flex; align-items: center; gap: 6px; min-width: 0; margin-left: 4px; font: 500 12px var(--ritemark-ui-font-family); white-space: nowrap; }
+.cp-state .tb-glyph { width: 14px; height: 14px; margin-top: 0; }
+.cp-sep { width: 1px; height: 16px; background: var(--r-hairline-strong); margin: 0 2px; flex-shrink: 0; }
+/* A narrow editor: the state word gives way first, then Comments and Dictate;
+   the stage, the action, History, a save problem and More always stay. */
+.cp-strip { container-type: inline-size; }
+@container (max-width: 560px) { .cp-strip .cp-state { display: none; } }
+@container (max-width: 470px) { .cp-strip .cp-tools { display: none; } }
+@container (max-width: 420px) { .cp-strip .cp-showboard-label { display: none; } .cp-strip .cp-showboard { padding: 0 8px; } }
+.cp-strip .cp-showboard { height: 28px; gap: 6px; padding: 0 10px 0 8px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.cp-head { max-width: 900px; margin: 0 auto; padding: 2rem 2rem 0 4rem; color: var(--r-ink-body); }
+.wysiwyg-editor .cp-head ~ div .ProseMirror { padding-top: 1.5rem !important; }
+.cp-title { font: 600 2rem/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--r-ink-strong); outline: none; margin: 0 0 8px; cursor: text; word-break: break-word; border-radius: 4px; }
+.cp-title:focus-visible { box-shadow: 0 0 0 4px var(--r-ring-color); }
+.cp-donewhen { display: flex; gap: 10px; align-items: baseline; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--r-ink-muted); }
+.cp-donewhen b, .cp-label { font: 700 11px var(--ritemark-ui-font-family); letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); flex-shrink: 0; }
+.cp-donewhen b { position: relative; top: -1px; }
+.cp-donewhen-text { flex: 1; min-width: 60px; outline: none; cursor: text; border-radius: 4px; }
+.cp-donewhen-text:focus-visible { box-shadow: 0 0 0 4px var(--r-ring-color); }
+.cp-title:empty::before, .cp-donewhen-text:empty::before { content: attr(data-ph); color: var(--r-ink-faint); }
+.cp-gap { margin-top: 20px; }
+.cp-block { margin: 22px 0 6px; border: 1px solid var(--r-hairline); border-radius: 10px; background: var(--r-surface-muted); padding: 14px 16px 16px; font: 14px/1.5 var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.cp-block.you { border-color: var(--r-accent-fainter); box-shadow: inset 3px 0 0 var(--r-accent); }
+.cp-block.blocked { border-color: var(--r-warning-soft); box-shadow: inset 3px 0 0 var(--r-warning); }
+.cp-block.quiet { background: transparent; }
+.cp-block-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 600; color: var(--r-ink-strong); }
+.cp-block-h .m { font-weight: 500; color: var(--r-ink-muted); }
+.cp-block-h a, .cp-say a, .cp-line a { color: var(--r-accent); font-weight: 600; text-decoration: none; }
+.cp-block-h a:hover, .cp-say a:hover, .cp-line a:hover { text-decoration: underline; }
+.cp-block-h .tb-glyph, .cp-line .tb-glyph { margin-top: 0; }
+.cp-say { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--r-ink-strong); }
+.cp-say.small { font-size: 14px; color: var(--r-ink-body); }
+/* A review that did not come back (W6). */
+.tb-sub.tone-red, .cp-say.tone-red { color: var(--r-error); }
+.cp-block .tb-check ul { font-size: 13.5px; }
+.cp-block .tb-actions { margin-top: 14px; flex-wrap: wrap; }
+.cp-changed { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--r-ink-muted); }
+.cp-line { margin: 20px 0 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font: 500 13px var(--ritemark-ui-font-family); }
+.cp-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--r-hairline); }
+.cp-files .cp-label { margin-right: 4px; }
+.cp-files .tb-file, .cp-changed .tb-file { font-size: 12.5px; padding: 3px 9px; }
+.cp-addfiles { margin: 0; display: inline-flex; align-items: center; gap: 4px; height: 26px; font-size: 12.5px; }
+.cp-history { padding: 16px 0 20px; border-bottom: 1px solid var(--r-hairline); }
+.cp-history .cp-label { display: block; margin-bottom: 8px; }
+/* Done column (D15): the note under the last four weeks. */
+.tb-colnote { padding: 6px 6px 2px; font-size: 12px; color: var(--r-ink-faint); }

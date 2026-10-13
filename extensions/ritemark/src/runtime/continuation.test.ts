@@ -69,6 +69,12 @@ function run(): void {
     authBinding: 'account-b',
   }));
   assert.notEqual(first, createRuntimeCompatibilityFingerprint('other-installation', fingerprintInput));
+  // Codex's dynamic tools are part of it (Sprint 130, P2): a thread resumes only
+  // with the tools it started with. Without a tool set the value is unchanged.
+  const withTools = createRuntimeCompatibilityFingerprint('installation-secret', { ...fingerprintInput, toolSet: 'abc' });
+  assert.notEqual(withTools, first);
+  assert.notEqual(withTools, createRuntimeCompatibilityFingerprint('installation-secret', { ...fingerprintInput, toolSet: 'abd' }));
+  assert.equal(createRuntimeCompatibilityFingerprint('installation-secret', { ...fingerprintInput, toolSet: undefined }), first);
 
   const redacted = redactRuntimeContinuationDescriptor(descriptor, scopeId);
   assert.equal(redacted.scopeMatches, true);

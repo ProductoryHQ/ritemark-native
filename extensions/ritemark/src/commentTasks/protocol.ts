@@ -166,14 +166,34 @@ export interface CommentTaskEnqueueMessage {
   /** The source document, frozen at acceptance. The runtime gets this instead
    *  of whatever tab happens to be active when the queue drains (audit F12). */
   sourceDisplayPath: string;
+  /**
+   * Sprint 130 (task board, G2): start a NEW conversation for this task instead
+   * of `conversationId`, titled `title`, without making it the open one. The
+   * answer carries the id the sidebar gave it.
+   */
+  newConversation?: { title: string };
+  /**
+   * Sprint 130: who asked. `card` items show the board's icon in the queue and,
+   * for a conversation the sidebar does not hold, are loaded from history in
+   * the background instead of being refused (P1).
+   */
+  sourceKind?: 'comment' | 'card';
 }
 
 export type CommentTaskEnqueueOutcome = 'queued' | 'full' | 'no-conversation';
 
 /** AI sidebar → host. */
 export type CommentTaskSidebarMessage =
-  | { type: 'comment-task/enqueue-result'; taskId: string; outcome: CommentTaskEnqueueOutcome }
-  | { type: 'comment-task/dequeued'; taskId: string };
+  | {
+      type: 'comment-task/enqueue-result';
+      taskId: string;
+      outcome: CommentTaskEnqueueOutcome;
+      /** The conversation the task was queued in (a new one for `newConversation`). */
+      conversationId?: string;
+    }
+  | { type: 'comment-task/dequeued'; taskId: string }
+  /** Sprint 130 (G6): the sidebar could not dispatch a queued task at all. */
+  | { type: 'comment-task/dispatch-failed'; taskId: string; message: string };
 
 export class CommentTaskProtocolError extends Error {
   constructor(
@@ -334,12 +354,16 @@ export function decodeCommentTaskSidebarMessage(value: unknown): CommentTaskSide
   if (type === 'comment-task/dequeued') {
     return { type, taskId: stringField(input, 'taskId', 128) };
   }
+  if (type === 'comment-task/dispatch-failed') {
+    return { type, taskId: stringField(input, 'taskId', 128), message: stringField(input, 'message', 2000) };
+  }
   if (type !== 'comment-task/enqueue-result') invalid('type must be a known comment-task sidebar message');
   const outcome = input.outcome;
   if (outcome !== 'queued' && outcome !== 'full' && outcome !== 'no-conversation') {
     invalid('outcome must be queued, full or no-conversation');
   }
-  return { type, taskId: stringField(input, 'taskId', 128), outcome };
+  const conversationId = input.conversationId === undefined ? undefined : stringField(input, 'conversationId', 128);
+  return { type, taskId: stringField(input, 'taskId', 128), outcome, ...(conversationId ? { conversationId } : {}) };
 }
 
 const RETRYABLE: ReadonlySet<CommentTaskErrorCode> = new Set([

@@ -21,7 +21,9 @@ const MAX_CANDIDATE_FILES = 5000;
 const SAVE_REFRESH_DEBOUNCE_MS = 2000;
 
 const QUICK_ACTIONS: Array<{ id: string; label: string; icon: string; command: string }> = [
-  { id: 'new-ai-task', label: 'New AI task', icon: 'sparkle', command: 'ritemark.newChat' },
+  // "New AI conversation", not "task": since Sprint 130 a task is a card on the
+  // task board (R14), and this action starts a conversation.
+  { id: 'new-ai-conversation', label: 'New AI conversation', icon: 'sparkle', command: 'ritemark.newChat' },
   { id: 'open-document', label: 'Open document…', icon: 'file', command: 'workbench.action.files.openFile' },
   { id: 'new-table', label: 'New table', icon: 'grid', command: 'ritemark.newTable' },
   { id: 'open-folder', label: 'Open folder…', icon: 'folder', command: 'workbench.action.files.openFolder' },
@@ -191,9 +193,9 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
         <span class="row-ico">${svgIcon('folder', 16)}</span>
         <span class="row-main"><span class="row-label">${esc(r.label)}</span><span class="row-detail">${esc(r.detail)}</span></span>
       </button>`).join('');
-    // New AI task needs a workspace folder (agent runs refuse without one) —
+    // New AI conversation needs a workspace folder (agent runs refuse without one) —
     // every other action works folderless, so the launcher stays the same.
-    const actions = hasFolder ? QUICK_ACTIONS : QUICK_ACTIONS.filter((a) => a.id !== 'new-ai-task');
+    const actions = hasFolder ? QUICK_ACTIONS : QUICK_ACTIONS.filter((a) => a.id !== 'new-ai-conversation');
     const quickRows = actions.map((a) => `
       <button class="row" data-command="${esc(a.command)}">
         <span class="row-ico">${svgIcon(a.icon, 16)}</span>

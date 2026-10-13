@@ -56,8 +56,8 @@ export interface AcpManagerConfig {
   /** Runtime-owned command directories prepended for child-process discovery. */
   pathEntries?: string[];
   /**
-   * MCP stdio server descriptors to pass to session/new. Populated by
-   * BrowserToolsInjector when the browser-agent-control feature flag is on.
+   * MCP stdio server descriptors to pass to session/new: Ritemark's tool
+   * groups (browser, task board) from RitemarkToolsInjector.
    */
   mcpServers?: unknown[];
   /** Permission handler — Phase 4 renders the approval UI. */
@@ -94,6 +94,12 @@ interface AcpSessionState {
    * chat the user already saw go idle would come back to life.
    */
   cancelRequested: boolean;
+  /**
+   * Sprint 130 (G4): the text of the turn's latest assistant message. ACP marks
+   * message boundaries with `messageId`; the last message is the agent's
+   * conclusion, which a task shows as its result.
+   */
+  lastMessage: { id: string | null; text: string };
   /** Full live option set returned by ACP session setup / config mutation. */
   configOptions: SessionConfigOption[];
   /** Original provider selection used when Composer returns to Auto. */
@@ -168,6 +174,7 @@ export class AcpManager {
       sawContentThisTurn: false,
       thoughtBuffer: '',
       cancelRequested: false,
+      lastMessage: { id: null, text: '' },
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -186,6 +193,7 @@ export class AcpManager {
       sawContentThisTurn: false,
       thoughtBuffer: '',
       cancelRequested: false,
+      lastMessage: { id: null, text: '' },
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -287,11 +295,20 @@ export class AcpManager {
    * content is treated as a soft error (audit R-1: a bad/missing provider key
    * produces a silent empty turn), emitting an `error` progress event.
    */
+  /**
+   * Sprint 130 (G4): the turn's last assistant message, when OpenCode marked
+   * message boundaries; otherwise the whole streamed text (no boundary seen).
+   */
+  lastAgentMessage(sessionId: string): string {
+    return this.sessions.get(sessionId)?.lastMessage.text.trim() ?? '';
+  }
+
   async prompt(sessionId: string, text: string): Promise<PromptResponse> {
     const { client, state } = this.requireSession(sessionId);
 
     state.sawContentThisTurn = false;
     state.cancelRequested = false;
+    state.lastMessage = { id: null, text: '' };
 
     let result: PromptResponse;
     try {
@@ -450,6 +467,9 @@ export class AcpManager {
         const text = update.content.type === 'text' ? update.content.text : '';
         if (text) {
           state.sawContentThisTurn = true;
+          const messageId = update.messageId ?? null;
+          if (messageId && messageId !== state.lastMessage.id) state.lastMessage = { id: messageId, text };
+          else state.lastMessage.text += text;
           this.emit(sessionId, 'text', text);
         }
         break;

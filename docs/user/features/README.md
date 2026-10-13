@@ -58,6 +58,7 @@ Build and run AI workflows.
 | Feature | Description |
 |---------|-------------|
 | [AI Agents](ai-agents.md) | Three built-in agents: Claude, Codex, and OpenCode |
+| [Task Board](task-board.md) | A task list in each project folder; hand any task to an agent |
 | [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
 | [Browser](browser.md) | In-app browser with AI context — open `.html` files and localhost next to your markdown |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
