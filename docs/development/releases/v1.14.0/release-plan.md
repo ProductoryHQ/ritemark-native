@@ -1,6 +1,6 @@
 # Release Plan — v1.14.0
 
-**Status:** **Feature complete** (2026-10-13). Sprints 129, 130 and 131 and every fix for this release are merged; `main` is at `f0bbe89e` before the version bump. Jarmo approved the runtime update on 2026-10-13 ([#424](https://github.com/ProductoryHQ/ritemark-native/pull/424), merges first; this version bump is rebased on it). Next: the release-candidate build from the version-bump commit. `main` freezes when the version bump merges<br>
+**Status:** **Feature complete** (2026-10-13). Sprints 129, 130 and 131, every fix for this release and the runtime update ([#424](https://github.com/ProductoryHQ/ritemark-native/pull/424), Jarmo approved 2026-10-13) are merged; `main` is at `426c4fc4` before the version bump. Next: the release-candidate build from the version-bump commit. `main` freezes when the version bump merges<br>
 **Target:** v1.14.0<br>
 **GitHub milestone:** [v1.14.0](https://github.com/ProductoryHQ/ritemark-native/milestone/13). All five issues are closed<br>
 **Release type:** **Shell-tier.** [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195) changes `patches/vscode/009-*`, [#421](https://github.com/ProductoryHQ/ritemark-native/pull/421) changes `patches/vscode/002-*`, Sprint 129 adds native whisper binaries for Windows and Intel Macs, and Sprint 130 adds an activity-bar icon that an extension release does not ship. Full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI. The first live run of the draft-first publish (release skill Step 8, [#402](https://github.com/ProductoryHQ/ritemark-native/pull/402))<br>
@@ -40,6 +40,7 @@ The sprint PRs are in the table above.
 | [#419](https://github.com/ProductoryHQ/ritemark-native/pull/419) | `a26d9820` | A profile without a saved Claude model starts on the catalog default, with no `claude-sonnet-4-5` notice | Yes (extension) |
 | [#421](https://github.com/ProductoryHQ/ritemark-native/pull/421) | `e75d02cf` | Activity Bar: Tasks right below the File browser, Agent Library last of Ritemark's tools, applied once to profiles from v1.13; a Task board button on Home | Yes (shell: patch 002; the Home button is extension code) |
 | [#422](https://github.com/ProductoryHQ/ritemark-native/pull/422) | `f0bbe89e` | Task board: Retry after a crash no longer stays Queued (W13); narrow side bar, keyboard focus, Make it a task names the file and fills Done when; a three-line add field | Yes (extension) |
+| [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424) | `426c4fc4` | Claude Code 2.1.296 / SDK 0.3.296, Codex 0.162.1, OpenCode 1.19.0; Haiku 5.5; Claude models below 5 hidden from model menus, kept for saved selections | Yes (shell: bundled agent binaries and the Agent SDK) |
 
 ## Runtime versions
 
@@ -70,7 +71,7 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 - [x] Release notes and `CHANGELOG.md` cover everything merged since v1.13.0.
 - [x] Version 1.14.0 in all six version files.
 - [x] Runtime update decided: Jarmo approved it on 2026-10-13.
-- [ ] [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424) merged, then this PR rebased on it.
+- [x] [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424) merged (`426c4fc4`), and the version bump rebased on it.
 - [ ] Windows and macOS x64 CI green on `main` before the candidate is cut (release skill, "Prove CI green BEFORE cutting a candidate").
 
 ## Gates
