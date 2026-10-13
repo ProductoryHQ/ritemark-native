@@ -137,6 +137,21 @@ Fine as is: the Claude SDK's `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED` warning. The boa
 10. **The Ideas tab's "Write an idea…"** is the same three-line field that grows, shared with the board's columns (`TitleField`) ([qa/ideas-tab-field.png](qa/ideas-tab-field.png)).
 11. **A focus race** seen once on Windows (the first Tab after Enter left the focus on the page body) and once on the Mac: the webview of a page just opened from the keyboard took the editor's focus but not into its document. When that page has loaded, the host focuses the editor again and the page calls `window.focus()`. After the change, 10 of 10 keyboard opens on the Mac had the focus in the page at 0.5 s and at 3 s (before it, 12 of 13).
 
+## Follow-up, 2026-10-13: Activity Bar order, Task board on Home
+
+Jarmo, through the Development manager: "Taskboard võiks olla activvity baris kohe File browseri all -- sest see on ju töö planeerimise keskus. Home tabis võiks olla nupp task boardile", then "agent lbrary should be on bottom - not on top 2". Dev build of `fix/tasks-below-explorer` (patch 002 changed, workbench transpiled). Agent Library was second in the build he saw because that profile's saved order had it above the File browser; no code places it there (a fresh profile has it after Transcribe). That saved order is the case the first version of this PR simulated.
+
+| Check | Result |
+|---|---|
+| Fresh profile | Home, Folder, Tasks, Search, Source Control, Extensions, Transcribe, Browser, Agent Library ([qa/activity-bar-order.png](qa/activity-bar-order.png), left) |
+| Profile from v1.13 as shipped (saved order without Tasks) | The same order (middle) |
+| Profile from v1.13 with Agent Library dragged to second | The same order (right): the v1.14 order is applied once, on the first start |
+| A later move by the user | Agent Library dragged back to the top after the update stays there after a restart |
+| Home | "Task board" with the kanban icon right after "New AI conversation"; tooltip "Open the task board for this folder" on hover, in the app tooltip's colours light and dark ([light](qa/home-task-board-light.jpg), [dark](qa/home-task-board-dark.jpg)); a click opens the Task board tab. Hidden without a folder and with the flag off (`HomeViewProvider.test.ts`) |
+| Patch stack | All 17 patches apply to a pristine checkout of the gitlink; the results equal the dev tree; `apply-patches.sh --dry-run` clean; patch 002 lists 31 files (30 + `compositeBar.ts`) |
+
+"Chat" and "Chat Debug" in the dev build's bar come from the dev-only Copilot extension, as in probe P6.
+
 ## Gate 2 list (v1.14.0)
 
 - Give to agent, follow-ups and results with **Codex** and **OpenCode** (S16–S19, S21–S23, S27, S30, S36's last-message summary), and Review with either (S20a's choice).

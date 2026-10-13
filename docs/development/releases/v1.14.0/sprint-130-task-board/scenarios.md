@@ -7,9 +7,22 @@ These are the manual QA matrix on a dev instance. Run the Give to agent rows onc
 ### S1: First look in a project folder
 Given a project folder with no `.ritemark/tasks/`
 When I click Tasks in the activity bar
-Then the Tasks button sits just above Transcribe, the first of Ritemark's own tools
+Then the Tasks button sits right below the File browser, and Agent Library is the last of Ritemark's tools (revised 2026-10-13)
 And the side bar shows "Tasks for this project live here. Give any of them to an agent.", the "Add a task…" field and the Open board icon button beside it
 And no `.ritemark/tasks/` folder exists yet
+
+### S1a: Updated from v1.13 (revised 2026-10-13)
+Given a profile from v1.13, as shipped or with Agent Library dragged above the File browser
+When I start v1.14.0
+Then the bar reads Home, File browser, Tasks, VS Code's own items where they were, Transcribe, Browser, Agent Library
+When I then drag Agent Library or Tasks somewhere else and restart
+Then it stays where I put it (the v1.14 order is applied once)
+
+### S1b: Task board on Home (2026-10-13)
+Given a project folder
+When I open Home
+Then "Task board" with the kanban icon sits right after "New AI conversation", its tooltip says "Open the task board for this folder", and it opens the Task board
+And without a folder, or with the `task-board` flag off, it is not shown
 
 ### S2: No folder open
 Given a window with no folder
