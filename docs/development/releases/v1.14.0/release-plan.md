@@ -53,7 +53,7 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 
 `check:anthropic-models` (catalog v2196, issued 2026-10-13): **OK**, the bundled Claude Code 2.1.289 supports every model in Anthropic's Claude Code catalog. One **WARNING**: Haiku 5.5 (`claude-haiku-5-5`) is in Anthropic's main list but not in Ritemark's Claude lineup, which still has Haiku 4.5.
 
-**Decision for Jarmo (asked through the Development manager on 2026-10-13):** update the three bundled runtimes in v1.14.0 and add Haiku 5.5, or ship v1.14.0 with the current ones. The update would be its own PR, as [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) was for v1.13.0, and it would merge **before** the version bump, because the version bump is the last merge before the freeze. Without the update, v1.14.0 ships the v1.13.0 runtimes, which `check:anthropic-models` passes.
+**Decision for Jarmo (asked through the Development manager on 2026-10-13):** update the three bundled runtimes in v1.14.0 and add Haiku 5.5, or ship v1.14.0 with the current ones. The update is ready as draft [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424), as [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) was for v1.13.0. If approved, it merges **before** the version bump, because the version bump is the last merge before the freeze. Claude Code 2.1.296 resolves `haiku` to Haiku 5.5 (2.1.289 resolved it to Haiku 4.5), so #424 adds Haiku 5.5 to the lineup in the same change. Without the update, v1.14.0 ships the v1.13.0 runtimes, which `check:anthropic-models` passes.
 
 ## Not in this release
 
@@ -66,7 +66,7 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 - [x] All five milestone issues closed (#119, #133, #195, #398, #406); no open PR on the repository.
 - [x] Release notes and `CHANGELOG.md` cover everything merged since v1.13.0.
 - [x] Version 1.14.0 in all six version files.
-- [ ] Runtime update: Jarmo's decision (above). Not a blocker either way: `check:anthropic-models` passes with the current runtimes.
+- [ ] Runtime update: Jarmo's decision on #424 (above). Not a blocker either way: `check:anthropic-models` passes with the current runtimes.
 - [ ] Windows and macOS x64 CI green on `main` before the candidate is cut (release skill, "Prove CI green BEFORE cutting a candidate").
 
 ## Gates
