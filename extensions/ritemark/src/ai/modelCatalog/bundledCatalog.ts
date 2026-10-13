@@ -17,7 +17,8 @@
  * v1.13.0 (2026-10-04): Sonnet 5.5 joins as the recommended default; Sonnet 5 stays as the previous one.
  * v1.14.0 (2026-10-13): GPT-6.1 Sol, the default of the bundled Codex, becomes the
  * Codex default (#398); GPT-5.6 Sol stays selectable. Haiku 5.5 joins, which Claude Code
- * 2.1.296 resolves `haiku` to; Haiku 4.5 stays as the previous one.
+ * 2.1.296 resolves `haiku` to. Claude models below 5 (Opus 4.8, Haiku 4.5) are kept
+ * for saved selections and hidden from model menus (`CLAUDE_MENU_MIN_GENERATION`).
  * `npm run check:anthropic-models` re-checks that before each release (R10).
  */
 
@@ -43,10 +44,10 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: CLAUDE_MODEL_IDS.SONNET_5, label: 'Sonnet 5', description: 'Previous Sonnet model', tier: 'medium', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.OPUS_5, label: 'Opus 5', description: 'Previous Opus model', tier: 'high', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable 5.1', description: 'Current long-horizon model', tier: 'high', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.OPUS_4_8, label: 'Opus 4.8', description: 'Older Opus generation', tier: 'high', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.OPUS_4_8, label: 'Opus 4.8', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.FABLE_5, label: 'Fable 5', description: 'Previous Fable generation', tier: 'high', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.HAIKU_5_5, label: 'Haiku 5.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 7, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Previous Haiku model', tier: 'low', deprecated: false, order: 8 },
+        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Retained for saved selections', tier: 'low', deprecated: true, order: 8 },
       ],
     },
     openai: {

@@ -12,6 +12,7 @@ import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS } from '../modelConfig';
 import { parseCodexModelsCache } from './providerDiscovery';
 import {
   canonicalizeModelAliases,
+  claudeGeneration,
   findModelEntry,
   isCatalogAtLeastAsFresh,
   resolveAll,
@@ -485,7 +486,7 @@ test('S127 S14: a fresher tombstone removes a model from static and live lists',
       { id: 'sonnet', resolvedModel: 'claude-sonnet-5', label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 1 },
     ],
   }, overlay, null, S127_BUNDLED, S127_APP);
-  assert.deepStrictEqual(live.anthropic.models.map((m) => m.id), ['sonnet']);
+  assert.deepStrictEqual(live.anthropic.models.filter((m) => !m.hidden).map((m) => m.id), ['sonnet']);
   const bundledTombstoned = feed('2026-09-24T09:10:00Z', [
     { id: 'claude-fable-5', label: 'Fable 5', description: '', tier: 'high', deprecated: false, order: 4, retired: true },
   ]);
@@ -551,7 +552,7 @@ test('S127: live alias rows take the curated presentation of the model they reso
   assert.strictEqual(findModelEntry(models, 'sonnet')?.label, 'Sonnet 5.5');
   assert.strictEqual(findModelEntry(models, 'haiku')?.label, 'Haiku 5.5');
   assert.deepStrictEqual(
-    models.filter((model) => !model.id.endsWith('[1m]')).map((model) => model.label),
+    models.filter((model) => !model.id.endsWith('[1m]') && !model.hidden).map((model) => model.label),
     ['Sonnet 5.5', 'Opus 5.5', 'Fable 5.1', 'Haiku 5.5'],
     'curated order',
   );
@@ -647,6 +648,69 @@ test('GH #398: a conversation saved on GPT-5.6 Sol keeps it', () => {
     const r = resolveAll(discovery, FEED_BEFORE_398, null, BUNDLED_CATALOG, APP);
     assert.deepStrictEqual(resolveRequestedModelIn(r.codex, CODEX_MODEL_IDS.SOL, 'codex'), { id: CODEX_MODEL_IDS.SOL });
   }
+});
+
+// ── v1.14.0: Claude below 5 is hidden from menus, kept for saved selections ──
+
+const menuLabels = (models: { label: string; hidden?: boolean }[]): string[] =>
+  models.filter((model) => !model.hidden).map((model) => model.label);
+const CLAUDE_5_MENU = ['Sonnet 5.5', 'Opus 5.5', 'Sonnet 5', 'Opus 5', 'Fable 5.1', 'Fable 5', 'Haiku 5.5'];
+
+test('v1.14.0: claudeGeneration reads the generation from every Claude id shape', () => {
+  const cases: Array<[string | undefined, number | undefined]> = [
+    ['claude-opus-4-8', 4], ['claude-haiku-4-5-20251001', 4], ['claude-sonnet-5-5', 5], ['claude-fable-5-1', 5],
+    ['claude-opus-5', 5], ['claude-opus-5-5[1m]', 5], ['claude-3-5-sonnet-20241022', 3],
+    ['anthropic/claude-3.5-sonnet', 3], ['openrouter/anthropic/claude-sonnet-4.5', 4], ['anthropic/claude-opus-4-8', 4],
+    ['haiku', undefined], ['opus[1m]', undefined], ['gpt-5.4', undefined], [undefined, undefined],
+  ];
+  for (const [id, generation] of cases) assert.strictEqual(claudeGeneration(id), generation, String(id));
+});
+
+test('v1.14.0: the bundled Claude menu offers only 5.x; Opus 4.8 and Haiku 4.5 are hidden and last', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP).anthropic;
+  assert.deepStrictEqual(menuLabels(r.models), CLAUDE_5_MENU);
+  assert.deepStrictEqual(r.models.filter((model) => model.hidden).map((model) => model.id), [CLAUDE_MODEL_IDS.OPUS_4_8, CLAUDE_MODEL_IDS.HAIKU_4_5]);
+  assert.strictEqual(r.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
+  for (const saved of [CLAUDE_MODEL_IDS.OPUS_4_8, CLAUDE_MODEL_IDS.HAIKU_4_5]) {
+    assert.deepStrictEqual(resolveRequestedModelIn(r, saved, 'claude-code'), { id: saved }, `${saved} runs, no notice`);
+  }
+});
+
+test('v1.14.0: Claude Code 2.1.296 live list — 5.x menu; a saved Haiku 4.5 or Opus 4.8 still runs', () => {
+  const live: DiscoveryResults = {
+    anthropic: [
+      { id: 'default', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Default (recommended)', description: '', tier: 'medium', deprecated: false, order: 0 },
+      { id: 'opus', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Opus', description: '', tier: 'medium', deprecated: false, order: 1 },
+      { id: 'fable', resolvedModel: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable', description: '', tier: 'medium', deprecated: false, order: 2 },
+      { id: 'sonnet', resolvedModel: CLAUDE_MODEL_IDS.SONNET_5_5, label: 'Sonnet', description: '', tier: 'medium', deprecated: false, order: 3 },
+      { id: 'haiku', resolvedModel: CLAUDE_MODEL_IDS.HAIKU_5_5, label: 'Haiku', description: '', tier: 'medium', deprecated: false, order: 4 },
+    ],
+  };
+  const r = resolveAll(live, null, null, BUNDLED_CATALOG, APP).anthropic;
+  assert.deepStrictEqual(menuLabels(r.models), ['Sonnet 5.5', 'Opus 5.5', 'Fable 5.1', 'Haiku 5.5']);
+  assert.strictEqual(r.models.at(-1)?.id, CLAUDE_MODEL_IDS.HAIKU_4_5, 'hidden rows sort last');
+  assert.deepStrictEqual(resolveRequestedModelIn(r, CLAUDE_MODEL_IDS.HAIKU_4_5, 'claude-code'), { id: CLAUDE_MODEL_IDS.HAIKU_4_5 });
+  assert.deepStrictEqual(resolveRequestedModelIn(r, CLAUDE_MODEL_IDS.OPUS_4_8, 'claude-code'), { id: CLAUDE_MODEL_IDS.OPUS_4_8 });
+  assert.deepStrictEqual(resolveRequestedModelIn(r, 'haiku', 'claude-code'), { id: 'haiku' }, 'the alias follows Claude Code to Haiku 5.5');
+});
+
+test('v1.14.0: an API key list hides every 4.x and 3.x model and still runs a saved one', () => {
+  const ids = ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001', 'claude-3-5-haiku-20241022'];
+  const live: DiscoveryResults = {
+    anthropic: ids.map((id, order) => ({ id, label: id, description: '', tier: 'medium' as const, deprecated: false, order })),
+  };
+  const r = resolveAll(live, null, null, BUNDLED_CATALOG, APP).anthropic;
+  assert.deepStrictEqual(menuLabels(r.models), ['Sonnet 5.5', 'Opus 5.5', 'Haiku 5.5']);
+  assert.ok(r.models.filter((model) => model.hidden).every((model) => /claude-(?:[a-z]+-)?[34]/.test(model.id)));
+  assert.deepStrictEqual(resolveRequestedModelIn(r, 'claude-opus-4-6', 'claude-code'), { id: 'claude-opus-4-6' }, 'a saved 4.6 runs, no notice');
+  assert.strictEqual(r.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
+});
+
+test('v1.14.0: OpenCode keeps Claude Opus 4.8 for saved selections and hides it from the menu', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP).opencode;
+  const opus48 = r.models.find((model) => model.id === 'anthropic/claude-opus-4-8');
+  assert.strictEqual(opus48?.hidden, true);
+  assert.ok(r.models.filter((model) => !model.hidden).every((model) => (claudeGeneration(model.id) ?? 5) >= 5));
 });
 
 test('versionLt compares dotted-numeric versions correctly', () => {

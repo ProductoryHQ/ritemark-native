@@ -80,6 +80,11 @@ export interface ModelEntry {
   addedAt?: string;
   /** Tombstone: never offered, never declared to a runtime. */
   retired?: boolean;
+  /**
+   * Set by the resolver, never read from a feed: kept so a saved selection still
+   * resolves and runs, but never offered in a model menu (Claude below 5).
+   */
+  hidden?: boolean;
   /** Anthropic rows only. */
   claudeCode?: ClaudeCodeDeclaration;
 }

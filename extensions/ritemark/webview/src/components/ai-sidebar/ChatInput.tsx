@@ -1000,12 +1000,12 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   const currentClaudeModel = models.find((m) => m.id === selectedModel) || models[0];
   const currentCodexModel = codexModels.find((m) => m.id === codexSelectedModel) || codexModels.find((m) => m.id === defaultCodexModelId(codexModels));
   // Sprint 76 R6: OpenCode model picker — only providers whose key is configured.
-  const openCodeModels: { compositeValue: string; label: string; description: string }[] = [];
+  const openCodeModels: { compositeValue: string; label: string; description: string; hidden?: boolean }[] = [];
   if (opencodeEnabled && byokProviderModels) {
     for (const provider of ['google', 'openai', 'anthropic', 'openrouter'] as const) {
       if (acpProviders?.[provider]) {
         for (const m of byokProviderModels[provider] || []) {
-          openCodeModels.push({ compositeValue: `opencode:${provider}/${m.id}`, label: m.label, description: m.description });
+          openCodeModels.push({ compositeValue: `opencode:${provider}/${m.id}`, label: m.label, description: m.description, hidden: m.hidden });
         }
       }
     }
@@ -1448,7 +1448,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               {canUseClaude && models.length > 0 && (
                 <SelectGroup>
                   <SelectLabel className="text-[10px]">Claude</SelectLabel>
-                  {models.map((model) => {
+                  {models.filter((model) => !model.hidden).map((model) => {
                     const { versionLine, tagline } = parseModelDescription(model.description);
                     const primary = versionLine || model.label;
                     return (
@@ -1513,7 +1513,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
                 <SelectGroup>
                   <SelectLabel className="text-[10px]">OpenCode</SelectLabel>
                   {openCodeModels.length > 0 ? (
-                    openCodeModels.map((entry) => (
+                    openCodeModels.filter((entry) => !entry.hidden).map((entry) => (
                       <SelectItem
                         key={entry.compositeValue}
                         value={entry.compositeValue}
