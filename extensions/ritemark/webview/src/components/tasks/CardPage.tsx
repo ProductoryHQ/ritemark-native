@@ -472,6 +472,7 @@ function CardBlock({ card, snapshot, p }: { card: BoardCardView; snapshot: Board
           </div>
           <div className="text-[14px] font-medium text-ink-strong">{card.review.title}</div>
           {card.review.description ? <div className="tb-sub">{card.review.description}</div> : null}
+          {card.review.doneWhen ? <div className="tb-sub">Done when: {card.review.doneWhen}</div> : null}
           <div className="tb-sub">How big: {card.review.size}.</div>
         </div>
         <div className="tb-actions" style={{ marginTop: 12 }}>

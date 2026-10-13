@@ -32,7 +32,12 @@
   .tb-side-actions { margin-left: -26px; margin-right: -28px; }
   .tb-side-actions .tb-opt { padding-left: 8px; padding-right: 8px; }
 }
-.tb-split { display: inline-flex; }
+/* The split button stays inside its column: the label shrinks to an ellipsis
+   (its tooltip says it in full) and the arrow stays whole (W15, 170 px). */
+.tb-split { display: inline-flex; min-width: 0; max-width: 100%; }
+.tb-split > :first-child { display: flex; min-width: 0; }
+.tb-split > :first-child > button { max-width: 100%; }
+.tb-split > :last-child { flex-shrink: 0; }
 .tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .tb-split > :last-child > button { border-left: 1px solid rgba(255,255,255,.24); padding-left: 8px !important; padding-right: 8px !important; }

@@ -1,5 +1,5 @@
 /**
- * IdeasView — the Ideas tab (Sprint 130, design.md §8): one-line capture, a
+ * IdeasView — the Ideas tab (Sprint 130, design.md §8): quick capture, a
  * review on request (an agent says whether it is worth doing and suggests a
  * task), Make it a task, Drop and Bring back.
  */
@@ -13,7 +13,7 @@ import { Tooltip } from '../ui/tooltip'
 import { AgentSplitButton } from './AgentSplitButton'
 import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
-import { INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
+import { StateGlyph, TitleField, toneClass, useNow, usePresenter } from './CardParts'
 import { VERDICTS, agentName, ago } from './taskCopy'
 import type { AgentId } from '../../../../src/agent/types'
 
@@ -28,18 +28,14 @@ export function IdeasView({ snapshot }: { snapshot: BoardSnapshot }) {
   const list = chip === 'open' ? open : dropped
   return (
     <div className="tb-ideas">
-      <input
-        className={cn(INPUT, 'h-9')}
+      <TitleField
         placeholder="Write an idea…"
-        aria-label="Write an idea"
+        label="Write an idea"
         value={title}
-        maxLength={200}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={async (event) => {
-          if (event.key === 'Enter' && title.trim()) {
-            const answer = await act({ type: 'board/add', title, stage: 'idea' })
-            if (answer.ok) setTitle('')
-          }
+        onChange={setTitle}
+        onSubmit={async () => {
+          const answer = await act({ type: 'board/add', title, stage: 'idea' })
+          if (answer.ok) setTitle('')
         }}
       />
       <div className="tb-chips">
@@ -100,6 +96,7 @@ function IdeaCard({ card, snapshot, p, now }: { card: BoardCardView; snapshot: B
           <div className="tb-label" style={{ margin: '0 0 4px' }}>Suggested task</div>
           <div className="text-[13px] font-medium text-ink-strong">{review.title}</div>
           {review.description ? <div className="tb-sub">{review.description}</div> : null}
+          {review.doneWhen ? <div className="tb-sub">Done when: {review.doneWhen}</div> : null}
           <div className="tb-sub">How big: {review.size}.</div>
         </div>
         <div className="tb-actions">

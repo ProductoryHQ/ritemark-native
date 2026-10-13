@@ -17,7 +17,7 @@ import { Tooltip } from '../ui/tooltip'
 import { act, moveCard, useBoardUi } from './boardUi'
 import type { BoardTab } from '../../../../src/taskBoard/protocol'
 import { CardMenu } from './CardMenu'
-import { CardGlyph, GivePromptPanel, HeaderIconButton, INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
+import { CardGlyph, GivePromptPanel, HeaderIconButton, StateGlyph, TitleField, toneClass, useNow, usePresenter } from './CardParts'
 import { Button } from '../ui/button'
 import { DONE_WINDOW_DAYS, STAGE_NAMES, finishedRecently, type CardPresentation } from './taskCopy'
 import { UnreadableCards } from './UnreadableCards'
@@ -174,33 +174,22 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
   )
 }
 
-/**
- * The column's add field: three lines of room that grow with the text, so an
- * idea or task reads whole while it is written (Jarmo, 2026-10-13). A title is
- * one line, so Enter adds it and a pasted line break becomes a space.
- */
+/** The column's add field, below its header. */
 function AddRow({ stage, onDone }: { stage: CardStage; onDone: () => void }) {
   const [title, setTitle] = useState('')
   return (
     <div className="tb-addrow">
-      <textarea
+      <TitleField
         autoFocus
-        rows={3}
-        className={cn(INPUT, 'block max-h-[220px] min-h-[72px] resize-none leading-snug [field-sizing:content]')}
         placeholder={stage === 'idea' ? 'Write an idea…' : 'Add a task…'}
-        aria-label="New card title"
+        label="New card title"
         value={title}
-        maxLength={200}
-        onChange={(event) => setTitle(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+        onChange={setTitle}
         onBlur={() => !title.trim() && onDone()}
-        onKeyDown={async (event) => {
-          if (event.key === 'Escape') onDone()
-          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-            event.preventDefault()
-            if (!title.trim()) return
-            const answer = await act({ type: 'board/add', title, stage })
-            if (answer.ok) setTitle('')
-          }
+        onEscape={onDone}
+        onSubmit={async () => {
+          const answer = await act({ type: 'board/add', title, stage })
+          if (answer.ok) setTitle('')
         }}
       />
     </div>

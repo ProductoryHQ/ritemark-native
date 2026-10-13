@@ -122,7 +122,8 @@ export class CardPages implements vscode.Disposable {
   private active: string | null = null;
   private readonly activeListeners = new Set<(cardId: string | null) => void>();
   private readonly invalidateTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  /** Cards whose page is coming back under a new file name (Make it a task). */
+  /** Cards whose next page to load takes the focus: one renamed by Make it a
+   *  task, or one just opened from the keyboard. */
   private readonly returning = new Map<string, ReturnType<typeof setTimeout>>();
   /** Card files being moved, by their old URI (see `noteMoving`). */
   private readonly moving = new Map<string, ReturnType<typeof setTimeout>>();
@@ -197,7 +198,7 @@ export class CardPages implements vscode.Disposable {
   connect(document: vscode.TextDocument, webview: vscode.Webview): vscode.Disposable {
     const uri = document.uri.toString();
     const cardId = this.cardModeFor(document)?.cardId ?? null;
-    return connectBoardSurface(webview, 'page', this.surfaceContext(), {
+    const connection = connectBoardSurface(webview, 'page', this.surfaceContext(), {
       onRequest: (request) => {
         if (EDITING_REQUESTS.has(request.type)) this.edited.add(uri);
         // Make it a task renames the file, and the page comes back as a new
@@ -209,9 +210,12 @@ export class CardPages implements vscode.Disposable {
         if (!cardId || !timer) return;
         clearTimeout(timer);
         this.returning.delete(cardId);
-        void focusPage();
+        // The editor takes the focus; the page then pulls it into its own
+        // document, where it can stop short (seen once on Windows and the Mac).
+        void focusPage().then(() => connection.focus({}));
       },
     });
+    return connection;
   }
 
   /** The next page of this card to load takes the focus, within a few seconds. */
@@ -239,6 +243,9 @@ export class CardPages implements vscode.Disposable {
     const key = uri.toString();
     const existing = findTab(key);
     const previous = this.lastOpened;
+    // A new page's webview loads after the editor took the focus, and could
+    // leave it on the page body (seen once on Windows): focus it again then.
+    if (target.focus && !existing && target.cardId) this.focusWhenBack(target.cardId);
     await vscode.commands.executeCommand('vscode.openWith', uri, RITEMARK_EDITOR_VIEW_TYPE, {
       preview: false,
       ...(existing ? { viewColumn: existing.group.viewColumn } : {}),

@@ -140,6 +140,13 @@ async function main(): Promise<void> {
     assert.equal(parseIdeaReview(JSON.stringify({ ...GOOD, title: undefined })), null, 'no title');
     assert.equal(parseIdeaReview(JSON.stringify({ ...GOOD, description: 42 })), null, 'a description that is not text');
     assert.deepEqual(parseIdeaReview(JSON.stringify({ ...GOOD, description: undefined })), { ...GOOD, description: '' });
+    // Done when comes as its own field (Windows test: it went into the body).
+    assert.deepEqual(
+      parseIdeaReview(JSON.stringify({ ...GOOD, doneWhen: ' The template is in\nthe shared folder. ' })),
+      { ...GOOD, doneWhen: 'The template is in the shared folder.' },
+    );
+    assert.deepEqual(parseIdeaReview(JSON.stringify({ ...GOOD, doneWhen: 7 })), GOOD, 'a Done when that is not text is left out');
+    assert.equal(parseIdeaReview(JSON.stringify({ ...GOOD, doneWhen: 'D'.repeat(500) }))!.doneWhen!.length, 200, 'cut to the card limit');
     assert.deepEqual(
       parseIdeaReview(JSON.stringify({ ...GOOD, why: 'One\n  sentence.', title: ' Write\tit ', extra: true })),
       { ...GOOD, why: 'One sentence.', title: 'Write it' },

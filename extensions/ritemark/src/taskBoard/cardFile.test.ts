@@ -128,6 +128,7 @@ function main(): void {
         size: 'small',
         title: 'Draft the agenda',
         description: 'Three themes.',
+        doneWhen: 'The agenda fits on one page.',
       },
       dropped: true,
       history: [{ at: '2026-10-12T08:00:00.000Z', by: 'you', what: 'Created: "quoted", #hash, colon: yes' }],
@@ -136,6 +137,7 @@ function main(): void {
     const text = serializeCard(card);
     assert.ok(text.startsWith('---\nritemark: task/1\nid: a1b2c3\n'), 'a new file starts with the marker');
     assert.ok(text.includes('history:\n  - {'), 'history entries are one line each');
+    assert.ok(text.includes('done_when: The agenda fits on one page.'), 'a review’s Done when is written as done_when');
     assert.deepEqual(parsedCard(text).card, card, 'every field round-trips, including awkward text');
   }
 

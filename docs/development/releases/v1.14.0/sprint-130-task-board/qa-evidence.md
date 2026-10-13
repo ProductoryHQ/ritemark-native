@@ -130,6 +130,13 @@ The Windows session ran W1–W16 on overlay `62c9b3a9` with a fresh profile and 
 
 Fine as is: the Claude SDK's `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED` warning. The board tools are allowed without asking, by design (D5).
 
+**Windows re-check of `eee2d0f5` (2026-10-13).** W13a–d, W16, Make it a task's rename and the board's Ideas field passed on Windows. Three more fixes followed, checked on the Mac dev instance:
+
+8. **W15 at 170 px, an interrupted card.** "Retry with Claude" and its agent arrow ran past the column (right 181 in a 169 px view). A split button now stays inside its column: the label ends in an ellipsis (its tooltip says it in full), the arrow stays whole, one line. On the Mac: right edge 153 of 169 ([qa/side-bar-170px-retry.png](qa/side-bar-170px-retry.png)).
+9. **Make it a task's Done when.** The review's "what done looks like" went into the card body and Done when stayed empty. The review now returns it as its own field, `doneWhen` (stored as `review.done_when`). Make it a task puts it in the card's Done when unless the user wrote one, and the review shows it as "Done when: …". On the Mac: the Done when field of the new task read the review's sentence, and the body kept the first step only (`ideaReview.test.ts`, `BoardController.test.ts`, `cardFile.test.ts`).
+10. **The Ideas tab's "Write an idea…"** is the same three-line field that grows, shared with the board's columns (`TitleField`) ([qa/ideas-tab-field.png](qa/ideas-tab-field.png)).
+11. **A focus race** seen once on Windows (the first Tab after Enter left the focus on the page body) and once on the Mac: the webview of a page just opened from the keyboard took the editor's focus but not into its document. When that page has loaded, the host focuses the editor again and the page calls `window.focus()`. After the change, 10 of 10 keyboard opens on the Mac had the focus in the page at 0.5 s and at 3 s (before it, 12 of 13).
+
 ## Gate 2 list (v1.14.0)
 
 - Give to agent, follow-ups and results with **Codex** and **OpenCode** (S16–S19, S21–S23, S27, S30, S36's last-message summary), and Review with either (S20a's choice).

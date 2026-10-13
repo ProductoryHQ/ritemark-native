@@ -697,6 +697,8 @@ export class BoardController {
           rank,
           title: title.ok ? title.value : latest.title,
           description: !suggestion ? latest.description : notes.trim() ? `${suggestion}\n\n${notes}` : `${suggestion}\n`,
+          // The suggested Done when fills the field, never over the user's own.
+          ...(review.doneWhen && !latest.doneWhen ? { doneWhen: review.doneWhen } : {}),
         };
         delete next.dropped;
         return next;

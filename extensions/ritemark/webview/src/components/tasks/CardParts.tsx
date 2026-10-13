@@ -20,7 +20,53 @@ import { agentName, cardAgent, presentCard, type CardPresentation, type Tone } f
 export const INPUT =
   'w-full px-3 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] placeholder:text-[var(--vscode-input-placeholderForeground)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]'
 
-export const SECTION = 'flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint'
+/**
+ * A new card's title, in a field of three lines that grows with the text, so
+ * an idea or a task reads whole while it is written (Jarmo, 2026-10-13). A
+ * title is one line: Enter adds it, and a pasted line break becomes a space.
+ */
+export function TitleField({
+  value,
+  onChange,
+  onSubmit,
+  placeholder,
+  label,
+  autoFocus,
+  onBlur,
+  onEscape,
+}: {
+  value: string
+  onChange: (value: string) => void
+  onSubmit: () => void
+  placeholder: string
+  label: string
+  autoFocus?: boolean
+  onBlur?: () => void
+  onEscape?: () => void
+}) {
+  return (
+    <textarea
+      autoFocus={autoFocus}
+      rows={3}
+      className={cn(INPUT, 'block max-h-[220px] min-h-[72px] resize-none leading-snug [field-sizing:content]')}
+      placeholder={placeholder}
+      aria-label={label}
+      value={value}
+      maxLength={200}
+      onChange={(event) => onChange(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+      onBlur={onBlur}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onEscape?.()
+        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+          event.preventDefault()
+          if (value.trim()) onSubmit()
+        }
+      }}
+    />
+  )
+}
+
+export const SECTION ='flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint'
 
 /** A small icon button in a section or column header (+, Archive all done). */
 export function HeaderIconButton({

@@ -550,6 +550,7 @@ async function main(): Promise<void> {
       size: 'small',
       title: 'Write the workshop follow-up email template',
       description: 'Draft one email with placeholders.',
+      doneWhen: 'The template is in the shared folder.',
     };
     const { store, settings, controller } = setup({ reviewer });
     const view = async (id: string) => (await controller.snapshot()).cards.find((c) => c.id === id)!;
@@ -602,6 +603,7 @@ async function main(): Promise<void> {
     assert.equal(snapshot.cards.filter((c) => c.stage === 'todo')[0].id, idea, 'on top of To do');
     assert.equal(current.title, 'Write the workshop follow-up email template');
     assert.equal(current.description, 'Draft one email with placeholders.\n\nNotes: keep it short.\n', 'the suggestion above the user’s notes');
+    assert.equal(current.doneWhen, 'The template is in the shared folder.', 'the suggested Done when fills the field, not the body');
     assert.equal(current.history.at(-1)?.what, 'Made it a task from “workshop follow-up email template”');
     assert.equal(!(await controller.reviewIdea(idea, 'claude-code')).ok, true, 'only ideas are reviewed');
     // The file is named after the task now, not the idea (Windows test).
@@ -615,7 +617,9 @@ async function main(): Promise<void> {
     await controller.settled();
     assert.equal((await view(plain)).history.at(-1)?.what, 'Reviewed: Needs detail');
     await card(controller, 'Add a client glossary page');
+    await store.mutate(plain, null, (c) => ({ ...c, doneWhen: 'My own line' }));
     await controller.acceptReview(plain);
+    assert.equal((await view(plain)).doneWhen, 'My own line', 'never over the user’s own Done when');
     assert.equal((await view(plain)).description, 'Draft one email with placeholders.\n');
     assert.equal(path.basename(store.filePathOf(plain)!), 'add-a-client-glossary-page-2.md', 'a name another card has gets a number');
 
