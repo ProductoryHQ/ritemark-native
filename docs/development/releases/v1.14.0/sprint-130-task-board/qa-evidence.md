@@ -87,6 +87,8 @@
 7. **W6.** "reviewed by Claude just now ago" (in the W6 commit).
 8. **Windows file names (found by reading, for the Windows test).** A card titled "Con", "Nul", "Com1"… would be named `con.md`, which Windows reserves even with an extension. Such names get `-task` (`cardFile.test.ts`).
 
+9. **The board's tick circle (Windows test W2, not Windows-specific).** On a board tile the circle sat in the layer that lets clicks fall through to the tile's open-the-card button, so clicking it opened the card instead of marking it done; the side bar's circle sits outside that layer and worked. The circle now takes pointer events. `boardClicks.test.ts` renders the board, Your calls and Ideas and fails on any button, link or field inside a pass-through layer (it caught exactly the two To do circles before the fix). Checked on the Mac dev instance with a real mouse click: the card went to Done and no page opened; the title and the count chips still open the card. S6b had been checked in the side bar only.
+
 The `qa-validator` review (T8.4) of `bb3c5005` returned FAIL on one item, fixed: `scripts/validate-qa.sh` still ran the deleted `BrowserToolsInjector.test.ts` for agent changes; it now runs `ritemarkTools.test.ts` and matches the new runtime files. Its minor findings are fixed too (stale old-name comments, `AGENTS.md`'s locked decision, three more hand-rolled buttons, `tasks.md` T3.9).
 
 `scripts/qa/make-windows-test-overlay.sh` now carries `media/*.svg`, so the Windows overlay shows the Tasks activity-bar and board-tab icons.

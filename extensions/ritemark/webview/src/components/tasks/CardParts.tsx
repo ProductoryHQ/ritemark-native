@@ -84,7 +84,9 @@ export function StateGlyph({ p, className }: { p: CardPresentation; className?: 
 export function CardGlyph({ card, p }: { card: BoardCardView; p: CardPresentation }) {
   if (p.plain && card.stage !== 'done' && card.stage !== 'idea') {
     return (
-      <Tooltip label={`Mark “${card.title}” done`} className="relative z-10">
+      // pointer-events-auto: on a board tile the circle sits in the layer that
+      // lets clicks fall through to the tile's open-the-card button.
+      <Tooltip label={`Mark “${card.title}” done`} className="pointer-events-auto relative z-10">
         <Button
           type="button"
           variant="ghost"
