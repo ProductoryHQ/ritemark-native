@@ -13,10 +13,11 @@
  * Keep this seed in sync with the published catalog at publish time (Phase 4).
  * Model ids frozen from the Sprint 116 provider/runtime audit on 2026-09-13.
  * Sprint 127 R9 (2026-09-24): the Anthropic lineup follows the bundled Claude
- * Code (2.1.289 since v1.13.0), which supports every model in Anthropic's Claude Code catalog.
+ * Code (2.1.296 since v1.14.0), which supports every model in Anthropic's Claude Code catalog.
  * v1.13.0 (2026-10-04): Sonnet 5.5 joins as the recommended default; Sonnet 5 stays as the previous one.
- * v1.14.0 (2026-10-13): GPT-6.1 Sol, the default of the bundled Codex 0.160.0, becomes the
- * Codex default (#398); GPT-5.6 Sol stays selectable.
+ * v1.14.0 (2026-10-13): GPT-6.1 Sol, the default of the bundled Codex, becomes the
+ * Codex default (#398); GPT-5.6 Sol stays selectable. Haiku 5.5 joins, which Claude Code
+ * 2.1.296 resolves `haiku` to; Haiku 4.5 stays as the previous one.
  * `npm run check:anthropic-models` re-checks that before each release (R10).
  */
 
@@ -44,7 +45,8 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable 5.1', description: 'Current long-horizon model', tier: 'high', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.OPUS_4_8, label: 'Opus 4.8', description: 'Older Opus generation', tier: 'high', deprecated: false, order: 5, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
         { id: CLAUDE_MODEL_IDS.FABLE_5, label: 'Fable 5', description: 'Previous Fable generation', tier: 'high', deprecated: false, order: 6, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
-        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 7 },
+        { id: CLAUDE_MODEL_IDS.HAIKU_5_5, label: 'Haiku 5.5', description: 'Quick & light', tier: 'low', deprecated: false, order: 7, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'] } },
+        { id: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku 4.5', description: 'Previous Haiku model', tier: 'low', deprecated: false, order: 8 },
       ],
     },
     openai: {

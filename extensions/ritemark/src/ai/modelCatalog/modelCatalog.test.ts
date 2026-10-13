@@ -538,7 +538,7 @@ test('S127: live alias rows take the curated presentation of the model they reso
       { id: CLAUDE_MODEL_IDS.FABLE_5_1, resolvedModel: CLAUDE_MODEL_IDS.FABLE_5_1, label: 'Fable', description: '', tier: 'medium', deprecated: false, order: 2 },
       { id: 'opus', resolvedModel: CLAUDE_MODEL_IDS.OPUS_5_5, label: 'Opus', description: '', tier: 'medium', deprecated: false, order: 3 },
       { id: 'opus[1m]', resolvedModel: `${CLAUDE_MODEL_IDS.OPUS_5_5}[1m]`, label: 'Opus (1M context)', description: '', tier: 'medium', deprecated: false, order: 4 },
-      { id: 'haiku', resolvedModel: CLAUDE_MODEL_IDS.HAIKU_4_5, label: 'Haiku', description: '', tier: 'medium', deprecated: false, order: 5 },
+      { id: 'haiku', resolvedModel: CLAUDE_MODEL_IDS.HAIKU_5_5, label: 'Haiku', description: '', tier: 'medium', deprecated: false, order: 5 },
     ],
   };
   const models = resolveAll(live, null, null, BUNDLED_CATALOG, APP).anthropic.models;
@@ -549,10 +549,10 @@ test('S127: live alias rows take the curated presentation of the model they reso
   assert.strictEqual(findModelEntry(models, CLAUDE_MODEL_IDS.OPUS_5_5)?.id, 'opus', 'the concrete id reconciles to the alias row');
   assert.strictEqual(findModelEntry(models, 'opus[1m]')?.label, 'Opus (1M context)', 'a 1M variant keeps its own label');
   assert.strictEqual(findModelEntry(models, 'sonnet')?.label, 'Sonnet 5.5');
-  assert.strictEqual(findModelEntry(models, 'haiku')?.label, 'Haiku 4.5');
+  assert.strictEqual(findModelEntry(models, 'haiku')?.label, 'Haiku 5.5');
   assert.deepStrictEqual(
     models.filter((model) => !model.id.endsWith('[1m]')).map((model) => model.label),
-    ['Sonnet 5.5', 'Opus 5.5', 'Fable 5.1', 'Haiku 4.5'],
+    ['Sonnet 5.5', 'Opus 5.5', 'Fable 5.1', 'Haiku 5.5'],
     'curated order',
   );
 });

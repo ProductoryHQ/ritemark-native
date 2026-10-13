@@ -10,6 +10,28 @@ Ritemark now depends on these Claude Code behaviours (Phase 0 on 2.1.289 / SDK 0
 - `perTaskStopAffordance: true` makes `interrupt()` spare background tasks; `Query.stopTask` stops one (`status: 'stopped'`).
 - `session_state_changed` is emitted only with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS` (not used).
 
+## v1.14.0 — Claude Code 2.1.296 / SDK 0.3.296, Codex 0.162.1, OpenCode 1.19.0 — 2026-10-13
+
+**Change:** Claude Code `2.1.289` → `2.1.296` with Claude Agent SDK `0.3.289` → `0.3.296` in lockstep; Codex `0.160.0` → `0.162.1`; OpenCode `1.18.34` → `1.19.0`. OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and zsh `5.9.0.3-test`, and ACP SDK `1.4.0` are unchanged. Codex's macOS ripgrep and zsh have new hashes because the package was re-signed; `--version` reports the same versions on darwin-arm64 and, under Rosetta, darwin-x64. The Windows ripgrep is byte-identical.
+
+**Why:** the per-release runtime review (v1.14.0 release plan). Each was npm `latest` / the latest Codex GitHub release on 2026-10-13. Jarmo decides whether v1.14.0 ships it.
+- **Claude Code:** 2.1.296 resolves the `haiku` alias to `claude-haiku-5-5` (2.1.289 resolved it to `claude-haiku-4-5-20251001`). Anthropic's catalog lists Haiku 5.5 in its main section, and `check:anthropic-models` warned that Ritemark's lineup lacked it. The lineup adds Haiku 5.5 in the same change. 2.1.296 also fixes token counts for Haiku 5.5.
+- **Codex:** 0.161.0 makes GPT-6.1 Sol Codex's own default, as Ritemark's catalog does since #418. 0.162.0 restores drive-letter file access on Windows 10 and keeps CRLF line endings in `apply_patch`.
+- **OpenCode:** small fixes. 1.19.0 adds an opt-in path to OpenCode 2 (`opencode upgrade --major`) and stops installing updates by itself; npm `latest` stays 1.x.
+
+| Check | Result |
+|---|---|
+| Manifest rows (darwin-arm64, darwin-x64, win32-x64) | pass. Every archive SHA-256, member/installed SHA-256 and npm integrity was measured by script from the published artifacts. Each npm integrity matched the registry's `dist.integrity`, and each Codex archive matched GitHub's asset digest. The Codex archives hold exactly the listed members. `fetch-agent-runtimes.mjs --all-platforms` gives PASS for all twelve rows, and so does `--verify-only` afterwards (exit 0). |
+| Lockstep pins | pass. `validate-agent-runtime-manifest.mjs` approves `2.1.296` / `0.3.296`, `0.162.1` and `1.19.0`; its tests pass (11/11). |
+| SDK type surface | pass. `tsc --noEmit` is clean for the extension and webview against 0.3.296, and the full `npm test` passes. |
+| Version discovery on darwin-arm64 | pass. `verify-agent-runtimes.sh`: `claude` 2.1.296, `opencode` 1.19.0, its ripgrep 15.1.0, `codex-app-server` 0.162.1; the Codex code-mode host starts. |
+| OpenCode permission gate (HARD GATE) | pass, with a named model. The first free model on offer, `opencode/fledge-alpha-free`, failed upstream ("This model is not available in your country") before the agent tried to write, so the pause row could not pass, as in v1.12.0 and v1.13.0. With `RITEMARK_VERIFY_OPENCODE_MODEL=opencode/longcat-2.5-preview-free` and with `opencode/ling-3.1-flash-free`, all four rows passed and the script exited 0: a write pauses, denial blocks, approval writes, cancel settles with the process alive. In the `ling-3.1-flash-free` run the approved write landed, and the turn then ended with an upstream error ("Endpoint is unavailable"). |
+| Claude model listing (2.1.296, unauthenticated, isolated home) | pass. `supportedModels()`: `default` → `claude-opus-5-5`, `opus` → `claude-opus-5-5`, `fable` → `claude-fable-5-1`, `sonnet` → `claude-sonnet-5-5`, **`haiku` → `claude-haiku-5-5`**, every row with effort levels low to max. `claude-haiku-4-5-20251001` is no longer listed live, so a saved Haiku 4.5 selection on a subscription moves to the default with the existing substitution notice. `check:anthropic-models`: OK, no warnings. |
+| Codex model list (0.162.1, isolated `CODEX_HOME`, file credential stores, unauthenticated) | `model/list` returns `gpt-6.1-sol` (default), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`: the same list as 0.160.0. |
+| Native execution (darwin-x64, win32-x64) | **not proven here.** Comes from Gate 2 (x64 DMG, Windows installer) and PR CI. |
+| Sprint 128 background probes (`background-probe.mjs --mode p1`, `--mode p6stop`) | **not run.** They need a real Claude login. Run them on the release Mac before this merges, with Jarmo's OK to use his login. |
+| Authenticated turns (Claude Haiku 5.5, Codex GPT-6.1 Sol) | **not proven here.** No credentials were used. Release test checklist. |
+
 ## v1.13.0 — Claude Code 2.1.289 / SDK 0.3.289, Codex 0.160.0, OpenCode 1.18.34 — 2026-10-04
 
 **Change:** Claude Code `2.1.281` → `2.1.289` with Claude Agent SDK `0.3.281` → `0.3.289` in lockstep; Codex `0.154.0` → `0.160.0`; OpenCode `1.18.30` → `1.18.34`. OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and zsh `5.9.0.3-test`, and ACP SDK `1.4.0` are unchanged (Codex's macOS ripgrep and zsh have new hashes because the package was re-signed; `--version` reports the same versions).
