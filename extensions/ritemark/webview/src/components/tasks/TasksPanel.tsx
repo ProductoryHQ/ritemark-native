@@ -15,8 +15,8 @@ import { notify, startBoard, useActivePage, useBoardSnapshot } from './boardClie
 import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { DeleteConfirm } from './DeleteConfirm'
-import { CallActions, CardGlyph, GivePromptPanel, INPUT, SECTION, toneClass, useNow, usePresenter } from './CardParts'
-import { STAGE_NAMES, waited } from './taskCopy'
+import { CallActions, CardGlyph, GivePromptPanel, HeaderIconButton, INPUT, SECTION, toneClass, useNow, usePresenter } from './CardParts'
+import { STAGE_NAMES, finishedRecently, waited } from './taskCopy'
 import { Notice } from './Notice'
 import { UnreadableCards } from './UnreadableCards'
 import './tasks.css'
@@ -74,7 +74,8 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
   const calls = snapshot.calls.map((call) => byId.get(call.cardId)).filter((card): card is BoardCardView => Boolean(card))
   const stage = (name: BoardCardView['stage']) => snapshot.cards.filter((card) => card.stage === name && !callIds.has(card.id))
   const ideas = snapshot.cards.filter((card) => card.stage === 'idea' && !card.dropped)
-  const done = snapshot.cards.filter((card) => card.stage === 'done')
+  // The last four weeks, as on the board (D15).
+  const done = snapshot.cards.filter((card) => card.stage === 'done' && finishedRecently(card, now))
   const empty = snapshot.cards.length === 0
   const showCalls = () => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
 
@@ -219,11 +220,7 @@ function Collapsible({
           </button>
         </Tooltip>
         {onAdd ? (
-          <Tooltip label="Add an idea on the board" className="ml-auto">
-            <button type="button" className="tb-addsec" aria-label="Add an idea" onClick={onAdd}>
-              <Icon name="plus" size={12} tone="inherit" />
-            </button>
-          </Tooltip>
+          <HeaderIconButton icon="plus" label="Add an idea" tip="Add an idea on the board" className="ml-auto" onClick={onAdd} />
         ) : null}
       </div>
       {open ? children : null}

@@ -255,6 +255,67 @@ async function main(): Promise<void> {
     }
   }
 
+  // ── Archive (D15): off the board, not deleted, restorable ─────────────────
+  {
+    const { store, ledger, controller } = setup();
+    const doneA = await card(controller, 'Done A', 'done');
+    const doneB = await card(controller, 'Done B', 'done');
+    const review = await card(controller, 'Waiting for review', 'doing');
+    await store.mutate(review, null, (c) => ({ ...c, result: { by: 'claude', at: at(-5), summary: 'Did it.', files: [], check: [] } }));
+    const busy = await card(controller, 'Busy', 'doing');
+    ledger.set(busy, { state: 'running', runtimeId: 'claude-code', since: at(0), canOpen: true });
+    const queued = await card(controller, 'Queued');
+    // It waits for the busy card (a slot wait would start as soon as archiving frees room in Doing).
+    ledger.set(queued, { state: 'waiting', waitFor: { kind: 'conflict', cardId: busy }, runtimeId: 'claude-code', since: at(0), canOpen: false });
+
+    let snapshot = await controller.refresh();
+    assert.equal(snapshot.doing.count, 2);
+    assert.ok(snapshot.calls.some((call) => call.cardId === review));
+
+    // One card: off the board and out of Your calls, with a history line.
+    assert.ok((await controller.archive(review)).ok);
+    snapshot = await controller.refresh();
+    assert.ok(!snapshot.cards.some((c) => c.id === review), 'an archived card is off the board');
+    assert.ok(!snapshot.calls.some((call) => call.cardId === review), 'and out of Your calls');
+    assert.equal(snapshot.doing.count, 1, 'and does not count in Doing');
+    const archived = snapshot.archived.find((c) => c.id === review)!;
+    assert.equal(archived.archived, now().toISOString());
+    assert.equal(archived.call, null);
+    assert.equal(archived.history.at(-1)?.what, 'Archived');
+    assert.ok(fs.readFileSync(store.filePathOf(review)!, 'utf8').includes('archived:'), 'the file stays, marked');
+
+    // An archived card cannot be moved or given; restore it first.
+    for (const answer of [await controller.move(review, 'todo'), await controller.give(review, 'claude-code'), await controller.queue(review, 'claude-code')]) {
+      assert.equal(!answer.ok && answer.message, 'This card is archived. Restore it first.');
+    }
+
+    // Not while an agent works on it; a waiting card stops waiting.
+    assert.equal(!(await controller.archive(busy)).ok && (await controller.archive(busy) as { code: string }).code, 'busy');
+    assert.ok((await controller.archive(queued)).ok);
+    assert.equal(ledger.list().get(queued)?.state ?? null, null, 'archiving a queued card takes it out of the queue');
+
+    // Archive all done: every Done card, and how many.
+    const all = await controller.archiveDone();
+    assert.ok(all.ok && all.count === 2);
+    snapshot = await controller.refresh();
+    assert.deepEqual(snapshot.cards.filter((c) => c.stage === 'done'), []);
+    assert.deepEqual(new Set(snapshot.archived.map((c) => c.id)), new Set([review, queued, doneA, doneB]));
+    assert.deepEqual(await controller.archiveDone(), { ok: true, count: 0 }, 'nothing left to archive');
+
+    // Restore puts it back where it was, and Your calls again.
+    assert.ok((await controller.restore(review)).ok);
+    snapshot = await controller.refresh();
+    const back = snapshot.cards.find((c) => c.id === review)!;
+    assert.equal(back.stage, 'doing');
+    assert.equal(back.archived, null);
+    assert.equal(back.history.at(-1)?.what, 'Restored');
+    assert.ok(snapshot.calls.some((call) => call.cardId === review));
+
+    // Delete works on an archived card too.
+    assert.ok((await controller.remove(doneA)).ok);
+    assert.ok(!(await controller.refresh()).archived.some((c) => c.id === doneA));
+  }
+
   // ── Give to agent: availability, conflict guard, Doing limit ──────────────
   {
     const { ledger, controller, settings } = setup();

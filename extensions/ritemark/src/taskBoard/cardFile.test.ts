@@ -237,6 +237,20 @@ function main(): void {
     assert.equal(cardFileName('Call Maria', 2), 'call-maria-2.md');
   }
 
+  // ── Archived (D15): a time, or `true` from a hand edit ─────────────────────
+  {
+    const base: Card = { id: 'arc001', title: 'Old', stage: 'done', rank: 'i', files: [], history: [], description: '' };
+    const text = serializeCard({ ...base, archived: '2026-10-13T09:00:00.000Z' });
+    assert.match(text, /\narchived: 2026-10-13T09:00:00.000Z\n/);
+    assert.equal(parsedCard(text).card.archived, '2026-10-13T09:00:00.000Z');
+    assert.equal(parsedCard(serializeCard(base)).card.archived, undefined, 'a card on the board has no archived key');
+    assert.doesNotMatch(serializeCard(base), /archived/);
+    const byHand = '---\nritemark: task/1\nid: arc002\ntitle: T\nstage: todo\narchived: true\n---\n';
+    assert.equal(parsedCard(byHand).card.archived, '');
+    assert.match(serializeCard(parsedCard(byHand).card, parsedCard(byHand).source), /\narchived: true\n/);
+    assert.equal(parsedCard(byHand.replace('archived: true', 'archived: false')).card.archived, undefined);
+  }
+
   // ── Front matter and body, for the card page ──────────────────────────────
   {
     const card = parsedCard(EXAMPLE).card;

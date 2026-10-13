@@ -118,6 +118,28 @@ Then it is refused with a sentence why
 When I choose Delete… on a card and confirm
 Then the file is in the system trash and the card is gone from both surfaces and the Log
 
+### S10a: Archive (D15)
+Given three cards in Done and one card Ready to review
+When I choose Archive in the review card's … menu
+Then it leaves Doing and Your calls, the badge goes down by one, and the Archive tab counts 1
+When I press Archive all done on the Done column
+Then the three Done cards move to the Archive tab and a notice says "Archived 3 cards. They are under Archive."
+When I press Restore on the review card in the Archive tab
+Then it is back in Doing as Ready to review, and its history says "Restored"
+When an agent is working on a card
+Then Archive in its … menu is disabled and says why
+When I open an archived card
+Then its page says Archived, with Restore as the action
+
+### S10b: Done shows four weeks
+Given a card was marked done 40 days ago and four cards this week
+Then the Done column shows the four, and below them "1 finished more than 4 weeks ago · See the Log"
+And See the Log opens the Log, where the old card is
+
+### S10c: Enter confirms Delete
+When I choose Delete… and press Enter
+Then the card is deleted; Escape instead closes the dialog and keeps it
+
 ### S11: Restore after restart
 Given the board tab is open on Ideas
 When I restart Ritemark

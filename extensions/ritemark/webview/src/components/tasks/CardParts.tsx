@@ -22,6 +22,36 @@ export const INPUT =
 
 export const SECTION = 'flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint'
 
+/** A small icon button in a section or column header (+, Archive all done). */
+export function HeaderIconButton({
+  icon,
+  label,
+  tip,
+  onClick,
+  className,
+}: {
+  icon: 'plus' | 'archive'
+  label: string
+  tip: string
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <Tooltip label={tip} className={cn('inline-flex', className)}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        className="size-[18px] rounded-[4px] text-ink-muted hover:bg-accent-soft hover:text-accent"
+        onClick={onClick}
+      >
+        <Icon name={icon} size={12} tone="inherit" />
+      </Button>
+    </Tooltip>
+  )
+}
+
 /** Re-render once a minute, so wait times stay true. */
 export function useNow(): Date {
   const [now, setNow] = useState(() => new Date())

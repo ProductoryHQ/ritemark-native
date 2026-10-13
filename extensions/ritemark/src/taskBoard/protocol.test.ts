@@ -35,6 +35,10 @@ function main(): void {
   );
   assert.deepEqual(decodeBoardRequest({ type: 'board/open-card', cardId: 'k3f9x2' }), { type: 'board/open-card', cardId: 'k3f9x2' });
   assert.deepEqual(decodeBoardRequest({ type: 'board/ready', surface: 'page' }), { type: 'board/ready', surface: 'page' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/archive', requestId: 'r7', cardId: 'k3f9x2' }), { type: 'board/archive', requestId: 'r7', cardId: 'k3f9x2' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/restore', requestId: 'r8', cardId: 'k3f9x2' }), { type: 'board/restore', requestId: 'r8', cardId: 'k3f9x2' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/archive-done', requestId: 'r9' }), { type: 'board/archive-done', requestId: 'r9' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/open', tab: 'archive' }), { type: 'board/open', tab: 'archive' });
   assert.deepEqual(
     decodeBoardRequest({ type: 'board/follow-up', requestId: 'r6', cardId: 'k3f9x2', text: 'Shorter', runtimeId: undefined }),
     { type: 'board/follow-up', requestId: 'r6', cardId: 'k3f9x2', text: 'Shorter' },

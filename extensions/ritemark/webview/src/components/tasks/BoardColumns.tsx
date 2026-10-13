@@ -15,9 +15,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { act, moveCard, useBoardUi } from './boardUi'
+import type { BoardTab } from '../../../../src/taskBoard/protocol'
 import { CardMenu } from './CardMenu'
-import { CardGlyph, GivePromptPanel, INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
-import { STAGE_NAMES, type CardPresentation } from './taskCopy'
+import { CardGlyph, GivePromptPanel, HeaderIconButton, INPUT, StateGlyph, toneClass, useNow, usePresenter } from './CardParts'
+import { Button } from '../ui/button'
+import { DONE_WINDOW_DAYS, STAGE_NAMES, finishedRecently, type CardPresentation } from './taskCopy'
 import { UnreadableCards } from './UnreadableCards'
 
 const HINTS: Record<CardStage, string> = {
@@ -29,7 +31,7 @@ const HINTS: Record<CardStage, string> = {
 const DONE_SHOWN = 10
 const DRAG_TYPE = 'application/x-ritemark-card'
 
-export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
+export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot; onShowTab?: (tab: BoardTab) => void }) {
   const now = useNow()
   const present = usePresenter(snapshot, now)
   const [adding, setAdding] = useState<CardStage | null>(null)
@@ -39,6 +41,16 @@ export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
 
   const column = (stage: CardStage) =>
     snapshot.cards.filter((card) => card.stage === stage && !(stage === 'idea' && card.dropped))
+  // Done shows the last four weeks; older work is in the Log (D15).
+  const allDoneCards = column('done')
+  const recentDone = allDoneCards.filter((card) => finishedRecently(card, now))
+  const olderDone = allDoneCards.length - recentDone.length
+  const archiveAllDone = async () => {
+    const answer = await act({ type: 'board/archive-done' })
+    if (answer.ok && answer.count) {
+      useBoardUi.getState().showNotice(`Archived ${answer.count} card${answer.count === 1 ? '' : 's'}. They are under Archive.`)
+    }
+  }
 
   const onDrop = (stage: CardStage) => {
     const id = dragging
@@ -54,7 +66,7 @@ export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
     <>
       <div className="tb-cols">
         {CARD_STAGES.map((stage) => {
-          const all = column(stage)
+          const all = stage === 'done' ? recentDone : column(stage)
           const cards = stage === 'done' && !allDone ? all.slice(0, DONE_SHOWN) : all
           return (
             <section
@@ -85,11 +97,22 @@ export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
                 {STAGE_NAMES[stage]}{' '}
                 {stage === 'doing' ? <DoingLimit snapshot={snapshot} /> : <span className="n">{all.length}</span>}
                 {stage === 'idea' || stage === 'todo' ? (
-                  <Tooltip label={stage === 'idea' ? 'Add an idea' : 'Add a task'} className="ml-auto">
-                    <button type="button" className="tb-addsec" aria-label={stage === 'idea' ? 'Add an idea' : 'Add a task'} onClick={() => setAdding(stage)}>
-                      <Icon name="plus" size={12} tone="inherit" />
-                    </button>
-                  </Tooltip>
+                  <HeaderIconButton
+                    icon="plus"
+                    label={stage === 'idea' ? 'Add an idea' : 'Add a task'}
+                    tip={stage === 'idea' ? 'Add an idea' : 'Add a task'}
+                    className="ml-auto"
+                    onClick={() => setAdding(stage)}
+                  />
+                ) : null}
+                {stage === 'done' && allDoneCards.length ? (
+                  <HeaderIconButton
+                    icon="archive"
+                    label="Archive all done cards"
+                    tip={`Archive all ${allDoneCards.length} done cards. You find them under Archive`}
+                    className="ml-auto"
+                    onClick={() => void archiveAllDone()}
+                  />
                 ) : null}
               </div>
               {adding === stage ? <AddRow stage={stage} onDone={() => setAdding(null)} /> : null}
@@ -110,12 +133,27 @@ export function BoardColumns({ snapshot }: { snapshot: BoardSnapshot }) {
                       />
                     </div>
                   ))
-                : <div className="tb-colhint">{HINTS[stage]}</div>}
+                : <div className="tb-colhint">{stage === 'done' && olderDone ? `Nothing finished in the last ${DONE_WINDOW_DAYS / 7} weeks.` : HINTS[stage]}</div>}
               {drop?.stage === stage && drop.beforeId === null && cards.length ? <div className="tb-dropline" /> : null}
               {stage === 'done' && all.length > DONE_SHOWN ? (
                 <button type="button" className="tb-more" onClick={() => setAllDone(!allDone)}>
                   {allDone ? 'Show fewer' : `Show all ${all.length}`}
                 </button>
+              ) : null}
+              {stage === 'done' && olderDone ? (
+                <div className="tb-colnote">
+                  {olderDone} finished more than {DONE_WINDOW_DAYS / 7} weeks ago
+                  {onShowTab ? (
+                    <>
+                      {' · '}
+                      <Tooltip label="Every finished task is in the Log, day by day">
+                        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-[12px] font-semibold" onClick={() => onShowTab('log')}>
+                          See the Log
+                        </Button>
+                      </Tooltip>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
             </section>
           )

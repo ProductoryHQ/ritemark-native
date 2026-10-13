@@ -168,6 +168,7 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     folder: folder ? folder.name : null,
     enabled,
     cards: [],
+    archived: [],
     unreadable: [],
     calls: [],
     attention: { count: 0, oldestSince: null, blocked: 0 },

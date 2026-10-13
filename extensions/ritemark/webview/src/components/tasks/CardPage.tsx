@@ -85,7 +85,15 @@ export function CardStrip({
   if (card && snapshot && p) {
     const h = card.handoff
     const waitingHere = h?.state === 'waiting' || (prompt && prompt.cardId === card.id)
-    if (card.stage === 'done') {
+    if (card.archived !== null) {
+      primary = (
+        <Tooltip label={`Put it back in ${STAGE_NAMES[card.stage]}`}>
+          <Button type="button" size="sm" variant="outline" onClick={() => void act({ type: 'board/restore', cardId: card.id })}>
+            Restore
+          </Button>
+        </Tooltip>
+      )
+    } else if (card.stage === 'done') {
       primary = (
         <Tooltip label="Move this task back to To do">
           <Button type="button" size="sm" variant="outline" onClick={() => void moveCard(card.id, 'todo')}>
@@ -120,7 +128,7 @@ export function CardStrip({
     }
   }
 
-  const words = !card || !p ? '' : card.stage === 'done' || p.waiting ? p.row : p.full || (card.nextUp ? 'Next up' : '')
+  const words = !card || !p ? '' : card.archived !== null || card.stage === 'done' || p.waiting ? p.row : p.full || (card.nextUp ? 'Next up' : '')
   const tone = card?.nextUp && !p?.full ? 'accent' : p?.tone === 'faint' ? 'muted' : p?.tone ?? 'muted'
 
   return (
@@ -183,15 +191,16 @@ export function CardStrip({
 }
 
 function StageMenu({ card }: { card: BoardCardView }) {
+  const fixed = card.locked || card.archived !== null
   const trigger = (
-    <Button type="button" variant="toolbar" size="sm" className="cp-stage" disabled={card.locked} aria-label={`Stage: ${STAGE_NAMES[card.stage]}`}>
+    <Button type="button" variant="toolbar" size="sm" className="cp-stage" disabled={fixed} aria-label={`Stage: ${STAGE_NAMES[card.stage]}`}>
       {STAGE_NAMES[card.stage]}
       <Icon name="caret-down" size={12} tone="inherit" />
     </Button>
   )
-  if (card.locked) {
+  if (fixed) {
     return (
-      <Tooltip label="The agent is still working, so the stage can’t change">
+      <Tooltip label={card.archived !== null ? 'The card is archived. Restore it to move it' : 'The agent is still working, so the stage can’t change'}>
         <span className="inline-flex">{trigger}</span>
       </Tooltip>
     )
@@ -347,6 +356,15 @@ function EditableLine({
 function CardBlock({ card, snapshot, p }: { card: BoardCardView; snapshot: BoardSnapshot; p: CardPresentation }) {
   const prompt = useBoardUi((state) => state.prompt)
   const h = card.handoff
+
+  if (card.archived !== null) {
+    return (
+      <div className="cp-line tone-muted">
+        <Icon name="archive" size={16} tone="inherit" />
+        <span>{p.full}. It is off the board; Restore puts it back in {STAGE_NAMES[card.stage]}.</span>
+      </div>
+    )
+  }
 
   if (prompt && prompt.cardId === card.id) {
     return (

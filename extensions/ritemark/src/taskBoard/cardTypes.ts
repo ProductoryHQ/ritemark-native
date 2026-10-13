@@ -88,6 +88,12 @@ export interface Card {
   ask?: CardAsk;
   review?: CardReview;
   dropped?: boolean;
+  /**
+   * When the user archived the card (Sprint 130, D15): off the board, the side
+   * bar and Your calls, listed under Archive, restorable. '' when a hand-edited
+   * file says `archived: true` without a time.
+   */
+  archived?: string;
   history: CardHistoryEntry[];
   /** The Markdown body, exactly as it is in the file. */
   description: string;

@@ -10,8 +10,6 @@
 .tb-sec-btn:hover { color: var(--r-ink-muted); }
 .tb-sec-btn svg { transition: transform .15s ease; }
 .tb-sec-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
-.tb-addsec { margin-left: auto; width: 18px; height: 18px; border-radius: 4px; border: 0; background: transparent; color: var(--r-ink-muted); display: inline-flex; align-items: center; justify-content: center; }
-.tb-addsec:hover { background: var(--r-accent-soft); color: var(--r-accent); }
 .tb-tick { position: relative; z-index: 10; width: 20px; height: 20px; margin: -2px -2px 0; border-radius: 999px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--r-ink-faint); flex-shrink: 0; }
 .tb-tick .on { display: none; }
 .tb-tick:hover { color: var(--r-accent); }
@@ -171,3 +169,5 @@
 .cp-addfiles { margin: 0; display: inline-flex; align-items: center; gap: 4px; height: 26px; font-size: 12.5px; }
 .cp-history { padding: 16px 0 20px; border-bottom: 1px solid var(--r-hairline); }
 .cp-history .cp-label { display: block; margin-bottom: 8px; }
+/* Done column (D15): the note under the last four weeks. */
+.tb-colnote { padding: 6px 6px 2px; font-size: 12px; color: var(--r-ink-faint); }

@@ -192,13 +192,14 @@ At 280 px "Ask for changes…" is the icon button `[p]` with its tooltip; at 360
 
 | Card is | Menu |
 |---|---|
-| To do | Give to… · Move to… · Delete… |
-| Working or queued | Open conversation · Stop · Delete… (stop the agent first) |
-| Needs you, Decision, Ready to review | Open conversation · Mark done · Move to… · Delete… |
-| Failed, Interrupted | Retry with… · Open conversation · Move to… · Delete… |
-| Stopped | Give to… · Open conversation · Move to… · Delete… |
-| Done | Reopen · Open conversation · Delete… |
-| Idea | Review with… · Make it a task · Drop · Delete… |
+| To do | Give to… · Move to… · Archive · Delete… |
+| Working or queued | Open conversation · Stop · Archive · Delete… (stop the agent first) |
+| Needs you, Decision, Ready to review | Open conversation · Mark done · Move to… · Archive · Delete… |
+| Failed, Interrupted | Retry with… · Open conversation · Move to… · Archive · Delete… |
+| Stopped | Give to… · Open conversation · Move to… · Archive · Delete… |
+| Done | Reopen · Open conversation · Archive · Delete… |
+| Idea | Review with… · Make it a task · Drop · Archive · Delete… |
+| Archived | Restore · Open conversation · Delete… |
 
 "Give to…", "Review with…" and "Retry with…" expand Claude Code, Codex and OpenCode in place, like Move to…; the default agent is checked, an unavailable one says why.
 
@@ -242,6 +243,19 @@ One "Task board" tab per window, with the folder name in muted text after the ti
 - Column headers: strong ink, uppercase, count. No colour per column. Cards use the Card pattern (hairline, 10 px radius).
 - Drag moves a card; the keyboard path is Move to… and the card page's stage menu. A working or waiting card refuses to leave Doing and says why in a polite message.
 - The tabs are `ui/tabs.tsx`, shadcn's standard Radix Tabs (§12). The Your calls tab holds the same call rows as the side bar, in one column at most 720 px wide.
+
+## 4b. Archive and the Done column
+
+**Approved by Jarmo, 2026-10-13 (D15).** Delete stays the real delete; Archive is the tidy-up that loses nothing.
+
+- **Archive** is in every card's `…` menu, just above Delete…. It is disabled while an agent works on the card ("Archive (stop the agent first)"); a card waiting to start stops waiting.
+- **Archive all done** is an icon button (`archive`) in the Done column's header. One click archives every card in Done; a notice says how many and where they went.
+- An archived card leaves the board, the side bar and Your calls, and does not count in Doing. Its file stays, marked `archived: <time>`, and its history gets "Archived". The Log keeps it.
+- **The Archive tab** (fifth, after Log) lists archived cards, the most recently archived first: title (opens the card's page), "Archived · Today · was in Done", **Restore** and **Delete…**. Empty: "Nothing archived. Archive a card from its … menu, or all done cards from the Done column."
+- An archived card's page shows "Archived" in its strip with **Restore** as the one action; the stage menu is disabled ("The card is archived. Restore it to move it").
+- **The Done column shows the last four weeks** (28 days, by when a card was marked done). Below it: "12 finished more than 4 weeks ago · See the Log". The side bar's Done section counts and lists the same four weeks.
+- **Delete…** asks once; Enter confirms and Escape cancels.
+- Agents cannot archive, restore or delete. `list_cards` leaves archived cards out; `read_card` still reads one and says it is archived.
 
 ## 5. The card page
 
@@ -590,7 +604,7 @@ If the sprint must shrink, cut in this order: agent decision rows, drag (Move to
 - **Screen reader.** A row's name is "{title}, {state line}". Glyphs are `aria-hidden`; the state is always text. One polite live region per surface announces Needs you, Decision for you, Ready to review and Failed once per change; it does not announce Sending, Queued or Working, never moves focus, and coalesces within 2 seconds.
 - **Reduced motion.** The spinner is static (glyph plus "Working"). No card-move animation.
 - **200 % zoom.** The side bar reflows with no horizontal scroll. The state word never wraps; detail wraps beneath. The card page reflows like any document.
-- **Width.** Options stack in the side bar; secondary buttons collapse as in §5; Done shows 5 in the side bar and 10 on the board.
+- **Width.** Options stack in the side bar; secondary buttons collapse as in §5; Done shows the last four weeks: 5 in the side bar and 10 on the board, then Show all.
 - **Long content.** Titles clamp to 2 lines in rows and cards and show in full on the card page. File names show the base name plus parent folder with a middle ellipsis and the full path in a tooltip. Results: 3 lines in rows, about 1,200 characters on the card page, then "Open conversation for the rest". Option labels are one line with a tooltip.
 - **Three working cards.** Each has its own spinner; there is no live activity text, so no ticker. Only Your calls moves the badge.
 - **Contrast and high contrast.** The sidebar's tokens (`--r-warning`, `--r-accent`, `--r-error`); glyph plus word carry every state.

@@ -48,7 +48,11 @@ export function CardMenu({
   const move: Item = { label: 'Move to…', icon: 'arrows-down-up', sub: 'move' }
 
   const items: Item[] = []
-  if (card.stage === 'idea') {
+  if (card.archived !== null) {
+    // An archived card (D15): put it back, or delete it.
+    items.push({ label: 'Restore', icon: 'arrow-counter-clockwise', run: () => void act({ type: 'board/restore', cardId: card.id }) })
+    if (canOpen) items.push(conversation)
+  } else if (card.stage === 'idea') {
     items.push(
       { label: 'Review with…', icon: 'sparkle', sub: 'review' },
       {
@@ -155,6 +159,12 @@ export function CardMenu({
           </div>
         ))}
         <DropdownMenuSeparator />
+        {card.archived === null ? (
+          <DropdownMenuItem disabled={busy} onSelect={() => void act({ type: 'board/archive', cardId: card.id })}>
+            <Icon name="archive" size={14} tone="inherit" />
+            <span>{busy ? 'Archive (stop the agent first)' : 'Archive'}</span>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem tone="danger" disabled={busy} onSelect={() => askDelete(card.id)}>
           <Icon name="trash" size={14} tone="inherit" />
           <span>{busy ? 'Delete… (stop the agent first)' : 'Delete…'}</span>

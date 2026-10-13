@@ -261,9 +261,10 @@ export function createBoardToolGroup(controller: () => BoardController | null): 
         input: { card_id: cardId },
         run: async (args) => {
           const snapshot = await board().snapshot();
-          const card = snapshot.cards.find((item) => item.id === args.card_id);
+          // An archived card is off the board but can still be read (D15).
+          const card = snapshot.cards.find((item) => item.id === args.card_id) ?? snapshot.archived.find((item) => item.id === args.card_id);
           if (!card) return { text: `There is no card ${String(args.card_id)} on the board. Use list_cards to find it.`, isError: true };
-          const lines = [`${card.title}`, `Stage: ${STAGE_WORDS[card.stage]}`];
+          const lines = [`${card.title}`, `Stage: ${STAGE_WORDS[card.stage]}${card.archived !== null ? ' (archived by the user; only the user can restore it)' : ''}`];
           if (card.doneWhen) lines.push(`Done when: ${card.doneWhen}`);
           if (card.files.length) lines.push(`Files: ${card.files.map((file) => file.path + (file.exists ? '' : ' (missing)')).join(', ')}`);
           lines.push('', 'Description:', card.description.trim() || '(none)');

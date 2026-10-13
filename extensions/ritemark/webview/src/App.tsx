@@ -772,7 +772,9 @@ function App() {
   const inlineTocShown = !cardMode && activePanel === 'toc' && headings.length >= 2
   const propertiesPanelShown = !cardMode && activePanel === 'properties'
   const agentPanelShown = activePanel === 'agent' && isAgentMode
-  const pageCard = cardMode && boardSnapshot ? boardSnapshot.cards.find((card) => card.id === cardMode.cardId) ?? null : null
+  const pageCard = cardMode && boardSnapshot
+    ? boardSnapshot.cards.find((card) => card.id === cardMode.cardId) ?? boardSnapshot.archived.find((card) => card.id === cardMode.cardId) ?? null
+    : null
   const commentsSlot = features.commentCallouts !== false ? <CommentsMenuButton getEditor={() => editorRef.current} /> : undefined
 
   const contentsClick = headings.length >= 2 ? toggleInlineToc : undefined

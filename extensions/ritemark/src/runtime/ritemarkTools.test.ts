@@ -184,6 +184,7 @@ function card(partial: Partial<BoardCardView> & { id: string; title: string }): 
     ask: null,
     review: null,
     dropped: false,
+    archived: null,
     history: [],
     copiedFrom: null,
     handoff: null,
@@ -207,6 +208,7 @@ function fakeBoard() {
       card({ id: 'abc123', title: 'Draft the agenda', doneWhen: 'One page', files: [{ path: 'docs/agenda.md', exists: true }], description: 'Use the notes.', move: 'you' }),
       card({ id: 'def456', title: 'Book the room', stage: 'doing', move: 'agent', history: [{ at: '2026-10-12T08:00:00.000Z', by: 'you', what: 'Created' }] }),
     ],
+    archived: [card({ id: 'old111', title: 'Old work', stage: 'done', archived: '2026-10-01T08:00:00.000Z' })],
     unreadable: [],
     calls: [],
     attention: { count: 0, oldestSince: null, blocked: 0 },
@@ -305,6 +307,8 @@ async function main(): Promise<void> {
     const read = await runTool(tool('read_card'), { card_id: 'def456' }, claude);
     assert.match(read.text, /^Book the room\nStage: Doing/);
     assert.match(read.text, /History:\n2026-10-12T08:00:00.000Z you: Created/);
+    assert.match((await runTool(tool('read_card'), { card_id: 'old111' }, claude)).text, /Stage: Done \(archived by the user/);
+    assert.doesNotMatch(list.text, /old111/, 'list_cards leaves archived cards out');
     const missing = await runTool(tool('read_card'), { card_id: 'zzz999' }, claude);
     assert.equal(missing.isError, true);
     assert.match(missing.text, /no card zzz999.*list_cards/);

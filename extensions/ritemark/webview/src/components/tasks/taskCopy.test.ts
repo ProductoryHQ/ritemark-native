@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import type { BoardCardView, CardHandoffView } from '../../../../src/taskBoard/protocol'
-import { duration, finishedLine, historyTime, logDay, modifiedLine, presentCard, shortDay, waited } from './taskCopy'
+import { duration, finishedLine, finishedRecently, historyTime, logDay, modifiedLine, presentCard, shortDay, waited } from './taskCopy'
 
 const now = new Date('2026-10-14T12:00:00') // a Wednesday, local time
 const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString()
@@ -20,6 +20,7 @@ function card(overrides: Partial<BoardCardView> = {}): BoardCardView {
     ask: null,
     review: null,
     dropped: false,
+    archived: null,
     history: [],
     copiedFrom: null,
     handoff: null,
@@ -118,7 +119,21 @@ function main(): void {
     'Codex finished in 1m 01s',
   )
 
-  console.log('tasks/taskCopy: all assertions passed')
+  // ── D15: archived cards, and the Done column's four weeks ───────────────────
+{
+  const archived = presentCard(card({ stage: 'done', archived: ago(60 * 24) }), context)
+  assert.equal(archived.row, 'Archived · Yesterday')
+  assert.equal(archived.glyph, 'archive')
+  assert.equal(archived.call, null)
+  assert.equal(presentCard(card({ archived: '' }), context).row, 'Archived', 'archived without a time (a hand edit)')
+
+  const doneOn = (minutesAgo: number) => card({ stage: 'done', history: [{ at: ago(minutesAgo), by: 'you', what: 'Marked done' }] })
+  assert.equal(finishedRecently(doneOn(60 * 24 * 27), now), true, '27 days ago is in the window')
+  assert.equal(finishedRecently(doneOn(60 * 24 * 29), now), false, '29 days ago is not')
+  assert.equal(finishedRecently(card({ stage: 'done', updated: null }), now), true, 'no known time counts as recent')
+}
+
+console.log('tasks/taskCopy: all assertions passed')
 }
 
 main()

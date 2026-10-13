@@ -13,6 +13,7 @@ import { cn } from '../../lib/utils'
 import { Icon } from '../ui/Icon'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Tooltip } from '../ui/tooltip'
+import { ArchiveView } from './ArchiveView'
 import { BoardColumns } from './BoardColumns'
 import { onFocus, startBoard, useBoardSnapshot } from './boardClient'
 import { CallsView } from './CallsView'
@@ -91,6 +92,9 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
               Ideas<span className="tb-count">{ideas}</span>
             </TabsTrigger>
             <TabsTrigger value="log">Log</TabsTrigger>
+            <TabsTrigger value="archive">
+              Archive<span className="tb-count">{snapshot.archived.length}</span>
+            </TabsTrigger>
           </TabsList>
         </div>
         <div className="tb-scroll min-h-0 flex-1" style={{ overflow: 'auto' }}>
@@ -98,13 +102,16 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
             <CallsView snapshot={snapshot} />
           </TabsContent>
           <TabsContent value="board">
-            <BoardColumns snapshot={snapshot} />
+            <BoardColumns snapshot={snapshot} onShowTab={setTab} />
           </TabsContent>
           <TabsContent value="ideas">
             <IdeasView snapshot={snapshot} />
           </TabsContent>
           <TabsContent value="log">
             <LogView snapshot={snapshot} />
+          </TabsContent>
+          <TabsContent value="archive">
+            <ArchiveView snapshot={snapshot} />
           </TabsContent>
         </div>
       </Tabs>

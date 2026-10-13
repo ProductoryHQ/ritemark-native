@@ -236,7 +236,7 @@ export class BoardController {
     const unreadable = entries.flatMap((entry) =>
       entry.kind === 'unreadable' ? [{ fileName: entry.fileName, message: entry.message }] : [],
     );
-    const nextUp = this.nextUpId(cards.map((entry) => entry.card), handoffs);
+    const nextUp = this.nextUpId(cards.flatMap((entry) => (entry.card.archived === undefined ? [entry.card] : [])), handoffs);
     const exists = new Map<string, boolean>();
     await Promise.all(
       [...new Set(cards.flatMap((entry) => entry.card.files))].map(async (file) => {
@@ -244,13 +244,16 @@ export class BoardController {
       }),
     );
     const views: BoardCardView[] = [];
+    const archived: BoardCardView[] = [];
     const calls: BoardCall[] = [];
     for (const entry of cards) {
       const { card } = entry;
       const handoff = handoffs.get(card.id) ?? null;
-      const who = deriveWho(card, handoff);
+      // An archived card is off the board: it waits on nobody (D15).
+      const isArchived = card.archived !== undefined;
+      const who = isArchived ? { move: null, call: null, since: null } : deriveWho(card, handoff);
       if (who.call && who.since) calls.push({ cardId: card.id, kind: who.call, since: who.since });
-      views.push({
+      (isArchived ? archived : views).push({
         id: card.id,
         title: card.title,
         doneWhen: card.doneWhen ?? null,
@@ -264,6 +267,7 @@ export class BoardController {
         ask: card.ask ?? null,
         review: card.review ?? null,
         dropped: card.dropped === true,
+        archived: card.archived ?? null,
         history: card.history,
         copiedFrom: entry.copiedFrom ?? null,
         handoff,
@@ -281,10 +285,11 @@ export class BoardController {
       folder: this.deps.folderName,
       enabled: this.deps.enabled(),
       cards: views,
+      archived: archived.sort((a, b) => ((a.archived ?? '') < (b.archived ?? '') ? 1 : (a.archived ?? '') > (b.archived ?? '') ? -1 : 0)),
       unreadable,
       calls,
       attention: { count: calls.length, oldestSince: oldest, blocked: calls.filter((call) => call.kind === 'needs-you').length },
-      doing: { count: cards.filter((entry) => entry.card.stage === 'doing').length, limit: this.wipLimit() },
+      doing: { count: cards.filter((entry) => entry.card.stage === 'doing' && entry.card.archived === undefined).length, limit: this.wipLimit() },
       runtimes: BOARD_AGENTS.map((id) => {
         const availability = runtimes[id];
         return {
@@ -441,6 +446,7 @@ export class BoardController {
     const entries = await this.store.list();
     const card = this.cardOf(entries, cardId);
     if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
     if (card.stage !== stage && this.isLocked(cardId)) {
       return answerError('busy', 'The agent is still working on this card. Stop it first, or wait until it finishes.');
     }
@@ -492,6 +498,58 @@ export class BoardController {
     } catch (error) {
       return fromStoreError(error);
     }
+  }
+
+  // ── Archive (D15) ────────────────────────────────────────────────────────
+
+  /**
+   * Take a card off the board without deleting it: it leaves the columns, the
+   * side bar and Your calls, keeps its file and history, and is listed under
+   * Archive until restored. Not while an agent works on it; a card waiting to
+   * start stops waiting.
+   */
+  async archive(cardId: string): Promise<BoardAnswer> {
+    if (this.isLocked(cardId)) return answerError('busy', 'An agent is working on this card. Stop it first.');
+    const card = await this.store.get(cardId);
+    if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return { ok: true, cardId };
+    try {
+      if (this.ledger.list().get(cardId)?.state === 'waiting') await this.ledger.unwait(cardId);
+      const at = this.now().toISOString();
+      await this.store.mutate(cardId, { by: 'you', what: 'Archived' }, (current) => ({ ...current, archived: at }));
+      return { ok: true, cardId };
+    } catch (error) {
+      return fromStoreError(error);
+    }
+  }
+
+  /** Put an archived card back on the board, in the stage it was in. */
+  async restore(cardId: string): Promise<BoardAnswer> {
+    const card = await this.store.get(cardId);
+    if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived === undefined) return { ok: true, cardId };
+    try {
+      await this.store.mutate(cardId, { by: 'you', what: 'Restored' }, (current) => {
+        const next = { ...current };
+        delete next.archived;
+        return next;
+      });
+      return { ok: true, cardId };
+    } catch (error) {
+      return fromStoreError(error);
+    }
+  }
+
+  /** Archive all done: every card in Done. Answers how many were archived. */
+  async archiveDone(): Promise<BoardAnswer> {
+    const entries = await this.store.list();
+    const done = this.cardsIn(entries, 'done');
+    let count = 0;
+    for (const card of done) {
+      const answer = await this.archive(card.id);
+      if (answer.ok) count += 1;
+    }
+    return { ok: true, count };
   }
 
   async setDropped(cardId: string, dropped: boolean): Promise<BoardAnswer> {
@@ -681,6 +739,7 @@ export class BoardController {
     const entries = await this.store.list();
     const card = this.cardOf(entries, cardId);
     if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
     if (card.stage === 'done') return answerError('invalid', 'Reopen the card before giving it to an agent.');
     if (this.isLocked(cardId)) return answerError('busy', 'An agent is already working on this card.');
     const gate = await this.availability(runtimeId);
@@ -722,6 +781,7 @@ export class BoardController {
     turn: { kind: StartTurn['kind']; text?: string },
     history: { by: BoardActor; what: string } | null,
   ): Promise<BoardAnswer> {
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
     if (this.starting.has(card.id)) return answerError('busy', 'An agent is already working on this card.');
     this.starting.add(card.id);
     try {
@@ -764,6 +824,7 @@ export class BoardController {
   private async recordWait(cardId: string, runtimeId: AgentId, reason: WaitReason): Promise<BoardAnswer> {
     const card = await this.store.get(cardId);
     if (!card) return answerError('not-found', 'That card is no longer on the board.');
+    if (card.archived !== undefined) return answerError('not-allowed', 'This card is archived. Restore it first.');
     if (this.isLocked(cardId)) return answerError('busy', 'An agent is already working on this card.');
     const gate = await this.availability(runtimeId);
     if (gate) return gate;
@@ -812,9 +873,10 @@ export class BoardController {
     return null;
   }
 
+  /** The cards on the board in a stage; archived cards are not on the board. */
   private cardsIn(entries: BoardEntry[], stage: CardStage): Card[] {
     return entries
-      .flatMap((entry) => (entry.kind === 'card' && entry.card.stage === stage ? [entry.card] : []))
+      .flatMap((entry) => (entry.kind === 'card' && entry.card.stage === stage && entry.card.archived === undefined ? [entry.card] : []))
       .sort(compareCards);
   }
 

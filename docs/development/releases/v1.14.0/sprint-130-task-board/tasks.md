@@ -56,6 +56,17 @@ Jarmo approved the plan on 2026-10-12. `sprint-130-task-board` was created from 
 - [x] T3b.8 Rebuild `media/webview.js` (8,453,831 → 8,459,024 bytes); live check of S8a–S8c on a dev instance, light and dark, and a 360 px editor (the strip gives way, More stays). Side-bar widths 280/420 go with the Phase 8 pass
 - [x] T3b.9 Unreadable card files listed in the side bar and below the board (R4 gap in W3)
 
+## Phase 3c: Archive and the Done window (D15, 2026-10-13)
+
+- [x] T3c.1 Jarmo's OK (2026-10-13: "yes, build archive like that and keep 28days Done limit also")
+- [x] T3c.2 `archived: <time>` in the card format (`true` from a hand edit reads too); tests
+- [x] T3c.3 `BoardController.archive`, `restore`, `archiveDone`; archived cards out of the board, Your calls, Doing and Next up (`snapshot.archived`); move and agent work refused until restored; tests
+- [x] T3c.4 Protocol: `board/archive`, `board/restore`, `board/archive-done`, the `archive` tab; tests
+- [x] T3c.5 Webview: Archive in `CardMenu`, Archive all done on the Done column, the Archive tab (`ArchiveView`), an archived card's page, Done and the side bar's Done limited to 28 days with the Log note; header icon buttons on shadcn `Button`
+- [x] T3c.6 Delete… confirms with Enter
+- [x] T3c.7 `read_card` reads an archived card; `list_cards` leaves them out
+- [x] T3c.8 Live check on a dev instance: the 28-day note, Archive all done, the Archive tab, Restore, Enter to delete
+
 ## Phase 4: Give to agent (W4, R5, R6, R7, R12)
 
 - [x] T4.1 `src/taskBoard/CardTaskStore.ts` (one record per card; records of deleted cards dropped at activation), covered by the ledger test

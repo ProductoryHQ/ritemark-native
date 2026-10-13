@@ -79,7 +79,7 @@ Concrete uses that must stay consistent across webview and VS Code patches.
 | Titlebar | `sidebar-simple`, `sidebar`, `gear` |
 | Activity bar | `folder-open`, `magnifying-glass`, `robot`, `flow-arrow`, `git-branch`, `puzzle-piece`, `gear`, `user-circle` |
 | Status / meta | `info`, `warning`, `x-circle`, `check`, `star`, `lock-simple`, `clock-counter-clockwise`, `list`, `package` |
-| Task board (Sprint 130) | `kanban` (the Tasks activity-bar entry and Open board), `lightbulb` (an idea not reviewed yet), `arrows-down-up` (Move to…), `hand-pointing` (the board's "waits on you" pill); state glyphs reuse `circle`, `check-circle`, `circle-notch`, `clock`, `shield-check`, `question`, `clipboard-text`, `eye`, `x-circle`, `x`, `warning` (design.md §10) |
+| Task board (Sprint 130) | `kanban` (the Tasks activity-bar entry and Open board), `lightbulb` (an idea not reviewed yet), `arrows-down-up` (Move to…), `hand-pointing` (the board's "waits on you" pill), `archive` (Archive, Archive all done, the Archive tab); state glyphs reuse `circle`, `check-circle`, `circle-notch`, `clock`, `shield-check`, `question`, `clipboard-text`, `eye`, `x-circle`, `x`, `warning` (design.md §10) |
 
 New surface additions must reuse names already present in this list when semantically equivalent (e.g. a new "add file" affordance uses `file-plus`, not `plus-circle`). New names must be added to `iconMap` in `Icon.tsx` AND to this table in the same change.
 

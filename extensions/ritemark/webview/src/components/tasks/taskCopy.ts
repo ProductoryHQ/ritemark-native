@@ -115,7 +115,18 @@ export function shortTitle(title: string, max = 26): string {
   return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`
 }
 
-function doneAt(card: BoardCardView): string | null {
+/** The Done column shows what finished in the last four weeks; older work is
+ *  in the Log, and Archive takes it off the board (Jarmo, 2026-10-13). */
+export const DONE_WINDOW_DAYS = 28
+
+/** Finished within the Done window (a card with no known finish time counts as recent). */
+export function finishedRecently(card: BoardCardView, now: Date, days = DONE_WINDOW_DAYS): boolean {
+  const at = doneAt(card)
+  const time = at ? Date.parse(at) : Number.NaN
+  return Number.isNaN(time) || now.getTime() - time <= days * 24 * 60 * 60 * 1000
+}
+
+export function doneAt(card: BoardCardView): string | null {
   for (let index = card.history.length - 1; index >= 0; index -= 1) {
     if (card.history[index].what === 'Marked done') return card.history[index].at
   }
@@ -131,6 +142,17 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
   const h = card.handoff
   const since = (iso: string | null | undefined) => waited(iso, context.now)
 
+  if (card.archived !== null) {
+    const day = card.archived ? shortDay(card.archived, context.now) : ''
+    return {
+      ...base,
+      glyph: 'archive',
+      tone: 'faint',
+      row: day ? `Archived · ${day}` : 'Archived',
+      full: card.archived ? `Archived · ${day} ${timeOfDay(card.archived)}` : 'Archived',
+      call: null,
+    }
+  }
   if (card.stage === 'done') {
     const at = doneAt(card)
     const day = at ? shortDay(at, context.now) : 'Today'

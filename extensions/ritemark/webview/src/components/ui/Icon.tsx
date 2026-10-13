@@ -14,6 +14,7 @@
  */
 import * as React from 'react'
 import {
+  Archive,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowSquareOut,
@@ -141,6 +142,7 @@ const toneToColor: Record<IconTone, string> = {
 
 const iconMap = {
   'arrow-clockwise': ArrowClockwise,
+  'archive': Archive,
   'arrow-counter-clockwise': ArrowCounterClockwise,
   'arrow-square-out': ArrowSquareOut,
   'arrow-up-right': ArrowUpRight,

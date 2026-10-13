@@ -28,7 +28,8 @@ export function LogView({ snapshot }: { snapshot: BoardSnapshot }) {
   const now = useNow()
   const openCard = useBoardUi((state) => state.openCard)
   const events: Event[] = []
-  for (const card of snapshot.cards) {
+  // Archived cards' history stays in the Log (D15).
+  for (const card of [...snapshot.cards, ...snapshot.archived]) {
     for (const entry of card.history) {
       if (Number.isNaN(Date.parse(entry.at))) continue
       events.push({ at: entry.at, what: entry.what, cardId: card.id, title: card.title })

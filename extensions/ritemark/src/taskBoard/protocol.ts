@@ -92,6 +92,8 @@ export interface BoardCardView {
   ask: CardAsk | null;
   review: CardReview | null;
   dropped: boolean;
+  /** When it was archived ('' when unknown); null for a card on the board. */
+  archived: string | null;
   history: CardHistoryEntry[];
   /** A copied card file shown under a fresh id until its next write. */
   copiedFrom: string | null;
@@ -128,7 +130,10 @@ export interface BoardSnapshot {
   /** The project folder's name; null without a folder. */
   folder: string | null;
   enabled: boolean;
+  /** The cards on the board; archived ones are in `archived`. */
   cards: BoardCardView[];
+  /** Archived cards, the most recently archived first (D15). */
+  archived: BoardCardView[];
   unreadable: Array<{ fileName: string; message: string }>;
   calls: BoardCall[];
   attention: { count: number; oldestSince: string | null; blocked: number };
@@ -159,7 +164,7 @@ export type BoardErrorCode =
   | 'write-failed';
 
 export type BoardAnswer =
-  | { ok: true; cardId?: string; waiting?: WaitReason }
+  | { ok: true; cardId?: string; waiting?: WaitReason; count?: number }
   | { ok: false; code: BoardErrorCode; message: string; recovery?: RuntimeAvailabilityRecovery }
   /** Give to would start a second agent on a file another card's agent is changing. */
   | { ok: false; code: 'conflict'; message: string; withCardId: string; withTitle: string; file: string }
@@ -180,8 +185,8 @@ export type BoardHostMessage =
 export type BoardSurface = 'sidebar' | 'panel' | 'page';
 
 /** The Task board tab's views. */
-export type BoardTab = 'calls' | 'board' | 'ideas' | 'log';
-export const BOARD_TABS: readonly BoardTab[] = ['calls', 'board', 'ideas', 'log'];
+export type BoardTab = 'calls' | 'board' | 'ideas' | 'log' | 'archive';
+export const BOARD_TABS: readonly BoardTab[] = ['calls', 'board', 'ideas', 'log', 'archive'];
 
 export type BoardRequest =
   | { type: 'board/ready'; surface: BoardSurface }
@@ -199,6 +204,10 @@ export type BoardRequest =
   | { type: 'board/mark-done'; requestId: string; cardId: string }
   | { type: 'board/delete'; requestId: string; cardId: string }
   | { type: 'board/drop'; requestId: string; cardId: string }
+  | { type: 'board/archive'; requestId: string; cardId: string }
+  | { type: 'board/restore'; requestId: string; cardId: string }
+  /** Archive every card in Done. */
+  | { type: 'board/archive-done'; requestId: string }
   | { type: 'board/bring-back'; requestId: string; cardId: string }
   | { type: 'board/give'; requestId: string; cardId: string; runtimeId: AgentId; force?: boolean; overLimit?: boolean }
   | { type: 'board/queue'; requestId: string; cardId: string; runtimeId: AgentId }
@@ -254,6 +263,9 @@ const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; op
   'board/mark-done': { required: { requestId: 'requestId', cardId: 'cardId' } },
   'board/delete': { required: { requestId: 'requestId', cardId: 'cardId' } },
   'board/drop': { required: { requestId: 'requestId', cardId: 'cardId' } },
+  'board/archive': { required: { requestId: 'requestId', cardId: 'cardId' } },
+  'board/restore': { required: { requestId: 'requestId', cardId: 'cardId' } },
+  'board/archive-done': { required: { requestId: 'requestId' } },
   'board/bring-back': { required: { requestId: 'requestId', cardId: 'cardId' } },
   'board/give': {
     required: { requestId: 'requestId', cardId: 'cardId', runtimeId: 'runtime' },

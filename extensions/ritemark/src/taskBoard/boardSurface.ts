@@ -159,6 +159,12 @@ async function route(request: Exclude<BoardRequest, { type: 'board/ready' }>, co
       return controller.remove(request.cardId);
     case 'board/drop':
       return controller.setDropped(request.cardId, true);
+    case 'board/archive':
+      return controller.archive(request.cardId);
+    case 'board/restore':
+      return controller.restore(request.cardId);
+    case 'board/archive-done':
+      return controller.archiveDone();
     case 'board/bring-back':
       return controller.setDropped(request.cardId, false);
     case 'board/give':

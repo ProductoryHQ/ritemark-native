@@ -61,6 +61,7 @@ const KNOWN_KEYS = [
   'ask',
   'review',
   'dropped',
+  'archived',
   'history',
 ] as const;
 
@@ -241,6 +242,9 @@ export function parseCardFile(text: string): ParsedCardFile {
       if (typeof data.dropped !== 'boolean') fail('dropped must be true or false.');
       if (data.dropped) card.dropped = true;
     }
+    if (data.archived !== undefined && data.archived !== null && data.archived !== false) {
+      card.archived = data.archived === true ? '' : timeOf(data.archived, 'archived');
+    }
     return { kind: 'card', card, source: { data } };
   } catch (error) {
     if (error instanceof CardFormatError) return { kind: 'error', message: error.message };
@@ -282,6 +286,7 @@ function frontMatterOf(card: Card): Record<string, unknown> {
   if (card.ask) out.ask = { ...card.ask, at: yamlTime(card.ask.at), options: [...card.ask.options] };
   if (card.review) out.review = { ...card.review, at: yamlTime(card.review.at) };
   if (card.dropped) out.dropped = true;
+  if (card.archived !== undefined) out.archived = card.archived ? yamlTime(card.archived) : true;
   out.history = card.history.map((entry) => ({ at: yamlTime(entry.at), by: entry.by, what: entry.what }));
   return out;
 }
