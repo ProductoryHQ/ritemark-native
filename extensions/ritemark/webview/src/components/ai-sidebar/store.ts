@@ -919,6 +919,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       return true;
     }
 
+    // A stopped card's prompt that has not started yet leaves its queue, as if
+    // the user had removed it there (the host hears `comment-task/dequeued`).
+    if (message.type === 'comment-task/drop') {
+      for (const [conversationId, items] of Object.entries(get().promptQueues)) {
+        const item = items.find((candidate) => candidate.taskId === message.taskId && candidate.status === 'queued');
+        if (item) get().removeQueued(conversationId, item.id);
+      }
+      return true;
+    }
+
     // "Open conversation" on a comment: show the task's own destination (R4).
     if (message.type === 'conversation/select') {
       if (message.conversationId) get().loadSavedConversation(message.conversationId);

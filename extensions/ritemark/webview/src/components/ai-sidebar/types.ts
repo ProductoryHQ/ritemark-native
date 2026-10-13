@@ -445,6 +445,9 @@ export type ExtensionMessage =
   // the editor relayed a prompt and the sidebar picked a thread of its own
   // (audit F20). The sidebar answers with `comment-task/enqueue-result`.
   | { type: 'comment-task/enqueue'; taskId: string; conversationId: string; conversationTurnId: string; runtimeId: 'claude-code' | 'codex' | 'opencode'; prompt: string; displayText: string; modelId: string | null; autonomy: 'auto' | 'ask'; thinkingEffort: string; sourceDisplayPath: string }
+  // Sprint 130 (W13): a card stopped while its prompt still waits in a queue.
+  // The sidebar drops it, so a later Give does not run the old prompt too.
+  | { type: 'comment-task/drop'; taskId: string }
   // Sprint 117: "Open conversation" on a comment reveals the task's own thread.
   | { type: 'conversation/select'; conversationId: string }
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }

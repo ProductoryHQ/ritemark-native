@@ -283,6 +283,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
   private readonly _conversationController: ConversationController;
+  /** Startup: turns a crash left running are recorded as interrupted (W13). */
+  private readonly _turnsLeftByRestart: Promise<void>;
   private readonly _conversationTitleGenerator: ConversationTitleGenerator;
   private _continuationHostSecretPromise: Promise<string> | null = null;
 
@@ -330,6 +332,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       markHostAuthority: () => conversationCutover.establishHostAuthority(),
       migrator: new LegacyConversationMigrator(conversationStore),
     });
+    // Sprint 130 (W13): turns a crash or forced quit left running. Conversation
+    // requests and new turns wait for it, so none reads such a turn as live.
+    this._turnsLeftByRestart = this._conversationController
+      .interruptTurnsLeftByRestart((conversationId) => this._runtimeSessions.has(conversationId))
+      .then(
+        () => undefined,
+        (error) => { console.error('[Agent Chat] Could not record turns left by a restart:', error); },
+      );
   }
 
   public resolveWebviewView(
@@ -352,6 +362,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (isConversationRequestMessage(message)) {
+        await this._turnsLeftByRestart;
         const response = await this._conversationController.handle(message);
         try {
           await webviewView.webview.postMessage(response);
@@ -656,6 +667,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
           try {
+            await this._turnsLeftByRestart;
             hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
             if (hostConversationEnabled) {
               if (message.conversationContinuation === true) {
@@ -1706,6 +1718,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       ),
       runtimeSettings: (runtimeId) => this._commentTaskRuntimeSettings('', runtimeId as AgentId),
       enqueue: (message) => this._enqueueCardTask(message),
+      dropQueued: async (taskId) => {
+        await this._view?.webview.postMessage({ type: 'comment-task/drop', taskId });
+      },
       canAttach: (conversationId) => this._canAttachRuntime(conversationId),
       revealConversation: (conversationId) => this._revealConversation(conversationId),
       cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),

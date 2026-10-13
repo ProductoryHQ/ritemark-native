@@ -66,7 +66,7 @@
 .tb-tile .mt { position: absolute; right: 6px; top: 6px; opacity: 0; }
 .tb-tile:hover .mt, .tb-tile .mt:has([data-state="open"]) { opacity: 1; }
 .tb-dropline { height: 2px; border-radius: 2px; background: var(--r-accent); margin: -5px 2px 3px; }
-.tb-addrow { margin-bottom: 8px; }
+.tb-addrow { margin: 6px 0 8px; } /* clear of the column header */
 .tb-foot { padding: 4px 24px 16px; font-size: 12px; color: var(--r-ink-faint); }
 .tb-callcard { border: 1px solid var(--r-hairline); background: var(--r-surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .tb-callcard:hover { border-color: var(--r-hairline-strong); }

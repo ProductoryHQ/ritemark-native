@@ -174,22 +174,30 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
   )
 }
 
+/**
+ * The column's add field: three lines of room that grow with the text, so an
+ * idea or task reads whole while it is written (Jarmo, 2026-10-13). A title is
+ * one line, so Enter adds it and a pasted line break becomes a space.
+ */
 function AddRow({ stage, onDone }: { stage: CardStage; onDone: () => void }) {
   const [title, setTitle] = useState('')
   return (
     <div className="tb-addrow">
-      <input
+      <textarea
         autoFocus
-        className={cn(INPUT, 'h-8')}
+        rows={3}
+        className={cn(INPUT, 'block max-h-[220px] min-h-[72px] resize-none leading-snug [field-sizing:content]')}
         placeholder={stage === 'idea' ? 'Write an idea…' : 'Add a task…'}
         aria-label="New card title"
         value={title}
         maxLength={200}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => setTitle(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
         onBlur={() => !title.trim() && onDone()}
         onKeyDown={async (event) => {
           if (event.key === 'Escape') onDone()
-          if (event.key === 'Enter' && title.trim()) {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            if (!title.trim()) return
             const answer = await act({ type: 'board/add', title, stage })
             if (answer.ok) setTitle('')
           }

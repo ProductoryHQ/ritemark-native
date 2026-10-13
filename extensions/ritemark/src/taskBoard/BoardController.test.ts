@@ -409,6 +409,31 @@ async function main(): Promise<void> {
     assert.equal(!(await controller.setWipLimit(9)).ok, true);
   }
 
+  // ── W13: Interrupted by a quit while Doing was over its limit (4/3) ────────
+  {
+    const { ledger, controller } = setup();
+    for (const title of ['D1', 'D2', 'D3']) await card(controller, title, 'doing');
+    const slides = await card(controller, 'Draft the slides', 'todo', ['meeting.md']);
+    assert.ok((await controller.give(slides, 'claude-code', { overLimit: true })).ok, 'Start anyway');
+    assert.deepEqual((await controller.snapshot()).doing, { count: 4, limit: 3 });
+    ledger.finish(slides, 'interrupted');
+
+    // Nothing holds an interrupted card: another card naming the same file starts.
+    const room = await card(controller, 'Book the room', 'todo', ['meeting.md']);
+    assert.equal((await controller.give(room, 'claude-code', { overLimit: true })).ok, true, 'no conflict with an interrupted card');
+    ledger.finish(room);
+
+    // Retry starts at once: the Doing limit holds back cards entering Doing, not one in it.
+    ledger.started.length = 0;
+    assert.deepEqual(await controller.retry(slides), { ok: true, cardId: slides });
+    assert.deepEqual(ledger.started.map((turn) => [turn.card.id, turn.kind]), [[slides, 'retry']]);
+
+    // Stop, then Give again: also at once.
+    assert.ok((await controller.stop(slides)).ok);
+    assert.deepEqual(await controller.give(slides, 'claude-code'), { ok: true, cardId: slides });
+    assert.deepEqual(ledger.started.map((turn) => turn.kind), ['retry', 'give']);
+  }
+
   // ── The AI sidebar is full: the card waits for room ────────────────────────
   {
     const { ledger, controller } = setup();

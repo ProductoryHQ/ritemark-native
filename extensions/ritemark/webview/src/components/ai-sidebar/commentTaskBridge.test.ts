@@ -409,4 +409,26 @@ for (const [label, error] of [['stopped', 'Execution cancelled'], ['failed', 'us
   assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'dest').length, 2);
 }
 
+// ── 11. Sprint 130 (W13): a card stopped while its prompt waits ──
+// The host drops the prompt, so a later Give does not run it too, untracked.
+{
+  resetAll();
+  seed('dest', { agentConversation: [runningClaudeTurn('dest') as never] });
+  deliver(enqueueMessage({ taskId: 'task-stopped', sourceKind: 'card' }));
+  deliver(enqueueMessage({ taskId: 'task-other', conversationTurnId: 'host-turn-2', sourceKind: 'card' }));
+  posted.length = 0;
+
+  deliver({ type: 'comment-task/drop', taskId: 'task-stopped' });
+  assert.deepEqual(
+    queueFor(useAISidebarStore.getState().promptQueues, 'dest').map((item) => item.taskId),
+    ['task-other'],
+    'only the stopped card’s prompt leaves the queue',
+  );
+  assert.deepEqual(postedOf('comment-task/dequeued'), [{ type: 'comment-task/dequeued', taskId: 'task-stopped' }]);
+
+  // A task that already left the queue: nothing to drop, nothing reported.
+  deliver({ type: 'comment-task/drop', taskId: 'task-stopped' });
+  assert.equal(postedOf('comment-task/dequeued').length, 1);
+}
+
 console.log('commentTaskBridge tests: all assertions passed');
