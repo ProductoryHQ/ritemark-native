@@ -94,7 +94,8 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
   const doingTone = snapshot.doing.limit && snapshot.doing.count > snapshot.doing.limit ? 'tb-wiptext-over' : snapshot.doing.limit && snapshot.doing.count === snapshot.doing.limit ? 'tb-wiptext-full' : ''
 
   return (
-    <div className="flex h-full flex-col font-ui text-ink-strong">
+    // The viewport's height, so the add field stays at the top and only the list scrolls.
+    <div className="flex h-screen flex-col font-ui text-ink-strong">
       <div className="p-3 pb-2">
         <div className="flex gap-2">
           <input

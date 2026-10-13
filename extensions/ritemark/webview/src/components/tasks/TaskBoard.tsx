@@ -59,7 +59,9 @@ function Board({ snapshot, tab, setTab }: { snapshot: BoardSnapshot; tab: BoardT
   const ideas = snapshot.cards.filter((card) => card.stage === 'idea' && !card.dropped).length
   const { count, blocked, oldestSince } = snapshot.attention
   return (
-    <div className="flex h-full flex-col font-ui text-ink-strong">
+    // The viewport's height, so the title and tabs stay put and only the view
+    // below them scrolls (Jarmo, 2026-10-13: the header scrolled away).
+    <div className="flex h-screen flex-col font-ui text-ink-strong">
       <Tabs value={tab} onValueChange={(value) => setTab(value as BoardTab)} className="flex min-h-0 flex-1 flex-col">
         <div className="tb-board-head">
           <div className="flex items-center gap-2">

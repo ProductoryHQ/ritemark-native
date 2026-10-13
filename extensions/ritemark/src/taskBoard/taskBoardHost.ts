@@ -261,7 +261,7 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     // With a card id, the card's page opens instead of the board.
     vscode.commands.registerCommand('ritemark.openTaskBoard', async (cardId?: unknown) => {
       if (typeof cardId === 'string' && cardPages) await cardPages.open({ cardId });
-      else TaskBoardPanel.show(extensionUri, surfaceContext);
+      else await TaskBoardPanel.show(extensionUri, surfaceContext);
     }),
     vscode.commands.registerCommand('ritemark.addTask', async () => {
       if (!controller) {
