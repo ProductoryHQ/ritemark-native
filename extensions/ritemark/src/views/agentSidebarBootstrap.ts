@@ -14,7 +14,8 @@ export interface AgentSidebarBootstrapInput {
   codexEnabled: boolean;
   opencodeEnabled: boolean;
   selectedAgent: string;
-  persistedClaudeModel: string;
+  /** The saved `ritemark.ai.selectedModel`; absent when the user chose none. */
+  persistedClaudeModel?: string;
   defaultClaudeModel: string;
   agents: AgentInfo[];
   claudeModels: ModelEntry[];
