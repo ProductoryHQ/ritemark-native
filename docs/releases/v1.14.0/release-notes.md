@@ -1,6 +1,6 @@
 # Ritemark 1.14.0 Release Notes
 
-Ritemark is a free writing app where the AI you choose works directly in your files, and you stay the author. Ritemark 1.14.0 gives every project folder a task board: write down what you want done, hand a task to Claude Code, Codex or OpenCode, and review the result when it is ready. Voice dictation and on-device transcription now work on Windows and Intel Macs, the browser's Recent list shows the pages you actually visited, and new Codex conversations start on GPT-6.1 Sol.
+Ritemark is a free writing app where the AI you choose works directly in your files, and you stay the author. Ritemark 1.14.0 gives every project folder a task board: write down what you want done, hand a task to Claude Code, Codex or OpenCode, and review the result when it is ready. Voice dictation and on-device transcription now work on Windows and Intel Macs, the browser's Recent list shows the pages you actually visited, and new Codex conversations start on GPT-6.1 Sol. Claude Haiku 5.5 joins the model menu, and the three built-in agents are updated.
 
 ## A task board in every project folder
 
@@ -44,6 +44,12 @@ New: a guide to [voice dictation](../../user/features/dictation.md).
 - **Titles, not just addresses.** Each page shows its title above its address.
 - **Only real visits.** Pages that fail to load, in-page jumps and redirects that pass in a moment are left out. A page you visit again moves to the top instead of appearing twice.
 - **Deleted files drop out.** A local file you have deleted no longer shows in Recent.
+
+## Claude and the built-in agents
+
+- **Haiku 5.5 in the Claude model menu.** Anthropic's newest Haiku is now the quick and light choice for Claude Code conversations.
+- **Only current Claude models in the menu.** The Claude model menu now offers Claude 5 models: Sonnet 5.5, Opus 5.5, Sonnet 5, Opus 5, Fable 5.1, Fable 5 and Haiku 5.5. Older models, such as Opus 4.8 and Haiku 4.5, are no longer offered. With a Claude subscription, a Haiku choice now runs Haiku 5.5. Any other older model you had chosen keeps working until you pick another.
+- **Updated built-in agents.** Ritemark now ships Claude Code 2.1.296, Codex 0.162.1 and OpenCode 1.19.0.
 
 ## Codex
 

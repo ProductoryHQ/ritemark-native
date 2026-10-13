@@ -1,6 +1,6 @@
 # Release Plan — v1.14.0
 
-**Status:** **Feature complete** (2026-10-13). Sprints 129, 130 and 131 and every fix for this release are merged; `main` is at `f0bbe89e` before the version bump. The runtime update is Jarmo's decision (below). Next: the release-candidate build from the version-bump commit. `main` freezes when the version bump merges<br>
+**Status:** **Feature complete** (2026-10-13). Sprints 129, 130 and 131 and every fix for this release are merged; `main` is at `f0bbe89e` before the version bump. Jarmo approved the runtime update on 2026-10-13 ([#424](https://github.com/ProductoryHQ/ritemark-native/pull/424), merges first; this version bump is rebased on it). Next: the release-candidate build from the version-bump commit. `main` freezes when the version bump merges<br>
 **Target:** v1.14.0<br>
 **GitHub milestone:** [v1.14.0](https://github.com/ProductoryHQ/ritemark-native/milestone/13). All five issues are closed<br>
 **Release type:** **Shell-tier.** [#195](https://github.com/ProductoryHQ/ritemark-native/issues/195) changes `patches/vscode/009-*`, [#421](https://github.com/ProductoryHQ/ritemark-native/pull/421) changes `patches/vscode/002-*`, Sprint 129 adds native whisper binaries for Windows and Intel Macs, and Sprint 130 adds an activity-bar icon that an extension release does not ship. Full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI. The first live run of the draft-first publish (release skill Step 8, [#402](https://github.com/ProductoryHQ/ritemark-native/pull/402))<br>
@@ -45,7 +45,7 @@ The sprint PRs are in the table above.
 
 Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Every release repeats this review.
 
-| Runtime | Bundled (v1.13.0) | Latest | Main changes since the bundled version |
+| Runtime | v1.13.0 | v1.14.0 ([#424](https://github.com/ProductoryHQ/ritemark-native/pull/424)) | Main changes |
 |---|---|---|---|
 | Claude Code / Agent SDK | 2.1.289 / 0.3.289 | **2.1.296 / 0.3.296** (2026-10-09) | Fixes; among them token counts for Haiku 5.5, and on Windows stdio MCP servers are no longer force-killed at shutdown |
 | Codex | 0.160.0 | **0.162.1** (2026-10-09) | 0.161.0 makes GPT-6.1 Sol Codex's own default, matching #418; 0.162.0 restores drive-letter file access on Windows 10 and keeps CRLF line endings in `apply_patch` |
@@ -53,7 +53,10 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 
 `check:anthropic-models` (catalog v2196, issued 2026-10-13): **OK**, the bundled Claude Code 2.1.289 supports every model in Anthropic's Claude Code catalog. One **WARNING**: Haiku 5.5 (`claude-haiku-5-5`) is in Anthropic's main list but not in Ritemark's Claude lineup, which still has Haiku 4.5.
 
-**Decision for Jarmo (asked through the Development manager on 2026-10-13):** update the three bundled runtimes in v1.14.0 and add Haiku 5.5, or ship v1.14.0 with the current ones. The update is ready as draft [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424), as [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) was for v1.13.0. If approved, it merges **before** the version bump, because the version bump is the last merge before the freeze. Claude Code 2.1.296 resolves `haiku` to Haiku 5.5 (2.1.289 resolved it to Haiku 4.5), so #424 adds Haiku 5.5 to the lineup in the same change. Without the update, v1.14.0 ships the v1.13.0 runtimes, which `check:anthropic-models` passes.
+**Decision (Jarmo, 2026-10-13, through the Development manager):** "jah uuenda kõik kolm ja lisa Haiku 5.5 - ja viska vanad Claude mudelid peitu - kõik mis alla 5" (yes, update all three and add Haiku 5.5, and hide the old Claude models, everything below 5). [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424) does all three, as [#386](https://github.com/ProductoryHQ/ritemark-native/pull/386) did for v1.13.0. It merges **before** the version bump, because the version bump is the last merge before the freeze.
+- **Haiku 5.5** is the quick Claude model. Claude Code 2.1.296 resolves `haiku` to it (2.1.289 resolved it to Haiku 4.5). With it, `check:anthropic-models` is OK with no warnings.
+- **Claude below 5 is hidden from model menus, not deleted.** This covers every source (the catalog, Claude Code's live list, an API key's `/v1/models`, OpenCode). A saved selection keeps running on its model, with no notice. Checked in a dev instance on Jarmo's subscription: the Claude group lists only the seven 5.x models, and a profile with Opus 4.8 saved ran a turn on `claude-opus-4-8`.
+- Evidence: hashes measured from the published artifacts, fetch 12/12, `verify-agent-runtimes.sh` and the OpenCode gate 4/4, and the Sprint 128 background probes on 2.1.296 (`agent-runtime-compatibility.md`, v1.14.0 entry).
 
 ## Not in this release
 
@@ -66,7 +69,8 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 - [x] All five milestone issues closed (#119, #133, #195, #398, #406); no open PR on the repository.
 - [x] Release notes and `CHANGELOG.md` cover everything merged since v1.13.0.
 - [x] Version 1.14.0 in all six version files.
-- [ ] Runtime update: Jarmo's decision on #424 (above). Not a blocker either way: `check:anthropic-models` passes with the current runtimes.
+- [x] Runtime update decided: Jarmo approved it on 2026-10-13.
+- [ ] [#424](https://github.com/ProductoryHQ/ritemark-native/pull/424) merged, then this PR rebased on it.
 - [ ] Windows and macOS x64 CI green on `main` before the candidate is cut (release skill, "Prove CI green BEFORE cutting a candidate").
 
 ## Gates
@@ -111,5 +115,12 @@ Reviewed 2026-10-13 against npm `latest` and the latest Codex GitHub release. Ev
 **Browser Recent (Sprint 131), on the signed builds:**
 - Agent navigation: ask Claude to open a page in the browser, then check Recent lists that page with its title. Repeat with Codex or OpenCode where signed in.
 - Windows: browse by typing an address and by clicking a link, open a link in a background tab with Ctrl-click and switch to it, open a local `.html` file, delete that file. Recent lists the pages with their titles and no longer lists the file. The same on the Mac with Cmd-click.
+
+**Claude models and agents (#424):**
+- A Claude turn on Haiku 5.5.
+- On a profile from v1.13 with Haiku chosen on a Claude subscription: after the update the button shows Haiku 5.5 and a turn runs on it.
+- With Opus 4.8 or Haiku 4.5 saved by id (`ritemark.ai.selectedModel`, or picked from an API key's list): the menu offers only 5.x models, the button still shows the old model, and a turn runs on it with no notice.
+- With an Anthropic API key: the menu offers no model below 5.
+- A Codex turn on Codex 0.162.1 (GPT-6.1 Sol), and the OpenCode permission gate with OpenCode 1.19.0 on x64 and Windows.
 
 **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows; Settings → Google Docs → Connect against the production client.
