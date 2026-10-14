@@ -89,6 +89,22 @@ test('target copy is immutable and filters foreign native payloads', () => {
 	}
 });
 
+test('relative symlinks stay relative in the copy', { skip: process.platform === 'win32' }, () => {
+	const { root, source } = fixture();
+	try {
+		write(source, 'node_modules/tool/bin/cli.js', 'cli');
+		fs.mkdirSync(path.join(source, 'node_modules/.bin'), { recursive: true });
+		fs.symlinkSync('../tool/bin/cli.js', path.join(source, 'node_modules/.bin/tool'));
+		const destination = path.join(root, 'copy-links');
+		copyExtensionForTarget({ source, destination, target: 'darwin-arm64' });
+		assert.equal(fs.readlinkSync(path.join(destination, 'node_modules/.bin/tool')), '../tool/bin/cli.js');
+		assert.equal(fs.readlinkSync(path.join(destination, 'binaries/darwin-arm64/libwhisper.dylib')), 'libwhisper.1.dylib');
+		assert.equal(fs.readFileSync(path.join(destination, 'node_modules/.bin/tool'), 'utf8'), 'cli');
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
 test('copy refuses overlapping source and destination paths', () => {
 	const { root, source } = fixture();
 	try {

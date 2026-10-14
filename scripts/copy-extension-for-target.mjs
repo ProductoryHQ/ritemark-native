@@ -58,6 +58,9 @@ export function copyExtensionForTarget({ source, destination, target }) {
 	fs.cpSync(sourceRoot, destinationRoot, {
 		recursive: true,
 		dereference: false,
+		// Without it fs.cp rewrites a relative link (node_modules/.bin/*) as an
+		// absolute path into the source tree, which breaks the app's signature.
+		verbatimSymlinks: true,
 		preserveTimestamps: true,
 		filter: candidate => shouldCopy(sourceRoot, target, candidate),
 	});
