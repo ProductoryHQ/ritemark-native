@@ -15,7 +15,7 @@ import { notify, startBoard, useActivePage, useBoardSnapshot } from './boardClie
 import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { DeleteConfirm } from './DeleteConfirm'
-import { CallActions, CardGlyph, GivePromptPanel, HeaderIconButton, INPUT, SECTION, toneClass, useNow, usePresenter } from './CardParts'
+import { CallActions, CardGlyph, GivePromptPanel, HeaderIconButton, SECTION, TitleField, toneClass, useNow, usePresenter } from './CardParts'
 import { STAGE_NAMES, finishedRecently, waited } from './taskCopy'
 import { Notice } from './Notice'
 import { UnreadableCards } from './UnreadableCards'
@@ -99,18 +99,10 @@ function Board({ snapshot }: { snapshot: BoardSnapshot }) {
     // The viewport's height, so the add field stays at the top and only the list scrolls.
     <div className="flex h-screen flex-col font-ui text-ink-strong">
       <div className="p-3 pb-2">
-        <div className="flex gap-2">
-          <input
-            className={cn(INPUT, 'h-8 min-w-0 flex-1')}
-            placeholder="Add a task…"
-            aria-label="Add a task"
-            value={title}
-            maxLength={200}
-            onChange={(event) => setTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void add()
-            }}
-          />
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <TitleField compact placeholder="Add a task…" label="Add a task" submitLabel="Add the task" value={title} onChange={setTitle} onSubmit={add} />
+          </div>
           <Tooltip label="Open the task board">
             <Button type="button" size="icon-sm" variant="outline" aria-label="Open the task board" onClick={() => notify({ type: 'board/open' })}>
               <Icon name="kanban" size={16} tone="inherit" />

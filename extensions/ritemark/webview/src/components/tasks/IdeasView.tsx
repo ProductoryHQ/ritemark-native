@@ -31,6 +31,7 @@ export function IdeasView({ snapshot }: { snapshot: BoardSnapshot }) {
       <TitleField
         placeholder="Write an idea…"
         label="Write an idea"
+        submitLabel="Add the idea"
         value={title}
         onChange={setTitle}
         onSubmit={async () => {
