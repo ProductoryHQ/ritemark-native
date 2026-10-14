@@ -480,6 +480,15 @@ if [[ -d "$EXT_PATH/binaries" ]]; then
     fi
   done
 fi
+
+# A link to an absolute path points outside the app: it dangles on users'
+# machines and fails codesign --verify --deep --strict (v1.14.0 RC).
+abs_links=$(find "$EXT_PATH" -type l -lname '/*' 2>/dev/null)
+if [[ -n "$abs_links" ]]; then
+  first_link=${abs_links%%$'\n'*}
+  echo -e "  ${RED}FAIL${NC}: $(wc -l <<< "$abs_links" | tr -d ' ') symlink(s) to absolute paths, e.g. ${first_link#"$EXT_PATH"/}"
+  ERRORS=$((ERRORS + 1))
+fi
 echo ""
 
 # -----------------------------------------------------------------------------
