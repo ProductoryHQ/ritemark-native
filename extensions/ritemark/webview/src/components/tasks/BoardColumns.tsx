@@ -183,6 +183,7 @@ function AddRow({ stage, onDone }: { stage: CardStage; onDone: () => void }) {
         autoFocus
         placeholder={stage === 'idea' ? 'Write an idea…' : 'Add a task…'}
         label="New card title"
+        submitLabel={stage === 'idea' ? 'Add the idea' : 'Add the task'}
         value={title}
         onChange={setTitle}
         onBlur={() => !title.trim() && onDone()}

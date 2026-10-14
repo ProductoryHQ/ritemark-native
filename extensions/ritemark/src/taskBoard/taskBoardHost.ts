@@ -278,7 +278,11 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
   }
 
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(TasksViewProvider.viewType, new TasksViewProvider(extensionUri, surfaceContext), {
+    vscode.window.registerWebviewViewProvider(TasksViewProvider.viewType, new TasksViewProvider(
+      extensionUri,
+      surfaceContext,
+      store ? () => TaskBoardPanel.show(extensionUri, surfaceContext) : undefined,
+    ), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.window.registerWebviewPanelSerializer(TaskBoardPanel.viewType, {

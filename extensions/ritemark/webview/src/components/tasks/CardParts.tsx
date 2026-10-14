@@ -21,9 +21,12 @@ export const INPUT =
   'w-full px-3 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] placeholder:text-[var(--vscode-input-placeholderForeground)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]'
 
 /**
- * A new card's title, in a field of three lines that grows with the text, so
- * an idea or a task reads whole while it is written (Jarmo, 2026-10-13). A
- * title is one line: Enter adds it, and a pasted line break becomes a space.
+ * A new card's title, in a field that grows with the text, so an idea or a
+ * task reads whole while it is written (Jarmo, 2026-10-13). Built like the
+ * agent composer's prompt box, with its send button inside, because people
+ * looked for one (Jarmo, 2026-10-14). A title is one line: Enter or the button
+ * adds it, and a pasted line break becomes a space. `compact` starts at one
+ * line (the Tasks side bar); otherwise the field starts at three.
  */
 export function TitleField({
   value,
@@ -31,38 +34,83 @@ export function TitleField({
   onSubmit,
   placeholder,
   label,
+  submitLabel,
+  compact,
   autoFocus,
   onBlur,
   onEscape,
 }: {
   value: string
   onChange: (value: string) => void
-  onSubmit: () => void
+  onSubmit: () => void | Promise<void>
   placeholder: string
   label: string
+  /** What the send button does, for its tooltip: "Add the task". */
+  submitLabel: string
+  compact?: boolean
   autoFocus?: boolean
   onBlur?: () => void
   onEscape?: () => void
 }) {
+  const field = useRef<HTMLTextAreaElement>(null)
+  const ready = value.trim().length > 0
+  const submit = async () => {
+    if (!value.trim()) return
+    await onSubmit()
+    field.current?.focus()
+  }
   return (
-    <textarea
-      autoFocus={autoFocus}
-      rows={3}
-      className={cn(INPUT, 'block max-h-[220px] min-h-[72px] resize-none leading-snug [field-sizing:content]')}
-      placeholder={placeholder}
-      aria-label={label}
-      value={value}
-      maxLength={200}
-      onChange={(event) => onChange(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
-      onBlur={onBlur}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onEscape?.()
-        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+    <div
+      className={cn(
+        'relative rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] focus-within:ring-1 focus-within:ring-[var(--vscode-focusBorder)]',
+        compact ? 'min-h-8' : 'min-h-[72px]',
+      )}
+      // A click in the field's padding still puts the caret in the text.
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
           event.preventDefault()
-          if (value.trim()) onSubmit()
+          field.current?.focus()
         }
       }}
-    />
+    >
+      <textarea
+        ref={field}
+        autoFocus={autoFocus}
+        rows={compact ? 1 : 3}
+        className={cn(
+          'block w-full max-h-[220px] resize-none bg-transparent py-1.5 pl-3 pr-10 text-sm leading-snug text-[var(--vscode-input-foreground)] placeholder:text-[var(--vscode-input-placeholderForeground)] [field-sizing:content] focus:outline-none',
+          compact ? 'min-h-[30px]' : 'min-h-[70px]',
+        )}
+        placeholder={placeholder}
+        aria-label={label}
+        value={value}
+        maxLength={200}
+        onChange={(event) => onChange(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+        onBlur={onBlur}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onEscape?.()
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            void submit()
+          }
+        }}
+      />
+      <Tooltip side="top" label={ready ? submitLabel : 'Type a title first'} className="absolute bottom-[3px] right-[3px] inline-flex">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="size-6 rounded border border-[var(--r-hairline)] bg-[var(--r-surface-soft)] p-0 text-[var(--r-ink-body)] hover:bg-[var(--r-surface-muted)] hover:text-[var(--r-ink-strong)] disabled:opacity-45"
+          aria-label={submitLabel}
+          disabled={!ready}
+          // Keep the focus in the field, so the next title can follow at once.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => void submit()}
+        >
+          <Icon name="paper-plane-right" size={14} className="size-3.5" />
+        </Button>
+      </Tooltip>
+    </div>
   )
 }
 
