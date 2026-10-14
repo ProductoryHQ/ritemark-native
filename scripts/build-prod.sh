@@ -248,7 +248,13 @@ echo "Removing old extension (if exists)..."
 rm -rf "$EXT_DEST"
 
 echo "Copying extension from source..."
-cp -R extensions/ritemark "$EXT_DEST"
+# The same copier the CI builds use: platform folders under binaries/ (the
+# whisper speech engine, Sprint 129) and binaries/agents/ are copied only for
+# $TARGET, so validate-build-output.sh finds no foreign native folders.
+node ./scripts/copy-extension-for-target.mjs \
+  --source extensions/ritemark \
+  --destination "$EXT_DEST" \
+  --target "$TARGET"
 
 # Remove dev dependencies that shouldn't be in production
 echo "Removing webview dev dependencies..."
