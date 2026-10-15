@@ -4,7 +4,8 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 
 ## A task board in every project folder
 
-- **Tasks in the activity bar.** Every project folder now has its own task board. Click **Tasks**, right below the File browser, to see what waits on you, what is being worked on, what is next, and your ideas. The button at the top of the side bar, or **Task board** on the Home tab, opens the whole board with its columns.
+- **Tasks in the activity bar.** Every project folder now has its own task board. Click **Tasks**, right below the File browser: the whole board opens with its columns, and the side bar lists what waits on you, what is being worked on, what is next, and your ideas. **Task board** on the Home tab opens it too.
+- **Add a task in a moment.** Type it in **Add a task…** and press Enter or the send button. The field grows with a long title, so you can read it whole while you write.
 - **Give a task to an agent.** Press **Give to Claude**; the arrow next to it lets you pick Codex or OpenCode instead. The agent works on the task in its own conversation in the AI sidebar while you keep writing. When it finishes, the task shows what the agent did, what it asks you to check, and the files it changed. Then it is your call: **Mark done**, or **Ask for changes…**. Agents never mark a task done and never delete one.
 - **What waits on you comes first.** **Your calls** lists results to review, agents waiting for your answer or approval, decisions an agent left you, and anything that failed, the longest-waiting first. The number on the Tasks icon counts them.
 - **Agents don't get in each other's way.** Doing holds three tasks at a time unless you change it. Ritemark won't start a second agent on a file another agent is changing. A task that has to wait starts by itself when there is room.

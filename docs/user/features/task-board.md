@@ -19,7 +19,7 @@ Every project folder gets its own task board. Write down what you want done, giv
 
 ## Opening the board
 
-Click the **Tasks** icon in the activity bar on the left, right below the File browser. The side bar lists your tasks:
+Click the **Tasks** icon in the activity bar on the left, right below the File browser. The Task board opens in front, and the side bar lists your tasks:
 
 | Section | What it holds |
 |---|---|
@@ -32,7 +32,7 @@ Click the **Tasks** icon in the activity bar on the left, right below the File b
 
 The number on the Tasks icon counts the tasks that wait on you.
 
-For the full board, click **Open the task board** at the top of the side bar, or **Task board** on the Home tab. The board has four tabs: **Your calls**, **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
+If you closed the board, click **Open the task board** at the top of the side bar, or **Task board** on the Home tab. If Tasks was open when you last closed Ritemark, the board waits for your click instead of jumping in front of your document. The board has four tabs: **Your calls**, **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
 
 The board needs a project folder. With no folder open, the side bar offers to open one.
 
@@ -40,7 +40,7 @@ The board needs a project folder. With no folder open, the side bar offers to op
 
 ## Adding a task
 
-- Type the title in **Add a task…** at the top of the side bar and press Enter, or click **+** on a column header on the board
+- Type the title in **Add a task…** at the top of the side bar and press Enter or the send button, or click **+** on a column header on the board. The field grows with a long title, so you can read it whole
 - Or run **Tasks: Add a Task…** from the Command Palette; the task goes to the top of To do and you stay in your document
 
 Click a task to open it as a page. The page is an ordinary Ritemark document: write what you want in the body, add a **Done when** line ("one page, names the three audiences"), and list the files the task is about under **Files**. Agents work better when they know what done looks like.
