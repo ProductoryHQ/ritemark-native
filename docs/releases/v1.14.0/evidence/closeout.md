@@ -41,4 +41,4 @@ This was the first release published draft-first (Step 8, #402): all four assets
 
 ## 10.3 After clearing the build output
 
-To be added once `dist/`, `VSCode-darwin-arm64/` and `VSCode-darwin-x64/` are deleted.
+This file and the evidence beside it were pushed first. Then `dist/`, `VSCode-darwin-arm64/` and `VSCode-darwin-x64/` were deleted by name. `worktree-hygiene.mjs --check` reclassified the worktree from `BLOCKED` (build output) to `REVIEW — verified disposable release worktree`. Under Jarmo's standing "remove useless worktrees", the worktree itself was then removed with `git worktree remove`.
