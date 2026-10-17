@@ -122,6 +122,11 @@ Acceptance criteria:
 - Terminal tabs come back as tabs after a restart. Terminals a v1.14.0 profile had in the AI column come back as tabs too (R16).
 - A terminal never opens in the AI column.
 
+**R8 (revised 2026-10-17, before Phase 0).** The keyboard and the View menu:
+- Ctrl+` (⌃` on the Mac) opens a new terminal tab in the project's folder. It does not toggle a panel.
+- The View menu gets no Terminal entry. The + is where a terminal is made.
+- Why: patch 002 removes VS Code's Toggle Terminal shortcut and its View-menu entry today. Sending that file wholly back to upstream would bring back both, as a toggle for a bottom panel that 2.0 does not use. Found by the Development manager's planning session on 17 October.
+
 ### R9: Home and Tasks keep the front of the row
 
 As a writer, I want the project's own tabs always first and always there.
@@ -229,7 +234,7 @@ Acceptance criteria:
 
 - The surfaces and frame live in a new patch, `018-ritemark-surfaces.patch`, and the tab row in another, `019-ritemark-tab-row.patch`.
 - No hunk in 018 or 019 removes, or uses as context, a line another patch wrote.
-- Patch 002's size lines (tab height, row height, the places bar's height) move into the new patches. Its terminal guards are removed from 002 itself, not overridden. The 2.0 order of the places and the layout toggle's condition go into 002's own lines.
+- Patch 002's size lines (tab height, row height, the places bar's height) move into the new patches. Its terminal guards are removed from 002 itself, not overridden; in `terminal.contribution.ts`, 002 keeps its removal of the Toggle Terminal shortcut and View-menu entry (R8, revised). The 2.0 order of the places and the layout toggle's condition go into 002's own lines.
 - Patch 007's Copilot Chat launcher changes in 007.
 - A script checks the rule, with today's known stacked pairs listed (009 → 010, 001 → 016 → 017).
 - `PATCH-RULES.md` §8: 002's file list is counted and diffed before and after.

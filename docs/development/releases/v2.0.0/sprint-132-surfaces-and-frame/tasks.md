@@ -20,7 +20,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 ## Phase 2: The patch rebuild and fold (W1, E1, E2)
 
 - [ ] 002: move the tab height (`editorTabsControl.ts`) and the row height (`explorerViewer.ts`) out, and the height lines of `explorerviewlet.css` and `applyRitemarkTopTabStyles` into 018's stylesheet
-- [ ] 002: remove the terminal guards from `terminal.contribution.ts`, `terminalConfigurationService.ts` (+ its test), `terminalEditorSerializer.ts` and `terminalView.ts`
+- [ ] 002: remove the terminal guards from `terminalConfigurationService.ts` (+ its test), `terminalEditorSerializer.ts` and `terminalView.ts`; in `terminal.contribution.ts`, revert the location and `hideIfEmpty` lines but keep the removal of the Toggle Terminal shortcut and View-menu entry
 - [ ] 002: the 2.0 order in `viewsExtensionPoint.ts` and `compositeBar.ts` (once per profile, W12), with always-in-More items; the left toggle's `when` in `layoutActions.ts`
 - [ ] 002: header updated; file list and count diffed against `notes/002-before.md`
 - [ ] 007: the Copilot Chat launcher runs `workbench.action.chat.openInEditor`; `revealCopilotChatViewState` no longer moves the container into the auxiliary bar
@@ -54,6 +54,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [ ] `ritemarkTerminalBar.ts` + its hook in `terminalEditor.ts`: Running and Stop (R8)
 - [ ] The working dot on a busy terminal's tab (R8)
 - [ ] `extension.ts`: the start-up terminal removed (R8)
+- [ ] `package.json`: Ctrl+` (⌃` on the Mac) opens a new terminal tab (R8, revised; S46)
 
 ## Phase 5: Head, You, menus and updating (W8, W9, W12)
 
@@ -70,7 +71,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [ ] Extension tests: the 2.0 defaults and the head's menus in `package.json` (E3)
 - [ ] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
 - [ ] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
-- [ ] Manual QA on the Mac: S1–S6, S12–S38, S44, S45; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md`
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [ ] PR 1 opened; `qa-validator` review; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
