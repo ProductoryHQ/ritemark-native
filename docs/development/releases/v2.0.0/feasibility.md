@@ -138,8 +138,9 @@ Dry-applied in a temporary index:
 | 1.117.0 (the pin) | All apply | Applies |
 | 1.118.0 | 002, 003, 010 and 015 fail (002 in 5 files, each of the others in 1) | Fails in 4 files: `layoutActions.ts`, `titlebar/titlebarPart.ts`, `webview/browser/overlayWebview.ts`, `electron-browser/parts/titlebar/titlebarPart.ts` |
 | 1.119.0 | 007 and 009 fail too | The same 4 files |
+| 1.142.0 (newest, 14 October; measured for Sprint 132's plan) | 16 of 17 patches fail, in 46 file patches | Fails in 16 of its 33 files (the proof of concept had grown to 33 with the terminal as a tab) |
 
-Upstream changed 6 of 018's files between 1.116 and 1.117, 7 between 1.117 and 1.118, and 2 between 1.118 and 1.119. A title bar file changed in both of the last two releases. The frame without a title row lives in the title bar, so the title bar is where 2.0 adds most to every bump.
+VS Code now ships a release every week, so the pin falls about one release behind each week. Upstream changed 6 of 018's files between 1.116 and 1.117, 7 between 1.117 and 1.118, and 2 between 1.118 and 1.119. A title bar file changed in both of the last two releases. The frame without a title row lives in the title bar, so the title bar is where 2.0 adds most to every bump.
 
 Two costs do not show up in `git apply`:
 

@@ -1,6 +1,6 @@
 # Release Plan — v2.0.0
 
-**Status:** **Proposed** (2026-10-17), with Jarmo's decisions of the same day built in. No sprint has a plan yet, and every sprint plan needs Jarmo's approval before any code. The plan is built on [feasibility.md](feasibility.md)<br>
+**Status:** **Proposed** (2026-10-17), with Jarmo's decisions of the same day built in. Step 1's sprint plan, [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md), is written and awaits Jarmo's approval; every sprint plan needs it before any code. The plan is built on [feasibility.md](feasibility.md)<br>
 **Target:** v2.0.0<br>
 **GitHub milestone:** none yet. The Development manager opens it, and can close the empty v1.15.0 milestone<br>
 **Release type:** **Shell-tier.** A new VS Code patch in `patches/vscode/`, changes to patches 002 and 007, new theme and icon files that ship only with the app, and new defaults for every user. A full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI<br>
@@ -34,10 +34,11 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 | Step | Scope | Depends on | Status |
 |---|---|---|---|
-| 1 — Surfaces and frame, theme first | The real surfaces patch, folded with patch 002; the frame without a title row on the Mac and on Windows; the terminal as a tab; Copilot Chat behind More; the tab row; the places row; the full light and dark theme pass; tests and a production build | The Experience lead's drawings for the terminal tab, the Windows top and the surfaces not yet drawn | **Not planned.** Plan needs Jarmo's approval |
+| 1 — Surfaces and frame, theme first | The real surfaces patch, folded with patch 002; the frame without a title row on the Mac and on Windows; the terminal as a tab; Copilot Chat behind More; the tab row; the places row; the full light and dark theme pass; tests and a production build | The Experience lead's drawings (all in but modal dialogs, Flows and the Agent Library) | **Planned:** [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md), plan awaiting Jarmo's approval |
 | 2 — The welcome | The welcome as a Ritemark page; which AI you use, with each provider's sign-in; setting up a project; landing on it; the usage-data choice on the welcome; the four analytics events; the welcome once for people updating from 1.x | Step 1 merged | **Not planned** |
 | 3 — The project at the centre | The project file and the project list (filled on the first 2.0 start); what waits in each project; Home as the project's page; Home and Tasks as permanent tabs; the projects list in the left column; the column's head; switching in place; the document's bar | Steps 1 and 2 merged | **Not planned** |
-| 4 — 2.0 as one release | Updating from v1.14.0; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; the runtime review; version 2.0.0, notes and the store listing | Steps 1–3 merged | **Not planned** |
+| Update — VS Code to the current release | One update of the pinned VS Code (1.117.0 today; 1.142.0 is out) to the release of that day, with every patch rebased and the screenshot baseline compared | Steps 1–3 merged | **Not planned** |
+| 4 — 2.0 as one release | Updating from v1.14.0; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; the runtime review; version 2.0.0, notes and the store listing | Steps 1–3 and the VS Code update merged | **Not planned** |
 
 ### Step 1 — Surfaces and frame, theme first
 
@@ -71,7 +72,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
   - the editor group's rule that keeps Home and Tasks first, pinned and open (ready for step 3; the Task board tab can use it from this step).
 - **The places row:** Ritemark's places first (Home, Documents, Tasks, Browser, Agents, Transcribe), then the others. The ⋯ at the end holds the places that do not fit, and Copilot Chat (Jarmo: "we need it for activity bar icons that do not fit to visible area").
 - **The left column's head:** its place and drawing in the shell, with its words and menu from the extension. Step 3 fills it.
-- **Narrow windows, if Jarmo agrees** (recommended): below a set width the AI column narrows, and then hides itself. The columns sliding over the desk stay out of 2.0.
+- **Narrow windows:** below 1400 points the AI column narrows to 320, below 1200 the left column hides itself, and below 960 the AI does too. The columns sliding over the desk stay out of 2.0. This is Sprint 132's R14; Jarmo confirms it with that plan.
 - **The full theme pass, light and dark:**
   - Ritemark Light and Ritemark Dark changed in place, with the 50 product icons, the dark file icons and high contrast;
   - every surface drawn in the new theme: the Markdown editor, CSV, PDF and Office previews, Flows, Transcribe, the task board, the browser, the Agent Library, the Settings page, dialogs, notifications, the command palette and quick picks, menus;
@@ -182,7 +183,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **The runtime review** that every release has: the bundled Claude Code, Codex and OpenCode against the latest, plus `check:anthropic-models`. This one covers the whole gap since v1.14.0.
 - **Version 2.0.0** in all six version files; release notes and `CHANGELOG.md` (with `product-marketer`); the Microsoft Store listing and screenshots. Website and launch work go in a cross-repo release plan in `ritemark-dev/releases/` if Jarmo wants one.
 
-**Depends on** steps 1–3 merged.
+**Depends on** steps 1–3 and the VS Code update merged.
 
 **Done when** v2.0.0 is published through the shell-tier gates below, the update feed is updated, and the release is closed out (release skill).
 
@@ -205,10 +206,11 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 
 | Step | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
-| Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | Open (docs only) | Pre-commit validator passed | n/a |
-| 1 — Surfaces and frame | `sprint-NN-surfaces-and-frame` (number when planned) | — | #276, #430, #199 | Not planned | — | — |
+| Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | **Merged 2026-10-17** as `9de4f267` | Pre-commit validator passed | n/a |
+| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: `docs/sprint-132-surfaces-and-frame-plan` | #276, #430, #199 | Plan written (Phase 2), awaiting Jarmo's approval | — | — |
 | 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
 | 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
+| Update — VS Code | `sprint-NN-vscode-update` | — | — | Not planned | — | — |
 | 4 — 2.0 as one release | the release worktree and version bump | — | — | Not planned | — | — |
 
 ## Feature-Complete Checklist
@@ -230,10 +232,10 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 |---|---|---|---|
 | The frame without a title row has never run on Windows, and each Windows round needs a merge and a paid build | High | Plan a Windows round right after step 1's first merge, before the theme pass is finished | Open |
 | The surfaces patch has never been built for production | High | A production build from a clean-room worktree right after step 1 merges | Open |
-| VS Code moves on while 2.0 is built: the pin is 1.117.0, 1.119.0 is out, and on it patches 002, 003, 007, 009, 010, 015 and the new patch conflict | Medium | Step 1's plan decides whether to move the pin first. Recommended: move it first, so the new patch is built once, on the base 2.0 ships on | Open |
+| VS Code moves on while 2.0 is built. It now ships weekly: the pin is 1.117.0, and 1.142.0 came out on 14 October. On 1.142.0, patches 001–017 fail in 46 file patches across 16 of the 17 patches, and the proof of concept's patch in 16 of its 33 files | Medium | Decided by engineering (Sprint 132's plan): the pin stays for steps 1–3, and one VS Code update sprint follows step 3. By then, 2.0 has removed part of what fails today (the Getting Started patches in step 2, 002's terminal guards in step 1). The drift is measured at each merge and recorded here | Open |
 | No fixes reach v1.14.0 users until 2.0 | Medium | An urgent fix only by Jarmo's exception to the clean-room rule (a release worktree from the v1.14.0 tag); new models keep arriving through the catalog feed | Open |
 | The bundled runtimes stay at their v1.14.0 versions; a new model may need a newer runtime | Medium | The catalog feed hides models the bundled runtime cannot run; step 4's runtime review | Open |
-| Many surfaces are not drawn in the new theme yet | Medium | The Experience lead's drawings before step 1 is planned in detail | **Blocks step 1's plan** |
+| Three surfaces are not drawn in the new theme yet: modal dialogs, Flows, the Agent Library | Low | The Experience lead draws them next. Sprint 132 does them last, in a third PR if needed | Open (no longer blocks step 1's plan) |
 | The stylesheet and the editor's DOM walks break visibly at a VS Code update, not at apply time | Medium | The screenshot comparison in `update-vscode.sh`'s checklist; VS Code's own layout information instead of DOM walks where it exists | Open |
 | Habits and saved state move: terminals saved in the AI column, Copilot Chat out of the row | Low | Terminals restore as tabs; the update test covers both | Open |
 | The webview bundle grows with the welcome and Home ([#107](https://github.com/ProductoryHQ/ritemark-native/issues/107)) | Low | Measure in steps 2 and 3 | Open |
@@ -282,14 +284,15 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 - **Patch ownership:** the new patch owns sizes and drawing, and patch 002 keeps what sits where.
 - **Windows testing:** each Windows round is built from main, with no separate unsigned branch builds.
 - **Copilot Chat:** chosen from More, it opens as a tab.
+- **The VS Code pin:** it stays at 1.117.0 for steps 1–3, and one update sprint follows step 3 (Sprint 132's plan; Risks and Blockers).
 - **The project list:** it fills on the first 2.0 start from recent folders, chats and task boards.
 
 **Still open, with a recommendation**, for the step that needs them:
 
-- **Narrow windows (step 1):** include the simple part. Below a set width the AI column narrows and then hides itself; the columns sliding over the desk stay out.
+- **Narrow windows (step 1):** the simple part is in Sprint 132's plan (R14), and its approval confirms it.
 - **A ChatGPT API key on the welcome (step 2):** leave it out of 2.0 and add it if people ask.
 - **An urgent fix for v1.14.0 while 2.0 is built:** only if one is needed.
-- **The VS Code pin (engineering, step 1's plan):** recommended to move to the current VS Code before the new patch is built, so it is built once, on the base 2.0 ships on.
+- **The Windows menu's last item (Sprint 132):** Exit, as drawn, unless Jarmo prefers Close window.
 
 ## Design questions for the Experience lead
 
