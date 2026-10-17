@@ -87,6 +87,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [ ] `ritemarkSurfaces.css` cleaned: theme variables only; each remaining `!important` marked with why (R13)
 - [x] Webviews: `index.css` and the AI sheet's components from `--vscode-ritemark-desk` (R13) (in merge 1, from the prototype)
 - [ ] Surface by surface against the drawings, both themes (W10's table) (R13)
+  - [x] Ritemark Settings lies on the desk's colour, white in Light (Jarmo's Mac pass on merge 1: "Ritemark settings screen must have white bg"; experiences/settings frame 2 draws it on the desk)
 - [ ] Modal dialogs, Flows and the Agent Library, when their drawings arrive (R13)
   - The Agents place (the Experience lead, 17 October; Experience 31): the column's head is the project head (mark, name, chevron) as on every place but Home, with no "Agents" title row and no "6 skills · 1 flow" line; the search field becomes the Search row under New; Project / User become the This project / All projects switch; the six sections as column groups with muted counts and 32 rows; the view's remaining hard-coded light fills themed.
 - [ ] The contrast unit test (R13)
