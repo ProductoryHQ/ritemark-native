@@ -26,6 +26,9 @@ export interface DataTableProps {
   /** Returns the cell's formula (with leading =) when it has one — shown in the
    *  fx bar instead of the cached value. Excel-backed grids only. */
   getCellFormula?: (rowPosition: number, columnIndex: number) => string | undefined
+  /** The columns have names (a CSV's header row), so the formula bar names the cell "Row 2 · Item";
+   *  otherwise the columns are letters and it uses A1-style references (Excel). */
+  namedColumns?: boolean
 }
 
 interface ActiveCell {
@@ -33,8 +36,10 @@ interface ActiveCell {
   columnIndex: number
 }
 
-export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow, getCellFormula }: DataTableProps) {
+export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow, getCellFormula, namedColumns = false }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const formulaRef = useRef<HTMLTextAreaElement>(null)
+  const [formulaFocused, setFormulaFocused] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const [hoverInsertIndex, setHoverInsertIndex] = useState<number | null>(null)
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
@@ -171,6 +176,26 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
   const activeFormula = activeCell ? getCellFormula?.(activeCell.rowPosition, activeCell.columnIndex) : undefined
   const isEditingActive = isSameCell(editingCell, activeCell)
   const formulaValue = isEditingActive ? editValue : (activeFormula ?? activeCellValue)
+  // The cell's name in the formula bar: "Row 2 · Item" when the columns have names, A1-style ("A3") when they are letters
+  const cellReference = !activeCell
+    ? '–'
+    : namedColumns
+      ? `Row ${activeCell.rowPosition + 1} · ${activeColumnId || '-'}`
+      : `${activeColumnId || '-'}${activeCell.rowPosition + 1}`
+
+  // The value field is one line; while it has the keyboard it grows with its value up to 5 lines (120), then scrolls
+  useLayoutEffect(() => {
+    const el = formulaRef.current
+    if (!el) return
+    if (formulaFocused) {
+      el.style.height = 'auto'
+      el.style.height = Math.min(120, el.scrollHeight) + 'px'
+      el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
+    } else {
+      el.style.height = ''
+      el.style.overflowY = 'hidden'
+    }
+  }, [formulaValue, formulaFocused])
 
   useEffect(() => {
     if (!activeCell || editingCell) return
@@ -180,6 +205,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   useEffect(() => {
     if (!editingCell) return
+    // An edit started in the formula bar stays there: the person goes on typing in it
+    if (formulaRef.current && formulaRef.current === formulaRef.current.ownerDocument.activeElement) return
     const el = editorRef.current
     if (!el) return
     el.focus()
@@ -235,8 +262,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       {editable && (
         <div className="flex-shrink-0 mx-4 mt-3 z-20">
           <div className="flex min-h-[32px] items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
-            <span className="flex min-w-[48px] items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
-              {activeCell ? `${activeColumnId || '-'}${activeCell.rowPosition + 1}` : '–'}
+            <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
+              <span className="truncate">{cellReference}</span>
             </span>
             <textarea
               value={formulaValue}
@@ -250,7 +277,9 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 }
                 setEditValue(e.target.value)
               }}
+              onFocus={() => setFormulaFocused(true)}
               onBlur={() => {
+                setFormulaFocused(false)
                 if (isSameCell(editingCell, activeCell)) {
                   commitEdit()
                 }
@@ -267,8 +296,9 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 }
               }}
               disabled={!activeCell}
+              ref={formulaRef}
               rows={1}
-              className="min-h-[30px] flex-1 resize-y rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"
+              className="h-[30px] min-h-[30px] flex-1 resize-none overflow-hidden rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"
               placeholder="Select a cell to view/edit full value"
             />
           </div>
