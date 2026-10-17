@@ -268,6 +268,22 @@
     "home": {
       "fontId": "phosphor-400",
       "fontCharacter": "\\e2c2"
+    },
+    "folder": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e24a"
+    },
+    "folder-opened": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e256"
+    },
+    "file": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e230"
+    },
+    "collapse-all": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e532"
     }
   }
 }

@@ -16,7 +16,8 @@ const Module = require('module') as {
   _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
 };
 const registered: string[] = [];
-const executed: string[] = [];
+const executed: Array<[string, ...unknown[]]> = [];
+const projectFolder = { fsPath: '/projects/Harbour' };
 const vscodeStub = {
   commands: {
     registerCommand: (id: string, run: () => unknown) => {
@@ -24,11 +25,12 @@ const vscodeStub = {
       run();
       return { dispose() { /* nothing */ } };
     },
-    executeCommand: (id: string) => {
-      executed.push(id);
+    executeCommand: (id: string, ...args: unknown[]) => {
+      executed.push([id, ...args]);
       return Promise.resolve();
     },
   },
+  workspace: { workspaceFolders: [{ uri: projectFolder }] },
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, isMain) {
@@ -41,19 +43,20 @@ Module._resolveFilename = function (request, parent, isMain) {
 require.cache['vscode'] = { id: 'vscode', filename: 'vscode', loaded: true, exports: vscodeStub } as unknown as NodeJS.Module;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { NEW_MENU_COMMANDS, PROJECT_MENU_COMMANDS, REVEAL_COMMAND, registerProjectHeadCommands } = require('./projectHeadCommands') as typeof import('./projectHeadCommands');
+const { NEW_MENU_COMMANDS, PROJECT_MENU_COMMANDS, registerProjectHeadCommands } = require('./projectHeadCommands') as typeof import('./projectHeadCommands');
 
 interface MenuItem { command: string; group?: string; when?: string }
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8')) as {
   contributes: {
-    commands: Array<{ command: string; title: string }>;
+    commands: Array<{ command: string; title: string; icon?: string }>;
+    icons: Record<string, { default: { fontPath: string; fontCharacter: string } }>;
     menus: Record<string, MenuItem[]>;
     keybindings: Array<{ key: string; mac?: string; command: string; when?: string }>;
     configurationDefaults: Record<string, unknown>;
     colors: Array<{ id: string; defaults: Record<string, string> }>;
   };
 };
-const { commands, menus, keybindings, configurationDefaults, colors } = pkg.contributes;
+const { commands, icons, menus, keybindings, configurationDefaults, colors } = pkg.contributes;
 
 let failures = 0;
 function test(name: string, run: () => void): void {
@@ -70,8 +73,26 @@ console.log('Ritemark 2.0 frame contributions');
 
 test('the head\'s two menus list their commands, in order', () => {
   const ids = (menu: string) => (menus[menu] ?? []).map(item => item.command);
-  assert.deepEqual(ids('ritemark/projectHead'), [PROJECT_MENU_COMMANDS[0].id, REVEAL_COMMAND, ...PROJECT_MENU_COMMANDS.slice(1).map(c => c.id)]);
+  assert.deepEqual(ids('ritemark/projectHead'), PROJECT_MENU_COMMANDS.map(c => c.id));
   assert.deepEqual(ids('ritemark/projectHead/new'), NEW_MENU_COMMANDS.map(c => c.id));
+});
+
+test('Reveal names the system\'s own app: Finder on the Mac, File Explorer on Windows', () => {
+  const when = (id: string) => menus['ritemark/projectHead'].find(item => item.command === id)?.when;
+  assert.equal(when('ritemark.projectHead.revealInFinder'), 'isMac');
+  assert.equal(when('ritemark.projectHead.revealInFileExplorer'), 'isWindows');
+});
+
+test('every head command has an icon, and Ritemark\'s own icons are in Phosphor\'s font', () => {
+  for (const { id } of [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS]) {
+    const icon = commands.find(command => command.command === id)?.icon ?? '';
+    assert.match(icon, /^\$\([a-z-]+\)$/, `${id} has no icon`);
+    const name = icon.slice(2, -1);
+    if (name.startsWith('ritemark-')) {
+      assert.ok(icons[name], `${name} is not contributed`);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', '..', icons[name].default.fontPath)), `${name}'s font is missing`);
+    }
+  }
 });
 
 test('every head command has a title in package.json and stays out of the command palette', () => {
@@ -86,6 +107,8 @@ test('every head command has a title in package.json and stays out of the comman
 test('the head\'s words are Ritemark\'s', () => {
   const title = (id: string) => commands.find(command => command.command === id)?.title;
   assert.equal(title('ritemark.projectHead.openFolder'), 'Open a folder…');
+  assert.equal(title('ritemark.projectHead.revealInFinder'), 'Reveal in Finder');
+  assert.equal(title('ritemark.projectHead.revealInFileExplorer'), 'Reveal in File Explorer');
   assert.equal(title('ritemark.projectHead.allCommands'), 'All commands');
   assert.equal(title('ritemark.projectHead.newText'), 'Text');
   assert.equal(title('ritemark.projectHead.newTable'), 'Table (CSV data)');
@@ -97,7 +120,7 @@ test('each head command runs the command that does the work', () => {
   registerProjectHeadCommands({ subscriptions: [] } as unknown as import('vscode').ExtensionContext);
   const all = [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS];
   assert.deepEqual(registered, all.map(c => c.id));
-  assert.deepEqual(executed, all.map(c => c.runs));
+  assert.deepEqual(executed, all.map(c => c.onFolder ? [c.runs, projectFolder] : [c.runs]));
 });
 
 test('the 2.0 defaults', () => {

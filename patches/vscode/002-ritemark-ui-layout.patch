@@ -1203,7 +1203,7 @@ index bdc603ff1a4..e0bbe7af85f 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index ecc6af48668..8e2364cda33 100644
+index ecc6af48668..c3359126fdc 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -1231,7 +1231,7 @@ index ecc6af48668..8e2364cda33 100644
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
 -	title: localize2('explore', "Explorer"),
-+	title: localize2('explore', "Folder"), // Ritemark: renamed from Explorer (one word everywhere: Folder)
++	title: localize2('explore', "Documents"), // Ritemark: renamed from Explorer; 2.0 calls the place Documents (Sprint 132, R5)
  	ctorDescriptor: new SyncDescriptor(ExplorerViewPaneContainer),
  	storageId: 'workbench.explorer.views.state',
  	icon: explorerViewIcon,
@@ -1241,8 +1241,8 @@ index ecc6af48668..8e2364cda33 100644
  		id: VIEWLET_ID,
 -		title: localize2('explore', "Explorer"),
 -		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Explorer"),
-+		title: localize2('explore', "File Browser"), // RiteMark: renamed from Explorer → Project → File Browser
-+		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&File Browser"), // RiteMark: renamed
++		title: localize2('explore', "Documents"), // Ritemark: renamed from Explorer; the place's own word (Sprint 132, R5)
++		mnemonicTitle: localize({ key: 'miViewExplorer', comment: ['&& denotes a mnemonic'] }, "&&Documents"), // Ritemark: renamed
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyE },
  		order: 0
  	},

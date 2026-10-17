@@ -250,10 +250,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..7315e32d2a9
+index 00000000000..0feef4750b5
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1224 @@
+@@ -0,0 +1,1243 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -430,6 +430,12 @@ index 00000000000..7315e32d2a9
 +/* A webview on the desk (the Markdown editor, CSV, PDF, Word) is a layer of its own: round it too (overlayWebview.ts) */
 +.ritemark-desk-webview {
 +	border-radius: var(--rm-radius);
++}
++
++/* Two desks lie apart on the ground, 8 between them (R2; editorGroupView.ts): each has its own edge, so the
++   gap carries no separator line (core draws one in editorGroup.border between groups) */
++.monaco-workbench .part.editor .monaco-split-view2.separator-border > .monaco-scrollable-element > .split-view-container > .split-view-view::before {
++	display: none;
 +}
 +
 +/* An empty desk is ground, with no sheet */
@@ -1249,6 +1255,20 @@ index 00000000000..7315e32d2a9
 +	font-size: 14px !important; /* !important: the codicon rule sets 16 */
 +}
 +
++.monaco-workbench .ritemark-menu-sep {
++	height: 1px;
++	margin: 6px 4px;
++	background-color: var(--rm-hairline);
++}
++
++/* The left column head's menus (experiences/home frame 2: the project's menu at 16, 4 under the head, 232 wide;
++   New's menu the same under New) */
++.monaco-workbench .ritemark-menu.ritemark-project-menu {
++	left: 8px;
++	width: 232px;
++	margin-top: 4px;
++}
++
 +/* You's menu (experiences/settings frame 1): 228 wide, 2 under You, its right edge 16 from the window's */
 +.monaco-workbench .ritemark-menu.ritemark-you-menu {
 +	left: -8px;
@@ -1297,8 +1317,7 @@ index 00000000000..7315e32d2a9
 +	outline-offset: -1px;
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head:hover,
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head[aria-expanded="true"] {
++.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head:hover {
 +	background-color: var(--rm-hover);
 +}
 +
@@ -2057,10 +2076,10 @@ index 00000000000..20613e775a9
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..4e0e020d9c9
+index 00000000000..91583b71c39
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,117 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2069,8 +2088,9 @@ index 00000000000..4e0e020d9c9
 +/*
 + * Ritemark 2.0: a small Ritemark menu, drawn as the Experience lead's kit draws one (kit/ritemark.css: .menu, .hd,
 + * .it, .it.tall, .sub): a white sheet with radius 10 and padding 6, an optional heading in small capitals, rows 32
-+ * (44 with a second line), each with its 14 icon, the chosen row in the theme's soft indigo (R12). Used by More (⋯)
-+ * at the end of the places row (R5, R6) and by You (R11).
++ * (44 with a second line), each with its 14 icon, the chosen row in the theme's soft indigo, a hairline between
++ * groups (R12). Used by More (⋯) at the end of the places row (R5, R6), by You (R11) and by the left column's head
++ * (R10).
 + */
 +
 +import { $, addDisposableListener, append, EventType, getWindow } from '../../../base/browser/dom.js';
@@ -2092,6 +2112,11 @@ index 00000000000..4e0e020d9c9
 +	readonly run: () => void;
 +}
 +
++/** A hairline between two groups of rows (kit: .menu .sep). */
++export const RITEMARK_MENU_SEPARATOR = 'separator';
++
++export type RitemarkMenuEntry = IRitemarkMenuItem | typeof RITEMARK_MENU_SEPARATOR;
++
 +export interface IRitemarkMenuOptions {
 +	readonly className: string;
 +	readonly ariaLabel: string;
@@ -2101,7 +2126,7 @@ index 00000000000..4e0e020d9c9
 +}
 +
 +/** Show a Ritemark menu under `anchor`. `onHide` runs when it closes, by a choice, Escape or a click anywhere else. */
-+export function showRitemarkMenu(contextViewService: IContextViewService, anchor: HTMLElement, options: IRitemarkMenuOptions, items: readonly IRitemarkMenuItem[], onHide: () => void): void {
++export function showRitemarkMenu(contextViewService: IContextViewService, anchor: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], onHide: () => void): void {
 +	const close = () => contextViewService.hideContextView();
 +	const leave = addDisposableListener(getWindow(anchor), EventType.BLUR, close); // a press inside a webview never reaches the workbench
 +	contextViewService.showContextView({
@@ -2115,7 +2140,7 @@ index 00000000000..4e0e020d9c9
 +	});
 +}
 +
-+function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly IRitemarkMenuItem[], close: () => void): IDisposable {
++function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void): IDisposable {
 +	const disposables = new DisposableStore();
 +	const menu = append(container, $(`.ritemark-menu.${options.className}`, { role: 'menu', 'aria-label': options.ariaLabel }));
 +	if (options.heading) {
@@ -2124,6 +2149,10 @@ index 00000000000..4e0e020d9c9
 +
 +	const rows: HTMLElement[] = [];
 +	for (const item of items) {
++		if (item === RITEMARK_MENU_SEPARATOR) {
++			append(menu, $('.ritemark-menu-sep', { role: 'separator' }));
++			continue;
++		}
 +		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': item.label }));
 +		append(row, $('span.ritemark-menu-icon')).classList.add(...item.iconClassNames);
 +		if (item.detail) {
@@ -2170,10 +2199,10 @@ index 00000000000..4e0e020d9c9
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..73d6de161fe
+index 00000000000..2a9fae8ba12
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,142 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2184,9 +2213,11 @@ index 00000000000..73d6de161fe
 + *
 + * The project by its whole name, with a chevron that opens the project's menu (the folder tools VS Code
 + * shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
-+ * place and the drawing live here; the menus' entries and their words come from the extension, through
-+ * the `ritemark/projectHead` and `ritemark/projectHead/new` menus (menusExtensionPoint.ts), so an
-+ * extension release can change them. Other places keep their own simple head.
++ * place and the drawing live here, and both menus are Ritemark menus (ritemarkMenu.ts), as the project's
++ * menu is drawn (experiences/home frame 2: 232 wide, 4 under the head). Their entries, words and icons
++ * come from the extension, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus
++ * (menusExtensionPoint.ts), so an extension release can change them; each menu group is set apart by a
++ * hairline. Other places keep their own simple head.
 + */
 +
 +import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
@@ -2197,12 +2228,12 @@ index 00000000000..73d6de161fe
 +import { Disposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
-+import { getFlatContextMenuActions } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
-+import { IMenuService, MenuId } from '../../../../platform/actions/common/actions.js';
++import { IMenuService, MenuId, MenuItemAction } from '../../../../platform/actions/common/actions.js';
 +import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-+import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
++import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
 +
 +const DOCUMENTS_CONTAINER = 'workbench.view.explorer';
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
@@ -2218,7 +2249,7 @@ index 00000000000..73d6de161fe
 +		private readonly part: HTMLElement,
 +		titleArea: HTMLElement,
 +		@ICommandService private readonly commandService: ICommandService,
-+		@IContextMenuService private readonly contextMenuService: IContextMenuService,
++		@IContextViewService private readonly contextViewService: IContextViewService,
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 +		@IMenuService private readonly menuService: IMenuService,
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
@@ -2229,7 +2260,7 @@ index 00000000000..73d6de161fe
 +		const label = this.label = titleArea.querySelector<HTMLElement>(':scope > .title-label')!;
 +		label.classList.add('ritemark-project-head');
 +		append(label, renderIcon(Codicon.chevronDown)).classList.add('ritemark-project-chevron');
-+		const openProjectMenu = () => this.showMenu(PROJECT_MENU, label);
++		const openProjectMenu = () => this.showMenu(PROJECT_MENU, label, localize('ritemark.project.menu', "Project"));
 +		this._register(addDisposableListener(label, EventType.CLICK, () => {
 +			if (this.active) {
 +				openProjectMenu();
@@ -2249,7 +2280,7 @@ index 00000000000..73d6de161fe
 +		this._register({ dispose: () => this.rows.remove() });
 +		const newRow = this.row(Codicon.add, localize('ritemark.project.new', "New"));
 +		newRow.setAttribute('aria-haspopup', 'menu');
-+		this._register(addDisposableListener(newRow, EventType.CLICK, () => this.showMenu(NEW_MENU, newRow)));
++		this._register(addDisposableListener(newRow, EventType.CLICK, () => this.showMenu(NEW_MENU, newRow, localize('ritemark.project.newMenu', "New"))));
 +		const searchRow = this.row(Codicon.search, localize('ritemark.project.search', "Search"));
 +		this._register(addDisposableListener(searchRow, EventType.CLICK, () => this.commandService.executeCommand('workbench.view.search')));
 +		append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }, localize('ritemark.project.documents', "Documents")));
@@ -2294,19 +2325,24 @@ index 00000000000..73d6de161fe
 +		return row;
 +	}
 +
-+	/** One of the extension's menus, in Ritemark's menu, under its anchor. */
-+	private showMenu(menuId: MenuId, anchor: HTMLElement): void {
-+		const actions = getFlatContextMenuActions(this.menuService.getMenuActions(menuId, this.contextKeyService, { shouldForwardArgs: true }));
-+		if (!actions.length) {
++	/** One of the extension's menus, as a Ritemark menu under its anchor: a hairline between its groups. */
++	private showMenu(menuId: MenuId, anchor: HTMLElement, ariaLabel: string): void {
++		const folder = this.workspaceService.getWorkspace().folders[0]?.uri;
++		const entries: RitemarkMenuEntry[] = [];
++		for (const [, actions] of this.menuService.getMenuActions(menuId, this.contextKeyService, { shouldForwardArgs: true })) {
++			if (entries.length) {
++				entries.push(RITEMARK_MENU_SEPARATOR);
++			}
++			for (const action of actions) {
++				const icon = action instanceof MenuItemAction && ThemeIcon.isThemeIcon(action.item.icon) ? action.item.icon : undefined;
++				entries.push({ label: action.label, iconClassNames: icon ? ThemeIcon.asClassNameArray(icon) : [], run: () => action.run(folder) });
++			}
++		}
++		if (!entries.length) {
 +			return;
 +		}
 +		anchor.setAttribute('aria-expanded', 'true');
-+		this.contextMenuService.showContextMenu({
-+			getAnchor: () => anchor,
-+			getActions: () => actions,
-+			getActionsContext: () => this.workspaceService.getWorkspace().folders[0]?.uri,
-+			onHide: () => anchor.setAttribute('aria-expanded', 'false')
-+		});
++		showRitemarkMenu(this.contextViewService, anchor, { className: 'ritemark-project-menu', ariaLabel, align: 'left' }, entries, () => anchor.setAttribute('aria-expanded', 'false'));
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
@@ -2481,7 +2517,7 @@ index 9250ef3f280..fdd208cd50b 100644
  import { WORKBENCH_BACKGROUND, TITLE_BAR_ACTIVE_BACKGROUND } from '../common/theme.js';
  import { isWeb, isIOS } from '../../base/common/platform.js';
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index ed7dbe07826..f68ada73691 100644
+index ed7dbe07826..b985501d431 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 @@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
@@ -2493,6 +2529,17 @@ index ed7dbe07826..f68ada73691 100644
  
  	getHeight(element: ExplorerItem): number {
  		return ExplorerDelegate.ITEM_HEIGHT;
+@@ -1412,7 +1412,9 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+ 			stat.isExcluded = true;
+ 			const editors = this.editorService.visibleEditors;
+ 			const editor = editors.find(e => e.resource && this.uriIdentityService.extUri.isEqualOrParent(e.resource, stat.resource));
+-			if (editor && stat.root === this.explorerService.findClosestRoot(stat.resource)) {
++			// Ritemark 2.0 (R10): Ritemark's own folder stays out of the tree even while one of its files, such as a flow, is open
++			const inRitemarkFolder = this.uriIdentityService.extUri.relativePath(stat.root.resource, stat.resource)?.split('/')[0] === '.ritemark';
++			if (editor && !inRitemarkFolder && stat.root === this.explorerService.findClosestRoot(stat.resource)) {
+ 				this.editorsAffectingFilter.add(editor);
+ 				return true; // Show all opened files and their parents
+ 			}
 diff --git a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
 index 683604c1cc7..880e0e927d2 100644
 --- a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts

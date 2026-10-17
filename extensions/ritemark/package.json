@@ -42,39 +42,58 @@
     "commands": [
       {
         "command": "ritemark.projectHead.openFolder",
-        "title": "Open a folder…"
+        "title": "Open a folder…",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "ritemark.projectHead.revealInFinder",
+        "title": "Reveal in Finder",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "ritemark.projectHead.revealInFileExplorer",
+        "title": "Reveal in File Explorer",
+        "icon": "$(link-external)"
       },
       {
         "command": "ritemark.projectHead.allCommands",
-        "title": "All commands"
+        "title": "All commands",
+        "icon": "$(ritemark-command)"
       },
       {
         "command": "ritemark.projectHead.newFolder",
-        "title": "New folder"
+        "title": "New folder",
+        "icon": "$(new-folder)"
       },
       {
         "command": "ritemark.projectHead.collapseFolders",
-        "title": "Collapse folders"
+        "title": "Collapse folders",
+        "icon": "$(collapse-all)"
       },
       {
         "command": "ritemark.projectHead.newText",
-        "title": "Text"
+        "title": "Text",
+        "icon": "$(file-text)"
       },
       {
         "command": "ritemark.projectHead.newTable",
-        "title": "Table (CSV data)"
+        "title": "Table (CSV data)",
+        "icon": "$(table)"
       },
       {
         "command": "ritemark.projectHead.newFlow",
-        "title": "Flow"
+        "title": "Flow",
+        "icon": "$(ritemark-flow)"
       },
       {
         "command": "ritemark.projectHead.newFile",
-        "title": "Other file…"
+        "title": "Other file…",
+        "icon": "$(file)"
       },
       {
         "command": "ritemark.projectHead.newFolderInNew",
-        "title": "Folder"
+        "title": "Folder",
+        "icon": "$(folder)"
       },
       {
         "command": "ritemark.configureApiKey",
@@ -524,7 +543,7 @@
         },
         {
           "id": "ritemark-agent-library",
-          "title": "Agent Library",
+          "title": "Agents",
           "icon": "media/agent-library-icon.svg"
         },
         {
@@ -600,9 +619,21 @@
         }
       ]
     },
+    "icons": {
+      "ritemark-command": {
+        "description": "All commands, in the project's menu",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e1c4" }
+      },
+      "ritemark-flow": {
+        "description": "A flow, in New",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6ec" }
+      }
+    },
     "menus": {
       "commandPalette": [
         { "command": "ritemark.projectHead.openFolder", "when": "false" },
+        { "command": "ritemark.projectHead.revealInFinder", "when": "false" },
+        { "command": "ritemark.projectHead.revealInFileExplorer", "when": "false" },
         { "command": "ritemark.projectHead.allCommands", "when": "false" },
         { "command": "ritemark.projectHead.newFolder", "when": "false" },
         { "command": "ritemark.projectHead.collapseFolders", "when": "false" },
@@ -614,7 +645,8 @@
       ],
       "ritemark/projectHead": [
         { "command": "ritemark.projectHead.openFolder", "group": "1_project@1" },
-        { "command": "revealFileInOS", "group": "1_project@2", "when": "!isWeb" },
+        { "command": "ritemark.projectHead.revealInFinder", "group": "1_project@2", "when": "isMac" },
+        { "command": "ritemark.projectHead.revealInFileExplorer", "group": "1_project@2", "when": "isWindows" },
         { "command": "ritemark.projectHead.allCommands", "group": "2_commands@1" },
         { "command": "ritemark.projectHead.newFolder", "group": "3_folder@1" },
         { "command": "ritemark.projectHead.collapseFolders", "group": "3_folder@2" }

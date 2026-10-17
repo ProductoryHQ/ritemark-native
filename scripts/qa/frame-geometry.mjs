@@ -66,6 +66,7 @@ const MEASURE = `(() => {
 		deskYou: box(document.querySelector('.part.editor > .ritemark-frame-strip.on-desk.right a.ritemark-you')),
 		deskRightStrip: box(document.querySelector('.part.editor > .ritemark-frame-strip.on-desk.right')),
 		desks: editorGroups.map(group => ({ group: box(group), sheet: box(group.querySelector(':scope > .editor-container')), title: box(group.querySelector(':scope > .title .tabs-and-actions-container')) })),
+		deskSeparators: all('.part.editor .monaco-split-view2.separator-border > .monaco-scrollable-element > .split-view-container > .split-view-view').filter(view => getComputedStyle(view, '::before').display !== 'none').length,
 		tabs: visibleTabs.map(tab => ({ ...box(tab), active: tab.classList.contains('active'), sticky: tab.classList.contains('sticky-compact'), label: box(tab.querySelector('.label-name')) })),
 		newTab: box(document.querySelector('.ritemark-new-tab')),
 		folded: box(document.querySelector('.ritemark-more-tabs')),
@@ -152,6 +153,7 @@ if (m.desks.length === 2) {
 	const [a, b] = m.desks.map(d => d.sheet).sort((p, q) => p.x - q.x || p.y - q.y);
 	const apart = b.x > a.right - 1 ? b.x - a.right : b.y - a.bottom;
 	check('R1 two desks lie 8 apart', near(apart, GAP), round(apart), GAP);
+	check('R1 no separator line in the gap between desks', m.deskSeparators === 0, m.deskSeparators, 0);
 }
 
 // R5: the places row (in the left column, so only while it is shown)
