@@ -29,7 +29,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S15 A view dragged to the AI column | Open | |
 | S16 The row | Pass | Fresh profile, as S1; places 34 apart from 8, the chosen one filled (geometry). |
 | S17 What does not fit | Pass | More lists Copilot Chat first, then Search, File changes and Extensions, as experiences/home frame 4 draws it. |
-| S18 Tasks opens the board | Open | |
+| S18 Tasks opens the board | Pass | With a document in front, a click on Tasks brings the Task board forward, from another place and when Tasks is already chosen, also after a reload with the pinned board restored but not yet shown. Two fixes: the places row on top no longer told the extension about a click on the open place (018 now runs `ritemark.placeClickedAgain`), and a pinned restored board could not be replaced, which opened a second board (the extension now shows the restored one). |
 | S19 Reordering | Open | |
 | S20 Copilot Chat installed | Partial | Copilot Chat in More opens as a tab on the desk. A second click (it should show the same tab) not checked yet. |
 | S21 Copilot Chat not installed | Open | |
@@ -45,7 +45,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S31 Ritemark's own terminals | Open | |
 | S32 No terminal at start | Pass | No terminal opens on start; the panel stays hidden after restarts. |
 | S33 Terminals across a restart | Pass | After a restart, all four terminals came back as tabs; no panel. |
-| S34 A pinned Task board tab | Partial | `ritemarkPermanentTabs.test.ts` (VS Code's runner, 5 tests pass): Close, Unpin and a move to the other desk leave it first, pinned and open; no tab moves or opens in front of it, from its own desk or another; Close all and Close others leave it; only disposing removes it. The test found that a tab *opened* at the front (a file dropped there, a tab dragged from the other desk) went in front of it; fixed. Not yet run by hand in the app. |
+| S34 A pinned Task board tab | Pass | In the app, with the board pinned: ⌘W leaves it and brings the next tab forward; ⌘K ⇧⌘↵ (Unpin) leaves it pinned; ⌃⌘→ leaves it on its desk; ⌘K ⇧⌘← on a document beside it leaves the document behind it; a slip of my palette driver closed every other tab and the emptied desk (most likely Close All Editors) and left only the board; Close all is confirmed by the unit test. `ritemarkPermanentTabs.test.ts` (5 tests) covers the same rules plus a tab opened or dragged to the front, Close others and disposal; it found that a tab *opened* at the front went in front of the board (fixed). Minor: ⌃⌘→ still opens an empty desk to the right before the refused move (listed under Open findings). |
 | S35 The head on Documents | Pass | New at 136, Search at 168, Documents at 214, the tree from 236, the name centred at 110 (geometry). The tree at 8 with 16 per level (icon 16 and 32, label 38 and 54), as the Experience lead's answer 6 asks. |
 | S36 The project's menu and New | Pass | Both are Ritemark menus at 16, 4 under their row, 232 wide, with icons and hairlines ([`qa/s36-project-menu.png`](qa/s36-project-menu.png), [`qa/s36-new-menu.png`](qa/s36-new-menu.png)). All commands, New folder, Collapse folders, Text, Table (CSV data), Flow, Other file… and Folder each worked. Open a folder… and Reveal in Finder were not run: they open a system dialog and Finder in front of Jarmo's work. Reveal's wiring is unit-tested. |
 | S37 You | Partial | The menu matches experiences/settings frame 1 (Settings, Help); ⌘, stays off it until Jarmo decides (Experience lead, answer 8). Keyboard and VoiceOver not run yet. |
@@ -62,4 +62,9 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 - The places were called Folder and Agent Library; now Documents and Agents, as R5 names them (6be0bbf5).
 - With a flow open, `.ritemark/flows` showed in the tree (6be0bbf5).
 - Ritemark's menus stayed open on a press in the tree (S27); they now close on any press outside them and on a second press of their button.
+- A click on Tasks when Tasks was already chosen did nothing (S18); now it brings the board forward. With a pinned board restored from the last session, it opened a second board; now it shows the restored one.
 - A tab opened at the front of the row (dropped there, or dragged from the other desk) went in front of a pinned Task board tab (R9); found by the unit test, fixed in `editorGroupView.ts`.
+
+## Open findings
+
+- ⌃⌘→ (Move Editor into Next Group) on a pinned Task board tab opens a new empty desk, then the move is refused, so the empty desk stays. Harmless, ⌘W closes it; a fix belongs in the move commands (`editorCommands.ts`), not in this merge.

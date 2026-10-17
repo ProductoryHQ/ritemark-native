@@ -34,6 +34,9 @@ import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
 import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
 
+/** The Tasks place's container id, as the shell reports a click on it. */
+const TASKS_PLACE_ID = 'workbench.view.extension.ritemark-tasks';
+
 export interface TaskBoardHostDependencies {
   context: vscode.ExtensionContext;
   runtimeAvailability: (runtimeId: AgentId) => Promise<RuntimeAvailability>;
@@ -294,6 +297,11 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
       async deserializeWebviewPanel(panel) {
         TaskBoardPanel.revive(panel, extensionUri, surfaceContext);
       },
+    }),
+    // Ritemark 2.0: the places row sits on top of the left column, where a click on the open place changes
+    // nothing; the shell tells us (patch 018), so a click on Tasks brings the board forward every time (R5, S18).
+    vscode.commands.registerCommand('ritemark.placeClickedAgain', async (placeId?: unknown) => {
+      if (placeId === TASKS_PLACE_ID && store) await TaskBoardPanel.show(extensionUri, surfaceContext);
     }),
     // With a card id, the card's page opens instead of the board.
     vscode.commands.registerCommand('ritemark.openTaskBoard', async (cardId?: unknown) => {

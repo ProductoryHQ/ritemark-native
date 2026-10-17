@@ -1855,6 +1855,23 @@ index bd77caab75a..e6802457ead 100644
  			}
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
+diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
+index 22bfb325a6f..688a85a4774 100644
+--- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
++++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
+@@ -856,6 +856,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+ 			}
+ 		}
+ 
++		// Ritemark 2.0: in the places row on top of the left column (R5), a click on the open place changes nothing, where
++		// the 1.x Activity Bar hid and showed the side bar; tell the extension, so Tasks brings its board forward every time
++		if (this.part === Parts.SIDEBAR_PART && this.paneCompositePart.getActivePaneComposite()?.getId() === this.compositeBarActionItem.id) {
++			this.commandService.executeCommand('ritemark.placeClickedAgain', this.compositeBarActionItem.id).catch(() => { /* not handled: nothing to do */ });
++		}
++
+ 		await this.paneCompositePart.openPaneComposite(this.compositeBarActionItem.id, focus);
+ 		return this.activate();
+ 	}
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
 index ae5536dd7c0..72709290367 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts

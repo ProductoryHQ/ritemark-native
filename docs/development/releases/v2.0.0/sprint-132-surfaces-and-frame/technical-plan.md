@@ -307,6 +307,10 @@ What the build needed beyond the workstreams' file lists, and why:
   Ritemark's menu), `browser/layout.ts` (the default column widths, 256 and 400), `platform/window/common/window.ts`
   (the strip constants, in one module) and `contrib/files/browser/views/explorerViewer.ts` (with a flow open,
   `.ritemark` stays out of the tree; upstream shows an open excluded file and its folders).
+- **018** also changes `parts/paneCompositeBar.ts`: a click on the open place in the top row runs
+  `ritemark.placeClickedAgain` with the place's id, which the 1.x Activity Bar signalled by hiding and showing the side
+  bar; the extension (`taskBoardHost.ts`) brings the Task board forward for Tasks (R5). `TaskBoardPanel.ts` shows a
+  pinned board restored from the last session instead of replacing it, since R9 keeps it from being closed.
 - **019** also changes `contrib/terminal/browser/terminalInstance.ts`: a terminal named "Terminal N" kept its name
   only until a reload, when the configured title source dropped it.
 - **002** also changes `explorerViewlet.ts`: the place is called Documents (R5), and it stays a place while its tree

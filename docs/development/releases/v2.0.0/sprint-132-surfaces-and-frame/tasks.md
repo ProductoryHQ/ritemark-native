@@ -28,7 +28,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] 019 created file by file from the proof of concept (W1's list)
 - [x] `editorGroupView.ts`: the window's edges come from `findGroup({ direction })`, not from DOM walks
 - [x] `scripts/check-patch-stacking.mjs` with the known pairs; pre-commit Check 14 runs it
-- [ ] `./scripts/apply-patches.sh --dry-run` counts read (not only the labels), a real apply from pristine, a second run clean; `compile-check-ts-native` green
+- [x] `./scripts/apply-patches.sh --dry-run` counts read (not only the labels), a real apply from pristine, a second run clean; `compile-check-ts-native` green (2026-10-17, on a detached checkout of the pin: dry run 19 can apply / 0 conflicts; apply 19; second run 0 applied, 19 already there; source identical to the patch stack)
 
 ## Phase 3: The frame (W2, W3, W4)
 
