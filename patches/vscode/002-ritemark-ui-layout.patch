@@ -1,14 +1,42 @@
-Ritemark UI Layout: sidebar, titlebar, tabs, explorer, panels, activity bar, terminal placement
+Ritemark UI Layout: what sits where (sidebar, titlebar, explorer, panels, places row)
 Sprint 38+: Original consolidated UI layout patch.
 Sprint 53: Chrome activity bar refactor (28px action labels, 40px container).
 Sprint 54: Agent Library activity bar entry, auxiliary bar chrome polish.
 Sprint 55: Rebased onto VS Code 1.117.0 (CSS var migration, compact-mode constants).
-v1.14.0 (Jarmo, 2026-10-13): Activity Bar order Home, Explorer, Tasks, ..., Agent Library last of Ritemark's: orders in viewsExtensionPoint.ts (ritemark-tasks 0.5, ritemark-agent-library 1000); compositeBar.ts applies the same once to a profile from before Tasks (Tasks after the Explorer, Agent Library to the bottom of Ritemark's group).
+v1.14.0 (Jarmo, 2026-10-13): Activity Bar order Home, Explorer, Tasks, ..., Agent Library last of Ritemark's.
+Sprint 132 (Ritemark 2.0 step 1, 2026-10-17): this patch keeps placement; 018 and 019 own sizes and drawing.
+  Moved out: the tab height (editorTabsControl.ts, now 019), the tree's row height (explorerViewer.ts and the
+  height lines of explorerviewlet.css, now 018) and the places bar's injected 40px styles (paneCompositePart.ts,
+  now 018's stylesheet).
+  Removed: the terminal guards. A terminal is a tab (Jarmo, 2026-10-17), so terminalConfigurationService.ts and
+  its test, terminalEditorSerializer.ts and terminalView.ts are upstream again, and terminal.contribution.ts keeps
+  only the removal of the Toggle Terminal shortcut and View-menu entry. View > Advanced loses its Terminal entry.
+  Changed: the places row's order is Home, Documents, Tasks, Browser, Agents, Transcribe, then the rest
+  (viewsExtensionPoint.ts orders; compositeBar.ts applies it once to an older profile, ritemark.places.order.v2,
+  and puts a new Ritemark place in its spot); Copilot Chat's launcher is always in More, after the places that do
+  not fit (compositeBar.ts); the title bar's left-column toggle is off, because the column's own strip holds it
+  (layoutActions.ts).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-index 833787070f3..9c97beb08de 100644
+index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 +++ b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
-@@ -323,6 +323,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -31,6 +31,15 @@ import { Extensions as ExtensionFeaturesRegistryExtensions, IExtensionFeatureTab
+ import { isProposedApiEnabled } from '../../services/extensions/common/extensions.js';
+ import { ExtensionMessageCollector, ExtensionsRegistry, IExtensionPoint, IExtensionPointUser } from '../../services/extensions/common/extensionsRegistry.js';
+ 
++// Ritemark: the orders of Ritemark's own places in the places row (see registerCustomViewContainers).
++const RITEMARK_PLACE_ORDERS = new Map<string, number>([
++	['ritemark-home', -1],
++	['ritemark-tasks', 0.5],
++	['ritemark-browser', 0.6],
++	['ritemark-agent-library', 0.7],
++	['ritemark-transcribe', 0.8],
++]);
++
+ export interface IUserFriendlyViewsContainerDescriptor {
+ 	id: string;
+ 	title: string;
+@@ -323,6 +332,9 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					case 'secondarySidebar':
  						auxiliaryBarOrder = this.registerCustomViewContainers(value, description, auxiliaryBarOrder, existingViewContainers, ViewContainerLocation.AuxiliaryBar);
  						break;
@@ -18,29 +46,25 @@ index 833787070f3..9c97beb08de 100644
  				}
  			});
  		}
-@@ -382,7 +385,20 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -382,7 +394,16 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  			const icon = themeIcon || resources.joinPath(extension.extensionLocation, descriptor.icon);
  			const id = `workbench.view.extension.${descriptor.id}`;
  			const title = descriptor.title || id;
 -			const viewContainer = this.registerCustomViewContainer(id, title, icon, order++, extension.identifier, location);
-+			// Ritemark: pin ritemark-ai first in the auxiliary bar. In the primary
-+			// Activity Bar (Jarmo, 2026-10-13): ritemark-home FIRST (before the
-+			// built-in Explorer at 0), ritemark-tasks right below the Explorer
-+			// (before Search at 1) because the task board is where the work is
-+			// planned, and ritemark-agent-library after every other container.
-+			// The other Ritemark containers keep their declaration order.
-+			// compositeBar.ts applies the same order to profiles from before Tasks.
++			// Ritemark: pin ritemark-ai first in the auxiliary bar. In the places row
++			// (Jarmo, 2026-10-16), Ritemark's own places lead in this order: Home,
++			// Documents (the built-in Explorer at 0), Tasks, Browser, Agents (Agent
++			// Library), Transcribe; every other place follows (Search is 1).
++			// compositeBar.ts applies the same order once to an older profile.
 +			const effectiveOrder = location === ViewContainerLocation.AuxiliaryBar && descriptor.id === 'ritemark-ai' ? 0
-+				: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-home' ? -1
-+					: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-tasks' ? 0.5
-+						: location === ViewContainerLocation.Sidebar && descriptor.id === 'ritemark-agent-library' ? 1000
-+							: order;
++				: location === ViewContainerLocation.Sidebar && RITEMARK_PLACE_ORDERS.has(descriptor.id) ? RITEMARK_PLACE_ORDERS.get(descriptor.id)!
++					: order;
 +			const viewContainer = this.registerCustomViewContainer(id, title, icon, effectiveOrder, extension.identifier, location);
 +			order++;
  
  			// Move those views that belongs to this container
  			if (existingViewContainers.length) {
-@@ -413,7 +429,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
+@@ -413,7 +434,7 @@ class ViewsExtensionHandler implements IWorkbenchContribution {
  					ViewPaneContainer,
  					[id, { mergeViewWithContainerWhenSingleView: true }]
  				),
@@ -49,71 +73,8 @@ index 833787070f3..9c97beb08de 100644
  				order,
  				icon,
  			}, location);
-diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-index c89c0e4eee8..4aaccf3c849 100644
---- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-+++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-@@ -10,7 +10,7 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
- import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
- import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
- import { INotificationService } from '../../../../platform/notification/common/notification.js';
--import { IStorageService } from '../../../../platform/storage/common/storage.js';
-+import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
- import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
- import { IThemeService } from '../../../../platform/theme/common/themeService.js';
- import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
-@@ -42,6 +42,40 @@ interface IAuxiliaryBarPartConfiguration {
- 	showLabels: boolean;
- }
- 
-+function migrateRitemarkAuxiliaryBarOrder(storageService: IStorageService): void {
-+	const ritemarkContainerId = 'workbench.view.extension.ritemark-ai';
-+	const value = storageService.get(AuxiliaryBarPart.pinnedViewsKey, StorageScope.PROFILE);
-+	if (!value) {
-+		return;
-+	}
-+
-+	try {
-+		const items = JSON.parse(value) as Array<{ id: string; pinned: boolean; visible: boolean; order?: number }>;
-+		if (!Array.isArray(items)) {
-+			return;
-+		}
-+
-+		const ritemarkItem = items.find(item => item.id === ritemarkContainerId);
-+		if (!ritemarkItem) {
-+			return;
-+		}
-+
-+		const remainingItems = items
-+			.filter(item => item.id !== ritemarkContainerId)
-+			.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
-+		const migratedItems = [
-+			{ ...ritemarkItem, order: 0 },
-+			...remainingItems.map((item, index) => ({ ...item, order: index + 1 }))
-+		];
-+
-+		if (JSON.stringify(items) !== JSON.stringify(migratedItems)) {
-+			storageService.store(AuxiliaryBarPart.pinnedViewsKey, JSON.stringify(migratedItems), StorageScope.PROFILE, StorageTarget.USER);
-+		}
-+	} catch {
-+		// Ignore malformed storage and let the regular composite bar recovery path handle it.
-+	}
-+}
-+
- export class AuxiliaryBarPart extends AbstractPaneCompositePart {
- 
- 	static readonly activeViewSettingsKey = 'workbench.auxiliarybar.activepanelid';
-@@ -97,6 +131,8 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
- 		@IMenuService menuService: IMenuService,
- 		@IConfigurationService private readonly configurationService: IConfigurationService
- 	) {
-+		migrateRitemarkAuxiliaryBarOrder(storageService);
-+
- 		super(
- 			Parts.AUXILIARYBAR_PART,
- 			{
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 86f783cefa4..b3e57918cea 100644
+index 86f783cefa4..a39529f50c3 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
@@ -158,7 +119,7 @@ index 86f783cefa4..b3e57918cea 100644
  
  
  MenuRegistry.appendMenuItems([{
-@@ -272,13 +274,40 @@ registerAction2(class extends Action2 {
+@@ -272,10 +274,28 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -178,31 +139,19 @@ index 86f783cefa4..b3e57918cea 100644
 +	group: '9_advanced',
 +	title: localize('miViewAdvanced', "Advanced"),
 +	submenu: MenuId.MenubarViewMenuAdvanced,
- 	order: 1
- });
- 
-+MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
-+	group: '1_views',
-+	command: {
-+		id: 'workbench.view.scm',
-+		title: localize('miViewSCMAdvanced', "Source Control"),
-+	},
 +	order: 1
 +});
 +
 +MenuRegistry.appendMenuItem(MenuId.MenubarViewMenuAdvanced, {
 +	group: '1_views',
 +	command: {
-+		id: 'workbench.action.terminal.toggleTerminal',
-+		title: localize('miTerminalAdvanced', "Terminal"),
++		id: 'workbench.view.scm',
++		title: localize('miViewSCMAdvanced', "Source Control"),
 +	},
-+	order: 2
-+});
-+
- // Toggle Sidebar Visibility
+ 	order: 1
+ });
  
- export class ToggleSidebarVisibilityAction extends Action2 {
-@@ -300,9 +329,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
+@@ -300,9 +320,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
  			},
  			category: Categories.View,
  			f1: true,
@@ -215,7 +164,7 @@ index 86f783cefa4..b3e57918cea 100644
  			},
  			menu: [
  				{
-@@ -347,23 +377,19 @@ MenuRegistry.appendMenuItems([
+@@ -347,23 +368,19 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -241,11 +190,11 @@ index 86f783cefa4..b3e57918cea 100644
 -					ContextKeyExpr.equals('config.workbench.layoutControl.type', 'both')),
 -				ContextKeyExpr.equals('config.workbench.sideBar.location', 'left')
 -			),
-+			when: IsAuxiliaryWindowContext.negate(),
++			when: ContextKeyExpr.false(), // Ritemark 2.0: the left column's own strip holds its toggle
  			order: 0
  		}
  	}, {
-@@ -371,19 +397,13 @@ MenuRegistry.appendMenuItems([
+@@ -371,19 +388,13 @@ MenuRegistry.appendMenuItems([
  		item: {
  			group: '2_pane_toggles',
  			command: {
@@ -543,6 +492,69 @@ index 4eefda8085b..d8453b0cbdb 100644
  		id: MenuId.ViewContainerTitleContext,
  		item: {
  			group: '3_workbench_layout_move',
+diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+index c89c0e4eee8..4aaccf3c849 100644
+--- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
++++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+@@ -10,7 +10,7 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+ import { INotificationService } from '../../../../platform/notification/common/notification.js';
+-import { IStorageService } from '../../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+ import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
+@@ -42,6 +42,40 @@ interface IAuxiliaryBarPartConfiguration {
+ 	showLabels: boolean;
+ }
+ 
++function migrateRitemarkAuxiliaryBarOrder(storageService: IStorageService): void {
++	const ritemarkContainerId = 'workbench.view.extension.ritemark-ai';
++	const value = storageService.get(AuxiliaryBarPart.pinnedViewsKey, StorageScope.PROFILE);
++	if (!value) {
++		return;
++	}
++
++	try {
++		const items = JSON.parse(value) as Array<{ id: string; pinned: boolean; visible: boolean; order?: number }>;
++		if (!Array.isArray(items)) {
++			return;
++		}
++
++		const ritemarkItem = items.find(item => item.id === ritemarkContainerId);
++		if (!ritemarkItem) {
++			return;
++		}
++
++		const remainingItems = items
++			.filter(item => item.id !== ritemarkContainerId)
++			.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
++		const migratedItems = [
++			{ ...ritemarkItem, order: 0 },
++			...remainingItems.map((item, index) => ({ ...item, order: index + 1 }))
++		];
++
++		if (JSON.stringify(items) !== JSON.stringify(migratedItems)) {
++			storageService.store(AuxiliaryBarPart.pinnedViewsKey, JSON.stringify(migratedItems), StorageScope.PROFILE, StorageTarget.USER);
++		}
++	} catch {
++		// Ignore malformed storage and let the regular composite bar recovery path handle it.
++	}
++}
++
+ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+ 
+ 	static readonly activeViewSettingsKey = 'workbench.auxiliarybar.activepanelid';
+@@ -97,6 +131,8 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+ 		@IMenuService menuService: IMenuService,
+ 		@IConfigurationService private readonly configurationService: IConfigurationService
+ 	) {
++		migrateRitemarkAuxiliaryBarOrder(storageService);
++
+ 		super(
+ 			Parts.AUXILIARYBAR_PART,
+ 			{
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
 index aec3de2d96d..40753c7e66b 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
@@ -601,19 +613,134 @@ index aec3de2d96d..40753c7e66b 100644
 +	transform: translate(-50%, -50%);
 +	bottom: auto;
 +}
-diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-index b0a44e2c23a..01070bb9145 100644
---- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-+++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-@@ -100,7 +100,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
- 	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
+diff --git a/src/vs/workbench/browser/parts/compositeBar.ts b/src/vs/workbench/browser/parts/compositeBar.ts
+index 8d1020b6621..54b759be10d 100644
+--- a/src/vs/workbench/browser/parts/compositeBar.ts
++++ b/src/vs/workbench/browser/parts/compositeBar.ts
+@@ -22,6 +22,30 @@ import { IComposite } from '../../common/composite.js';
+ import { CompositeDragAndDropData, CompositeDragAndDropObserver, IDraggedCompositeData, ICompositeDragAndDrop, Before2D, toggleDropEffect, ICompositeDragAndDropObserverCallbacks } from '../dnd.js';
+ import { Gesture, EventType as TouchEventType, GestureEvent } from '../../../base/browser/touch.js';
+ import { MutableDisposable } from '../../../base/common/lifecycle.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
++
++// Ritemark 2.0 (Jarmo, 2026-10-16): Ritemark's own places lead the places row in
++// this order: Home, Documents, Tasks, Browser, Agents, Transcribe. Every other
++// place follows in its own order, and what does not fit folds into More (⋯).
++const RITEMARK_OWN_PLACES: readonly string[] = [
++	'workbench.view.extension.ritemark-home',
++	'workbench.view.explorer',
++	'workbench.view.extension.ritemark-tasks',
++	'workbench.view.extension.ritemark-browser',
++	'workbench.view.extension.ritemark-agent-library',
++	'workbench.view.extension.ritemark-transcribe',
++];
++
++// Ritemark 2.0: an older profile gets the order above once; after that the
++// person's own order is kept.
++const RITEMARK_PLACES_ORDER_KEY = 'ritemark.places.order.v2';
++
++// Ritemark 2.0 (Jarmo, 2026-10-17): places that never sit in the row but always
++// in More, after the places that do not fit: Copilot Chat's launcher (patch 007
++// opens it as a tab and hides it when Copilot Chat is not installed).
++const RITEMARK_ALWAYS_IN_MORE: readonly string[] = [
++	'workbench.view.ritemark.copilotChatLauncher',
++];
  
- 	private static readonly EDITOR_TAB_HEIGHT = {
--		normal: 35 as const,
-+		normal: 40 as const, // Ritemark: taller tabs
- 		compact: 22 as const
- 	};
+ export interface ICompositeBarItem {
  
+@@ -253,10 +277,16 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 		@IInstantiationService private readonly instantiationService: IInstantiationService,
+ 		@IContextMenuService private readonly contextMenuService: IContextMenuService,
+ 		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
++		@IStorageService storageService: IStorageService,
+ 	) {
+ 		super();
+ 
+ 		this.model = new CompositeBarModel(items, options);
++		// Ritemark 2.0: the places row (the bar whose default is Documents) takes the 2.0 order once
++		if (RITEMARK_OWN_PLACES.includes(options.getDefaultCompositeId() ?? '') && !storageService.getBoolean(RITEMARK_PLACES_ORDER_KEY, StorageScope.PROFILE, false)) {
++			this.model.leadWithRitemarkPlaces();
++			storageService.store(RITEMARK_PLACES_ORDER_KEY, true, StorageScope.PROFILE, StorageTarget.MACHINE);
++		}
+ 		this.visibleComposites = [];
+ 		this.compositeSizeInBar = new Map<string, number>();
+ 		this.computeSizes(this.model.visibleItems);
+@@ -530,8 +560,10 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 		).map(item => item.id);
+ 
+ 		// Ensure we are not showing more composites than we have height for
+-		let maxVisible = compositesToShow.length;
++		// Ritemark 2.0: the always-in-More places count, so More shows, but never take a spot in the row
+ 		const totalComposites = compositesToShow.length;
++		compositesToShow = compositesToShow.filter(compositeId => !RITEMARK_ALWAYS_IN_MORE.includes(compositeId));
++		let maxVisible = compositesToShow.length;
+ 		let size = 0;
+ 		const limit = this.options.orientation === ActionsOrientation.VERTICAL ? this.dimension.height : this.dimension.width;
+ 
+@@ -648,7 +680,9 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 		}
+ 
+ 		overflowingIds = overflowingIds.filter(compositeId => !this.visibleComposites.includes(compositeId));
+-		return this.model.visibleItems.filter(c => overflowingIds.includes(c.id)).map(item => { return { id: item.id, name: this.getAction(item.id)?.label || item.name }; });
++		// Ritemark 2.0: the always-in-More places come after the places that do not fit
++		const overflowing = this.model.visibleItems.filter(c => overflowingIds.includes(c.id));
++		return [...overflowing.filter(c => !RITEMARK_ALWAYS_IN_MORE.includes(c.id)), ...overflowing.filter(c => RITEMARK_ALWAYS_IN_MORE.includes(c.id))].map(item => { return { id: item.id, name: this.getAction(item.id)?.label || item.name }; });
+ 	}
+ 
+ 	private showContextMenu(targetWindow: Window, e: MouseEvent | GestureEvent): void {
+@@ -758,7 +792,13 @@ class CompositeBarModel {
+ 			return changed;
+ 		} else {
+ 			const item = this.createCompositeBarItem(id, name, order, true, true);
+-			if (!isUndefinedOrNull(requestedIndex)) {
++			// Ritemark 2.0: one of Ritemark's own places new to the row takes its
++			// spot among the others (a fresh profile, or a place an older one
++			// never had), wherever the person has put them.
++			const ritemarkIndex = isUndefinedOrNull(requestedIndex) ? this.ritemarkPlaceIndex(id) : -1;
++			if (ritemarkIndex !== -1) {
++				this.items.splice(ritemarkIndex, 0, item);
++			} else if (!isUndefinedOrNull(requestedIndex)) {
+ 				let index = 0;
+ 				let rIndex = requestedIndex;
+ 				while (rIndex > 0 && index < this.items.length) {
+@@ -782,6 +822,37 @@ class CompositeBarModel {
+ 		}
+ 	}
+ 
++	/**
++	 * Ritemark 2.0: where one of Ritemark's own places goes when it is new to the
++	 * row: after the nearest own place before it in the 2.0 order, or else before
++	 * the nearest one after it. -1 for any other place, or when none is there yet.
++	 */
++	private ritemarkPlaceIndex(id: string): number {
++		const rank = RITEMARK_OWN_PLACES.indexOf(id);
++		if (rank === -1) {
++			return -1;
++		}
++		for (let before = rank - 1; before >= 0; before--) {
++			const index = this.items.findIndex(candidate => candidate.id === RITEMARK_OWN_PLACES[before]);
++			if (index !== -1) {
++				return index + 1;
++			}
++		}
++		for (let after = rank + 1; after < RITEMARK_OWN_PLACES.length; after++) {
++			const index = this.items.findIndex(candidate => candidate.id === RITEMARK_OWN_PLACES[after]);
++			if (index !== -1) {
++				return index;
++			}
++		}
++		return -1;
++	}
++
++	/** Ritemark 2.0: Ritemark's own places lead, in their order; every other place keeps its own, after them. */
++	leadWithRitemarkPlaces(): void {
++		const own = RITEMARK_OWN_PLACES.map(id => this._items.find(item => item.id === id)).filter(item => !!item);
++		this._items = [...own, ...this._items.filter(item => !RITEMARK_OWN_PLACES.includes(item.id))];
++	}
++
+ 	remove(id: string): boolean {
+ 		for (let index = 0; index < this.items.length; index++) {
+ 			if (this.items[index].id === id) {
 diff --git a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
 index 4c7da5f5466..06c584c57ed 100644
 --- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
@@ -627,66 +754,6 @@ index 4c7da5f5466..06c584c57ed 100644
  }
  
  .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
-diff --git a/src/vs/workbench/browser/parts/compositeBar.ts b/src/vs/workbench/browser/parts/compositeBar.ts
-index 8d1020b6621..723f65644ee 100644
---- a/src/vs/workbench/browser/parts/compositeBar.ts
-+++ b/src/vs/workbench/browser/parts/compositeBar.ts
-@@ -23,6 +23,13 @@ import { CompositeDragAndDropData, CompositeDragAndDropObserver, IDraggedComposi
- import { Gesture, EventType as TouchEventType, GestureEvent } from '../../../base/browser/touch.js';
- import { MutableDisposable } from '../../../base/common/lifecycle.js';
- 
-+// Ritemark: the Activity Bar containers that the v1.14 order moves (see
-+// CompositeBarModel.add).
-+const EXPLORER_CONTAINER = 'workbench.view.explorer';
-+const RITEMARK_CONTAINER_PREFIX = 'workbench.view.extension.ritemark-';
-+const RITEMARK_TASKS_CONTAINER = 'workbench.view.extension.ritemark-tasks';
-+const RITEMARK_AGENT_LIBRARY_CONTAINER = 'workbench.view.extension.ritemark-agent-library';
-+
- export interface ICompositeBarItem {
- 
- 	readonly id: string;
-@@ -758,7 +765,18 @@ class CompositeBarModel {
- 			return changed;
- 		} else {
- 			const item = this.createCompositeBarItem(id, name, order, true, true);
--			if (!isUndefinedOrNull(requestedIndex)) {
-+			// Ritemark (Jarmo, 2026-10-13): Tasks new to the bar marks a profile
-+			// from before v1.14 (or a fresh one). Tasks goes right below the
-+			// Explorer wherever the user has put it, and Agent Library moves once
-+			// to the bottom of Ritemark's group, as in a fresh profile. Nothing
-+			// else moves, and from then on the user's own placement is kept.
-+			const explorerIndex = id === RITEMARK_TASKS_CONTAINER && isUndefinedOrNull(requestedIndex)
-+				? this.items.findIndex(candidate => candidate.id === EXPLORER_CONTAINER && candidate.visible)
-+				: -1;
-+			if (explorerIndex !== -1) {
-+				this.items.splice(explorerIndex + 1, 0, item);
-+				this.moveAgentLibraryBelowRitemarkGroup();
-+			} else if (!isUndefinedOrNull(requestedIndex)) {
- 				let index = 0;
- 				let rIndex = requestedIndex;
- 				while (rIndex > 0 && index < this.items.length) {
-@@ -782,6 +800,21 @@ class CompositeBarModel {
- 		}
- 	}
- 
-+	/** Ritemark: Agent Library right after the last other Ritemark container. */
-+	private moveAgentLibraryBelowRitemarkGroup(): void {
-+		const from = this.items.findIndex(candidate => candidate.id === RITEMARK_AGENT_LIBRARY_CONTAINER);
-+		let last = -1;
-+		this.items.forEach((candidate, index) => {
-+			if (candidate.id.startsWith(RITEMARK_CONTAINER_PREFIX) && candidate.id !== RITEMARK_AGENT_LIBRARY_CONTAINER) {
-+				last = index;
-+			}
-+		});
-+		if (from !== -1 && last > from) {
-+			const [agentLibrary] = this.items.splice(from, 1);
-+			this.items.splice(last, 0, agentLibrary);
-+		}
-+	}
-+
- 	remove(id: string): boolean {
- 		for (let index = 0; index < this.items.length; index++) {
- 			if (this.items[index].id === id) {
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
 index 48220d63dc3..d5b081e981f 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
@@ -829,7 +896,7 @@ index fe0f2adfc11..a8d1ff5ce3c 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index a35c19c2a06..8f1b32bed53 100644
+index a35c19c2a06..ae5536dd7c0 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
 @@ -18,7 +18,7 @@ import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.j
@@ -862,41 +929,6 @@ index a35c19c2a06..8f1b32bed53 100644
  			nameForTelemetry,
  			compositeCSSClass,
  			titleForegroundColor,
-@@ -442,9 +447,34 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
- 	protected override createHeaderArea(): HTMLElement {
- 		const headerArea = super.createHeaderArea();
- 
-+		// Ritemark: apply custom tab bar styles
-+		this.applyRitemarkTopTabStyles(headerArea);
-+
- 		return this.createHeaderFooterCompositeBarArea(headerArea);
- 	}
- 
-+	// Ritemark: inject CSS for tab bar styling
-+	private applyRitemarkTopTabStyles(headerArea: HTMLElement): void {
-+		const style = document.createElement('style');
-+		style.textContent = `
-+			/* Ritemark: top tab bar styling */
-+			.pane-composite-part > .header-or-footer {
-+				height: 40px;
-+			}
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon {
-+				height: 30px;
-+				padding: 0 3px;
-+			}
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item .action-label:not(.codicon-more) {
-+				border-radius: 6px;
-+			}
-+			.pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .actions-container {
-+				gap: 2px;
-+			}
-+		`;
-+		headerArea.appendChild(style);
-+	}
-+
- 	protected override createFooterArea(): HTMLElement {
- 		const footerArea = super.createFooterArea();
- 
 diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
 index 10fcbca0b96..18a93a0558f 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
@@ -1243,19 +1275,10 @@ index ecc6af48668..8e2364cda33 100644
  		// no editor is open
  		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..97012c7c1ef 100644
+index db5712fe9b0..a60d1e2daf2 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-@@ -16,13 +16,14 @@
- 
- .explorer-folders-view .explorer-item,
- .explorer-folders-view .editor-group {
--	height: 22px;
--	line-height: 22px;
-+	height: 28px;
-+	line-height: 28px;
- }
- 
+@@ -23,6 +23,7 @@
  .explorer-folders-view .explorer-item {
  	display: flex; /* this helps showing the overflow ellipsis (...) even though we use display:inline-block for the labels */
  	flex-wrap: nowrap;
@@ -1354,21 +1377,8 @@ index 5b115684ac0..8677e1f68e7 100644
  			metadata: {
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
-diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index ed7dbe07826..ed4bdf15959 100644
---- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-+++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-@@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
- 
- export class ExplorerDelegate implements IListVirtualDelegate<ExplorerItem> {
- 
--	static readonly ITEM_HEIGHT = 22;
-+	static readonly ITEM_HEIGHT = 28;
- 
- 	getHeight(element: ExplorerItem): number {
- 		return ExplorerDelegate.ITEM_HEIGHT;
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index be3baf06aeb..7a35b17312f 100644
+index be3baf06aeb..1cd14898cb7 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 @@ -4,7 +4,6 @@
@@ -1388,20 +1398,7 @@ index be3baf06aeb..7a35b17312f 100644
  import { TerminalEditingService } from './terminalEditingService.js';
  import { registerColors } from '../common/terminalColorRegistry.js';
  import { registerTerminalConfiguration } from '../common/terminalConfiguration.js';
-@@ -111,10 +110,10 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
- 	icon: terminalViewIcon,
- 	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [TERMINAL_VIEW_ID, { mergeViewWithContainerWhenSingleView: true }]),
- 	storageId: TERMINAL_VIEW_ID,
--	hideIfEmpty: true,
-+	hideIfEmpty: false, // Ritemark: keep terminal tab visible
- 	order: 3,
- 	windowVisibility: WindowVisibility.Both
--}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
-+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true, isDefault: false }); // Ritemark: auxiliary bar, AI panel is default
- Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
- 	id: TERMINAL_VIEW_ID,
- 	name: nls.localize2('terminal', "Terminal"),
-@@ -123,15 +122,7 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
+@@ -123,15 +122,8 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
  	canMoveView: true,
  	ctorDescriptor: new SyncDescriptor(TerminalViewPane),
  	windowVisibility: WindowVisibility.Both,
@@ -1414,167 +1411,11 @@ index be3baf06aeb..7a35b17312f 100644
 -		},
 -		order: 3
 -	}
-+	// RiteMark: Terminal hidden from View menu; surfaced via Ritemark layout and View > Advanced.
++	// Ritemark: no Toggle Terminal shortcut or View-menu entry. In 2.0 a terminal is a tab: the tab row's + and
++	// Ctrl+` (the extension's keybinding for workbench.action.createTerminalEditor) open a new one.
  }], VIEW_CONTAINER);
  
  registerTerminalActions();
-diff --git a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
-index 71dd2237254..c2d28e3536c 100644
---- a/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
-+++ b/src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
-@@ -8,6 +8,7 @@ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
- import { type IEditorOptions } from '../../../../editor/common/config/editorOptions.js';
- import { EDITOR_FONT_DEFAULTS } from '../../../../editor/common/config/fontInfo.js';
- import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-+import { IProductService } from '../../../../platform/product/common/productService.js';
- import { ITerminalConfigurationService, LinuxDistro } from './terminal.js';
- import type { IXtermCore } from './xterm-private.js';
- import { DEFAULT_BOLD_FONT_WEIGHT, DEFAULT_FONT_WEIGHT, DEFAULT_LETTER_SPACING, DEFAULT_LINE_HEIGHT, FontWeight, ITerminalConfiguration, MAXIMUM_FONT_WEIGHT, MINIMUM_FONT_WEIGHT, MINIMUM_LETTER_SPACING, TERMINAL_CONFIG_SECTION, type ITerminalFont } from '../common/terminal.js';
-@@ -27,6 +28,9 @@ export class TerminalConfigurationService extends Disposable implements ITermina
- 	get config() { return this._config; }
- 
- 	get defaultLocation(): TerminalLocation {
-+		if (this._productService.applicationName === 'ritemark') {
-+			return TerminalLocation.Panel;
-+		}
- 		if (this.config.defaultLocation === TerminalLocationConfigValue.Editor) {
- 			return TerminalLocation.Editor;
- 		}
-@@ -38,6 +42,7 @@ export class TerminalConfigurationService extends Disposable implements ITermina
- 
- 	constructor(
- 		@IConfigurationService private readonly _configurationService: IConfigurationService,
-+		@IProductService private readonly _productService: IProductService,
- 	) {
- 		super();
- 
-diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
-index b0544972b48..5fa4969adc5 100644
---- a/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
-+++ b/src/vs/workbench/contrib/terminal/browser/terminalEditorSerializer.ts
-@@ -5,18 +5,22 @@
- 
- import { isNumber, isObject } from '../../../../base/common/types.js';
- import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
-+import { IProductService } from '../../../../platform/product/common/productService.js';
-+import { TerminalLocation } from '../../../../platform/terminal/common/terminal.js';
- import { IEditorSerializer } from '../../../common/editor.js';
- import { EditorInput } from '../../../common/editor/editorInput.js';
--import { ISerializedTerminalEditorInput, ITerminalEditorService, ITerminalInstance, type IDeserializedTerminalEditorInput } from './terminal.js';
-+import { ISerializedTerminalEditorInput, ITerminalEditorService, ITerminalInstance, ITerminalService, type IDeserializedTerminalEditorInput } from './terminal.js';
- import { TerminalEditorInput } from './terminalEditorInput.js';
- 
- export class TerminalInputSerializer implements IEditorSerializer {
- 	constructor(
--		@ITerminalEditorService private readonly _terminalEditorService: ITerminalEditorService
-+		@IProductService private readonly _productService: IProductService,
-+		@ITerminalEditorService private readonly _terminalEditorService: ITerminalEditorService,
-+		@ITerminalService private readonly _terminalService: ITerminalService
- 	) { }
- 
- 	public canSerialize(editorInput: TerminalEditorInput): editorInput is TerminalEditorInput & { readonly terminalInstance: ITerminalInstance } {
--		return isNumber(editorInput.terminalInstance?.persistentProcessId) && editorInput.terminalInstance.shouldPersist;
-+		return !this._shouldRestoreInTerminalView() && isNumber(editorInput.terminalInstance?.persistentProcessId) && editorInput.terminalInstance.shouldPersist;
- 	}
- 
- 	public serialize(editorInput: TerminalEditorInput): string | undefined {
-@@ -31,6 +35,13 @@ export class TerminalInputSerializer implements IEditorSerializer {
- 		if (!isDeserializedTerminalEditorInput(editorInput)) {
- 			throw new Error(`Could not revive terminal editor input, ${editorInput}`);
- 		}
-+		if (this._shouldRestoreInTerminalView()) {
-+			void this._terminalService.createTerminal({
-+				config: { attachPersistentProcess: editorInput },
-+				location: TerminalLocation.Panel
-+			}).then(undefined, () => undefined);
-+			return undefined;
-+		}
- 		return this._terminalEditorService.reviveInput(editorInput);
- 	}
- 
-@@ -50,6 +61,10 @@ export class TerminalInputSerializer implements IEditorSerializer {
- 			shellIntegrationNonce: instance.shellIntegrationNonce
- 		};
- 	}
-+
-+	private _shouldRestoreInTerminalView(): boolean {
-+		return this._productService.applicationName === 'ritemark';
-+	}
- }
- 
- function isDeserializedTerminalEditorInput(obj: unknown): obj is IDeserializedTerminalEditorInput {
-diff --git a/src/vs/workbench/contrib/terminal/browser/terminalView.ts b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
-index 9a745727415..97b8e1acd96 100644
---- a/src/vs/workbench/contrib/terminal/browser/terminalView.ts
-+++ b/src/vs/workbench/contrib/terminal/browser/terminalView.ts
-@@ -219,10 +219,6 @@ export class TerminalViewPane extends ViewPane {
- 					this._onDidChangeViewWelcomeState.fire();
- 				}
- 				this._initializeTerminal(false);
--				// we don't know here whether or not it should be focused, so
--				// defer focusing the panel to the focus() call
--				// to prevent overriding preserveFocus for extensions
--				this._terminalGroupService.showPanel(false);
- 			} else {
- 				for (const instance of this._terminalGroupService.instances) {
- 					instance.resetFocusContextKey();
-diff --git a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts b/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
-index 206b113186c..ea5b8e7255c 100644
---- a/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
-+++ b/src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
-@@ -11,7 +11,8 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/tes
- import { EDITOR_FONT_DEFAULTS } from '../../../../../editor/common/config/fontInfo.js';
- import { ConfigurationTarget, IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
- import { TestConfigurationService } from '../../../../../platform/configuration/test/common/testConfigurationService.js';
--import { TestInstantiationService } from '../../../../../platform/instantiation/test/common/instantiationServiceMock.js';
-+import { IProductService } from '../../../../../platform/product/common/productService.js';
-+import { TerminalLocation } from '../../../../../platform/terminal/common/terminal.js';
- import { ITerminalConfigurationService, LinuxDistro } from '../../browser/terminal.js';
- import { TestTerminalConfigurationService, workbenchInstantiationService } from '../../../../test/browser/workbenchTestServices.js';
- 
-@@ -54,9 +55,14 @@ suite('Workbench - TerminalConfigurationService', () => {
- 		});
- 	});
- 
--	function createTerminalConfigationService(config: any, linuxDistro?: LinuxDistro): ITerminalConfigurationService {
--		const instantiationService = new TestInstantiationService();
--		instantiationService.set(IConfigurationService, new TestConfigurationService(config));
-+	function createTerminalConfigationService(config: any, linuxDistro?: LinuxDistro, applicationName?: string): ITerminalConfigurationService {
-+		const instantiationService = workbenchInstantiationService({
-+			configurationService: () => new TestConfigurationService(config)
-+		}, store);
-+		if (applicationName) {
-+			const productService = instantiationService.get(IProductService);
-+			instantiationService.stub(IProductService, { ...productService, applicationName });
-+		}
- 		const terminalConfigurationService = store.add(instantiationService.createInstance(TestTerminalConfigurationService));
- 		instantiationService.set(ITerminalConfigurationService, terminalConfigurationService);
- 		terminalConfigurationService.setPanelContainer(mainWindow.document.body);
-@@ -66,6 +72,24 @@ suite('Workbench - TerminalConfigurationService', () => {
- 		return terminalConfigurationService;
- 	}
- 
-+	suite('defaultLocation', () => {
-+		test('honors editor default location for non-Ritemark products', () => {
-+			const terminalConfigurationService = createTerminalConfigationService({
-+				terminal: { integrated: { defaultLocation: 'editor' } }
-+			}, undefined, 'code-oss');
-+
-+			strictEqual(terminalConfigurationService.defaultLocation, TerminalLocation.Editor);
-+		});
-+
-+		test('forces terminal view location for Ritemark even when user config says editor', () => {
-+			const terminalConfigurationService = createTerminalConfigationService({
-+				terminal: { integrated: { defaultLocation: 'editor' } }
-+			}, undefined, 'ritemark');
-+
-+			strictEqual(terminalConfigurationService.defaultLocation, TerminalLocation.Panel);
-+		});
-+	});
-+
- 	suite('getFont', () => {
- 		test('fontFamily', () => {
- 			const terminalConfigurationService = createTerminalConfigationService({
 diff --git a/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts b/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts
 index ef3388a877f..873b2dbf292 100644
 --- a/src/vs/workbench/services/userDataProfile/common/userDataProfileIcons.ts

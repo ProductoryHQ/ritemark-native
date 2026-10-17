@@ -282,6 +282,13 @@ if git diff --cached --name-only | grep -qE '^scripts/(notarize-dmg|test-notariz
   fi
 fi
 
+# Check 14: no VS Code patch builds on another patch's lines (Sprint 132, E1).
+# Text only, so it runs without the vscode/ submodule.
+if ! node ./scripts/check-patch-stacking.mjs; then
+  echo "ERROR: a patch in patches/vscode/ builds on another patch's lines"
+  ERRORS=$((ERRORS + 1))
+fi
+
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
