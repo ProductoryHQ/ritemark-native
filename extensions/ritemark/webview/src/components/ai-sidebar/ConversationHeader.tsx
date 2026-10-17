@@ -41,7 +41,7 @@ export function ConversationHeader() {
   return (
     <header
       aria-label="Current conversation"
-      className="flex min-h-[40px] shrink-0 items-center gap-2 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] py-1 pl-3 pr-1.5"
+      className="flex min-h-[40px] shrink-0 items-center gap-2 bg-transparent py-1 pl-3 pr-1.5"
     >
       <Tooltip label={title} className="min-w-0 flex-1">
         <h2 className="m-0 min-w-0 flex-1 truncate font-ui text-[13px] font-semibold leading-[1.35] text-[var(--r-ink-strong)]">

@@ -10,7 +10,8 @@ them to another group, and no tab moves in front of them; only the extension dis
 A terminal is a tab (R8; Jarmo, 17 October): ritemarkTerminalTabs.ts moves any terminal that lands in the
 panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether each runs a command; the
 terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
-tab carries the working dot (terminalEditorInput.ts).
+tab carries the working dot (terminalEditorInput.ts). A named terminal keeps its name as the title's source
+when the shell reports its folder, so it comes back named after a reload (terminalInstance.ts).
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index 28d0480ab86..08b6f36aa5f 100644
@@ -597,10 +598,10 @@ index 00000000000..7ac893b5de7
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
 new file mode 100644
-index 00000000000..1f24f73882f
+index 00000000000..b6130b1e804
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,180 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -678,6 +679,7 @@ index 00000000000..1f24f73882f
 +	let pressedWhileOpen = false;
 +	disposables.add(addDisposableListener(button, EventType.MOUSE_DOWN, e => {
 +		e.preventDefault();
++		e.stopPropagation(); // the editor group would focus its editor (a webview), and the window's blur would close the menu
 +		pressedWhileOpen = isOpen() || Date.now() - hiddenAt() < 50;
 +	}));
 +	disposables.add(addDisposableListener(button, EventType.CLICK, () => {
@@ -782,20 +784,21 @@ index 00000000000..1f24f73882f
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
-index 00000000000..e68f6d676d3
+index 00000000000..3c04b6350bb
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,119 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
 +/*
-+ * Ritemark 2.0: the bar at the top of a terminal tab (R8; comparison/after-terminal.png): the shell's name,
-+ * a Running chip while a command runs, and Stop, then Split, Clear and Close. Its height never changes, so
-+ * the terminal is not resized at every command (full-screen programs redraw on every resize). Without shell
-+ * integration there is no running state, so neither Running nor Stop shows.
++ * Ritemark 2.0: the bar at the top of a terminal tab (R8; comparison/after-terminal.png, files.html): the shell,
++ * which also makes a new terminal with another shell; a Running chip while a command runs; Stop; then Split,
++ * Clear and Close. Its height never changes, so the terminal is not resized at every command (full-screen
++ * programs redraw on every resize). Without shell integration there is no running state, so neither Running nor
++ * Stop shows.
 + */
 +
 +import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
@@ -805,7 +808,9 @@ index 00000000000..e68f6d676d3
 +import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { TerminalCommandId } from '../common/terminal.js';
 +import { ITerminalInstance, ITerminalService } from './terminal.js';
 +import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
 +
@@ -824,6 +829,7 @@ index 00000000000..e68f6d676d3
 +		container: HTMLElement,
 +		@ITerminalService private readonly terminalService: ITerminalService,
 +		@IHoverService private readonly hoverService: IHoverService,
++		@ICommandService private readonly commandService: ICommandService,
 +	) {
 +		super();
 +
@@ -831,23 +837,26 @@ index 00000000000..e68f6d676d3
 +		container.prepend(bar);
 +		this._register({ dispose: () => bar.remove() });
 +
-+		const start = append(bar, $('.ritemark-terminal-bar-start'));
-+		append(start, renderIcon(Codicon.terminal));
-+		this.name = append(start, $('span.ritemark-terminal-name'));
-+		this.runningChip = append(start, $('span.ritemark-terminal-running-chip', { role: 'status' }));
++		// The shell, and a new terminal with another shell (VS Code's profile picker; the new one is a tab too)
++		const shell = this.button(bar, 'ritemark-terminal-shell', Codicon.terminal, undefined, localize('ritemark.terminal.shell', "Shell, and new terminal"), () => {
++			this.commandService.executeCommand(TerminalCommandId.NewWithProfile);
++		});
++		this.name = append(shell, $('span.ritemark-terminal-name'));
++		append(shell, renderIcon(Codicon.chevronDown)).classList.add('ritemark-terminal-caret');
++		this.runningChip = append(bar, $('span.ritemark-terminal-running-chip', { role: 'status' }));
 +		append(this.runningChip, $('span.ritemark-terminal-running-dot', { 'aria-hidden': 'true' }));
 +		append(this.runningChip, $('span', undefined, localize('ritemark.terminal.running', "Running")));
++		append(bar, $('span.ritemark-terminal-bar-grow'));
 +
-+		const end = append(bar, $('.ritemark-terminal-bar-end'));
-+		this.stop = this.button(end, 'ritemark-terminal-stop', Codicon.debugStop, localize('ritemark.terminal.stop', "Stop"), localize('ritemark.terminal.stopTooltip', "Stop the running command"), instance => {
++		this.stop = this.button(bar, 'ritemark-terminal-stop', Codicon.debugStop, localize('ritemark.terminal.stop', "Stop"), localize('ritemark.terminal.stopTooltip', "Stop the running command (Ctrl+C)"), instance => {
 +			instance.sendText('\x03', false); // Ctrl+C, which also reaches the command through ConPTY on Windows
 +			instance.focus();
 +		});
-+		this.button(end, 'ritemark-terminal-action', Codicon.splitHorizontal, undefined, localize('ritemark.terminal.split', "Split: a second terminal beside this one"), instance => {
++		this.button(bar, 'ritemark-terminal-icon', Codicon.splitHorizontal, undefined, localize('ritemark.terminal.split', "Split"), instance => {
 +			this.terminalService.createTerminal({ location: { parentTerminal: instance } });
 +		});
-+		this.button(end, 'ritemark-terminal-action', Codicon.clearAll, undefined, localize('ritemark.terminal.clear', "Clear the terminal"), instance => instance.clearBuffer());
-+		this.button(end, 'ritemark-terminal-action', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close the terminal and end what runs in it"), instance => this.terminalService.safeDisposeTerminal(instance));
++		this.button(bar, 'ritemark-terminal-icon', Codicon.clearAll, undefined, localize('ritemark.terminal.clear', "Clear"), instance => instance.clearBuffer());
++		this.button(bar, 'ritemark-terminal-icon', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close this terminal: its shell ends and the tab closes"), instance => this.terminalService.safeDisposeTerminal(instance));
 +
 +		this.update();
 +		this._register(ritemarkTerminalRunning.onDidChange(changed => {
@@ -1119,3 +1128,18 @@ index f7ce1dab62b..408ee855444 100644
  		const colorClass = getColorClass(this._terminalInstance);
  		if (colorClass) {
  			extraClasses.push(colorClass);
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts b/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
+index 50a4c0f4917..db53f732c98 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
+@@ -2127,7 +2127,9 @@ export class TerminalInstance extends Disposable implements ITerminalInstance {
+ 				}
+ 				break;
+ 		}
+-		this._titleSource = eventSource;
++		// Ritemark 2.0: re-reading the title (Config, when the shell reports its folder) keeps a terminal's own
++		// name (Api) as the title's source, so a named terminal tab is saved and comes back with its name (R8)
++		this._titleSource = eventSource === TitleEventSource.Config && this._staticTitle !== undefined ? TitleEventSource.Api : eventSource;
+ 		return title;
+ 	}
+ 

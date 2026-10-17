@@ -836,6 +836,8 @@
       "workbench.panel.defaultLocation": "right",
       "terminal.integrated.defaultLocation": "editor",
       "terminal.integrated.hideOnStartup": "always",
+      "terminal.integrated.tabs.description": "${task}",
+      "terminal.integrated.shellIntegration.decorationsEnabled": "never",
       "terminal.integrated.commandsToSkipShell": [
         "workbench.action.createTerminalEditor"
       ],
@@ -891,6 +893,10 @@
     "keybindings": [
       {
         "key": "ctrl+`",
+        "command": "workbench.action.createTerminalEditor"
+      },
+      {
+        "key": "ctrl+[Backquote]",
         "command": "workbench.action.createTerminalEditor"
       },
       {

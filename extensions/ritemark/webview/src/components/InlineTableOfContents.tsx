@@ -14,7 +14,7 @@ import {
   ContextMenuTrigger,
 } from './ui/context-menu'
 
-export const INLINE_TOC_WIDTH = 220
+export const INLINE_TOC_WIDTH = 232
 
 interface Props {
   editor: Editor
@@ -22,83 +22,13 @@ interface Props {
   activeHeadingPos: number | null
 }
 
-const leftPaddingForLevel: Record<number, number> = {
-  1: 12,
-  2: 22,
-  3: 32,
-}
-
-function getPaddingLeft(level: number): number {
-  return leftPaddingForLevel[level] ?? 42
-}
-
-const ACTIVE_COLOR = 'var(--r-accent)'
-
-function getItemStyle(
-  heading: Heading,
-  isActive: boolean
-): React.CSSProperties {
-  const paddingLeft = getPaddingLeft(heading.level)
-
-  const base: React.CSSProperties = {
-    display: 'block',
-    width: '100%',
-    textAlign: 'left',
-    border: 'none',
-    // Active item uses the sidebar background as a subtle highlight; the
-    // panel itself stays transparent so only the active item and hover state
-    // tint the item background.
-    background: isActive ? 'var(--vscode-sideBar-background)' : 'transparent',
-    cursor: 'pointer',
-    fontFamily: 'var(--ritemark-ui-font-family)',
-    paddingTop: 5,
-    paddingBottom: 5,
-    paddingRight: 10,
-    paddingLeft,
-    transition: 'background-color 0.1s, color 0.1s',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  }
-
-  if (heading.level === 1) {
-    return {
-      ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-strong)',
-      fontWeight: isActive ? 600 : 500,
-      fontSize: 13,
-    }
-  }
-
-  if (heading.level === 2) {
-    return {
-      ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
-      fontWeight: isActive ? 600 : 400,
-      fontSize: 12,
-    }
-  }
-
-  if (heading.level === 3) {
-    return {
-      ...base,
-      color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
-      fontWeight: isActive ? 500 : 400,
-      fontSize: 12,
-      fontStyle: 'italic',
-      opacity: isActive ? 1 : 0.8,
-    }
-  }
-
-  // H4+
-  return {
-    ...base,
-    color: isActive ? ACTIVE_COLOR : 'var(--r-ink-muted)',
-    fontWeight: isActive ? 500 : 400,
-    fontSize: 11,
-    fontStyle: 'italic',
-    opacity: isActive ? 1 : 0.7,
-  }
+/**
+ * Ritemark 2.0: the outline is a quiet list on the desk, in the frame's own list language: rows 28
+ * high with radius 6, inset 8 from the desk's edges, 12 more per heading level, the current heading
+ * an indigo-soft fill (never a band, never a line), a soft hover. Colours from the theme's tokens.
+ */
+function indentForLevel(level: number): number {
+  return 8 + Math.min(Math.max(level, 1) - 1, 3) * 12
 }
 
 const SHORTCUT_LABEL = isMac ? '⌥⌘' : 'Ctrl+Alt+'
@@ -132,23 +62,76 @@ export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Pr
   if (headings.length < 2) return null
 
   return (
-    <nav
-      aria-label="Table of contents"
-      className="inline-toc"
-      style={{
-        width: INLINE_TOC_WIDTH,
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        alignSelf: 'flex-start',
-        height: '100vh',
-        overflowY: 'auto',
-        background: 'transparent',
-        paddingTop: 16,
-        paddingBottom: 16,
-      }}
-    >
+    <nav aria-label="Table of contents" className="inline-toc" style={{ width: INLINE_TOC_WIDTH }}>
       <style>{`
+        .inline-toc {
+          flex-shrink: 0;
+          position: sticky;
+          top: 0;
+          align-self: flex-start;
+          height: 100vh;
+          overflow-y: auto;
+          box-sizing: border-box;
+          /* the outline hangs from its button in the document's bar: 8 below the bar, rows from the
+             button's edge (4), text on the icon's edge (12) */
+          padding: 8px 8px 16px 4px;
+          background: transparent;
+          font-family: var(--ritemark-ui-font-family);
+        }
+        .inline-toc-head {
+          padding: 6px 8px 6px;
+          font-size: 11px;
+          line-height: 14px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          color: var(--r-ink-muted);
+        }
+        .inline-toc-item {
+          display: flex;
+          align-items: center;
+          width: 100%;
+          height: 28px;
+          margin: 1px 0;
+          padding: 0 8px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          text-align: left;
+          font: inherit;
+          font-size: 13px;
+          line-height: 28px;
+          color: var(--r-ink-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          cursor: pointer;
+          transition: background-color 0.1s, color 0.1s;
+        }
+        .inline-toc-item > span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .inline-toc-item[data-level='1'] {
+          color: var(--r-ink-strong);
+          font-weight: 500;
+        }
+        .inline-toc-item:hover {
+          background: rgba(15, 23, 42, 0.05);
+          color: var(--r-ink-strong);
+        }
+        .inline-toc-item[aria-current='true'] {
+          background: var(--r-accent-soft);
+          color: var(--r-ink-strong);
+          font-weight: 600;
+        }
+        .inline-toc-item:focus-visible {
+          outline: 2px solid var(--r-accent);
+          outline-offset: -2px;
+        }
+        body.vscode-dark .inline-toc-item:hover {
+          background: rgba(255, 255, 255, 0.06);
+        }
         .inline-toc::-webkit-scrollbar {
           width: 8px;
         }
@@ -167,9 +150,9 @@ export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Pr
           background: transparent;
         }
       `}</style>
+      <div className="inline-toc-head">Contents</div>
       {headings.map((heading, i) => {
         const isActive = heading.pos === activeHeadingPos
-        const restingBg = isActive ? 'var(--vscode-sideBar-background)' : 'transparent'
         return (
           <ContextMenu key={`${heading.pos}-${i}`}>
             <ContextMenuTrigger asChild>
@@ -177,20 +160,15 @@ export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Pr
                 ref={(el) => {
                   itemsRef.current[i] = el
                 }}
+                className="inline-toc-item"
+                data-level={heading.level}
                 aria-current={isActive ? 'true' : undefined}
                 title={heading.text}
                 onClick={() => scrollToHeading(editor, heading.pos)}
                 onKeyDown={(event) => handleKeyDown(event, heading.pos)}
-                style={getItemStyle(heading, isActive)}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLButtonElement).style.background =
-                    'var(--vscode-sideBar-background)'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLButtonElement).style.background = restingBg
-                }}
+                style={{ paddingLeft: indentForLevel(heading.level) }}
               >
-                {heading.text}
+                <span>{heading.text}</span>
               </button>
             </ContextMenuTrigger>
             <ContextMenuContent>

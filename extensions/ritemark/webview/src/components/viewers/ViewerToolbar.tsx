@@ -37,7 +37,7 @@ export function ViewerToolbar({ children }: { children: ReactNode }) {
     <CompactContext.Provider value={compact}>
       <div
         ref={ref}
-        className="flex h-10 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3"
+        className="flex h-10 shrink-0 items-center gap-2 bg-surface px-3"
         data-viewer-toolbar
         data-compact={compact || undefined}
       >

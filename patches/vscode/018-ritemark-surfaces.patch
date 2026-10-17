@@ -22,13 +22,17 @@ The status bar is 24 with the remote and problems signals hidden; the tree's row
 The left column's head on Documents (R10, ritemarkProjectHead.ts): the project's name with a chevron, New
 and Search, Documents over the tree; its menus come from the extension (ritemark/projectHead and
 ritemark/projectHead/new, menusExtensionPoint.ts).
-You (R11): Settings and Help. Ritemark's menus on every platform (R12): window.menuStyle defaults to
-custom, and menu.ts draws them; the chosen row is the theme's menu selection (defaultStyles.ts).
+More (R5, R6): the places row's overflow opens Ritemark's menu as drawn: "More places", Copilot Chat first,
+then the places that do not fit, with Ritemark's names (compositeBarActions.ts, ritemarkMenu.ts).
+You (R11): Settings and Help, in the same menu. Ritemark's menus on every platform (R12): window.menuStyle
+defaults to custom, and menu.ts draws them; the chosen row is the theme's menu selection (defaultStyles.ts).
+A new window's columns are the drawn widths: the left column 256 (248 and the 8 to the desk), the AI column
+400 (the 8, the AI's sheet 340 and its rail 52), so the desk is 784 at 1440 (layout.ts).
 The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; each !important says why.
 Built file by file from the Experience lead's proof of concept (branch poc/2.0-surfaces), without its
 proof-of-concept-only code.
 diff --git a/src/vs/base/browser/ui/menu/menu.ts b/src/vs/base/browser/ui/menu/menu.ts
-index bbadbf1d73b..5d2e1639552 100644
+index bbadbf1d73b..68422afd6fa 100644
 --- a/src/vs/base/browser/ui/menu/menu.ts
 +++ b/src/vs/base/browser/ui/menu/menu.ts
 @@ -1315,6 +1315,41 @@ ${formatRule(Codicon.menuSubmenu)}
@@ -69,7 +73,7 @@ index bbadbf1d73b..5d2e1639552 100644
 +}
 +
 +.monaco-menu .monaco-action-bar.vertical .action-label.separator {
-+	margin: 4px 4px !important; /* VS Code sets the separator's margin inline */
++	margin: 6px 4px !important; /* VS Code sets the separator's margin inline (kit: .menu .sep) */
  }`;
  
  	if (isForShadowDom) {
@@ -204,12 +208,52 @@ index 07551319546..fd815be7e21 100644
  				this.updateWindowControls({ height: cachedWindowControlHeight });
  			} else {
  				this.updateWindowControls({ height: DEFAULT_CUSTOM_TITLEBAR_HEIGHT });
+diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
+index c213b29de93..3f6375403b9 100644
+--- a/src/vs/workbench/browser/layout.ts
++++ b/src/vs/workbench/browser/layout.ts
+@@ -135,6 +135,12 @@ export const TITLE_BAR_SETTINGS = [
+ ];
+ 
+ const DEFAULT_EMPTY_WINDOW_DIMENSIONS = new Dimension(DEFAULT_EMPTY_WINDOW_SIZE.width, DEFAULT_EMPTY_WINDOW_SIZE.height);
++
++// Ritemark 2.0 (surfaces/README.md, Measurements): a new window's columns as drawn at 1440: the left column
++// 248 and the 8 to the desk; the AI column the 8 from the desk, the AI's sheet (340) and its chat rail (52).
++// The desk takes the rest: 784 at 1440.
++const RITEMARK_LEFT_COLUMN_SIZE = 256;
++const RITEMARK_AI_COLUMN_SIZE = 400;
+ const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
+ 
+ export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
+@@ -2934,9 +2940,9 @@ class LayoutStateModel extends Disposable {
+ 		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
+ 		const workbenchState = this.contextService.getWorkbenchState();
+ 		const mainContainerDimension = configuration.mainContainerDimension;
+-		LayoutStateKeys.SIDEBAR_SIZE.defaultValue = Math.min(300, mainContainerDimension.width / 4);
++		LayoutStateKeys.SIDEBAR_SIZE.defaultValue = Math.min(RITEMARK_LEFT_COLUMN_SIZE, mainContainerDimension.width / 4);
+ 		LayoutStateKeys.SIDEBAR_HIDDEN.defaultValue = workbenchState === WorkbenchState.EMPTY || auxiliaryBarForceMaximized === true;
+-		LayoutStateKeys.AUXILIARYBAR_SIZE.defaultValue = auxiliaryBarForceMaximized ? Math.max(300, mainContainerDimension.width / 2) : Math.min(300, mainContainerDimension.width / 4);
++		LayoutStateKeys.AUXILIARYBAR_SIZE.defaultValue = auxiliaryBarForceMaximized ? Math.max(300, mainContainerDimension.width / 2) : Math.min(RITEMARK_AI_COLUMN_SIZE, mainContainerDimension.width * RITEMARK_AI_COLUMN_SIZE / 1440);
+ 		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
+ 			if (isWeb && !this.environmentService.remoteAuthority) {
+ 				return true; // not required in web if unsupported
+@@ -3032,8 +3038,8 @@ class LayoutStateModel extends Disposable {
+ 
+ 		// Restrict auxiliary bar size in case of small window dimensions
+ 		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
+-			this.setInitializationValue(LayoutStateKeys.SIDEBAR_SIZE, Math.min(300, configuration.mainContainerDimension.width / 4));
+-			this.setInitializationValue(LayoutStateKeys.AUXILIARYBAR_SIZE, Math.min(300, configuration.mainContainerDimension.width / 4));
++			this.setInitializationValue(LayoutStateKeys.SIDEBAR_SIZE, Math.min(RITEMARK_LEFT_COLUMN_SIZE, configuration.mainContainerDimension.width / 4));
++			this.setInitializationValue(LayoutStateKeys.AUXILIARYBAR_SIZE, Math.min(RITEMARK_AI_COLUMN_SIZE, configuration.mainContainerDimension.width * RITEMARK_AI_COLUMN_SIZE / 1440));
+ 		}
+ 	}
+ 
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..09fe5afa460
+index 00000000000..7315e32d2a9
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1095 @@
+@@ -0,0 +1,1224 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -255,6 +299,7 @@ index 00000000000..09fe5afa460
 +.monaco-workbench .ritemark-new-tab,
 +.monaco-workbench .ritemark-more-tabs,
 +.monaco-workbench .ritemark-new-tab-menu [role="menuitem"],
++.monaco-workbench .ritemark-menu [role="menuitem"],
 +.monaco-workbench .ritemark-more-tabs-close,
 +.monaco-workbench .ritemark-terminal-stop,
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item {
@@ -323,7 +368,7 @@ index 00000000000..09fe5afa460
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar {
-+	padding-left: 14px !important; /* !important: core pads the bar inline. 14 is paneCompositePart.ts's inset */
++	padding-left: 3px !important; /* !important: core pads the bar. With the header's own 4 and the place's 1, the first place's fill starts at 8 and its icon at 16, the column's text edge (kit: .nav left 8); paneCompositePart.ts counts this inset */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .actions-container {
@@ -331,7 +376,7 @@ index 00000000000..09fe5afa460
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item {
-+	width: 34px !important; /* a place: 32 fill + 1 either side; sidebarPart.ts's overflowActionSize is 34 too */
++	width: 34px !important; /* a place: 32 fill + 1 either side, so places sit 34 apart (kit: ritemark.js Ritemark.more, 8, 42, 76 ... More at 212); sidebarPart.ts's overflowActionSize is 34 too */
 +	height: 32px !important; /* !important on the box: core sizes the items from the bar's own compact sizes */
 +	box-sizing: border-box !important;
 +	padding: 0 1px !important;
@@ -443,7 +488,7 @@ index 00000000000..09fe5afa460
 +	padding-top: 8px; /* one centre line at 26: the tabs' labels, the traffic lights, the toggles, You */
 +	display: flex;
 +	align-items: center;
-+	gap: 6px;
++	gap: 8px;
 +	-webkit-app-region: drag;
 +}
 +
@@ -453,7 +498,7 @@ index 00000000000..09fe5afa460
 +
 +.monaco-workbench .ritemark-frame-strip.right {
 +	justify-content: flex-end;
-+	padding-right: calc(var(--rm-buttons) + 10px);
++	padding-right: calc(var(--rm-buttons) + 8px); /* You ends 8 from the edge (kit: You at 1404 of 1440) */
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a {
@@ -489,9 +534,15 @@ index 00000000000..09fe5afa460
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-you:hover,
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible,
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you[aria-expanded="true"] {
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible {
 +	background-color: var(--rm-hover);
++	opacity: 1;
++}
++
++/* open, You keeps its outline and gains a soft ring (experiences/settings frame 1) */
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you[aria-expanded="true"] {
++	background-color: transparent;
++	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-foreground) 24%, transparent), 0 0 0 2px var(--rm-place-background);
 +	opacity: 1;
 +}
 +
@@ -620,7 +671,7 @@ index 00000000000..09fe5afa460
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row {
 +	left: 8px !important; /* !important: the list positions its rows inline */
 +	width: calc(100% - 16px) !important;
-+	border-radius: 6px;
++	border-radius: 4px; /* rows: framework.md, Radius */
 +}
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row.selected,
@@ -725,6 +776,17 @@ index 00000000000..09fe5afa460
 +	text-overflow: ellipsis;
 +}
 +
++.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label {
++	font-size: 12px !important; /* !important: the codicon rule sets 16. Close is 12, muted (kit: .tb .x) */
++	color: var(--vscode-descriptionForeground) !important;
++}
++
++/* The chosen tab's own icon is indigo, where attention is (kit: .tb.on > .ph); a file's icon is an image and keeps its colours */
++.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-label.codicon::before,
++.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-label > .codicon:first-child {
++	color: var(--rm-place-foreground);
++}
++
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label:hover {
 +	background-color: var(--rm-hover) !important; /* !important: core paints the close button's hover inline */
 +	box-shadow: none !important;
@@ -752,7 +814,7 @@ index 00000000000..09fe5afa460
 +   plus the fillet (8); the fillet's 8 is inside the scrolling tabs container, which would cut it off. The + sits
 +   18 in from the desk's edge. */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
-+	padding-left: 10px !important; /* !important: core pads the row inline for the editor actions */
++	padding-left: 8px !important; /* !important: core pads the row inline for the editor actions. With the tabs container's 8, tabs start 16 into the desk (kit: .tabs at 272) */
 +	padding-right: 18px !important;
 +	box-sizing: border-box;
 +}
@@ -929,25 +991,31 @@ index 00000000000..09fe5afa460
 +	font-size: 14px;
 +}
 +
-+/* Their menus: the menus' sheet (menu.ts), a small heading, then the rows (R12) */
++/* Their menus, in the kit's menu (kit/ritemark.css: .menu, .menu.kinds): the menus' sheet (menu.ts), a small heading,
++   then the rows (R12) */
 +.monaco-workbench .ritemark-new-tab-menu {
-+	width: 248px;
++	position: relative;
++	left: 6px; /* the drawn menu reaches 6 past its button's right edge (comparison/after-newtab.png) */
++	min-width: 248px;
++	width: max-content;
 +	margin-top: 6px;
 +	padding: 6px;
 +	box-sizing: border-box;
 +	border-radius: 10px;
 +	background-color: var(--vscode-menu-background);
 +	color: var(--vscode-menu-foreground);
++	font-size: 13px;
++	line-height: 20px;
 +	box-shadow: 0 0 0 1px var(--rm-hairline), 0 10px 24px -6px var(--rm-shadow), 0 4px 8px -4px var(--rm-shadow);
 +	-webkit-app-region: no-drag;
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-head {
-+	padding: 6px 8px 4px;
++	padding: 8px 10px 4px;
 +	font-size: 11px;
 +	line-height: 14px;
 +	font-weight: 600;
-+	letter-spacing: 0.06em;
++	letter-spacing: 0.5px;
 +	text-transform: uppercase;
 +	color: var(--vscode-descriptionForeground);
 +}
@@ -956,9 +1024,12 @@ index 00000000000..09fe5afa460
 +	display: flex;
 +	align-items: center;
 +	gap: 10px;
-+	padding: 6px 8px;
++	height: 44px;
++	padding: 0 10px;
++	box-sizing: border-box;
 +	border-radius: 6px;
 +	color: inherit;
++	white-space: nowrap;
 +	outline: none;
 +}
 +
@@ -973,19 +1044,11 @@ index 00000000000..09fe5afa460
 +	flex: 0 0 28px;
 +	width: 28px;
 +	height: 28px;
-+	display: flex;
-+	align-items: center;
-+	justify-content: center;
++	display: grid;
++	place-items: center;
 +	border-radius: 6px;
 +	background-color: var(--rm-ground);
-+	box-shadow: 0 0 0 1px var(--rm-hairline);
-+	color: var(--vscode-descriptionForeground);
-+}
-+
-+.monaco-workbench .ritemark-new-tab-menu-item:focus .ritemark-new-tab-menu-icon,
-+.monaco-workbench .ritemark-new-tab-menu-item:hover .ritemark-new-tab-menu-icon {
-+	background-color: var(--rm-desk);
-+	color: var(--vscode-menu-selectionForeground);
++	color: var(--vscode-foreground);
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-icon .codicon {
@@ -993,23 +1056,13 @@ index 00000000000..09fe5afa460
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-text {
-+	display: flex;
-+	flex-direction: column;
-+	min-width: 0;
-+}
-+
-+.monaco-workbench .ritemark-new-tab-menu-label {
-+	font-size: 13px;
-+	line-height: 17px;
++	display: grid;
++	line-height: 16px;
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-detail {
-+	font-size: 11.5px;
-+	line-height: 15px;
++	font-size: 12px;
 +	color: var(--vscode-descriptionForeground);
-+	white-space: nowrap;
-+	overflow: hidden;
-+	text-overflow: ellipsis;
 +}
 +
 +.monaco-workbench .ritemark-more-tabs-menu {
@@ -1026,7 +1079,7 @@ index 00000000000..09fe5afa460
 +	align-items: center;
 +	gap: 8px;
 +	height: 32px;
-+	padding: 0 4px 0 8px;
++	padding: 0 4px 0 10px;
 +	border-radius: 6px;
 +	color: inherit;
 +	font-size: 13px;
@@ -1092,15 +1145,115 @@ index 00000000000..09fe5afa460
 +
 +.monaco-workbench .ritemark-more-tabs-separator {
 +	height: 1px;
-+	margin: 4px;
++	margin: 6px 4px;
 +	background-color: var(--rm-hairline);
 +}
 +
 +.monaco-workbench .ritemark-more-tabs-close-all {
 +	height: 32px;
-+	padding: 0 8px;
++	padding: 0 10px;
 +	font-size: 13px;
 +	box-sizing: border-box;
++}
++
++
++/* More (⋯) at the end of the places row: open, it has the chosen place's soft fill, and its menu is Ritemark's
++   (ritemarkMoreMenu.ts; experiences/home frame 4: 256 wide, 6 below the place and 6 left of it) */
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-open,
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-open:hover {
++	background-color: var(--rm-place-background);
++}
++
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-open .action-label.codicon {
++	color: var(--rm-place-foreground) !important; /* !important: core colours the glyph inline */
++}
++
++.monaco-workbench .ritemark-menu {
++	position: relative;
++	left: -6px;
++	width: 256px;
++	margin-top: 6px;
++	padding: 6px;
++	box-sizing: border-box;
++	border-radius: 10px;
++	background-color: var(--vscode-menu-background);
++	color: var(--vscode-menu-foreground);
++	font-size: 13px;
++	line-height: 20px;
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 10px 24px -6px var(--rm-shadow), 0 4px 8px -4px var(--rm-shadow);
++}
++
++.monaco-workbench .ritemark-menu-head {
++	padding: 8px 10px 4px;
++	font-size: 11px;
++	line-height: 14px;
++	font-weight: 600;
++	letter-spacing: 0.5px;
++	text-transform: uppercase;
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .ritemark-menu-item {
++	display: flex;
++	align-items: center;
++	gap: 10px;
++	height: 32px;
++	padding: 0 10px;
++	box-sizing: border-box;
++	border-radius: 6px;
++	color: inherit;
++	white-space: nowrap;
++	outline: none;
++}
++
++.monaco-workbench .ritemark-menu-item.tall {
++	height: 44px;
++}
++
++.monaco-workbench .ritemark-menu-item:focus,
++.monaco-workbench .ritemark-menu-item:hover {
++	background-color: var(--vscode-menu-selectionBackground);
++	color: var(--vscode-menu-selectionForeground);
++	outline: none !important; /* the fill shows where the keyboard is, as in the other menus */
++}
++
++.monaco-workbench .ritemark-menu-icon {
++	flex: none;
++	font-size: 14px !important; /* !important: the codicon rule sets 16; icons in rows are 14 (framework.md) */
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .ritemark-menu-text {
++	display: grid;
++	min-width: 0;
++}
++
++.monaco-workbench .ritemark-menu-item.tall .ritemark-menu-text {
++	line-height: 16px;
++}
++
++.monaco-workbench .ritemark-menu-detail {
++	font-size: 12px;
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .ritemark-menu-sub,
++.monaco-workbench .ritemark-menu-trailing {
++	margin-left: auto;
++	padding-left: 16px;
++	font-size: 12px;
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .ritemark-menu-trailing {
++	font-size: 14px !important; /* !important: the codicon rule sets 16 */
++}
++
++/* You's menu (experiences/settings frame 1): 228 wide, 2 under You, its right edge 16 from the window's */
++.monaco-workbench .ritemark-menu.ritemark-you-menu {
++	left: -8px;
++	width: 228px;
++	margin-top: 2px;
 +}
 +
 +
@@ -1125,15 +1278,19 @@ index 00000000000..09fe5afa460
 +	display: none !important; /* !important: core shows the title's actions; they live in the project's menu */
 +}
 +
++.monaco-workbench .part.sidebar.ritemark-documents > .composite.title {
++	overflow: visible; /* the head's box reaches 4 below the title area, as drawn */
++}
++
 +.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head {
 +	display: flex;
 +	align-items: center;
-+	gap: 6px;
++	gap: 8px;
 +	flex: 0 1 auto;
 +	min-width: 0;
 +	max-width: calc(100% - 8px);
-+	height: 32px;
-+	margin: 4px 0 0 0;
++	height: 36px; /* kit: .proj, 36 high at 92; the name on its centre, 110 */
++	margin: 8px 0 0 0;
 +	padding: 0 6px 0 8px;
 +	box-sizing: border-box;
 +	border-radius: 6px;
@@ -1160,7 +1317,7 @@ index 00000000000..09fe5afa460
 +.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-chevron {
 +	display: block;
 +	flex: none;
-+	font-size: 14px !important; /* !important: the codicon rule sets 16 */
++	font-size: 12px !important; /* !important: the codicon rule sets 16. Carets are 12 (framework.md, Icons) */
 +	color: var(--vscode-descriptionForeground);
 +}
 +
@@ -1175,7 +1332,7 @@ index 00000000000..09fe5afa460
 +	gap: 8px;
 +	height: 32px;
 +	padding: 0 8px;
-+	border-radius: 6px;
++	border-radius: 4px; /* rows: framework.md, Radius */
 +	color: var(--vscode-sideBar-foreground);
 +	font-size: 13px;
 +	outline-offset: -1px;
@@ -1205,14 +1362,15 @@ index 00000000000..09fe5afa460
 +}
 +
 +
-+/* A terminal tab (R8; comparison/after-terminal.png): its bar (ritemarkTerminalBar.ts, 52 high: RITEMARK_TERMINAL_BAR_HEIGHT)
-+   and, behind other tabs, the chat rail's working dot on its tab while a command runs (terminalEditorInput.ts) */
++/* A terminal tab (R8; comparison/after-terminal.png, files.html): its bar (ritemarkTerminalBar.ts; RITEMARK_TERMINAL_BAR_HEIGHT,
++   52: the document bar's 28 at 12, then the terminal under a hairline) and, behind other tabs, the chat rail's working dot
++   on its tab while a command runs (terminalEditorInput.ts) */
 +.monaco-workbench .ritemark-terminal-bar {
 +	display: flex;
 +	align-items: center;
-+	justify-content: space-between;
++	gap: 4px;
 +	height: 52px;
-+	padding: 0 16px 0 20px;
++	padding: 0 12px 0 16px;
 +	box-sizing: border-box;
 +	border-bottom: 1px solid var(--rm-hairline);
 +	color: var(--vscode-foreground);
@@ -1223,23 +1381,43 @@ index 00000000000..09fe5afa460
 +	height: calc(100% - 52px);
 +}
 +
-+.monaco-workbench .ritemark-terminal-bar-start,
-+.monaco-workbench .ritemark-terminal-bar-end {
-+	display: flex;
++.monaco-workbench .ritemark-terminal-bar > a {
++	display: inline-flex;
 +	align-items: center;
-+	gap: 8px;
-+	min-width: 0;
++	justify-content: center;
++	gap: 6px;
++	height: 28px;
++	box-sizing: border-box;
++	border-radius: 6px;
++	color: var(--vscode-foreground);
++	white-space: nowrap;
++	outline-offset: -1px;
 +}
 +
-+.monaco-workbench .ritemark-terminal-bar-start > .codicon {
++.monaco-workbench .ritemark-terminal-bar > a:hover {
++	background-color: var(--rm-hover);
++}
++
++.monaco-workbench .ritemark-terminal-shell {
++	padding: 0 8px; /* kit: .docbar .shell */
++	font-size: 12px;
++	font-weight: 500;
++	color: var(--vscode-tab-inactiveForeground) !important; /* !important: the bar's buttons share a colour rule above; the shell is body text */
++}
++
++.monaco-workbench .ritemark-terminal-shell > .codicon {
 +	font-size: 14px;
++}
++
++.monaco-workbench .ritemark-terminal-shell > .ritemark-terminal-caret {
++	font-size: 10px;
 +	color: var(--vscode-descriptionForeground);
 +}
 +
 +.monaco-workbench .ritemark-terminal-name {
++	max-width: 160px;
 +	overflow: hidden;
 +	text-overflow: ellipsis;
-+	white-space: nowrap;
 +}
 +
 +.monaco-workbench .ritemark-terminal-running-chip {
@@ -1247,11 +1425,14 @@ index 00000000000..09fe5afa460
 +	align-items: center;
 +	gap: 6px;
 +	height: 22px;
-+	padding: 0 9px;
++	margin-left: 4px;
++	padding: 0 8px;
 +	border-radius: 11px;
 +	background-color: var(--rm-place-background);
 +	color: var(--rm-place-foreground);
 +	font-size: 12px;
++	font-weight: 500;
++	line-height: 22px;
 +}
 +
 +.monaco-workbench .ritemark-terminal-running-dot {
@@ -1261,45 +1442,37 @@ index 00000000000..09fe5afa460
 +	background-color: var(--rm-place-foreground);
 +}
 +
-+.monaco-workbench .ritemark-terminal-bar-end > a {
-+	display: flex;
-+	align-items: center;
-+	justify-content: center;
-+	gap: 6px;
-+	height: 28px;
-+	min-width: 28px;
-+	box-sizing: border-box;
-+	border-radius: 6px;
-+	color: var(--vscode-foreground);
-+	outline-offset: -1px;
++.monaco-workbench .ritemark-terminal-bar-grow {
++	flex: 1;
 +}
 +
-+.monaco-workbench .ritemark-terminal-bar-end > a:hover {
-+	background-color: var(--rm-hover);
-+}
-+
-+.monaco-workbench .ritemark-terminal-bar-end > a .codicon {
-+	font-size: 16px;
-+}
-+
-+.monaco-workbench .ritemark-terminal-bar-end > a.ritemark-terminal-stop {
++.monaco-workbench .ritemark-terminal-bar > a.ritemark-terminal-stop {
 +	padding: 0 10px;
-+	margin-right: 8px;
-+	box-shadow: inset 0 0 0 1px var(--rm-hairline);
++	box-shadow: 0 0 0 1px var(--rm-hairline);
 +	font-size: 12px;
++	font-weight: 500;
 +}
 +
-+.monaco-workbench .ritemark-terminal-bar-end > a.ritemark-terminal-stop .codicon {
++.monaco-workbench .ritemark-terminal-bar > a.ritemark-terminal-stop .codicon {
 +	font-size: 12px;
++	color: inherit !important; /* !important: core colours debug-stop red; the drawn Stop is ink */
++}
++
++.monaco-workbench .ritemark-terminal-bar > a.ritemark-terminal-icon {
++	width: 28px;
++}
++
++.monaco-workbench .ritemark-terminal-bar > a.ritemark-terminal-icon .codicon {
++	font-size: 16px;
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab:not(.active) > .tab-label.ritemark-terminal-running > .monaco-icon-label-container::before {
 +	content: '';
 +	position: absolute;
-+	left: 25px; /* the icon's lower right */
-+	top: 22px;
-+	width: 6px;
-+	height: 6px;
++	left: 22px; /* files.html: .tb .wk, at the icon's lower right */
++	top: 20px;
++	width: 7px;
++	height: 7px;
 +	border-radius: 50%;
 +	background-color: var(--rm-place-foreground);
 +	box-shadow: 0 0 0 2px var(--rm-ground);
@@ -1481,6 +1654,103 @@ index 4aaccf3c849..31f3520c15a 100644
 +if (RITEMARK_AI_COLUMN_ALONE) {
 +	registerWorkbenchContribution2(RitemarkAiColumnGuard.ID, RitemarkAiColumnGuard, WorkbenchPhase.BlockRestore);
 +}
+diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
+index fe7bce2f083..43e76f5eee6 100644
+--- a/src/vs/workbench/browser/parts/compositeBarActions.ts
++++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
+@@ -8,7 +8,7 @@ import { Action, IAction, Separator } from '../../../base/common/actions.js';
+ import { $, addDisposableListener, append, clearNode, EventHelper, EventType, getDomNodePagePosition, hide, show } from '../../../base/browser/dom.js';
+ import { ICommandService } from '../../../platform/commands/common/commands.js';
+ import { toDisposable, DisposableStore, MutableDisposable } from '../../../base/common/lifecycle.js';
+-import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
++import { IContextMenuService, IContextViewService } from '../../../platform/contextview/browser/contextView.js';
+ import { IThemeService, IColorTheme } from '../../../platform/theme/common/themeService.js';
+ import { NumberBadge, IBadge, IActivity, ProgressBadge, IconBadge } from '../../services/activity/common/activity.js';
+ import { IInstantiationService, ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
+@@ -30,6 +30,7 @@ import { ViewContainerLocation } from '../../common/views.js';
+ import { IPaneCompositePartService } from '../../services/panecomposite/browser/panecomposite.js';
+ import { createConfigureKeybindingAction } from '../../../platform/actions/common/menuService.js';
+ import { HoverStyle } from '../../../base/browser/ui/hover/hover.js';
++import { showRitemarkMenu } from './ritemarkMenu.js';
+ 
+ export interface ICompositeBar {
+ 
+@@ -463,52 +464,49 @@ export class CompositeOverflowActivityAction extends CompositeBarAction {
+ 	}
+ }
+ 
++/** Ritemark 2.0: Ritemark's names and lines for the places More lists (comparison/README.md, "Every function, today and now"). */
++const RITEMARK_PLACE_WORDS = new Map<string, { label: string; detail?: string }>([
++	['workbench.view.ritemark.copilotChatLauncher', { label: localize('ritemark.more.copilotChat', "Copilot Chat"), detail: localize('ritemark.more.copilotChatDetail', "GitHub's chat, opens as a tab") }],
++	['workbench.view.scm', { label: localize('ritemark.more.fileChanges', "File changes") }],
++]);
++
+ export class CompositeOverflowActivityActionViewItem extends CompositeBarActionViewItem {
+ 
+ 	constructor(
+ 		action: CompositeBarAction,
+ 		private getOverflowingComposites: () => { id: string; name?: string }[],
+-		private getActiveCompositeId: () => string | undefined,
++		_getActiveCompositeId: () => string | undefined, // Ritemark 2.0: More's menu marks no chosen place
+ 		private getBadge: (compositeId: string) => IBadge,
+ 		private getCompositeOpenAction: (compositeId: string) => IAction,
+ 		colors: (theme: IColorTheme) => ICompositeBarColors,
+ 		hoverOptions: IActivityHoverOptions,
+-		@IContextMenuService private readonly contextMenuService: IContextMenuService,
+ 		@IThemeService themeService: IThemeService,
+ 		@IHoverService hoverService: IHoverService,
+ 		@IConfigurationService configurationService: IConfigurationService,
+ 		@IKeybindingService keybindingService: IKeybindingService,
++		@IContextViewService private readonly contextViewService: IContextViewService,
+ 	) {
+ 		super(action, { icon: true, colors, hasPopup: true, hoverOptions, isTabList: true }, () => true, themeService, hoverService, configurationService, keybindingService);
+ 	}
+ 
+ 	showMenu(): void {
+-		this.contextMenuService.showContextMenu({
+-			getAnchor: () => this.container,
+-			getActions: () => this.getActions(),
+-			getCheckedActionsRepresentation: () => 'radio',
+-		});
+-	}
+-
+-	private getActions(): IAction[] {
+-		return this.getOverflowingComposites().map(composite => {
++		// Ritemark 2.0: More (⋯) opens Ritemark's menu, as drawn (experiences/home frame 4): "More places", Copilot Chat
++		// first, then the places that do not fit, each with its icon and Ritemark's name for it, and no shortcuts
++		this.container.classList.add('ritemark-open');
++		const heading = localize('ritemark.more.head', "More places");
++		showRitemarkMenu(this.contextViewService, this.container, { className: 'ritemark-more-menu', ariaLabel: heading, heading, align: 'left' }, this.getOverflowingComposites().map(composite => {
+ 			const action = this.getCompositeOpenAction(composite.id);
+-			action.checked = this.getActiveCompositeId() === action.id;
+-
++			const item = action instanceof CompositeBarAction ? action.compositeBarActionItem : undefined;
+ 			const badge = this.getBadge(composite.id);
+-			let suffix: string | number | undefined;
+-			if (badge instanceof NumberBadge) {
+-				suffix = badge.number;
+-			}
+-
+-			if (suffix) {
+-				action.label = localize('numberBadge', "{0} ({1})", composite.name, suffix);
+-			} else {
+-				action.label = composite.name || '';
+-			}
+-
+-			return action;
+-		});
++			const words = RITEMARK_PLACE_WORDS.get(composite.id);
++			return {
++				label: words?.label ?? composite.name ?? action.label,
++				detail: words?.detail,
++				iconClassNames: item?.classNames ?? [],
++				sub: badge instanceof NumberBadge && badge.number ? String(badge.number) : undefined,
++				run: () => action.run(),
++			};
++		}), () => this.container.classList.remove('ritemark-open'));
+ 	}
+ }
+ 
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
 index 9bb098c68f8..9c7898b39be 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
@@ -1567,7 +1837,7 @@ index bd77caab75a..e6802457ead 100644
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index ae5536dd7c0..09bf42508b6 100644
+index ae5536dd7c0..72709290367 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
 @@ -612,6 +612,9 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
@@ -1575,7 +1845,7 @@ index ae5536dd7c0..09bf42508b6 100644
  			const borderWidth = this.partId === Parts.PANEL_PART ? 0 : 1;
  			let availableWidth = this.contentDimension.width - padding - borderWidth;
 +			if (this.partId === Parts.SIDEBAR_PART) {
-+				availableWidth -= 14; // Ritemark 2.0: the places row's left inset (ritemarkSurfaces.css) is not room for places
++				availableWidth -= 3; // Ritemark 2.0: the places row's left inset (ritemarkSurfaces.css) is not room for places
 +			}
  			availableWidth = Math.max(AbstractPaneCompositePart.MIN_COMPOSITE_BAR_WIDTH, availableWidth - this.getToolbarWidth());
  			this.paneCompositeBar.value.layout(availableWidth, this.dimension.height);
@@ -1675,10 +1945,10 @@ index 00000000000..05ea0275947
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
 new file mode 100644
-index 00000000000..5678721f1c2
+index 00000000000..20613e775a9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,106 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1698,20 +1968,21 @@ index 00000000000..5678721f1c2
 +import { $, addDisposableListener, append, EventType, getWindow, getWindowId } from '../../../base/browser/dom.js';
 +import { getDefaultHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegateFactory.js';
 +import { renderIcon } from '../../../base/browser/ui/iconLabel/iconLabels.js';
-+import { toAction } from '../../../base/common/actions.js';
 +import { Codicon } from '../../../base/common/codicons.js';
 +import { DisposableStore, IDisposable } from '../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../base/common/themables.js';
 +import { localize } from '../../../nls.js';
 +import { ICommandService } from '../../../platform/commands/common/commands.js';
-+import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
++import { IContextViewService } from '../../../platform/contextview/browser/contextView.js';
 +import { IHoverService } from '../../../platform/hover/browser/hover.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
 +import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
 +import { RITEMARK_FRAME_MENU, registerRitemarkFrameMenuSlot } from './ritemarkFrameMenu.js';
++import { showRitemarkMenu } from './ritemarkMenu.js';
 +
 +const TOGGLE_LEFT_COLUMN = 'workbench.action.toggleSidebarVisibility';
 +const TOGGLE_AI = 'workbench.action.toggleAuxiliaryBar';
++const OPEN_SETTINGS = 'ritemark.aiSettings'; // Ritemark's own settings page
 +
 +/**
 + * Keep `--ritemark-zoom-factor` on a part, so its strip (and the desk's tab row) can undo the window's
@@ -1733,7 +2004,7 @@ index 00000000000..5678721f1c2
 + */
 +export function createRitemarkFrameStrip(accessor: ServicesAccessor, part: HTMLElement, side: 'left' | 'right', placement: 'column' | 'desk'): DisposableStore {
 +	const commandService = accessor.get(ICommandService);
-+	const contextMenuService = accessor.get(IContextMenuService);
++	const contextViewService = accessor.get(IContextViewService);
 +	const hoverService = accessor.get(IHoverService);
 +	const keybindingService = accessor.get(IKeybindingService);
 +
@@ -1770,23 +2041,132 @@ index 00000000000..5678721f1c2
 +	aiToggle.classList.add(...ThemeIcon.asClassNameArray(Codicon.layoutSidebarRight));
 +
 +	// You (R11): an outline circle, a person, where a project is a square. Its menu holds only Settings
-+	// (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October).
++	// (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October; experiences/settings frame 1).
 +	const you: HTMLElement = control('ritemark-you', localize('ritemark.frame.you', "You"), undefined, () => {
 +		you.setAttribute('aria-expanded', 'true');
-+		contextMenuService.showContextMenu({
-+			getAnchor: () => you,
-+			getActions: () => [
-+				toAction({ id: 'ritemark.you.settings', label: localize('ritemark.frame.settings', "Settings"), run: () => commandService.executeCommand('ritemark.aiSettings') }),
-+				toAction({ id: 'ritemark.you.help', label: localize('ritemark.frame.help', "Help"), run: () => commandService.executeCommand('workbench.action.openDocumentationUrl') }),
-+			],
-+			onHide: () => you.setAttribute('aria-expanded', 'false')
-+		});
++		showRitemarkMenu(contextViewService, you, { className: 'ritemark-you-menu', ariaLabel: localize('ritemark.frame.you', "You"), align: 'right' }, [
++			{ label: localize('ritemark.frame.settings', "Settings"), iconClassNames: ThemeIcon.asClassNameArray(Codicon.settingsGear), sub: keybindingService.lookupKeybinding(OPEN_SETTINGS)?.getLabel() ?? undefined, run: () => commandService.executeCommand(OPEN_SETTINGS) },
++			{ label: localize('ritemark.frame.help', "Help"), iconClassNames: ThemeIcon.asClassNameArray(Codicon.question), trailingIconClassNames: ThemeIcon.asClassNameArray(Codicon.linkExternal), run: () => commandService.executeCommand('workbench.action.openDocumentationUrl') },
++		], () => you.setAttribute('aria-expanded', 'false'));
 +	});
 +	you.setAttribute('aria-haspopup', 'menu');
 +	you.setAttribute('aria-expanded', 'false');
 +	append(you, renderIcon(Codicon.account));
 +
 +	return disposables;
++}
+diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
+new file mode 100644
+index 00000000000..4e0e020d9c9
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
+@@ -0,0 +1,107 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: a small Ritemark menu, drawn as the Experience lead's kit draws one (kit/ritemark.css: .menu, .hd,
++ * .it, .it.tall, .sub): a white sheet with radius 10 and padding 6, an optional heading in small capitals, rows 32
++ * (44 with a second line), each with its 14 icon, the chosen row in the theme's soft indigo (R12). Used by More (⋯)
++ * at the end of the places row (R5, R6) and by You (R11).
++ */
++
++import { $, addDisposableListener, append, EventType, getWindow } from '../../../base/browser/dom.js';
++import { StandardKeyboardEvent } from '../../../base/browser/keyboardEvent.js';
++import { AnchorAlignment } from '../../../base/browser/ui/contextview/contextview.js';
++import { KeyCode } from '../../../base/common/keyCodes.js';
++import { DisposableStore, IDisposable, toDisposable } from '../../../base/common/lifecycle.js';
++import { IContextViewService } from '../../../platform/contextview/browser/contextView.js';
++
++export interface IRitemarkMenuItem {
++	readonly label: string;
++	/** A second line, under the label: the row is 44 high. */
++	readonly detail?: string;
++	readonly iconClassNames: readonly string[];
++	/** Quiet text at the row's right: a shortcut or a count. */
++	readonly sub?: string;
++	/** A quiet icon at the row's right, such as the external-link mark of a page that opens in the browser. */
++	readonly trailingIconClassNames?: readonly string[];
++	readonly run: () => void;
++}
++
++export interface IRitemarkMenuOptions {
++	readonly className: string;
++	readonly ariaLabel: string;
++	readonly heading?: string;
++	/** Which edge of the anchor the menu lines up with. */
++	readonly align: 'left' | 'right';
++}
++
++/** Show a Ritemark menu under `anchor`. `onHide` runs when it closes, by a choice, Escape or a click anywhere else. */
++export function showRitemarkMenu(contextViewService: IContextViewService, anchor: HTMLElement, options: IRitemarkMenuOptions, items: readonly IRitemarkMenuItem[], onHide: () => void): void {
++	const close = () => contextViewService.hideContextView();
++	const leave = addDisposableListener(getWindow(anchor), EventType.BLUR, close); // a press inside a webview never reaches the workbench
++	contextViewService.showContextView({
++		getAnchor: () => anchor,
++		anchorAlignment: options.align === 'right' ? AnchorAlignment.RIGHT : AnchorAlignment.LEFT,
++		render: container => renderMenu(container, options, items, close),
++		onHide: () => {
++			leave.dispose();
++			onHide();
++		}
++	});
++}
++
++function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly IRitemarkMenuItem[], close: () => void): IDisposable {
++	const disposables = new DisposableStore();
++	const menu = append(container, $(`.ritemark-menu.${options.className}`, { role: 'menu', 'aria-label': options.ariaLabel }));
++	if (options.heading) {
++		append(menu, $('.ritemark-menu-head', { 'aria-hidden': 'true' }, options.heading));
++	}
++
++	const rows: HTMLElement[] = [];
++	for (const item of items) {
++		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': item.label }));
++		append(row, $('span.ritemark-menu-icon')).classList.add(...item.iconClassNames);
++		if (item.detail) {
++			const text = append(row, $('span.ritemark-menu-text'));
++			append(text, $('span', undefined, item.label));
++			append(text, $('span.ritemark-menu-detail', undefined, item.detail));
++		} else {
++			append(row, $('span.ritemark-menu-text', undefined, item.label));
++		}
++		if (item.sub) {
++			append(row, $('span.ritemark-menu-sub', undefined, item.sub));
++		}
++		if (item.trailingIconClassNames) {
++			append(row, $('span.ritemark-menu-trailing')).classList.add(...item.trailingIconClassNames);
++		}
++		const run = () => {
++			close();
++			item.run();
++		};
++		disposables.add(addDisposableListener(row, EventType.CLICK, run));
++		disposables.add(addDisposableListener(row, EventType.MOUSE_ENTER, () => row.focus()));
++		rows.push(row);
++	}
++
++	disposables.add(addDisposableListener(menu, EventType.KEY_DOWN, e => {
++		const event = new StandardKeyboardEvent(e);
++		const index = rows.indexOf(getWindow(menu).document.activeElement as HTMLElement);
++		if (event.equals(KeyCode.DownArrow) || event.equals(KeyCode.UpArrow)) {
++			const step = event.equals(KeyCode.DownArrow) ? 1 : -1;
++			rows[(index + step + rows.length) % rows.length].focus();
++		} else if ((event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) && index >= 0) {
++			rows[index].click();
++		} else if (event.equals(KeyCode.Escape) || event.equals(KeyCode.Tab)) {
++			close();
++		} else {
++			return;
++		}
++		event.preventDefault();
++		event.stopPropagation();
++	}));
++
++	getWindow(menu).setTimeout(() => rows[0]?.focus(), 0);
++	return toDisposable(() => disposables.dispose());
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644

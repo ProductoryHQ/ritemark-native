@@ -92,6 +92,13 @@ Modal dialogs, Flows and the Agent Library wait for their drawings. If those com
 
 - **2026-10-17, after approval and before Phase 0 (engineering):** R8 revised. Ctrl+` (⌃` on the Mac) opens a new terminal tab, and the View menu gets no Terminal entry. Patch 002 removes VS Code's Toggle Terminal shortcut and menu entry today; sending its `terminal.contribution.ts` wholly back to upstream would have brought both back as a toggle for an unused bottom panel. This clarifies R8's "and the shortcut" and adds S46. Found by the Development manager's planning session.
 
+- **2026-10-17, during Phase 3–5 (Jarmo):** "make sure you match stuff with Experience prototype ... even the latest recent changes are important." So, with the Experience lead's kit (`kit/ritemark.css`, `ritemark.js`) and latest drawings as the reference:
+  - the prototype's themes, product icons, dark file icons and webview look come over in merge 1 rather than Phase 7; Phase 7 still checks every surface against its drawing;
+  - More (⋯) and You open Ritemark's own drawn menus (experiences/home frame 4: "More places", Copilot Chat first; experiences/settings frame 1), not VS Code's plain menu;
+  - a new window's columns take the drawn widths (left column 256, AI column 400, the desk 784 at 1440);
+  - the places sit 34 apart from 8, as the kit's script lays them out.
+- **2026-10-17, during Phase 4 (engineering):** the terminal shortcut is also bound by physical key (`ctrl+[Backquote]`). With an Estonian or other non-US layout, "`" is not a plain key, so the character binding alone never fires.
+
 ## Feature Flag Check
 
 No feature flag. Jarmo decided on 17 October that 2.0 is built straight on main with no switch ("We will focus on 2.0 from now on"), so this sprint changes Ritemark for everyone who builds from main. HARD RULE #1 still holds: nothing is removed without a home, and R15 checks that at each merge.
