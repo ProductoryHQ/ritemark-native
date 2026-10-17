@@ -1,12 +1,20 @@
 # Microsoft Store status
 
-Last updated: **2026-09-15**
+Last updated: **2026-10-17**
 
 ## High-level status
 
-**Submitted. Awaiting Microsoft’s certification decision.** The v1.10.1 candidate 3 submission was completed in Partner Center on 2026-09-12 at ~12:08 UTC with Jarmo’s explicit approval, and shows **In review** with a stated Microsoft SLA of three business days. Package ID `23647104` (x64), installer `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, SHA-256 `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250`, re-verified by a fresh HTTPS download immediately before Submit.
+**v1.14.0 submitted as an update. Awaiting Microsoft's review.** Jarmo submitted the update in Partner Center on 2026-10-17, through his ChatGPT flow. Ritemark is **In Microsoft Store** and the update shows **Update in review**, with a stated SLA of three business days. Package URL `https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe`, SHA-256 `8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48`, re-verified by a fresh HTTPS download on 2026-10-17. The record is [`release-candidates/v1.14.0-candidate-1.md`](./release-candidates/v1.14.0-candidate-1.md).
 
-Submission completion is **not** certification approval and **not** Store publication. Clean Windows 11 / Smart App Control On testing on a machine other than the developer’s is still outstanding, and the submission must not be represented as having covered it. The full record is in [`SUBMISSION-2026-09-12.md`](./SUBMISSION-2026-09-12.md); **Partner Center remains the live source of certification status** — this file is a snapshot.
+Installers for v1.11.0 and v1.12.0 are hosted at `windows/v1.11.0/` and `windows/v1.12.0/`. Jarmo made those Store submissions from ChatGPT, and no candidate record was written for them. v1.13.0 was never hosted, so it never reached the Store. Since 2026-10-15 the Development manager prepares each Store update (installer check, package fields, What's new) and Jarmo uploads with the R2 keys and submits.
+
+Submission is **not** certification and **not** Store publication. Clean Windows 11 / Smart App Control On testing on a machine other than the developer's is still outstanding. **Partner Center remains the live source of certification status.** This file is a snapshot.
+
+<details><summary>Earlier snapshot (2026-09-15): the v1.10.1 first submission</summary>
+
+The v1.10.1 candidate 3 submission was completed in Partner Center on 2026-09-12 at ~12:08 UTC with Jarmo's explicit approval. Package ID `23647104` (x64), installer `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, SHA-256 `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250`. The full record is in [`SUBMISSION-2026-09-12.md`](./SUBMISSION-2026-09-12.md).
+
+</details>
 
 ## Account and Partner Center
 
