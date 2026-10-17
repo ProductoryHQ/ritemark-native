@@ -1,0 +1,47 @@
+/**
+ * The left column's head (Ritemark 2.0, Sprint 132, R10): the entries of its two menus.
+ *
+ * The shell draws the head (the project's name, New and Search); its menus come from
+ * here, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus in
+ * package.json, so an extension release can change their words and entries. Each
+ * command below carries Ritemark's word for an action and runs the command that does
+ * it. Reveal in Finder (Reveal in File Explorer on Windows) is VS Code's own
+ * `revealFileInOS`, whose title already names the system's app.
+ */
+
+import * as vscode from 'vscode';
+
+export interface ProjectHeadCommand {
+  /** The command the menu shows (declared in package.json with its title). */
+  readonly id: string;
+  /** The command that does the work. */
+  readonly runs: string;
+}
+
+/** The project's menu, behind the chevron: Open a folder, All commands and the folder tools. */
+export const PROJECT_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
+  { id: 'ritemark.projectHead.openFolder', runs: 'workbench.action.files.openFolder' },
+  { id: 'ritemark.projectHead.allCommands', runs: 'workbench.action.showCommands' },
+  { id: 'ritemark.projectHead.newFolder', runs: 'explorer.newFolder' },
+  { id: 'ritemark.projectHead.collapseFolders', runs: 'workbench.files.action.collapseExplorerFolders' },
+];
+
+/** New: every kind of new file Ritemark makes today. */
+export const NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
+  { id: 'ritemark.projectHead.newText', runs: 'ritemark.newDocument' },
+  { id: 'ritemark.projectHead.newTable', runs: 'ritemark.newTable' },
+  { id: 'ritemark.projectHead.newFlow', runs: 'ritemark.flows.new' },
+  { id: 'ritemark.projectHead.newFile', runs: 'explorer.newFile' },
+  { id: 'ritemark.projectHead.newFolderInNew', runs: 'explorer.newFolder' },
+];
+
+/** VS Code's own command in the project's menu, between Open a folder and All commands. */
+export const REVEAL_COMMAND = 'revealFileInOS';
+
+export function registerProjectHeadCommands(context: vscode.ExtensionContext): void {
+  for (const { id, runs } of [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS]) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(id, () => vscode.commands.executeCommand(runs)),
+    );
+  }
+}

@@ -1,0 +1,1121 @@
+Ritemark 2.0 editor groups and tab row (Sprint 132, step 1)
+Each editor group is its own desk: a group with a neighbour on its left or above steps in by 8, and a desk at
+the window's left or right edge stays 8 from it (editorGroupView.ts asks its part for its neighbours,
+editor.ts). The tab row is the desk's 44 strip, with tabs 36 high at its foot (editorTabsControl.ts); each
+tab is as wide as its whole name, 120 to 200, and a tab's tooltip shows its path inside the project (R7).
+When the row is full, the tabs used longest ago fold into "N ⌄" (ritemarkFoldedTabs.ts) before the + at the
+right end of the row, which makes a new Text, Table, Web page or Terminal tab (ritemarkNewTab.ts, #199).
+Home and Tasks keep the front of the row (R9): once pinned, a person or a command cannot close, unpin or move
+them to another group, and no tab moves in front of them; only the extension disposes them.
+A terminal is a tab (R8; Jarmo, 17 October): ritemarkTerminalTabs.ts moves any terminal that lands in the
+panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether each runs a command; the
+terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
+tab carries the working dot (terminalEditorInput.ts).
+Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
+diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
+index 28d0480ab86..08b6f36aa5f 100644
+--- a/src/vs/workbench/browser/parts/editor/editor.ts
++++ b/src/vs/workbench/browser/parts/editor/editor.ts
+@@ -234,6 +234,9 @@ export interface IEditorGroupsView {
+ 	arrangeGroups(arrangement: GroupsArrangement, target?: IEditorGroupView | GroupIdentifier): void;
+ 	toggleMaximizeGroup(group?: IEditorGroupView | GroupIdentifier): void;
+ 	toggleExpandGroup(group?: IEditorGroupView | GroupIdentifier): void;
++
++	/** Ritemark 2.0: a group's neighbour in a direction, so each desk knows where it touches another (editorGroupView.ts). */
++	findGroup?(scope: { direction: GroupDirection }, source: IEditorGroupView): IEditorGroupView | undefined;
+ }
+ 
+ export interface IEditorGroupTitleHeight {
+diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
+index a2344eaf8f2..19e33c8c2dd 100644
+--- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
++++ b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
+@@ -18,7 +18,7 @@ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar
+ import { IThemeService, Themable } from '../../../../platform/theme/common/themeService.js';
+ import { editorBackground, contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
+ import { EDITOR_GROUP_HEADER_TABS_BACKGROUND, EDITOR_GROUP_HEADER_NO_TABS_BACKGROUND, EDITOR_GROUP_EMPTY_BACKGROUND, EDITOR_GROUP_HEADER_BORDER } from '../../../common/theme.js';
+-import { ICloseEditorsFilter, GroupsOrder, ICloseEditorOptions, ICloseAllEditorsOptions, IEditorReplacement, IActiveEditorActions } from '../../../services/editor/common/editorGroupsService.js';
++import { ICloseEditorsFilter, GroupsOrder, ICloseEditorOptions, ICloseAllEditorsOptions, IEditorReplacement, IActiveEditorActions, GroupDirection } from '../../../services/editor/common/editorGroupsService.js';
+ import { EditorPanes } from './editorPanes.js';
+ import { IEditorProgressService } from '../../../../platform/progress/common/progress.js';
+ import { EditorProgressIndicator } from '../../../services/progress/browser/progressIndicator.js';
+@@ -59,6 +59,12 @@ import { IHostService } from '../../../services/host/browser/host.js';
+ import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
+ import { FileSystemProviderCapabilities, IFileService } from '../../../../platform/files/common/files.js';
+ 
++/** Ritemark 2.0: the view types of the extension's Home and Task board tabs (see `isRitemarkPermanent`). */
++const RITEMARK_PERMANENT_VIEW_TYPES: readonly string[] = ['mainThreadWebview-ritemark.home', 'mainThreadWebview-ritemark.taskBoard'];
++
++/** Ritemark 2.0: the ground between two desks, and between a desk and the window's edge. */
++const RITEMARK_DESK_GAP = 8;
++
+ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 
+ 	//#region factory
+@@ -1113,6 +1119,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 	}
+ 
+ 	private doStickEditor(candidate: EditorInput | undefined, sticky: boolean): void {
++		if (!sticky && candidate && this.isRitemarkPermanent(candidate)) {
++			return; // Ritemark 2.0: Home and Tasks are never unpinned
++		}
++
+ 		if (candidate && this.model.isSticky(candidate) !== sticky) {
+ 			const oldIndexOfEditor = this.getIndexOfEditor(candidate);
+ 
+@@ -1391,6 +1401,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 			return true;
+ 		}
+ 
++		// Ritemark 2.0: Home and Tasks stay in their group
++		else if (this.isRitemarkPermanent(editor)) {
++			return false;
++		}
++
+ 		// Move across groups
+ 		else {
+ 			return this.doMoveOrCopyEditorAcrossGroups(editor, target, options, { ...internalOptions, keepCopy: false });
+@@ -1398,11 +1413,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 	}
+ 
+ 	private doMoveEditorInsideGroup(candidate: EditorInput, options?: IEditorOpenOptions): void {
+-		const moveToIndex = options ? options.index : undefined;
++		let moveToIndex = options ? options.index : undefined;
+ 		if (typeof moveToIndex !== 'number') {
+ 			return; // do nothing if we move into same group without index
+ 		}
+ 
++		// Ritemark 2.0: Home and Tasks keep the front of the row. They move only
++		// among the pinned tabs, and no other tab moves in front of them.
++		if (this.isRitemarkPermanent(candidate)) {
++			moveToIndex = Math.min(moveToIndex, Math.max(this.model.stickyCount - 1, 0));
++		} else {
++			moveToIndex = Math.max(moveToIndex, this.ritemarkPermanentCount());
++		}
++
+ 		// Update model and make sure to continue to use the editor we get from
+ 		// the model. It is possible that the editor was already opened and we
+ 		// want to ensure that we use the existing instance in that case.
+@@ -1522,9 +1545,33 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 	//#region closeEditor()
+ 
+ 	async closeEditor(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions): Promise<boolean> {
++		if (editor && this.isRitemarkPermanent(editor)) {
++			return false; // Ritemark 2.0: only the extension closes Home and Tasks, by disposing them
++		}
++
+ 		return this.doCloseEditorWithConfirmationHandling(editor, options);
+ 	}
+ 
++	/**
++	 * Ritemark 2.0: Home and Tasks are the project's own tabs, first in the row as
++	 * icons (Jarmo, 16 October). Once pinned, a person or a command can never close,
++	 * unpin or move them to another group; only their owner, the extension, can
++	 * dispose them (a disposed editor leaves through `handleDisposedEditors`).
++	 */
++	private isRitemarkPermanent(editor: EditorInput): boolean {
++		const viewType = (editor as { viewType?: unknown }).viewType;
++		return typeof viewType === 'string' && RITEMARK_PERMANENT_VIEW_TYPES.includes(viewType) && this.model.isSticky(editor);
++	}
++
++	/** Ritemark 2.0: how many tabs at the front of the row are Home or Tasks. */
++	private ritemarkPermanentCount(): number {
++		let count = 0;
++		while (count < this.model.count && this.isRitemarkPermanent(this.model.getEditorByIndex(count)!)) {
++			count++;
++		}
++		return count;
++	}
++
+ 	private async doCloseEditorWithConfirmationHandling(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions, internalOptions?: IInternalEditorCloseOptions): Promise<boolean> {
+ 		if (!editor) {
+ 			return false;
+@@ -1880,6 +1927,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 	}
+ 
+ 	private doGetEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
++		return this.doGetAnyEditorsToClose(args).filter(editor => !this.isRitemarkPermanent(editor)); // Ritemark 2.0
++	}
++
++	private doGetAnyEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
+ 		if (Array.isArray(args)) {
+ 			return args;
+ 		}
+@@ -1969,7 +2020,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 	}
+ 
+ 	private doCloseAllEditors(options?: ICloseAllEditorsOptions): void {
+-		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options);
++		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options).filter(editor => !this.isRitemarkPermanent(editor)); // Ritemark 2.0
+ 		if (options?.excludeConfirming) {
+ 			editors = editors.filter(editor => !this.shouldConfirmClose(editor));
+ 		}
+@@ -2171,6 +2222,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 		this.lastLayout = { width, height, top, left };
+ 		this.element.classList.toggle('max-height-478px', height <= 478);
+ 
++		// Ritemark 2.0: each group is its own desk on the ground. A desk with a neighbour on its left or
++		// above steps in by the gap, so two desks lie 8 apart; a desk at the window's left or right edge
++		// (its side column hidden) stays 8 from it.
++		const gap = this.ritemarkDeskGap(width, left);
++		this.element.classList.toggle('ritemark-left-edge', gap.edges.left);
++		this.element.classList.toggle('ritemark-right-edge', gap.edges.right);
++		this.element.classList.toggle('ritemark-top-edge', gap.edges.top);
++		this.element.style.boxSizing = 'border-box';
++		this.element.style.paddingLeft = `${gap.left}px`;
++		this.element.style.paddingRight = `${gap.right}px`;
++		this.element.style.paddingTop = `${gap.top}px`;
++		width = Math.max(0, width - gap.left - gap.right);
++		height = Math.max(0, height - gap.top);
++		left += gap.left;
++		top += gap.top;
++
+ 		// Layout the title control first to receive the size it occupies
+ 		const titleControlSize = this.titleControl.layout({
+ 			container: new Dimension(width, height),
+@@ -2186,6 +2253,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 		this.editorPane.layout({ width, height: editorHeight, top: top + titleControlSize.height, left });
+ 	}
+ 
++	/** Ritemark 2.0: the desk's gaps, and which of the editor area's edges it touches (no neighbour there). */
++	private ritemarkDeskGap(width: number, left: number): { left: number; right: number; top: number; edges: { left: boolean; right: boolean; top: boolean } } {
++		let neighbours: { left: boolean; right: boolean; up: boolean };
++		try {
++			const find = (direction: GroupDirection) => !!this.groupsView.findGroup?.({ direction }, this);
++			neighbours = { left: find(GroupDirection.LEFT), right: find(GroupDirection.RIGHT), up: find(GroupDirection.UP) };
++		} catch {
++			// The grid's first layout is still running, so it cannot name neighbours yet: lay out once more after it
++			getWindow(this.element).requestAnimationFrame(() => this.relayout());
++			neighbours = { left: false, right: false, up: false };
++		}
++
++		const windowWidth = getWindow(this.element).innerWidth;
++		return {
++			left: neighbours.left || left === 0 ? RITEMARK_DESK_GAP : 0,
++			right: !neighbours.right && windowWidth > 0 && left + width >= windowWidth ? RITEMARK_DESK_GAP : 0,
++			top: neighbours.up ? RITEMARK_DESK_GAP : 0,
++			edges: { left: !neighbours.left, right: !neighbours.right, top: !neighbours.up }
++		};
++	}
++
+ 	relayout(): void {
+ 		if (this.lastLayout) {
+ 			const { width, height, top, left } = this.lastLayout;
+diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
+index b0a44e2c23a..040e7ede5e1 100644
+--- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
+@@ -100,7 +100,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+ 	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
+ 
+ 	private static readonly EDITOR_TAB_HEIGHT = {
+-		normal: 35 as const,
++		normal: 44 as const, // Ritemark 2.0: the desk's strip, with the tabs 36 high at its foot (ritemarkSurfaces.css)
+ 		compact: 22 as const
+ 	};
+ 
+@@ -451,7 +451,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+ 	}
+ 
+ 	protected getHoverTitle(editor: EditorInput): string | IManagedHoverTooltipMarkdownString {
+-		const title = editor.getTitle(Verbosity.LONG);
++		const title = editor.getTitle(Verbosity.MEDIUM); // Ritemark 2.0: the path inside the project, never the system path
+ 		if (!this.tabsModel.isPinned(editor)) {
+ 			return {
+ 				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
+diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
+index b56047d66e1..e75599fb6d4 100644
+--- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
+@@ -44,7 +44,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
+ import { IPath, win32, posix } from '../../../../base/common/path.js';
+ import { coalesce, insert } from '../../../../base/common/arrays.js';
+ import { isHighContrast } from '../../../../platform/theme/common/theme.js';
+-import { isSafari } from '../../../../base/browser/browser.js';
++import { getZoomFactor, isSafari } from '../../../../base/browser/browser.js';
+ import { equals } from '../../../../base/common/objects.js';
+ import { EditorActivation, IEditorOptions } from '../../../../platform/editor/common/editor.js';
+ import { UNLOCK_GROUP_COMMAND_ID } from './editorCommands.js';
+@@ -58,6 +58,8 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
+ import { IHostService } from '../../../services/host/browser/host.js';
+ import { BugIndicatingError } from '../../../../base/common/errors.js';
+ import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
++import { createRitemarkNewTabButton } from './ritemarkNewTab.js';
++import { RitemarkFoldedTabs } from './ritemarkFoldedTabs.js';
+ 
+ interface IEditorInputLabel {
+ 	readonly editor: EditorInput;
+@@ -87,6 +89,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
+ 	options?: IMultiEditorTabsControlLayoutOptions;
+ }
+ 
++/**
++ * Ritemark 2.0: the tabs container's own side padding (ritemarkSurfaces.css), the room for the chosen
++ * tab's fillets where the scrolling container would cut them off. Pinned tabs stick after it.
++ */
++const RITEMARK_TABS_INSET = 8;
++
+ export class MultiEditorTabsControl extends EditorTabsControl {
+ 
+ 	private static readonly SCROLLBAR_SIZES = {
+@@ -107,6 +115,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 
+ 	private titleContainer: HTMLElement | undefined;
+ 	private tabsAndActionsContainer: HTMLElement | undefined;
++	private ritemarkFoldedTabs: RitemarkFoldedTabs | undefined;
+ 	private tabsContainer: HTMLElement | undefined;
+ 	private tabsScrollbar: ScrollableElement | undefined;
+ 	private tabSizingFixedDisposables: DisposableStore | undefined;
+@@ -190,6 +199,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 		// Tabs Container listeners
+ 		this.registerTabsContainerListeners(this.tabsContainer, this.tabsScrollbar);
+ 
++		// Ritemark 2.0: tabs that do not fit fold into "N ⌄" before the +, which asks what kind of new tab
++		this.ritemarkFoldedTabs = this._register(this.instantiationService.createInstance(RitemarkFoldedTabs, this.tabsAndActionsContainer, this.groupView));
++		this._register(this.instantiationService.invokeFunction(accessor => createRitemarkNewTabButton(accessor, this.tabsAndActionsContainer!, () => this.groupsView.activateGroup(this.groupView))));
++
+ 		// Create Editor Toolbar
+ 		this.createEditorActionsToolBar(this.tabsAndActionsContainer, ['editor-actions']);
+ 
+@@ -1798,12 +1811,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 			// the real height of the title area with wrapping.
+ 			height = this.tabsAndActionsContainer.offsetHeight;
+ 		} else {
+-			height = this.tabHeight;
++			// Ritemark 2.0: the tab row is the desk's strip; it keeps its height when the window zooms
++			// (ritemarkSurfaces.css counter-zooms it), so it takes less of the zoomed window's room
++			height = this.tabHeight / getZoomFactor(getWindow(this.parent));
+ 		}
+ 
+ 		return height;
+ 	}
+ 
++	/**
++	 * Ritemark 2.0: every tab shows its whole name (up to the stylesheet's 200; a longer name ends with
++	 * an ellipsis). When the row is full, the tabs used longest ago fold rather than shorten the others'
++	 * names (never a pinned tab or the open one), and "N ⌄" lists them. The row keeps its order, and
++	 * scrolls only when it is too narrow for the open tab itself.
++	 */
++	private ritemarkFoldTabs(): void {
++		const [tabsContainer, tabsScrollbar, folded] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar, this.ritemarkFoldedTabs);
++		const tabs = Array.from(tabsContainer.children) as HTMLElement[];
++		for (const tab of tabs) {
++			tab.classList.remove('ritemark-folded');
++			tab.style.removeProperty('min-width');
++		}
++
++		// Each tab's own width, its whole name (up to the stylesheet's maximum), measured unflexed. Not
++		// rounded: a rounded-down width cuts the name's last letter, a rounded-up one makes the gaps
++		// between names differ by a pixel; the same half pixel on every tab keeps them equal and whole.
++		tabsContainer.classList.add('ritemark-measuring');
++		const natural = tabs.map(tab => tab.getBoundingClientRect().width + 0.5);
++		tabsContainer.classList.remove('ritemark-measuring');
++
++		const editors = this.tabsModel.getEditors(EditorsOrder.SEQUENTIAL);
++		const active = this.tabsModel.activeEditor;
++		const widthOf = (index: number) => natural[index] ?? 0;
++		let fixedWidth = 2 * RITEMARK_TABS_INSET;
++		editors.forEach((editor, index) => {
++			if (this.tabsModel.isSticky(index) || editor === active) {
++				fixedWidth += widthOf(index); // pinned tabs and the open one never fold
++			}
++		});
++		const candidates = this.groupView.getEditors(EditorsOrder.MOST_RECENTLY_ACTIVE)
++			.map(editor => this.tabsModel.indexOf(editor))
++			.filter(index => index >= 0 && editors[index] !== active && !this.tabsModel.isSticky(index));
++		const fit = (width: number) => {
++			const shown = new Set<number>();
++			let used = fixedWidth;
++			for (const index of candidates) { // most recently used first
++				if (used + widthOf(index) > width) {
++					break;
++				}
++				used += widthOf(index);
++				shown.add(index);
++			}
++			return shown;
++		};
++
++		const rowWidth = tabsScrollbar.getDomNode().clientWidth + folded.outerWidth;
++		let shown = fit(rowWidth);
++		if (shown.size < candidates.length) {
++			folded.update(candidates.length - shown.size); // shown, so it can be measured
++			shown = fit(rowWidth - folded.outerWidth);
++		}
++		const foldedEditors: EditorInput[] = [];
++		for (const index of candidates) {
++			if (shown.has(index)) {
++				tabs[index]?.style.setProperty('min-width', `${widthOf(index)}px`, 'important');
++			} else {
++				tabs[index]?.classList.add('ritemark-folded');
++				foldedEditors.push(editors[index]);
++			}
++		}
++		folded.update(foldedEditors);
++	}
++
+ 	layout(dimensions: IEditorTitleControlDimensions, options?: IMultiEditorTabsControlLayoutOptions): Dimension {
+ 
+ 		// Remember dimensions that we get
+@@ -2014,6 +2093,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 	private doLayoutTabsNonWrapping(options?: IMultiEditorTabsControlLayoutOptions): void {
+ 		const [tabsContainer, tabsScrollbar] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar);
+ 
++		this.ritemarkFoldTabs(); // Ritemark 2.0
++
+ 		//
+ 		// Synopsis
+ 		// - allTabsWidth:   			sum of all tab widths
+@@ -2049,7 +2130,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 					break;
+ 			}
+ 
+-			stickyTabsWidth = this.tabsModel.stickyCount * stickyTabWidth;
++			stickyTabsWidth = RITEMARK_TABS_INSET + this.tabsModel.stickyCount * stickyTabWidth; // Ritemark 2.0: the row's inset
+ 		}
+ 
+ 		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
+diff --git a/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts b/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts
+new file mode 100644
+index 00000000000..7ac893b5de7
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts
+@@ -0,0 +1,214 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: tabs that do not fit fold away, and say so (R7).
++ *
++ * Every tab shows its whole name. When the row is full, the tabs used longest ago fold (never Home,
++ * Tasks or the open document) rather than shorten the others' names, and "N ⌄" at the right end of
++ * the row, before the +, lists them in Ritemark's menu. The tabs control decides which fold
++ * (`ritemarkFoldTabs` in multiEditorTabsControl.ts); this file draws the button and its menu.
++ */
++
++import { $, addDisposableListener, append, clearNode, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
++import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
++import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { Codicon } from '../../../../base/common/codicons.js';
++import { KeyCode } from '../../../../base/common/keyCodes.js';
++import { Disposable, DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
++import { dirname, extname, isEqual } from '../../../../base/common/resources.js';
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { localize } from '../../../../nls.js';
++import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { EditorResourceAccessor, SideBySideEditor, Verbosity } from '../../../common/editor.js';
++import { EditorInput } from '../../../common/editor/editorInput.js';
++import { IEditorGroupView } from './editor.js';
++import { ritemarkMenuButton, ritemarkShowMenuUnder } from './ritemarkNewTab.js';
++
++function iconOf(editor: EditorInput): ThemeIcon {
++	const resource = EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.PRIMARY });
++	if (!resource) {
++		return editor.typeId.includes('terminal') ? Codicon.terminal : editor.typeId.includes('webview') ? Codicon.globe : Codicon.file;
++	}
++	switch (extname(resource).toLowerCase()) {
++		case '.md': case '.markdown': case '.txt': return Codicon.fileText;
++		case '.csv': case '.xlsx': return Codicon.table;
++		default: return Codicon.file;
++	}
++}
++
++export class RitemarkFoldedTabs extends Disposable {
++
++	private readonly button: HTMLElement;
++	private readonly count: HTMLElement;
++	private readonly hover;
++	private folded: readonly EditorInput[] = [];
++	private open = false;
++	private hiddenAt = 0;
++	private renderMenu: (() => void) | undefined;
++
++	constructor(
++		container: HTMLElement,
++		private readonly group: IEditorGroupView,
++		@IContextViewService private readonly contextViewService: IContextViewService,
++		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
++		@IHoverService hoverService: IHoverService,
++	) {
++		super();
++
++		this.button = append(container, $('a.ritemark-more-tabs', { role: 'button', tabIndex: 0, 'aria-haspopup': 'menu', 'aria-expanded': 'false' }));
++		this.count = append(this.button, $('span.ritemark-more-tabs-count'));
++		append(this.button, renderIcon(Codicon.chevronDown));
++		this.button.style.display = 'none';
++		this.hover = this._register(hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), this.button, ''));
++		this._register(toDisposable(() => this.button.remove()));
++		this._register(ritemarkMenuButton(this.button, () => this.show(), () => this.open, () => this.hiddenAt, () => this.contextViewService.hideContextView()));
++	}
++
++	/** Its width with its gap, 0 while it is hidden. */
++	get outerWidth(): number {
++		return this.button.style.display === 'none' ? 0 : this.button.offsetWidth + 8;
++	}
++
++	/** Show the count (a number while measuring, the folded tabs once known); hide at none. */
++	update(folded: readonly EditorInput[] | number): void {
++		const count = typeof folded === 'number' ? folded : folded.length;
++		if (typeof folded !== 'number') {
++			this.folded = folded;
++		}
++		this.button.style.display = count > 0 ? '' : 'none';
++		this.count.textContent = String(count);
++		const label = count === 1 ? localize('ritemark.moreTabs.one', "1 more tab") : localize('ritemark.moreTabs', "{0} more tabs", count);
++		this.button.setAttribute('aria-label', label);
++		this.hover.update(label);
++		if (typeof folded !== 'number') {
++			if (this.open && count === 0) {
++				this.contextViewService.hideContextView();
++			} else {
++				this.renderMenu?.();
++			}
++		}
++	}
++
++	private show(): void {
++		if (this.open) {
++			this.contextViewService.hideContextView();
++			return;
++		}
++		if (!this.folded.length) {
++			return;
++		}
++		this.open = true;
++		this.button.classList.add('open');
++		this.button.setAttribute('aria-expanded', 'true');
++		ritemarkShowMenuUnder(this.contextViewService, this.button, container => this.renderInto(container), () => {
++			this.open = false;
++			this.hiddenAt = Date.now();
++			this.renderMenu = undefined;
++			this.button.classList.remove('open');
++			this.button.setAttribute('aria-expanded', 'false');
++		});
++	}
++
++	private renderInto(container: HTMLElement): IDisposable {
++		const disposables = new DisposableStore();
++		const menu = append(container, $('.ritemark-new-tab-menu.ritemark-more-tabs-menu', { role: 'menu' }));
++		const close = () => this.contextViewService.hideContextView();
++		let items: HTMLElement[] = [];
++
++		const render = (focusIndex = 0) => {
++			disposables.clear();
++			clearNode(menu);
++			const editors = this.folded;
++			const head = editors.length === 1 ? localize('ritemark.moreTabs.headOne', "1 more tab") : localize('ritemark.moreTabs.head', "{0} more tabs", editors.length);
++			menu.setAttribute('aria-label', head);
++			append(menu, $('.ritemark-new-tab-menu-head', { 'aria-hidden': 'true' }, head));
++			const list = append(menu, $('.ritemark-more-tabs-list'));
++			items = [];
++			for (const editor of editors) {
++				const item = append(list, $('a.ritemark-more-tabs-item', { role: 'menuitem', tabIndex: -1, 'aria-label': editor.getTitle(Verbosity.MEDIUM) ?? editor.getName() }));
++				append(item, renderIcon(iconOf(editor)));
++				append(item, $('span.ritemark-more-tabs-name', undefined, editor.getName()));
++				const where = this.folderOf(editor);
++				if (where) {
++					append(item, $('span.ritemark-more-tabs-where', undefined, where));
++				}
++				const x = append(item, $('a.ritemark-more-tabs-close', { role: 'button', 'aria-label': localize('ritemark.moreTabs.closeNamed', "Close {0}", editor.getName()) }));
++				append(x, renderIcon(Codicon.close));
++				disposables.add(addDisposableListener(x, EventType.CLICK, e => {
++					e.stopPropagation();
++					this.closeOne(editor);
++				}));
++				disposables.add(addDisposableListener(item, EventType.CLICK, () => {
++					close();
++					this.group.openEditor(editor);
++				}));
++				disposables.add(addDisposableListener(item, EventType.MOUSE_ENTER, () => item.focus()));
++				items.push(item);
++			}
++			append(menu, $('.ritemark-more-tabs-separator'));
++			const all = append(menu, $('a.ritemark-new-tab-menu-item.ritemark-more-tabs-close-all', { role: 'menuitem', tabIndex: -1 }, editors.length === 1 ? localize('ritemark.moreTabs.closeThisOne', "Close this tab") : localize('ritemark.moreTabs.closeThese', "Close these {0} tabs", editors.length)));
++			disposables.add(addDisposableListener(all, EventType.CLICK, () => {
++				close();
++				this.group.closeEditors([...this.folded]);
++			}));
++			disposables.add(addDisposableListener(all, EventType.MOUSE_ENTER, () => all.focus()));
++			items.push(all);
++			getWindow(menu).setTimeout(() => items[Math.min(focusIndex, items.length - 1)]?.focus(), 0);
++		};
++
++		this.renderMenu = () => render(Math.max(0, items.indexOf(getWindow(menu).document.activeElement as HTMLElement)));
++
++		const keys = addDisposableListener(menu, EventType.KEY_DOWN, e => {
++			const event = new StandardKeyboardEvent(e);
++			const index = items.indexOf(getWindow(menu).document.activeElement as HTMLElement);
++			if (event.equals(KeyCode.DownArrow) || event.equals(KeyCode.UpArrow)) {
++				const step = event.equals(KeyCode.DownArrow) ? 1 : -1;
++				items[(index + step + items.length) % items.length].focus();
++			} else if ((event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) && index >= 0) {
++				items[index].click();
++			} else if ((event.equals(KeyCode.Delete) || event.equals(KeyCode.Backspace)) && index >= 0 && index < this.folded.length) {
++				this.closeOne(this.folded[index]);
++			} else if (event.equals(KeyCode.Escape) || event.equals(KeyCode.Tab)) {
++				close();
++				this.button.focus();
++			} else {
++				return;
++			}
++			event.preventDefault();
++			event.stopPropagation();
++		});
++
++		render();
++		return toDisposable(() => {
++			keys.dispose();
++			disposables.dispose();
++		});
++	}
++
++	/** The folder a tab's file is in, or nothing at the project's top level (its name would say only the project's). */
++	private folderOf(editor: EditorInput): string | undefined {
++		const resource = EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.PRIMARY });
++		const root = resource ? this.workspaceService.getWorkspaceFolder(resource) : null;
++		if (root && resource && isEqual(dirname(resource), root.uri)) {
++			return undefined;
++		}
++		return editor.getDescription(Verbosity.SHORT);
++	}
++
++	/** Close one folded tab and keep the menu open on the next one; the row folds again on its next layout. */
++	private closeOne(editor: EditorInput): void {
++		this.folded = this.folded.filter(candidate => candidate !== editor);
++		this.group.closeEditor(editor, { preserveFocus: true });
++		if (!this.folded.length) {
++			this.contextViewService.hideContextView();
++		} else {
++			this.renderMenu?.();
++		}
++	}
++}
+diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
+new file mode 100644
+index 00000000000..1f24f73882f
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
+@@ -0,0 +1,179 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: a new tab where the tabs are (R7, issue #199).
++ *
++ * The + at the right end of the tab row asks what kind of tab: Text, Table (CSV data), Web page or
++ * Terminal. It sits outside the tabs container, whose children the tabs control maps to tab indexes.
++ */
++
++import { $, addDisposableListener, append, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
++import { AnchorAlignment } from '../../../../base/browser/ui/contextview/contextview.js';
++import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { Codicon } from '../../../../base/common/codicons.js';
++import { KeyCode } from '../../../../base/common/keyCodes.js';
++import { DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { localize } from '../../../../nls.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
++import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
++
++interface INewTabKind {
++	readonly label: string;
++	readonly detail: string;
++	readonly icon: ThemeIcon;
++	readonly command: string;
++}
++
++const KINDS: readonly INewTabKind[] = [
++	{ label: localize('ritemark.newTab.text', "Text"), detail: localize('ritemark.newTab.textDetail', "A new document in this project"), icon: Codicon.fileText, command: 'ritemark.newDocument' },
++	{ label: localize('ritemark.newTab.table', "Table"), detail: localize('ritemark.newTab.tableDetail', "CSV data, rows and columns"), icon: Codicon.table, command: 'ritemark.newTable' },
++	{ label: localize('ritemark.newTab.web', "Web page"), detail: localize('ritemark.newTab.webDetail', "Open a site, or a recent page"), icon: Codicon.globe, command: 'ritemark.browser.newTab' },
++	{ label: localize('ritemark.newTab.terminal', "Terminal"), detail: localize('ritemark.newTab.terminalDetail', "A command line in this project's folder"), icon: Codicon.terminal, command: 'workbench.action.createTerminalEditor' },
++];
++
++/**
++ * Ritemark's menus close when the person clicks outside them (R7). VS Code closes a context view on a
++ * press anywhere in the workbench, but a press inside a webview (a document, the AI) never reaches
++ * the workbench: it moves focus into the webview, so the window's blur closes the menu instead.
++ */
++export function ritemarkCloseOnLeave(element: HTMLElement, hide: () => void): IDisposable {
++	return addDisposableListener(getWindow(element), EventType.BLUR, () => hide());
++}
++
++/**
++ * Show a Ritemark menu under a button at the right end of the tab row: it opens leftward, over the
++ * desk. Anchored to the button itself, so the context view corrects for the window's zoom.
++ */
++export function ritemarkShowMenuUnder(contextViewService: IContextViewService, button: HTMLElement, render: (container: HTMLElement) => IDisposable, onHide: () => void): void {
++	const leave = ritemarkCloseOnLeave(button, () => contextViewService.hideContextView());
++	contextViewService.showContextView({
++		getAnchor: () => button,
++		anchorAlignment: AnchorAlignment.RIGHT,
++		render,
++		onHide: () => {
++			leave.dispose();
++			onHide();
++		}
++	});
++}
++
++/**
++ * A button that toggles its menu. A press on the button while its menu is open closes the menu (the
++ * menu hides itself on any press outside it, just before this one); it must not open it again on the
++ * click that follows.
++ */
++export function ritemarkMenuButton(button: HTMLElement, show: () => void, isOpen: () => boolean, hiddenAt: () => number, hide: () => void): IDisposable {
++	const disposables = new DisposableStore();
++	let pressedWhileOpen = false;
++	disposables.add(addDisposableListener(button, EventType.MOUSE_DOWN, e => {
++		e.preventDefault();
++		pressedWhileOpen = isOpen() || Date.now() - hiddenAt() < 50;
++	}));
++	disposables.add(addDisposableListener(button, EventType.CLICK, () => {
++		if (pressedWhileOpen) {
++			pressedWhileOpen = false;
++			if (isOpen()) {
++				hide();
++			}
++			return;
++		}
++		show();
++	}));
++	disposables.add(addDisposableListener(button, EventType.KEY_DOWN, e => {
++		const event = new StandardKeyboardEvent(e);
++		if (event.equals(KeyCode.Enter) || event.equals(KeyCode.Space) || event.equals(KeyCode.DownArrow)) {
++			event.preventDefault();
++			show();
++		}
++	}));
++	return disposables;
++}
++
++/** The + at the right end of the tab row. `beforeRun` makes its group the active one. */
++export function createRitemarkNewTabButton(accessor: ServicesAccessor, container: HTMLElement, beforeRun: () => void): IDisposable {
++	const commandService = accessor.get(ICommandService);
++	const contextViewService = accessor.get(IContextViewService);
++	const hoverService = accessor.get(IHoverService);
++	const disposables = new DisposableStore();
++
++	const label = localize('ritemark.newTab', "New tab");
++	const button = append(container, $('a.ritemark-new-tab', { role: 'button', tabIndex: 0, 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': label }));
++	append(button, renderIcon(Codicon.add));
++	disposables.add(hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), button, label));
++	disposables.add(toDisposable(() => button.remove()));
++
++	let open = false;
++	let hiddenAt = 0;
++	const hide = () => contextViewService.hideContextView();
++	const show = () => {
++		if (open) {
++			hide();
++			return;
++		}
++		open = true;
++		button.classList.add('open');
++		button.setAttribute('aria-expanded', 'true');
++		ritemarkShowMenuUnder(contextViewService, button, menuContainer => renderMenu(menuContainer, kind => {
++			hide();
++			beforeRun();
++			commandService.executeCommand(kind.command);
++		}, () => {
++			hide();
++			button.focus();
++		}), () => {
++			open = false;
++			hiddenAt = Date.now();
++			button.classList.remove('open');
++			button.setAttribute('aria-expanded', 'false');
++		});
++	};
++	disposables.add(ritemarkMenuButton(button, show, () => open, () => hiddenAt, hide));
++
++	return disposables;
++}
++
++function renderMenu(container: HTMLElement, run: (kind: INewTabKind) => void, close: () => void): IDisposable {
++	const disposables = new DisposableStore();
++	const menu = append(container, $('.ritemark-new-tab-menu', { role: 'menu', 'aria-label': localize('ritemark.newTab.menu', "New tab") }));
++	append(menu, $('.ritemark-new-tab-menu-head', { 'aria-hidden': 'true' }, localize('ritemark.newTab.head', "New tab")));
++
++	const items: HTMLElement[] = [];
++	for (const kind of KINDS) {
++		const item = append(menu, $('a.ritemark-new-tab-menu-item', { role: 'menuitem', tabIndex: -1, 'aria-label': kind.label }));
++		append(append(item, $('span.ritemark-new-tab-menu-icon')), renderIcon(kind.icon));
++		const text = append(item, $('span.ritemark-new-tab-menu-text'));
++		append(text, $('span.ritemark-new-tab-menu-label', undefined, kind.label));
++		append(text, $('span.ritemark-new-tab-menu-detail', undefined, kind.detail));
++		disposables.add(addDisposableListener(item, EventType.CLICK, () => run(kind)));
++		disposables.add(addDisposableListener(item, EventType.MOUSE_ENTER, () => item.focus()));
++		items.push(item);
++	}
++
++	disposables.add(addDisposableListener(menu, EventType.KEY_DOWN, e => {
++		const event = new StandardKeyboardEvent(e);
++		const index = items.indexOf(getWindow(menu).document.activeElement as HTMLElement);
++		if (event.equals(KeyCode.DownArrow) || event.equals(KeyCode.UpArrow)) {
++			const step = event.equals(KeyCode.DownArrow) ? 1 : -1;
++			items[(index + step + items.length) % items.length].focus();
++		} else if ((event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) && index >= 0) {
++			run(KINDS[index]);
++		} else if (event.equals(KeyCode.Escape) || event.equals(KeyCode.Tab)) {
++			close();
++		} else {
++			return;
++		}
++		event.preventDefault();
++		event.stopPropagation();
++	}));
++
++	getWindow(menu).setTimeout(() => items[0].focus(), 0);
++	return disposables;
++}
+diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
+new file mode 100644
+index 00000000000..e68f6d676d3
+--- /dev/null
++++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
+@@ -0,0 +1,112 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: the bar at the top of a terminal tab (R8; comparison/after-terminal.png): the shell's name,
++ * a Running chip while a command runs, and Stop, then Split, Clear and Close. Its height never changes, so
++ * the terminal is not resized at every command (full-screen programs redraw on every resize). Without shell
++ * integration there is no running state, so neither Running nor Stop shows.
++ */
++
++import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
++import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
++import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { Codicon } from '../../../../base/common/codicons.js';
++import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { localize } from '../../../../nls.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { ITerminalInstance, ITerminalService } from './terminal.js';
++import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
++
++/** The bar's fixed height, in the desk's pixels. */
++export const RITEMARK_TERMINAL_BAR_HEIGHT = 52;
++
++export class RitemarkTerminalBar extends Disposable {
++
++	private readonly name: HTMLElement;
++	private readonly runningChip: HTMLElement;
++	private readonly stop: HTMLElement;
++	private readonly instanceDisposables = this._register(new MutableDisposable<DisposableStore>());
++	private instance: ITerminalInstance | undefined;
++
++	constructor(
++		container: HTMLElement,
++		@ITerminalService private readonly terminalService: ITerminalService,
++		@IHoverService private readonly hoverService: IHoverService,
++	) {
++		super();
++
++		const bar = $('.ritemark-terminal-bar');
++		container.prepend(bar);
++		this._register({ dispose: () => bar.remove() });
++
++		const start = append(bar, $('.ritemark-terminal-bar-start'));
++		append(start, renderIcon(Codicon.terminal));
++		this.name = append(start, $('span.ritemark-terminal-name'));
++		this.runningChip = append(start, $('span.ritemark-terminal-running-chip', { role: 'status' }));
++		append(this.runningChip, $('span.ritemark-terminal-running-dot', { 'aria-hidden': 'true' }));
++		append(this.runningChip, $('span', undefined, localize('ritemark.terminal.running', "Running")));
++
++		const end = append(bar, $('.ritemark-terminal-bar-end'));
++		this.stop = this.button(end, 'ritemark-terminal-stop', Codicon.debugStop, localize('ritemark.terminal.stop', "Stop"), localize('ritemark.terminal.stopTooltip', "Stop the running command"), instance => {
++			instance.sendText('\x03', false); // Ctrl+C, which also reaches the command through ConPTY on Windows
++			instance.focus();
++		});
++		this.button(end, 'ritemark-terminal-action', Codicon.splitHorizontal, undefined, localize('ritemark.terminal.split', "Split: a second terminal beside this one"), instance => {
++			this.terminalService.createTerminal({ location: { parentTerminal: instance } });
++		});
++		this.button(end, 'ritemark-terminal-action', Codicon.clearAll, undefined, localize('ritemark.terminal.clear', "Clear the terminal"), instance => instance.clearBuffer());
++		this.button(end, 'ritemark-terminal-action', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close the terminal and end what runs in it"), instance => this.terminalService.safeDisposeTerminal(instance));
++
++		this.update();
++		this._register(ritemarkTerminalRunning.onDidChange(changed => {
++			if (changed === this.instance) {
++				this.update();
++			}
++		}));
++	}
++
++	/** The terminal this tab shows, or none. */
++	setInstance(instance: ITerminalInstance | undefined): void {
++		this.instance = instance;
++		const disposables = this.instanceDisposables.value = new DisposableStore();
++		if (instance) {
++			disposables.add(instance.onTitleChanged(() => this.update()));
++			disposables.add(instance.onDidChangeShellType(() => this.update()));
++		}
++		this.update();
++	}
++
++	private update(): void {
++		const instance = this.instance;
++		this.name.textContent = instance ? (instance.shellType ?? instance.processName) || instance.title : '';
++		const isRunning = !!instance && ritemarkTerminalRunning.isRunning(instance);
++		this.runningChip.style.display = isRunning ? '' : 'none';
++		this.stop.style.display = isRunning ? '' : 'none';
++	}
++
++	private button(parent: HTMLElement, className: string, icon: ThemeIcon, label: string | undefined, tooltip: string, run: (instance: ITerminalInstance) => void): HTMLElement {
++		const button = append(parent, $(`a.${className}`, { role: 'button', tabIndex: 0, 'aria-label': label ?? tooltip }));
++		append(button, renderIcon(icon));
++		if (label) {
++			append(button, $('span', undefined, label));
++		}
++		this._register(this.hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), button, tooltip));
++		const press = () => {
++			if (this.instance) {
++				run(this.instance);
++			}
++		};
++		this._register(addDisposableListener(button, EventType.CLICK, press));
++		this._register(addDisposableListener(button, EventType.KEY_DOWN, (e: KeyboardEvent) => {
++			if (e.key === 'Enter' || e.key === ' ') {
++				e.preventDefault();
++				press();
++			}
++		}));
++		return button;
++	}
++}
+diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
+new file mode 100644
+index 00000000000..9816138c2ac
+--- /dev/null
++++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
+@@ -0,0 +1,132 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: a terminal is one kind of tab (R8; Jarmo, 17 October: "Terminal must be one type of tab").
++ *
++ * - A terminal that appears in the panel (an extension asked for it, or an older profile's saved terminals
++ *   came back there) moves onto the desk as a tab, behind the open document. It never stays in the panel,
++ *   and never reaches the AI column.
++ * - A new terminal with no name of its own is named "Terminal", then "Terminal 2" and so on. Ritemark's own
++ *   terminals (Install Codex, Codex Repair, ...) keep their names.
++ * - Whether a terminal runs a command now, from its shell integration (`CommandDetection`): the terminal's
++ *   bar (ritemarkTerminalBar.ts) shows Running and Stop, and its tab carries the working dot
++ *   (terminalEditorInput.ts). Without shell integration there is no running state, and nothing shows.
++ */
++
++import { Emitter, Event } from '../../../../base/common/event.js';
++import { Disposable } from '../../../../base/common/lifecycle.js';
++import { RunOnceScheduler } from '../../../../base/common/async.js';
++import { TerminalCapability } from '../../../../platform/terminal/common/capabilities/capabilities.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
++import { IEditorService } from '../../../services/editor/common/editorService.js';
++import { ITerminalGroupService, ITerminalInstance, ITerminalService } from './terminal.js';
++
++const RITEMARK_TERMINAL_NAME = 'Terminal';
++
++const running = new Set<number>();
++const onDidChangeRunning = new Emitter<ITerminalInstance>();
++
++/** Whether a terminal runs a command now, as its shell integration reports it. */
++export const ritemarkTerminalRunning = {
++	isRunning(instance: ITerminalInstance): boolean {
++		return running.has(instance.instanceId);
++	},
++	onDidChange: onDidChangeRunning.event as Event<ITerminalInstance>,
++};
++
++function setRunning(instance: ITerminalInstance, isRunning: boolean): void {
++	if (running.has(instance.instanceId) !== isRunning) {
++		if (isRunning) {
++			running.add(instance.instanceId);
++		} else {
++			running.delete(instance.instanceId);
++		}
++		onDidChangeRunning.fire(instance);
++	}
++}
++
++/** The lowest free name among the open terminals: "Terminal", then "Terminal 2", "Terminal 3", ... */
++export function ritemarkNextTerminalName(openTitles: readonly string[]): string {
++	const taken = new Set(openTitles);
++	if (!taken.has(RITEMARK_TERMINAL_NAME)) {
++		return RITEMARK_TERMINAL_NAME;
++	}
++	for (let number = 2; ; number++) {
++		const name = `${RITEMARK_TERMINAL_NAME} ${number}`;
++		if (!taken.has(name)) {
++			return name;
++		}
++	}
++}
++
++/** Whether a new terminal should get a "Terminal N" name: a person's plain terminal, not a revived, hidden, task or named one. */
++export function ritemarkShouldNameTerminal(instance: ITerminalInstance): boolean {
++	const config = instance.shellLaunchConfig;
++	return !config.name
++		&& !config.attachPersistentProcess
++		&& !config.hideFromUser
++		&& !config.isFeatureTerminal
++		&& config.type !== 'Task'
++		&& !config.customPtyImplementation
++		&& !config.titleTemplate;
++}
++
++export class RitemarkTerminalTabs extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.ritemarkTerminalTabs';
++
++	private restored = false;
++	private readonly sweep = this._register(new RunOnceScheduler(() => this.moveToDesk(false), 0));
++
++	constructor(
++		@ITerminalService terminalService: ITerminalService,
++		@ITerminalGroupService private readonly terminalGroupService: ITerminalGroupService,
++		@IEditorService private readonly editorService: IEditorService,
++	) {
++		super();
++
++		// Names: set before the process starts, so the name is the terminal's own from the start and survives a restart
++		this._register(terminalService.onDidCreateInstance(instance => {
++			if (ritemarkShouldNameTerminal(instance)) {
++				const name = ritemarkNextTerminalName(terminalService.instances.filter(other => other !== instance).map(other => other.title));
++				instance.shellLaunchConfig.name = name;
++				instance.rename(name);
++			}
++		}));
++
++		// Running: from the moment a command is executed until it finishes
++		this._register(terminalService.createOnInstanceCapabilityEvent(TerminalCapability.CommandDetection, capability => capability.onCommandExecuted).event(({ instance }) => setRunning(instance, true)));
++		this._register(terminalService.createOnInstanceCapabilityEvent(TerminalCapability.CommandDetection, capability => capability.onCommandFinished).event(({ instance }) => setRunning(instance, false)));
++		this._register(terminalService.onDidDisposeInstance(instance => setRunning(instance, false)));
++
++		// The desk: once the saved terminals are back, and whenever a terminal lands in the panel later.
++		// Never inside the event: the panel group is not registered yet when it fires.
++		terminalService.whenConnected.then(() => {
++			this.restored = true;
++			this.moveToDesk(true);
++		});
++		this._register(terminalGroupService.onDidChangeInstances(() => {
++			if (this.restored) {
++				this.sweep.schedule();
++			}
++		}));
++	}
++
++	/**
++	 * Open every terminal in the panel as a tab on the desk, keeping the keyboard where it is. Terminals that
++	 * come back at start stay behind the open document; one made later comes to the front, as asked.
++	 */
++	private moveToDesk(behind: boolean): void {
++		for (const instance of this.terminalGroupService.instances) {
++			if (instance.shellLaunchConfig.hideFromUser) {
++				continue;
++			}
++			this.editorService.openEditor({ resource: instance.resource, options: { pinned: true, inactive: behind, preserveFocus: true } });
++		}
++	}
++}
++
++registerWorkbenchContribution2(RitemarkTerminalTabs.ID, RitemarkTerminalTabs, WorkbenchPhase.AfterRestored);
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts
+index 8b40d469375..42065eef04e 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts
+@@ -29,11 +29,13 @@ import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser
+ import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
+ import { DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
+ import { ITerminalProfile, TerminalLocation } from '../../../../platform/terminal/common/terminal.js';
++import { RITEMARK_TERMINAL_BAR_HEIGHT, RitemarkTerminalBar } from './ritemarkTerminalBar.js';
+ 
+ export class TerminalEditor extends EditorPane {
+ 
+ 	private _editorInstanceElement: HTMLElement | undefined;
+ 	private _overflowGuardElement: HTMLElement | undefined;
++	private _ritemarkBar: RitemarkTerminalBar | undefined; // Ritemark 2.0: Running and Stop (R8)
+ 
+ 	private _editorInput?: TerminalEditorInput = undefined;
+ 
+@@ -78,6 +80,7 @@ export class TerminalEditor extends EditorPane {
+ 		this._editorInput = newInput;
+ 		await super.setInput(newInput, options, context, token);
+ 		this._editorInput.terminalInstance?.attachToElement(this._overflowGuardElement!);
++		this._ritemarkBar?.setInstance(this._editorInput.terminalInstance);
+ 		if (this._lastDimension) {
+ 			this.layout(this._lastDimension);
+ 		}
+@@ -98,6 +101,7 @@ export class TerminalEditor extends EditorPane {
+ 			this._editorInput.terminalInstance?.detachFromElement();
+ 		}
+ 		this._editorInput = undefined;
++		this._ritemarkBar?.setInstance(undefined);
+ 	}
+ 
+ 	private _setActiveInstance(): void {
+@@ -118,6 +122,7 @@ export class TerminalEditor extends EditorPane {
+ 		this._editorInstanceElement = parent;
+ 		this._overflowGuardElement = dom.$('.terminal-overflow-guard.terminal-editor');
+ 		this._editorInstanceElement.appendChild(this._overflowGuardElement);
++		this._ritemarkBar = this._register(this._instantiationService.createInstance(RitemarkTerminalBar, this._editorInstanceElement));
+ 		this._registerListeners();
+ 	}
+ 
+@@ -164,7 +169,7 @@ export class TerminalEditor extends EditorPane {
+ 		const instance = this._editorInput?.terminalInstance;
+ 		if (instance) {
+ 			instance.attachToElement(this._overflowGuardElement!);
+-			instance.layout(dimension);
++			instance.layout(new dom.Dimension(dimension.width, Math.max(0, dimension.height - RITEMARK_TERMINAL_BAR_HEIGHT))); // Ritemark 2.0: under the bar
+ 		}
+ 		this._lastDimension = dimension;
+ 	}
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
+index f7ce1dab62b..408ee855444 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
+@@ -23,6 +23,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
+ import { TerminalContextKeys } from '../common/terminalContextKey.js';
+ import { ConfirmResult, IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
+ import { Emitter } from '../../../../base/common/event.js';
++import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
+ 
+ export class TerminalEditorInput extends EditorInput implements IEditorCloseHandler {
+ 
+@@ -162,7 +163,8 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+ 			instance.onIconChanged(() => this._onDidChangeLabel.fire()),
+ 			instanceOnDidFocusListener,
+ 			instanceOnDidBlurListener,
+-			instance.statusList.onDidChangePrimaryStatus(() => this._onDidChangeLabel.fire())
++			instance.statusList.onDidChangePrimaryStatus(() => this._onDidChangeLabel.fire()),
++			ritemarkTerminalRunning.onDidChange(changed => changed === instance && this._onDidChangeLabel.fire()) // Ritemark 2.0: the working dot
+ 		];
+ 
+ 		this._register(toDisposable(() => {
+@@ -207,6 +209,9 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+ 			return [];
+ 		}
+ 		const extraClasses: string[] = ['terminal-tab', 'predefined-file-icon'];
++		if (ritemarkTerminalRunning.isRunning(this._terminalInstance)) {
++			extraClasses.push('ritemark-terminal-running'); // Ritemark 2.0: the chat rail's working dot on the tab (R8, ritemarkSurfaces.css)
++		}
+ 		const colorClass = getColorClass(this._terminalInstance);
+ 		if (colorClass) {
+ 			extraClasses.push(colorClass);

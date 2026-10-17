@@ -57,6 +57,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { registerProjectHeadCommands } from './views/projectHeadCommands';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -309,22 +310,14 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // === Layout settings: EVERY startup ===
-  // NOTE: terminal.integrated.defaultLocation defaults to 'view' in VS Code core +
-  // package.json configurationDefaults. Do NOT write it here — it was previously set
-  // to 'editor' by mistake, which overrode the correct default.
+  // A terminal is a tab in 2.0 (Sprint 132, R8): terminal.integrated.defaultLocation
+  // is 'editor' in package.json configurationDefaults, so it is not reset here.
   // AI panel location is enforced in VS Code core (viewDescriptorService.ts patch).
   (async () => {
     try {
       const wb = vscode.workspace.getConfiguration('workbench');
       await wb.update('layoutControl.enabled', true, vscode.ConfigurationTarget.Global);
       await wb.update('layoutControl.type', 'toggles', vscode.ConfigurationTarget.Global);
-
-      // Fix for users who had the old 'editor' value written by previous versions
-      const terminal = vscode.workspace.getConfiguration('terminal.integrated');
-      const current = terminal.get<string>('defaultLocation');
-      if (current === 'editor') {
-        await terminal.update('defaultLocation', undefined, vscode.ConfigurationTarget.Global);
-      }
     } catch (e) {
       console.error('Ritemark: failed to set layout defaults', e);
     }
@@ -594,18 +587,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // AI panel opens via activity bar click, not auto-shown on startup
   // User requested Explorer (folder view) to be default
-
-  // Auto-open terminal in right sidebar only if no terminal exists yet
-  setTimeout(async () => {
-    try {
-      if (vscode.window.terminals.length === 0) {
-        await vscode.commands.executeCommand('workbench.action.focusAuxiliaryBar');
-        await vscode.commands.executeCommand('workbench.action.terminal.new');
-      }
-    } catch (e) {
-      console.log('Failed to auto-open terminal:', e);
-    }
-  }, 2500);
+  // No terminal opens by itself (Sprint 132, R8): the tab row's + and Ctrl+` make one.
 
   // Register commands
   context.subscriptions.push(
@@ -681,6 +663,9 @@ export function activate(context: vscode.ExtensionContext) {
       await createDraftAndOpen('csv', RitemarkEditorProvider.viewType, buildCsvTemplate());
     })
   );
+
+  // The left column's head: its menus' entries (Ritemark 2.0, Sprint 132)
+  registerProjectHeadCommands(context);
 
   // Initialize Settings Provider
   settingsProvider = new RitemarkSettingsProvider(context, updateService);
