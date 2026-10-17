@@ -806,19 +806,19 @@ index 00000000000..99967801216
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
-index 00000000000..3c04b6350bb
+index 00000000000..d1b8dd87cc4
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,114 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
 +/*
-+ * Ritemark 2.0: the bar at the top of a terminal tab (R8; comparison/after-terminal.png, files.html): the shell,
-+ * which also makes a new terminal with another shell; a Running chip while a command runs; Stop; then Split,
-+ * Clear and Close. Its height never changes, so the terminal is not resized at every command (full-screen
++ * Ritemark 2.0: the bar at the top of a terminal tab (R8; comparison/after-terminal.png, files.html): the shell's
++ * name, a plain label in step 1 (its menu of other shells comes later; Experience lead and Jarmo, 17 October); a
++ * Running chip while a command runs; Stop; then Split, Clear and Close. Its height never changes, so the terminal is not resized at every command (full-screen
 + * programs redraw on every resize). Without shell integration there is no running state, so neither Running nor
 + * Stop shows.
 + */
@@ -830,9 +830,7 @@ index 00000000000..3c04b6350bb
 +import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
-+import { TerminalCommandId } from '../common/terminal.js';
 +import { ITerminalInstance, ITerminalService } from './terminal.js';
 +import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
 +
@@ -851,7 +849,6 @@ index 00000000000..3c04b6350bb
 +		container: HTMLElement,
 +		@ITerminalService private readonly terminalService: ITerminalService,
 +		@IHoverService private readonly hoverService: IHoverService,
-+		@ICommandService private readonly commandService: ICommandService,
 +	) {
 +		super();
 +
@@ -859,12 +856,10 @@ index 00000000000..3c04b6350bb
 +		container.prepend(bar);
 +		this._register({ dispose: () => bar.remove() });
 +
-+		// The shell, and a new terminal with another shell (VS Code's profile picker; the new one is a tab too)
-+		const shell = this.button(bar, 'ritemark-terminal-shell', Codicon.terminal, undefined, localize('ritemark.terminal.shell', "Shell, and new terminal"), () => {
-+			this.commandService.executeCommand(TerminalCommandId.NewWithProfile);
-+		});
++		// The shell's name
++		const shell = append(bar, $('span.ritemark-terminal-shell'));
++		append(shell, renderIcon(Codicon.terminal));
 +		this.name = append(shell, $('span.ritemark-terminal-name'));
-+		append(shell, renderIcon(Codicon.chevronDown)).classList.add('ritemark-terminal-caret');
 +		this.runningChip = append(bar, $('span.ritemark-terminal-running-chip', { role: 'status' }));
 +		append(this.runningChip, $('span.ritemark-terminal-running-dot', { 'aria-hidden': 'true' }));
 +		append(this.runningChip, $('span', undefined, localize('ritemark.terminal.running', "Running")));

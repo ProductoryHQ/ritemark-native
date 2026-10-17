@@ -250,7 +250,7 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..f0f7b2224a6
+index 00000000000..87c03f56921
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 @@ -0,0 +1,1250 @@
@@ -1425,19 +1425,19 @@ index 00000000000..f0f7b2224a6
 +}
 +
 +.monaco-workbench .ritemark-terminal-shell {
++	display: inline-flex;
++	align-items: center;
++	gap: 6px;
++	height: 28px;
 +	padding: 0 8px; /* kit: .docbar .shell */
 +	font-size: 12px;
 +	font-weight: 500;
-+	color: var(--vscode-tab-inactiveForeground) !important; /* !important: the bar's buttons share a colour rule above; the shell is body text */
++	color: var(--vscode-tab-inactiveForeground); /* the shell's name is body text, a label in step 1 */
++	white-space: nowrap;
 +}
 +
 +.monaco-workbench .ritemark-terminal-shell > .codicon {
 +	font-size: 14px;
-+}
-+
-+.monaco-workbench .ritemark-terminal-shell > .ritemark-terminal-caret {
-+	font-size: 10px;
-+	color: var(--vscode-descriptionForeground);
 +}
 +
 +.monaco-workbench .ritemark-terminal-name {
