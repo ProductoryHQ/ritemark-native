@@ -81,7 +81,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   const { rows } = table.getRowModel()
 
-  const ROW_HEIGHT = 37
+  const ROW_HEIGHT = 32 // Ritemark 2.0: rows 32, as the kit's .grid
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -229,12 +229,14 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
   return (
     <div className="flex h-full flex-col">
+      {/* Ritemark 2.0 (Experience 30, the kit's .grid; Jarmo's Mac pass on Sprint 132): the table is one area on the
+          desk, 16 in from its sides. The formula bar sits 12 under the document bar, the table 12 under it (24 under the
+          document bar without one); a short table's border ends after Add row, a long one scrolls inside its border. */}
       {editable && (
-        <div className="flex-shrink-0 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] px-3 py-1 z-20">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-[var(--r-ink-muted)]">fx</span>
-            <span className="min-w-[90px] text-xs text-[var(--r-ink-muted)]">
-              {activeCell ? `${activeColumnId || '-'}${activeCell.rowPosition + 1}` : 'No cell selected'}
+        <div className="flex-shrink-0 mx-4 mt-3 z-20">
+          <div className="flex min-h-[32px] items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
+            <span className="flex min-w-[48px] items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
+              {activeCell ? `${activeColumnId || '-'}${activeCell.rowPosition + 1}` : '–'}
             </span>
             <textarea
               value={formulaValue}
@@ -266,15 +268,18 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
               }}
               disabled={!activeCell}
               rows={1}
-              className="min-h-[28px] flex-1 resize-y rounded border border-[var(--r-hairline-strong)] bg-[var(--r-surface-muted)] px-2 py-1 text-xs text-[var(--r-ink-strong)] outline-none"
+              className="min-h-[30px] flex-1 resize-y rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"
               placeholder="Select a cell to view/edit full value"
             />
           </div>
         </div>
       )}
     <div
+      className={`mx-4 mb-4 ${editable ? 'mt-3' : 'mt-6'} flex min-h-0 flex-[0_1_auto] flex-col overflow-hidden rounded-lg border border-[var(--r-hairline)]`}
+    >
+    <div
       ref={parentRef}
-      className="flex-1 overflow-auto"
+      className="min-h-0 flex-[0_1_auto] overflow-auto"
       onClick={() => {
         setSelectedRow(null)
         setConfirmDeleteRow(null)
@@ -282,16 +287,16 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
         setConfirmDeleteColumn(null)
       }}
     >
-      <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: '100%', minWidth: 'max-content' }}>
+      <table className={`border-separate border-spacing-0 text-[13px] ${editable && onAddRow ? '' : 'rm-grid-closed'}`} style={{ tableLayout: 'fixed', width: '100%', minWidth: 'max-content' }}>
         <thead
-          className="sticky z-10 bg-[var(--vscode-editor-background)]"
+          className="sticky z-10 bg-[var(--vscode-ritemark-aiSheet,var(--r-surface-muted))]"
           style={{ top: 0 }}
         >
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               <th
-                className="px-2 py-2 text-center font-semibold border-b border-r border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-[var(--r-ink-muted)]"
-                style={{ minWidth: 50, width: 50 }}
+                className="h-8 border-b border-[var(--r-hairline)] bg-[var(--vscode-ritemark-aiSheet,var(--r-surface-muted))]"
+                style={{ minWidth: 36, width: 36 }}
               />
               {headerGroup.headers.map((header) => {
                 const colId = header.column.id
@@ -301,7 +306,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 return (
                 <th
                   key={header.id}
-                  className="group relative px-3 py-2 text-left font-semibold border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-[var(--r-ink-strong)] select-none"
+                  className="group relative h-8 px-2.5 py-0 text-left text-xs font-semibold border-b border-[var(--r-hairline)] bg-[var(--vscode-ritemark-aiSheet,var(--r-surface-muted))] text-[var(--r-ink-muted)] select-none"
                   style={{ minWidth: 120, maxWidth: 400, cursor: 'pointer' }}
                   onClick={(e) => {
                     if (isRenaming) return
@@ -454,7 +459,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
               })}
               {editable && onAddColumn && (
                 <th
-                  className="px-2 py-2 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)] text-center"
+                  className="h-8 px-2 py-0 border-b border-[var(--r-hairline)] bg-[var(--vscode-ritemark-aiSheet,var(--r-surface-muted))] text-center"
                   style={{ width: 36, minWidth: 36 }}
                 >
                   <button
@@ -487,8 +492,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 style={{ minHeight: ROW_HEIGHT }}
               >
                 <td
-                  className={`relative px-2 py-2 text-center text-xs border-b border-r border-[var(--r-hairline)] whitespace-nowrap bg-[var(--vscode-sideBar-background)] text-[var(--r-ink-muted)]`}
-                  style={{ minWidth: 50, width: 50, verticalAlign: 'top', overflow: 'visible', cursor: onDeleteRow ? 'pointer' : 'default' }}
+                  className={`relative h-8 pl-1 pr-2.5 py-0 text-right text-xs leading-[31px] border-b border-[var(--r-hairline)] whitespace-nowrap text-[var(--r-ink-muted)]`}
+                  style={{ minWidth: 36, width: 36, verticalAlign: 'top', overflow: 'visible', cursor: onDeleteRow ? 'pointer' : 'default' }}
                   onClick={(e) => {
                     if (onDeleteRow) {
                       e.stopPropagation()
@@ -585,15 +590,12 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         }
                       }}
                       tabIndex={isActive ? 0 : -1}
-                      className={`relative px-3 py-2 border-b border-[var(--r-hairline)] text-[var(--r-ink-strong)] cursor-cell focus:outline-none ${isEditing ? 'overflow-visible whitespace-normal' : 'overflow-hidden'}`}
+                      className={`relative h-8 px-2.5 py-0 align-middle leading-5 border-b border-[var(--r-hairline)] text-[var(--r-ink-strong)] cursor-cell focus:outline-none ${isEditing ? 'overflow-visible whitespace-normal' : 'overflow-hidden'}`}
                       style={{
                         minWidth: 120,
                         maxWidth: 400,
-                        boxShadow: isActive && !isEditing
-                          ? 'inset 0 0 0 2px var(--vscode-focusBorder, var(--vscode-textLink-foreground))'
-                          : undefined,
                         background: isActive && !isEditing
-                          ? 'var(--vscode-editor-selectionHighlightBackground, transparent)'
+                          ? 'var(--r-accent-soft)' // the chosen cell: the soft indigo fill (comparison/after-sheet.png)
                           : undefined,
                         zIndex: isEditing ? 40 : undefined,
                       }}
@@ -745,21 +747,21 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       </table>
 
       {editable && onAddRow && (
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-separate border-spacing-0 text-[13px]">
           <tbody>
             <tr
               className="group cursor-pointer hover:bg-[var(--r-surface-soft)]"
               onClick={onAddRow}
             >
               <td
-                className="px-2 py-1.5 text-center border-b border-r border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)]"
-                style={{ width: 50, minWidth: 50 }}
+                className="h-8 pl-1 pr-2.5 py-0 text-right"
+                style={{ width: 36, minWidth: 36 }}
               >
-                <Icon name="plus" size={12} className="mx-auto opacity-40 group-hover:opacity-100 text-[var(--r-accent)] transition-opacity" />
+                <Icon name="plus" size={12} className="ml-auto text-[var(--r-ink-muted)] group-hover:text-[var(--r-accent)]" />
               </td>
               <td
                 colSpan={columns.length + (onAddColumn ? 1 : 0)}
-                className="px-3 py-1.5 text-xs border-b border-[var(--r-hairline)] text-[var(--r-ink-muted)] opacity-40 group-hover:opacity-100 transition-opacity"
+                className="h-8 px-2.5 py-0 text-[13px] text-[var(--r-ink-muted)] group-hover:text-[var(--r-ink-strong)]"
               >
                 Add row
               </td>
@@ -767,6 +769,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
           </tbody>
         </table>
       )}
+    </div>
     </div>
     </div>
   )

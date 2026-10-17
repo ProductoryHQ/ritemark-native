@@ -254,6 +254,11 @@ body[data-vscode-theme-kind='vscode-dark'],
   box-shadow: 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--r-hairline)), 0 1px 2px var(--vscode-ritemark-sheetShadow, rgba(15, 23, 42, 0.05));
 }
 
+/* Ritemark 2.0: a table without Add row closes on its area's border, with no line after its last row (DataTable.tsx) */
+.rm-grid-closed > tbody > tr:last-child > td {
+  border-bottom-width: 0;
+}
+
 body {
   font-family: var(--ritemark-ui-font-family);
   font-size: var(--vscode-font-size, 13px);
