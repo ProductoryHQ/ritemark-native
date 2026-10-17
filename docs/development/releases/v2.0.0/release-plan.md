@@ -207,7 +207,7 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | Step | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | **Merged 2026-10-17** as `9de4f267` | Pre-commit validator passed | n/a |
-| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: `docs/sprint-132-surfaces-and-frame-plan` | #276, #430, #199 | Plan written (Phase 2), awaiting Jarmo's approval | — | — |
+| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438) | #276, #430, #199 | Plan written (Phase 2), awaiting Jarmo's approval | — | — |
 | 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
 | 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
 | Update — VS Code | `sprint-NN-vscode-update` | — | — | Not planned | — | — |
