@@ -91,6 +91,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 - The Experience lead's drawings: the terminal as a tab, the Windows top (menu button and window controls), the ⋯ menu with Copilot Chat, and the surfaces not yet drawn (the Settings page, dialogs, notifications, the command palette, Flows, Transcribe, the previews, the browser, the Agent Library).
 - Jarmo's yes or no on the narrow-window rule.
+- Whether the VS Code pin moves to the current release before the new patch is built (engineering's call in this step's plan; see Risks and Blockers).
 
 **Done when**
 
@@ -185,6 +186,58 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 **Done when** v2.0.0 is published through the shell-tier gates below, the update feed is updated, and the release is closed out (release skill).
 
+## Issue Intake
+
+Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges into main before v2.0.0 ships in 2.0, so the milestone takes bugs as they are picked up, too.
+
+| Issue | Decision | Step | Notes |
+|---|---|---|---|
+| [#276](https://github.com/ProductoryHQ/ritemark-native/issues/276) A new profile hides Ritemark AI behind the terminal and shows an empty CHAT side bar | Include | 1 | Solved by the terminal as a tab and Copilot Chat behind More: the AI column holds only Ritemark's AI |
+| [#430](https://github.com/ProductoryHQ/ritemark-native/issues/430) A fresh profile opens an empty CHAT panel in the left side bar | Include | 1 | Same cause as #276 (Copilot Chat's view); proven on a fresh profile |
+| [#199](https://github.com/ProductoryHQ/ritemark-native/issues/199) Tab row: a "New" button at the right edge | Include | 1 | The + at the right end of the tab row: Text, Table, Web page, Terminal |
+| [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429) The first launch sometimes opens a `.md` twice | Include | 2 | The welcome owns the first window; checked on a fresh profile |
+| [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338) Analytics: mark non-production runs | Include | 2 | The four welcome events must leave dev and test runs out |
+| [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401) Windows: the extension host is unresponsive for about 8 s after activation on a fresh profile | Decide in step 2's plan | 2 | It is the welcome's first impression on Windows |
+| [#107](https://github.com/ProductoryHQ/ritemark-native/issues/107) Webview bundle size | Watch | 2, 3 | The welcome and Home join the shared bundle; measure the bundle before and after |
+| [#139](https://github.com/ProductoryHQ/ritemark-native/issues/139) Native shell auto-update | Not in 2.0 | — | v1.14.0 users move to 2.0 through today's update flow |
+
+## Sprint / Issue / PR Tracker
+
+| Step | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
+|---|---|---|---|---|---|---|
+| Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | Open (docs only) | Pre-commit validator passed | n/a |
+| 1 — Surfaces and frame | `sprint-NN-surfaces-and-frame` (number when planned) | — | #276, #430, #199 | Not planned | — | — |
+| 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
+| 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
+| 4 — 2.0 as one release | the release worktree and version bump | — | — | Not planned | — | — |
+
+## Feature-Complete Checklist
+
+- [ ] Steps 1, 2 and 3 merged, each with its issues closed or explicitly deferred with evidence.
+- [ ] Everything v1.14.0 can do is reachable in 2.0, checked against a written list (including Home's launcher, the Getting Started launch check, the terminal and Copilot Chat).
+- [ ] The base window matches the drawings on the Mac and on Windows, light and dark. Jarmo approves the screenshot baseline.
+- [ ] An update from a lived-in v1.14.0 profile tested on the Mac and on Windows.
+- [ ] The four analytics events verified, sent only after a yes and never from dev runs.
+- [ ] Docs updated: `layout-invariants.md`, `architecture.md`, `CLAUDE.md`'s patch table, `PATCH-RULES.md`.
+- [ ] Runtime review done for the gap since v1.14.0, and `check:anthropic-models` OK.
+- [ ] Version 2.0.0 in all six version files; release notes and `CHANGELOG.md` cover everything merged since v1.14.0.
+- [ ] Windows and macOS x64 CI green on `main` before the candidate is cut.
+- [ ] No open blocker in the risk register below.
+
+## Risks and Blockers
+
+| Risk | Severity | Retirement plan | Status |
+|---|---|---|---|
+| The frame without a title row has never run on Windows, and each Windows round needs a merge and a paid build | High | Plan a Windows round right after step 1's first merge, before the theme pass is finished | Open |
+| The surfaces patch has never been built for production | High | A production build from a clean-room worktree right after step 1 merges | Open |
+| VS Code moves on while 2.0 is built: the pin is 1.117.0, 1.119.0 is out, and on it patches 002, 003, 007, 009, 010, 015 and the new patch conflict | Medium | Step 1's plan decides whether to move the pin first. Recommended: move it first, so the new patch is built once, on the base 2.0 ships on | Open |
+| No fixes reach v1.14.0 users until 2.0 | Medium | An urgent fix only by Jarmo's exception to the clean-room rule (a release worktree from the v1.14.0 tag); new models keep arriving through the catalog feed | Open |
+| The bundled runtimes stay at their v1.14.0 versions; a new model may need a newer runtime | Medium | The catalog feed hides models the bundled runtime cannot run; step 4's runtime review | Open |
+| Many surfaces are not drawn in the new theme yet | Medium | The Experience lead's drawings before step 1 is planned in detail | **Blocks step 1's plan** |
+| The stylesheet and the editor's DOM walks break visibly at a VS Code update, not at apply time | Medium | The screenshot comparison in `update-vscode.sh`'s checklist; VS Code's own layout information instead of DOM walks where it exists | Open |
+| Habits and saved state move: terminals saved in the AI column, Copilot Chat out of the row | Low | Terminals restore as tabs; the update test covers both | Open |
+| The webview bundle grows with the welcome and Home ([#107](https://github.com/ProductoryHQ/ritemark-native/issues/107)) | Low | Measure in steps 2 and 3 | Open |
+
 ## Not in 2.0
 
 - **The columns coming over the desk** in narrow windows (below 1200 and 960). This is deep work in VS Code's `layout.ts`.
@@ -236,6 +289,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **Narrow windows (step 1):** include the simple part. Below a set width the AI column narrows and then hides itself; the columns sliding over the desk stay out.
 - **A ChatGPT API key on the welcome (step 2):** leave it out of 2.0 and add it if people ask.
 - **An urgent fix for v1.14.0 while 2.0 is built:** only if one is needed.
+- **The VS Code pin (engineering, step 1's plan):** recommended to move to the current VS Code before the new patch is built, so it is built once, on the base 2.0 ships on.
 
 ## Design questions for the Experience lead
 
