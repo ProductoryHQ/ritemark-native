@@ -1681,7 +1681,7 @@ index 4aaccf3c849..31f3520c15a 100644
 +	registerWorkbenchContribution2(RitemarkAiColumnGuard.ID, RitemarkAiColumnGuard, WorkbenchPhase.BlockRestore);
 +}
 diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
-index fe7bce2f083..43e76f5eee6 100644
+index fe7bce2f083..71fd1bb112b 100644
 --- a/src/vs/workbench/browser/parts/compositeBarActions.ts
 +++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
 @@ -8,7 +8,7 @@ import { Action, IAction, Separator } from '../../../base/common/actions.js';
@@ -1701,6 +1701,15 @@ index fe7bce2f083..43e76f5eee6 100644
  
  export interface ICompositeBar {
  
+@@ -453,7 +454,7 @@ export class CompositeOverflowActivityAction extends CompositeBarAction {
+ 	) {
+ 		super({
+ 			id: 'additionalComposites.action',
+-			name: localize('additionalViews', "Additional Views"),
++			name: localize('additionalViews', "More"), // Ritemark 2.0: More (⋯), at the end of the places row (R5, R6)
+ 			classNames: ThemeIcon.asClassNameArray(Codicon.more)
+ 		});
+ 	}
 @@ -463,52 +464,49 @@ export class CompositeOverflowActivityAction extends CompositeBarAction {
  	}
  }
@@ -2100,10 +2109,10 @@ index 00000000000..20613e775a9
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..9b7b9dc9733
+index 00000000000..67f3b47cd9f
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,152 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2183,7 +2192,11 @@ index 00000000000..9b7b9dc9733
 +	contextViewService.showContextView({
 +		getAnchor: () => anchor,
 +		anchorAlignment: options.align === 'right' ? AnchorAlignment.RIGHT : AnchorAlignment.LEFT,
-+		render: container => renderMenu(container, options, items, close),
++		render: container => renderMenu(container, options, items, close, () => {
++			close();
++			// Escape and Tab hand the keyboard back to the menu's button (More's is its place item, focusable at -1 in the row)
++			(anchor.hasAttribute('tabindex') ? anchor : anchor.querySelector<HTMLElement>('[tabindex]'))?.focus();
++		}),
 +		onHide: () => {
 +			if (openAnchor === anchor) {
 +				openAnchor = undefined;
@@ -2195,7 +2208,7 @@ index 00000000000..9b7b9dc9733
 +	openAnchor = anchor;
 +}
 +
-+function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void): IDisposable {
++function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void, leave: () => void): IDisposable {
 +	const disposables = new DisposableStore();
 +	const menu = append(container, $(`.ritemark-menu.${options.className}`, { role: 'menu', 'aria-label': options.ariaLabel }));
 +	if (options.heading) {
@@ -2241,7 +2254,7 @@ index 00000000000..9b7b9dc9733
 +		} else if ((event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) && index >= 0) {
 +			rows[index].click();
 +		} else if (event.equals(KeyCode.Escape) || event.equals(KeyCode.Tab)) {
-+			close();
++			leave();
 +		} else {
 +			return;
 +		}
