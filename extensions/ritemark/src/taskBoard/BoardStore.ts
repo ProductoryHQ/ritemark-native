@@ -405,10 +405,21 @@ export class BoardStore {
     try {
       text = unsaved ?? (await this.fs.readFile(file));
     } catch (error) {
-      if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read ${fileName}: ${messageOf(error)}`, error);
-      const had = this.entries.delete(fileName);
+      if (isMissing(error)) {
+        const had = this.entries.delete(fileName);
+        this.provisionalIds.delete(fileName);
+        return had;
+      }
+      // A file that can't be read right now (a cloud drive still fetching it, a
+      // permission) is listed as unreadable, like a file that doesn't parse, and
+      // the rest of the board still loads. One timed-out OneDrive file used to
+      // leave the whole board and the Tasks side bar empty (v1.14.0).
+      const message = `Couldn't read it: ${messageOf(error)}`;
+      const previous = this.entries.get(fileName);
+      if (previous?.parsed.kind === 'unreadable' && previous.parsed.message === message) return false;
+      this.entries.set(fileName, { fileName, hash: `unreadable:${message}`, parsed: { kind: 'unreadable', message } });
       this.provisionalIds.delete(fileName);
-      return had;
+      return true;
     }
     const hash = hashOf(text);
     if (this.entries.get(fileName)?.hash === hash) return false;

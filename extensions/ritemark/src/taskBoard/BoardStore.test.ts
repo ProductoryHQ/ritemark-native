@@ -387,6 +387,34 @@ async function main(): Promise<void> {
     assert.equal(closed.kind === 'card' && closed.card.stage, 'done');
   }
 
+  // ── A card file that can't be read right now doesn't empty the board ──────
+  // (v1.14.0: one OneDrive file still downloading timed out, and the whole
+  // board and the Tasks side bar stayed empty.)
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'k3f9x2-fine.md', { id: 'k3f9x2', title: 'Still on the board' });
+    writeCard(folder, 'p7q2m4-cloud.md', { id: 'p7q2m4', title: 'In the cloud' });
+    let cloudReady = false;
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (path.basename(file) === 'p7q2m4-cloud.md' && !cloudReady) {
+          throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+        }
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    const entries = await store.list();
+    assert.deepEqual(cardsOf(entries).map((card) => card.title), ['Still on the board'], 'the readable card loads');
+    const unreadable = entries.find((entry) => entry.kind === 'unreadable');
+    assert.ok(unreadable && unreadable.kind === 'unreadable' && unreadable.fileName === 'p7q2m4-cloud.md', 'the timed-out file is listed as unreadable');
+    assert.match(unreadable.kind === 'unreadable' ? unreadable.message : '', /Couldn't read it: ETIMEDOUT/, 'with the reason');
+    assert.equal(await store.invalidate('p7q2m4-cloud.md'), false, 'the same failure again is no change');
+
+    cloudReady = true;
+    assert.equal(await store.invalidate('p7q2m4-cloud.md'), true, 'once the file can be read, it becomes a card again');
+    assert.deepEqual(cardsOf(await store.list()).map((card) => card.title).sort(), ['In the cloud', 'Still on the board']);
+  }
+
   console.log('taskBoard/BoardStore: all assertions passed');
 }
 
