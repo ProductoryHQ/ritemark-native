@@ -2076,10 +2076,10 @@ index 00000000000..20613e775a9
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..91583b71c39
+index 00000000000..9b7b9dc9733
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,148 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2125,19 +2125,50 @@ index 00000000000..91583b71c39
 +	readonly align: 'left' | 'right';
 +}
 +
-+/** Show a Ritemark menu under `anchor`. `onHide` runs when it closes, by a choice, Escape or a click anywhere else. */
++/**
++ * Ritemark's menus close on a press outside them (R7, S27): anywhere in the workbench but the menu and its anchor (a
++ * press on the anchor belongs to the anchor, which closes its menu), and inside a webview (a document, the AI), whose
++ * press never reaches the workbench but moves focus into the webview, so the window's blur closes the menu instead.
++ */
++export function ritemarkCloseOnLeave(anchor: HTMLElement, hide: () => void): IDisposable {
++	const targetWindow = getWindow(anchor);
++	const disposables = new DisposableStore();
++	disposables.add(addDisposableListener(targetWindow, EventType.BLUR, () => hide()));
++	disposables.add(addDisposableListener(targetWindow.document, EventType.MOUSE_DOWN, e => {
++		const target = e.target as Element | null;
++		if (target && !anchor.contains(target) && !target.closest('.context-view')) {
++			hide();
++		}
++	}, true)); // capture: a row that stops the press (the tree's) still closes the menu
++	return disposables;
++}
++
++let openAnchor: HTMLElement | undefined;
++
++/**
++ * Show a Ritemark menu under `anchor`, or close it when it is already open there (a second press on its anchor).
++ * `onHide` runs when it closes, by a choice, Escape, the anchor or a press anywhere else.
++ */
 +export function showRitemarkMenu(contextViewService: IContextViewService, anchor: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], onHide: () => void): void {
 +	const close = () => contextViewService.hideContextView();
-+	const leave = addDisposableListener(getWindow(anchor), EventType.BLUR, close); // a press inside a webview never reaches the workbench
++	if (openAnchor === anchor) {
++		close();
++		return;
++	}
++	const leave = ritemarkCloseOnLeave(anchor, close);
 +	contextViewService.showContextView({
 +		getAnchor: () => anchor,
 +		anchorAlignment: options.align === 'right' ? AnchorAlignment.RIGHT : AnchorAlignment.LEFT,
 +		render: container => renderMenu(container, options, items, close),
 +		onHide: () => {
++			if (openAnchor === anchor) {
++				openAnchor = undefined;
++			}
 +			leave.dispose();
 +			onHide();
 +		}
 +	});
++	openAnchor = anchor;
 +}
 +
 +function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void): IDisposable {

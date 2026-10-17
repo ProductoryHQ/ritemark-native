@@ -598,10 +598,10 @@ index 00000000000..7ac893b5de7
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
 new file mode 100644
-index 00000000000..b6130b1e804
+index 00000000000..99967801216
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,172 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -628,6 +628,7 @@ index 00000000000..b6130b1e804
 +import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 +import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
++import { ritemarkCloseOnLeave } from '../ritemarkMenu.js';
 +
 +interface INewTabKind {
 +	readonly label: string;
@@ -642,15 +643,6 @@ index 00000000000..b6130b1e804
 +	{ label: localize('ritemark.newTab.web', "Web page"), detail: localize('ritemark.newTab.webDetail', "Open a site, or a recent page"), icon: Codicon.globe, command: 'ritemark.browser.newTab' },
 +	{ label: localize('ritemark.newTab.terminal', "Terminal"), detail: localize('ritemark.newTab.terminalDetail', "A command line in this project's folder"), icon: Codicon.terminal, command: 'workbench.action.createTerminalEditor' },
 +];
-+
-+/**
-+ * Ritemark's menus close when the person clicks outside them (R7). VS Code closes a context view on a
-+ * press anywhere in the workbench, but a press inside a webview (a document, the AI) never reaches
-+ * the workbench: it moves focus into the webview, so the window's blur closes the menu instead.
-+ */
-+export function ritemarkCloseOnLeave(element: HTMLElement, hide: () => void): IDisposable {
-+	return addDisposableListener(getWindow(element), EventType.BLUR, () => hide());
-+}
 +
 +/**
 + * Show a Ritemark menu under a button at the right end of the tab row: it opens leftward, over the
