@@ -252,6 +252,24 @@ async function main(): Promise<void> {
     assert.equal(reborn.list().has('zzzzzz'), false, 'records of cards that are gone are dropped');
     assert.ok(events.length > 0);
 
+    // A card the board couldn't read at startup (a cloud drive still fetching
+    // it) is not gone: its record and its conversation link stay, and work in
+    // flight still becomes Interrupted. (After #437 an unreadable file no longer
+    // fails the board, so recovery must not take its missing id for "gone".)
+    {
+      const cloud = await board.create({ title: 'Its file is in the cloud', stage: 'doing', by: 'you' });
+      await reborn.start({ card: cloud, runtimeId: 'claude-code', kind: 'give' });
+      const cloudTurn = sidebar.enqueued.at(-1)!;
+      sidebar.conversations.add(cloudTurn.conversationId ?? 'conv-cloud');
+      const third = new CardHandoffLedger({ store: new CardTaskStore(recordsDir), board, sidebar, folderPath: '/', now });
+      await third.recover(new Set([running.id]), { forgetMissing: false });
+      assert.ok(third.list().has(cloud.id), 'the unreadable card keeps its hand-off record');
+      assert.equal(third.list().get(cloud.id)?.state, 'interrupted', 'its work in flight is Interrupted, as for any card');
+      const fourth = new CardHandoffLedger({ store: new CardTaskStore(recordsDir), board, sidebar, folderPath: '/', now });
+      await fourth.recover(new Set([running.id]));
+      assert.equal(fourth.list().has(cloud.id), false, 'with every card file read, a missing id still means gone');
+    }
+
     // W13: Retry after the restart goes to the card's own conversation and runs
     // (the sidebar side: conversations/turnsLeftByRestart.test.ts).
     const sent = sidebar.enqueued.length;

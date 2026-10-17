@@ -165,7 +165,12 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     // records of cards that are gone are dropped.
     void store
       .list()
-      .then((entries) => ledger.recover(new Set(entries.flatMap((entry) => (entry.kind === 'card' ? [entry.card.id] : [])))))
+      .then((entries) =>
+        ledger.recover(new Set(entries.flatMap((entry) => (entry.kind === 'card' ? [entry.card.id] : []))), {
+          // A card file that can't be read or parsed has no id here, but it isn't gone.
+          forgetMissing: entries.every((entry) => entry.kind === 'card'),
+        }),
+      )
       .then(() => boardController.scheduleRefresh())
       .catch((error) => console.warn('[taskBoard] recovery failed', error));
 

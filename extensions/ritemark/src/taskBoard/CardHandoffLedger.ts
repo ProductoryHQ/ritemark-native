@@ -84,11 +84,15 @@ export class CardHandoffLedger implements HandoffLedger, AgentTaskListener {
    * Startup: read the records, forget cards that are gone from the board, and
    * turn work a quit or crash left in flight into `interrupted` (with Retry).
    * Call after the controller subscribed, so cards waiting on that work hear it.
+   * Pass `forgetMissing: false` when the board could not read every card file:
+   * a card it can't read right now (a cloud drive still fetching it) or that
+   * doesn't parse is not gone, and its record holds the link to its conversation.
    */
-  async recover(existingCardIds: ReadonlySet<string>): Promise<void> {
+  async recover(existingCardIds: ReadonlySet<string>, options: { forgetMissing?: boolean } = {}): Promise<void> {
+    const forgetMissing = options.forgetMissing ?? true;
     const records = await this.deps.store.load();
     for (const record of records) {
-      if (!existingCardIds.has(record.cardId)) {
+      if (forgetMissing && !existingCardIds.has(record.cardId)) {
         await this.deps.store.remove(record.cardId);
         continue;
       }
