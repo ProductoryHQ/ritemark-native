@@ -298,7 +298,7 @@ All of this is patch 019, from the proof of concept:
 | `webview/src` (index.css, AI sidebar, rail, headers, button, toolbars) | 10 | Yes, rebuilt from source; not the committed bundle |
 | `extension.ts` (start-up terminal removed) | 7 | Yes |
 | `views/HomePanel.ts`, `ProjectsViewProvider.ts`, `permanentTabs.ts`, `homeIcons.ts`, `media/home-*` | — | Step 3, not this sprint |
-| `taskBoard/BoardStore.ts` fix (an unreadable task file no longer empties the board) | — | Not this sprint: a separate bug-fix PR to main |
+| `taskBoard/BoardStore.ts` fix (an unreadable task file no longer empties the board) | — | Not this sprint: already on main as [#437](https://github.com/ProductoryHQ/ritemark-native/pull/437) |
 
 ## Delivery plan: two merges
 
