@@ -16,8 +16,25 @@ Six patches, numbered 001 through 006, each owning a specific domain:
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
+| `007-ritemark-vscode-1117-compat.patch` | Compatibility | VS Code 1.117 API fixes; the Copilot Chat launcher opens Copilot Chat as a tab |
+| `008-ritemark-windows-binary-strip.patch` | Windows packaging | Strips non-Windows native binaries from bundled packages |
+| `009-ritemark-browser-context-bridge.patch` | Browser | The active browser tab's context for AI chat; navigation pushes for Browser Recent |
+| `010-ritemark-browser-action-bridge.patch` | Browser | AI agent actions in the integrated browser |
+| `011-ritemark-cloud-file-error.patch` | Windows | OneDrive/SharePoint cloud-file read errors |
+| `012-ritemark-shell-watchdog.patch` | Updates | Quarantines a broken user-dir extension copy |
+| `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |
+| `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts |
+| `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark |
+| `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion |
+| `017-ritemark-launch-check-node.patch` | Welcome | The launch check's Node line only when needed |
+| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head (sizes and drawing) |
+| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs |
 
-**Rule:** Patches must not overlap in domain. Each file belongs to exactly one patch.
+**Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
+`auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's
+lines outside the known pairs; `scripts/check-patch-stacking.mjs` (pre-commit Check 14) enforces it. For 002, 018
+and 019, a change goes in the patch that owns its kind: placement, the frame's sizes and drawing, or the tab row
+(`references/layout-invariants.md`).
 
 ---
 

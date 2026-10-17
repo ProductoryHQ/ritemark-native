@@ -67,10 +67,10 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 6: Merge 1, the frame
 
-- [ ] VS Code unit tests: `ritemarkPermanentTabs.test.ts`; the panel-to-desk terminal guard (E3)
+- [x] VS Code unit tests: `ritemarkPermanentTabs.test.ts`; the panel-to-desk terminal guard (E3)
 - [x] Extension tests: the 2.0 defaults and the head's menus in `package.json` (E3)
 - [x] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
-- [ ] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
+- [x] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
 - [ ] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md`
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [ ] PR 1 opened; `qa-validator` review; Jarmo's "admin merge"

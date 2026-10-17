@@ -28,7 +28,7 @@ index 28d0480ab86..08b6f36aa5f 100644
  
  export interface IEditorGroupTitleHeight {
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
-index a2344eaf8f2..19e33c8c2dd 100644
+index a2344eaf8f2..a9e8b628053 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 @@ -18,7 +18,7 @@ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar
@@ -64,7 +64,32 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		if (candidate && this.model.isSticky(candidate) !== sticky) {
  			const oldIndexOfEditor = this.getIndexOfEditor(candidate);
  
-@@ -1391,6 +1401,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1165,17 +1175,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 		// Fire the event letting everyone know we are about to open an editor
+ 		this._onWillOpenEditor.fire({ editor, groupId: this.id });
+ 
++		// Ritemark 2.0: no tab opens in front of Home and Tasks (a file dropped at the front of the row, a tab dragged from another desk)
++		const index = typeof options?.index === 'number' && !this.isRitemarkPermanentType(editor) ? Math.max(options.index, this.ritemarkPermanentCount()) : options?.index;
++
+ 		// Determine options
+ 		const pinned = options?.sticky
+ 			|| (!this.groupsView.partOptions.enablePreview && !options?.transient)
+ 			|| editor.isDirty()
+-			|| (options?.pinned ?? typeof options?.index === 'number' /* unless specified, prefer to pin when opening with index */)
+-			|| (typeof options?.index === 'number' && this.model.isSticky(options.index))
++			|| (options?.pinned ?? typeof index === 'number' /* unless specified, prefer to pin when opening with index */)
++			|| (typeof index === 'number' && this.model.isSticky(index))
+ 			|| editor.hasCapability(EditorInputCapabilities.Scratchpad);
+ 		const openEditorOptions: IEditorOpenOptions = {
+-			index: options ? options.index : undefined,
++			index,
+ 			pinned,
+-			sticky: options?.sticky || (typeof options?.index === 'number' && this.model.isSticky(options.index)),
++			sticky: options?.sticky || (typeof index === 'number' && this.model.isSticky(index)),
+ 			transient: !!options?.transient,
+ 			inactiveSelection: internalOptions?.inactiveSelection,
+ 			active: this.count === 0 || !options?.inactive,
+@@ -1391,6 +1404,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			return true;
  		}
  
@@ -76,7 +101,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		// Move across groups
  		else {
  			return this.doMoveOrCopyEditorAcrossGroups(editor, target, options, { ...internalOptions, keepCopy: false });
-@@ -1398,11 +1413,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1398,11 +1416,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doMoveEditorInsideGroup(candidate: EditorInput, options?: IEditorOpenOptions): void {
@@ -97,7 +122,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		// Update model and make sure to continue to use the editor we get from
  		// the model. It is possible that the editor was already opened and we
  		// want to ensure that we use the existing instance in that case.
-@@ -1522,9 +1545,33 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1522,9 +1548,38 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	//#region closeEditor()
  
  	async closeEditor(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions): Promise<boolean> {
@@ -115,8 +140,13 @@ index a2344eaf8f2..19e33c8c2dd 100644
 +	 * dispose them (a disposed editor leaves through `handleDisposedEditors`).
 +	 */
 +	private isRitemarkPermanent(editor: EditorInput): boolean {
++		return this.isRitemarkPermanentType(editor) && this.model.isSticky(editor);
++	}
++
++	/** Ritemark 2.0: whether an editor is Home or the Task board, pinned or not. */
++	private isRitemarkPermanentType(editor: EditorInput): boolean {
 +		const viewType = (editor as { viewType?: unknown }).viewType;
-+		return typeof viewType === 'string' && RITEMARK_PERMANENT_VIEW_TYPES.includes(viewType) && this.model.isSticky(editor);
++		return typeof viewType === 'string' && RITEMARK_PERMANENT_VIEW_TYPES.includes(viewType);
 +	}
 +
 +	/** Ritemark 2.0: how many tabs at the front of the row are Home or Tasks. */
@@ -131,7 +161,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  	private async doCloseEditorWithConfirmationHandling(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions, internalOptions?: IInternalEditorCloseOptions): Promise<boolean> {
  		if (!editor) {
  			return false;
-@@ -1880,6 +1927,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1880,6 +1935,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doGetEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
@@ -142,7 +172,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		if (Array.isArray(args)) {
  			return args;
  		}
-@@ -1969,7 +2020,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1969,7 +2028,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doCloseAllEditors(options?: ICloseAllEditorsOptions): void {
@@ -151,7 +181,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		if (options?.excludeConfirming) {
  			editors = editors.filter(editor => !this.shouldConfirmClose(editor));
  		}
-@@ -2171,6 +2222,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2171,6 +2230,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.lastLayout = { width, height, top, left };
  		this.element.classList.toggle('max-height-478px', height <= 478);
  
@@ -174,7 +204,7 @@ index a2344eaf8f2..19e33c8c2dd 100644
  		// Layout the title control first to receive the size it occupies
  		const titleControlSize = this.titleControl.layout({
  			container: new Dimension(width, height),
-@@ -2186,6 +2253,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2186,6 +2261,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.editorPane.layout({ width, height: editorHeight, top: top + titleControlSize.height, left });
  	}
  
@@ -1135,3 +1165,268 @@ index 50a4c0f4917..db53f732c98 100644
  		return title;
  	}
  
+diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
+new file mode 100644
+index 00000000000..5627ecf829b
+--- /dev/null
++++ b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
+@@ -0,0 +1,112 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../../base/common/async.js';
++import { Emitter } from '../../../../../base/common/event.js';
++import { DisposableStore } from '../../../../../base/common/lifecycle.js';
++import { URI } from '../../../../../base/common/uri.js';
++import { upcastPartial } from '../../../../../base/test/common/mock.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { IShellLaunchConfig } from '../../../../../platform/terminal/common/terminal.js';
++import { IEditorService } from '../../../../services/editor/common/editorService.js';
++import { ITerminalGroupService, ITerminalInstance, ITerminalService } from '../../browser/terminal.js';
++import { ritemarkNextTerminalName, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
++
++interface IOpened { resource: string; inactive: boolean; preserveFocus: boolean }
++
++/**
++ * Ritemark 2.0 (Sprint 132, R8): a terminal is a tab. Terminals that land in the panel move onto the desk, behind
++ * the open document at start and in front later; hidden ones stay where they are. Plain new terminals are named
++ * "Terminal", "Terminal 2", ...; a terminal with a name of its own keeps it.
++ */
++suite('Ritemark terminal tabs', () => {
++
++	const disposables = new DisposableStore();
++	teardown(() => disposables.clear());
++
++	function terminal(id: number, config: Partial<IShellLaunchConfig> = {}): ITerminalInstance {
++		const instance = upcastPartial<ITerminalInstance>({
++			instanceId: id,
++			resource: URI.from({ scheme: 'vscode-terminal', path: `/${id}` }),
++			title: config.name ?? 'zsh',
++			shellLaunchConfig: { ...config },
++			rename: async (name?: string) => { (instance as { title: string }).title = name ?? ''; },
++		});
++		return instance;
++	}
++
++	function setUp(panel: ITerminalInstance[]) {
++		const onDidCreateInstance = disposables.add(new Emitter<ITerminalInstance>());
++		const onDidChangeInstances = disposables.add(new Emitter<void>());
++		let connect!: () => void;
++		const whenConnected = new Promise<void>(resolve => connect = resolve);
++		const all: ITerminalInstance[] = [...panel];
++		const opened: IOpened[] = [];
++		const terminalService = upcastPartial<ITerminalService>({
++			get instances() { return all; },
++			onDidCreateInstance: onDidCreateInstance.event,
++			onDidDisposeInstance: disposables.add(new Emitter<ITerminalInstance>()).event,
++			whenConnected,
++			createOnInstanceCapabilityEvent: (() => disposables.add(new Emitter<unknown>())) as unknown as ITerminalService['createOnInstanceCapabilityEvent'],
++		});
++		const terminalGroupService = upcastPartial<ITerminalGroupService>({
++			get instances() { return panel; },
++			onDidChangeInstances: onDidChangeInstances.event,
++		});
++		const editorService = upcastPartial<IEditorService>({
++			openEditor: (async (input: { resource: URI; options: { inactive: boolean; preserveFocus: boolean } }) => {
++				opened.push({ resource: input.resource.path, inactive: input.options.inactive, preserveFocus: input.options.preserveFocus });
++				return undefined;
++			}) as unknown as IEditorService['openEditor'],
++		});
++		disposables.add(new RitemarkTerminalTabs(terminalService, terminalGroupService, editorService));
++		const create = (instance: ITerminalInstance) => {
++			all.push(instance);
++			onDidCreateInstance.fire(instance);
++		};
++		return { connect, opened, panel, create, changed: () => onDidChangeInstances.fire() };
++	}
++
++	test('panel terminals move onto the desk: behind the document at start, in front later; hidden ones stay', async () => {
++		const { connect, opened, panel, changed } = setUp([terminal(1), terminal(2, { hideFromUser: true })]);
++
++		connect();
++		await timeout(0);
++		const atStart = opened.splice(0);
++		panel.splice(0, panel.length, terminal(3));
++		changed();
++		await timeout(10);
++
++		assert.deepStrictEqual({ atStart, later: opened }, {
++			atStart: [{ resource: '/1', inactive: true, preserveFocus: true }],
++			later: [{ resource: '/3', inactive: false, preserveFocus: true }],
++		});
++	});
++
++	test('plain terminals are named Terminal, Terminal 2; named, task and revived ones keep their names', () => {
++		const { create } = setUp([]);
++		const first = terminal(1);
++		const second = terminal(2);
++		const codex = terminal(3, { name: 'Install Codex' });
++		const task = terminal(4, { type: 'Task' });
++		const revived = terminal(5, { attachPersistentProcess: upcastPartial<NonNullable<IShellLaunchConfig['attachPersistentProcess']>>({ id: 7 }) });
++
++		[first, second, codex, task, revived].forEach(create);
++
++		assert.deepStrictEqual([first, second, codex, task, revived].map(instance => instance.title), ['Terminal', 'Terminal 2', 'Install Codex', 'zsh', 'zsh']);
++	});
++
++	test('the next name is the lowest free one', () => {
++		assert.deepStrictEqual([
++			ritemarkNextTerminalName([]),
++			ritemarkNextTerminalName(['Terminal']),
++			ritemarkNextTerminalName(['Terminal', 'Terminal 3']),
++			ritemarkNextTerminalName(['zsh', 'Terminal 2']),
++		], ['Terminal', 'Terminal 2', 'Terminal 2', 'Terminal']);
++	});
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++});
+diff --git a/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts b/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts
+new file mode 100644
+index 00000000000..949c7891831
+--- /dev/null
++++ b/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts
+@@ -0,0 +1,141 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../../base/common/async.js';
++import { DisposableStore } from '../../../../../base/common/lifecycle.js';
++import { URI } from '../../../../../base/common/uri.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { SyncDescriptor } from '../../../../../platform/instantiation/common/descriptors.js';
++import { Registry } from '../../../../../platform/registry/common/platform.js';
++import { EditorExtensions, EditorsOrder, IEditorFactoryRegistry } from '../../../../common/editor.js';
++import { createEditorParts, ITestInstantiationService, registerTestEditor, TestEditorPart, TestFileEditorInput, workbenchInstantiationService, workbenchTeardown } from '../../../../test/browser/workbenchTestServices.js';
++import { GroupDirection, IEditorGroupsService } from '../../common/editorGroupsService.js';
++
++/** A tab the group takes for the extension's Task board: a webview of that view type. */
++class TestTaskBoardInput extends TestFileEditorInput {
++	readonly viewType = 'mainThreadWebview-ritemark.taskBoard';
++}
++
++/**
++ * Ritemark 2.0 (Sprint 132, R9): a pinned Home or Task board tab keeps the front of the row. A person or a
++ * command cannot close, unpin or move it to another group, no tab moves in front of it, and Close all and
++ * Close others leave it. Only the extension removes it, by disposing it.
++ */
++suite('Ritemark permanent tabs', () => {
++
++	const TEST_EDITOR_ID = 'MyFileEditorForRitemarkPermanentTabs';
++	const TEST_EDITOR_INPUT_ID = 'testEditorInputForRitemarkPermanentTabs';
++
++	const disposables = new DisposableStore();
++	let instantiationService: ITestInstantiationService | undefined;
++
++	setup(() => {
++		disposables.add(registerTestEditor(TEST_EDITOR_ID, [new SyncDescriptor(TestFileEditorInput)], TEST_EDITOR_INPUT_ID));
++	});
++
++	teardown(async () => {
++		if (instantiationService) {
++			await workbenchTeardown(instantiationService);
++			instantiationService = undefined;
++		}
++		disposables.clear();
++	});
++
++	async function createPart(): Promise<TestEditorPart> {
++		instantiationService = workbenchInstantiationService(undefined, disposables);
++		instantiationService.invokeFunction(accessor => Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).start(accessor));
++		const parts = await createEditorParts(instantiationService, disposables);
++		instantiationService.stub(IEditorGroupsService, parts);
++		return parts.testMainPart;
++	}
++
++	function board(): TestTaskBoardInput {
++		return disposables.add(new TestTaskBoardInput(URI.file('/project/.ritemark/tasks'), TEST_EDITOR_INPUT_ID));
++	}
++
++	function document(name: string): TestFileEditorInput {
++		return disposables.add(new TestFileEditorInput(URI.file(`/project/${name}.md`), TEST_EDITOR_INPUT_ID));
++	}
++
++	/** The row, by file: TestFileEditorInput names every tab alike. */
++	function row(group: TestEditorPart['activeGroup']): string[] {
++		return group.getEditors(EditorsOrder.SEQUENTIAL).map(editor => editor.resource?.path ?? '');
++	}
++
++	async function openRow(part: TestEditorPart) {
++		const group = part.activeGroup;
++		const tasks = board();
++		const brief = document('Brief');
++		const proposal = document('Proposal');
++		await group.openEditor(tasks, { pinned: true, sticky: true });
++		await group.openEditor(brief, { pinned: true });
++		await group.openEditor(proposal, { pinned: true });
++		return { group, tasks, brief, proposal };
++	}
++
++	test('a pinned Task board tab cannot be closed, unpinned or moved to another group', async () => {
++		const part = await createPart();
++		const { group, tasks } = await openRow(part);
++
++		assert.strictEqual(await group.closeEditor(tasks), false);
++		group.unstickEditor(tasks);
++		const right = part.addGroup(group, GroupDirection.RIGHT);
++		const moved = group.moveEditor(tasks, right);
++
++		assert.deepStrictEqual({ moved, open: group.contains(tasks), index: group.getIndexOfEditor(tasks), sticky: group.isSticky(tasks), inRight: right.contains(tasks), disposed: tasks.gotDisposed }, { moved: false, open: true, index: 0, sticky: true, inRight: false, disposed: false });
++	});
++
++	test('no other tab moves or opens in front of it, from this desk or another', async () => {
++		const part = await createPart();
++		const { group, tasks, proposal } = await openRow(part);
++
++		group.moveEditor(proposal, group, { index: 0 });
++		await group.openEditor(document('Kickoff'), { pinned: true, index: 0 });
++		const right = part.addGroup(group, GroupDirection.RIGHT);
++		const notes = document('Notes');
++		await right.openEditor(notes, { pinned: true });
++		right.moveEditor(notes, group, { index: 0 });
++
++		assert.deepStrictEqual({ row: row(group), sticky: group.stickyCount }, { row: [tasks.resource.path, '/project/Notes.md', '/project/Kickoff.md', '/project/Proposal.md', '/project/Brief.md'], sticky: 1 });
++	});
++
++	test('Close all and Close others leave it', async () => {
++		const part = await createPart();
++		const { group, tasks, brief, proposal } = await openRow(part);
++
++		await group.closeEditors({ except: brief });
++		const afterOthers = row(group);
++		await group.closeEditors([tasks, brief]);
++		const afterList = row(group);
++		await group.openEditor(document('Proposal again'), { pinned: true });
++		await group.closeAllEditors();
++		const afterAll = row(group);
++
++		assert.deepStrictEqual({ afterOthers, afterList, afterAll, proposalClosed: !group.contains(proposal) }, { afterOthers: [tasks.resource.path, '/project/Brief.md'], afterList: [tasks.resource.path], afterAll: [tasks.resource.path], proposalClosed: true });
++	});
++
++	test('the extension removes it by disposing it', async () => {
++		const part = await createPart();
++		const { group, tasks } = await openRow(part);
++
++		tasks.dispose();
++		await timeout(10); // the group closes disposed editors in a worker, a tick later
++
++		assert.strictEqual(group.contains(tasks), false);
++	});
++
++	test('a Task board tab that is not pinned is an ordinary tab', async () => {
++		const part = await createPart();
++		const group = part.activeGroup;
++		const tasks = board();
++		await group.openEditor(tasks, { pinned: true });
++
++		assert.strictEqual(await group.closeEditor(tasks), true);
++		assert.strictEqual(group.contains(tasks), false);
++	});
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++});

@@ -95,7 +95,7 @@ After this, 002 should have about 22 files. Its header lists what moved where.
 - `windowImpl.ts`: `setSheetOffset(44)`.
 - VS Code's macOS 26 sizes (`isTahoeOrNewer`, 32 against 28) go, so their imports go with them. VS Code's strict build fails on any unused import.
 
-**Zoom (R3).** As `NativeTitlebarPart` does with `preventZoom`, the strips divide their height and centre line by `getZoomFactor(window)`. The traffic lights are placed with the scaled height, so the line holds while the documents zoom. *Audit first:* `research/zoom-audit.md` (Phase 1) settles whether CSS `zoom: 1 / factor` on the strip or a computed height is cleaner, and how the overlay webviews behave.
+**Zoom (R3).** As `NativeTitlebarPart` does with `preventZoom`, the strips divide their height and centre line by `getZoomFactor(window)`. The traffic lights are placed in screen points with the unscaled 52, so a zoom never moves them while the documents zoom (corrected in Phase 1, below). *Audit first:* `research/zoom-audit.md` (Phase 1) settles whether CSS `zoom: 1 / factor` on the strip or a computed height is cleaner, and how the overlay webviews behave.
 - *Phase 1 ([research/zoom-audit.md](research/zoom-audit.md)):* VS Code's own title-bar pattern. The strips and the desk's tab row are counter-zoomed in CSS (`zoom: calc(1 / var(--ritemark-zoom-factor))`), so every number inside them stays as drawn; the parts lay their content out under `44 / factor` (`ritemarkStripLayoutHeight`), and the tab row reports `44 / factor` as its height. The traffic lights take the **unscaled** 52: they are placed in screen points, so a zoom never moves them, and the sentence above about a scaled height was wrong. The hidden title bar must not send its own height (0) to the window controls, a likely cause of the proof of concept's misplaced lights at start. Overlay webviews follow their anchors and need nothing.
 
 **The status bar and rows.** `StatusbarPart.HEIGHT = 24` with its CSS; `ExplorerDelegate.ITEM_HEIGHT = 32` with its CSS. The remote indicator and the problems counts are hidden through settings where VS Code has them, and otherwise in the stylesheet. Problems stays in the View menu.
@@ -297,6 +297,25 @@ All of this is patch 019, from the proof of concept:
   - After each merge: a production build from a clean-room worktree at the merged commit (`create-release-worktree.sh`, then `build-prod.sh`), as a build check only.
   - A Windows build from main.
   - All patches dry-apply and apply on the pin, and a second `apply-patches.sh` run is clean.
+
+## Build notes (Phases 3 to 5)
+
+What the build needed beyond the workstreams' file lists, and why:
+
+- **018** also changes `parts/ritemarkMenu.ts` (new: Ritemark's menus, and the one rule that closes them on a press
+  outside, on the window's blur and on a second press of their button), `parts/compositeBarActions.ts` (More opens
+  Ritemark's menu), `browser/layout.ts` (the default column widths, 256 and 400), `platform/window/common/window.ts`
+  (the strip constants, in one module) and `contrib/files/browser/views/explorerViewer.ts` (with a flow open,
+  `.ritemark` stays out of the tree; upstream shows an open excluded file and its folders).
+- **019** also changes `contrib/terminal/browser/terminalInstance.ts`: a terminal named "Terminal N" kept its name
+  only until a reload, when the configured title source dropped it.
+- **002** also changes `explorerViewlet.ts`: the place is called Documents (R5), and it stays a place while its tree
+  is not registered yet (`hideIfEmpty: false`). Without that, a fresh window opened on Search, because 003 hides
+  Outline and Timeline and Documents briefly held no view.
+- **Extension:** `contributes.icons` adds two Phosphor glyphs for the head's menus (All commands, Flow); the product
+  icon theme maps `folder`, `folder-opened`, `file` and `collapse-all` to Phosphor; Reveal in Finder and Reveal in
+  File Explorer are two commands, one per system. `branding/product.json` sets the tree indent to 16 (the Experience
+  lead's answer of 17 October: no carets, the tree from 8, 16 per level).
 
 ## Proof-of-concept map
 

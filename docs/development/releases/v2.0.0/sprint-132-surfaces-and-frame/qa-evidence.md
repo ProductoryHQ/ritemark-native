@@ -45,7 +45,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S31 Ritemark's own terminals | Open | |
 | S32 No terminal at start | Pass | No terminal opens on start; the panel stays hidden after restarts. |
 | S33 Terminals across a restart | Pass | After a restart, all four terminals came back as tabs; no panel. |
-| S34 A pinned Task board tab | Open | Unit test planned (`ritemarkPermanentTabs.test.ts`). |
+| S34 A pinned Task board tab | Partial | `ritemarkPermanentTabs.test.ts` (VS Code's runner, 5 tests pass): Close, Unpin and a move to the other desk leave it first, pinned and open; no tab moves or opens in front of it, from its own desk or another; Close all and Close others leave it; only disposing removes it. The test found that a tab *opened* at the front (a file dropped there, a tab dragged from the other desk) went in front of it; fixed. Not yet run by hand in the app. |
 | S35 The head on Documents | Pass | New at 136, Search at 168, Documents at 214, the tree from 236, the name centred at 110 (geometry). The tree at 8 with 16 per level (icon 16 and 32, label 38 and 54), as the Experience lead's answer 6 asks. |
 | S36 The project's menu and New | Pass | Both are Ritemark menus at 16, 4 under their row, 232 wide, with icons and hairlines ([`qa/s36-project-menu.png`](qa/s36-project-menu.png), [`qa/s36-new-menu.png`](qa/s36-new-menu.png)). All commands, New folder, Collapse folders, Text, Table (CSV data), Flow, Other file… and Folder each worked. Open a folder… and Reveal in Finder were not run: they open a system dialog and Finder in front of Jarmo's work. Reveal's wiring is unit-tested. |
 | S37 You | Partial | The menu matches experiences/settings frame 1 (Settings, Help); ⌘, stays off it until Jarmo decides (Experience lead, answer 8). Keyboard and VoiceOver not run yet. |
@@ -62,3 +62,4 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 - The places were called Folder and Agent Library; now Documents and Agents, as R5 names them (6be0bbf5).
 - With a flow open, `.ritemark/flows` showed in the tree (6be0bbf5).
 - Ritemark's menus stayed open on a press in the tree (S27); they now close on any press outside them and on a second press of their button.
+- A tab opened at the front of the row (dropped there, or dragged from the other desk) went in front of a pinned Task board tab (R9); found by the unit test, fixed in `editorGroupView.ts`.
