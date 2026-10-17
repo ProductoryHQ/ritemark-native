@@ -114,7 +114,7 @@ Then ⋯ does not list it, and nothing else about it shows.
 
 ### S22: Readable tabs
 Given four documents with names of different lengths
-Then each tab is as wide as its name (120 to 200), and the gaps between names are equal.
+Then each tab is as wide as its name (up to 200), and the gaps between names are equal.
 
 ### S23: Pointing at a tab
 When the person points at a tab that is not chosen
@@ -127,7 +127,7 @@ Then a menu opens leftward over the desk with Text, Table (CSV data), Web page a
 
 ### S25: Many tabs
 Given 13 documents open with both columns shown
-Then the tabs used longest ago fold into "N ⌄" before the +, no tab is narrower than 120, and the row does not scroll
+Then the tabs used longest ago fold into "N ⌄" before the +, no tab is narrower than its name, and the row does not scroll
 When the person hides the left column
 Then fewer tabs fold, and with both columns hidden none do.
 
@@ -194,7 +194,7 @@ Then the head shows the whole name with a chevron, then New and Search as rows, 
 
 ### S36: The project's menu and New
 When the person opens the chevron, then New
-Then the chevron offers Open a folder, Reveal in Finder (Reveal in File Explorer on Windows), All commands and the folder tools, and New lists every kind of new file Ritemark makes today; each works.
+Then the chevron offers Switch project…, Open a folder, Reveal in Finder (Reveal in File Explorer on Windows) and the folder tools, and New lists every kind of new file Ritemark makes today; each works.
 
 ## Feature: You and the menus (R11, R12)
 

@@ -39,7 +39,7 @@ Build-environment prerequisites that the hook can't enforce at commit time (arm6
 
 **Bundle-safe extension code (Sprint 92, #105):** the extension host is one esbuild bundle (`out/extension.js` + the standalone `out/browser/browserMcpAdapter.js`), not loose files. New host code must not do `__dirname`-depth path math, must add native/runtime-asset/dynamic-path deps to the esbuild `external` list, and must give separately-spawned processes their own entry point. Full rule: `.claude/skills/vscode-development/SKILL.md` ## Extension host build.
 
-Layout invariants (right sidebar AI panel + terminal placement, titlebar toolbar, etc.) are owned by patch 002. Detailed contract: `.claude/skills/vscode-development/references/layout-invariants.md`.
+Layout invariants (Ritemark 2.0's frame: placement, the strips and sheets, the tab row, terminals as tabs) are owned by patches 002 (placement), 018 (the frame) and 019 (the tab row). Detailed contract: `.claude/skills/vscode-development/references/layout-invariants.md`.
 
 * * *
 
@@ -173,12 +173,12 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (17)
+### Current patches (19)
 
 | Patch | Purpose |
 | --- | --- |
 | `001-ritemark-branding.patch` | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
-| `002-ritemark-ui-layout.patch` | Sidebar, titlebar, tabs, explorer, panels |
+| `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code dev features (chat, debug, go menu) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
@@ -194,6 +194,8 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries |
 | `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion — the Git download button in Source Control and the Git/Node "Click here to install" actions on the welcome page (Microsoft Store policy 10.1.5) |
 | `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when `ritemark.getHealthStatus` reports `nodeRequired` (a system-installed runtime on Windows); the bundled runtimes need no Node.js |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus, the left column's head |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs with their bar |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

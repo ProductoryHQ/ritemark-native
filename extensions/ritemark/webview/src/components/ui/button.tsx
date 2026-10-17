@@ -28,7 +28,7 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-surface-soft hover:text-ink-strong",
         toolbar:
-          "border border-hairline bg-surface text-ink-strong font-medium " +
+          "border border-transparent bg-transparent text-ink-strong font-medium " + // Ritemark 2.0: plain icon buttons, a fill on hover, never a box
           "hover:bg-surface-soft " +
           "data-[state=active]:bg-[--r-accent-soft] data-[state=active]:text-[--r-accent] data-[state=active]:border-[--r-accent-soft] data-[state=active]:font-semibold",
         link: "text-primary underline-offset-4 hover:underline",

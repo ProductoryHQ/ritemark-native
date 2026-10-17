@@ -40,6 +40,254 @@
     "workspace-trust-banner": {
       "fontId": "phosphor-400",
       "fontCharacter": "\\e40a"
+    },
+    "layout-sidebar-left": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "layout-sidebar-right": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "layout-sidebar-left-off": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "layout-sidebar-right-off": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "account": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e4c2"
+    },
+    "bell": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e0ce"
+    },
+    "bell-dot": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e0ce"
+    },
+    "bell-slash": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e0ce"
+    },
+    "close": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e4f6"
+    },
+    "close-dirty": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e18a"
+    },
+    "ellipsis": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e1fe"
+    },
+    "more": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e1fe"
+    },
+    "refresh": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e036"
+    },
+    "new-file": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e236"
+    },
+    "new-folder": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e258"
+    },
+    "add": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e3d4"
+    },
+    "remove": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e32a"
+    },
+    "check": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e182"
+    },
+    "edit": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e3b4"
+    },
+    "copy": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e1ca"
+    },
+    "trash": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e4a6"
+    },
+    "chat-view-icon": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e17e"
+    },
+    "source-control-view-icon": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e27c"
+    },
+    "extensions-view-icon": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e596"
+    },
+    "search-view-icon": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e30c"
+    },
+    "question": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e3e8"
+    },
+    "debug-stop": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e46c"
+    },
+    "split-horizontal": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e546"
+    },
+    "clear-all": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec54"
+    },
+    "link-external": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e5de"
+    },
+    "pin": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e3e2"
+    },
+    "pinned": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e3e2"
+    },
+    "filter": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e266"
+    },
+    "screen-full": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e0a6"
+    },
+    "screen-normal": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e09e"
+    },
+    "history": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e1a0"
+    },
+    "terminal": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\eae8"
+    },
+    "gear": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e270"
+    },
+    "settings-gear": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e272"
+    },
+    "search": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e30c"
+    },
+    "arrow-left": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e058"
+    },
+    "arrow-right": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e06c"
+    },
+    "chevron-down": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e136"
+    },
+    "chevron-right": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e13a"
+    },
+    "chevron-left": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e138"
+    },
+    "chevron-up": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e13c"
+    },
+    "error": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e4f8"
+    },
+    "warning": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e4e0"
+    },
+    "info": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e2ce"
+    },
+    "pass": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e184"
+    },
+    "loading": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\eb44"
+    },
+    "panel-left": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "panel-right": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\ec24"
+    },
+    "file-text": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e23a"
+    },
+    "table": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e476"
+    },
+    "globe": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e288"
+    },
+    "home": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e2c2"
+    },
+    "folder": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e24a"
+    },
+    "folder-opened": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e256"
+    },
+    "file": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e230"
+    },
+    "collapse-all": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e532"
+    },
+    "arrow-swap": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e83c"
     }
   }
 }

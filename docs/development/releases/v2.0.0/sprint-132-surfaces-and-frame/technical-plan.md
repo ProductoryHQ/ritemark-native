@@ -56,6 +56,8 @@ After this, 002 should have about 22 files. Its header lists what moved where.
   - `parts/editor/ritemarkNewTab.ts` (new), `parts/editor/ritemarkFoldedTabs.ts` (new);
   - `contrib/terminal/browser/terminalEditor.ts` + `ritemarkTerminalBar.ts` (new), `contrib/terminal/browser/ritemarkTerminalTabs.ts` (new, W7).
 
+*Phase 1 additions to these lists:* 018 also takes `browser/parts/ritemarkFrameMenu.ts` (new), `base/browser/ui/menu/menubar.ts` and `platform/window/common/window.ts` (W3); 019 also takes `parts/editor/editor.ts` (a group asks its part for its neighbours, see "DOM walks out") and `contrib/terminal/browser/terminalEditorInput.ts` (W7's working dot).
+
 **Dropped from the proof of concept** (`feasibility.md` §6):
 - `RITEMARK_REPIN_ONCE` and its `ritemark.places.repinned` key;
 - the empty `RITEMARK_SECONDARY_PLACES` and the code that reads it;
@@ -93,7 +95,8 @@ After this, 002 should have about 22 files. Its header lists what moved where.
 - `windowImpl.ts`: `setSheetOffset(44)`.
 - VS Code's macOS 26 sizes (`isTahoeOrNewer`, 32 against 28) go, so their imports go with them. VS Code's strict build fails on any unused import.
 
-**Zoom (R3).** As `NativeTitlebarPart` does with `preventZoom`, the strips divide their height and centre line by `getZoomFactor(window)`. The traffic lights are placed with the scaled height, so the line holds while the documents zoom. *Audit first:* `research/zoom-audit.md` (Phase 1) settles whether CSS `zoom: 1 / factor` on the strip or a computed height is cleaner, and how the overlay webviews behave.
+**Zoom (R3).** As `NativeTitlebarPart` does with `preventZoom`, the strips divide their height and centre line by `getZoomFactor(window)`. The traffic lights are placed in screen points with the unscaled 52, so a zoom never moves them while the documents zoom (corrected in Phase 1, below). *Audit first:* `research/zoom-audit.md` (Phase 1) settles whether CSS `zoom: 1 / factor` on the strip or a computed height is cleaner, and how the overlay webviews behave.
+- *Phase 1 ([research/zoom-audit.md](research/zoom-audit.md)):* VS Code's own title-bar pattern. The strips and the desk's tab row are counter-zoomed in CSS (`zoom: calc(1 / var(--ritemark-zoom-factor))`), so every number inside them stays as drawn; the parts lay their content out under `44 / factor` (`ritemarkStripLayoutHeight`), and the tab row reports `44 / factor` as its height. The traffic lights take the **unscaled** 52: they are placed in screen points, so a zoom never moves them, and the sentence above about a scaled height was wrong. The hidden title bar must not send its own height (0) to the window controls, a likely cause of the proof of concept's misplaced lights at start. Overlay webviews follow their anchors and need nothing.
 
 **The status bar and rows.** `StatusbarPart.HEIGHT = 24` with its CSS; `ExplorerDelegate.ITEM_HEIGHT = 32` with its CSS. The remote indicator and the problems counts are hidden through settings where VS Code has them, and otherwise in the stylesheet. Problems stays in the View menu.
 
@@ -112,12 +115,18 @@ After this, 002 should have about 22 files. Its header lists what moved where.
 
 Shortcut words (Ctrl) come from VS Code's keybinding labels on Windows. The strings this sprint adds use those labels and never hard-code ⌘.
 
+*Phase 1 ([research/windows-frame-audit.md](research/windows-frame-audit.md)) changes three of the four points:*
+- **The menu is not compact mode.** `menuBarVisibility: compact` would also put a second menu button in the places row and open the menus sideways. Instead `ritemarkFrameMenu.ts` (018, new) hosts one `CustomMenubarControl` in a 28 slot at the start of the left strip, where it shows only its overflow button and opens downward; it moves to the desk's strip when the left column is hidden. The hidden title bar stops installing its own copy, so only one menu answers Alt. `menubar.ts` (018) names that button "Application Menu" and makes it reachable with Tab.
+- **One sender for the window buttons.** `electron-browser/titlebarPart.ts` sends `{ height: 44, backgroundColor: ground, foregroundColor }` on Windows (52 on the Mac, for the traffic lights) and nothing while hidden; `windowImpl.ts` starts the main window at that height, from a constant in `platform/window/common/window.ts`. In the new frame `window.controlsStyle` is treated as `native`, since VS Code's own buttons live in the hidden title bar.
+- **The buttons' room** is VS Code's own Windows rule, 138 wide (plain, inside the counter-zoomed strips), reserved at the right of the AI's strip, or of the desk's strip and the top-right tab row when the AI is hidden. The `env(titlebar-area-*)` variables are a dev-build cross-check only. The strips stop dragging while the menu has focus, as VS Code's title bar does.
+
 **Testing.** Each Windows round is a merge into main and a build from main (`build-windows.yml` with `source_commit`; the repository's visibility toggle is the Development manager's, per release practice). There are two rounds: after merge 1, and after merge 2 (Delivery plan, below).
 
 ## Workstream 4: The AI column (R4)
 
 - `auxiliaryBarPart.ts` (018): `hasTitle: false`, no composite bar (`RITEMARK_AI_SIDE_ALONE`), and the strip, as in the proof of concept.
 - **Keeping it the AI's.** A small contribution in 018 listens to `IViewDescriptorService.onDidChangeContainerLocation` and container registration. Any view container other than `workbench.view.extension.ritemark-ai` that lands in the auxiliary bar moves to the sidebar. This covers a person's drag, an extension's contribution and a v1.14.0 profile (R16). The terminal (W7) and Copilot Chat (patch 007) no longer go there in the first place.
+  - *Phase 1 (2026-10-17, [research/confirmations.md](research/confirmations.md), [research/terminal-tabs-audit.md](research/terminal-tabs-audit.md)):* a container goes back to its own default place when that is not the AI column: the terminal's to the panel, Search's to the left column. Copilot Chat's own container (`workbench.panel.chat`) is registered in the auxiliary bar, and its launcher already sits in More; in the left column it would show as a second Chat place, so it goes to the panel, which 2.0 does not show. Any other container whose home is the AI column (a view a person dragged there, such as Outline) goes to the left column.
 - The webview follows its sheet; VS Code 1.117 already anchors it, and the proof of concept checked it.
 
 ## Workstream 5: The places row, More and Copilot Chat (R5, R6)
@@ -164,18 +173,23 @@ All of this is patch 019, from the proof of concept:
   - terminal editors restore as editors.
 - **The default.** `terminal.integrated.defaultLocation: "editor"` in the extension's `package.json` (today `"view"`). Every `createTerminal` call then opens a tab: Claude Login, Install Git, Install Node.js, Install Codex and both Codex Repair entry points.
 - **Never in the AI column, never in the panel.** `ritemarkTerminalTabs.ts` (019) is a workbench contribution. After restore, and whenever a terminal instance appears in the panel, it moves the instance to the editor area (`ITerminalService.moveToEditor`). This covers an extension that asks for the panel explicitly, and the terminals a v1.14.0 profile revives (R16).
+  - *Phase 1 ([research/terminal-tabs-audit.md](research/terminal-tabs-audit.md)):* the move opens the instance as an editor that is pinned, inactive and keeps focus where it is, rather than `moveToEditor`, which would take the front and the focus at start; hidden terminals stay alone. The contribution registers itself from its own module, which `terminalEditor.ts` imports, so `terminal.contribution.ts` (002) is not touched. Running state lives here too, shared by the bar and the tab.
 - **Names.**
   - VS Code has no numbering variable for terminal titles; `${sequence}` is the name the process gives itself.
   - So `ritemarkTerminalTabs.ts` names a new terminal that has no name of its own "Terminal", then "Terminal 2" and so on, with `ITerminalInstance.rename()`, counting the terminal tabs open in the window.
   - Named terminals (Claude Login and the others) keep their names.
 - **The bar.**
   - `ritemarkTerminalBar.ts` (019) sits above the terminal in `terminalEditor.ts`, the one hook in that file.
-  - It shows Running while the terminal's `CommandDetection` capability reports a command between `onCommandStarted` and `onCommandFinished`.
-  - Stop sends an interrupt (Ctrl+C) to the instance.
+  - It shows Running while the terminal's `CommandDetection` capability reports a command between `onCommandExecuted` and `onCommandFinished` (*Phase 1:* `onCommandStarted` fires when the prompt is drawn, with the shell idle).
+  - Stop sends an interrupt (Ctrl+C, `sendText('\x03')`, which also works through ConPTY on Windows) to the instance.
+  - The bar's height is fixed, so the terminal is not resized at every command.
   - Without shell integration there is no Running chip, and the bar shows nothing.
 - **The working dot.** `multiEditorTabsControl.ts` (019) adds a class to a terminal editor's tab while its command runs, and the stylesheet draws the chat rail's dot.
+  - *Phase 1:* VS Code's layer rule forbids the tabs control importing terminal code, so the class comes from `TerminalEditorInput.getLabelExtraClasses()` (`terminalEditorInput.ts`, 019), which the tab already applies.
 - **The shortcut (R8, revised).** The extension's `package.json` binds Ctrl+` (⌃` on the Mac; the key ``ctrl+` `` on both) to `workbench.action.createTerminalEditor`. The binding sits where VS Code's own Toggle Terminal binding was, so nothing else changes.
+  - *Phase 1:* inside a terminal the key would go to the shell, so `terminal.integrated.commandsToSkipShell` lists the command (a `package.json` default).
 - **The start-up terminal goes.** `extension.ts:598-608` is removed, as the proof of concept's `b9dacaed` does.
+  - *Phase 1:* so does the start-up block that clears `terminal.integrated.defaultLocation` when it is `editor` (`extension.ts:311-331`), and `terminal.integrated.hideOnStartup: "always"` keeps VS Code from making a terminal when the panel shows an empty terminal view.
 - *Audit first:* `research/terminal-tabs-audit.md` (Phase 1) covers:
   - shell integration on zsh, bash and PowerShell (Mac and Windows), and what the bar shows without it;
   - the names surviving a restart;
@@ -259,7 +273,7 @@ All of this is patch 019, from the proof of concept:
 ## Workstream 13: Tests, checks, docs and builds (E3–E6)
 
 - **VS Code unit tests**, run with `./scripts/test.sh --grep` in the VS Code tree:
-  - `parts/editor/test/browser/ritemarkPermanentTabs.test.ts` (019) for the rule;
+  - `services/editor/test/browser/ritemarkPermanentTabs.test.ts` (019) for the rule;
   - a test for the terminal guard that moves panel terminals to the desk (019).
   - 002's changes to `terminalConfigurationService.test.ts` go back to upstream along with its guard.
 - **Extension tests.** `package.json` carries the 2.0 defaults and the head's menus; both themes carry the surface colours; contrast (W10).
@@ -283,6 +297,33 @@ All of this is patch 019, from the proof of concept:
   - After each merge: a production build from a clean-room worktree at the merged commit (`create-release-worktree.sh`, then `build-prod.sh`), as a build check only.
   - A Windows build from main.
   - All patches dry-apply and apply on the pin, and a second `apply-patches.sh` run is clean.
+
+## Build notes (Phases 3 to 5)
+
+What the build needed beyond the workstreams' file lists, and why:
+
+- **018** also changes `parts/ritemarkMenu.ts` (new: Ritemark's menus, and the one rule that closes them on a press
+  outside, on the window's blur and on a second press of their button), `parts/compositeBarActions.ts` (More opens
+  Ritemark's menu), `browser/layout.ts` (the default column widths, 256 and 400), `platform/window/common/window.ts`
+  (the strip constants, in one module) and `contrib/files/browser/views/explorerViewer.ts` (with a flow open,
+  `.ritemark` stays out of the tree; upstream shows an open excluded file and its folders).
+- **018** also changes `parts/paneCompositeBar.ts`: a click on the open place in the top row runs
+  `ritemark.placeClickedAgain` with the place's id, which the 1.x Activity Bar signalled by hiding and showing the side
+  bar; the extension (`taskBoardHost.ts`) brings the Task board forward for Tasks (R5). `TaskBoardPanel.ts` shows a
+  pinned board restored from the last session instead of replacing it, since R9 keeps it from being closed.
+- **The Experience lead's review (17 October):** 002's `compositeBar.ts` keeps the places row to Ritemark's six (others
+  live in More, which takes the chosen fill while one is open); 018 draws the project's mark (`ritemarkProjectInitials`
+  in `ritemarkProjectHead.ts`), keeps an empty desk's sheet and drops the letterpress; 019's `multiEditorTabsControl.ts`
+  keeps the tab row on an empty desk (its `visible` is always true), and tabs have no width floor.
+- **019** also changes `contrib/terminal/browser/terminalInstance.ts`: a terminal named "Terminal N" kept its name
+  only until a reload, when the configured title source dropped it.
+- **002** also changes `explorerViewlet.ts`: the place is called Documents (R5), and it stays a place while its tree
+  is not registered yet (`hideIfEmpty: false`). Without that, a fresh window opened on Search, because 003 hides
+  Outline and Timeline and Documents briefly held no view.
+- **Extension:** `contributes.icons` adds two Phosphor glyphs for the head's menus (All commands, Flow); the product
+  icon theme maps `folder`, `folder-opened`, `file` and `collapse-all` to Phosphor; Reveal in Finder and Reveal in
+  File Explorer are two commands, one per system. `branding/product.json` sets the tree indent to 16 (the Experience
+  lead's answer of 17 October: no carets, the tree from 8, 16 per level).
 
 ## Proof-of-concept map
 

@@ -583,14 +583,13 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       padding: 10px 12px 10px 14px;
       font-size: 11px; font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--r-ink-muted);
-      background: var(--r-surface-muted);
+      letter-spacing: 0.5px;
+      /* Ritemark 2.0 (Experience 31): a column group, in ink, with no band; the count in muted ink */
+      color: var(--r-ink-strong);
+      background: transparent;
       user-select: none;
       cursor: pointer;
-      transition: color 0.1s;
     }
-    .section-header:hover { color: var(--r-ink-strong); }
     .section-title { display: inline-flex; align-items: center; gap: 6px; }
     .section-caret {
       width: 10px; height: 10px; flex-shrink: 0;
@@ -598,7 +597,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
     .section-caret.collapsed { transform: rotate(-90deg); }
     .section-header-meta { display: flex; align-items: center; gap: 8px; }
-    .section-count { font-size: 11px; font-weight: 400; color: var(--r-ink-faint); }
+    .section-count { font-size: 11px; font-weight: 400; color: var(--r-ink-muted); }
     .section-add-btn {
       width: 18px; height: 18px;
       display: inline-flex; align-items: center; justify-content: center;

@@ -137,8 +137,7 @@ export function SpreadsheetToolbar({
           right: 0;
           height: 40px;
           background: var(--vscode-editor-background);
-          border-bottom: 1px solid var(--r-hairline);
-          z-index: 60;
+          z-index: 60; /* Ritemark 2.0: no line under the table's own bar */
         }
 
         .toolbar-content {

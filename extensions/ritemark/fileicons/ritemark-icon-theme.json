@@ -6,6 +6,9 @@
     "_file_markdown": {
       "iconPath": "./icons/file-text.svg"
     },
+    "_file_flow": {
+      "iconPath": "./icons/flow-arrow.svg"
+    },
     "_file_code": {
       "iconPath": "./icons/file-code.svg"
     },
@@ -35,67 +38,171 @@
     },
     "_folder_open": {
       "iconPath": "./icons/folder-open.svg"
+    },
+    "_file_dark": {
+      "iconPath": "./icons/dark/file.svg"
+    },
+    "_file_markdown_dark": {
+      "iconPath": "./icons/dark/file-text.svg"
+    },
+    "_file_flow_dark": {
+      "iconPath": "./icons/dark/flow-arrow.svg"
+    },
+    "_file_code_dark": {
+      "iconPath": "./icons/dark/file-code.svg"
+    },
+    "_file_code_ts_dark": {
+      "iconPath": "./icons/dark/file-code-2.svg"
+    },
+    "_file_json_dark": {
+      "iconPath": "./icons/dark/braces.svg"
+    },
+    "_file_css_dark": {
+      "iconPath": "./icons/dark/paintbrush.svg"
+    },
+    "_file_image_dark": {
+      "iconPath": "./icons/dark/image.svg"
+    },
+    "_file_config_dark": {
+      "iconPath": "./icons/dark/settings.svg"
+    },
+    "_file_package_dark": {
+      "iconPath": "./icons/dark/package.svg"
+    },
+    "_file_readme_dark": {
+      "iconPath": "./icons/dark/book-open.svg"
+    },
+    "_folder_dark": {
+      "iconPath": "./icons/dark/folder.svg"
+    },
+    "_folder_open_dark": {
+      "iconPath": "./icons/dark/folder-open.svg"
     }
   },
-  "file": "_file",
-  "folder": "_folder",
-  "folderExpanded": "_folder_open",
+  "file": "_file_dark",
+  "folder": "_folder_dark",
+  "folderExpanded": "_folder_open_dark",
   "fileExtensions": {
-    "md": "_file_markdown",
-    "mdx": "_file_markdown",
-    "markdown": "_file_markdown",
-    "json": "_file_json",
-    "jsonc": "_file_json",
-    "json5": "_file_json",
-    "js": "_file_code",
-    "mjs": "_file_code",
-    "cjs": "_file_code",
-    "jsx": "_file_code",
-    "ts": "_file_code_ts",
-    "tsx": "_file_code_ts",
-    "mts": "_file_code_ts",
-    "cts": "_file_code_ts",
-    "html": "_file_code",
-    "htm": "_file_code",
-    "css": "_file_css",
-    "scss": "_file_css",
-    "sass": "_file_css",
-    "less": "_file_css",
-    "png": "_file_image",
-    "jpg": "_file_image",
-    "jpeg": "_file_image",
-    "gif": "_file_image",
-    "webp": "_file_image",
-    "svg": "_file_image",
-    "ico": "_file_image",
-    "bmp": "_file_image",
-    "yaml": "_file_config",
-    "yml": "_file_config",
-    "toml": "_file_config",
-    "ini": "_file_config",
-    "env": "_file_config"
+    "flow.json": "_file_flow_dark",
+    "md": "_file_markdown_dark",
+    "mdx": "_file_markdown_dark",
+    "markdown": "_file_markdown_dark",
+    "json": "_file_json_dark",
+    "jsonc": "_file_json_dark",
+    "json5": "_file_json_dark",
+    "js": "_file_code_dark",
+    "mjs": "_file_code_dark",
+    "cjs": "_file_code_dark",
+    "jsx": "_file_code_dark",
+    "ts": "_file_code_ts_dark",
+    "tsx": "_file_code_ts_dark",
+    "mts": "_file_code_ts_dark",
+    "cts": "_file_code_ts_dark",
+    "html": "_file_code_dark",
+    "htm": "_file_code_dark",
+    "css": "_file_css_dark",
+    "scss": "_file_css_dark",
+    "sass": "_file_css_dark",
+    "less": "_file_css_dark",
+    "png": "_file_image_dark",
+    "jpg": "_file_image_dark",
+    "jpeg": "_file_image_dark",
+    "gif": "_file_image_dark",
+    "webp": "_file_image_dark",
+    "svg": "_file_image_dark",
+    "ico": "_file_image_dark",
+    "bmp": "_file_image_dark",
+    "yaml": "_file_config_dark",
+    "yml": "_file_config_dark",
+    "toml": "_file_config_dark",
+    "ini": "_file_config_dark",
+    "env": "_file_config_dark"
   },
   "fileNames": {
-    "package.json": "_file_package",
-    "package-lock.json": "_file_package",
-    "readme.md": "_file_readme",
-    "readme": "_file_readme",
-    "changelog.md": "_file_readme",
-    "license": "_file_readme",
-    "license.md": "_file_readme"
+    "package.json": "_file_package_dark",
+    "package-lock.json": "_file_package_dark",
+    "readme.md": "_file_readme_dark",
+    "readme": "_file_readme_dark",
+    "changelog.md": "_file_readme_dark",
+    "license": "_file_readme_dark",
+    "license.md": "_file_readme_dark"
   },
   "languageIds": {
-    "markdown": "_file_markdown",
-    "json": "_file_json",
-    "jsonc": "_file_json",
-    "javascript": "_file_code",
-    "javascriptreact": "_file_code",
-    "typescript": "_file_code_ts",
-    "typescriptreact": "_file_code_ts",
-    "html": "_file_code",
-    "css": "_file_css",
-    "scss": "_file_css",
-    "less": "_file_css",
-    "yaml": "_file_config"
+    "markdown": "_file_markdown_dark",
+    "json": "_file_json_dark",
+    "jsonc": "_file_json_dark",
+    "javascript": "_file_code_dark",
+    "javascriptreact": "_file_code_dark",
+    "typescript": "_file_code_ts_dark",
+    "typescriptreact": "_file_code_ts_dark",
+    "html": "_file_code_dark",
+    "css": "_file_css_dark",
+    "scss": "_file_css_dark",
+    "less": "_file_css_dark",
+    "yaml": "_file_config_dark"
+  },
+  "light": {
+    "file": "_file",
+    "folder": "_folder",
+    "folderExpanded": "_folder_open",
+    "fileExtensions": {
+      "flow.json": "_file_flow",
+      "md": "_file_markdown",
+      "mdx": "_file_markdown",
+      "markdown": "_file_markdown",
+      "json": "_file_json",
+      "jsonc": "_file_json",
+      "json5": "_file_json",
+      "js": "_file_code",
+      "mjs": "_file_code",
+      "cjs": "_file_code",
+      "jsx": "_file_code",
+      "ts": "_file_code_ts",
+      "tsx": "_file_code_ts",
+      "mts": "_file_code_ts",
+      "cts": "_file_code_ts",
+      "html": "_file_code",
+      "htm": "_file_code",
+      "css": "_file_css",
+      "scss": "_file_css",
+      "sass": "_file_css",
+      "less": "_file_css",
+      "png": "_file_image",
+      "jpg": "_file_image",
+      "jpeg": "_file_image",
+      "gif": "_file_image",
+      "webp": "_file_image",
+      "svg": "_file_image",
+      "ico": "_file_image",
+      "bmp": "_file_image",
+      "yaml": "_file_config",
+      "yml": "_file_config",
+      "toml": "_file_config",
+      "ini": "_file_config",
+      "env": "_file_config"
+    },
+    "fileNames": {
+      "package.json": "_file_package",
+      "package-lock.json": "_file_package",
+      "readme.md": "_file_readme",
+      "readme": "_file_readme",
+      "changelog.md": "_file_readme",
+      "license": "_file_readme",
+      "license.md": "_file_readme"
+    },
+    "languageIds": {
+      "markdown": "_file_markdown",
+      "json": "_file_json",
+      "jsonc": "_file_json",
+      "javascript": "_file_code",
+      "javascriptreact": "_file_code",
+      "typescript": "_file_code_ts",
+      "typescriptreact": "_file_code_ts",
+      "html": "_file_code",
+      "css": "_file_css",
+      "scss": "_file_css",
+      "less": "_file_css",
+      "yaml": "_file_config"
+    }
   }
 }

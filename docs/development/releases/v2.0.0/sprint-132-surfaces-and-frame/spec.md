@@ -98,7 +98,7 @@ Acceptance criteria:
 As a writer with many documents, I want tabs I can read, and a way to make a new one where the tabs are.
 
 Acceptance criteria:
-- The tabs sit in the desk's strip, 36 high, each as wide as its whole name from 120 to 200. The gaps between names are equal.
+- The tabs sit in the desk's strip, 36 high, each as wide as its whole name, up to 200 (no floor: the proof of concept, the Experience lead's review of 17 October). The gaps between names are equal.
 - Pointing at a tab shows its own shape in the frame's soft fill, and its close button takes the icon's place, so nothing moves.
 - The tab's tooltip shows the path inside the project, never the system path.
 - The + sits at the right end of the tab row, 18 in from the desk's edge. It opens Ritemark's menu leftward over the desk: Text, Table (CSV data), Web page, Terminal.
@@ -147,7 +147,7 @@ Acceptance criteria:
   - New and Search as rows;
   - Documents over the tree.
 - The positions follow the drawing's measurements (New at 136, Search at 168, Documents at 214, the tree from 236).
-- The chevron's menu holds Open a folder, Reveal in Finder (Reveal in File Explorer on Windows), All commands and the folder tools.
+- The chevron's menu holds project things only: Switch project…, Open a folder, Reveal in Finder (Reveal in File Explorer on Windows) and the folder tools. All commands stays on ⇧⌘P and in the View menu (the Experience lead's review, 17 October).
 - New lists every kind of new file Ritemark can make today. Search opens the search across files.
 - Ritemark's own `.ritemark` folder is out of the tree.
 - The words and menu entries come from the extension, so an extension change can change them.
@@ -160,6 +160,7 @@ As a writer, I want my menu in one quiet place.
 Acceptance criteria:
 - You is an outline circle at the AI toggle's weight, at the right end of the AI's strip (before the window buttons on Windows). The new-chat + is the corner's only filled shape.
 - Its menu holds Settings, which opens Ritemark's own settings page, and Help, which opens https://ritemark.app/en/support/.
+- ⌘, (Ctrl+, on Windows) opens Ritemark's own settings page, and Settings shows it (Jarmo, 17 October).
 - It works with the mouse, Enter and Space, and VoiceOver and Narrator announce it as a menu button.
 
 ### R12: Ritemark's menus

@@ -418,6 +418,29 @@ board/give ───────────────────→     shar
 | One user per board | A shared folder shows everyone as "You" |
 | Idea review state is in memory | "Reviewing · {Agent}" and a failed review do not survive a reload; the stored review does |
 
+### The 2.0 frame (Sprint 132)
+
+Ritemark 2.0's window is the workbench redrawn, not a new shell: three patches change VS Code, and the extension
+supplies defaults, words and colours.
+
+- **Placement (002).** The places row sits on top of the left column (`workbench.activityBar.location: top`) in
+  Ritemark's order, applied once per profile; Copilot Chat is always in More and opens as a tab (007); the AI column
+  holds only Ritemark's AI.
+- **The frame (018).** No title row in the main window on the Mac and Windows; a 44 strip tops each column and the
+  desk, with every control on the line at 26 and the traffic lights or window buttons placed on it; the desks and
+  the AI's sheet are raised sheets on the ground, 8 apart; the strips keep their size at any zoom. Ritemark's menus
+  (`ritemarkMenu.ts`: More, You, the left column head's menus) replace VS Code's context menus where Ritemark draws
+  one. The left column's head on Documents (`ritemarkProjectHead.ts`) takes its menus' entries and words from the
+  extension through `ritemark/projectHead` and `ritemark/projectHead/new`.
+- **The tab row (019).** Tabs 120–200 wide that fold into "N ⌄"; a + that asks what kind of tab; pinned Home and
+  Task board tabs that only the extension removes; terminals as tabs on the desk, named "Terminal", "Terminal 2",
+  with their own bar (Running, Stop, Split, Clear, Close).
+- **Extension.** 2.0 defaults in `package.json` (`configurationDefaults`), the head's commands
+  (`src/views/projectHeadCommands.ts`), the seven `ritemark.*` surface colours, the themes and the icon themes.
+
+TO BE: the theme pass on every surface (dialogs, Flows, the Agent Library) and the window-size crossings
+(`ritemarkWindowSizes.ts`) come with merge 2 of the sprint.
+
 ## Agent Runtime Architecture
 
 ### Bundled runtime baseline (Sprint 111, RC-corrected 2026-09-03; Windows sandbox helpers added 2026-09-07)
@@ -1322,7 +1345,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 - **Model IDs and catalog resolution have separate authorities** — canonical IDs and stable defaults live in `src/ai/modelConfig.ts`; `src/ai/modelCatalog/` projects them into provider/runtime lists and resolves availability through live probe → eligible remote → eligible cache → bundled floor. A remote/cache snapshot older than the bundled `updatedAt` cannot hide a newer app baseline. Never hardcode model IDs in runtimes, views, or Flow executors. *Sprint 127:* the static layers merge per row, not first-wins. Existence (Anthropic), runnability (the runtime, extended by feed declarations) and presentation (Ritemark) are separate authorities. Automated feed rows never become defaults.
 - **Flows are JSON + pluggable executors** — new automation capability = new node executor, not a new engine.
 - **Features ON by default, gated by flags** — never delete code to disable (broke Settings in v1.3.0). Disable only via `src/features/flags.ts` and only on explicit instruction.
-- **Layout invariants owned by patch 002** — sidebar, terminal, titlebar placement is contractual; enforced by `.claude/hooks/pre-commit-validator.sh`.
+- **Layout invariants owned by patches 002 (placement), 018 (the frame's sizes and drawing) and 019 (the tab row)** (Sprint 132) — where the parts and places live, the frame's geometry and the tab row are contractual (`.claude/skills/vscode-development/references/layout-invariants.md`). Each kind of change goes in the patch that owns it; `scripts/check-patch-stacking.mjs` (pre-commit Check 14) blocks a hunk that builds on another patch's lines, and `scripts/qa/frame-geometry.mjs` measures the frame on a running instance.
 - **darwin-arm64 is the primary target** — Apple Silicon first; x64/Windows follow.
 - **Ritemark's agent tools are defined once** (Sprint 130) — `src/runtime/ritemarkTools.ts` holds every Ritemark tool (browser, task board), and `RitemarkToolsInjector` projects it into Claude, Codex and OpenCode. No runtime-specific tool implementation or hand copy of a tool.
 - **Three distinct AI execution shapes** — autonomous agent runtimes (Claude Code, Codex, ACP) vs. single-shot flow nodes are genuinely different and must stay so. Sprint 79 unifies the plumbing, not the behavior. The distinction is why `AgentRuntime.prompt()` is separate from `FlowExecutor` node execution.
@@ -1348,6 +1371,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-17 | Sprint 132 | **The 2.0 frame, merge 1 (#443).** Patch 002 shrinks to placement (places row on top in Ritemark's order once per profile, Copilot Chat behind More, the 1.x terminal guards removed); new 018 (no title row, 44 strips on the line at 26, sheets and gaps, zoom, Ritemark's menus, the left column head) and 019 (tab row, +, folded tabs, permanent Home/Task board tabs, terminals as tabs with their bar). Extension: 2.0 defaults, `projectHeadCommands.ts`, seven surface colours, themes and icon themes. New checks: `check-patch-stacking.mjs` (pre-commit Check 14), `qa/frame-geometry.mjs`, `check-vscode-drift.sh`. |
 | 2026-10-13 | Sprint 130 | **Task board (v1.14.0, #119).** New `src/taskBoard/`: card files in `.ritemark/tasks/` (`cardFile.ts`, `BoardStore.ts`, reads and writes an open card page through its document), `BoardController.ts` (derived who-moves-next, Your calls, Doing limit, conflict guard, auto-start, archive + 28-day Done window, idea review), `CardTaskStore.ts` + `CardHandoffLedger.ts` (Give to agent through the Sprint 117 queue: `newConversation`, `sourceKind: 'card'`, `attachTaskListener`; G1–G6), `cardPages.ts` (the Ritemark editor's card mode: `cardMode` in `editorSync/protocol.ts`, body spliced under the front matter), `ideaReview.ts` on the new shared `runtime/oneShotTurn.ts` (conversation titles moved onto it), surfaces `TasksViewProvider.ts` + `TaskBoardPanel.ts`. **Ritemark tool registry:** `runtime/ritemarkTools.ts` + `RitemarkToolsInjector.ts` + `RitemarkIpcServer.ts` replace `BrowserToolsInjector.ts`, `browserMcpServer.ts`, `codexBrowserTools.ts` and `browser/BrowserIpcServer.ts`; the OpenCode adapter is generic; Codex gets `codexDynamicTools` / `onDynamicToolCall` and a `toolSet` key in its continuation fingerprint; Claude gets a new MCP server per session (fixes browser tools reaching only the first open Claude conversation). `capabilityContext.ts` v2: `hasBoardTools` + TASK BOARD section. Flag `task-board` (default on). No patch change. |
 | 2026-10-12 | Sprint 131 | **Browser Recent records in-panel browsing (v1.14.0, #195).** Patch 009 gains `RitemarkBrowserHistoryContribution`, the browser bridge's first workbench→extension push (`ritemark.browser.didNavigate`), with no new hunk in upstream VS Code files. New `browser/browserNavigationRecorder.ts` owns every rule (validation, private sessions, failed loads, schemes, 1 s settle for client redirects, 10 s title window, fallback titles). `BrowserHistoryStore` gains titles, `historyKey` dedupe (case, slash, default port, fragment), `setTitle` and `pruneMissingFiles`. `openInIntegratedBrowser()` stops writing to the store. See *Browser Recent* under the subsystem map. |
 | 2026-10-05 | Sprint 128 | **Claude background work (v1.13.0, #393).** New conversation-scoped `AgentLiveHooks` on `RuntimeSessionConfig.live` (Claude only) and optional `RuntimeSession.stopBackgroundTask` / `backgroundTaskCount`; new pure `agent/backgroundTasks.ts`; `AgentSession` declares `perTaskStopAffordance`, tags prompts `origin: human`, tracks the turn Claude opens itself after background work and matches results by origin; the inactivity timer no longer runs with no turn open; Ask-mode approvals outside a human turn reach the gate instead of failing open. `ConversationController.beginRuntimeInitiatedTurn` + optional `UserMessageEventV1.origin`; context packs skip it. Webview: `agent-task-progress`, `agent-background-tasks`, `agent-turn-started`, `agent-stop-task`; cards keyed by tool_use id and updated across turns; `done-background` / `stopped-background` states; switch confirmation. Capability `backgroundWork`. No patch, flag or shell-tier change. |

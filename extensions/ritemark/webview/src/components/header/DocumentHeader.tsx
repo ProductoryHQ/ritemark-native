@@ -38,8 +38,8 @@ export function DocumentHeader({
   features
 }: DocumentHeaderProps) {
   return (
-    <header className="sticky top-0 left-0 right-0 h-10 bg-surface border-b border-hairline z-[60]">
-      <div className="flex items-center h-full px-4">
+    <header className="sticky top-0 left-0 right-0 h-10 bg-surface z-[60]" /* Ritemark 2.0: no line under the document's own bar */>
+      <div className="flex items-center h-full px-1" /* Ritemark 2.0: buttons inset 4 on every side; 10 (the desk's corner) − 4 = 6, their radius, so the corners nest */>
         {/* Left: toggle cluster */}
         <div className="flex items-center gap-1.5">
           {onContentsClick && (

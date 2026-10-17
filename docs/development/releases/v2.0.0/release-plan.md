@@ -119,6 +119,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **The usage-data choice is part of the welcome sheet**, and nothing is counted until the person says yes (Jarmo, 17 October). It replaces today's separate notice.
 - **Four analytics events:** welcome shown, AI signed in, project opened, first message sent. They go through Ritemark's PostHog (`src/analytics/posthog.ts`), are anonymous, and are sent only after a yes.
 - **People updating from 1.x see the welcome once** (Jarmo, 17 October). It shows them as already signed in; they confirm and pick a project.
+- **A file's extension in muted ink** in the tree and on tabs (the body colour on the chosen tab and the open row), as the framework draws it. It needs VS Code's resource label to render the name and the extension apart, a patch, so it waits for this step (the Experience lead's review of Sprint 132, 17 October).
 
 **Depends on**
 
@@ -207,7 +208,7 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | Step | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | **Merged 2026-10-17** as `9de4f267` | Pre-commit validator passed | n/a |
-| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438) | #276, #430, #199 | Plan approved 2026-10-17; implementation not started | — | — |
+| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438); merge 1 (the frame): [#443](https://github.com/ProductoryHQ/ritemark-native/pull/443) | #276, #430, #199 (closed at merge 2) | Phase 6: merge 1 open 2026-10-17, waits for Jarmo's admin merge | Mac QA in [qa-evidence.md](sprint-132-surfaces-and-frame/qa-evidence.md); Jarmo's pass, the production build and Windows round 1 after the merge | Changelog at 2.0.0 |
 | 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
 | 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
 | Update — VS Code | `sprint-NN-vscode-update` | — | — | Not planned | — | — |
@@ -235,7 +236,7 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | VS Code moves on while 2.0 is built. It now ships weekly: the pin is 1.117.0, and 1.142.0 came out on 14 October. On 1.142.0, patches 001–017 fail in 46 file patches across 16 of the 17 patches, and the proof of concept's patch in 16 of its 33 files | Medium | Decided by engineering (Sprint 132's plan): the pin stays for steps 1–3, and one VS Code update sprint follows step 3. By then, 2.0 has removed part of what fails today (the Getting Started patches in step 2, 002's terminal guards in step 1). The drift is measured at each merge and recorded here | Open |
 | No fixes reach v1.14.0 users until 2.0 | Medium | An urgent fix only by Jarmo's exception to the clean-room rule (a release worktree from the v1.14.0 tag); new models keep arriving through the catalog feed | Open |
 | The bundled runtimes stay at their v1.14.0 versions; a new model may need a newer runtime | Medium | The catalog feed hides models the bundled runtime cannot run; step 4's runtime review | Open |
-| Three surfaces are not drawn in the new theme yet: modal dialogs, Flows, the Agent Library | Low | The Experience lead draws them next. Sprint 132 does them last, in a third PR if needed | Open (no longer blocks step 1's plan) |
+| Three surfaces are not drawn in the new theme yet: modal dialogs, Flows, the Agent Library | Low | The Experience lead draws them next. Sprint 132 does them last, in a third PR if needed | Open: the Experience lead's drawing pass is in progress (experience 31 started 2026-10-17); they go into merge 2 |
 | The stylesheet and the editor's DOM walks break visibly at a VS Code update, not at apply time | Medium | The screenshot comparison in `update-vscode.sh`'s checklist; VS Code's own layout information instead of DOM walks where it exists | Open |
 | Habits and saved state move: terminals saved in the AI column, Copilot Chat out of the row | Low | Terminals restore as tabs; the update test covers both | Open |
 | The webview bundle grows with the welcome and Home ([#107](https://github.com/ProductoryHQ/ritemark-native/issues/107)) | Low | Measure in steps 2 and 3 | Open |

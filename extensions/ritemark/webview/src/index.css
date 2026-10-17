@@ -99,7 +99,7 @@
   --ritemark-ring-color: rgba(67, 56, 202, 0.1);
   --ritemark-ring-color-dark: rgba(129, 140, 248, 0.25);
 
-  --r-surface: var(--ritemark-surface);
+  --r-surface: var(--vscode-ritemark-desk, var(--ritemark-surface)); /* Ritemark 2.0: the desk's colour comes from the theme */
   --r-surface-muted: var(--ritemark-surface-muted);
   --r-surface-soft: var(--ritemark-surface-soft);
   --r-hairline: var(--ritemark-hairline);
@@ -176,7 +176,7 @@ body.vscode-dark,
 body.ritemark-dark,
 body[data-vscode-theme-kind='vscode-dark'],
 .dark {
-  --r-surface: var(--ritemark-dark-surface);
+  --r-surface: var(--vscode-ritemark-desk, var(--ritemark-dark-surface)); /* Ritemark 2.0: the desk's colour comes from the theme */
   --r-surface-muted: var(--ritemark-dark-surface-muted);
   --r-surface-soft: var(--ritemark-dark-surface-soft);
   --r-hairline: var(--ritemark-dark-hairline);
@@ -240,6 +240,18 @@ body[data-vscode-theme-kind='vscode-dark'],
   --secondary-foreground: var(--r-ink-strong);
   --accent: var(--r-accent-soft);
   --accent-foreground: var(--r-ink-strong);
+}
+
+/* Ritemark 2.0: the AI's sheet lies on the ground, 8 from the desk; the chat rail sits beside it on the ground.
+   Colours come from the theme (the ritemark.* colours), so Light and Dark follow. */
+.rm-ai-ground {
+  background-color: var(--vscode-ritemark-ground, var(--vscode-sideBar-background));
+}
+
+.rm-ai-sheet {
+  background-color: var(--vscode-ritemark-aiSheet, var(--r-surface));
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--r-hairline)), 0 1px 2px var(--vscode-ritemark-sheetShadow, rgba(15, 23, 42, 0.05));
 }
 
 body {
