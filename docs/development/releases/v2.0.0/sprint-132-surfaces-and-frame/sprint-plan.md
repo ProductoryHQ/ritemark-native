@@ -90,6 +90,8 @@ Modal dialogs, Flows and the Agent Library wait for their drawings. If those com
   - The drift is measured at each merge (E6), so the update sprint starts from known numbers.
 - **2026-10-17 (engineering): window sizes (R14) take the simple part** of `framework.md`'s rules: narrowing, then hiding. The columns coming over the desk stay out. Jarmo raised no objection to the recommendation; this plan's approval confirms it.
 
+- **2026-10-17, after approval and before Phase 0 (engineering):** R8 revised. Ctrl+` (⌃` on the Mac) opens a new terminal tab, and the View menu gets no Terminal entry. Patch 002 removes VS Code's Toggle Terminal shortcut and menu entry today; sending its `terminal.contribution.ts` wholly back to upstream would have brought both back as a toggle for an unused bottom panel. This clarifies R8's "and the shortcut" and adds S46. Found by the Development manager's planning session.
+
 ## Feature Flag Check
 
 No feature flag. Jarmo decided on 17 October that 2.0 is built straight on main with no switch ("We will focus on 2.0 from now on"), so this sprint changes Ritemark for everyone who builds from main. HARD RULE #1 still holds: nothing is removed without a home, and R15 checks that at each merge.

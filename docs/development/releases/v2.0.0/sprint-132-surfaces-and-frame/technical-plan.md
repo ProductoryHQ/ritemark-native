@@ -6,7 +6,7 @@ The plan for [spec.md](spec.md). The research behind it is the release's [feasib
 
 | Layer | What changes | Where |
 |---|---|---|
-| Patch 002 (placement) | **Shrinks.** Its size lines leave: the tab height, the tree's row height and the places bar's 40 px injected CSS. Its terminal guards leave: 5 files and 14 hunks go back to upstream. It gains the 2.0 order of the places and the layout toggle's 2.0 condition, in its own lines | `patches/vscode/002-ritemark-ui-layout.patch` |
+| Patch 002 (placement) | **Shrinks.** Its size lines leave: the tab height, the tree's row height and the places bar's 40 px injected CSS. Its terminal guards leave: 4 files go back to upstream, and `terminal.contribution.ts` keeps only its removal of the Toggle Terminal shortcut and View-menu entry. It gains the 2.0 order of the places and the layout toggle's 2.0 condition, in its own lines | `patches/vscode/002-ritemark-ui-layout.patch` |
 | Patch 007 (Copilot Chat) | The launcher opens Copilot Chat as a tab and no longer moves Copilot Chat into the AI column | `patches/vscode/007-ritemark-vscode-1117-compat.patch` |
 | Patch 018 (new: surfaces and frame) | The frame without a title row on the Mac and Windows; the strips, sheets and gaps; the AI column; the status bar and rows; the left column's head; You; Ritemark's menus; window sizes; the stylesheet | `patches/vscode/018-ritemark-surfaces.patch` |
 | Patch 019 (new: editor groups and tab row) | The desks' gaps; the tab row (heights, widths, the +, folding); the rule for Home and Tasks; terminal tabs (the bar, the working dot, terminals kept on the desk) | `patches/vscode/019-ritemark-tab-row.patch` |
@@ -29,7 +29,8 @@ No new webview ↔ host message type crosses a subsystem boundary. The head's me
 | `contrib/files/browser/views/explorerViewer.ts` | Row height 28 (its only hunk) | Leaves 002; owned by 018 |
 | `contrib/files/browser/media/explorerviewlet.css` | Row height 28 + the tree's styling | The height lines go to 018's stylesheet; the styling stays |
 | `browser/parts/paneCompositePart.ts` | `applyRitemarkTopTabStyles` (a 40 px bar in injected CSS); the AI column starts on the AI | The injected sizes go to 018's stylesheet; the AI default stays; 018 adds the places inset |
-| `contrib/terminal/browser/terminal.contribution.ts`, `terminalConfigurationService.ts` (+ its test), `terminalEditorSerializer.ts`, `terminalView.ts` | The three terminal guards | **Removed from 002**; the files go back to upstream (W7) |
+| `contrib/terminal/browser/terminalConfigurationService.ts` (+ its test), `terminalEditorSerializer.ts`, `terminalView.ts` | The terminal guards | **Removed from 002**; the files go back to upstream (W7) |
+| `contrib/terminal/browser/terminal.contribution.ts` | The view container in the auxiliary bar; `hideIfEmpty: false`; the Toggle Terminal shortcut and View-menu entry removed | The location and `hideIfEmpty` lines go back to upstream; the removal of the shortcut and the menu entry **stays** (R8, revised) |
 | `browser/parts/compositeBar.ts` | Tasks and Agent Library order, once, for profiles from before Tasks | Replaced by the 2.0 order, once per profile (W5, W12); always-in-More items |
 | `api/browser/viewsExtensionPoint.ts` | Orders: Home −1, Tasks 0.5, Agent Library 1000 | The 2.0 orders: Home, Explorer, Tasks, Browser, Agents, Transcribe |
 | `browser/actions/layoutActions.ts` | The layout toggles rewritten | The left toggle's `when` becomes false (the strip holds it) |
@@ -156,8 +157,9 @@ All of this is patch 019, from the proof of concept:
 
 ## Workstream 7: The terminal is a tab (R8)
 
-- **The guards go (002).** The files go back to upstream:
-  - the terminal view container registers in the panel, as upstream does;
+- **The guards go (002).** Four files go back to upstream, and `terminal.contribution.ts` keeps one change:
+  - the terminal view container registers in the panel, as upstream does, and hides when empty;
+  - VS Code's Toggle Terminal shortcut and its View-menu entry stay removed, as 002 removes them today;
   - `terminal.integrated.defaultLocation` is honoured;
   - terminal editors restore as editors.
 - **The default.** `terminal.integrated.defaultLocation: "editor"` in the extension's `package.json` (today `"view"`). Every `createTerminal` call then opens a tab: Claude Login, Install Git, Install Node.js, Install Codex and both Codex Repair entry points.
@@ -172,6 +174,7 @@ All of this is patch 019, from the proof of concept:
   - Stop sends an interrupt (Ctrl+C) to the instance.
   - Without shell integration there is no Running chip, and the bar shows nothing.
 - **The working dot.** `multiEditorTabsControl.ts` (019) adds a class to a terminal editor's tab while its command runs, and the stylesheet draws the chat rail's dot.
+- **The shortcut (R8, revised).** The extension's `package.json` binds Ctrl+` (⌃` on the Mac, `ctrl+\`` in keybinding terms on both) to `workbench.action.createTerminalEditor`. The binding sits where VS Code's own Toggle Terminal binding was, so nothing else changes.
 - **The start-up terminal goes.** `extension.ts:598-608` is removed, as the proof of concept's `b9dacaed` does.
 - *Audit first:* `research/terminal-tabs-audit.md` (Phase 1) covers:
   - shell integration on zsh, bash and PowerShell (Mac and Windows), and what the bar shows without it;

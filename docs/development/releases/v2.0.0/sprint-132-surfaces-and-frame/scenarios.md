@@ -173,6 +173,11 @@ Given two terminal tabs
 When Ritemark restarts
 Then both come back as tabs.
 
+### S46: The terminal shortcut (R8, revised)
+When the person presses Ctrl+` on Windows, or ⌃` on the Mac, twice
+Then two new terminal tabs open on the desk, and no panel appears
+And the View menu has no Terminal entry.
+
 ## Feature: Home and Tasks keep the front (R9)
 
 ### S34: A pinned Task board tab
