@@ -33,8 +33,8 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S19 Reordering | Open | |
 | S20 Copilot Chat installed | Partial | Copilot Chat in More opens as a tab on the desk. A second click (it should show the same tab) not checked yet. |
 | S21 Copilot Chat not installed | Open | |
-| S22 Readable tabs | Partial | Widths 120 to 200 (geometry). Tooltips not checked yet. |
-| S23 Pointing at a tab | Open | |
+| S22 Readable tabs | Pass | Each tab is its name plus the kit's padding (34 before the name, 12 after; 32 after on the chosen tab, for its close button), at least 120 and at most 200: Kickoff notes.md 142, Proposal.md (chosen) 135, Brief.md 120 ([`qa/s22-tab-row.png`](qa/s22-tab-row.png)). Fixed on the way: core's transparent 1px tab border made every tab 1 wider, and the chosen tab's close button sat 3–5 off the kit (its glyph now centred 16 from the edge). Names end equally far from the next tab except where 120 is wider than a short name, as the kit's minimum implies. |
+| S23 Pointing at a tab | Partial | Under the pointer a tab that is not chosen fills softly and its close button takes the icon's place exactly (both centred 20 from the tab's left); nothing moves. The tooltip with the path not checked yet. |
 | S24 A new tab | Partial | The + menu matches the drawing (Text, Table, Web page, Terminal). Terminal from it checked (S28); the other three not run yet. |
 | S25 Many tabs | Partial | Tabs fold into "N ⌄" per desk; its menu not yet checked against the drawing. |
 | S26 Bringing a folded tab back | Open | |

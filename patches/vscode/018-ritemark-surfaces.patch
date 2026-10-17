@@ -250,10 +250,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..0feef4750b5
+index 00000000000..f0f7b2224a6
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1243 @@
+@@ -0,0 +1,1250 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -829,13 +829,19 @@ index 00000000000..0feef4750b5
 +	padding: 0 8px; /* multiEditorTabsControl.ts RITEMARK_TABS_INSET */
 +}
 +
-+/* The close button has its own slot inside the tab (VS Code lets it spill past the tab's edge) */
++/* The close button has its own slot inside the tab (VS Code lets it spill past the tab's edge): its 20 box (a 16 button
++   padded by 2) 6 after the name and 6 from the tab's edge, so its glyph is centred 16 from the edge and the name ends 32
++   from it (kit: .tb.on padding-right 32, .tb .x 16 at right 8) */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-shrink > .tab-actions {
-+	flex: 0 0 24px !important; /* !important: core's tab sizing rules are as specific */
-+	width: 24px !important;
-+	margin-left: 4px;
++	flex: 0 0 20px !important; /* !important: core's tab sizing rules are as specific */
++	width: 20px !important;
++	margin-left: 6px;
 +	overflow: visible !important;
++}
++
++.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions > .monaco-action-bar {
++	width: 100% !important; /* !important: core makes the bar 28 wide, which would push the button out of its slot */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed > .tab-label,
@@ -875,11 +881,12 @@ index 00000000000..0feef4750b5
 +	max-width: 200px !important;
 +	padding-left: 12px !important;
 +	padding-right: 12px !important;
++	border-right-width: 0 !important; /* !important: core keeps a 1px tab border even when tab.border is transparent; tabs touch, as drawn */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.dirty {
-+	padding-right: 8px !important; /* the close button's own 4 plus 8: 12 from its glyph to the tab's edge */
++	padding-right: 6px !important; /* the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active {
