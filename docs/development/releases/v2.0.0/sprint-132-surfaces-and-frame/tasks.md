@@ -11,11 +11,11 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 1: Audits first
 
-- [ ] `research/windows-frame-audit.md` (W3): compact `CustomMenubarControl` in a strip; Alt focus; WCO height and colours via `updateWindowControls`; `env(titlebar-area-*)` in the strips; drag regions and double-click; which menus remain on Windows
-- [ ] `research/zoom-audit.md` (W2, R3): CSS zoom against computed heights for the strips; the traffic lights at each zoom level; overlay webviews
-- [ ] `research/terminal-tabs-audit.md` (W7, R8): shell integration on zsh, bash and PowerShell (Mac and Windows); the bar without it; renaming new terminals and the names after a restart; how v1.14.0's persistent terminals revive
-- [ ] Confirm the webview editors' `viewType` prefix for Home and the Task board (W6, R9)
-- [ ] Confirm that the overflow keeps always-in-More items after the places that do not fit (W5, R5, R6)
+- [x] `research/windows-frame-audit.md` (W3): compact `CustomMenubarControl` in a strip; Alt focus; WCO height and colours via `updateWindowControls`; `env(titlebar-area-*)` in the strips; drag regions and double-click; which menus remain on Windows
+- [x] `research/zoom-audit.md` (W2, R3): CSS zoom against computed heights for the strips; the traffic lights at each zoom level; overlay webviews
+- [x] `research/terminal-tabs-audit.md` (W7, R8): shell integration on zsh, bash and PowerShell (Mac and Windows); the bar without it; renaming new terminals and the names after a restart; how v1.14.0's persistent terminals revive
+- [x] Confirm the webview editors' `viewType` prefix for Home and the Task board (W6, R9): `research/confirmations.md`
+- [x] Confirm that the overflow keeps always-in-More items after the places that do not fit (W5, R5, R6): `research/confirmations.md`
 
 ## Phase 2: The patch rebuild and fold (W1, E1, E2)
 
