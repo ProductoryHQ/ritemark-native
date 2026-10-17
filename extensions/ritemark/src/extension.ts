@@ -263,10 +263,12 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
   void activationIntegrity.setLastAttemptedVersion(currentVersion);
+  // Ritemark's themes are set up once per profile (Sprint 52). A theme the person chooses afterwards is theirs and
+  // survives every update: this used to run again whenever the version changed, which reset a hand-chosen theme on
+  // each update (Ritemark 2.0, R16, S45).
   const designFoundationsThemeMigration = 'sprint-52-design-foundations-v1';
-  const lastThemeVersion = context.globalState.get<string>('ritemark.themeAppliedVersion');
   const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
-  if (lastThemeVersion !== currentVersion || lastDesignThemeMigration !== designFoundationsThemeMigration) {
+  if (lastDesignThemeMigration !== designFoundationsThemeMigration) {
     setTimeout(async () => {
       const wb = vscode.workspace.getConfiguration('workbench');
       const win = vscode.workspace.getConfiguration('window');

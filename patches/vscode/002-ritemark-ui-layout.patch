@@ -614,7 +614,7 @@ index aec3de2d96d..40753c7e66b 100644
 +	bottom: auto;
 +}
 diff --git a/src/vs/workbench/browser/parts/compositeBar.ts b/src/vs/workbench/browser/parts/compositeBar.ts
-index 8d1020b6621..af63b401636 100644
+index 8d1020b6621..e296661def9 100644
 --- a/src/vs/workbench/browser/parts/compositeBar.ts
 +++ b/src/vs/workbench/browser/parts/compositeBar.ts
 @@ -22,6 +22,31 @@ import { IComposite } from '../../common/composite.js';
@@ -704,7 +704,17 @@ index 8d1020b6621..af63b401636 100644
  				let index = 0;
  				let rIndex = requestedIndex;
  				while (rIndex > 0 && index < this.items.length) {
-@@ -782,6 +823,37 @@ class CompositeBarModel {
+@@ -775,6 +816,9 @@ class CompositeBarModel {
+ 				while (index < this.items.length && typeof this.items[index].order === 'number' && this.items[index].order! < order) {
+ 					index++;
+ 				}
++				// Ritemark 2.0: another place new to the row never goes in among Ritemark's own (R5); a profile's saved
++				// places carry no order, so the search above can stop early, between two of them
++				index = Math.max(index, this.ritemarkPlacesEnd());
+ 				this.items.splice(index, 0, item);
+ 			}
+ 
+@@ -782,6 +826,48 @@ class CompositeBarModel {
  		}
  	}
  
@@ -731,6 +741,17 @@ index 8d1020b6621..af63b401636 100644
 +			}
 +		}
 +		return -1;
++	}
++
++	/** Ritemark 2.0: the index just after the last of Ritemark's own places in the row (0 when none is there). */
++	private ritemarkPlacesEnd(): number {
++		let end = 0;
++		this.items.forEach((item, index) => {
++			if (RITEMARK_OWN_PLACES.includes(item.id)) {
++				end = index + 1;
++			}
++		});
++		return end;
 +	}
 +
 +	/** Ritemark 2.0: Ritemark's own places lead, in their order; every other place keeps its own, after them. */

@@ -595,8 +595,8 @@
         {
           "type": "webview",
           "id": "ritemark.agentLibraryView",
-          "name": "Agent Library",
-          "contextualTitle": "Agent Library",
+          "name": "Agents",
+          "contextualTitle": "Agents",
           "visibility": "visible"
         }
       ],

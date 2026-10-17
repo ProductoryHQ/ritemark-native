@@ -25,8 +25,8 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S7–S11 | Windows | Windows round 1, after merge 1. |
 | S12 Zoom in and out | Pass | Native captures of the top 52 points at zoom 1.0, 1.2, 1.44 and 0.83 ([`qa/s12-zoom-top-band.png`](qa/s12-zoom-top-band.png)): the lights, toggles, You and the tabs keep their size and the line; the lights' pixels are identical; only the columns under the strip change width. |
 | S13 Zoom across a restart | Pass | Zoomed to 1.2, quit and relaunched: zoom 1.2 came back, the lights and toggles at the same pixels as at zoom 1.0 ([`qa/s13-zoom-after-restart.png`](qa/s13-zoom-after-restart.png)). |
-| S14 Only the AI | Partial | The AI column shows only the AI after a fresh start and after restarts. Not yet checked with other views placed there by an older profile (S45). |
-| S15 A view dragged to the AI column | Open | |
+| S14 Only the AI | Pass | After a fresh start, restarts and the v1.14 profile (S45), the AI column shows only the AI's sheet with its chat rail: no VS Code title row, no row of icons ([`qa/s1-fresh-start.png`](qa/s1-fresh-start.png)). |
+| S15 A view dragged to the AI column | Pass | Search moved into the AI column (View: Move View → New Secondary Side Bar Entry, the same move as a drop) went straight back to the left column; More lists it and opens it there; the AI column kept only the AI. Search then sits last in More rather than second as drawn. |
 | S16 The row | Pass | Fresh profile, as S1; places 34 apart from 8, the chosen one filled (geometry). |
 | S17 What does not fit | Pass | More lists Copilot Chat first, then Search, File changes and Extensions, as experiences/home frame 4 draws it. |
 | S18 Tasks opens the board | Pass | With a document in front, a click on Tasks brings the Task board forward, from another place and when Tasks is already chosen, also after a reload with the pinned board restored but not yet shown. Two fixes: the places row on top no longer told the extension about a click on the open place (018 now runs `ritemark.placeClickedAgain`), and a pinned restored board could not be replaced, which opened a second board (the extension now shows the restored one). |
@@ -51,7 +51,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S37 You | Partial | The menu matches experiences/settings frame 1 (Settings, Help); ⌘, stays off it until Jarmo decides (Experience lead, answer 8). By keyboard: You is a button with `aria-haspopup=menu`; Enter and Space open the menu, ↑ ↓ move, Enter on Settings opens Ritemark Settings, Escape closes it and returns focus to You (it did not before; fixed for every Ritemark menu). Not run: Help (it opens ritemark.app in the system browser in front of Jarmo's work) and VoiceOver (it speaks aloud); both for Jarmo's pass. |
 | S38 Ritemark's menus | Partial | More, You, the + and the head's menus are Ritemark menus. The application menu on Windows is for the Windows round. |
 | S44 The inventory | Open | |
-| S45 A lived-in profile | Open | |
+| S45 A lived-in profile | Pass | A v1.14.0 profile made with the installed app (its own instance and profile, in the background): a terminal and Search in the AI column, the Chat view once opened, Agent Library dragged to the top, Ritemark Dark chosen by hand. Opened with this build: the places row on top in R5's order (the drag replaced once), the AI column only the AI, Search in the left column (in More), Chat moved to the panel, the theme still Ritemark Dark ([`qa/s45-lived-in-profile.png`](qa/s45-lived-in-profile.png)). Three fixes came out of it (below). Not exercisable: v1.14 keeps no terminal across a quit (its saved buffer state is empty), so there is none to bring over; Copilot Chat is not installed in the shipped app, and Outline is hidden in 1.x, so Search stood in for it. |
 | S46 The terminal shortcut | Partial | ⌃` opens a new terminal tab from the tree and from inside a terminal; no panel. The View menu not checked yet. |
 
 ## Found and fixed during QA
@@ -64,6 +64,9 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 - Ritemark's menus stayed open on a press in the tree (S27); they now close on any press outside them and on a second press of their button.
 - A click on Tasks when Tasks was already chosen did nothing (S18); now it brings the board forward. With a pinned board restored from the last session, it opened a second board; now it shows the restored one.
 - Escape in You's, More's or the head's menus left the keyboard nowhere; it now returns to the menu's button. The ⋯ button was still called "Additional Views"; now More.
+- Updating from v1.14 reset a hand-chosen theme: the extension re-applied its Sprint 52 theme set-up whenever the version changed ("1.14.0-0" in the shipped app, so every update). It now runs once per profile (S45, R16).
+- A place of another extension new to a v1.14 profile went in among Ritemark's six (a saved place carries no order); it now goes after them (S45, R5).
+- The Agents place's head read "Agents: Agent Library"; its view is called Agents too.
 - A tab opened at the front of the row (dropped there, or dragged from the other desk) went in front of a pinned Task board tab (R9); found by the unit test, fixed in `editorGroupView.ts`.
 
 ## Open findings
