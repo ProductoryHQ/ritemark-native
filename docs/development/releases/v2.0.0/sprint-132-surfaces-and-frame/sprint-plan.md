@@ -4,7 +4,7 @@ Track: SDD (16 user-facing requirements, Mac and Windows, VS Code patches plus t
 Override with: "use plain full track"
 Branch: `sprint-132-surfaces-and-frame` (created only after approval)
 Release tier: shell (`patches/vscode/002`, `007`, new `018` and `019`; theme and icon files that ship only with the app)
-Status: Phase 2 (PLAN), awaiting Jarmo's approval
+Status: Phase 2 (PLAN) approved by Jarmo on 2026-10-17; Phase 0 (branch) is next
 
 ## SDD Artifacts
 
@@ -135,4 +135,4 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (2026-10-17: "approved, admin merge 438")

@@ -1,6 +1,6 @@
 # Release Plan — v2.0.0
 
-**Status:** **Proposed** (2026-10-17), with Jarmo's decisions of the same day built in. Step 1's sprint plan, [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md), is written and awaits Jarmo's approval; every sprint plan needs it before any code. The plan is built on [feasibility.md](feasibility.md)<br>
+**Status:** **Proposed** (2026-10-17), with Jarmo's decisions of the same day built in. Step 1's sprint plan, [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md), was approved by Jarmo on 2026-10-17; every sprint plan needs his approval before any code. The plan is built on [feasibility.md](feasibility.md)<br>
 **Target:** v2.0.0<br>
 **GitHub milestone:** none yet. The Development manager opens it, and can close the empty v1.15.0 milestone<br>
 **Release type:** **Shell-tier.** A new VS Code patch in `patches/vscode/`, changes to patches 002 and 007, new theme and icon files that ship only with the app, and new defaults for every user. A full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI<br>
@@ -34,7 +34,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 | Step | Scope | Depends on | Status |
 |---|---|---|---|
-| 1 — Surfaces and frame, theme first | The real surfaces patch, folded with patch 002; the frame without a title row on the Mac and on Windows; the terminal as a tab; Copilot Chat behind More; the tab row; the places row; the full light and dark theme pass; tests and a production build | The Experience lead's drawings (all in but modal dialogs, Flows and the Agent Library) | **Planned:** [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md), plan awaiting Jarmo's approval |
+| 1 — Surfaces and frame, theme first | The real surfaces patch, folded with patch 002; the frame without a title row on the Mac and on Windows; the terminal as a tab; Copilot Chat behind More; the tab row; the places row; the full light and dark theme pass; tests and a production build | The Experience lead's drawings (all in but modal dialogs, Flows and the Agent Library) | **Plan approved** 2026-10-17: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) |
 | 2 — The welcome | The welcome as a Ritemark page; which AI you use, with each provider's sign-in; setting up a project; landing on it; the usage-data choice on the welcome; the four analytics events; the welcome once for people updating from 1.x | Step 1 merged | **Not planned** |
 | 3 — The project at the centre | The project file and the project list (filled on the first 2.0 start); what waits in each project; Home as the project's page; Home and Tasks as permanent tabs; the projects list in the left column; the column's head; switching in place; the document's bar | Steps 1 and 2 merged | **Not planned** |
 | Update — VS Code to the current release | One update of the pinned VS Code (1.117.0 today; 1.142.0 is out) to the release of that day, with every patch rebased and the screenshot baseline compared | Steps 1–3 merged | **Not planned** |
@@ -207,7 +207,7 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | Step | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Plan and feasibility read | `claude/docs-v2-feasibility-plan-bf53c8` | [#435](https://github.com/ProductoryHQ/ritemark-native/pull/435) | — | **Merged 2026-10-17** as `9de4f267` | Pre-commit validator passed | n/a |
-| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438) | #276, #430, #199 | Plan written (Phase 2), awaiting Jarmo's approval | — | — |
+| 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438) | #276, #430, #199 | Plan approved 2026-10-17; implementation not started | — | — |
 | 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
 | 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
 | Update — VS Code | `sprint-NN-vscode-update` | — | — | Not planned | — | — |
