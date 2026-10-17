@@ -16,6 +16,9 @@ Sprint 132 (Ritemark 2.0 step 1, 2026-10-17): this patch keeps placement; 018 an
   and puts a new Ritemark place in its spot); Copilot Chat's launcher is always in More, after the places that do
   not fit (compositeBar.ts); the title bar's left-column toggle is off, because the column's own strip holds it
   (layoutActions.ts).
+  In the places row only Ritemark's six take a spot: every other place lives in More, even while open, and More
+  takes the chosen fill then; a place new to a saved row never goes in among the six (compositeBar.ts). Documents
+  stays a place while its tree is not registered yet, and is called Documents (explorerViewlet.ts).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -614,7 +617,7 @@ index aec3de2d96d..40753c7e66b 100644
 +	bottom: auto;
 +}
 diff --git a/src/vs/workbench/browser/parts/compositeBar.ts b/src/vs/workbench/browser/parts/compositeBar.ts
-index 8d1020b6621..e296661def9 100644
+index 8d1020b6621..b211fb7cf90 100644
 --- a/src/vs/workbench/browser/parts/compositeBar.ts
 +++ b/src/vs/workbench/browser/parts/compositeBar.ts
 @@ -22,6 +22,31 @@ import { IComposite } from '../../common/composite.js';
@@ -649,7 +652,16 @@ index 8d1020b6621..e296661def9 100644
  
  export interface ICompositeBarItem {
  
-@@ -253,10 +278,16 @@ export class CompositeBar extends Widget implements ICompositeBar {
+@@ -246,6 +271,8 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 	private readonly model: CompositeBarModel;
+ 	private readonly visibleComposites: string[];
+ 	private readonly compositeSizeInBar: Map<string, number>;
++	/** Ritemark 2.0: this bar is the places row (its default is one of Ritemark's own places). */
++	private readonly ritemarkPlacesRow: boolean;
+ 
+ 	constructor(
+ 		items: ICompositeBarItem[],
+@@ -253,10 +280,17 @@ export class CompositeBar extends Widget implements ICompositeBar {
  		@IInstantiationService private readonly instantiationService: IInstantiationService,
  		@IContextMenuService private readonly contextMenuService: IContextMenuService,
  		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
@@ -658,27 +670,76 @@ index 8d1020b6621..e296661def9 100644
  		super();
  
  		this.model = new CompositeBarModel(items, options);
++		this.ritemarkPlacesRow = RITEMARK_OWN_PLACES.includes(options.getDefaultCompositeId() ?? '');
 +		// Ritemark 2.0: the places row (the bar whose default is Documents) takes the 2.0 order once
-+		if (RITEMARK_OWN_PLACES.includes(options.getDefaultCompositeId() ?? '') && !storageService.getBoolean(RITEMARK_PLACES_ORDER_KEY, StorageScope.PROFILE, false)) {
++		if (this.ritemarkPlacesRow && !storageService.getBoolean(RITEMARK_PLACES_ORDER_KEY, StorageScope.PROFILE, false)) {
 +			this.model.leadWithRitemarkPlaces();
 +			storageService.store(RITEMARK_PLACES_ORDER_KEY, true, StorageScope.PROFILE, StorageTarget.MACHINE);
 +		}
  		this.visibleComposites = [];
  		this.compositeSizeInBar = new Map<string, number>();
  		this.computeSizes(this.model.visibleItems);
-@@ -530,8 +561,10 @@ export class CompositeBar extends Widget implements ICompositeBar {
+@@ -383,6 +417,7 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 			if (this.visibleComposites.indexOf(id) === - 1 || (!!this.model.activeItem && !this.model.activeItem.pinned) || (previousActiveItem && !previousActiveItem.pinned)) {
+ 				this.updateCompositeSwitcher();
+ 			}
++			this.ritemarkMarkMore();
+ 		}
+ 	}
+ 
+@@ -392,9 +427,21 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 			if (previousActiveItem && !previousActiveItem.pinned) {
+ 				this.updateCompositeSwitcher();
+ 			}
++			this.ritemarkMarkMore();
+ 		}
+ 	}
+ 
++	/** Ritemark 2.0: whether a place may take a spot in this bar (in the places row, only Ritemark's own). */
++	private ritemarkTakesSpot(id: string): boolean {
++		return !this.ritemarkPlacesRow || RITEMARK_OWN_PLACES.includes(id);
++	}
++
++	/** Ritemark 2.0: More shows the chosen fill while the open place lives in its menu, so the row says where you are. */
++	private ritemarkMarkMore(): void {
++		const activeId = this.model.activeItem?.id;
++		this.compositeOverflowActionViewItem.value?.element?.classList.toggle('ritemark-chosen', !!activeId && !this.visibleComposites.includes(activeId));
++	}
++
+ 	async pin(compositeId: string, open?: boolean): Promise<void> {
+ 		if (this.model.setPinned(compositeId, true)) {
+ 			this.updateCompositeSwitcher();
+@@ -530,8 +577,11 @@ export class CompositeBar extends Widget implements ICompositeBar {
  		).map(item => item.id);
  
  		// Ensure we are not showing more composites than we have height for
 -		let maxVisible = compositesToShow.length;
-+		// Ritemark 2.0: the always-in-More places count, so More shows, but never take a spot in the row
++		// Ritemark 2.0: in the places row only Ritemark's own places take a spot (R5); every other place, and the
++		// always-in-More ones, count, so More shows, and live in its menu, even while open
  		const totalComposites = compositesToShow.length;
-+		compositesToShow = compositesToShow.filter(compositeId => !RITEMARK_ALWAYS_IN_MORE.includes(compositeId));
++		compositesToShow = compositesToShow.filter(compositeId => !RITEMARK_ALWAYS_IN_MORE.includes(compositeId) && (!this.ritemarkPlacesRow || RITEMARK_OWN_PLACES.includes(compositeId)));
 +		let maxVisible = compositesToShow.length;
  		let size = 0;
  		const limit = this.options.orientation === ActionsOrientation.VERTICAL ? this.dimension.height : this.dimension.width;
  
-@@ -648,7 +681,9 @@ export class CompositeBar extends Widget implements ICompositeBar {
+@@ -553,7 +603,7 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 		}
+ 
+ 		// We always try show the active composite, so re-add it if it was sliced out
+-		if (this.model.activeItem && compositesToShow.every(compositeId => !!this.model.activeItem && compositeId !== this.model.activeItem.id)) {
++		if (this.model.activeItem && this.ritemarkTakesSpot(this.model.activeItem.id) && compositesToShow.every(compositeId => !!this.model.activeItem && compositeId !== this.model.activeItem.id)) {
+ 			size += this.compositeSizeInBar.get(this.model.activeItem.id)!;
+ 			compositesToShow.push(this.model.activeItem.id);
+ 		}
+@@ -633,6 +683,7 @@ export class CompositeBar extends Widget implements ICompositeBar {
+ 
+ 			compositeSwitcherBar.push(this.compositeOverflowAction.value, { label: false, icon: true });
+ 		}
++		this.ritemarkMarkMore();
+ 
+ 		if (!donotTrigger) {
+ 			this._onDidChange.fire();
+@@ -648,7 +699,9 @@ export class CompositeBar extends Widget implements ICompositeBar {
  		}
  
  		overflowingIds = overflowingIds.filter(compositeId => !this.visibleComposites.includes(compositeId));
@@ -689,7 +750,7 @@ index 8d1020b6621..e296661def9 100644
  	}
  
  	private showContextMenu(targetWindow: Window, e: MouseEvent | GestureEvent): void {
-@@ -758,7 +793,13 @@ class CompositeBarModel {
+@@ -758,7 +811,13 @@ class CompositeBarModel {
  			return changed;
  		} else {
  			const item = this.createCompositeBarItem(id, name, order, true, true);
@@ -704,7 +765,7 @@ index 8d1020b6621..e296661def9 100644
  				let index = 0;
  				let rIndex = requestedIndex;
  				while (rIndex > 0 && index < this.items.length) {
-@@ -775,6 +816,9 @@ class CompositeBarModel {
+@@ -775,6 +834,9 @@ class CompositeBarModel {
  				while (index < this.items.length && typeof this.items[index].order === 'number' && this.items[index].order! < order) {
  					index++;
  				}
@@ -714,7 +775,7 @@ index 8d1020b6621..e296661def9 100644
  				this.items.splice(index, 0, item);
  			}
  
-@@ -782,6 +826,48 @@ class CompositeBarModel {
+@@ -782,6 +844,48 @@ class CompositeBarModel {
  		}
  	}
  

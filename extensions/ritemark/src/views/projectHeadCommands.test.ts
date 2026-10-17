@@ -109,7 +109,7 @@ test('the head\'s words are Ritemark\'s', () => {
   assert.equal(title('ritemark.projectHead.openFolder'), 'Open a folder…');
   assert.equal(title('ritemark.projectHead.revealInFinder'), 'Reveal in Finder');
   assert.equal(title('ritemark.projectHead.revealInFileExplorer'), 'Reveal in File Explorer');
-  assert.equal(title('ritemark.projectHead.allCommands'), 'All commands');
+  assert.equal(title('ritemark.projectHead.switchProject'), 'Switch project…');
   assert.equal(title('ritemark.projectHead.newText'), 'Text');
   assert.equal(title('ritemark.projectHead.newTable'), 'Table (CSV data)');
 });
@@ -127,7 +127,7 @@ test('the 2.0 defaults', () => {
   assert.equal(configurationDefaults['workbench.activityBar.location'], 'top');
   assert.equal(configurationDefaults['breadcrumbs.enabled'], false);
   assert.equal(configurationDefaults['workbench.editor.tabSizing'], 'fixed');
-  assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMinWidth'], 120);
+  assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMinWidth'], 38); // no floor: tabs are as wide as their names (the stylesheet)
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMaxWidth'], 200);
   assert.equal(configurationDefaults['workbench.editor.pinnedTabSizing'], 'compact');
   assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true });

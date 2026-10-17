@@ -126,7 +126,7 @@ for (const [index, tab] of m.tabs.entries()) {
 	check(`R7 tab ${index + 1} is 36 high from 8`, near(tab.y, 8) && near(tab.h, 36), `${round(tab.y)}+${round(tab.h)}`, '8+36');
 	check(`R1 tab ${index + 1}'s label sits on the line (26)`, tab.label ? near(tab.label.cy, LINE, 1.5) : null, round(tab.label?.cy), LINE);
 	if (!tab.sticky) {
-		check(`R7 tab ${index + 1} is 120 to 200 wide`, tab.w >= 119.5 && tab.w <= 200.5, round(tab.w), '120..200');
+		check(`R7 tab ${index + 1} is at most 200 wide (as wide as its name)`, tab.w <= 200.5, round(tab.w), '<=200');
 	}
 }
 if (m.newTab) {

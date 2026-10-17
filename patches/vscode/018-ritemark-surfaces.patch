@@ -266,10 +266,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..d48c179a708
+index 00000000000..c14e93ad8d1
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1251 @@
+@@ -0,0 +1,1286 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -416,8 +416,9 @@ index 00000000000..d48c179a708
 +	background-color: var(--rm-hover);
 +}
 +
-+.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked {
-+	background-color: var(--rm-place-background);
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked,
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-chosen {
++	background-color: var(--rm-place-background); /* ritemark-chosen: More, while the open place is in its menu (compositeBar.ts) */
 +}
 +
 +/* A place's icon is either a mask (coloured by its background) or a font glyph (coloured by its text colour) */
@@ -425,7 +426,8 @@ index 00000000000..d48c179a708
 +	background-color: var(--rm-place-foreground) !important; /* !important: core colours the mask inline */
 +}
 +
-+.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.codicon {
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.codicon,
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-chosen .action-label.codicon {
 +	color: var(--rm-place-foreground) !important; /* !important: core colours the glyph inline */
 +	background-color: transparent !important;
 +}
@@ -455,10 +457,18 @@ index 00000000000..d48c179a708
 +	display: none;
 +}
 +
-+/* An empty desk is ground, with no sheet */
-+.monaco-workbench .part.editor .editor-group-container.empty > .editor-container {
-+	background-color: var(--rm-ground) !important; /* !important: as the desk's own rule above */
-+	box-shadow: none;
++/* An empty desk keeps its sheet and its tab row with the + (the Experience lead's review, 17 October); VS Code hides an
++   empty group's title row and shows its letterpress on the ground instead */
++.monaco-workbench .part.editor > .content .editor-group-container.empty > .title.tabs {
++	display: block !important; /* !important: core hides an empty group's title row */
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container.empty > .editor-container {
++	display: block !important; /* !important: core hides an empty group's sheet */
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark {
++	display: none !important; /* !important: core shows the letterpress on an empty group */
 +}
 +
 +/* A webview's frame is a block: as an inline element it sits on a text line with a few pixels under it, so its
@@ -683,8 +693,8 @@ index 00000000000..d48c179a708
 +}
 +
 +
-+/* The documents tree (R1): rows 32 (explorerViewer.ts ITEM_HEIGHT); the open document's row a white row lying on
-+   the ground, inset 8, not an indigo band */
++/* The documents tree (R1): rows 32 (explorerViewer.ts ITEM_HEIGHT); the open document's row the desk's colour on
++   the ground, inset 8, radius 4, with no border and not an indigo band */
 +.monaco-workbench .explorer-folders-view .explorer-item,
 +.monaco-workbench .explorer-folders-view .editor-group {
 +	height: 32px;
@@ -702,7 +712,8 @@ index 00000000000..d48c179a708
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row.selected.focused {
 +	background-color: var(--rm-desk) !important; /* !important: the list's selection colours are injected per list */
 +	color: var(--vscode-sideBarTitle-foreground) !important;
-+	box-shadow: 0 0 0 1px var(--rm-hairline), 0 1px 2px var(--rm-shadow) !important;
++	box-shadow: none !important; /* the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
++	border-radius: 4px !important;
 +	outline: none !important;
 +}
 +
@@ -889,12 +900,13 @@ index 00000000000..d48c179a708
 +	visibility: hidden;
 +}
 +
-+/* Each tab is as wide as its whole name, 120 to 200, so the gaps between names are equal (R7, S22). A crowded row
-+   folds the tabs used longest ago (multiEditorTabsControl.ts ritemarkFoldTabs) rather than shorten names. */
++/* Each tab is as wide as its whole name, up to 200, with no floor, so the gaps between names are equal (R7, S22; the
++   prototype: a shown tab keeps its measured width, ritemarkFoldTabs). A crowded row folds the tabs used longest ago
++   rather than shorten names. */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed {
 +	flex: 0 1 auto !important; /* !important: core sizes fixed tabs with a flex basis */
 +	width: auto;
-+	min-width: 120px;
++	min-width: 0;
 +	max-width: 200px !important;
 +	padding-left: 12px !important;
 +	padding-right: 12px !important;
@@ -1312,9 +1324,32 @@ index 00000000000..d48c179a708
 +	letter-spacing: 0;
 +}
 +
++.monaco-workbench .part.sidebar .ritemark-project-mark,
 +.monaco-workbench .part.sidebar .ritemark-project-chevron,
 +.monaco-workbench .part.sidebar > .ritemark-project-rows {
 +	display: none;
++}
++
++/* The project's mark (kit: .mark): its initials in a 24 square of ink before the name, as the prototype draws it;
++   in the dark theme the square is the body colour with ground-coloured letters */
++.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-mark {
++	display: block;
++	flex: none;
++	width: 24px;
++	height: 24px;
++	border-radius: 6px;
++	background-color: var(--vscode-foreground);
++	color: var(--rm-desk);
++	font-size: 10px;
++	font-weight: 700;
++	line-height: 24px;
++	letter-spacing: 0.2px;
++	text-align: center;
++}
++
++.monaco-workbench.vs-dark .part.sidebar.ritemark-documents .ritemark-project-mark {
++	background-color: var(--vscode-tab-inactiveForeground);
++	color: var(--rm-ground);
 +}
 +
 +.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-actions,
@@ -2284,10 +2319,10 @@ index 00000000000..67f3b47cd9f
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..2a9fae8ba12
+index 00000000000..4caf7650450
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,159 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2296,8 +2331,8 @@ index 00000000000..2a9fae8ba12
 +/*
 + * Ritemark 2.0: the left column's head on Documents (R10), as drawn (surfaces/README.md, Measurements).
 + *
-+ * The project by its whole name, with a chevron that opens the project's menu (the folder tools VS Code
-+ * shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
++ * The project's mark (its initials in a 24 square of ink) and its whole name, with a chevron that opens the
++ * project's menu (the folder tools VS Code shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
 + * place and the drawing live here, and both menus are Ritemark menus (ritemarkMenu.ts), as the project's
 + * menu is drawn (experiences/home frame 2: 232 wide, 4 under the head). Their entries, words and icons
 + * come from the extension, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus
@@ -2324,9 +2359,16 @@ index 00000000000..2a9fae8ba12
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
 +const NEW_MENU = MenuId.for('ritemark/projectHead/new');
 +
++/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
++export function ritemarkProjectInitials(name: string): string {
++	const words = name.split(/[\s:_-]+/).filter(word => /[\p{L}\p{N}]/u.test(word));
++	return words.slice(0, 2).map(word => [...word.replace(/[^\p{L}\p{N}]/gu, '')][0] ?? '').join('').toUpperCase() || '·';
++}
++
 +export class RitemarkProjectHead extends Disposable {
 +
 +	private readonly label: HTMLElement;
++	private readonly mark: HTMLElement;
 +	private readonly rows: HTMLElement;
 +	private active = false;
 +
@@ -2344,7 +2386,12 @@ index 00000000000..2a9fae8ba12
 +		// The head: the project's whole name and a chevron; the whole label opens the project's menu
 +		const label = this.label = titleArea.querySelector<HTMLElement>(':scope > .title-label')!;
 +		label.classList.add('ritemark-project-head');
++		this.mark = $('span.ritemark-project-mark', { 'aria-hidden': 'true' });
++		label.prepend(this.mark);
 +		append(label, renderIcon(Codicon.chevronDown)).classList.add('ritemark-project-chevron');
++		this.updateMark();
++		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this.updateMark()));
++		this._register(this.workspaceService.onDidChangeWorkspaceName(() => this.updateMark()));
 +		const openProjectMenu = () => this.showMenu(PROJECT_MENU, label, localize('ritemark.project.menu', "Project"));
 +		this._register(addDisposableListener(label, EventType.CLICK, () => {
 +			if (this.active) {
@@ -2394,6 +2441,11 @@ index 00000000000..2a9fae8ba12
 +			this.label.removeAttribute('tabindex');
 +		}
 +		return true;
++	}
++
++	private updateMark(): void {
++		const folder = this.workspaceService.getWorkspace().folders[0];
++		this.mark.textContent = folder ? ritemarkProjectInitials(folder.name) : '';
 +	}
 +
 +	private row(icon: ThemeIcon, text: string): HTMLElement {

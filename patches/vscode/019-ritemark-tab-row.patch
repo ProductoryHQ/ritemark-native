@@ -262,7 +262,7 @@ index b0a44e2c23a..040e7ede5e1 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index b56047d66e1..e75599fb6d4 100644
+index b56047d66e1..65d4bb75968 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 @@ -44,7 +44,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
@@ -413,6 +413,15 @@ index b56047d66e1..e75599fb6d4 100644
  		}
  
  		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
+@@ -2166,7 +2247,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 	}
+ 
+ 	private get visible(): boolean {
+-		return this.tabsModel.count > 0;
++		return true; // Ritemark 2.0: the tab row is the desk's strip; an empty desk keeps it, with its + (the Experience lead's review)
+ 	}
+ 
+ 	private getTabAndIndex(editor: EditorInput): [HTMLElement, number /* index */] | undefined {
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts b/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts
 new file mode 100644
 index 00000000000..7ac893b5de7

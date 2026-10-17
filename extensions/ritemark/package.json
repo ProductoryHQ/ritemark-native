@@ -41,6 +41,11 @@
   "contributes": {
     "commands": [
       {
+        "command": "ritemark.projectHead.switchProject",
+        "title": "Switch project…",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "command": "ritemark.projectHead.openFolder",
         "title": "Open a folder…",
         "icon": "$(folder-opened)"
@@ -54,11 +59,6 @@
         "command": "ritemark.projectHead.revealInFileExplorer",
         "title": "Reveal in File Explorer",
         "icon": "$(link-external)"
-      },
-      {
-        "command": "ritemark.projectHead.allCommands",
-        "title": "All commands",
-        "icon": "$(ritemark-command)"
       },
       {
         "command": "ritemark.projectHead.newFolder",
@@ -620,10 +620,6 @@
       ]
     },
     "icons": {
-      "ritemark-command": {
-        "description": "All commands, in the project's menu",
-        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e1c4" }
-      },
       "ritemark-flow": {
         "description": "A flow, in New",
         "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6ec" }
@@ -634,7 +630,7 @@
         { "command": "ritemark.projectHead.openFolder", "when": "false" },
         { "command": "ritemark.projectHead.revealInFinder", "when": "false" },
         { "command": "ritemark.projectHead.revealInFileExplorer", "when": "false" },
-        { "command": "ritemark.projectHead.allCommands", "when": "false" },
+        { "command": "ritemark.projectHead.switchProject", "when": "false" },
         { "command": "ritemark.projectHead.newFolder", "when": "false" },
         { "command": "ritemark.projectHead.collapseFolders", "when": "false" },
         { "command": "ritemark.projectHead.newText", "when": "false" },
@@ -644,10 +640,10 @@
         { "command": "ritemark.projectHead.newFolderInNew", "when": "false" }
       ],
       "ritemark/projectHead": [
+        { "command": "ritemark.projectHead.switchProject", "group": "1_project@0" },
         { "command": "ritemark.projectHead.openFolder", "group": "1_project@1" },
         { "command": "ritemark.projectHead.revealInFinder", "group": "1_project@2", "when": "isMac" },
         { "command": "ritemark.projectHead.revealInFileExplorer", "group": "1_project@2", "when": "isWindows" },
-        { "command": "ritemark.projectHead.allCommands", "group": "2_commands@1" },
         { "command": "ritemark.projectHead.newFolder", "group": "3_folder@1" },
         { "command": "ritemark.projectHead.collapseFolders", "group": "3_folder@2" }
       ],
@@ -842,7 +838,7 @@
       "breadcrumbs.enabled": false,
       "workbench.editor.editorActionsLocation": "hidden",
       "workbench.editor.tabSizing": "fixed",
-      "workbench.editor.tabSizingFixedMinWidth": 120,
+      "workbench.editor.tabSizingFixedMinWidth": 38,
       "workbench.editor.tabSizingFixedMaxWidth": 200,
       "workbench.editor.pinnedTabSizing": "compact",
       "files.exclude": {

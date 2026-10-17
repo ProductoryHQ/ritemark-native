@@ -21,12 +21,12 @@ export interface ProjectHeadCommand {
   readonly onFolder?: true;
 }
 
-/** The project's menu, behind the chevron: Open a folder, Reveal, All commands and the folder tools. */
+/** The project's menu, behind the chevron: project things only (Switch project, Open a folder, Reveal) and the folder tools. */
 export const PROJECT_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
+  { id: 'ritemark.projectHead.switchProject', runs: 'workbench.action.openRecent' },
   { id: 'ritemark.projectHead.openFolder', runs: 'workbench.action.files.openFolder' },
   { id: 'ritemark.projectHead.revealInFinder', runs: 'revealFileInOS', onFolder: true },
   { id: 'ritemark.projectHead.revealInFileExplorer', runs: 'revealFileInOS', onFolder: true },
-  { id: 'ritemark.projectHead.allCommands', runs: 'workbench.action.showCommands' },
   { id: 'ritemark.projectHead.newFolder', runs: 'explorer.newFolder' },
   { id: 'ritemark.projectHead.collapseFolders', runs: 'workbench.files.action.collapseExplorerFolders' },
 ];

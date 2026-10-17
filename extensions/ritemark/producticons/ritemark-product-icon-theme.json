@@ -284,6 +284,10 @@
     "collapse-all": {
       "fontId": "phosphor-400",
       "fontCharacter": "\\e532"
+    },
+    "arrow-swap": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e83c"
     }
   }
 }

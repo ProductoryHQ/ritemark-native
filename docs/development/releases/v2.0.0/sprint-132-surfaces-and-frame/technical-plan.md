@@ -311,6 +311,10 @@ What the build needed beyond the workstreams' file lists, and why:
   `ritemark.placeClickedAgain` with the place's id, which the 1.x Activity Bar signalled by hiding and showing the side
   bar; the extension (`taskBoardHost.ts`) brings the Task board forward for Tasks (R5). `TaskBoardPanel.ts` shows a
   pinned board restored from the last session instead of replacing it, since R9 keeps it from being closed.
+- **The Experience lead's review (17 October):** 002's `compositeBar.ts` keeps the places row to Ritemark's six (others
+  live in More, which takes the chosen fill while one is open); 018 draws the project's mark (`ritemarkProjectInitials`
+  in `ritemarkProjectHead.ts`), keeps an empty desk's sheet and drops the letterpress; 019's `multiEditorTabsControl.ts`
+  keeps the tab row on an empty desk (its `visible` is always true), and tabs have no width floor.
 - **019** also changes `contrib/terminal/browser/terminalInstance.ts`: a terminal named "Terminal N" kept its name
   only until a reload, when the configured title source dropped it.
 - **002** also changes `explorerViewlet.ts`: the place is called Documents (R5), and it stays a place while its tree

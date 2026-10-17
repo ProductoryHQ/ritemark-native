@@ -6,6 +6,9 @@
     "_file_markdown": {
       "iconPath": "./icons/file-text.svg"
     },
+    "_file_flow": {
+      "iconPath": "./icons/flow-arrow.svg"
+    },
     "_file_code": {
       "iconPath": "./icons/file-code.svg"
     },
@@ -42,6 +45,9 @@
     "_file_markdown_dark": {
       "iconPath": "./icons/dark/file-text.svg"
     },
+    "_file_flow_dark": {
+      "iconPath": "./icons/dark/flow-arrow.svg"
+    },
     "_file_code_dark": {
       "iconPath": "./icons/dark/file-code.svg"
     },
@@ -77,6 +83,7 @@
   "folder": "_folder_dark",
   "folderExpanded": "_folder_open_dark",
   "fileExtensions": {
+    "flow.json": "_file_flow_dark",
     "md": "_file_markdown_dark",
     "mdx": "_file_markdown_dark",
     "markdown": "_file_markdown_dark",
@@ -139,6 +146,7 @@
     "folder": "_folder",
     "folderExpanded": "_folder_open",
     "fileExtensions": {
+      "flow.json": "_file_flow",
       "md": "_file_markdown",
       "mdx": "_file_markdown",
       "markdown": "_file_markdown",

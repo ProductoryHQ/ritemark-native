@@ -119,6 +119,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **The usage-data choice is part of the welcome sheet**, and nothing is counted until the person says yes (Jarmo, 17 October). It replaces today's separate notice.
 - **Four analytics events:** welcome shown, AI signed in, project opened, first message sent. They go through Ritemark's PostHog (`src/analytics/posthog.ts`), are anonymous, and are sent only after a yes.
 - **People updating from 1.x see the welcome once** (Jarmo, 17 October). It shows them as already signed in; they confirm and pick a project.
+- **A file's extension in muted ink** in the tree and on tabs (the body colour on the chosen tab and the open row), as the framework draws it. It needs VS Code's resource label to render the name and the extension apart, a patch, so it waits for this step (the Experience lead's review of Sprint 132, 17 October).
 
 **Depends on**
 
