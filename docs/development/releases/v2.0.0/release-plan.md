@@ -1,28 +1,32 @@
 # Release Plan — v2.0.0
 
-**Status:** **Proposed** (2026-10-17), not approved. No sprint has a plan yet, and every sprint plan needs Jarmo's approval before any code. The plan is built on [feasibility.md](feasibility.md)<br>
+**Status:** **Proposed** (2026-10-17), with Jarmo's decisions of the same day built in. No sprint has a plan yet, and every sprint plan needs Jarmo's approval before any code. The plan is built on [feasibility.md](feasibility.md)<br>
 **Target:** v2.0.0<br>
-**GitHub milestone:** none yet. The Development manager opens it once Jarmo approves this plan<br>
-**Release type:** **Shell-tier.** A new VS Code patch in `patches/vscode/`, new theme and icon files that ship only with the app, and new defaults for every user. A full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI<br>
+**GitHub milestone:** none yet. The Development manager opens it, and can close the empty v1.15.0 milestone<br>
+**Release type:** **Shell-tier.** A new VS Code patch in `patches/vscode/`, changes to patches 002 and 007, new theme and icon files that ship only with the app, and new defaults for every user. A full app release: clean-room release worktree, Gate 1 + Gate 2, notarization after the hardening window, Windows CI<br>
 **Platforms:** darwin-arm64, darwin-x64, win32-x64<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-10-17<br>
-**Source:** Jarmo's decision of 15 October 2026 (`ritemark-dev`: `product/design/experience/migration.md`): 2.0 is one new Ritemark that ships the welcome, the new theme with its surfaces and the project at the centre together, theme first, and patching VS Code is fine. The Experience lead's technical analysis and proof of concept (`product/design/experience/technical/README.md`) went to the Development manager with Jarmo's yes on 16 October, and this plan was written in a session Jarmo asked for on 17 October
+**Source:** Jarmo's decision of 15 October 2026 (`ritemark-dev`: `product/design/experience/migration.md`): 2.0 is one new Ritemark that ships the welcome, the new theme with its surfaces and the project at the centre together, theme first, and patching VS Code is fine. The Experience lead's technical analysis and proof of concept (`product/design/experience/technical/README.md`) went to the Development manager with Jarmo's yes on 16 October. This plan was written in a session Jarmo asked for on 17 October, and Jarmo answered its questions the same day
 
 ## Release Thesis
 
 Ritemark 2.0 is one new Ritemark, with three things together:
 
-- **A calm frame**, in light and dark: a flat ground, the AI on its own sheet, and the document on a raised desk with its tabs at the top of the window.
+- **A calm frame**, in light and dark, on the Mac and on Windows alike: a flat ground, the AI on its own sheet, and the document on a raised desk with its tabs at the top of the window.
 - **A first window** that asks one question (which AI do you use) and lands the person on a project, with the AI ready beside it.
 - **The project at the centre:** each project has its own Home and its tasks, and switching between projects happens in place.
 
 ## How 2.0 is built
 
-- **On main, behind one internal switch.** That is the `ritemark-2` flag and its setting, off by default; the switch needs Jarmo's word. Each sprint merges into main switched off. The 1.x releases in between (v1.15.0 and on) carry it dark and must look and behave exactly as today. Why main and not a long-lived branch, and what the switch cannot hide: [feasibility.md §4](feasibility.md#4-building-20-on-main-behind-one-setting).
-- **Theme first, and VS Code changes first.** Sprint 1 carries nearly all the VS Code (shell) changes 2.0 needs. Sprints 2 and 3 are then mostly extension code, which is cheaper to change and can be tried on Windows with the existing test overlay over a 1.x app that already has the patch.
-- **Every 1.x shell release from Sprint 1 on** adds one row to its Gate 2 list: a screenshot comparison of the base window, light and dark, Mac and Windows, with the switch off.
-- **Main freezes during each 1.x release** as usual; a sprint merge waits for the freeze to end.
+- **Main becomes 2.0, step by step, with no switch.** Jarmo, 17 October: "We will focus on 2.0 from now on." v1.14.0 is the last 1.x release. From the first 2.0 merge, no release is built from main until 2.0, neither shell nor extension, because an extension release ships the extension's code and `package.json` from main too. Why there is no switch, and what pausing 1.x costs: [feasibility.md §4](feasibility.md#4-building-20-on-main).
+- **Main stays buildable and usable at every merge**, so each step can be tried in a dev build and in a Windows build from main.
+- **Features stay** (HARD RULE #1). Whatever a 1.x surface does keeps a place in 2.0 when the surface is replaced: Home's launcher, the Getting Started page and its launch check, the terminal, Copilot Chat.
+- **Theme first, and VS Code changes first.** Step 1 carries nearly all the VS Code (shell) changes 2.0 needs. Steps 2 and 3 are then mostly extension code, which is cheaper to change and can be tried on Windows with the existing test overlay.
+- **While 1.x is paused:**
+  - New models still reach v1.14.0 users through the model catalog feed, as long as the bundled runtimes can run them.
+  - Runtime updates wait for 2.0.
+  - An urgent fix for v1.14.0 would need an exception to the clean-room release rule. Jarmo decides if one is ever needed.
 - **Sprint numbers** are given when each sprint plan is written (132 is the next free number today). Each sprint is repo-scoped to `ritemark-native` and starts on its own `sprint-NN-short-name` branch after its plan is approved.
 - **Nothing from the proof of concept merges as it is.** It is the starting point, measured in [feasibility.md §1](feasibility.md#1-the-proof-of-concept-measured), with what comes over and what does not in [§6](feasibility.md#6-what-comes-over-from-the-proof-of-concept-and-what-does-not).
 
@@ -30,26 +34,19 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 | Step | Scope | Depends on | Status |
 |---|---|---|---|
-| 1 — Surfaces and frame, theme first | The switch; the real surfaces patch, folded with patch 002; the frame on the Mac and Windows; the AI column's contents; the tab row; the places row; the full light and dark theme pass; tests and a production build | Jarmo's decisions on the switch, the terminal, Copilot Chat, the Windows frame, More and the layout contract | **Not planned.** Plan needs Jarmo's approval |
-| 2 — The welcome | The welcome as a Ritemark page; which AI you use, with each provider's sign-in; setting up a project; landing on it; the usage-data notice on the welcome; the four analytics events | Step 1 merged; Jarmo's decisions on the notice and on who sees the welcome | **Not planned** |
+| 1 — Surfaces and frame, theme first | The real surfaces patch, folded with patch 002; the frame without a title row on the Mac and on Windows; the terminal as a tab; Copilot Chat behind More; the tab row; the places row; the full light and dark theme pass; tests and a production build | The Experience lead's drawings for the terminal tab, the Windows top and the surfaces not yet drawn | **Not planned.** Plan needs Jarmo's approval |
+| 2 — The welcome | The welcome as a Ritemark page; which AI you use, with each provider's sign-in; setting up a project; landing on it; the usage-data choice on the welcome; the four analytics events; the welcome once for people updating from 1.x | Step 1 merged | **Not planned** |
 | 3 — The project at the centre | The project file and the project list (filled on the first 2.0 start); what waits in each project; Home as the project's page; Home and Tasks as permanent tabs; the projects list in the left column; the column's head; switching in place; the document's bar | Steps 1 and 2 merged | **Not planned** |
-| 4 — 2.0 as one release | The switch removed; migration from 1.x profiles; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; version 2.0.0, notes and the store listing | Steps 1–3 merged; Jarmo's decision on what the switch's removal removes | **Not planned** |
+| 4 — 2.0 as one release | Updating from v1.14.0; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; the runtime review; version 2.0.0, notes and the store listing | Steps 1–3 merged | **Not planned** |
 
 ### Step 1 — Surfaces and frame, theme first
 
 **Scope**
 
-- **The switch.**
-  - One flag in `src/features/flags.ts` with one application-scoped setting, off by default.
-  - A small module in the patch that reads the same setting for the window's page and for the main process.
-  - One contribution that registers 2.0's defaults only when the switch is on: the places row on top, breadcrumbs off, tab sizing and compact pinned tabs, `window.menuStyle`, the start-up editor, Home first in a new profile, `.ritemark` hidden in the tree, and the 2.0 themes.
-  - A class on the workbench that scopes the stylesheet.
-  - A check the extension uses to see that the shell has the patch.
-  - Detail: [feasibility.md §4](feasibility.md#the-switch).
 - **The real surfaces patch**, built from the proof of concept on main's pinned VS Code:
-  - folded with patch 002 by the rule in [feasibility.md §2.2](feasibility.md#22-how-the-real-patch-folds), so that no hunk removes or uses as context a line another patch wrote, with that rule as a small harness check;
+  - folded with patch 002 by the rule in [feasibility.md §2.2](feasibility.md#22-how-the-real-patch-folds): the new patch owns sizes and drawing, and 002 keeps what sits where (decided by engineering, Jarmo: "You decide");
+  - no hunk removes or uses as context a line another patch wrote, with that rule as a small harness check;
   - the proof-of-concept-only code dropped;
-  - every upstream hunk behind the switch, with the 1.x value kept;
   - the editor's DOM walks replaced where VS Code gives the same information;
   - possibly split into two patches by domain (the surfaces and frame, and the tab row).
 - **The frame on the Mac:**
@@ -57,73 +54,81 @@ Ritemark 2.0 is one new Ritemark, with three things together:
   - the desk and the AI's sheet 8 apart and 8 above the status bar; two desks; hidden columns, whose controls move onto the desk's strip;
   - the traffic lights on the strip's centre line, also through zoom;
   - Ritemark's own menus.
-- **The frame on Windows**, as Jarmo decides: the 44 title row kept, or no title row with the menu behind a button and the window controls over the AI's strip. It is seen on a Windows PC, either from a main build or from a branch build added to the harness, as decided.
-- **The AI column's other contents**, as decided: the terminal (a desk tab, a switch in the AI's header, or the bottom panel) and Copilot Chat (patch 007's launcher and view). If the terminal becomes a tab, patch 002's three guards and the written invariant go, and Terminal joins the +'s menu.
+- **The frame on Windows, as close to the Mac as possible** (Jarmo: "try to mimic as much apple as possible"):
+  - no title row;
+  - the menu behind a button at the start of the left column's strip;
+  - minimize, maximize and close at the right end of the AI's strip, or of the desk's strip when the AI is hidden;
+  - each round built from main and tried on a Windows PC (decided by engineering: no separate unsigned branch builds).
+- **The terminal is a tab** (Jarmo: "Terminal must be one type of tab"):
+  - patch 002's three guards and the written invariant go, so the terminal opens as a tab on the desk, from the +;
+  - terminals saved in the AI column come back as tabs;
+  - no terminal opens by itself at start (`extension.ts:598-608`).
+- **Copilot Chat goes behind More** (Jarmo). Chosen from More, it opens as a tab on the desk (engineering's choice), so the AI column holds only Ritemark's AI. Patch 007's launcher and its move of Copilot Chat into the AI column change.
 - **The tab row:**
   - tabs at the top, joined to the desk, as wide as their names (120 to 200);
-  - the + for a new tab;
+  - the +, for a Text, Table, Web page or Terminal tab;
   - the tabs used longest ago folding into "N ⌄";
   - the editor group's rule that keeps Home and Tasks first, pinned and open (ready for step 3; the Task board tab can use it from this step).
-- **The places row:** Ritemark's places first (Home, Documents, Tasks, Browser, Agents, Transcribe), the others after them, what does not fit folding into the overflow, and a permanent More if Jarmo keeps it.
+- **The places row:** Ritemark's places first (Home, Documents, Tasks, Browser, Agents, Transcribe), then the others. The ⋯ at the end holds the places that do not fit, and Copilot Chat (Jarmo: "we need it for activity bar icons that do not fit to visible area").
 - **The left column's head:** its place and drawing in the shell, with its words and menu from the extension. Step 3 fills it.
+- **Narrow windows, if Jarmo agrees** (recommended): below a set width the AI column narrows, and then hides itself. The columns sliding over the desk stay out of 2.0.
 - **The full theme pass, light and dark:**
-  - 2.0's Ritemark Light and Ritemark Dark as their own theme ids, and the 2.0 product icons;
-  - the dark file icons, and high contrast;
-  - every surface drawn in the new theme: the Markdown editor, CSV, PDF and Office previews, Flows, Transcribe, the task board, the browser, the Agent Library, the Settings page, dialogs, notifications, the command palette and quick picks, menus.
+  - Ritemark Light and Ritemark Dark changed in place, with the 50 product icons, the dark file icons and high contrast;
+  - every surface drawn in the new theme: the Markdown editor, CSV, PDF and Office previews, Flows, Transcribe, the task board, the browser, the Agent Library, the Settings page, dialogs, notifications, the command palette and quick picks, menus;
+  - the new defaults (the places row on top, breadcrumbs off, tab sizing, `.ritemark` hidden in the tree, Ritemark's menus) in `package.json`, `product.json` and the patch.
 - **Docs:**
   - `references/layout-invariants.md`: the changed and the new rules ([feasibility.md §2.4](feasibility.md#24-layout-invariants-that-change));
-  - `architecture.md`: the locked decision on layout ownership and the switch;
+  - `architecture.md`: the locked decision on layout ownership;
   - `CLAUDE.md`'s patch table, and `PATCH-RULES.md`'s patch table brought up to date;
   - `update-vscode.sh`'s checklist, with the screenshot check.
 - **Tests:**
   - VS Code unit tests for the editor group's rule;
-  - extension unit tests for the switch and the capability check;
   - CDP geometry checks for the frame's numbers;
-  - a screenshot comparison of the base window, light and dark, switch off and on.
+  - a screenshot comparison of the base window, light and dark, as the baseline for the later steps and for VS Code updates;
+  - a check that everything v1.14.0 can do is still reachable.
 
 **Depends on**
 
-- Jarmo's decisions: the switch, the terminal, Copilot Chat, the Windows frame, More and the layout contract (see the end of this plan).
-- The Experience lead's drawings for the surfaces not yet drawn (the Settings page, dialogs, notifications, the command palette, Flows, Transcribe, the previews, the browser, the Agent Library), for the Windows top, and for whatever stays in the AI column.
-- No 1.x release freeze while it merges.
+- The Experience lead's drawings: the terminal as a tab, the Windows top (menu button and window controls), the ⋯ menu with Copilot Chat, and the surfaces not yet drawn (the Settings page, dialogs, notifications, the command palette, Flows, Transcribe, the previews, the browser, the Agent Library).
+- Jarmo's yes or no on the narrow-window rule.
 
 **Done when**
 
-- **With the switch off**, a fresh profile and a profile from v1.14.0 look and behave as v1.14.0: the screenshot comparison passes, light and dark, on the Mac and on Windows. The extension's tests pass.
-- **With the switch on, on the Mac**, the frame is as drawn, and the geometry checks prove its numbers. This holds in light, dark and high contrast, at 100% and zoomed, with one desk and two, and with each column shown and hidden. Keyboard and VoiceOver reach every control in the strips.
-- **On Windows**, the chosen frame is seen working on a Windows PC, switch on and off.
+- **On the Mac**, the frame is as drawn, and the geometry checks prove its numbers. This holds in light, dark and high contrast, at 100% and zoomed, with one desk and two, and with each column shown and hidden. Keyboard and VoiceOver reach every control in the strips.
+- **On Windows**, a build from main works on a Windows PC with the same frame. The menu works by mouse and by Alt; the window controls, dragging and snapping work.
+- **The terminal** opens as a tab, restores as a tab after a restart, and never lands in the AI column. **Copilot Chat** opens from More as a tab.
+- **Everything v1.14.0 can do is still reachable.**
 - All patches apply on the pinned VS Code, the fold check passes, and a second run of `apply-patches.sh` is clean.
-- **A production build** from a clean-room worktree at the merged main commit runs once with the switch off and once with it on. Production builds never run from a sprint worktree, so this check comes right after the merge.
+- **A production build** from a clean-room worktree at the merged main commit succeeds. It is a build check, not a release; production builds never run from a sprint worktree.
 - The docs listed above are updated.
 
 ### Step 2 — The welcome
 
 **Scope**
 
-- **The welcome as a Ritemark page** in the shared React bundle, behind the switch. It opens when the window has no folder, with the side columns closed for it. 1.x keeps patch 001's Getting Started page, unchanged. The start-up default that keeps Getting Started from opening comes with step 1's switched defaults.
+- **The welcome as a Ritemark page** in the shared React bundle. It opens when the window has no folder, with the side columns closed for it. It replaces patch 001's Getting Started page. The launch check's rows (patch 017) keep a place, on the welcome or in Settings, so nothing it reports is lost.
 - **"Which AI do you use, ChatGPT or Claude?"**
   - Each provider's own sign-in, reused: `agent/claudeLogin.ts`, `codex/codexAuth.ts`.
   - Each provider's state is shown as its check arrives (each check takes up to 5 s).
-  - Under Other ways to connect, the Anthropic API key that Settings already has. An OpenAI key for ChatGPT exists nowhere today, so adding one is a decision.
+  - Under Other ways to connect, the Anthropic API key that Settings already has.
+  - Recommended: no OpenAI key for ChatGPT in 2.0, confirmed in this step's plan.
 - **Set up project:** a folder the person has, or a new folder that Ritemark creates with About this project in it.
 - **Landing:** opening the folder reloads the window. The welcome writes where it is going, and after the reload Ritemark opens the documents and the AI, with the project in the AI's first message. In step 3 the landing also opens Home first.
-- With the switch on, no terminal opens by itself at start (`extension.ts:598-608`).
-- **The usage-data notice** is answered on the welcome sheet itself.
-- **Four analytics events:** welcome shown, AI signed in, project opened, first message sent. They go through Ritemark's PostHog (`src/analytics/posthog.ts`), are anonymous, and respect the person's usage-data choice.
+- **The usage-data choice is part of the welcome sheet**, and nothing is counted until the person says yes (Jarmo, 17 October). It replaces today's separate notice.
+- **Four analytics events:** welcome shown, AI signed in, project opened, first message sent. They go through Ritemark's PostHog (`src/analytics/posthog.ts`), are anonymous, and are sent only after a yes.
+- **People updating from 1.x see the welcome once** (Jarmo, 17 October). It shows them as already signed in; they confirm and pick a project.
 
 **Depends on**
 
-- Step 1 merged: the frame, and the start-up defaults behind the switch.
-- Jarmo's decisions: the notice on the welcome and what is counted before it is answered, whether people upgrading from 1.x see the welcome, and the OpenAI key.
-- The Experience lead's drawings of the welcome's states (signed in, signed out, offline, checking).
+- Step 1 merged.
+- The Experience lead's drawings of the welcome's states: signed in, signed out, offline, checking, and updating from 1.x.
 
 **Done when**
 
-- With the switch on, a fresh profile goes from the welcome to a project with the AI ready. This works with Claude and with ChatGPT, signed in and signed out, with an existing folder and a new one, and with the network off (the words say why).
-- The four events reach PostHog with their properties, and none is sent when usage data is off.
-- With the switch off, a fresh profile still opens on v1.14.0's Getting Started page.
-- Windows is tried through the test overlay on a 1.x app that has step 1's patch.
-- The step is extension-tier by path; anything it needs from the shell is already in step 1's patch.
+- A fresh profile goes from the welcome to a project with the AI ready. This works with Claude and with ChatGPT, signed in and signed out, with an existing folder and a new one, and with the network off (the words say why).
+- A profile from v1.14.0 sees the welcome once, already signed in, and never again.
+- The four events reach PostHog with their properties after a yes. None is sent before an answer or after a no.
+- Windows is tried through the test overlay on a Windows build from main.
 
 ### Step 3 — The project at the centre
 
@@ -132,13 +137,13 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **The project file**, `.ritemark/project.json`: the name, mark, cover and the line about the project. It is written only when the person changes something; otherwise the folder's name and Ritemark's defaults are used. It travels with the folder, as the tasks do.
 - **The project list**, in Ritemark's own storage:
   - added to whenever a folder opens;
-  - filled on the first 2.0 start from VS Code's recent folders, every project that has chats and every task board, so nobody starts with an empty list;
+  - filled on the first 2.0 start from VS Code's recent folders, every project that has chats and every task board (decided by engineering: all of it is already on the computer, and nothing leaves it);
   - this list replaces the proof of concept's use of an internal VS Code command.
 - **What waits, in each project and across them:** chats that need the person (from the chat store) and tasks that wait (from each project's board).
-- **Home as the project's page**, built in React with the UI components, with project names and card titles escaped. It redraws when the board's calls or the project's files change.
+- **Home as the project's page**, built in React with the UI components, with project names and card titles escaped. It redraws when the board's calls or the project's files change. What Home's 1.x launcher does (a new document, a new AI conversation, recent work, the Task board) is on it.
 - **Home and Tasks as the first two tabs, permanent and pinned as icons** (`permanentTabs.ts` on step 1's rule). A fresh window opens on Home, and the Home place always brings Home's tab forward. Main's [#431](https://github.com/ProductoryHQ/ritemark-native/pull/431) already does this for Tasks.
 - **The Tasks tab carries the waiting count**, the same number as the Tasks place.
-- **On Home the left column holds the projects list.** With the switch off, 1.x keeps Home's launcher, and what the launcher does stays reachable from 2.0's Home.
+- **On Home the left column holds the projects list**, in place of the launcher view.
 - **The left column's head**, filled: the switcher menu, New and Search.
 - **Switching in place:**
   - the reload stays (VS Code restarts the extension host when the folder changes, and its API offers no way around that);
@@ -151,86 +156,92 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 **Depends on**
 
 - Step 1 merged (the editor group's rule, the head's place, the tab row) and step 2 merged (the landing).
-- Jarmo's decision on what fills the list on the first 2.0 start: it reads every project's chat store and task board on this computer.
 - The Experience lead's drawings for an empty project, a missing folder and a project with no board.
 
 **Done when**
 
-- With the switch on, a project opened for the first time opens on its Home with its own Home and Tasks tabs. Coming back to a project brings back its tabs as they were. The list, the counts and Home agree with each project's board and chats.
+- A project opened for the first time opens on its Home with its own Home and Tasks tabs. Coming back to a project brings back its tabs as they were. The list, the counts and Home agree with each project's board and chats.
 - "Close all" leaves exactly Home and Tasks.
 - A missing or moved folder is shown as such and is never silently dropped.
-- With the switch off, 1.x's Home launcher and Tasks behave as in v1.14.0, also on a profile that ran with the switch on (feasibility.md §4, what 2.0 writes).
+- Everything Home's launcher did in v1.14.0 can be done from 2.0's Home.
 - Light, dark and Windows are checked.
 
 ### Step 4 — 2.0 as one release
 
 **Scope**
 
-- **The switch removed:** 2.0 becomes what everyone gets. By HARD RULE #1, Jarmo decides what goes with the switch: patch 001's Getting Started page, the separate Home launcher view, the 1.x themes (kept as themes people can still choose, or folded away), and whether the flag stays one release as a kill switch.
-- **Migration from 1.x profiles:**
+- **Updating from v1.14.0:**
   - settings the person chose keep winning;
-  - the places row moves to the top;
+  - the places row moves to the top, and terminals restore as tabs;
+  - the welcome shows once;
   - the project list fills on the first start;
-  - a profile from v1.14.0 and one from the last 1.x release are tested.
+  - tested with a lived-in v1.14.0 profile.
 - **Dark and Windows checked** on the signed builds.
 - **The release checklist** (`TEST-CHECKLIST.md`, release skill) gains a permanent screenshot comparison of the base window.
+- **The runtime review** that every release has: the bundled Claude Code, Codex and OpenCode against the latest, plus `check:anthropic-models`. This one covers the whole gap since v1.14.0.
 - **Version 2.0.0** in all six version files; release notes and `CHANGELOG.md` (with `product-marketer`); the Microsoft Store listing and screenshots. Website and launch work go in a cross-repo release plan in `ritemark-dev/releases/` if Jarmo wants one.
-- **The runtime review** that every release has: the bundled Claude Code, Codex and OpenCode against the latest, plus `check:anthropic-models`.
 
-**Depends on**
-
-- Steps 1–3 merged.
-- Jarmo's decisions on what goes with the switch and on the welcome for people upgrading.
+**Depends on** steps 1–3 merged.
 
 **Done when** v2.0.0 is published through the shell-tier gates below, the update feed is updated, and the release is closed out (release skill).
 
 ## Not in 2.0
 
-- **The window-size rules:** the AI narrowing below 1400, and the columns coming over the desk below 1200 and 960. Coming over the desk is deep work in VS Code's `layout.ts`. 2.0 ships without these unless Jarmo decides otherwise.
+- **The columns coming over the desk** in narrow windows (below 1200 and 960). This is deep work in VS Code's `layout.ts`.
 - **Search across projects.** In 2.0, Search filters the projects list by name.
 - **Switching projects without a reload.** It would mean rebuilding how VS Code runs extensions.
-- **The terminal as a tab**, if Jarmo decides it is not needed for 2.0 and another home is found for it.
 
 ## Gates
 
 - **Shell-tier:** a clean-room release worktree from exact `origin/main`, Gate 1 + Gate 2, notarization after the 60-minute hardening window, and Windows CI (`release-manager`).
+- No release from main between the first 2.0 merge and v2.0.0, unless Jarmo makes an exception for an urgent v1.14.0 fix.
 - `main` is frozen from the first release-candidate build until publish. The version bump is the last merge before the candidate.
-- Every 1.x shell release while the switch exists: Gate 2 includes the base-window screenshot comparison with the switch off.
 
 ### Gate 2 checklist (first draft, completed by each sprint)
 
-- A fresh profile on the Mac and on Windows: the welcome, a provider's sign-in, a new project, landing on Home with the AI ready.
-- An upgrade from the last 1.x release with a lived-in profile (several projects, chats, task boards, a moved view, the person's own theme): the person's settings are kept, the project list is filled, and no project or chat is lost.
-- Ritemark Light, Ritemark Dark and high contrast; zoomed in and out; one desk and two; each column shown and hidden.
-- Many tabs: folding, "N ⌄", Close all leaving Home and Tasks.
-- Switching projects with the AI working in the one being left.
-- The terminal and Copilot Chat in their decided homes.
-- Windows: the frame as decided, the menu by mouse and by Alt, the window controls, snapping.
-- Every release: an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
+- **A fresh profile** on the Mac and on Windows: the welcome, a provider's sign-in, the usage-data choice, a new project, landing on Home with the AI ready.
+- **An update from v1.14.0** with a lived-in profile (several projects, chats, task boards, a terminal in the AI column, a moved view, the person's own theme):
+  - the welcome shows once;
+  - the person's settings are kept;
+  - the terminal comes back as a tab;
+  - the project list is filled;
+  - no project or chat is lost.
+- **Looks:** Ritemark Light, Ritemark Dark and high contrast; zoomed in and out; one desk and two; each column shown and hidden.
+- **Tabs:** many tabs folding into "N ⌄"; Close all leaving Home and Tasks; a terminal tab; Copilot Chat from More.
+- **Switching projects** with the AI working in the one being left.
+- **Windows:** the frame without a title row, the menu by mouse and by Alt, the window controls, dragging and snapping.
+- **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
 
-## Decisions for Jarmo
+## Decisions
 
-These come back to you through the Development manager. The first six are needed before Step 1's plan can be approved.
+**Jarmo, 17 October:**
 
-- **The switch.** Shall 2.0 be built on main behind one internal setting that stays off until 2.0 ships? It is an exception to "every feature is on by default", and it is what lets 1.x releases keep going while 2.0 is built.
-- **The terminal.** Today it sits in the AI column, and 2.0's AI column has no row of icons to reach it. Should it become a tab on the desk (opened from the + like a document), stay beside the AI with its own switch in the AI's header, or move to a bottom panel?
-- **Copilot Chat.** Its launcher is in the places row, and it opens in the AI column, which has the same problem. Where should it live in 2.0: as one of the agents inside the AI's sheet, as a tab, as a place with its own switch, or behind More or You?
-- **Windows' top.**
-  - Keep a 44 title row on Windows, so the menu bar and the window controls stay where Windows users expect them (but the top differs from the Mac's), or draw it without a title row like the Mac, with the menu behind a button?
-  - And to try it: merge it switched off and build from main for each round, or add an unsigned Windows test build for branches to the release harness first?
-- **More in the places row.** Since every place now stays in the row and only the overflow folds, do you still want a More (⋯) that is always there?
-- **The layout contract.** Patch 002 owns the layout today, and `architecture.md` locks that. Do you approve that the new patch owns the sizes and drawing while 002 keeps the placement, with the new rules written down?
-- **For the welcome (step 2).**
-  - May the usage-data notice be answered on the welcome itself, and is anything counted before it is answered?
-  - Do people upgrading from 1.x see the welcome once, or go straight to their project?
-  - Should ChatGPT get an OpenAI API key option, which Ritemark has never offered?
-- **For the project list (step 3).** May the first 2.0 start fill the list by reading every project's chats and task board on this computer?
-- **For the release (step 4).** When the switch goes, may patch 001's Getting Started page, the separate Home launcher view and the 1.x look go with it, or should any of them stay (for example, the 1.x themes as a choice)?
-- **Window sizes.** Is it fine that 2.0 ships without the rules for narrow windows?
+- **Focus on 2.0, with no switch:** "We will focus on 2.0 from now on." 1.x releases pause and main becomes 2.0 step by step.
+- **The terminal:** "Terminal must be one type of tab."
+- **Windows:** "try to mimic as much apple as possible", so there is no title row on Windows either.
+- **More:** "we need it for activity bar icons that do not fit to visible area."
+- **Copilot Chat:** behind More.
+- **Usage data:** the choice is on the welcome, and nothing is counted until yes.
+- **Updating from 1.x:** the welcome shows once.
+
+**Engineering, on Jarmo's "You decide":**
+
+- **Patch ownership:** the new patch owns sizes and drawing, and patch 002 keeps what sits where.
+- **Windows testing:** each Windows round is built from main, with no separate unsigned branch builds.
+- **Copilot Chat:** chosen from More, it opens as a tab.
+- **The project list:** it fills on the first 2.0 start from recent folders, chats and task boards.
+
+**Still open, with a recommendation**, for the step that needs them:
+
+- **Narrow windows (step 1):** include the simple part. Below a set width the AI column narrows and then hides itself; the columns sliding over the desk stay out.
+- **A ChatGPT API key on the welcome (step 2):** leave it out of 2.0 and add it if people ask.
+- **An urgent fix for v1.14.0 while 2.0 is built:** only if one is needed.
 
 ## Design questions for the Experience lead
 
-- What stays in the AI column besides the AI (the terminal or Copilot Chat, if they stay), and how the AI's header switches to them.
-- The Windows top, in both forms.
+- The terminal as a tab: its icon and name in the tab row, its place in the +'s menu, and how a running terminal looks.
+- The Windows top without a title row: the menu button in the left strip, and the window controls at the right end of the AI's or the desk's strip.
+- The ⋯ menu, with the places that do not fit and Copilot Chat.
+- The welcome for someone updating from 1.x who is already signed in; the usage-data choice on the welcome sheet.
 - The theme pass for surfaces not yet drawn: the Settings page, dialogs, notifications, the command palette and quick picks, Flows, Transcribe, the PDF and Office previews, the browser, the Agent Library.
-- What More holds, if it stays; high contrast; the welcome for people upgrading from 1.x; an empty project, a missing folder.
+- An empty project, a missing folder, a project with no board.
