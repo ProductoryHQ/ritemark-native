@@ -262,7 +262,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       {editable && (
         <div className="flex-shrink-0 mx-4 mt-3 z-20">
           <div className="flex min-h-[32px] items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
-            <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
+            {/* The reference sits beside the value's first line, also when the field grows */}
+            <span className="flex min-w-[48px] max-w-[160px] flex-none items-start border-r border-[var(--r-hairline)] px-2.5 py-[5px] text-xs leading-5 text-[var(--r-ink-muted)]">
               <span className="truncate">{cellReference}</span>
             </span>
             <textarea
