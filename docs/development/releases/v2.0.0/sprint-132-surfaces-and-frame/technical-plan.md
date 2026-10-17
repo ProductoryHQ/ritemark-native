@@ -174,7 +174,7 @@ All of this is patch 019, from the proof of concept:
   - Stop sends an interrupt (Ctrl+C) to the instance.
   - Without shell integration there is no Running chip, and the bar shows nothing.
 - **The working dot.** `multiEditorTabsControl.ts` (019) adds a class to a terminal editor's tab while its command runs, and the stylesheet draws the chat rail's dot.
-- **The shortcut (R8, revised).** The extension's `package.json` binds Ctrl+` (⌃` on the Mac, `ctrl+\`` in keybinding terms on both) to `workbench.action.createTerminalEditor`. The binding sits where VS Code's own Toggle Terminal binding was, so nothing else changes.
+- **The shortcut (R8, revised).** The extension's `package.json` binds Ctrl+` (⌃` on the Mac; the key ``ctrl+` `` on both) to `workbench.action.createTerminalEditor`. The binding sits where VS Code's own Toggle Terminal binding was, so nothing else changes.
 - **The start-up terminal goes.** `extension.ts:598-608` is removed, as the proof of concept's `b9dacaed` does.
 - *Audit first:* `research/terminal-tabs-audit.md` (Phase 1) covers:
   - shell integration on zsh, bash and PowerShell (Mac and Windows), and what the bar shows without it;
