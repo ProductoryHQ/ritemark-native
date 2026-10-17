@@ -72,7 +72,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
 - [x] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
 - [ ] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md`
-- [ ] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
+- [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [ ] PR 1 opened; `qa-validator` review; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2)
