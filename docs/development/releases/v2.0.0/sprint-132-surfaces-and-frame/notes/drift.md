@@ -1,0 +1,91 @@
+# Drift: the patch stack on the newest VS Code
+
+E6 asks for the whole stack to be dry-applied on the newest VS Code release at each merge, so the VS Code update sprint starts from known numbers. Measured with `./scripts/check-vscode-drift.sh <tag>` (new in this sprint): a shallow, blob-less clone of the tag, a temporary Git index, and every failing file excluded and retried so each conflict is listed. Nothing in the repository or its `vscode/` submodule is touched.
+
+## Phase 0 baseline (2026-10-17, `origin/main` `17de26dc`, patches 001–017)
+
+| VS Code | Result |
+|---|---|
+| 1.117.0 (the pin) | 0 of 17 patches fail |
+| 1.142.0 (newest, 14 October) | **13 of 17 patches fail, in 46 file patches** |
+
+The plan's figure (46 file patches) is confirmed. The plan's "16 of the 17 patches" is not: 006, 011, 012 and 014 apply on 1.142.0, so 13 patches fail.
+
+Which of these the sprint removes is measured at merge 1, not guessed: 002's terminal guards leave the stack (`terminalConfigurationService.ts` and its test go back to upstream; `terminal.contribution.ts` keeps its shortcut removal), `editorTabsControl.ts` moves from 002 to 019, and step 2's welcome later removes the Getting Started rows (001 ×3, 016, 017).
+
+```
+Cloning microsoft/vscode at 1.142.0 (shallow, blob-less)...
+FAIL  001-ritemark-branding.patch (7)
+        build/gulpfile.vscode.ts
+        build/lib/optimize.ts
+        build/next/index.ts
+        src/vs/platform/dialogs/electron-browser/dialog.ts
+        src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+        src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+        src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
+FAIL  002-ritemark-ui-layout.patch (15)
+        src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
+        src/vs/workbench/browser/actions/layoutActions.ts
+        src/vs/workbench/browser/part.ts
+        src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
+        src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
+        src/vs/workbench/browser/parts/editor/editorTabsControl.ts
+        src/vs/workbench/browser/parts/globalCompositeBar.ts
+        src/vs/workbench/browser/parts/paneCompositePart.ts
+        src/vs/workbench/browser/parts/panel/panelActions.ts
+        src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
+        src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+        src/vs/workbench/browser/workbench.contribution.ts
+        src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
+        src/vs/workbench/contrib/terminal/browser/terminalConfigurationService.ts
+        src/vs/workbench/contrib/terminal/test/browser/terminalConfigurationService.test.ts
+FAIL  003-ritemark-menu-cleanup.patch (8)
+        src/vs/workbench/browser/parts/editor/editor.contribution.ts
+        src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+        src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
+        src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
+        src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+        src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
+        src/vs/workbench/browser/actions/workspaceActions.ts
+        src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
+FAIL  004-ritemark-build-system.patch (1)
+        src/vs/code/electron-main/app.ts
+FAIL  005-ritemark-windows-and-oss-fixes.patch (2)
+        build/lib/electron.ts
+        src/vs/workbench/services/accounts/browser/defaultAccount.ts
+OK    006-ritemark-dev-launch-fallback.patch
+FAIL  007-ritemark-vscode-1117-compat.patch (3)
+        src/vs/workbench/contrib/chat/browser/chat.contribution.ts
+        src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
+        src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
+FAIL  008-ritemark-windows-binary-strip.patch (1)
+        build/.moduleignore
+FAIL  009-ritemark-browser-context-bridge.patch (2)
+        src/vs/workbench/contrib/browserView/common/browserView.ts
+        src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
+FAIL  010-ritemark-browser-action-bridge.patch (2)
+        src/vs/workbench/contrib/browserView/common/browserView.ts
+        src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
+OK    011-ritemark-cloud-file-error.patch
+OK    012-ritemark-shell-watchdog.patch
+FAIL  013-ritemark-configuration-defaults.patch (1)
+        src/vs/base/common/product.ts
+OK    014-ritemark-save-receipts.patch
+FAIL  015-ritemark-help-menu-policy.patch (2)
+        src/vs/workbench/browser/parts/titlebar/menubarControl.ts
+        src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
+FAIL  016-ritemark-store-acquisition-policy.patch (1)
+        src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+FAIL  017-ritemark-launch-check-node.patch (1)
+        src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+
+VS Code 1.142.0: 13 of 17 patches fail in 46 file patches
+```
+
+## Merge 1
+
+Not measured yet.
+
+## Merge 2
+
+Not measured yet.

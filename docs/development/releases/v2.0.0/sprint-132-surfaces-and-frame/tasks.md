@@ -4,10 +4,10 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 0: Branch and starting tree
 
-- [ ] `git checkout -b sprint-132-surfaces-and-frame` from `origin/main`; `git branch --show-current` shows it
-- [ ] VS Code at 1.117.0 (`10c8e557`) with patches 001–017 from reset + clean + apply (copy-on-write clone for the worktree)
-- [ ] Record patch 002's file list and count (31 files, 88 hunks) in `notes/002-before.md` (`PATCH-RULES.md` §8)
-- [ ] Drift baseline: the whole stack dry-applied on the newest VS Code release, results in `notes/drift.md` (E6)
+- [x] `git checkout -b sprint-132-surfaces-and-frame` from `origin/main`; `git branch --show-current` shows it
+- [x] VS Code at 1.117.0 (`10c8e557`) with patches 001–017 from reset + clean + apply (copy-on-write clone for the worktree)
+- [x] Record patch 002's file list and count (31 files, 88 hunks) in `notes/002-before.md` (`PATCH-RULES.md` §8)
+- [x] Drift baseline: the whole stack dry-applied on the newest VS Code release, results in `notes/drift.md` (E6)
 
 ## Phase 1: Audits first
 
