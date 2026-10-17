@@ -144,6 +144,14 @@ test('Ctrl+` (⌃` on the Mac) opens a new terminal tab', () => {
   assert.equal(binding.when, undefined);
 });
 
+test('⌘, (Ctrl+, on Windows) opens Ritemark\'s settings, not VS Code\'s (Jarmo, 17 October)', () => {
+  const binding = keybindings.find(candidate => candidate.command === 'ritemark.aiSettings');
+  assert.ok(binding, 'no binding for Ritemark settings');
+  assert.equal(binding.key, 'ctrl+,');
+  assert.equal(binding.mac, 'cmd+,');
+  assert.equal(binding.when, undefined);
+});
+
 test('the seven surface colours, each with light, dark and high-contrast values', () => {
   const ids = colors.map(color => color.id);
   assert.deepEqual(ids, ['ritemark.ground', 'ritemark.aiSheet', 'ritemark.desk', 'ritemark.sheetBorder', 'ritemark.sheetShadow', 'ritemark.placeActiveBackground', 'ritemark.placeActiveForeground']);

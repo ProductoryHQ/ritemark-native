@@ -6,7 +6,7 @@ This document captures hard-won knowledge from the patch consolidation incident 
 
 ## 1. Patch Architecture (Current State)
 
-Six patches, numbered 001 through 006, each owning a specific domain:
+Nineteen patches, numbered 001 through 019, each owning a specific domain:
 
 | Patch | Domain | Summary |
 |-------|--------|---------|
@@ -32,7 +32,9 @@ Six patches, numbered 001 through 006, each owning a specific domain:
 
 **Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
 `auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's
-lines outside the known pairs; `scripts/check-patch-stacking.mjs` (pre-commit Check 14) enforces it. For 002, 018
+lines outside the known pairs; `scripts/check-patch-stacking.mjs` (pre-commit Check 14) enforces it. A patch
+may also use what an earlier one adds without sharing its lines, which the check cannot see; the later patch's
+header names it (018 uses the `ICommandService` that 007 injects into `paneCompositeBar.ts`). For 002, 018
 and 019, a change goes in the patch that owns its kind: placement, the frame's sizes and drawing, or the tab row
 (`references/layout-invariants.md`).
 

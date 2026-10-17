@@ -12,7 +12,14 @@ panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether
 terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
 tab carries the working dot (terminalEditorInput.ts). A named terminal keeps its name as the title's source
 when the shell reports its folder, so it comes back named after a reload (terminalInstance.ts).
+The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later).
+Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
+contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
+
+Files: workbench/browser/parts/editor/{editor,editorGroupView,editorTabsControl,multiEditorTabsControl,
+ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
+terminalEditor,terminalEditorInput,terminalInstance}.ts; and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index 28d0480ab86..08b6f36aa5f 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts

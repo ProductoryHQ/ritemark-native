@@ -924,6 +924,11 @@
     ],
     "keybindings": [
       {
+        "key": "ctrl+,",
+        "mac": "cmd+,",
+        "command": "ritemark.aiSettings"
+      },
+      {
         "key": "ctrl+`",
         "command": "workbench.action.createTerminalEditor"
       },

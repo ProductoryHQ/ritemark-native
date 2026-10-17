@@ -28,9 +28,25 @@ You (R11): Settings and Help, in the same menu. Ritemark's menus on every platfo
 defaults to custom, and menu.ts draws them; the chosen row is the theme's menu selection (defaultStyles.ts).
 A new window's columns are the drawn widths: the left column 256 (248 and the 8 to the desk), the AI column
 400 (the 8, the AI's sheet 340 and its rail 52), so the desk is 784 at 1440 (layout.ts).
-The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; each !important says why.
+The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; an !important says why on its line
+or in its group's comment (the theme pass finishes marking the rest).
+Also: a click on the open place in the top row runs ritemark.placeClickedAgain, which the extension answers
+(Tasks brings its board forward); with a flow open, Ritemark's own .ritemark folder stays out of the tree.
 Built file by file from the Experience lead's proof of concept (branch poc/2.0-surfaces), without its
 proof-of-concept-only code.
+
+Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
+ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
+
+Files: base/browser/ui/menu/{menu,menubar}.ts; platform/theme/browser/defaultStyles.ts;
+platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
+workbench/browser/media/ritemarkSurfaces.css; workbench/browser/parts/{compositeBarActions,paneCompositeBar,
+paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu}.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
+parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts}.ts;
+parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
+parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
+electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
+services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 diff --git a/src/vs/base/browser/ui/menu/menu.ts b/src/vs/base/browser/ui/menu/menu.ts
 index bbadbf1d73b..68422afd6fa 100644
 --- a/src/vs/base/browser/ui/menu/menu.ts
@@ -250,10 +266,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..87c03f56921
+index 00000000000..d48c179a708
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1250 @@
+@@ -0,0 +1,1251 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -273,8 +289,9 @@ index 00000000000..87c03f56921
 + * the desk's gaps (editorPart.ts, editorGroupView.ts).
 + *
 + * VS Code's class names are internal. Keep the selectors few and commented, and compare a screenshot of
-+ * the base window, light and dark, after every VS Code update (update-vscode.sh's checklist). Every
-+ * !important here says why: each one beats a rule of VS Code's that an update can change silently.
++ * the base window, light and dark, after every VS Code update (update-vscode.sh's checklist). An !important
++ * here beats a rule of VS Code's that an update can change silently; it says why on its line or in its group's
++ * comment, and the theme pass (Phase 7) marks the few that still do not.
 + */
 +
 +.monaco-workbench {

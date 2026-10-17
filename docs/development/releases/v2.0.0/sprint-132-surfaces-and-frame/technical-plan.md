@@ -273,7 +273,7 @@ All of this is patch 019, from the proof of concept:
 ## Workstream 13: Tests, checks, docs and builds (E3–E6)
 
 - **VS Code unit tests**, run with `./scripts/test.sh --grep` in the VS Code tree:
-  - `parts/editor/test/browser/ritemarkPermanentTabs.test.ts` (019) for the rule;
+  - `services/editor/test/browser/ritemarkPermanentTabs.test.ts` (019) for the rule;
   - a test for the terminal guard that moves panel terminals to the desk (019).
   - 002's changes to `terminalConfigurationService.test.ts` go back to upstream along with its guard.
 - **Extension tests.** `package.json` carries the 2.0 defaults and the head's menus; both themes carry the surface colours; contrast (W10).

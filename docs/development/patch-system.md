@@ -11,12 +11,12 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | Patch | Purpose |
 |-------|---------|
 | `001-ritemark-branding.patch` | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
-| `002-ritemark-ui-layout.patch` | Sidebar, titlebar, tabs, explorer, panels |
+| `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows packaging and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Development launch fallback behavior |
-| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 compatibility adjustments |
+| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 compatibility adjustments; Copilot Chat opens as a tab |
 | `008-ritemark-windows-binary-strip.patch` | Windows binary packaging exclusions |
 | `009-ritemark-browser-context-bridge.patch` | Browser context bridge |
 | `010-ritemark-browser-action-bridge.patch` | Browser action bridge |
@@ -27,6 +27,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars |
 | `016-ritemark-store-acquisition-policy.patch` | No external software-acquisition promotion: no Git download button in Source Control, no install links in the welcome page launch check (Microsoft Store policy 10.1.5) |
 | `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when a runtime needs Node.js (`nodeRequired` from `ritemark.getHealthStatus`) |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame: no title row, the strips and sheets, zoom, Ritemark's menus, the left column's head |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row: tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs |
 
 ## Commands
 

@@ -160,6 +160,7 @@ As a writer, I want my menu in one quiet place.
 Acceptance criteria:
 - You is an outline circle at the AI toggle's weight, at the right end of the AI's strip (before the window buttons on Windows). The new-chat + is the corner's only filled shape.
 - Its menu holds Settings, which opens Ritemark's own settings page, and Help, which opens https://ritemark.app/en/support/.
+- ⌘, (Ctrl+, on Windows) opens Ritemark's own settings page, and Settings shows it (Jarmo, 17 October).
 - It works with the mouse, Enter and Space, and VoiceOver and Narrator announce it as a menu button.
 
 ### R12: Ritemark's menus

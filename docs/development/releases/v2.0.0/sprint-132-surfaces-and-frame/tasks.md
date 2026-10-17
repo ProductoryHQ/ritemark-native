@@ -81,11 +81,11 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 7: The theme and window sizes (W10, W11)
 
-- [ ] Both themes: the ground, the AI's sheet, the desk; no lines between parts; no indigo tab line; `menu.*` keys (R13)
-- [ ] The seven `ritemark.*` colours in `package.json`, with high-contrast values (R13)
-- [ ] The product icon theme (50 icons) and the dark file icons (R13)
+- [x] Both themes: the ground, the AI's sheet, the desk; no lines between parts; no indigo tab line; `menu.*` keys (R13) (in merge 1, from the prototype, on Jarmo's instruction of 17 October; the surface-by-surface check below is still Phase 7)
+- [x] The seven `ritemark.*` colours in `package.json`, with high-contrast values (R13) (in merge 1)
+- [x] The product icon theme (50 icons) and the dark file icons (R13) (in merge 1: 65 icon mappings, from the prototype plus the head's menus)
 - [ ] `ritemarkSurfaces.css` cleaned: theme variables only; each remaining `!important` marked with why (R13)
-- [ ] Webviews: `index.css` and the AI sheet's components from `--vscode-ritemark-desk` (R13)
+- [x] Webviews: `index.css` and the AI sheet's components from `--vscode-ritemark-desk` (R13) (in merge 1, from the prototype)
 - [ ] Surface by surface against the drawings, both themes (W10's table) (R13)
 - [ ] Modal dialogs, Flows and the Agent Library, when their drawings arrive (R13)
 - [ ] The contrast unit test (R13)
@@ -95,7 +95,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 ## Phase 8: Merge 2, the theme and Windows, and closeout
 
 - [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3)
-- [ ] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6)
+- [ ] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist is not done yet)
 - [ ] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand
 - [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge"

@@ -98,6 +98,8 @@ Modal dialogs, Flows and the Agent Library wait for their drawings. If those com
   - a new window's columns take the drawn widths (left column 256, AI column 400, the desk 784 at 1440);
   - the places sit 34 apart from 8, as the kit's script lays them out.
 - **2026-10-17, during Phase 4 (engineering):** the terminal shortcut is also bound by physical key (`ctrl+[Backquote]`). With an Estonian or other non-US layout, "`" is not a plain key, so the character binding alone never fires.
+- **2026-10-17, during Phase 6 (Jarmo, through the Experience lead):** ⌘, (Ctrl+, on Windows) opens Ritemark's settings page ("Ritemark settins"), and You shows "Settings ⌘,", as experiences/settings frame 1 draws it. VS Code's own settings stay in All commands; the route behind Settings > Advanced comes with the Settings redesign.
+- **2026-10-17, during Phase 6 (Experience lead's answers, confirmed by Jarmo):** the proof of concept at 4bca3078 is the reference for the frame, theme, sizes and behaviour, and the drawings for what it does not build (the Windows top, More's contents, the terminal's bar, the +'s words); file names keep their extension; the terminal bar's shell name is a plain label in step 1; a fresh window's left column is 248 and the AI's sheet 384 (with the 8 gaps: 256 and 400).
 
 ## Feature Flag Check
 
