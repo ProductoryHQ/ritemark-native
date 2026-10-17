@@ -266,10 +266,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..c14e93ad8d1
+index 00000000000..4fbb6f15651
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1286 @@
+@@ -0,0 +1,1291 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -424,6 +424,11 @@ index 00000000000..c14e93ad8d1
 +/* A place's icon is either a mask (coloured by its background) or a font glyph (coloured by its text colour) */
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.uri-icon {
 +	background-color: var(--rm-place-foreground) !important; /* !important: core colours the mask inline */
++}
++
++/* A font glyph's label (More, ⋯) never paints its own hover box inside the place's fill */
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .action-label.codicon {
++	background-color: transparent !important; /* !important: core paints the toolbar's hover on the label */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.codicon,

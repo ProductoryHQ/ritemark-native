@@ -74,7 +74,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [ ] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md`
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [x] PR 1 opened; `qa-validator` review; Jarmo's "admin merge" (#443, merged 2026-10-17 as d781a0e1)
-- [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
+- [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) (the Development manager, at d781a0e1: source verified, 19/19 patches on vanilla 1.117.0, both validations and provenance passed, the extension activates with no errors on a fresh profile)
 - [ ] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2)
 - [x] After the merge: drift check, results in the release plan's risk register (E6) (15 of 19 fail on 1.142.0, in 58 file patches)
 - [ ] Release plan tracker updated

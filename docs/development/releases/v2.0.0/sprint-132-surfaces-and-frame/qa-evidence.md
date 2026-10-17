@@ -35,7 +35,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S18 Tasks opens the board | Pass | With a document in front, a click on Tasks brings the Task board forward, from another place and when Tasks is already chosen, also after a reload with the pinned board restored but not yet shown. Two fixes: the places row on top no longer told the extension about a click on the open place (018 now runs `ritemark.placeClickedAgain`), and a pinned restored board could not be replaced, which opened a second board (the extension now shows the restored one). |
 | S19 Reordering | Pass | Transcribe dragged before Browser (an HTML5 drag through CDP's drag interception) stayed there after a restart: Home, Documents, Tasks, Transcribe, Browser, Agents, More. |
 | S20 Copilot Chat installed | Partial | Copilot Chat in More opens as a tab on the desk. A second click (it should show the same tab) not checked yet. |
-| S21 Copilot Chat not installed | Open (build) | The dev build carries a dev-only Copilot extension, so More always lists Copilot Chat there; checked on the production build after the merge. |
+| S21 Copilot Chat not installed | Pass | On the clean-room production build of d781a0e1 (the Development manager's E5 run), More lists Search, File changes and Extensions and no Copilot Chat. |
 | S22 Readable tabs | Pass | Each tab is its name plus the kit's padding (34 before the name, 12 after; 32 after on the chosen tab, for its close button), at most 200, with no floor (the prototype; the Experience lead's review): Brief.md 93, Module 1.md 118, Proposal.md (chosen) 135 ([`qa/review-light.png`](qa/review-light.png)). Fixed on the way: core's transparent 1px tab border made every tab 1 wider, and the chosen tab's close button sat 3–5 off the kit (its glyph now centred 16 from the edge). |
 | S23 Pointing at a tab | Pass | Under the pointer a tab that is not chosen fills softly and its close button takes the icon's place exactly (both centred 20 from the tab's left); nothing moves. The tooltip shows the path inside the project ("Modules/Module 1.md"; "Brief.md" at the top level). |
 | S24 A new tab | Partial | The + menu matches the drawing (Text, Table, Web page, Terminal). Terminal from it checked (S28); the other three not run yet. |
@@ -76,3 +76,10 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 ## Open findings
 
 - ⌃⌘→ (Move Editor into Next Group) on a pinned Task board tab opens a new empty desk, then the move is refused, so the empty desk stays. Harmless, ⌘W closes it; a fix belongs in the move commands (`editorCommands.ts`), not in this merge.
+
+## After merge 1
+
+- **E5, production build check (the Development manager, at `d781a0e1`):** clean-room release worktree; source verified and preflight passed (19 of 19 patches apply on vanilla 1.117.0); `build-prod` passed both validations, with provenance verified (source commit `d781a0e1`); no absolute symlinks; `webview.js` and `office-preview.js` byte-identical to the source. Launched in the background on a fresh profile: the extension activates with no extension-host errors; More holds no Copilot Chat when it is not installed (S21). The production AI default is Sonnet 5.5; the dev build's "Opus 5 with 1M" is the dev build's own.
+- **Drift at merge 1:** 15 of 19 patches fail on VS Code 1.142.0, in 58 file patches ([`notes/drift.md`](notes/drift.md)).
+- **Jarmo's Mac pass on merge 1:** Ritemark Settings must lie on white, and the CSV grid lost its edge; both are fixed for merge 2 (tasks.md, Phase 7).
+- **More's tooltip over its open menu** (seen by the Development manager on a scripted click): not reproduced, either hovering first or clicking at once and waiting. Found instead and fixed: while the pointer was on More, its glyph painted VS Code's toolbar hover box inside the place's fill.
