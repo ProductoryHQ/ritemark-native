@@ -109,7 +109,7 @@ Acceptance criteria:
 - Someone updating from 1.x keeps the answer they gave to 1.x's notice (Jarmo, 18 October, refining the 17 October rule; experience 32, frame 1, redrawn to match):
   - an OK carries over as a yes. The update welcome's switch is on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and they can turn it off there;
   - Opt Out, or no answer, is off, with "Off until you turn it on. Never your documents, chats or names."
-  1.x's OK wrote no yes, only that the notice was closed, and it wrote the same when the notice was closed in other ways. How 2.0 recognises an OK is an open technical point (technical plan, W1).
+  1.x's OK wrote no yes, only that the notice was closed, and it wrote the same when the notice was closed in other ways. So any notice closed without Opt Out counts as the OK (Jarmo, 18 October; technical plan, W1).
 
 ### R8: Four events
 
@@ -282,6 +282,6 @@ Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
 1. **The welcome's events before the yes.** Hold `welcome_shown` and `ai_signed_in` in memory and send them at the yes, or drop everything that happened before the switch was turned on? **Recommendation: hold and send.** Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
 2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee.
 
-One technical point is open too, without a recommendation: 1.x stored the same thing for an OK as for a notice closed without a choice, so how 2.0 recognises a 1.x OK needs a decision (technical plan, W1, "Open technical point").
+The technical point on recognising a 1.x OK is decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK (technical plan, W1).
 
 The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*). Jarmo's answers of the same day, through the Experience lead's question form, settled the sample project, the 1.x OK and About this project's file.

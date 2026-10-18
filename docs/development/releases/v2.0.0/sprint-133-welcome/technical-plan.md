@@ -72,10 +72,10 @@ This goes first: it changes what every part of Ritemark may send.
   - unset, with `hasSeenNotice` absent: never answered. `unknown`, the switch off, "Off until you turn it on."
   - unset, with `hasSeenNotice` true: the notice was closed without Opt Out. Every OK is here, and so is every × and every link opened. See the open technical point below.
 - **A carried-over yes** is written once, as `ritemark.analytics.enabled: true` (Global) and `ritemark.analytics.answeredV2` with `from: '1.x'`, so Settings and the gate agree. The update welcome's switch shows it on, with "On, as you chose in Ritemark 1. Never your documents, chats or names." Turning it off there is a no, at once (R7). The yes holds from the first start, so `app_session_start` and the update welcome's `welcome_shown` are sent as they happen; nothing is held.
-- **Open technical point: an OK cannot be told from a notice closed without a choice.** 1.x stored that the notice closed, not which button closed it, and nothing else on the computer records it. So the decision can be built in only one of two ways, and this plan picks neither:
+- **Decided (Jarmo, 18 October): "closed, not opted out" counts as the OK.** 1.x stored that the notice closed, not which button closed it, and nothing else on the computer records it. Of the two ways it could be built, Jarmo chose the first, because 1.x counted those people anyway (its notice was opt-out):
   - read "closed, not opted out" as the OK. Everyone who pressed OK gets the carry-over, and so does everyone who closed the toast with its × or only opened Privacy Policy or Terms of Use;
   - carry over only an explicit `true`. Nobody who pressed OK gets the carry-over, so the 18 October decision changes nothing for them, and they are asked with the switch off, as before it.
-  Jarmo decides at the plan's approval (sprint plan, Decision 3). `updateDetection.ts` keeps the reading in one rule, and its tests cover both, so the choice does not change the shape of the code. S52 assumes the first reading.
+  `updateDetection.ts` keeps the reading in one rule, and its tests cover both. The first is the one built; S52 tests it.
 - **Not changed:** what the existing events carry, and GeoIP. Both are listed for the privacy note to the Development manager (E6).
 - **Tests:** `analytics/consent.test.ts` and an extended `analytics.test.ts`: no send before an answer, none after a no, held events sent once at a yes and dropped at a no, `build_channel` on every event, the kill switch winning over a yes, and the 1.x answers (an Opt Out off, an explicit `true` on, no notice off, a closed notice as decided).
 
@@ -201,4 +201,4 @@ The shell part is small (patches 001, 016, 017 shrink; 018 gains two hunks), so 
 | The bundle grows | The illustration is a file, not inlined; measured before and after |
 | The sample's content is not ready when step 2 is built | Asked for at the plan's approval; the copy is built and tested on a small test fixture; the merge waits for the real content (S50) |
 | The sample's copy writes into a folder the person already has | `overwrite: false` and the next free name; S51 |
-| A 1.x OK cannot be told from a notice closed with its × | The open technical point in W1, decided at the plan's approval; the detection keeps the reading in one rule |
+| A 1.x OK cannot be told from a notice closed with its × | Decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK; the update sheet shows the switch on and it can be turned off there |

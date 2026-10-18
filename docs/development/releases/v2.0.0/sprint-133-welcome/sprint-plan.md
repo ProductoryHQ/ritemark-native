@@ -122,7 +122,7 @@ The first two have a recommendation. They are listed in plain words, in [spec.md
 
 1. **The welcome's events before the yes.** The switch is on step 2, after both "welcome shown" and "signed in" have happened. I recommend holding those two in memory and sending them only if the person says yes, dropping them otherwise; nothing leaves the computer or is written before the answer. Without this, no fresh start is ever counted.
 2. **#401.** I recommend an audit first, and a fix in this sprint if the cause is in Ritemark's own start-up code.
-3. **How a 1.x OK is recognised.** The 18 October answer carries an OK over as a yes. But 1.x wrote the same note when the notice was closed with its ×, or left through Privacy Policy or Terms of Use, as when OK was pressed, so the computer cannot tell those apart. The two readings, and what each does, are in [technical-plan.md](technical-plan.md) (W1, "Open technical point"). This plan does not pick one.
+3. **How a 1.x OK is recognised: decided.** 1.x wrote the same note when the notice was closed with its ×, or left through Privacy Policy or Terms of Use, as when OK was pressed. Jarmo chose (18 October) that any notice closed without Opt Out counts as the OK, because 1.x counted those people anyway; they see the switch on and can turn it off ([technical-plan.md](technical-plan.md), W1).
 
 ## Feature Flag Check
 
@@ -152,7 +152,7 @@ No feature flag. 2.0 is built on main with no switch (Jarmo, 17 October). The ex
 | #401 is outside Ritemark | Recorded; R15's guarantee holds either way |
 | The bundle grows | The illustration is a file; measured before and after |
 | The sample's content arrives late | Asked for at the plan's approval; the copy is built and tested on a small test fixture, and the merge waits for the real content |
-| A 1.x OK cannot be told from a closed notice | Decision 3, at the plan's approval; the update detection is built for either reading |
+| A 1.x OK cannot be told from a closed notice | Decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK |
 
 The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprint).
 
