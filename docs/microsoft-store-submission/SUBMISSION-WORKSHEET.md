@@ -13,12 +13,12 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 | Architecture | `x64` |
 | Install context | Per-user / current user; normal install does not require an administrator account |
 | Package language | English (`en`) |
-| Store listing language | English (United Kingdom); language page not yet added to the live draft |
+| Store listing language | English (United Kingdom); live listing exists |
 | Minimum OS | Windows 10 x64-compatible; clean Windows 11 is the certification and Smart App Control baseline |
 | Category | `Productivity` — confirmed in the live Partner Center taxonomy |
-| Pricing | `Free: no payment necessary` |
+| Pricing | `Freemium: optional in-app purchases` — inherited accepted value; covers optional third-party AI account, subscription, or API-credit requirements, while Ritemark sells no in-app subscription |
 | Markets | All 240 regions; do not add future regions automatically |
-| Age rating | Questionnaire and preview complete; IARC Terms/adult-status attestation and final Save pending |
+| Age rating | Live rating exists; preserve the accepted answers unless product behavior changed |
 
 ## Publisher and public information
 
@@ -31,23 +31,23 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 | Support URL | `https://ritemark.app/en/support/` |
 | Privacy policy URL | `https://www.productory.ai/en/privacy/` |
 | License / terms URL | `https://www.productory.ai/en/terms/` |
-| Public support email | **Pending explicit confirmation** |
+| Public support email | `info@productory.eu` |
 | Developed by | `Productory Services OÜ` |
 | Copyright and trademark | `Copyright 2024–2026 Productory OÜ. Ritemark is released under the MIT License.` |
 
 ## Package fields
 
-Current candidate: v1.10.1 candidate 3. Hosted bytes are verified; Store-specific approval and clean-machine testing remain pending.
+Current candidate: v1.14.0 candidate 2. Exact release bytes are hosted and public hash verification passed. Partner Center validation completed on 2026-10-17: malware clean, code sign valid, and three identification checks inconclusive. Jarmo approved the exact URL/hash and the separate Freemium warning; the update was submitted at approximately 15:00 EEST and is now `Update in review`.
 
 | Field | Stable value / candidate source |
 |---|---|
 | Expected filename | `Ritemark-Setup.exe` |
-| Package URL | `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe` |
+| Package URL | `https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe` |
 | Installer parameters | `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CURRENTUSER` |
 | Installer type | Standalone/offline EXE; no setup-time payload downloads |
 | Signature publisher | `Productory Services OÜ` |
-| SHA-256 | `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250` |
-| Version | `1.10.1` |
+| SHA-256 | `8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48` |
+| Version | `1.14.0` |
 | Uninstall | Inno Setup uninstaller; standard-user silent uninstall and cleanup must pass |
 | Custom return-code handling | Leave unset unless final installer testing identifies a required mapping |
 | Non-Microsoft driver or NT service dependency | None expected; verify for every candidate |
@@ -63,12 +63,12 @@ Copy the full text from [`LISTING-COPY.md`](./LISTING-COPY.md).
 | Description | Prepared |
 | Short description | Prepared; under Microsoft's recommended 270-character display threshold |
 | Product features | Prepared; enter one feature per field without manual bullet characters |
-| What's new | Leave blank for the first Store submission; use version-specific copy for later updates |
+| What's new | Use the v1.14.0 copy in `release-candidates/v1.14.0-candidate-2.md` |
 | Search terms | Seven prepared terms; within the current Store limit |
 | Applicable license terms | Use `https://www.productory.ai/en/terms/` |
-| Screenshot set | Four installed-Windows v1.10.1 images selected; Jarmo review and Partner Center preview pending |
+| Screenshot set | Preserve the accepted live Windows screenshots unless Jarmo requests a listing-media update |
 | 1:1 Store logo | `assets/store-logo-1x1.png` |
-| 2:3 poster art | Optional/recommended; no final asset prepared |
+| 2:3 poster art | Accepted live asset exists; do not replace during this package-only update |
 
 ## Properties and disclosures
 

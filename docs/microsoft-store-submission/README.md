@@ -6,18 +6,18 @@ Release folders may describe why a particular Windows candidate was built, but S
 
 ## Current position
 
-Last reviewed: **2026-09-11**
+Last reviewed: **2026-10-17**
 
 | Area | State | Next action |
 |---|---|---|
 | Company developer account | Active; Partner Center accessible | Maintain account verification and contact details |
-| English Store listing | `Ritemark` reserved; EXE/MSI draft active | Complete draft sections after account-state propagation and field decisions |
+| English Store listing | Live in Microsoft Store; Store ID `XP9K8SP24TRNK4` | Update only the version-specific What's new text when needed |
 | Public product/support pages | Ready | Recheck immediately before submission |
 | Privacy and terms | Ready at Productory URLs | Use the approved Productory pages, not the 404 Ritemark paths |
-| Installer hosting | Complete: locked v1.10.1 object, direct HTTPS response, and fresh-download hash pass | Preserve the object unchanged and reuse the guarded procedure for new versioned keys |
-| Signed Windows package | v1.10.1 candidate 3 published and audited | Complete clean-machine test and Store-specific approval |
-| Store screenshots | Four installed-Windows v1.10.1 images selected | Jarmo review and Partner Center preview |
-| Submission | Not authorized | Keep as draft until the final candidate and all checks pass |
+| Installer hosting | Cloudflare R2 with an indefinite `windows/` lock and conditional no-overwrite uploader; v1.14.0 is published and verified | Preserve all published keys; never overwrite or delete them |
+| Signed Windows package | v1.14.0 candidate 2 is the public release asset, matches Windows CI, completed package validation, and was freshly reverified after submission | Preserve the immutable object unchanged |
+| Store screenshots | Current live assets accepted by Partner Center | Do not replace unless the v1.14.0 listing makes a new screenshot necessary |
+| Submission | v1.14.0 candidate 2 submitted 2026-10-17; `Update in review` | Monitor certification and respond only to concrete Microsoft findings |
 
 The detailed checklist is in [`STATUS.md`](./STATUS.md).
 
@@ -46,7 +46,7 @@ The detailed checklist is in [`STATUS.md`](./STATUS.md).
 | [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md) | Current live product ID, section state, and pending decisions |
 | [`PACKAGE-AND-CERTIFICATION.md`](./PACKAGE-AND-CERTIFICATION.md) | Installer, signature, URL, hash, and test gates |
 | [`HOSTING-AND-DOWNLOADS.md`](./HOSTING-AND-DOWNLOADS.md) | DNS, R2 architecture, immutable object paths, upload, verification, and rollback |
-| [`WINDOWS-TEST-GUIDE-ET.md`](./WINDOWS-TEST-GUIDE-ET.md) | Estonian clean-Windows test instructions for the exact v1.10.1 candidate |
+| [`WINDOWS-TEST-GUIDE-ET.md`](./WINDOWS-TEST-GUIDE-ET.md) | Estonian clean-Windows test instructions; always substitute the current candidate identity |
 | [`LEGAL-AND-URLS.md`](./LEGAL-AND-URLS.md) | Canonical public URLs and live checks |
 | [`ASSETS.md`](./ASSETS.md) | Store logo and screenshot inventory |
 | [`DECISIONS.md`](./DECISIONS.md) | Durable decisions and change log |
@@ -65,6 +65,7 @@ The detailed checklist is in [`STATUS.md`](./STATUS.md).
 - Partner Center, hosted file, clean-Windows evidence, and direct-download evidence must identify the same SHA-256.
 - Do not click **Submit to the Store** until Jarmo approves the exact candidate record.
 - Do not claim the Store channel shipped until certification passes and the Store-origin install has been verified.
+- Never change the approved privacy or terms URLs during a package-only Store update.
 
 ## Updating this hub
 
