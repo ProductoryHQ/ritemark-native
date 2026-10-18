@@ -3,11 +3,12 @@
  * welcome-screenshots.mjs - capture the welcome's frames, light and dark (Sprint 133, E3).
  *
  * Usage: node scripts/qa/welcome-screenshots.mjs --port <cdp-port> --out <dir> --scene <name>
- *          [--then-skip] [--size 1440x900]
+ *          [--then-skip] [--size 1440x900] [--page <window title part>]
  *
  * Connects over CDP to a Ritemark dev instance (`open -n -g`, an isolated --user-data-dir; never Jarmo's own
  * profile) that shows the welcome, lays the page out at --size, and captures the sheet in Ritemark Light and
- * Ritemark Dark as <out>/<theme>-welcome-<scene>.png. With --then-skip (a fresh profile on step 1), it presses
+ * Ritemark Dark as <out>/<theme>-welcome-<scene>.png. With --page, it uses the window whose title contains that text
+ * (a profile can have a project window open beside the welcome's). With --then-skip (a fresh profile on step 1), it presses
  * Skip for now afterwards and captures step 2 as <theme>-welcome-step-2.png. The run leaves the window in
  * Ritemark Light.
  *
@@ -32,9 +33,10 @@ const port = option('port');
 const out = option('out');
 const scene = option('scene');
 const thenSkip = args.includes('--then-skip');
+const pageTitle = option('page');
 const [width, height] = option('size', '1440x900').split('x').map(Number);
 if (!port || !out || !scene) {
-	console.error('usage: node scripts/qa/welcome-screenshots.mjs --port <cdp-port> --out <dir> --scene <name> [--then-skip] [--size 1440x900]');
+	console.error('usage: node scripts/qa/welcome-screenshots.mjs --port <cdp-port> --out <dir> --scene <name> [--then-skip] [--size 1440x900] [--page <window title part>]');
 	process.exit(2);
 }
 
@@ -72,7 +74,7 @@ async function connect(target) {
 }
 
 const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-const pageTarget = targets.find(target => target.type === 'page' && target.url.includes('workbench'));
+const pageTarget = targets.find(target => target.type === 'page' && target.url.includes('workbench') && (!pageTitle || target.title.includes(pageTitle)));
 if (!pageTarget) {
 	console.error(`no workbench page on port ${port}`);
 	process.exit(2);

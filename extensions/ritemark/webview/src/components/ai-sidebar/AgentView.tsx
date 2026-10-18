@@ -142,7 +142,7 @@ export function AgentTurnBlock({
 // ── View (empty state + scroll container) ──────────────────────────────────────
 
 export function AgentView() {
-  const { agentConversation, codexConversation } = useActiveConversation();
+  const { agentConversation, codexConversation, selectedAgent } = useActiveConversation();
   const isMixedRuntime = codexConversation.length > 0;
   const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
@@ -173,7 +173,8 @@ export function AgentView() {
   }, []);
 
   if (agentConversation.length === 0) {
-    return <EmptyState variant="agent" onPrompt={sendAgentMessage} />;
+    // Name the AI in use (Sprint 133: the landing puts OpenCode's people here too).
+    return <EmptyState variant="agent" aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} onPrompt={sendAgentMessage} />;
   }
 
   return (

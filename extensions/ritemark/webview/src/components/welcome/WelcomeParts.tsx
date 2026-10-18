@@ -10,7 +10,7 @@ import { Button } from '../ui/button'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { Icon } from '../ui/Icon'
-import { Dialog, DialogBody, DialogButton, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import type { ProjectView, ProviderView, WelcomeKeyName, WelcomeProviderId } from '../../../../src/welcome/protocol'
 import { COPY, PROVIDER_NAMES, browserOpened } from './welcomeCopy'
 import { send } from './welcomeClient'
@@ -397,18 +397,18 @@ export function KeySheet({
     send({ type: 'welcome/save-keys', target: target ?? 'claude', keys })
   }
   return (
+    // Experience 31's dialog (the Experience lead, 18 October): a title, the words, the fields, Cancel and Done;
+    // no icon, no X, no dividers. Escape and Cancel close it.
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent aria-describedby="rw-keys-note" onOpenAutoFocus={(event) => {
+      <DialogContent className="rw-dialog" overlayClassName="rw-dim" aria-describedby="rw-keys-note" onOpenAutoFocus={(event) => {
         event.preventDefault()
         ;(document.querySelector('.rw-keyfield input') as HTMLInputElement | null)?.focus()
       }} onCloseAutoFocus={(event) => {
         event.preventDefault()
         if (opener.current?.isConnected) opener.current.focus()
       }}>
-        <DialogHeader icon={<Icon name="key" size={16} />} onClose={onClose}>
-          <DialogTitle className="text-[15px] font-semibold">{target === 'claude' ? COPY.apiKeys : 'Set up OpenCode'}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
+        <DialogTitle className="rw-dialog-title">{target === 'claude' ? COPY.apiKeys : 'Set up OpenCode'}</DialogTitle>
+        <div>
           <p className="rw-keynote" id="rw-keys-note">
             {target === 'claude'
               ? 'Use Claude with an Anthropic API key of your own. You can change it later in Settings.'
@@ -433,11 +433,11 @@ export function KeySheet({
             </div>
           ))}
           {result && !result.ok && result.message && <p className="rw-keyerror" role="alert">{result.message}</p>}
-        </DialogBody>
-        <DialogFooter>
-          <Tooltip label="Close without saving"><DialogButton variant="secondary" onClick={onClose}>{COPY.cancel}</DialogButton></Tooltip>
-          <Tooltip label="Save the keys and go on"><DialogButton variant="primary" onClick={done} disabled={saving}>Done</DialogButton></Tooltip>
-        </DialogFooter>
+        </div>
+        <div className="rw-dialog-foot">
+          <Tooltip label="Close without saving"><Button variant="ghost" className="rw-dbtn ghost" onClick={onClose}>{COPY.cancel}</Button></Tooltip>
+          <Tooltip label="Save the keys and go on"><Button className="rw-dbtn" onClick={done} disabled={saving}>Done</Button></Tooltip>
+        </div>
       </DialogContent>
     </Dialog>
   )

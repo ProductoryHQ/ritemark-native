@@ -26,6 +26,7 @@ import { getAgentEnvironmentStatus, getSetupStatus, setAnthropicKeyAvailable } f
 import { emitClaudeStatusInvalidated, onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { onCodexStatusInvalidated } from '../codex';
 import { connectivityChanged, isOnline } from '../ai/connectivity';
+import { isEnabled } from '../features';
 import * as modelCatalog from '../ai/modelCatalog';
 import { runProcess } from '../utils/runProcess';
 import {
@@ -640,7 +641,11 @@ class WelcomeController implements vscode.Disposable {
       const out: WelcomeMessage = { type: 'welcome/keys-saved', target, ok, message };
       void this.panel?.webview.postMessage(out);
     };
-    const entries = Object.entries(keys).map(([name, value]) => [name as WelcomeKeyName, (value ?? '').trim()] as const).filter(([, value]) => value);
+    const entries = Object.entries(keys)
+      .map(([name, value]) => [name as WelcomeKeyName, (value ?? '').trim()] as const)
+      .filter(([, value]) => value)
+      // As in Settings (Sprint 76): the OpenRouter key is inert while the opencode-integration kill switch is off.
+      .filter(([name]) => name !== 'openrouter-api-key' || isEnabled('opencode-integration'));
     if (target === 'claude') {
       const key = entries.find(([name]) => name === 'anthropic-api-key')?.[1];
       if (!key) return reply(false, 'Paste your Anthropic API key first.');
