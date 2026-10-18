@@ -36,6 +36,7 @@ These rules must stay true after every upstream sync. Breaking any of them is vi
 - **Terminals were the opposite in 1.x.** 1.x guarded the terminal into the right sidebar in three places (002); 2.0 removed those guards. If an upstream sync brings back a terminal in the panel, `ritemarkTerminalTabs.ts` moves it; check its test first.
 - **Zoom.** The strips keep 44 and the line at any zoom (counter-zoom through `--ritemark-zoom-factor`, layout at 44 / factor); the columns' content and the desks zoom. `frame-geometry.mjs` measures at zoom 0, so check zoom from native window captures.
 - **Ritemark's menus.** More, You, the +, "N ⌄" and the left column head's menus are Ritemark menus (`ritemarkMenu.ts`); one rule closes them on a press outside them, on the window's blur (a press inside a webview) and on a second press of their button.
+- **The screenshot baseline.** `docs/development/frame-baseline/` holds the frame in 9 scenes, light and dark. After a VS Code update or a change to 002, 018 or 019, run `scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` and `frame-geometry.mjs` on a fresh profile with its sample project; a changed scene is fixed, or Jarmo approves a new baseline.
 - **Chat icon is a moving target.** Every upstream sync may add a new entry surface (`MenuId.TitleBar`, `MenuId.CommandCenter`, etc.). On each sync, re-grep for `Codicon.chatSparkle` registrations and extend patch 003 if needed.
 
 ## When patching layout

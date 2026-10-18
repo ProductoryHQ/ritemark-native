@@ -173,7 +173,11 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "  1. Rebuild: arch -arm64 /bin/zsh -c \\"
     echo "       'source \"\$HOME/.nvm/nvm.sh\" && nvm use && cd vscode && npm run compile'"
     echo "  2. Test the build (dev mode + production)"
-    echo "  3. Update submodule reference: git add vscode && git commit"
+    echo "  3. Check Ritemark's frame in a dev instance (fresh profile, the sample project; docs/development/frame-baseline/README.md):"
+    echo "       node scripts/qa/frame-geometry.mjs --port <cdp-port>"
+    echo "       node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <folder> --compare docs/development/frame-baseline"
+    echo "     A changed scene is fixed, or shown to Jarmo for a new baseline."
+    echo "  4. Update submodule reference: git add vscode && git commit"
 else
     echo ""
     echo -e "${RED}========================================"

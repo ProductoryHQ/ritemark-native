@@ -97,8 +97,8 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 8: Merge 2, the theme and Windows, and closeout
 
-- [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3)
-- [ ] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist is not done yet)
+- [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3). Script and set done: 9 scenes in light and dark from a fresh profile, in `docs/development/frame-baseline/` with its sample project; `--compare` diffs inside the running instance (no image library) and writes a side-by-side page. Waiting for Jarmo's approval
+- [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
 - [ ] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand
 - [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge"
