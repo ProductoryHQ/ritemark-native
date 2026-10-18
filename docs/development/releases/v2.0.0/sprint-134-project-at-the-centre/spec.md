@@ -4,6 +4,8 @@
 
 Ritemark 2.0's third step makes the project the place a person works in. Each project has its own Home, a page that says what waits for the person and what changed, and its own Tasks, both always first in the tab row. On Home the left column lists the person's projects, with what waits in each, and switching between them happens in the same window. The document's own bar says Saved and gathers the ways to send a copy under Share.
 
+Refreshed on 18 October 2026 with what Sprint 132 handed to step 3 (R16–R19, and changes to R2, R8 and R13), and with the gaps the [v1.14 parity list](../parity-v1.14.md) gives this step.
+
 ## Principles
 
 - **The drawings are the contract.** Experience 3 (`ritemark-dev`: `product/design/experience/experiences/home/`), experience 29 (`empty/`), experience 32's frame 5 (`update/`), experience 33 (`missing/`), experience 26's frame 1 (`share/`) and the comparison's document bar (`comparison/after-write.png`). Where a drawing and this spec disagree, the drawing wins and this spec changes first.
@@ -39,6 +41,7 @@ Acceptance criteria:
 - The list is ordered by when each project was last open, the open project first.
 - The list never contains a path the person did not open in Ritemark, and nothing in it leaves the computer.
 - The list replaces the proof of concept's use of VS Code's internal recent-folders command for everything after the first fill.
+- The welcome's project lists read this list too: the update sheet's projects and the "Where do you want to start?" sheet. In Sprint 133 they read VS Code's recent folders, until this list exists (Sprint 133's technical plan, W6).
 
 ### R3: What waits, in each project and across them
 
@@ -128,7 +131,11 @@ Acceptance criteria:
 - Documents hides only a `CLAUDE.md` that Ritemark wrote and that holds nothing but the pointer. A `CLAUDE.md` with the person's own words stays visible as it is, extension and all (Experience lead, 18 October).
 - New and Search keep Sprint 132's behaviour.
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
-- On Windows, the menu button's File menu gains Switch project, where experiences/windows frame 2 draws it.
+- The File menu gains three items, where experiences/windows frame 2 draws them:
+  - New tab (⌘T, Ctrl+T on Windows), which opens the +'s menu;
+  - Switch project, which opens the switcher;
+  - Share, which opens the Share menu of the document in front (R12), and is greyed out when none is.
+  This holds for Windows' menu button and for the Mac's menu bar. Sprint 132 left New tab and Switch project for this step (its technical plan, W3).
 
 ### R9: Switching projects in place
 
@@ -189,6 +196,7 @@ Acceptance criteria:
 - An empty project: Home as R4 says (experience 29, frame 1).
 - A project with no task board yet: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and its tab has no count; no board file is written until the person adds a card.
 - With the `task-board` flag off: no Tasks tab, no task counts; chats still count.
+- Nothing in Ritemark brings back a project folder that has gone. Today Flows' storage does: it creates `.ritemark/flows` with every missing parent, so a deleted project folder comes back empty (`FlowStorage.ts:44`; Sprint 133's QA, open findings). A folder that is not found stays not found until the person finds it or removes it from the list.
 
 ### R14: Nothing v1.14.0 does is lost
 
@@ -204,7 +212,7 @@ Acceptance criteria:
   | New AI conversation | The AI sheet's New chat, beside Home |
   | Recent work | Home's Last changed in <project> |
   | Task board | The Tasks tab, second in the row; Home's Waiting for you |
-  | Open a file or folder | Add a project…; the head's Open a folder… |
+  | Open document…, Open folder… | File ▸ Open… (⌘O, Ctrl+O on Windows) for a single document; Add a project… and the head's Open a folder… for a folder |
   | Recent folders (with no folder open) | The projects list |
 
 - The Export menu's every item works from Share (R12).
@@ -217,6 +225,61 @@ As a writer on Windows, I want Home, the projects and switching to work the same
 Acceptance criteria:
 - Home, the projects list, the head's menu, switching, Alt click, Reveal in File Explorer and the document's bar work on a Windows PC, with Windows paths and Ctrl in every shortcut.
 - Projects on other drives and on network paths are listed and opened; a disconnected drive shows the project as missing (R13).
+- R16 to R19 hold on Windows too, with Reveal in File Explorer in the project's menu.
+
+### R16: The project's head on Tasks, Browser and Transcribe
+
+As a writer, I want my project's name on top of every place, so I always know which project I am in.
+
+Acceptance criteria:
+- On Tasks, Browser and Transcribe, the left column's head is the project's head, as on Documents and Agents (Sprint 132 R10; experience 31): the project's mark, its name and the chevron, with the project's menu (R8). Every place but Home has it in the Experience lead's drawings.
+- The place's own title row goes. Sprint 132 left the plain place name there: "Tasks", "Browser", "Transcribe" (the Experience lead's review of Windows round 2, 18 October).
+- Each place's own content stays under the head. Only the rows its drawing gives are added:
+  - Tasks: New task and Search (experience 6, frame 1; R17);
+  - Transcribe: Record and Transcribe a file… (experience 20, frames 2 and 3). They are today's Record and Add recording, with the same actions. The library follows under the column's group labels, with "Recordings" in place of "Library";
+  - Browser: no rows; the Recent label and its actions (R18).
+- An action that the place's title row carries today keeps a home:
+  - Browser's New browser tab and Clear history go to the Recent label (R18);
+  - Transcribe's settings button, which opens Settings at the transcription card, goes where the Experience lead draws it (design question). Until then it sits at the right of the Recordings label, as Browser's actions do.
+- The head's row words and their commands come from the extension, as Documents' and Agents' do, so an extension release can change them.
+- With no folder open, each place keeps its plain name, as Sprint 132 left it.
+- The head and its rows work by keyboard and VoiceOver, as on Documents (Sprint 132, S35–S37).
+
+### R17: Tasks under the head
+
+As a writer, I want the Tasks place to start a task and find one, with the tasks in the order work moves.
+
+Acceptance criteria:
+- New task, the head's first row, starts a task as today's add field does: it shows the field ("Add a task…") and puts the keyboard in it.
+- Search, the second row, filters the list by a task's title as the person types. Escape clears it.
+- The list runs in the order work moves, as experience 6's frame 1 draws it and as the board does (Jarmo, 15 October):
+  - Ideas, folded;
+  - To do;
+  - Doing, with the tasks that wait for the person first and marked "Waiting for you";
+  - Done, folded, with today's Archived inside it.
+- A task that waits for the person (the board's calls: needs you, a decision, a review, failed) is marked and first in its stage, wherever it is. No call is hidden by the order, and the count is unchanged (R6).
+- Every task the list shows today is still listed, and every action on a row stays: open, the … menu, and Restore and Delete… for an archived task.
+- Your calls is no longer a panel of its own, and Archived is no longer a section of its own. This changes a 1.x behaviour, so it needs Jarmo's yes (Open Question 3).
+
+### R18: Browser under the head
+
+As a writer, I want the Browser place to say plainly what it holds.
+
+Acceptance criteria:
+- Under the head, a group label, "Recent", heads the recent pages in the column's 11-caps style, as Documents' label heads the tree.
+- New browser tab (+) and Clear history sit at the right of the Recent label, in the column's icon-button style, each with a tooltip that says what it does. They do what the title row's two buttons do today, and stay in the palette.
+- With no pages, the list says "No pages yet" in place of "No recent URLs" (the Experience lead, 18 October: plain words). The line under it stays as today.
+- The recent pages, their remove button and opening a page work as today (Sprint 131).
+
+### R19: The PDF and Word bars
+
+As a writer, I want a PDF's and a Word file's bar to use the same words as a document's bar.
+
+Acceptance criteria:
+- On the PDF viewer's bar and the Word preview's bar, Save as Markdown becomes **Make an editable copy** (decided with Jarmo on 14 October; the comparison's "Decided with Jarmo"). It does what Save as Markdown does today, behind the same `save-as-markdown-from-preview` flag.
+- Each bar ends in **Share**, as the document's bar does (R12; the comparison's `after-pdf.png`). What Share holds for a file that Ritemark shows but does not edit is a design question for the Experience lead, asked before this work starts. Nothing on today's bar is removed.
+- Page, zoom, fit and find stay as they are. The PowerPoint preview keeps its bar.
+- The Experience lead's scope of 18 October left these words and Share to this step (Sprint 132's sprint plan).
 
 ## Engineering requirements
 
@@ -235,8 +298,10 @@ Acceptance criteria:
 
 - Extension unit tests: the project file, the list (first fill, add, remove, missing, order), what waits (counts from fixtures of boards and chats), the permanent tabs' restore order, the switch guard, About this project (open, create, an existing `CLAUDE.md` or `AGENTS.md` left as it is).
 - Webview unit tests for Home's states (full, empty, missing, no board) and for escaping.
+- Webview unit tests for the Tasks list's order and its filter (R17), and for Make an editable copy and Share on the PDF and Word bars (R19).
 - CDP checks on a dev instance: Home and Tasks first, Close all, the count on the Tasks tab, switching both ways with tabs restored.
-- The screenshot baseline gains Home, the projects list and the switcher, light and dark.
+- CDP geometry checks: the head on Tasks, Browser and Transcribe has the numbers it has on Documents (R16).
+- The screenshot baseline gains Home, the projects list and the switcher, light and dark, and the Tasks, Browser and Transcribe places with their heads.
 
 ### E4: The bundle (#107)
 
@@ -250,7 +315,7 @@ Acceptance criteria:
 ### E6: Docs
 
 - `architecture.md`: a Projects subsystem section (the project file, the list, what waits, Home, switching), the 1.x Home launcher's replacement, the version-history row.
-- `references/layout-invariants.md`: Home and Tasks opened by default; on Home the left column holds the projects.
+- `references/layout-invariants.md`: Home and Tasks opened by default; on Home the left column holds the projects; every other place has the project's head.
 
 ### E7: Drift is measured
 
@@ -265,6 +330,9 @@ Acceptance criteria:
 - **Picking an icon or picture as a project's mark.** Marks are initials in ink.
 - **About this project written by Claude**, or offered at other moments than the project's menu (experience 24's open question on when to offer it).
 - **A VS Code update.** The pin stays at 1.117.0.
+- **The Task board tab redrawn** as experience 6 draws it: its bar with Board, Ideas, Log and New task, and the tasks that wait inside Doing on the board too. This sprint changes the left column's list only (R17).
+- **Transcribe redrawn** as experience 20 draws it: the recording's card at the foot of the left column, the transcript saved as a document, and its insights in the AI's sheet. This sprint gives Transcribe its head and its two rows only (R16).
+- **The browser's share question asked on the AI's sheet** in place of today's dialog (experience 28, frame 1). Today's dialog stays.
 
 ## Resolved Questions
 
@@ -279,6 +347,11 @@ Acceptance criteria:
   - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes, shown on and changeable on the update sheet; anyone who opted out or never answered starts off (Sprint 133). This sprint adds no event (*Analytics and privacy* in the sprint plan).
 - **2026-10-18 (the Experience lead, About this project's details):** a folder with its own `CLAUDE.md` gets the note and Add the line or Not now, and its `CLAUDE.md` never changes without that click; Documents hides only Ritemark's pointer-only `CLAUDE.md`; the tab and the Documents row read About this project with the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT" (R8).
 - **Release plan:** the reload stays; the splash takes the ground's colour; switching asks first when the AI is working; ⌥ click opens a new window.
+- **2026-10-18 (Sprint 132's handover to this step):**
+  - The Experience lead's review of Windows round 2: the project's head on Tasks, Browser and Transcribe comes in this step, with their content under it. Browser's + and Clear sit at the right of a "Recent" group label in the column's 11-caps style. Tasks' drawing has New task and its list (R16–R18).
+  - The Experience lead: Browser's empty text in plain words, "No pages yet" (R18).
+  - The Experience lead's scope for step 1: the PDF bar's words and Share are this step's (R19).
+  - Sprint 132's technical plan: New tab and Switch project join the File menu in a later step, which is this one (R8).
 
 ## Open Questions
 
@@ -287,4 +360,11 @@ Each has a recommendation; Jarmo answers at this plan's approval.
 1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
 2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
 
-The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides.
+3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own: the tasks that wait lead their stage, marked. Archived moves inside Done. **Recommendation:** yes, as drawn. Nothing is lost: every task and every action stays, and the count is unchanged. Because it changes how a 1.x list looks, `CLAUDE.md`'s first hard rule asks for Jarmo's yes, as Sprint 132 asked for Agents' sections.
+
+New design questions for the Experience lead, from the refresh:
+- Where Transcribe's settings button goes once the head takes the title row (R16). Until it is drawn, it sits at the right of the Recordings label.
+- What Share holds on a PDF and on a Word file (R19). Experience 26 draws it only for a Markdown document.
+- Whether Browser has rows under the head. The handover names only the Recent label and its two actions, so the plan draws none.
+
+The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides.
