@@ -1,0 +1,117 @@
+# Sprint 135 Tasks
+
+Nothing here starts before Jarmo approves the sprint plan, and not before Steps 1, 2 and 3 are merged. Tick a box only when the change is on the sprint branch. W numbers are workstreams in [technical-plan.md](technical-plan.md), R and E numbers are requirements in [spec.md](spec.md), and S numbers are scenarios in [scenarios.md](scenarios.md).
+
+## Phase 0: Branch, freeze and starting tree
+
+- [ ] Steps 1–3 merged; confirm on `origin/main` and note the commit
+- [ ] `git checkout -b sprint-135-vscode-update` from `origin/main`; `git branch --show-current` shows it
+- [ ] Freeze the target by R1's rule; write `notes/freeze.md` (tag, commit, date, Node, Electron, server Node); put the target in the sprint plan's status line (W1, S1)
+- [ ] Record the rollback point: main's last 1.117.0 commit and its clean-room build check, in the release plan's tracker (R10, W11)
+- [ ] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1)
+- [ ] The upstream diff inventory for every patched file (W1)
+- [ ] List Steps 2 and 3's patches and their shell scenarios by number below, under Phase 7 (R7)
+- [ ] Record every patch's file list and count before the rebase, in `notes/rebase.md` (`PATCH-RULES.md` §8)
+- [ ] `vscode/` from a copy-on-write clone; fetch the target and the pin (depth 1); pristine at the target with `clean -fd -e extensions/ritemark`
+
+## Phase 1: Audits first (W2)
+
+- [ ] `research/frame-audit.md`: every 018 and 019 file sorted into moved lines, changed mechanism or upstream offers it; the selector audit of `ritemarkSurfaces.css`; the remaining DOM reads; for each changed mechanism, carry, re-cut or adopt; the newest release where any uncarriable mechanism still holds (D3)
+- [ ] `research/toolchain-audit.md`: Node 24 arm64, its npm and node-gyp (VS 2026?), local `node-gyp` pins in `vscode/`'s lockfiles, Xcode and Python, the gulp and esbuild steps `build-prod.sh` relies on, Electron 39 → target breaking changes for 004, 012, 018 and the extension
+- [ ] `research/browser-bridge-audit.md`: 009, 010 and Browser Recent mapped onto the target's `browserView`
+- [ ] `research/surfaces-audit.md`: new chat and agent entry points; new built-ins; default drift; new `product.json` fields
+- [ ] If any audit says the target cannot carry a mechanism, stop and bring D3 to Jarmo with the audit's evidence before Phase 3
+
+## Phase 2: Tooling and toolchain (W10, W4)
+
+- [ ] `check-vscode-drift.sh`: hunk counts (E1)
+- [ ] `update-vscode.sh`: explicit tag fetched exactly; `--check` through `check-vscode-drift.sh` (no stash, no checkout); `clean -fd -e extensions/ritemark`; the new checklist (E2). Tried on 1.117.0 first
+- [ ] One commit: the root `.nvmrc` and the six workflow Node pins; grep for the old version outside `docs/` and `vscode/` (R3)
+- [ ] Node `<target>` arm64 installed by `nvm`; `validate-build-env.sh` passes, and fails on Node 22 and on x64 (S7)
+
+## Phase 3: The rebase (W3, R2)
+
+One commit per patch, in order. For each: `git apply --3way`, resolve by intent, classify every hunk in `notes/rebase.md`, regenerate from the scratch commits, run the hunk-level diff against main's patch, count and diff the files.
+
+- [ ] 001
+- [ ] 002
+- [ ] 003, with `PATCH-RULES.md` §2's inventory checked against all of 003's files
+- [ ] 004
+- [ ] 005
+- [ ] 006 (applied at 1.142.0; confirm on the target)
+- [ ] 007, including whether `onboardingVariationA.ts` still needs the fallback
+- [ ] 008
+- [ ] 009
+- [ ] 010
+- [ ] 011, 012, 014 (applied at 1.142.0; confirm on the target)
+- [ ] 013
+- [ ] 015
+- [ ] 016, 017 (cascade at 1.142.0; confirm, or drop if Step 2 removed their base)
+- [ ] 018, following `research/frame-audit.md`
+- [ ] 019
+- [ ] The patches Steps 2 and 3 added (named at Phase 0)
+- [ ] `check-patch-stacking.mjs` passes; any change to its known pairs explained
+- [ ] `apply-patches.sh --dry-run` counts read; a real apply from pristine; a second run applies nothing and exits 0 (S5)
+- [ ] The target's `core-ci` type-check and the minified bundle compile, with no unused imports
+- [ ] Every patch header names the target version
+
+## Phase 4: Branding, defaults and stray surfaces (W8, R8)
+
+- [ ] New upstream `product.json` fields merged into `branding/product.json`
+- [ ] Drifted chrome defaults pinned in `configurationDefaults` (S15)
+- [ ] New chat and agent entry points hidden in 003, or 007 for Copilot Chat (S24)
+- [ ] Each new built-in shipped, hidden or stripped, decision recorded (S25)
+- [ ] `PATCH-RULES.md` §3–§7 expected states describe 2.0
+
+## Phase 5: Native modules (W5, R4)
+
+- [ ] `npm ci` in `vscode/` under the arm64 wrapper; built-in extensions' `out/` wiped; compile
+- [ ] `check-native-modules.sh` derives its list from the `.node` files present; passes; catches an x64 module (S9)
+- [ ] `validate-build-output.sh` checks every `.node` file's architecture in the built app
+- [ ] The JSON, CSS and HTML language servers start in dev
+
+## Phase 6: Windows workflows (W6, R5)
+
+- [ ] `build-windows.yml` and `windows-canary.yml` in one commit: node-gyp layers 1–3 per `research/toolchain-audit.md`
+- [ ] `windows-test-overlay.yml`'s Node pin (in Phase 2's commit)
+
+## Phase 7: Checks on the Mac, before the PR
+
+- [ ] The extension on the new Node: `npm run compile`, the webview's `npm run build`, the unit tests (R3)
+- [ ] VS Code unit tests: `ritemarkPermanentTabs.test.ts`, `ritemarkTerminalTabs.test.ts`, and Steps 2 and 3's (R7)
+- [ ] `frame-geometry.mjs`, every scene, equal to Sprint 132 merge 2's numbers (S16)
+- [ ] `frame-screenshots.mjs`, light and dark, fresh profile; `qa/screenshot-diff.md` written; pinnable causes pinned; the rest to the Experience lead, then Jarmo (S13–S15, D5)
+- [ ] Sprint 132's scenarios on the updated build, in dev on the Mac (S17): S1–S6, S12–S40, S42–S46. S41 only for the surfaces drawn by then
+- [ ] Steps 2 and 3's shell scenarios, numbers filled in at Phase 0 (S18): …
+- [ ] The inventory (S22) and both profiles (S23)
+- [ ] The browser (S26), the runtimes on darwin-arm64 (S27), saving and the small patches (S28), the native features in dev (S10)
+- [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation
+- [ ] The fresh-clone walk-through from `SKILL.md` (S8)
+- [ ] The rollback rehearsal on a scratch branch, never pushed (S20)
+
+## Phase 8: Docs (E3)
+
+- [ ] `CLAUDE.md`: the patch table (007's line), anything naming 1.117
+- [ ] `PATCH-RULES.md`: the table; 003's inventory (21 files)
+- [ ] `SKILL.md`: the Node table; "VS Code 1.142 upgrade pitfalls" (or the target's number); the rollback recipe
+- [ ] `references/layout-invariants.md`: enforcing files and symbols that moved
+- [ ] `architecture.md`: history line; anything naming the pin
+- [ ] Release plan: the Update row's status and tracker; the drift risk retired or updated
+
+## Phase 9: PR and merge
+
+- [ ] `./scripts/validate-qa.sh`; the pre-commit hook passes (run by hand in the worktree with `CLAUDE_PROJECT_DIR="$PWD"`)
+- [ ] qa-validator and pr-reviewer
+- [ ] The PR links `notes/rebase.md`, `qa/screenshot-diff.md` and Jarmo's baseline approval
+- [ ] Jarmo's admin-merge yes; one squash merge
+
+## Phase 10: After the merge (E3, R5)
+
+Main stays closed to other shell-tier merges until this phase is green or rolled back (D4).
+
+- [ ] A clean-room release worktree at the merged commit; `release-preflight.sh`; `build-prod.sh`; `validate-build-output.sh`; provenance names the new gitlink (S30)
+- [ ] The production build: the native features (S10), the fonts, a runtime turn, the frame
+- [ ] macOS x64 CI green; S27 on darwin-x64
+- [ ] Windows CI green with the installer round trip (S11)
+- [ ] On a Windows PC: S12 (with Windows screenshots against the last round's), S27, S29, and Sprint 132's S7–S11
+- [ ] Release plan: tracker updated; the rollback point marked as no longer needed, or used (S21)
