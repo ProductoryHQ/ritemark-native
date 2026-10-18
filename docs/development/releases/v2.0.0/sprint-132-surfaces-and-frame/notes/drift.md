@@ -82,10 +82,16 @@ FAIL  017-ritemark-launch-check-node.patch (1)
 VS Code 1.142.0: 13 of 17 patches fail in 46 file patches
 ```
 
-## Merge 1
+## Merge 1 (2026-10-17, `origin/main` `d781a0e1`, patches 001–019)
 
-Not measured yet.
+| VS Code | Result |
+|---|---|
+| 1.117.0 (the pin) | 0 of 19 patches fail (the pristine apply in Phase 6) |
+| 1.142.0 (newest, 14 October) | **15 of 19 patches fail, in 58 file patches** |
+
+Against Phase 0 (13 of 17, 46 file patches): the stack is two patches and 12 file patches bigger, because 018 (12 files fail) and 019 (3) are new. 002 fails in 12 files rather than 15: the terminal guards left it (`terminalConfigurationService.ts` and its test, `terminalEditorSerializer.ts`, `terminalView.ts`), and `editorTabsControl.ts` moved to 019. Most of 018's failures are files VS Code changed around the title bar and the window (`window.ts`, `windowImpl.ts`, `defaultStyles.ts`, the title bar parts), which the VS Code update sprint after step 3 re-cuts with the frame's screenshots as the check.
+
 
 ## Merge 2
 
-Not measured yet.
+Measured after merge 2 is merged (tasks.md, Phase 8: E6).

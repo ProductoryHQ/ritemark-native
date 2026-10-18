@@ -302,7 +302,7 @@ export function FormattingBubbleMenu({
             `--r-surface-soft` turns dark in dark mode and hover/active states
             render dark-on-white text (invisible), e.g. the Comment label (#151). */}
         <div
-          className="flex items-center gap-1 bg-white border border-hairline-strong rounded shadow-lg p-2"
+          className="flex items-center gap-1 bg-surface border border-hairline-strong rounded shadow-lg p-2"
           style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
         >
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
@@ -484,7 +484,7 @@ export function FormattingBubbleMenu({
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 z-50 w-96">
+          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96">
             <Dialog.Title className="text-lg font-semibold mb-4">
               {editor.isActive('link') ? 'Edit Link' : 'Add Link'}
             </Dialog.Title>
@@ -568,7 +568,7 @@ export function FormattingBubbleMenu({
                   </div>
                 )}
                 {isFileSearchMode && (
-                  <div className="mt-2 rounded border border-hairline-strong bg-white shadow-sm max-h-56 overflow-y-auto">
+                  <div className="mt-2 rounded border border-hairline-strong bg-surface shadow-sm max-h-56 overflow-y-auto">
                     {fileSearchLoading ? (
                       <div className="px-3 py-2 text-sm text-ink-muted">Searching files...</div>
                     ) : fileSearchReason ? (

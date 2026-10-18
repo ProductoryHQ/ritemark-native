@@ -5,11 +5,10 @@ import * as path from 'path';
 import * as fsp from 'fs/promises';
 import { discoverAgents, discoverCommands, validateAgentFrontmatter } from '../agent/discovery';
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
-import { COLORS, ICONS } from '../agent/iconPack';
 import type { DaemonResultStore } from '../daemon/DaemonResultStore';
 import type { DaemonController } from '../daemon/index';
 
-type HelperType = 'skill' | 'agent';
+type HelperType = 'skill' | 'agent' | 'command';
 
 type CreateHelperPayload = {
   type: HelperType;
@@ -85,6 +84,17 @@ memory:
 `;
 }
 
+function commandSkeleton(name: string): string {
+  return `---
+description: ${name}
+argument-hint:
+---
+
+<!-- The prompt Claude follows when someone types this command (/ and its file name).
+     Write it as instructions; $ARGUMENTS stands for what follows the command. -->
+`;
+}
+
 function getClaudeRoot(scope: ItemScope, workspacePath: string | undefined): string | null {
   if (scope === 'project') {
     return workspacePath ? path.join(workspacePath, '.claude') : null;
@@ -118,6 +128,9 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   private _commands: DiscoveredCommand[] = [];
   private _flows: Array<{ id: string; name: string; filePath: string }> = [];
   private _refreshTimer: NodeJS.Timeout | null = null;
+  /** The webview has said it is ready; until then, messages wait (New and Search at the column's head). */
+  private _ready = false;
+  private readonly _pending: object[] = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -138,13 +151,18 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
+    this._ready = false;
     this._discover();
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage((message) => {
       switch (message.type) {
         case 'ready':
+          this._ready = true;
           this._sendItems();
+          for (const pending of this._pending.splice(0)) {
+            void webviewView.webview.postMessage(pending);
+          }
           break;
         case 'openFile':
           this._openFile(message.filePath);
@@ -187,6 +205,26 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           break;
       }
     });
+  }
+
+  /** Opens the library's New dialog for a kind: New at the column's head (Ritemark 2.0, experience 31). */
+  public openCreate(kind: HelperType): void {
+    this._postWhenReady({ type: 'openCreate', kind });
+  }
+
+  /** Shows and focuses the library's search: Search at the column's head. */
+  public focusSearch(): void {
+    this._postWhenReady({ type: 'focusSearch' });
+  }
+
+  /** Reveals the library and sends the message once its webview listens. */
+  private _postWhenReady(message: object): void {
+    void vscode.commands.executeCommand(`${AgentLibraryViewProvider.viewType}.focus`);
+    if (this._view && this._ready) {
+      void this._view.webview.postMessage(message);
+    } else {
+      this._pending.push(message);
+    }
   }
 
   /** Public refresh API used by file watchers and external callers. Debounced. */
@@ -302,7 +340,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const subdir = type === 'skill' ? 'skills' : 'agents';
+    const subdir = type === 'skill' ? 'skills' : type === 'command' ? 'commands' : 'agents';
     const parentDir = path.join(claudeRoot, subdir);
     fs.mkdirSync(parentDir, { recursive: true });
 
@@ -318,7 +356,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       fs.writeFileSync(filePath, skillSkeleton(trimmed), 'utf8');
     } else {
       filePath = path.join(parentDir, `${slug}.md`);
-      fs.writeFileSync(filePath, agentSkeleton(trimmed), 'utf8');
+      fs.writeFileSync(filePath, type === 'command' ? commandSkeleton(trimmed) : agentSkeleton(trimmed), 'utf8');
     }
 
     this.refresh();
@@ -466,311 +504,227 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
   private _getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
+    // The kit's icons, from the Phosphor font the extension ships for the product icons
+    const phosphorUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'producticons', 'Phosphor-Regular.woff2'));
+    const fontLatin = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'fonts', 'SofiaSans-latin.woff2'));
+    const fontLatinExt = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'fonts', 'SofiaSans-latin-ext.woff2'));
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <style>
-    /* === Ritemark design tokens (Indigo-Editorial) === */
+    /* === Ritemark 2.0 (experience 31): the Agents place in the column's list language; colours from the theme === */
+    @font-face { font-family: 'Phosphor'; src: url('${phosphorUri}') format('woff2'); font-display: block; }
+    /* Brand font: Ritemark UI is Sofia Sans, never the system stack */
+    @font-face {
+      font-family: 'Sofia Sans'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('${fontLatinExt}') format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Sofia Sans'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('${fontLatin}') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
     :root {
-      --r-accent: #4338CA;
-      --r-accent-hover: #3730A3;
-      --r-accent-soft: rgba(67, 56, 202, 0.10);
+      --r-accent: var(--vscode-focusBorder, #4338CA);
+      --r-accent-hover: var(--vscode-button-hoverBackground, #3730A3);
+      --r-accent-soft: var(--vscode-ritemark-placeActiveBackground, rgba(67, 56, 202, 0.10));
       --r-accent-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.25);
-      --r-surface: var(--vscode-sideBar-background, #FFFFFF);
-      --r-surface-muted: rgba(241, 245, 249, 0.6);
-      --r-hairline: rgba(148, 163, 184, 0.2);
-      --r-hairline-strong: rgba(148, 163, 184, 0.4);
+      --r-surface: var(--vscode-sideBar-background, #F1F5F9);
+      --r-surface-muted: var(--vscode-ritemark-aiSheet, #F8FAFC);
+      --r-surface-soft: var(--vscode-toolbar-hoverBackground, rgba(148, 163, 184, 0.12));
+      --r-desk: var(--vscode-ritemark-desk, #FFFFFF);
+      --r-hairline: var(--vscode-ritemark-sheetBorder, #E2E8F0);
+      --r-hairline-strong: var(--vscode-input-border, #CBD5E1);
       --r-ink-strong: var(--vscode-foreground, #1E1B4B);
-      --r-ink-muted: var(--vscode-descriptionForeground, #64748B);
-      --r-ink-faint: rgba(100, 116, 139, 0.65);
+      --r-ink-body: var(--vscode-tab-inactiveForeground, #475569);
+      --r-ink-muted: var(--vscode-descriptionForeground, #617187);
+      --r-ink-faint: var(--vscode-descriptionForeground, #617187);
+      --r-hover: var(--vscode-toolbar-hoverBackground, rgba(148, 163, 184, 0.12));
+      --r-warn: var(--vscode-editorWarning-foreground, #B45309);
       --r-radius-component: 10px;
-      --r-radius-input: 6px;
-      --r-danger: #B91C1C;
+      --r-radius-input: 8px;
+      --r-danger: var(--vscode-errorForeground, #B91C1C);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: var(--vscode-font-family);
+      font-family: 'Sofia Sans', var(--vscode-font-family);
       font-size: 13px;
-      color: var(--r-ink-strong);
+      color: var(--r-ink-body);
       background: var(--r-surface);
       overflow-x: hidden;
+      padding-bottom: 16px;
     }
+    .ph { font-family: 'Phosphor'; font-style: normal; font-weight: normal; line-height: 1; }
 
-    /* === Header === */
-    .header-counts {
-      padding: 0 14px 8px 20px;
-      font-size: 11px;
-      color: var(--r-ink-muted);
-    }
+    /* === Search: shown by Search at the column's head, or while it filters === */
     .search-container {
-      padding: 0 10px 8px 10px;
+      padding: 0 8px 8px 8px;
       display: flex;
       gap: 6px;
       align-items: center;
     }
+    .search-container.hidden { display: none; }
     .search-input-wrapper {
       display: flex;
       align-items: center;
       gap: 6px;
       flex: 1;
-      padding: 6px 8px;
-      background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-input-border, transparent);
+      height: 28px;
+      padding: 0 10px;
+      background: var(--r-desk);
+      box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
       border-radius: var(--r-radius-input);
     }
+    .search-input-wrapper:focus-within { box-shadow: inset 0 0 0 1px var(--r-accent); }
+    .search-input {
+      flex: 1; padding: 0; font-size: 12px;
+      font-family: inherit;
+      color: var(--r-ink-strong);
+      background: transparent; border: none; outline: none;
+    }
+    .search-input::placeholder { color: var(--r-ink-muted); }
+    .search-icon { flex-shrink: 0; font-size: 12px; color: var(--r-ink-muted); }
     .sort-btn {
       flex-shrink: 0;
       width: 28px; height: 28px;
       display: inline-flex; align-items: center; justify-content: center;
-      background: transparent;
-      border: 1px solid var(--r-hairline-strong);
+      background: var(--r-desk);
+      border: none;
+      box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
       border-radius: var(--r-radius-input);
       color: var(--r-ink-muted);
       cursor: pointer;
       padding: 0;
-      transition: color 0.1s, border-color 0.1s, background 0.1s;
     }
-    .sort-btn:hover { color: var(--r-accent); border-color: var(--r-accent); background: var(--r-accent-soft); }
-    .sort-btn.open { color: var(--r-accent); border-color: var(--r-accent); background: var(--r-accent-soft); }
+    .sort-btn:hover, .sort-btn.open { color: var(--r-ink-strong); background: var(--r-hover); }
     .sort-btn svg { width: 13px; height: 13px; }
-    .search-input-wrapper:focus-within {
-      border-color: var(--r-accent);
-      box-shadow: 0 0 0 3px var(--r-accent-soft);
-    }
-    .search-input {
-      flex: 1; padding: 0; font-size: 12px;
-      font-family: var(--vscode-font-family);
-      color: var(--vscode-input-foreground);
-      background: transparent; border: none; outline: none;
-    }
-    .search-input::placeholder { color: var(--vscode-input-placeholderForeground); }
-    .search-icon {
-      flex-shrink: 0; width: 12px; height: 12px;
-      color: var(--r-ink-muted);
-    }
 
-    /* === Scope tabs === */
-    .scope-tabs {
-      display: flex;
-      padding: 0 10px;
-      border-bottom: 1px solid var(--r-hairline);
+    /* === This project and All projects: a two-part switch (kit: theme.html .seg) === */
+    .seg {
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      margin: 0 0 0 16px; /* the column's head ends 8 under Search, so the switch sits at 208 (theme.html .seg) */
+      border-radius: 8px;
+      background: var(--r-hairline);
     }
-    .scope-tab {
-      flex: 1; padding: 6px 4px;
-      font-size: 12px; font-weight: 500;
-      text-align: center; cursor: pointer;
-      color: var(--r-ink-muted);
-      border-bottom: 2px solid transparent;
-      transition: color 0.1s, border-color 0.1s;
+    .seg-item {
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 12px; font-weight: 500; line-height: 24px;
+      color: var(--r-ink-body);
+      cursor: pointer;
       user-select: none;
     }
-    .scope-tab:hover { color: var(--r-ink-strong); }
-    .scope-tab.active {
+    .seg-item.on {
+      background: var(--r-desk);
       color: var(--r-ink-strong);
-      border-bottom-color: var(--r-accent);
-      font-weight: 600;
+      box-shadow: 0 1px 2px var(--vscode-ritemark-sheetShadow, rgba(30, 27, 75, 0.08));
     }
 
-    /* === Section headers (collapsible, with + affordance) === */
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px 10px 14px;
-      font-size: 11px; font-weight: 600;
+    /* === The library's sections, as the column's groups (kit: theme.html .g2) === */
+    .group {
+      display: flex; align-items: center; gap: 6px;
+      margin: 16px 0 8px 16px;
+      font-size: 11px; font-weight: 600; line-height: 14px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      /* Ritemark 2.0 (Experience 31): a column group, in ink, with no band; the count in muted ink */
       color: var(--r-ink-strong);
-      background: transparent;
       user-select: none;
-      cursor: pointer;
     }
-    .section-title { display: inline-flex; align-items: center; gap: 6px; }
-    .section-caret {
-      width: 10px; height: 10px; flex-shrink: 0;
-      transition: transform 0.15s ease;
-    }
-    .section-caret.collapsed { transform: rotate(-90deg); }
-    .section-header-meta { display: flex; align-items: center; gap: 8px; }
-    .section-count { font-size: 11px; font-weight: 400; color: var(--r-ink-muted); }
-    .section-add-btn {
-      width: 18px; height: 18px;
-      display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 4px; cursor: pointer; padding: 0;
-      color: var(--r-ink-muted); background: transparent; border: none;
-    }
-    .section-add-btn:hover { background: var(--r-accent-soft); color: var(--r-accent); }
-    .section-add-btn svg { width: 12px; height: 12px; }
+    .group .count { font-weight: 500; color: var(--r-ink-muted); }
 
-    /* === List items === */
+    /* === Rows: 32 high, as the documents tree's (kit: ritemark.css .row) === */
     .item {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 8px 12px 8px 14px;
+      position: relative;
+      display: flex; align-items: center; gap: 8px;
+      height: 32px;
+      margin: 0 8px;
+      padding: 0 8px;
+      border-radius: 4px;
       cursor: pointer;
-      border-left: 2px solid transparent;
-      transition: background-color 0.1s;
+      color: var(--r-ink-body);
     }
-    .item:hover { background: var(--vscode-list-hoverBackground); }
-    .item.selected {
-      background: var(--r-accent-soft);
-      border-left-color: var(--r-accent);
-    }
-    .item.selected .item-name { font-weight: 600; }
-    .item-icon-chip {
-      flex-shrink: 0;
-      width: 32px; height: 32px;
-      display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 8px;
-      margin-top: 1px;
-    }
-    .item-icon-chip svg {
-      width: 18px; height: 18px;
-      display: block;
-    }
-    .item-content { flex: 1; min-width: 0; padding-top: 1px; }
-    .item-name {
-      font-size: 13px; font-weight: 500; line-height: 1.35;
+    .item:hover { background: var(--r-hover); }
+    .item.open { background: var(--r-desk); }
+    .item.open .row-label { color: var(--r-ink-strong); font-weight: 500; }
+    .item.open .row-icon { color: var(--r-accent); }
+    .row-icon { flex: none; width: 14px; font-size: 14px; color: var(--r-ink-muted); }
+    .row-label {
+      flex: 1 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 13px; line-height: 32px;
     }
-    .item-description {
-      font-size: 11px; color: var(--r-ink-muted);
-      line-height: 1.4;
-      margin-top: 2px;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      word-break: break-word;
-    }
-    .item-description.placeholder { font-style: italic; opacity: 0.65; }
-    .item-icon {
-      flex-shrink: 0; margin-left: 6px; margin-top: 6px;
-      font-size: 11px; line-height: 1;
-    }
-    .item-icon.star { color: var(--r-accent); }
-    .item-icon.warning { color: #F59E0B; cursor: help; }
-    .val-chip {
-      display: inline-flex; align-items: center; gap: 3px;
-      font-size: 10px; font-weight: 500; padding: 1px 5px;
-      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
-      color: #B91C1C; border-radius: 3px; margin-top: 2px; cursor: help;
-    }
-    .prov-badge {
-      display: inline-flex; align-items: center;
-      font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
-      padding: 1px 4px; border-radius: 3px; margin-left: 4px;
-    }
-    .prov-claude { background: rgba(67,56,202,0.10); color: #4338CA; border: 1px solid rgba(67,56,202,0.2); }
-    .prov-codex  { background: rgba(5,150,105,0.10);  color: #059669; border: 1px solid rgba(5,150,105,0.2); }
-    .prov-shared { background: rgba(100,116,139,0.10); color: #475569; border: 1px solid rgba(100,116,139,0.2); }
-    .flow-attach { font-size: 11px; color: var(--r-accent); margin-top: 2px; }
+    .row-ext { color: var(--r-ink-muted); }
+    .item.open .row-ext { color: var(--r-ink-muted); font-weight: 400; }
+    .row-meta { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 32px; color: var(--r-ink-muted); padding-right: 2px; }
+    .row-meta.failed { color: var(--r-ink-body); }
+    .row-meta .ph { font-size: 14px; }
+    .row-meta svg { width: 12px; height: 12px; }
+    .row-meta.warn, .row-warn { color: var(--r-warn); }
+    .row-meta.warn { cursor: pointer; }
+    .row-warn { flex: none; font-size: 14px; }
     .item-more-btn {
-      flex-shrink: 0;
+      position: absolute;
+      right: 4px; top: 5px;
       width: 22px; height: 22px;
-      margin-left: 4px;
-      margin-top: 4px;
       display: inline-flex; align-items: center; justify-content: center;
       border-radius: 4px;
-      background: transparent;
+      background: var(--r-desk);
       border: none;
       padding: 0;
       cursor: pointer;
       color: var(--r-ink-muted);
       opacity: 0;
-      transition: opacity 0.1s, background-color 0.1s, color 0.1s;
     }
+    /* a row with a warning keeps it in sight: the ⋯ sits just before it */
+    .item.has-warn .item-more-btn { right: 26px; }
     .item:hover .item-more-btn,
-    .item.selected .item-more-btn,
-    .item-more-btn.menu-open { opacity: 1; }
+    .item-more-btn.menu-open,
+    .item-more-btn:focus-visible { opacity: 1; }
     .item-more-btn:hover,
-    .item-more-btn.menu-open {
-      background: var(--r-surface-soft, rgba(148,163,184,0.10));
-      color: var(--r-ink-strong, var(--r-ink-muted));
-    }
-    .item-more-btn:focus-visible { opacity: 1; outline: 1px solid var(--r-accent); }
+    .item-more-btn.menu-open { color: var(--r-ink-strong); }
+    .item-more-btn:focus-visible { outline: 1px solid var(--r-accent); }
     .item-more-btn svg { width: 14px; height: 14px; display: block; }
-    .item-hint {
-      font-size: 10px; line-height: 1.3;
-      color: #F59E0B; padding: 2px 0 0; opacity: 0.85;
-    }
 
-    /* === Scheduled runs section === */
+    /* === Scheduled runs: the folder's permission, then the runs === */
     .consent-row {
       display: flex; align-items: center; gap: 8px;
-      padding: 6px 8px; margin: 2px 0 4px; border-radius: 6px;
-      background: var(--r-surface-soft, rgba(148,163,184,0.10));
+      margin: 0 8px 4px; padding: 6px 8px;
+      border-radius: 6px;
+      background: var(--r-hover);
     }
-    .consent-label { font-size: 11px; color: var(--r-ink-muted); flex: 1; min-width: 0; }
+    .consent-label { font-size: 12px; line-height: 16px; color: var(--r-ink-body); flex: 1; min-width: 0; }
+    /* kit: .btn.quiet, body ink with no fill until hovered */
     .consent-btn {
-      flex-shrink: 0; border: 0; border-radius: 5px; padding: 4px 10px;
-      font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
-      background: var(--r-accent, #4338CA); color: #fff;
+      flex-shrink: 0; height: 24px; padding: 0 8px;
+      border: 0; border-radius: 6px;
+      font-family: inherit; font-size: 12px; font-weight: 500; line-height: 24px;
+      cursor: pointer;
+      background: transparent; color: var(--r-ink-body);
     }
-    .consent-btn:hover { background: var(--r-accent-deep, #3730A3); }
-
-    .run-time {
-      font-size: 10px; font-weight: 400;
-      color: var(--r-ink-faint); margin-left: auto;
-      white-space: nowrap; padding-left: 8px;
-    }
-    .item-name { display: flex; align-items: center; gap: 6px; }
-    .sched-chip svg { width: 16px; height: 16px; }
-    .sched-chip.sched-ok   { background: #DCFCE7; color: #15803D; }
-    .sched-chip.sched-warn { background: #FEF3C7; color: #B45309; }
-    .sched-chip.sched-err  { background: #FEE2E2; color: #B91C1C; }
-    .sched-chip.sched-muted{ background: var(--r-surface-soft); color: var(--r-ink-muted); }
-    .sched-chip.sched-run  { background: var(--r-accent-soft); color: var(--r-accent); }
-    .sched-pill {
-      display: inline-block; margin-top: 4px;
-      font-size: 9px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.4px; padding: 1px 6px; border-radius: 3px;
-    }
-    .sched-pill.sched-ok   { background: #DCFCE7; color: #15803D; }
-    .sched-pill.sched-err  { background: #FEE2E2; color: #B91C1C; }
-    .sched-pill.sched-muted{ background: var(--r-surface-soft); color: var(--r-ink-muted); }
-    .sched-pill.sched-run  { background: var(--r-accent-soft); color: var(--r-accent); }
-    .sched-approve { cursor: pointer; font-weight: 500; }
-    .sched-approve:hover { text-decoration: underline; }
-    .run-spin { animation: sched-spin 1.1s linear infinite; transform-origin: center; }
+    .consent-btn:hover { background: var(--r-hover); color: var(--r-ink-strong); }
+    .run-spin { animation: sched-spin 1.1s linear infinite; display: inline-block; }
     @keyframes sched-spin { to { transform: rotate(360deg); } }
 
     /* === Empty state === */
+    /* experience 31: an empty list is one line in muted ink */
     .empty-state {
-      padding: 32px 16px 24px;
-      text-align: center;
-    }
-    .empty-state-title {
-      font-size: 13px; font-weight: 500;
-      color: var(--r-ink-strong);
-      margin-bottom: 16px;
-    }
-    .empty-state-actions {
-      display: flex; gap: 8px;
-      justify-content: center;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .empty-state-footnote {
-      font-size: 11px;
+      padding: 12px 8px;
+      font-size: 13px; line-height: 20px;
       color: var(--r-ink-muted);
-      line-height: 1.5;
-    }
-    .empty-state-footnote code {
-      background: var(--r-surface-muted);
-      border-radius: 3px;
-      padding: 1px 4px;
-      font-size: 10px;
     }
 
     /* === Buttons === */
     .btn {
       height: 30px; padding: 0 14px;
-      font-family: var(--vscode-font-family);
+      font-family: inherit;
       font-size: 12px; font-weight: 500;
       border-radius: var(--r-radius-input);
       cursor: pointer;
@@ -779,10 +733,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       user-select: none;
     }
     .btn-primary {
-      background: var(--r-accent); color: #FFFFFF;
-      border-color: var(--r-accent);
+      /* the theme's button colours: white on indigo in Light, ink on the lighter indigo in Dark (kit: .dark .btn.primary) */
+      background: var(--vscode-button-background, var(--r-accent)); color: var(--vscode-button-foreground, #FFFFFF);
+      border-color: var(--vscode-button-background, var(--r-accent));
       box-shadow: var(--r-accent-shadow);
     }
+    body.vscode-dark .btn-primary { box-shadow: none; }
     .btn-primary:hover:not(:disabled) { background: var(--r-accent-hover); border-color: var(--r-accent-hover); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
     .btn-secondary {
@@ -825,7 +781,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     .modal-input {
       width: 100%; height: 34px;
       padding: 0 10px;
-      font-family: var(--vscode-font-family);
+      font-family: inherit;
       font-size: 13px;
       color: var(--r-ink-strong);
       background: var(--r-surface);
@@ -890,19 +846,18 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   </style>
 </head>
 <body>
-  <div class="header-counts" id="counts"></div>
-  <div class="search-container">
+  <div class="search-container hidden" id="searchContainer">
     <div class="search-input-wrapper">
-      <svg class="search-icon" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round"><circle cx="116" cy="116" r="84"/><line x1="175.4" y1="175.4" x2="224" y2="224"/></svg>
-      <input type="text" class="search-input" id="search" placeholder="Search" />
+      <i class="ph search-icon" aria-hidden="true">&#xe30c;</i>
+      <input type="text" class="search-input" id="search" placeholder="Search agents, skills and flows" />
     </div>
     <button class="sort-btn" id="sortBtn" title="Sort" aria-label="Sort">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="12" x2="13" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>
     </button>
   </div>
-  <div class="scope-tabs" id="scopeTabs">
-    <div class="scope-tab active" data-scope="project" id="tabProject">Project</div>
-    <div class="scope-tab" data-scope="user" id="tabUser">User</div>
+  <div class="seg" id="scopeTabs" role="tablist">
+    <span class="seg-item on" role="tab" data-scope="project" id="tabProject">This project</span>
+    <span class="seg-item" role="tab" data-scope="user" id="tabUser">All projects</span>
   </div>
   <div id="content"></div>
 
@@ -917,8 +872,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       <div class="modal-field">
         <label class="modal-field-label">Scope</label>
         <div class="scope-toggle" id="modalScopeToggle">
-          <div class="scope-toggle-option active" data-scope="project">Project</div>
-          <div class="scope-toggle-option" data-scope="user">User</div>
+          <div class="scope-toggle-option active" data-scope="project">This project</div>
+          <div class="scope-toggle-option" data-scope="user">All projects</div>
         </div>
       </div>
       <div class="modal-actions">
@@ -934,21 +889,6 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
 
-    const ICON_PATHS = ${JSON.stringify(ICONS)};
-    const ICON_COLORS = ${JSON.stringify(COLORS)};
-    const DEFAULT_ICON = 'sparkle';
-    const DEFAULT_COLOR = 'indigo';
-
-    function renderIconChip(iconName, colorName) {
-      const path = ICON_PATHS[iconName] || ICON_PATHS[DEFAULT_ICON];
-      const palette = ICON_COLORS[colorName] || ICON_COLORS[DEFAULT_COLOR];
-      const style = 'background:' + palette.bg + ';color:' + palette.fg + ';';
-      return '<span class="item-icon-chip" style="' + style + '" aria-hidden="true">' +
-        '<svg viewBox="0 0 256 256">' +
-        path +
-        '</svg></span>';
-    }
-
     let agents = [];
     let skills = [];
     let commands = [];
@@ -962,30 +902,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let activeScope = 'project';
     let sortMode = 'name'; // 'name' | 'recent'
 
-    // Collapsed section titles — persisted in webview state so the user's focus
-    // (e.g. "only Skills expanded") survives panel reloads.
-    const persistedState = vscode.getState() || {};
-    let collapsedSections = new Set(Array.isArray(persistedState.collapsedSections) ? persistedState.collapsedSections : []);
-
-    function toggleSection(title) {
-      if (collapsedSections.has(title)) {
-        collapsedSections.delete(title);
-      } else {
-        collapsedSections.add(title);
-      }
-      vscode.setState({ ...(vscode.getState() || {}), collapsedSections: Array.from(collapsedSections) });
-      render();
-    }
-
-    function caretSvg(collapsed) {
-      return '<svg class="section-caret' + (collapsed ? ' collapsed' : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-    }
-
     // Modal state
     let modalType = 'skill';
     let modalScope = 'project';
 
-    const countsEl = document.getElementById('counts');
     const contentEl = document.getElementById('content');
     const searchEl = document.getElementById('search');
     const tabProjectEl = document.getElementById('tabProject');
@@ -1002,6 +922,23 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     searchEl.addEventListener('input', (e) => {
       filter = e.target.value.toLowerCase();
       render();
+    });
+
+    // Search shows from Search at the column's head (or while it filters) and hides again with Escape
+    const searchContainerEl = document.getElementById('searchContainer');
+    function setSearchOpen(open) {
+      searchContainerEl.classList.toggle('hidden', !open && !filter);
+    }
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        searchEl.value = '';
+        filter = '';
+        setSearchOpen(false);
+        render();
+      }
+    });
+    searchEl.addEventListener('blur', (e) => {
+      if (!filter && !(e.relatedTarget && searchContainerEl.contains(e.relatedTarget))) setSearchOpen(false);
     });
 
     tabProjectEl.addEventListener('click', () => { activeScope = 'project'; render(); });
@@ -1055,7 +992,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     function openModal(type) {
       modalType = type;
       modalScope = activeScope;
-      modalTitleEl.textContent = type === 'skill' ? 'New skill' : 'New agent';
+      modalTitleEl.textContent = type === 'skill' ? 'New skill' : type === 'command' ? 'New command' : 'New agent';
       modalNameEl.value = '';
       modalCreateBtn.disabled = true;
       modalScopeToggleEl.querySelectorAll('.scope-toggle-option').forEach((el) => {
@@ -1101,7 +1038,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     function showContextMenu(x, y, item, alignRightX) {
       const isMainAgent = !!item.isMainAgent;
       const itemScope = item.scope;
-      const moveLabel = itemScope === 'project' ? 'Move to User scope' : 'Move to Project scope';
+      const moveLabel = itemScope === 'project' ? 'Move to All projects' : 'Move to This project';
 
       const items = [];
       if (item.source === undefined) {
@@ -1185,15 +1122,21 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         workspacePath = msg.workspacePath || '';
         userHomePath = msg.userHomePath || '';
         render();
+      } else if (msg.type === 'openCreate') {
+        // New at the column's head (Ritemark 2.0, experience 31)
+        openModal(msg.kind);
+      } else if (msg.type === 'focusSearch') {
+        setSearchOpen(true);
+        searchEl.focus();
+        searchEl.select();
       } else if (msg.type === 'revealScheduled') {
         // Triggered by the daemon's toast buttons / status-bar item.
-        collapsedSections.delete('Scheduled');
         render();
         requestAnimationFrame(() => {
           const row = msg.runId
             ? contentEl.querySelector('.sched-item[data-run="' + msg.runId + '"]')
             : null;
-          const target = row || contentEl.querySelector('[data-section="Scheduled"]');
+          const target = row || contentEl.querySelector('[data-group="Scheduled"]');
           if (target) target.scrollIntoView({ block: 'center' });
           if (row) {
             row.style.outline = '2px solid var(--vscode-focusBorder)';
@@ -1242,8 +1185,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     function render() {
-      tabProjectEl.className = 'scope-tab' + (activeScope === 'project' ? ' active' : '');
-      tabUserEl.className = 'scope-tab' + (activeScope === 'user' ? ' active' : '');
+      tabProjectEl.className = 'seg-item' + (activeScope === 'project' ? ' on' : '');
+      tabUserEl.className = 'seg-item' + (activeScope === 'user' ? ' on' : '');
+      tabProjectEl.setAttribute('aria-selected', String(activeScope === 'project'));
+      tabUserEl.setAttribute('aria-selected', String(activeScope === 'user'));
 
       const scopedAgents = agents.filter(byScope);
       const scopedSkills = skills.filter(byScope);
@@ -1253,16 +1198,6 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const filteredSkills = applySort(scopedSkills.filter(matches));
       const filteredCommands = applySort(scopedCommands.filter(matches));
       const filteredFlows = flows.filter((f) => !filter || f.name.toLowerCase().includes(filter));
-
-      const parts = [];
-      const mainAgentCount = agents.filter((a) => a.isMainAgent).length;
-      const subAgentCount = agents.length - mainAgentCount;
-      if (subAgentCount) parts.push(subAgentCount + ' agent' + (subAgentCount !== 1 ? 's' : ''));
-      if (mainAgentCount) parts.push(mainAgentCount + ' instruction file' + (mainAgentCount !== 1 ? 's' : ''));
-      if (skills.length) parts.push(skills.length + ' skill' + (skills.length !== 1 ? 's' : ''));
-      if (commands.length) parts.push(commands.length + ' command' + (commands.length !== 1 ? 's' : ''));
-      if (flows.length) parts.push(flows.length + ' flow' + (flows.length !== 1 ? 's' : ''));
-      countsEl.textContent = parts.join(' \\u00b7 ');
 
       const scopeTotal = scopedAgents.length + scopedSkills.length + scopedCommands.length + flows.length + scheduledRuns.length;
       if (scopeTotal === 0) {
@@ -1275,7 +1210,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const instructionDocs = filteredAgents.filter((a) => a.isMainAgent);
       const subAgents = filteredAgents.filter((a) => !a.isMainAgent);
       if (instructionDocs.length > 0) {
-        html += renderSection('Instructions', null, instructionDocs);
+        html += renderSection('Instructions', 'instructions', instructionDocs);
       }
       if (subAgents.length > 0) {
         html += renderSection('Agents', 'agent', subAgents);
@@ -1284,7 +1219,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         html += renderSection('Skills', 'skill', filteredSkills);
       }
       if (filteredCommands.length > 0) {
-        html += renderSection('Commands', null, filteredCommands);
+        html += renderSection('Commands', 'command', filteredCommands);
       }
       const filteredRuns = scheduledRuns.filter((r) => !filter || (r.taskId || '').toLowerCase().includes(filter));
       if (filteredRuns.length > 0) {
@@ -1295,13 +1230,11 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (!html && filter) {
-        html = '<div class="empty-state"><div class="empty-state-title">No matches for "' + escapeHtml(filter) + '"</div></div>';
+        html = '<div class="empty-state">No matches for \u201c' + escapeHtml(filter) + '\u201d</div>';
       }
 
       contentEl.innerHTML = html;
       wireRowHandlers();
-      wireSectionAddHandlers();
-      wireSectionToggleHandlers();
       wireScheduledHandlers();
     }
 
@@ -1317,36 +1250,64 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       });
     }
 
-    function wireSectionToggleHandlers() {
-      contentEl.querySelectorAll('.section-header[data-section]').forEach((el) => {
-        el.addEventListener('click', (e) => {
-          // The + (add) button has its own handler with stopPropagation; guard anyway.
-          if (e.target && e.target.closest && e.target.closest('.section-add-btn')) return;
-          toggleSection(el.dataset.section);
-        });
-      });
+    // The kit's icons (Phosphor), by kind of row
+    const ICON = { instructions: '&#xe23a;', agent: '&#xe762;', skill: '&#xe6a2;', command: '&#xe1c4;', scheduled: '&#xe19a;', flow: '&#xe6ec;', warning: '&#xe4e0;', warningCircle: '&#xe4e2;' };
+
+    function moreButton() {
+      return '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
+        '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">' +
+        '<circle cx="64" cy="128" r="12" /><circle cx="128" cy="128" r="12" /><circle cx="192" cy="128" r="12" />' +
+        '</svg></button>';
+    }
+
+    function groupHtml(title, count) {
+      return '<div class="group" data-group="' + escapeHtml(title) + '" role="heading" aria-level="2">' + escapeHtml(title) + '<span class="count">' + count + '</span></div>';
+    }
+
+    // A row (kit: ritemark.css .row): the kind's icon, the name, then what it needs to say at the right
+    function rowHtml(row) {
+      let html = '<div class="item' + (row.open ? ' open' : '') + (row.warn ? ' has-warn' : '') + (row.extraClass ? ' ' + row.extraClass : '') + '"' + (row.attrs || '') + ' title="' + escapeHtml(row.title) + '">';
+      html += '<i class="ph row-icon" aria-hidden="true">' + row.icon + '</i>';
+      html += '<span class="row-label">' + labelHtml(row.label) + '</span>';
+      if (row.warn) html += '<i class="ph row-warn" role="img" aria-label="' + escapeHtml(row.warn) + '">' + ICON.warning + '</i>';
+      if (row.meta || row.metaHtml) html += '<span class="row-meta' + (row.metaClass ? ' ' + row.metaClass : '') + '"' + (row.metaAttrs || '') + '>' + (row.metaHtml || escapeHtml(row.meta)) + '</span>';
+      if (row.more) html += moreButton();
+      return html + '</div>';
+    }
+
+    // The name in the row's ink, its extension in muted ink (experience 31)
+    function labelHtml(label) {
+      const m = /^(.+?)(\\.flow\\.json|\\.[^.\\s]+)$/i.exec(label || '');
+      return m ? escapeHtml(m[1]) + '<span class="row-ext">' + escapeHtml(m[2]) + '</span>' : escapeHtml(label);
+    }
+
+    // Files show their extension (framework.md); a skill is a folder and shows its folder's name
+    function fileLabel(filePath) {
+      const parts = (filePath || '').split(/[\\\\/]/);
+      const base = parts.pop() || '';
+      return /^SKILL\\.md$/i.test(base) ? (parts.pop() || base) : base;
+    }
+
+    // What used to be on the row's second line is in its tooltip: where it lives, its description, who it is for
+    function itemTooltip(item, extra) {
+      const lines = [displayPath(item)];
+      const desc = (item.description || '').trim();
+      if (desc) lines.push(desc);
+      // the badge's words (the Experience lead): For Claude, For ChatGPT, Shared
+      if (item.provenance) lines.push(item.provenance === 'shared' ? 'Shared' : item.provenance === 'codex' ? 'For ChatGPT' : 'For Claude');
+      if (extra) lines.push(extra);
+      return lines.join('\\n');
     }
 
     function renderFlowsSection(items) {
-      const collapsed = collapsedSections.has('Flows');
-      let html = '<div class="section-header" data-section="Flows" role="button" aria-expanded="' + String(!collapsed) + '">';
-      html += '<span class="section-title">' + caretSvg(collapsed) + 'Flows</span>';
-      html += '<div class="section-header-meta"><span class="section-count">' + items.length + '</span></div>';
-      html += '</div>';
-      if (collapsed) return html;
+      let html = groupHtml('Flows', items.length);
       for (const flow of items) {
-        html += '<div class="item" data-filepath="' + escapeHtml(flow.filePath) + '" title="' + escapeHtml(flow.filePath) + '">';
-        html += '<div class="item-content">';
-        html += '<div class="item-name">' + escapeHtml(flow.name) + '</div>';
-        if (flow.attachedAgents && flow.attachedAgents.length > 0) {
-          html += '<div class="flow-attach">\\u2192 used by ' + escapeHtml(flow.attachedAgents.join(', ')) + '</div>';
-        }
-        html += '</div>';
-        html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
-          '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">' +
-          '<circle cx="64" cy="128" r="12" /><circle cx="128" cy="128" r="12" /><circle cx="192" cy="128" r="12" />' +
-          '</svg></button>';
-        html += '</div>';
+        const used = flow.attachedAgents && flow.attachedAgents.length > 0 ? 'Used by ' + flow.attachedAgents.join(', ') : '';
+        html += rowHtml({
+          icon: ICON.flow, label: fileLabel(flow.filePath), open: flow.filePath === selectedPath, more: true,
+          attrs: ' data-filepath="' + escapeHtml(flow.filePath) + '"',
+          title: [flow.filePath, used].filter(Boolean).join('\\n'),
+        });
       }
       return html;
     }
@@ -1384,12 +1345,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     function renderScheduledSection(items) {
-      const collapsed = collapsedSections.has('Scheduled');
-      let html = '<div class="section-header" data-section="Scheduled" role="button" aria-expanded="' + String(!collapsed) + '">';
-      html += '<span class="section-title">' + caretSvg(collapsed) + 'Scheduled</span>';
-      html += '<div class="section-header-meta"><span class="section-count">' + items.length + '</span></div>';
-      html += '</div>';
-      if (collapsed) return html;
+      const visible = items.filter((run) => !run.supersededBy);
+      let html = groupHtml('Scheduled', visible.length);
       // Sprint 107 R2: consent status + toggle — schedule-triggered runs fire
       // without a user gesture, so the workspace opt-in is always visible and
       // reversible here.
@@ -1405,101 +1362,51 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
           + (on ? 'Pause' : 'Allow') + '</button>';
         html += '</div>';
       }
-      for (const run of items) {
-        if (run.supersededBy) continue;
+      for (const run of visible) {
         const meta = scheduledOutcomeMeta(run.outcome);
         const label = run.taskId || 'Scheduled run';
         const desc = run.outcome === 'blocked' && run.blockedAction
-          ? 'Wanted to ' + (run.blockedAction.kind === 'file-write' ? 'write ' : 'run ') + escapeHtml(run.blockedAction.target)
+          ? 'Wanted to ' + (run.blockedAction.kind === 'file-write' ? 'write ' : 'run ') + run.blockedAction.target
           : (run.outputFirstLine || run.errorMessage || run.skipReason || '');
-        const dur = run.durationMs ? ' \\u00b7 ' + (run.durationMs / 1000).toFixed(1) + 's' : '';
-        html += '<div class="item sched-item" data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '">';
-        html += '<span class="item-icon-chip sched-chip sched-' + meta.cls + '">' + meta.icon + '</span>';
-        html += '<div class="item-content">';
-        html += '<div class="item-name">' + escapeHtml(label) +
-          '<span class="run-time">' + escapeHtml(relativeTime(run.startedAt)) + '</span></div>';
-        if (desc) {
-          html += '<div class="item-description">' + escapeHtml(desc) + '</div>';
-        }
-        if (run.outcome === 'blocked') {
-          html += '<div class="item-hint sched-approve" data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '">Approval needed \\u2014 click to review</div>';
-        } else {
-          html += '<span class="sched-pill sched-' + meta.cls + '">' + escapeHtml(meta.label) + dur + '</span>';
-        }
-        html += '</div></div>';
+        const dur = run.durationMs ? ' (' + (run.durationMs / 1000).toFixed(1) + 's)' : '';
+        const blocked = run.outcome === 'blocked';
+        const runAttrs = ' data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '"';
+        // experience 31: the run's time when done, a spinner while it runs, "Approval needed" in amber (it opens
+        // the review), "Failed" in body ink with a warning; the details in the tooltip
+        const running = meta.cls === 'run';
+        const failed = run.outcome === 'errored';
+        html += rowHtml({
+          icon: ICON.scheduled, label, extraClass: 'sched-item', attrs: runAttrs,
+          meta: blocked ? 'Approval needed' : failed ? '' : relativeTime(run.startedAt),
+          metaHtml: running ? meta.icon : failed ? '<i class="ph" aria-hidden="true">' + ICON.warningCircle + '</i>Failed' : '',
+          metaClass: blocked ? 'warn sched-approve' : failed ? 'failed' : '',
+          metaAttrs: blocked ? runAttrs : '',
+          title: [meta.label + dur, desc].filter(Boolean).join('\\n'),
+        });
       }
       return html;
     }
 
+    // experience 31: an empty list is one line in muted ink; New in the head makes every kind
     function renderEmptyState() {
-      const pathHint = activeScope === 'project' ? '.claude/' : '~/.claude/';
-      contentEl.innerHTML =
-        '<div class="empty-state">' +
-          '<div class="empty-state-title">No skills or agents yet</div>' +
-          '<div class="empty-state-actions">' +
-            '<button class="btn btn-primary" id="emptyNewSkillBtn">' + plusSvg() + 'New skill</button>' +
-            '<button class="btn btn-primary" id="emptyNewAgentBtn">' + plusSvg() + 'New agent</button>' +
-          '</div>' +
-          '<div class="empty-state-footnote">Helpers live in <code>' + pathHint + '</code> — they\\u2019re just markdown files.</div>' +
-        '</div>';
-      const sBtn = document.getElementById('emptyNewSkillBtn');
-      const aBtn = document.getElementById('emptyNewAgentBtn');
-      if (sBtn) sBtn.addEventListener('click', () => openModal('skill'));
-      if (aBtn) aBtn.addEventListener('click', () => openModal('agent'));
+      contentEl.innerHTML = '<div class="empty-state">' + (activeScope === 'project'
+        ? 'Agents, skills, commands and flows for this project live here. New makes one.'
+        : 'Agents, skills and commands for all your projects live here. New makes one.') + '</div>';
     }
 
-    function plusSvg() {
-      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-    }
-
-    function renderSection(title, addType, items) {
-      const collapsed = collapsedSections.has(title);
-      let html = '<div class="section-header" data-section="' + escapeHtml(title) + '" role="button" aria-expanded="' + String(!collapsed) + '">';
-      html += '<span class="section-title">' + caretSvg(collapsed) + escapeHtml(title) + '</span>';
-      html += '<div class="section-header-meta">';
-      html += '<span class="section-count">' + items.length + '</span>';
-      if (addType) {
-        html += '<button class="section-add-btn" data-add-type="' + addType + '" title="New ' + addType + '" aria-label="New ' + addType + '">' + plusSvg() + '</button>';
-      }
-      html += '</div></div>';
-      if (collapsed) return html;
+    function renderSection(title, kind, items) {
+      let html = groupHtml(title, items.length);
       for (const item of items) {
-        const sel = item.filePath === selectedPath ? ' selected' : '';
         const main = !!item.isMainAgent;
-        const warn = !main && !item.hasFrontmatter;
-        const rel = displayPath(item);
-        const desc = (item.description || '').trim();
-        const descText = desc || (main ? 'Instructions loaded into every session \\u2014 not an agent' : 'No description in frontmatter');
-        const descClass = desc ? 'item-description' : 'item-description placeholder';
-        html += '<div class="item' + sel + '" data-filepath="' + escapeHtml(item.filePath) + '" title="' + escapeHtml(rel) + '">';
-        html += renderIconChip(item.icon, item.color);
         // validateAgentFrontmatter only applies to agents (have isMainAgent property)
         const isAgent = 'isMainAgent' in item;
-        const validationErrors = (isAgent && !main) ? (item.validationErrors || []) : [];
-        const provenance = !isAgent ? item.provenance : undefined;
-        html += '<div class="item-content">';
-        html += '<div class="item-name">' + escapeHtml(item.name) +
-          (provenance ? '<span class="prov-badge prov-' + provenance + '">' + provenance + '</span>' : '') +
-          '</div>';
-        html += '<div class="' + descClass + '">' + escapeHtml(descText) + '</div>';
-        if (warn) {
-          html += '<div class="item-hint">Add a description in frontmatter — open file and click \\u24D8</div>';
-        }
-        if (validationErrors.length > 0) {
-          html += '<div class="val-chip" title="' + escapeHtml(validationErrors[0]) + '">' +
-            '\\u26A0 ' + escapeHtml(validationErrors[0]) + '</div>';
-        }
-        html += '</div>';
-        if (main) {
-          html += '<span class="item-icon star" title="Instructions file (CLAUDE.md / AGENTS.md) \\u2014 loaded into every session, not a configurable agent">\\u2605</span>';
-        } else if (warn) {
-          html += '<span class="item-icon warning" title="Missing or empty description field in frontmatter.">\\u26A0</span>';
-        }
-        html += '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
-          '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">' +
-          '<circle cx="64" cy="128" r="12" /><circle cx="128" cy="128" r="12" /><circle cx="192" cy="128" r="12" />' +
-          '</svg></button>';
-        html += '</div>';
+        const errors = (isAgent && !main) ? (item.validationErrors || []) : [];
+        const warn = errors[0] || (isAgent && !main && !item.hasFrontmatter ? 'Add a description in its frontmatter' : '');
+        html += rowHtml({
+          icon: ICON[kind], label: fileLabel(item.filePath), open: item.filePath === selectedPath, more: true,
+          attrs: ' data-filepath="' + escapeHtml(item.filePath) + '"',
+          title: itemTooltip(item, main ? 'Instructions loaded into every session' : warn), warn,
+        });
       }
       return html;
     }
@@ -1544,16 +1451,6 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
             showContextMenu(rect.right, rect.bottom + 2, item, rect.right);
           });
         }
-      });
-    }
-
-    function wireSectionAddHandlers() {
-      contentEl.querySelectorAll('.section-add-btn').forEach((el) => {
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const type = el.dataset.addType;
-          if (type === 'skill' || type === 'agent') openModal(type);
-        });
       });
     }
 

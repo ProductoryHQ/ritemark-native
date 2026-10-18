@@ -55,11 +55,11 @@ console.log('[Ritemark] Initializing editor, type:', editorType)
 
 watchRitemarkThemeClass()
 
-// Sidebar panels use sideBar background (grey) instead of editor background (white)
+// Sidebar panels use sideBar background (grey) instead of editor background (white). Ritemark Settings is a tab
+// on the desk in 2.0 (experiences/settings frame 2; Jarmo, 17 October: "must have white bg"), so it keeps the desk's.
 if (
   editorType === 'flows-panel' ||
   editorType === 'ai-sidebar' ||
-  editorType === 'settings' ||
   editorType === 'transcribe-panel' ||
   editorType === 'tasks-panel'
 ) {

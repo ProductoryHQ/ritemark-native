@@ -39,7 +39,7 @@
   /* Ink ladder — always 4 steps, used for hierarchy */
   --ritemark-ink-strong:         #1E1B4B; /* editor.foreground — "Deep Space" */
   --ritemark-ink-body:           #475569; /* primary body text (Slate 600) */
-  --ritemark-ink-muted:          #64748B; /* secondary text, descriptions (Slate 500) */
+  --ritemark-ink-muted:          #617187; /* secondary text, descriptions: 4.54:1 on the ground, 4.76 on the AI's sheet, 4.98 on the desk (kit, ritemark-dev 10f2732). The status bar on the ground uses body #475569 (accessibility.md, finding 1) */
   --ritemark-ink-faint:          #94A3B8; /* placeholders, inactive (Slate 400) */
   --ritemark-ink-disabled:       #CBD5E1; /* fully disabled state (Slate 300) */
 

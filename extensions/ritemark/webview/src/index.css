@@ -52,7 +52,7 @@
   --ritemark-hairline-strong: #cbd5e1;
   --ritemark-ink-strong: #1e1b4b;
   --ritemark-ink-body: #475569;
-  --ritemark-ink-muted: #64748b;
+  --ritemark-ink-muted: #617187; /* the kit's muted, 4.5:1 on the ground (Sprint 132) */
   --ritemark-ink-faint: #94a3b8;
   --ritemark-ink-disabled: #cbd5e1;
   --ritemark-indigo: #4338ca;
@@ -67,20 +67,21 @@
   --ritemark-error: #ef4444;
   --ritemark-error-soft: #fee2e2;
 
-  --ritemark-dark-surface: #0F172A;
-  --ritemark-dark-surface-muted: #020617;
-  --ritemark-dark-surface-soft: #1E293B;
-  --ritemark-dark-hairline: #1E293B;
-  --ritemark-dark-hairline-strong: #334155;
+  /* Ritemark Dark (the kit's dark tokens, kit/ritemark.css .dark .win): the desk, the AI's sheet, the ground, the hairlines */
+  --ritemark-dark-surface: #1E1B4B;
+  --ritemark-dark-surface-muted: #1A1740;
+  --ritemark-dark-surface-soft: #16132F;
+  --ritemark-dark-hairline: rgba(199, 210, 254, 0.12);
+  --ritemark-dark-hairline-strong: rgba(199, 210, 254, 0.22);
   --ritemark-dark-ink-strong: #f8fafc;
-  --ritemark-dark-ink-body: #CBD5E1;
+  --ritemark-dark-ink-body: #C7D2FE;
   --ritemark-dark-ink-muted: #94a3b8;
-  --ritemark-dark-ink-faint: #64748b;
+  --ritemark-dark-ink-faint: #7C86A2;
   --ritemark-dark-ink-disabled: #475569;
   --ritemark-dark-indigo: #818cf8;
   --ritemark-dark-indigo-deep: #6366f1;
   --ritemark-dark-indigo-darker: #4f46e5;
-  --ritemark-dark-indigo-soft: rgba(129, 140, 248, 0.16);
+  --ritemark-dark-indigo-soft: rgba(129, 140, 248, 0.18);
   --ritemark-dark-indigo-fainter: rgba(129, 140, 248, 0.28);
   --ritemark-dark-success: #4ade80;
   --ritemark-dark-success-soft: rgba(34, 197, 94, 0.18);
@@ -163,6 +164,8 @@
   --ring: var(--r-accent);
   --primary: var(--r-accent);
   --primary-foreground: #ffffff;
+  --primary-hover: var(--r-accent-deep);
+  --r-on-accent: #ffffff; /* text and icons on an indigo fill */
   --secondary: var(--r-surface-soft);
   --secondary-foreground: var(--r-ink-strong);
   --accent: var(--r-accent-soft);
@@ -228,7 +231,15 @@ body[data-vscode-theme-kind='vscode-dark'],
      shadcn role tokens on :root kept their light values in dark mode
      (bg-background stayed #ffffff, bg-secondary #f1f5f9, measured in 1.13.0).
      Re-declared here, so outline and secondary buttons follow the theme.
-     --primary is left as it ships. */
+     Primary (Ritemark 2.0, kit: Ritemark Dark): the light indigo with the ground's
+     ink on it, lighter on hover, as the theme's button colours. */
+  --primary: var(--r-accent);
+  --primary-foreground: var(--r-on-accent);
+  --primary-hover: #a5b4fc;
+  /* kit: text on indigo becomes the ground's ink (white on the lighter indigo is below 4.5:1), and the primary loses its glow */
+  --r-on-accent: #16132f;
+  --ritemark-shadow-indigo-sm: none;
+  --ritemark-shadow-indigo-md: none;
   --background: var(--r-surface);
   --foreground: var(--r-ink-strong);
   --muted: var(--r-surface-soft);
@@ -252,6 +263,11 @@ body[data-vscode-theme-kind='vscode-dark'],
   background-color: var(--vscode-ritemark-aiSheet, var(--r-surface));
   border-radius: 10px;
   box-shadow: 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--r-hairline)), 0 1px 2px var(--vscode-ritemark-sheetShadow, rgba(15, 23, 42, 0.05));
+}
+
+/* Ritemark 2.0: a table without Add row closes on its area's border, with no line after its last row (DataTable.tsx) */
+.rm-grid-closed > tbody > tr:last-child > td {
+  border-bottom-width: 0;
 }
 
 body {
@@ -408,7 +424,7 @@ body {
   border: 1px solid var(--ritemark-hairline, #e2e8f0);
   border-radius: 6px; padding: 6px 9px;
   font-family: var(--ritemark-ui-font-family); font-size: 12px;
-  color: var(--ritemark-ink-muted, #64748b); cursor: pointer;
+  color: var(--ritemark-ink-muted, #617187); cursor: pointer;
   box-shadow: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
 }
 .rm-marker:hover { border-color: var(--ritemark-hairline-strong, #cbd5e1); }
@@ -557,7 +573,7 @@ body {
   background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
 }
 .rm-mention-opt-alias { font-weight: 600; }
-.rm-mention-opt-label { color: var(--ritemark-ink-muted, #64748b); }
+.rm-mention-opt-label { color: var(--ritemark-ink-muted, #617187); }
 .rm-mention-opt[data-active="true"] .rm-mention-opt-label { color: inherit; }
 
 /* Send / Open conversation / recovery actions in a comment bubble */
@@ -610,7 +626,7 @@ body {
   word-break: break-word;
 }
 .rm-task-glyph { flex: none; font-size: 10px; line-height: inherit; }
-.rm-task-status--idle      { color: var(--r-ink-muted, #64748b); }
+.rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
 .rm-task-status--success   { color: var(--r-success); }
@@ -622,7 +638,7 @@ body {
   font-family: var(--ritemark-ui-font-family);
   font-size: 11px;
   line-height: 1.35;
-  color: var(--r-ink-muted, #64748b);
+  color: var(--r-ink-muted, #617187);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -641,3 +657,58 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* === Ritemark 2.0 (experience 31): a flow ============================================================ */
+/* each kind of step keeps one colour, in both themes (kit: theme.html .ic) */
+.rm-step-chip { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; flex: none; }
+.rm-step-chip.start { background: var(--r-accent-soft); color: var(--r-accent); }
+.rm-step-chip.ai { background: #FEF3C7; color: #B45309; }
+.rm-step-chip.action { background: #DCFCE7; color: #15803D; }
+body.vscode-dark .rm-step-chip.ai, body.ritemark-dark .rm-step-chip.ai, .dark .rm-step-chip.ai { background: rgba(251, 191, 36, 0.16); color: #FCD34D; }
+body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, .dark .rm-step-chip.action { background: rgba(74, 222, 128, 0.14); color: #86EFAC; }
+
+/* a step's sheet, and the chosen one's ring (kit: .node, .node.on) */
+.rm-step-node { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.10); }
+.rm-step-node-on { box-shadow: 0 0 0 2px var(--r-accent), 0 4px 12px -4px rgba(67, 56, 202, 0.25); }
+
+/* the zoom controls: one 28-wide stack, radius 8, at the bottom left (kit: .canvas .zoom) */
+.rm-flow-canvas .react-flow__controls {
+  margin: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--r-surface);
+  box-shadow: 0 0 0 1px var(--r-hairline), 0 1px 2px rgba(30, 27, 75, 0.06);
+}
+.rm-flow-canvas .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--r-hairline);
+  background: var(--r-surface);
+  color: var(--r-ink-body);
+}
+.rm-flow-canvas .react-flow__controls-button:last-child { border-bottom: 0; }
+.rm-flow-canvas .react-flow__controls-button:hover { background: var(--r-surface-soft); }
+.rm-flow-canvas .react-flow__controls-button svg { width: 12px; height: 12px; max-width: 12px; max-height: 12px; fill: currentColor; }
+
+/* the settings column: labels 12 in body ink, fields 32 with radius 8 on the desk (kit: .props) */
+.rm-flow-props label { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--r-ink-body); }
+.rm-flow-props input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+.rm-flow-props textarea,
+.rm-flow-props button[role='combobox'] {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--r-ink-strong);
+}
+.rm-flow-props input:focus-visible,
+.rm-flow-props textarea:focus-visible,
+.rm-flow-props button[role='combobox']:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--r-accent); }
+.rm-flow-props textarea { min-height: 120px; }

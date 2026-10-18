@@ -71,7 +71,7 @@ export async function executeCodexNode(
     const accountResponse = await appServer.getAccount();
     if (!accountResponse || !accountResponse.account) {
       throw new Error(
-        'Codex is not authenticated. Open the AI sidebar and log in with your ChatGPT account.'
+        'Codex is not signed in. Open Settings and sign in with ChatGPT under Agent Runtime, then run the flow again.'
       );
     }
 

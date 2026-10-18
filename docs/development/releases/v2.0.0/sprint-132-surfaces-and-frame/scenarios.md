@@ -43,8 +43,9 @@ When Ritemark opens
 Then there is no title row; the menu button and the left toggle sit at the start of the left strip, and minimise, maximise and close sit at full height at the right end of the AI's strip, after the AI's toggle and You.
 
 ### S8: The menu
-When the person clicks the menu button, or presses Alt
+When the person clicks the menu button, or presses Alt and then Enter or ↓
 Then File, Edit, View and Help open with today's items and Ctrl shortcuts, and the arrow keys and Escape work.
+Alt alone focuses the menu button, as Windows does and 1.14 did (reworded after Windows round 1, with the Development manager, 18 October).
 
 ### S9: The AI hidden on Windows
 When the person hides the AI
@@ -118,8 +119,11 @@ Then each tab is as wide as its name (up to 200), and the gaps between names are
 
 ### S23: Pointing at a tab
 When the person points at a tab that is not chosen
-Then its own shape fills softly, its close button takes the icon's place, and nothing else moves
+Then its own shape fills softly, its close button shows at its right edge, where the chosen tab has it, and its icon stays
+And no tab changes width and nothing else moves, since every tab keeps the close button's room (32 after the name)
 And its tooltip shows its path inside the project.
+
+(Revised 18 October, Jarmo, after Windows round 1: "x (Close) ei saa olla sedasi tab-ikooni peal, sest seda ei ole kasutajale näha... x-close on teistes äppides ikka paremal?", that is, the × can't sit on the tab's icon, where people don't see it, and other apps put close on the right. The 32 room on every tab is the Experience lead's condition. It was: the close button takes the icon's place.)
 
 ### S24: A new tab
 When the person clicks the +

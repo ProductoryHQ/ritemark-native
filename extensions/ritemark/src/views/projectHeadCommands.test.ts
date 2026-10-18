@@ -43,7 +43,7 @@ Module._resolveFilename = function (request, parent, isMain) {
 require.cache['vscode'] = { id: 'vscode', filename: 'vscode', loaded: true, exports: vscodeStub } as unknown as NodeJS.Module;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { NEW_MENU_COMMANDS, PROJECT_MENU_COMMANDS, registerProjectHeadCommands } = require('./projectHeadCommands') as typeof import('./projectHeadCommands');
+const { AGENTS_NEW_MENU_COMMANDS, NEW_MENU_COMMANDS, PROJECT_HEAD_COMMANDS, PROJECT_MENU_COMMANDS, registerProjectHeadCommands } = require('./projectHeadCommands') as typeof import('./projectHeadCommands');
 
 interface MenuItem { command: string; group?: string; when?: string }
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8')) as {
@@ -71,10 +71,11 @@ function test(name: string, run: () => void): void {
 
 console.log('Ritemark 2.0 frame contributions');
 
-test('the head\'s two menus list their commands, in order', () => {
+test('the head\'s three menus list their commands, in order', () => {
   const ids = (menu: string) => (menus[menu] ?? []).map(item => item.command);
   assert.deepEqual(ids('ritemark/projectHead'), PROJECT_MENU_COMMANDS.map(c => c.id));
   assert.deepEqual(ids('ritemark/projectHead/new'), NEW_MENU_COMMANDS.map(c => c.id));
+  assert.deepEqual(ids('ritemark/projectHead/agents/new'), AGENTS_NEW_MENU_COMMANDS.map(c => c.id));
 });
 
 test('Reveal names the system\'s own app: Finder on the Mac, File Explorer on Windows', () => {
@@ -84,7 +85,7 @@ test('Reveal names the system\'s own app: Finder on the Mac, File Explorer on Wi
 });
 
 test('every head command has an icon, and Ritemark\'s own icons are in Phosphor\'s font', () => {
-  for (const { id } of [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS]) {
+  for (const { id } of PROJECT_HEAD_COMMANDS) {
     const icon = commands.find(command => command.command === id)?.icon ?? '';
     assert.match(icon, /^\$\([a-z-]+\)$/, `${id} has no icon`);
     const name = icon.slice(2, -1);
@@ -97,7 +98,7 @@ test('every head command has an icon, and Ritemark\'s own icons are in Phosphor\
 
 test('every head command has a title in package.json and stays out of the command palette', () => {
   const hidden = new Set((menus.commandPalette ?? []).filter(item => item.when === 'false').map(item => item.command));
-  for (const { id } of [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS]) {
+  for (const { id } of PROJECT_HEAD_COMMANDS) {
     const declared = commands.find(command => command.command === id);
     assert.ok(declared && declared.title.trim().length > 0, `${id} has no title`);
     assert.ok(hidden.has(id), `${id} shows in the command palette`);
@@ -118,7 +119,7 @@ test('each head command runs the command that does the work', () => {
   registered.length = 0;
   executed.length = 0;
   registerProjectHeadCommands({ subscriptions: [] } as unknown as import('vscode').ExtensionContext);
-  const all = [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS];
+  const all = PROJECT_HEAD_COMMANDS;
   assert.deepEqual(registered, all.map(c => c.id));
   assert.deepEqual(executed, all.map(c => c.onFolder ? [c.runs, projectFolder] : [c.runs]));
 });

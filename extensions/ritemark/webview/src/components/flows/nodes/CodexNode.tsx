@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { CodexNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -29,9 +28,8 @@ function CodexNodeComponent({ id, data, selected }: CodexNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Icon name="terminal" size={16} />}
+      type="codexNode"
       selected={selected}
-      headerColor="var(--vscode-charts-purple)"
       executionStep={executionStep}
     >
       <NodeField
@@ -44,9 +42,7 @@ function CodexNodeComponent({ id, data, selected }: CodexNodeProps) {
           value={data.model}
         />
       )}
-      <div className="mt-2 text-xs text-[var(--r-ink-muted)]">
-        Timeout: {data.timeout || 5} min
-      </div>
+      <NodeField label="Timeout" value={`${data.timeout || 5} minute${(data.timeout || 5) === 1 ? '' : 's'}`} />
     </BaseNode>
   );
 }

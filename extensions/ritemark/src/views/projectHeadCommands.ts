@@ -1,9 +1,10 @@
 /**
- * The left column's head (Ritemark 2.0, Sprint 132, R10): the entries of its two menus.
+ * The left column's head (Ritemark 2.0, Sprint 132, R10; experience 31): the entries of its menus.
  *
- * The shell draws the head (the project's name, New and Search); its menus come from
- * here, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus in
- * package.json, so an extension release can change their words, icons and entries.
+ * The shell draws the head (the project's name, New and Search) on Documents and on Agents; its
+ * menus come from here, through the `ritemark/projectHead`, `ritemark/projectHead/new` and
+ * `ritemark/projectHead/agents/new` menus in package.json, so an extension release can change
+ * their words, icons and entries.
  * Each command below carries Ritemark's word for an action and runs the command that
  * does it. Reveal in Finder (Reveal in File Explorer on Windows) is two commands, one
  * per system, because a command's title cannot change with the system; both run
@@ -40,8 +41,21 @@ export const NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
   { id: 'ritemark.projectHead.newFolderInNew', runs: 'explorer.newFolder' },
 ];
 
+/** New on Agents (experience 31): the library's four kinds; Flow is the same entry as in New on Documents. */
+export const AGENTS_NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
+  { id: 'ritemark.projectHead.newAgent', runs: 'ritemark.agentLibrary.newAgent' },
+  { id: 'ritemark.projectHead.newSkill', runs: 'ritemark.agentLibrary.newSkill' },
+  { id: 'ritemark.projectHead.newCommand', runs: 'ritemark.agentLibrary.newCommand' },
+  { id: 'ritemark.projectHead.newFlow', runs: 'ritemark.flows.new' },
+];
+
+/** Every head command once (a command can sit in two menus). */
+export const PROJECT_HEAD_COMMANDS: readonly ProjectHeadCommand[] = [...new Map(
+  [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS, ...AGENTS_NEW_MENU_COMMANDS].map(command => [command.id, command]),
+).values()];
+
 export function registerProjectHeadCommands(context: vscode.ExtensionContext): void {
-  for (const { id, runs, onFolder } of [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS]) {
+  for (const { id, runs, onFolder } of PROJECT_HEAD_COMMANDS) {
     context.subscriptions.push(
       vscode.commands.registerCommand(id, () => onFolder
         ? vscode.commands.executeCommand(runs, vscode.workspace.workspaceFolders?.[0]?.uri)

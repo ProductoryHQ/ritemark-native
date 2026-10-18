@@ -144,8 +144,7 @@ export function TranscribePanel() {
             {/* At 200% zoom the sidebar is narrow: the label ellipsizes rather
                 than overflowing the button; the tooltip keeps the full name. */}
             <Button
-              className="w-full min-w-0"
-              size="lg"
+              className="h-8 w-full min-w-0 rounded-[8px] text-[13px]" /* the kit's button: 32 high, radius 8, 13 */
               onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
               disabled={nothingReady && !state.pending}
             >
@@ -165,8 +164,8 @@ export function TranscribePanel() {
               }
             >
               <Button
-                className="rounded-lg"
-                size="icon-lg"
+                className="size-8 rounded-[8px]"
+                size="icon"
                 aria-label="Record"
                 onClick={() => recording.start()}
                 disabled={nothingReady || recordingBusy}
@@ -251,7 +250,7 @@ export function TranscribePanel() {
         )}
 
         {!state.pending && !nothingReady && !recordingBusy && state.recordings.length === 0 && activeJobs.length === 0 && (
-          <p className="px-4 py-6 text-center text-xs leading-relaxed text-ink-muted">
+          <p className="px-4 py-6 text-center text-[13px] leading-5 text-ink-muted [text-wrap:balance]">
             {state.otherProjectCount > 0 ? (
               // The library is project-scoped, so an empty list here does NOT
               // mean an empty library. Saying only "add a recording" made
@@ -307,9 +306,10 @@ function Section({
 }) {
   return (
     <div className="mb-1">
-      <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+      {/* the column's group head (kit: .group): 11 semibold uppercase in ink, the count in muted ink */}
+      <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-strong">
         <span>{title}</span>
-        {count !== undefined && <span className="font-semibold normal-case tracking-normal">· {count}</span>}
+        {count !== undefined && <span className="font-normal normal-case tracking-normal text-ink-muted">{count}</span>}
       </div>
       {children}
     </div>
@@ -341,7 +341,7 @@ function PendingImportCard({
           <div className="truncate text-xs font-semibold" title={pending.audioName}>
             {pending.audioName}
           </div>
-          <div className="mt-0.5 text-[11px] text-ink-muted">{formatDuration(pending.durationSec)}</div>
+          <div className="mt-0.5 text-[12px] text-ink-muted">{formatDuration(pending.durationSec)}</div>
         </div>
       </div>
 
@@ -359,7 +359,7 @@ function PendingImportCard({
 
       {selected && !selected.isLocal && selected.readiness.ready && (
         <div className="mt-2.5 rounded-md border border-ritemark-warning/40 bg-ritemark-warning-soft px-2.5 py-2">
-          <p className="text-[11px] leading-relaxed text-ritemark-warning-foreground">
+          <p className="text-[12px] leading-relaxed text-ritemark-warning-foreground">
             <strong className="font-semibold">This uploads your audio to ElevenLabs.</strong>{' '}
             {pending.durationSec === null
               ? 'Length unknown, so the cost cannot be estimated up front — ElevenLabs charges about $0.22 per hour.'
@@ -438,7 +438,7 @@ function EngineChoice({
           </span>
         )}
       </div>
-      <div className="mt-1 pl-5 text-[10.5px] leading-relaxed text-ink-muted">
+      <div className="mt-1 pl-5 text-[12px] leading-relaxed text-ink-muted">
         {usable
           ? engine.isLocal
             ? 'Private — audio never leaves this device. No speaker separation.'
@@ -467,7 +467,7 @@ function FirstRun({ engines }: { engines: EngineStatus[] }) {
             />
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold">{engine.label}</div>
-              <div className="mt-0.5 text-[10.5px] leading-relaxed text-ink-muted">
+              <div className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
                 {engine.readiness.ready ? 'Ready' : engine.readiness.reason}
               </div>
             </div>
@@ -531,7 +531,7 @@ function JobRow({ job }: { job: TranscriptionJob }) {
           <div className="truncate text-xs font-semibold" title={job.audioName}>
             {job.audioName}
           </div>
-          <div className="mt-0.5 text-[10.5px] text-ink-muted">
+          <div className="mt-0.5 text-[12px] text-ink-muted">
             {formatDuration(job.durationSec)} · {job.engine === 'elevenlabs' ? 'ElevenLabs' : 'On-device'}
           </div>
         </div>
@@ -556,7 +556,7 @@ function JobRow({ job }: { job: TranscriptionJob }) {
         />
       </div>
 
-      <div className="mt-1.5 flex items-center gap-2 text-[10.5px] font-semibold text-accent-deep">
+      <div className="mt-1.5 flex items-center gap-2 text-[12px] font-semibold text-accent-deep">
         <span>
           {phaseLabel(job)}
           {percent !== null ? ` · ${percent}%` : ''}
@@ -573,7 +573,7 @@ function AttentionRow({ job }: { job: TranscriptionJob }) {
       <div className="truncate text-xs font-semibold" title={job.audioName}>
         {job.audioName}
       </div>
-      <p className="mt-1 text-[10.5px] leading-relaxed text-ritemark-error">
+      <p className="mt-1 text-[12px] leading-relaxed text-ritemark-error">
         {job.error?.message ?? (interrupted ? 'Interrupted.' : 'Transcription failed.')}
       </p>
       <div className="mt-2 flex gap-2">
@@ -623,14 +623,14 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
             onClick={() => vscode.postMessage({ type: 'transcribe:openSession', sessionId: recording.sessionId })}
           />
           {/* Beside the title's first line (13px at 1.5), however many lines follow. */}
-          <Icon name="microphone" size={16} className="mt-[1.75px] shrink-0 text-ink-muted" />
+          <Icon name="waveform" size={16} className="mt-[1.75px] shrink-0 text-ink-muted" />
           <div className="pointer-events-none relative min-w-0 flex-1">
             <div className="line-clamp-2 break-words text-[13px] font-medium text-ink-strong">{title}</div>
-            <div className="mt-0.5 truncate text-[11px] text-ink-muted">
+            <div className="mt-0.5 truncate text-[12px] text-ink-muted">
               {[formatRecordingDate(recording.createdAt), formatDuration(recording.durationSec)].filter(Boolean).join(' · ')}
             </div>
             {recording.projectName && (
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-ink-faint">
+              <div className="mt-1 flex items-center gap-1 text-[12px] text-ink-faint">
                 <Icon name="folder-open" size={12} className="shrink-0" />
                 <span className="truncate">Transcribed in {recording.projectName}</span>
               </div>
@@ -638,13 +638,13 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
             {recording.audioMissing && (
               // R12: the transcript is intact — only the path went stale. Offer to
               // find the file rather than implying anything was lost.
-              <div className="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px]">
+              <div className="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12px]">
                 <span className="truncate text-ritemark-warning">Recording moved or deleted</span>
                 <Tooltip label="Choose where the recording is now. The transcript is kept.">
                   <Button
                     variant="link"
                     size="sm"
-                    className="pointer-events-auto relative z-10 h-auto shrink-0 p-0 text-[11px] font-semibold"
+                    className="pointer-events-auto relative z-10 h-auto shrink-0 p-0 text-[12px] font-semibold"
                     onClick={() => vscode.postMessage({ type: 'transcribe:relinkSession', sessionId: recording.sessionId })}
                   >
                     Find it

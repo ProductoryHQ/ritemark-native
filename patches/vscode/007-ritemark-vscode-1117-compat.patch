@@ -27,7 +27,10 @@
 #      installed (paneCompositeBar.ts, the chatSetupInstalled context key), and
 #      opens Copilot Chat as a tab on the desk: an open one comes forward, or
 #      workbench.action.chat.openInEditor opens a new one
-#      (ritemark.copilotChat.openAsTab, chatSetupContributions.ts).
+#      (ritemark.copilotChat.openAsTab, chatSetupContributions.ts). The View
+#      menu's Copilot Chat and Ctrl+Alt+I (Ctrl+Cmd+I on the Mac) run it too,
+#      so neither opens Copilot Chat in the bottom panel (Windows round 1,
+#      2026-10-18; patch 003 drops the panel view's own View-menu entry).
 #
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
 #          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
@@ -133,10 +136,24 @@ index e76d44b8645..91b73daa38a 100644
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-index 2ea65ba8917..6d848c0a5f9 100644
+index 2ea65ba8917..95d50335294 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-@@ -32,6 +32,7 @@ import { IMarkerService } from '../../../../../platform/markers/common/markers.j
+@@ -7,6 +7,7 @@ import * as dom from '../../../../../base/browser/dom.js';
+ import { BaseActionViewItem, IBaseActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
+ import { IAction, WorkbenchActionExecutedClassification, WorkbenchActionExecutedEvent } from '../../../../../base/common/actions.js';
+ import { Event } from '../../../../../base/common/event.js';
++import { KeyCode, KeyMod } from '../../../../../base/common/keyCodes.js';
+ import { Lazy } from '../../../../../base/common/lazy.js';
+ import { Disposable, DisposableStore, markAsSingleton, MutableDisposable } from '../../../../../base/common/lifecycle.js';
+ import Severity from '../../../../../base/common/severity.js';
+@@ -27,20 +28,25 @@ import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.j
+ import { IEnvironmentService } from '../../../../../platform/environment/common/environment.js';
+ import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
+ import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
++import { KeybindingWeight } from '../../../../../platform/keybinding/common/keybindingsRegistry.js';
+ import { ILogService } from '../../../../../platform/log/common/log.js';
+ import { IMarkerService } from '../../../../../platform/markers/common/markers.js';
  import { IOpenerService } from '../../../../../platform/opener/common/opener.js';
  import product from '../../../../../platform/product/common/product.js';
  import { IProductService } from '../../../../../platform/product/common/productService.js';
@@ -144,7 +161,10 @@ index 2ea65ba8917..6d848c0a5f9 100644
  import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
  import { IWorkbenchContribution } from '../../../../common/contributions.js';
  import { IViewDescriptorService, ViewContainerLocation } from '../../../../common/views.js';
-@@ -41,6 +42,9 @@ import { ExtensionUrlHandlerOverrideRegistry, IExtensionUrlHandlerOverride } fro
+-import { ChatEntitlement, ChatEntitlementContext, ChatEntitlementRequests, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
++import { ChatEntitlement, ChatEntitlementContext, ChatEntitlementContextKeys, ChatEntitlementRequests, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
+ import { EnablementState, IWorkbenchExtensionEnablementService } from '../../../../services/extensionManagement/common/extensionManagement.js';
+ import { ExtensionUrlHandlerOverrideRegistry, IExtensionUrlHandlerOverride } from '../../../../services/extensions/browser/extensionUrlHandler.js';
  import { IExtensionService } from '../../../../services/extensions/common/extensions.js';
  import { IHostService } from '../../../../services/host/browser/host.js';
  import { IWorkbenchLayoutService, Parts } from '../../../../services/layout/browser/layoutService.js';
@@ -154,7 +174,7 @@ index 2ea65ba8917..6d848c0a5f9 100644
  import { ILifecycleService } from '../../../../services/lifecycle/common/lifecycle.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
  import { IExtension, IExtensionsWorkbenchService } from '../../../extensions/common/extensions.js';
-@@ -49,7 +53,7 @@ import { IChatModeService } from '../../common/chatModes.js';
+@@ -49,7 +55,7 @@ import { IChatModeService } from '../../common/chatModes.js';
  import { IChatSessionsService } from '../../common/chatSessionsService.js';
  import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
  import { CHAT_CATEGORY, CHAT_SETUP_ACTION_ID, CHAT_SETUP_SUPPORT_ANONYMOUS_ACTION_ID } from '../actions/chatActions.js';
@@ -163,13 +183,14 @@ index 2ea65ba8917..6d848c0a5f9 100644
  import { chatViewsWelcomeRegistry } from '../viewsWelcome/chatViewsWelcome.js';
  import { ChatSetupAnonymous, ChatSetupStrategy } from './chatSetup.js';
  import { ChatSetupController } from './chatSetupController.js';
-@@ -66,6 +70,304 @@ const defaultChat = {
+@@ -66,6 +72,321 @@ const defaultChat = {
  };
  
  const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
 +const RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID = 'workbench.view.ritemark.copilotChatLauncher';
-+// Ritemark 2.0: More's Copilot Chat entry (paneCompositeBar.ts) runs this. Copilot Chat
-+// opens as a tab on the desk, never in the AI column, which holds only Ritemark's AI.
++// Ritemark 2.0: More's Copilot Chat entry (paneCompositeBar.ts), the View menu and Ctrl+Alt+I
++// (⌃⌘I on the Mac) run this. Copilot Chat opens as a tab on the desk, never in the AI column,
++// which holds only Ritemark's AI.
 +const RITEMARK_OPEN_COPILOT_CHAT_TAB_ID = 'ritemark.copilotChat.openAsTab';
 +
 +export class ChatSetupActionsContribution extends Disposable implements IWorkbenchContribution {
@@ -440,8 +461,24 @@ index 2ea65ba8917..6d848c0a5f9 100644
 +			constructor() {
 +				super({
 +					id: RITEMARK_OPEN_COPILOT_CHAT_TAB_ID,
-+					title: localize2('ritemark.openCopilotChatTab', "Open Copilot Chat as a Tab"),
++					title: {
++						...localize2('ritemark.openCopilotChatTab', "Copilot Chat"),
++						mnemonicTitle: localize({ key: 'miRitemarkCopilotChat', comment: ['&& denotes a mnemonic'] }, "&&Copilot Chat"),
++					},
 +					f1: false,
++					// Copilot Chat's own shortcut and the View menu's entry open the tab too, not the panel (Windows round 1)
++					keybinding: {
++						weight: KeybindingWeight.WorkbenchContrib + 1,
++						primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI,
++						mac: { primary: KeyMod.CtrlCmd | KeyMod.WinCtrl | KeyCode.KeyI },
++						when: ChatEntitlementContextKeys.Setup.installed,
++					},
++					menu: {
++						id: MenuId.MenubarViewMenu,
++						group: '4_auxbar',
++						order: 1,
++						when: ChatEntitlementContextKeys.Setup.installed,
++					},
 +				});
 +			}
 +

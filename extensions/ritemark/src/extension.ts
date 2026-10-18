@@ -536,6 +536,13 @@ export function activate(context: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );
+  // Ritemark 2.0 (experience 31): New and Search at the head of the Agents column
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.agentLibrary.newAgent', () => agentLibraryViewProvider?.openCreate('agent')),
+    vscode.commands.registerCommand('ritemark.agentLibrary.newSkill', () => agentLibraryViewProvider?.openCreate('skill')),
+    vscode.commands.registerCommand('ritemark.agentLibrary.newCommand', () => agentLibraryViewProvider?.openCreate('command')),
+    vscode.commands.registerCommand('ritemark.agentLibrary.search', () => agentLibraryViewProvider?.focusSearch()),
+  );
   // Live-refresh the Agent Library SCHEDULED section when daemon runs change
   daemon.onRunsChanged(() => agentLibraryViewProvider?.refresh());
 

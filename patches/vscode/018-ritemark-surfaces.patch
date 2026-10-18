@@ -19,17 +19,26 @@ height). Sheets (dialogs) hang from 44. The strips and the desk's tab row keep t
 The AI column (R4): no title rows and no row of icons; a guard sends any other view container that lands
 there back to its own home (Copilot Chat's container to the panel).
 The status bar is 24 with the remote and problems signals hidden; the tree's rows are 32 (R1).
-The left column's head on Documents (R10, ritemarkProjectHead.ts): the project's name with a chevron, New
-and Search, Documents over the tree; its menus come from the extension (ritemark/projectHead and
-ritemark/projectHead/new, menusExtensionPoint.ts).
+The left column's head on Documents (R10) and on Agents (experience 31; ritemarkProjectHead.ts): the project's mark
+and name with a chevron, New and Search, and on Documents the Documents label over the tree; its menus come from
+the extension (ritemark/projectHead, ritemark/projectHead/new and ritemark/projectHead/agents/new,
+menusExtensionPoint.ts).
 More (R5, R6): the places row's overflow opens Ritemark's menu as drawn: "More places", Copilot Chat first,
 then the places that do not fit, with Ritemark's names (compositeBarActions.ts, ritemarkMenu.ts).
 You (R11): Settings and Help, in the same menu. Ritemark's menus on every platform (R12): window.menuStyle
 defaults to custom, and menu.ts draws them; the chosen row is the theme's menu selection (defaultStyles.ts).
+Dialogs (experience 31): window.dialogStyle defaults to custom too, so a dialog is Ritemark's own sheet, drawn in
+ritemarkSurfaces.css (400 wide, the title, the detail, Don't ask again beside the buttons, the default button ringed).
+The palette and notifications (the Experience lead's step-1 spec): the quick input on the menus' sheet with radius 10,
+a 32 input and 32 rows (quickInputList.ts and the tree's delegate give the rows their 32); toasts and the centre on the
+menus' sheet with the message 13/20 (notificationsViewer.ts measures with that line) and 32-high buttons.
 A new window's columns are the drawn widths: the left column 256 (248 and the 8 to the desk), the AI column
 400 (the 8, the AI's sheet 340 and its rail 52), so the desk is 784 at 1440 (layout.ts).
-The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; an !important says why on its line
-or in its group's comment (the theme pass finishes marking the rest).
+Window sizes (R14, ritemarkWindowSizes.ts, loaded by desktop.contribution.ts): below 1400 the AI's column narrows
+to 336 (its sheet 320), below 1200 the left column hides, below 960 the AI's column hides; crossing back up undoes
+only what the crossing down did, and a column the person opens in between stays until the next crossing.
+The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; each !important says on its line which
+rule of VS Code's (or inline style, or of its own) it beats, and where none competes in any state there is none.
 Also: a click on the open place in the top row runs ritemark.placeClickedAgain, which the extension answers
 (Tasks brings its board forward); with a flow open, Ritemark's own .ritemark folder stays out of the tree.
 Built file by file from the Experience lead's proof of concept (branch poc/2.0-surfaces), without its
@@ -38,15 +47,17 @@ proof-of-concept-only code.
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 
-Files: base/browser/ui/menu/{menu,menubar}.ts; platform/theme/browser/defaultStyles.ts;
+Files: base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
+tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
 workbench/browser/media/ritemarkSurfaces.css; workbench/browser/parts/{compositeBarActions,paneCompositeBar,
-paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu}.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
-parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts}.ts;
+paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu,ritemarkWindowSizes}.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
+parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts,notificationsViewer}.ts;
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
+Test: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14); run with ./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/menu/menu.ts b/src/vs/base/browser/ui/menu/menu.ts
 index bbadbf1d73b..68422afd6fa 100644
 --- a/src/vs/base/browser/ui/menu/menu.ts
@@ -112,6 +123,58 @@ index 29240b5c9a4..7cae3011235 100644
  	}
  
  	private updateLabels(titleElement: HTMLElement, buttonElement: HTMLElement, label: string): void {
+diff --git a/src/vs/platform/quickinput/browser/quickInputList.ts b/src/vs/platform/quickinput/browser/quickInputList.ts
+index f71937903f3..22cce6eb73b 100644
+--- a/src/vs/platform/quickinput/browser/quickInputList.ts
++++ b/src/vs/platform/quickinput/browser/quickInputList.ts
+@@ -277,7 +277,7 @@ class QuickInputItemDelegate implements IListVirtualDelegate<IQuickPickElement>
+ 		if (element instanceof QuickPickSeparatorElement) {
+ 			return 30;
+ 		}
+-		return element.saneDetail ? 44 : 22;
++		return element.saneDetail ? 44 : 32; // Ritemark 2.0: the palette's rows are 32, as the menus' (the Experience lead)
+ 	}
+ 
+ 	getTemplateId(element: IQuickPickElement): string {
+@@ -1405,8 +1405,8 @@ export class QuickInputList extends Disposable {
+ 
+ 	layout(maxHeight?: number): void {
+ 		this._tree.getHTMLElement().style.maxHeight = maxHeight ? `${
+-			// Make sure height aligns with list item heights
+-			Math.floor(maxHeight / 44) * 44
++			// Make sure height aligns with list item heights (Ritemark 2.0: rows of 32)
++			Math.floor(maxHeight / 32) * 32
+ 			// Add some extra height so that it's clear there's more to scroll
+ 			+ 6
+ 			}px` : '';
+diff --git a/src/vs/platform/quickinput/browser/tree/quickInputDelegate.ts b/src/vs/platform/quickinput/browser/tree/quickInputDelegate.ts
+index 328285f0222..b18cffe94d2 100644
+--- a/src/vs/platform/quickinput/browser/tree/quickInputDelegate.ts
++++ b/src/vs/platform/quickinput/browser/tree/quickInputDelegate.ts
+@@ -12,7 +12,7 @@ import { QuickInputTreeRenderer } from './quickInputTreeRenderer.js';
+  */
+ export class QuickInputTreeDelegate<T extends IQuickTreeItem> implements IListVirtualDelegate<T> {
+ 	getHeight(_element: T): number {
+-		return 22;
++		return 32; // Ritemark 2.0: the palette's rows are 32, as the menus' (the Experience lead)
+ 	}
+ 
+ 	getTemplateId(_element: T): string {
+diff --git a/src/vs/platform/quickinput/browser/tree/quickInputTreeController.ts b/src/vs/platform/quickinput/browser/tree/quickInputTreeController.ts
+index 893665466a9..a700df49784 100644
+--- a/src/vs/platform/quickinput/browser/tree/quickInputTreeController.ts
++++ b/src/vs/platform/quickinput/browser/tree/quickInputTreeController.ts
+@@ -197,8 +197,8 @@ export class QuickInputTreeController extends Disposable {
+ 
+ 	layout(maxHeight?: number): void {
+ 		this._tree.getHTMLElement().style.maxHeight = maxHeight ? `${
+-			// Make sure height aligns with list item heights
+-			Math.floor(maxHeight / 44) * 44
++			// Make sure height aligns with list item heights (Ritemark 2.0: rows of 32)
++			Math.floor(maxHeight / 32) * 32
+ 			// Add some extra height so that it's clear there's more to scroll
+ 			+ 6
+ 			}px` : '';
 diff --git a/src/vs/platform/theme/browser/defaultStyles.ts b/src/vs/platform/theme/browser/defaultStyles.ts
 index fdc98de1cf6..eef39db7fd4 100644
 --- a/src/vs/platform/theme/browser/defaultStyles.ts
@@ -266,10 +329,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..c14e93ad8d1
+index 00000000000..7119cab4f60
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1286 @@
+@@ -0,0 +1,1561 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -290,8 +353,8 @@ index 00000000000..c14e93ad8d1
 + *
 + * VS Code's class names are internal. Keep the selectors few and commented, and compare a screenshot of
 + * the base window, light and dark, after every VS Code update (update-vscode.sh's checklist). An !important
-+ * here beats a rule of VS Code's that an update can change silently; it says why on its line or in its group's
-+ * comment, and the theme pass (Phase 7) marks the few that still do not.
++ * here beats a rule of VS Code's (or an inline style) that an update can change silently, and says which on
++ * its line; where no rule of VS Code's competes in any state, there is none.
 + */
 +
 +.monaco-workbench {
@@ -302,6 +365,8 @@ index 00000000000..c14e93ad8d1
 +	--rm-place-background: var(--vscode-ritemark-placeActiveBackground, var(--vscode-list-activeSelectionBackground));
 +	--rm-place-foreground: var(--vscode-ritemark-placeActiveForeground, var(--vscode-list-activeSelectionForeground));
 +	--rm-hover: var(--vscode-toolbar-hoverBackground);
++	--rm-body: var(--vscode-tab-inactiveForeground); /* the kit's body ink: #475569 in Light, #C7D2FE in Dark */
++	--rm-muted: var(--vscode-descriptionForeground); /* the kit's muted ink: #617187 in Light, #94A3B8 in Dark */
 +	--rm-radius: 10px;
 +	/* the room the window controls take at the left (the Mac's traffic lights) and the right (Windows' buttons) */
 +	--rm-lights: 0px;
@@ -354,13 +419,24 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .part.sidebar .pane-header,
 +.monaco-workbench .part.editor .editor-group-container > .title,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
-+	border-color: transparent !important; /* !important: the borders are set inline from the theme */
-+	box-shadow: none !important;
++	box-shadow: none !important; /* !important: the parts' own shadows (--vscode-shadow-md, titlebarpart.css) */
 +}
 +
-+.monaco-workbench .part.statusbar::after,
-+.monaco-workbench .part.titlebar::after,
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container::after,
++/* High contrast keeps the lines: there each part keeps its theme's border, since the sheets' own edges are clipped
++   where they meet the window and the tab row (R13: every border readable) */
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.titlebar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.statusbar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.sidebar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.auxiliarybar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.sidebar .pane-header,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title .tabs-and-actions-container {
++	border-color: transparent !important; /* !important: the borders are set inline from the theme */
++}
++
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.statusbar::after,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.titlebar::after,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title .tabs-and-actions-container::after,
 +.monaco-workbench .part.editor::after /* the 1.117 editor depth shadow */ {
 +	display: none !important; /* !important: these lines are drawn by more specific core rules */
 +}
@@ -381,7 +457,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.sidebar > .header-or-footer {
 +	border-bottom: 0 !important; /* !important: core draws the header's border inline */
-+	box-shadow: none !important;
++	box-shadow: none;
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar {
@@ -389,17 +465,17 @@ index 00000000000..c14e93ad8d1
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .actions-container {
-+	gap: 0 !important; /* VS Code measures each place to decide what fits; a gap would go uncounted */
++	gap: 0; /* VS Code measures each place to decide what fits; a gap would go uncounted */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item {
-+	width: 34px !important; /* a place: 32 fill + 1 either side, so places sit 34 apart (kit: ritemark.js Ritemark.more, 8, 42, 76 ... More at 212); sidebarPart.ts's overflowActionSize is 34 too */
++	width: 34px; /* a place: 32 fill + 1 either side, so places sit 34 apart (kit: ritemark.js Ritemark.more, 8, 42, 76 ... More at 212); sidebarPart.ts's overflowActionSize is 34 too */
 +	height: 32px !important; /* !important on the box: core sizes the items from the bar's own compact sizes */
-+	box-sizing: border-box !important;
-+	padding: 0 1px !important;
++	box-sizing: border-box;
++	padding: 0 1px !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
 +	background-clip: content-box;
-+	margin: 4px 0 !important;
-+	display: flex !important;
++	margin: 4px 0;
++	display: flex !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
 +	align-items: center;
 +	justify-content: center;
 +	border-radius: 6px;
@@ -407,9 +483,9 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .action-label {
 +	width: 20px !important; /* !important: core sizes the label for its own 16 icon box */
-+	height: 20px !important;
-+	margin: 0 !important;
-+	border-radius: 0 !important;
++	height: 20px !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
++	margin: 0 !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
++	border-radius: 0 !important; /* !important: paneCompositePart.css's composite-bar radius is more specific */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item:not(.checked):hover {
@@ -426,10 +502,15 @@ index 00000000000..c14e93ad8d1
 +	background-color: var(--rm-place-foreground) !important; /* !important: core colours the mask inline */
 +}
 +
++/* A font glyph's label (More, ⋯) never paints its own hover box inside the place's fill */
++.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .action-label.codicon {
++	background-color: transparent !important; /* !important: core paints the toolbar's hover on the label */
++}
++
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.codicon,
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-chosen .action-label.codicon {
 +	color: var(--rm-place-foreground) !important; /* !important: core colours the glyph inline */
-+	background-color: transparent !important;
++	background-color: transparent !important; /* !important: paneCompositePart.css's rule here is !important itself */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .active-item-indicator {
@@ -542,41 +623,30 @@ index 00000000000..c14e93ad8d1
 +	width: 28px;
 +	height: 28px;
 +	border-radius: 6px;
-+	color: var(--vscode-foreground);
++	color: var(--rm-muted); /* the kit draws the toggles and You in its muted ink */
 +	outline-offset: -1px;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-frame-button {
 +	font-size: 16px;
-+	opacity: 0.8;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-frame-button:hover {
 +	background-color: var(--rm-hover);
-+	opacity: 1;
 +}
 +
-+/* You (R11): quiet, an outline circle at the AI toggle's weight, so the new-chat + below stays the corner's one filled
-+   shape (Jarmo, 17 October) */
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you {
-+	border-radius: 50%;
-+	background-color: transparent;
-+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-foreground) 24%, transparent);
-+	opacity: 0.8;
-+	font-size: 15px;
++/* You (R11) is an icon button like the AI's toggle beside it (Jarmo, 18 October: "It must be smaller - visually aligned
++   to the icon button on its left side"; kit: .avatar): the user-circle glyph at 17, its circle 14 across as the toggle's
++   glyph is 14 wide, in the toggles' ink, no ring; the same 28 button with their hover fill, also while its menu is open */
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you > .codicon {
++	font-size: 17px;
++	color: inherit;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-you:hover,
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible {
-+	background-color: var(--rm-hover);
-+	opacity: 1;
-+}
-+
-+/* open, You keeps its outline and gains a soft ring (experiences/settings frame 1) */
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible,
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-you[aria-expanded="true"] {
-+	background-color: transparent;
-+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-foreground) 24%, transparent), 0 0 0 2px var(--rm-place-background);
-+	opacity: 1;
++	background-color: var(--rm-hover);
 +}
 +
 +/* Phosphor has one side-panel glyph; the AI's toggle shows it mirrored */
@@ -626,7 +696,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .tabs-container > .tab {
 +	height: 36px !important; /* !important: core sizes tabs from --editor-group-tab-height (44, the strip) */
-+	line-height: 36px !important;
++	line-height: 36px;
 +	margin-top: 8px;
 +	-webkit-app-region: no-drag;
 +}
@@ -635,13 +705,13 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .part.editor .tabs-container > .tab .monaco-icon-label::before,
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions {
 +	line-height: 36px !important; /* !important: core sets these from the 44 strip height */
-+	height: 36px !important;
++	height: 36px !important; /* !important: editortabscontrol.css sizes the label's icon to the tab height in a more specific rule */
 +}
 +
 +/* A tab's own icon (a web page's favicon, for instance) sits on the label's line: its box is the tab's 36 */
 +.monaco-workbench .part.editor .tabs-container > .tab .monaco-icon-label-iconpath {
 +	height: 36px !important; /* !important: as above */
-+	background-position: center !important;
++	background-position: center !important; /* !important: the icon label sets its position inline */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .editor-actions {
@@ -685,7 +755,7 @@ index 00000000000..c14e93ad8d1
 +}
 +
 +.monaco-workbench.windows.nosidebar .part.editor .editor-group-container.ritemark-left-edge.ritemark-top-edge > .title .tabs-and-actions-container {
-+	padding-left: 76px !important; /* the on-desk strip's 84 less the tabs container's own 8 */
++	padding-left: 76px !important; /* !important: our own rules above (no left column) and below (the row's padding) are !important. The on-desk strip's 84 less the tabs container's own 8 */
 +}
 +
 +.monaco-workbench.noauxiliarybar .part.editor .editor-group-container.ritemark-right-edge.ritemark-top-edge > .title .tabs-and-actions-container {
@@ -703,7 +773,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row {
 +	left: 8px !important; /* !important: the list positions its rows inline */
-+	width: calc(100% - 16px) !important;
++	width: calc(100% - 16px) !important; /* !important: the list sets a row's width inline while it measures it (listView.ts) */
 +	border-radius: 4px; /* rows: framework.md, Radius */
 +}
 +
@@ -711,10 +781,17 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .part.sidebar .monaco-list:focus .monaco-list-row.selected,
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row.selected.focused {
 +	background-color: var(--rm-desk) !important; /* !important: the list's selection colours are injected per list */
-+	color: var(--vscode-sideBarTitle-foreground) !important;
-+	box-shadow: none !important; /* the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
-+	border-radius: 4px !important;
-+	outline: none !important;
++	color: var(--vscode-sideBarTitle-foreground) !important; /* !important: the list's own style element (listWidget.ts) colours selected rows, some with !important */
++	box-shadow: none !important; /* !important: explorerviewlet.css draws the selected row's band with !important. the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
++	border-radius: 4px !important; /* !important: the list's own selection styles (listWidget.ts) */
++	outline: none !important; /* !important: the list's own focus outline (listWidget.ts) */
++}
++
++/* High contrast: the open document's row keeps an outline in the theme's active border (R13: every chosen state visible) */
++.monaco-workbench.hc-black .part.sidebar .monaco-list .monaco-list-row.selected,
++.monaco-workbench.hc-light .part.sidebar .monaco-list .monaco-list-row.selected {
++	outline: 1px solid var(--vscode-contrastActiveBorder) !important; /* !important: the rule above removes the outline with !important */
++	outline-offset: -1px;
 +}
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row:not(.selected):hover {
@@ -730,7 +807,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .tabs-container > .tab {
 +	background-color: transparent !important; /* !important: tab colours are set inline from the theme */
-+	border-color: transparent !important;
++	border-color: transparent !important; /* !important: the tab's border is set inline (multiEditorTabsControl.ts) */
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab > .tab-border-top-container,
@@ -741,7 +818,7 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .part.editor .tabs-container > .tab.active {
 +	background-color: var(--rm-desk) !important; /* !important: as the tabs' rule above */
 +	border-radius: 8px 8px 0 0;
-+	box-shadow: 0 0 0 1px var(--rm-hairline) !important; /* not VS Code's inset shade, which greys the tab's top against the desk */
++	box-shadow: 0 0 0 1px var(--rm-hairline) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk */
 +	z-index: 2;
 +}
 +
@@ -753,7 +830,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active::after {
 +	content: '';
-+	display: block !important;
++	display: block;
 +	position: absolute;
 +	left: 0;
 +	right: 0;
@@ -771,8 +848,8 @@ index 00000000000..c14e93ad8d1
 +	left: 0;
 +	right: 0;
 +	bottom: 0;
-+	height: 0 !important;
-+	background: transparent !important;
++	height: 0 !important; /* !important: multieditortabscontrol.css's tab-border-bottom rule is more specific */
++	background: transparent !important; /* !important: multieditortabscontrol.css's tab-border-bottom rule is more specific */
 +	z-index: 4;
 +	pointer-events: none;
 +}
@@ -812,7 +889,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label {
 +	font-size: 12px !important; /* !important: the codicon rule sets 16. Close is 12, muted (kit: .tb .x) */
-+	color: var(--vscode-descriptionForeground) !important;
++	color: var(--vscode-descriptionForeground) !important; /* !important: multieditortabscontrol.css's tab-actions colour is more specific */
 +}
 +
 +/* The chosen tab's own icon is indigo, where attention is (kit: .tb.on > .ph); a file's icon is an image and keeps its colours */
@@ -823,7 +900,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label:hover {
 +	background-color: var(--rm-hover) !important; /* !important: core paints the close button's hover inline */
-+	box-shadow: none !important;
++	box-shadow: none;
 +}
 +
 +/* The chosen tab stays the desk's colour on hover; the close button's container never paints its own band */
@@ -849,7 +926,7 @@ index 00000000000..c14e93ad8d1
 +   18 in from the desk's edge. */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
 +	padding-left: 8px !important; /* !important: core pads the row inline for the editor actions. With the tabs container's 8, tabs start 16 into the desk (kit: .tabs at 272) */
-+	padding-right: 18px !important;
++	padding-right: 18px;
 +	box-sizing: border-box;
 +}
 +
@@ -857,15 +934,17 @@ index 00000000000..c14e93ad8d1
 +	padding: 0 8px; /* multiEditorTabsControl.ts RITEMARK_TABS_INSET */
 +}
 +
-+/* The close button has its own slot inside the tab (VS Code lets it spill past the tab's edge): its 20 box (a 16 button
++/* The close button has its own slot inside every tab (VS Code lets it spill past the tab's edge): its 20 box (a 16 button
 +   padded by 2) 6 after the name and 6 from the tab's edge, so its glyph is centred 16 from the edge and the name ends 32
-+   from it (kit: .tb.on padding-right 32, .tb .x 16 at right 8) */
++   from it (kit: .tb padding-right 32, .tb .x 16 at right 8). VS Code shows the button on the chosen tab, a changed one
++   and the tab under the pointer, so a pointed-at tab shows it at its right edge, its icon stays, and no tab changes
++   width (R7, S23; Jarmo, 18 October: "x-close on teistes äppides ikka paremal?") */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-shrink > .tab-actions {
 +	flex: 0 0 20px !important; /* !important: core's tab sizing rules are as specific */
-+	width: 20px !important;
++	width: 20px;
 +	margin-left: 6px;
-+	overflow: visible !important;
++	overflow: visible !important; /* !important: multieditortabscontrol.css hides the overflow in a more specific rule */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions > .monaco-action-bar {
@@ -877,27 +956,12 @@ index 00000000000..c14e93ad8d1
 +	min-width: 0;
 +	overflow: hidden;
 +	white-space: nowrap;
-+	text-overflow: ellipsis !important; /* VS Code clips here because it fades the end; Ritemark ends a long name with … */
++	text-overflow: ellipsis !important; /* !important: multieditortabscontrol.css clips the label in a more specific rule. VS Code clips here because it fades the end; Ritemark ends a long name with … */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed > .tab-label .monaco-icon-label-container {
 +	flex: 1 1 auto !important; /* !important: as above */
 +	max-width: 100%;
-+}
-+
-+/* Only the chosen tab (and a changed one) keeps room for its close button, at its right. On the others the close
-+   button takes the icon's place under the pointer: no tab keeps empty room, pointing moves nothing (R7, S23) */
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed:not(.active):not(.dirty) > .tab-actions {
-+	position: absolute !important; /* !important: as above */
-+	left: 6px; /* its glyph exactly where the icon was (the button pads it by 4) */
-+	top: 0;
-+	width: 20px !important;
-+	flex: none !important;
-+	margin: 0 !important;
-+}
-+
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed:not(.active):not(.dirty):hover > .tab-label::before {
-+	visibility: hidden;
 +}
 +
 +/* Each tab is as wide as its whole name, up to 200, with no floor, so the gaps between names are equal (R7, S22; the
@@ -907,23 +971,18 @@ index 00000000000..c14e93ad8d1
 +	flex: 0 1 auto !important; /* !important: core sizes fixed tabs with a flex basis */
 +	width: auto;
 +	min-width: 0;
-+	max-width: 200px !important;
-+	padding-left: 12px !important;
-+	padding-right: 12px !important;
++	max-width: 200px !important; /* !important: multieditortabscontrol.css's fixed sizing sets it from a variable in a more specific rule */
++	padding-left: 12px !important; /* !important: multieditortabscontrol.css's tab padding is more specific */
++	padding-right: 6px !important; /* !important: VS Code's padding for tabs whose close button is off or on the left is more specific. the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
 +	border-right-width: 0 !important; /* !important: core keeps a 1px tab border even when tab.border is transparent; tabs touch, as drawn */
 +}
 +
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active,
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.dirty {
-+	padding-right: 6px !important; /* the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
-+}
-+
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active {
-+	flex: 0 0 auto !important; /* the open tab keeps its whole name */
++	flex: 0 0 auto !important; /* !important: multieditortabscontrol.css's tab sizing flex is as specific or more. the open tab keeps its whole name */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container.ritemark-measuring > .tab {
-+	flex: none !important; /* measured at its own width (ritemarkFoldTabs) */
++	flex: none !important; /* !important: multieditortabscontrol.css's tab sizing flex is as specific or more. measured at its own width (ritemarkFoldTabs) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.ritemark-folded {
@@ -935,11 +994,11 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.sticky-compact,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.sticky-compact.active {
 +	flex: 0 0 38px !important; /* !important: beats the tab widths above */
-+	width: 38px !important;
-+	min-width: 38px !important;
-+	max-width: 38px !important;
-+	padding: 0 !important;
-+	border-width: 0 !important;
++	width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	min-width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	max-width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	padding: 0 !important; /* !important: multieditortabscontrol.css's tab padding is more specific */
++	border-width: 0 !important; /* !important: the tab's border is set inline (multiEditorTabsControl.ts) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label {
@@ -954,8 +1013,8 @@ index 00000000000..c14e93ad8d1
 +/* the icon on the tab's centre: no gap after it (there is no name) */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label::before {
 +	margin: 0 !important; /* !important: core spaces the icon */
-+	padding: 0 !important;
-+	background-position: center !important;
++	padding: 0;
++	background-position: center;
 +}
 +
 +/* a webview's tab (Home, Tasks) draws its icon in its own element; the label's empty icon slot would push it off centre */
@@ -965,7 +1024,7 @@ index 00000000000..c14e93ad8d1
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label > .monaco-icon-label-iconpath {
 +	margin: 0 !important; /* !important: as above */
-+	padding: 0 !important;
++	padding: 0;
 +}
 +
 +
@@ -1079,7 +1138,7 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .ritemark-new-tab-menu-item:hover {
 +	background-color: var(--vscode-menu-selectionBackground);
 +	color: var(--vscode-menu-selectionForeground);
-+	outline: none !important; /* the fill shows where the keyboard is, as in the other menus */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is as specific. the fill shows where the keyboard is, as in the other menus */
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-icon {
@@ -1125,7 +1184,7 @@ index 00000000000..c14e93ad8d1
 +	border-radius: 6px;
 +	color: inherit;
 +	font-size: 13px;
-+	outline: none !important; /* the fill shows where the keyboard is */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is more specific. the fill shows where the keyboard is */
 +}
 +
 +.monaco-workbench .ritemark-more-tabs-item:focus,
@@ -1256,7 +1315,7 @@ index 00000000000..c14e93ad8d1
 +.monaco-workbench .ritemark-menu-item:hover {
 +	background-color: var(--vscode-menu-selectionBackground);
 +	color: var(--vscode-menu-selectionForeground);
-+	outline: none !important; /* the fill shows where the keyboard is, as in the other menus */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is as specific. the fill shows where the keyboard is, as in the other menus */
 +}
 +
 +.monaco-workbench .ritemark-menu-icon {
@@ -1332,7 +1391,7 @@ index 00000000000..c14e93ad8d1
 +
 +/* The project's mark (kit: .mark): its initials in a 24 square of ink before the name, as the prototype draws it;
 +   in the dark theme the square is the body colour with ground-coloured letters */
-+.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-mark {
++.monaco-workbench .part.sidebar.ritemark-project-place .ritemark-project-mark {
 +	display: block;
 +	flex: none;
 +	width: 24px;
@@ -1347,21 +1406,21 @@ index 00000000000..c14e93ad8d1
 +	text-align: center;
 +}
 +
-+.monaco-workbench.vs-dark .part.sidebar.ritemark-documents .ritemark-project-mark {
++.monaco-workbench.vs-dark .part.sidebar.ritemark-project-place .ritemark-project-mark {
 +	background-color: var(--vscode-tab-inactiveForeground);
 +	color: var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-actions,
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .global-actions {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-actions,
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .global-actions {
 +	display: none !important; /* !important: core shows the title's actions; they live in the project's menu */
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title {
 +	overflow: visible; /* the head's box reaches 4 below the title area, as drawn */
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head {
 +	display: flex;
 +	align-items: center;
 +	gap: 8px;
@@ -1376,15 +1435,25 @@ index 00000000000..c14e93ad8d1
 +	outline-offset: -1px;
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head:hover {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head:hover {
 +	background-color: var(--rm-hover);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head h2 {
++/* the place's own title (Documents shows the folder's name there, Agents its own) gives way to the project's name */
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head h2 {
++	display: none;
++}
++
++.monaco-workbench .part.sidebar:not(.ritemark-project-place) .ritemark-project-name {
++	display: none;
++}
++
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head .ritemark-project-name {
 +	flex: 0 1 auto;
 +	min-width: 0;
-+	padding: 0 !important; /* !important: core pads the title */
 +	overflow: hidden;
++	font-weight: 600;
++	color: var(--vscode-sideBarTitle-foreground);
 +	text-overflow: ellipsis;
 +	white-space: nowrap;
 +	font-size: 14px;
@@ -1392,14 +1461,14 @@ index 00000000000..c14e93ad8d1
 +	text-transform: none;
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-chevron {
++.monaco-workbench .part.sidebar.ritemark-project-place .ritemark-project-chevron {
 +	display: block;
 +	flex: none;
 +	font-size: 12px !important; /* !important: the codicon rule sets 16. Carets are 12 (framework.md, Icons) */
 +	color: var(--vscode-descriptionForeground);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .ritemark-project-rows {
++.monaco-workbench .part.sidebar.ritemark-project-place > .ritemark-project-rows {
 +	display: block;
 +	padding: 12px 8px 8px;
 +}
@@ -1555,6 +1624,275 @@ index 00000000000..c14e93ad8d1
 +	background-color: var(--rm-place-foreground);
 +	box-shadow: 0 0 0 2px var(--rm-ground);
 +	pointer-events: none;
++}
++
++/* Dialogs (experience 31; kit: theme.html .dim, .dialog): Ritemark's own sheet, as the menus are (window.dialogStyle defaults
++   to custom), over the window dimmed in ink. 400 wide, padding 20, radius 12; no icon and no close X (Escape and Cancel close
++   it); the title, the detail, then one row: Don't ask again, Cancel, and the default button ringed, as Enter presses it. */
++.monaco-workbench .monaco-dialog-modal-block.dimmed {
++	background: color-mix(in srgb, var(--vscode-foreground) 18%, transparent);
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-modal-block.dimmed,
++.monaco-workbench.hc-black .monaco-dialog-modal-block.dimmed {
++	background: color-mix(in srgb, color-mix(in srgb, var(--rm-ground), black 50%) 50%, transparent); /* near-black, from the ground */
++}
++
++.monaco-workbench .monaco-dialog-box {
++	position: relative;
++	margin-top: -40px; /* its top at 360 in a 900 window, a little above the centre (theme.html) */
++	width: 400px;
++	min-width: 400px;
++	min-height: 0;
++	padding: 20px;
++	box-sizing: border-box;
++	border-radius: 12px;
++	background-color: var(--rm-desk) !important; /* !important: the dialog sets its colours inline from the editor widget's */
++	color: var(--vscode-foreground) !important; /* !important: as above */
++	border: none !important; /* !important: as above */
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px color-mix(in srgb, var(--vscode-foreground) 28%, transparent), 0 8px 16px -8px color-mix(in srgb, var(--vscode-foreground) 12%, transparent) !important; /* !important: as above */
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-box,
++.monaco-workbench.hc-black .monaco-dialog-box {
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px var(--rm-shadow), 0 8px 16px -8px var(--rm-shadow) !important; /* !important: the dialog sets its shadow inline from the widget shadow */
++}
++
++.monaco-workbench.hc-black .monaco-dialog-box,
++.monaco-workbench.hc-light .monaco-dialog-box {
++	outline: 1px solid var(--vscode-contrastBorder);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-toolbar-row,
++.monaco-workbench .monaco-dialog-box .dialog-message-row > .dialog-icon {
++	display: none;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row {
++	padding: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container {
++	padding: 0;
++	margin: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message {
++	min-height: 0; /* dialog.css keeps 22 */
++	margin: 0 0 6px;
++	font-size: 15px;
++	line-height: 20px;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message-text {
++	font-size: 15px;
++	font-weight: 600;
++	line-height: 20px;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message-detail {
++	margin: 0 0 20px;
++	font-size: 13px;
++	line-height: 20px;
++	color: var(--rm-body);
++	opacity: 1;
++}
++
++/* Don't ask again sits on the buttons' row, at its left */
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-checkbox-row {
++	position: absolute;
++	left: 20px;
++	bottom: 20px;
++	height: 32px;
++	display: flex;
++	align-items: center;
++	gap: 8px;
++	padding: 0;
++	margin: 0;
++	font-size: 13px;
++	line-height: 20px;
++	color: var(--rm-body);
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-checkbox-row .dialog-checkbox-message {
++	padding: 0;
++	margin: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-checkbox-row .monaco-checkbox {
++	width: 14px !important; /* !important: the checkbox sets its size inline */
++	height: 14px !important; /* !important: as above */
++	font-size: 12px !important; /* !important: as above (the tick) */
++	margin: 0;
++	border-radius: 4px;
++	box-sizing: border-box;
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row {
++	padding: 0;
++	margin: 0;
++	overflow: visible; /* the ring reaches 4 outside the button */
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons {
++	gap: 8px;
++	overflow: visible;
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button {
++	width: auto;
++	min-width: 0;
++	height: 32px;
++	white-space: nowrap; /* a button's words stay on one line */
++	margin: 0;
++	padding: 0 14px;
++	border-radius: 8px;
++	font-size: 13px;
++	font-weight: 500;
++	line-height: 32px;
++	border: none !important; /* !important: the buttons set their colours and border inline */
++}
++
++/* Cancel and the other buttons are ghosts: the desk with the strong hairline */
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button.secondary {
++	background-color: var(--rm-desk) !important; /* !important: as above */
++	color: var(--vscode-foreground) !important; /* !important: as above */
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:not(.secondary) {
++	background-color: var(--vscode-button-background) !important; /* !important: the button paints its focus in the hover colour, inline */
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:not(.secondary):hover {
++	background-color: var(--vscode-button-hoverBackground) !important; /* !important: as above */
++}
++
++/* The ring marks the button Enter presses: the default one when the dialog opens, then whichever has the keyboard */
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:focus {
++	outline: none !important; /* !important: the workbench's focus outline (style.css) is as specific */
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:focus {
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button.secondary:focus {
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border), 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
++}
++
++/* The palette (VS Code's quick input; the Experience lead's step-1 spec, 18 October): the menus' sheet with radius 10,
++   the input 32 high with radius 8 and the strong hairline, rows 32 with radius 6 and the chosen row in soft indigo
++   (quickInputList.focus* in the themes), descriptions and keys in muted ink. The rows' 32 is the list's own row height
++   (quickInputList.ts, tree/quickInputDelegate.ts), so the virtual list places them; the plain-word commands come later */
++.monaco-workbench .quick-input-widget {
++	border-radius: var(--rm-radius);
++	box-shadow: 0 10px 24px -6px var(--rm-shadow), 0 4px 8px -4px var(--rm-shadow); /* the menus' shadow; the hairline is the widget's own border */
++}
++
++.monaco-workbench .quick-input-widget .quick-input-header {
++	padding: 8px 8px 6px;
++}
++
++.monaco-workbench .quick-input-widget .quick-input-filter .monaco-inputbox {
++	border-radius: 8px;
++}
++
++.monaco-workbench .quick-input-widget .quick-input-box .monaco-inputbox > .ibwrapper > .input {
++	height: 30px; /* 32 with the box's border */
++	padding: 0 10px;
++	font-size: 13px;
++}
++
++.monaco-workbench .quick-input-list .monaco-scrollable-element {
++	padding: 0 8px;
++}
++
++.monaco-workbench .quick-input-list .monaco-list-row {
++	border-radius: 6px;
++}
++
++.monaco-workbench .quick-input-list .quick-input-list-entry {
++	padding: 0 10px;
++}
++
++/* A row's contents keep core's 22-high line; they sit on the 32 row's middle (a row with a detail line fills its 44) */
++.monaco-workbench .quick-input-list .monaco-list-row .monaco-tl-contents {
++	display: flex;
++	flex-direction: column;
++	justify-content: center;
++}
++
++.monaco-workbench .quick-input-list .quick-input-list-entry.quick-input-list-separator-border {
++	border-top-color: transparent !important; /* !important: quickInputController.ts writes the group border into its own style element. a group is its label, with no line over it */
++}
++
++.monaco-workbench .quick-input-list .monaco-icon-label > .monaco-icon-label-container > .monaco-icon-description-container > .label-description,
++.monaco-workbench .quick-input-list .quick-input-list-label-meta {
++	opacity: 1;
++	color: var(--vscode-descriptionForeground);
++}
++
++/* Notifications (the Experience lead's step-1 spec, 18 October): toasts and the centre on the menus' sheet, radius 10;
++   the message 13/20 (notificationsViewer.ts measures with the same line) with its source in muted ink; buttons 32 high,
++   the default one primary and the others ghosts, as the dialogs'. The bell's "since you last looked" page comes later */
++.monaco-workbench > .notifications-toasts.visible .notification-toast-container > .notification-toast,
++.monaco-workbench > .notifications-toasts.visible .notifications-list-container,
++.monaco-workbench > .notifications-toasts.visible .notification-toast-container > .notification-toast .monaco-scrollable-element,
++.monaco-workbench > .notifications-toasts.visible .notification-toast-container > .notification-toast .monaco-list-row {
++	border-radius: var(--rm-radius);
++}
++
++.monaco-workbench > .notifications-toasts.visible .notifications-list-container {
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 10px 24px -6px var(--rm-shadow), 0 4px 8px -4px var(--rm-shadow);
++}
++
++.monaco-workbench > .notifications-center.visible {
++	border-radius: var(--rm-radius);
++	border-color: var(--rm-hairline);
++	box-shadow: 0 10px 24px -6px var(--rm-shadow), 0 4px 8px -4px var(--rm-shadow);
++}
++
++.monaco-workbench > .notifications-center.visible .notifications-list-container,
++.monaco-workbench > .notifications-center.visible .notifications-list-container .monaco-scrollable-element {
++	border-radius: 0 0 var(--rm-radius) var(--rm-radius);
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-message,
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-offset-helper {
++	line-height: 20px;
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-icon {
++	height: 20px;
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-source {
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-buttons-container > .monaco-button {
++	height: 32px;
++	margin: 4px 0 4px 8px;
++	padding: 0 12px;
++	box-sizing: border-box;
++	border: 0 !important; /* !important: the button's border is written inline (button.ts) */
++	border-radius: 8px;
++	font-size: 13px;
++	font-weight: 500;
++	line-height: 32px;
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-buttons-container > .monaco-button.secondary {
++	background-color: var(--rm-desk) !important; /* !important: the button's colours are written inline (button.ts) */
++	color: var(--vscode-foreground) !important; /* !important: as above */
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++}
++
++.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-buttons-container > .monaco-button.secondary:hover {
++	background-color: var(--rm-hover) !important; /* !important: as above */
 +}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 index 4aaccf3c849..31f3520c15a 100644
@@ -1923,6 +2261,19 @@ index bd77caab75a..e6802457ead 100644
  			}
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
+diff --git a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
+index 7c01c6202c3..f3bc6e1f1bc 100644
+--- a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
++++ b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
+@@ -37,7 +37,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
+ export class NotificationsListDelegate implements IListVirtualDelegate<INotificationViewItem> {
+ 
+ 	private static readonly ROW_HEIGHT = 42;
+-	private static readonly LINE_HEIGHT = 22;
++	private static readonly LINE_HEIGHT = 20; // Ritemark 2.0: a notification's message is 13/20 (the Experience lead; ritemarkSurfaces.css)
+ 
+ 	private offsetHelper: HTMLElement;
+ 
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 index 22bfb325a6f..688a85a4774 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
@@ -2049,7 +2400,7 @@ index 00000000000..05ea0275947
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
 new file mode 100644
-index 00000000000..20613e775a9
+index 00000000000..16a18d72338
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
 @@ -0,0 +1,106 @@
@@ -2144,8 +2495,8 @@ index 00000000000..20613e775a9
 +	const aiToggle = control('ritemark-frame-button', localize('ritemark.frame.toggleAI', "Show or Hide the AI"), TOGGLE_AI, () => commandService.executeCommand(TOGGLE_AI));
 +	aiToggle.classList.add(...ThemeIcon.asClassNameArray(Codicon.layoutSidebarRight));
 +
-+	// You (R11): an outline circle, a person, where a project is a square. Its menu holds only Settings
-+	// (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October; experiences/settings frame 1).
++	// You (R11): an icon button like the AI's toggle beside it, the person in a circle (Jarmo, 18 October). Its menu holds
++	// only Settings (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October; experiences/settings frame 1).
 +	const you: HTMLElement = control('ritemark-you', localize('ritemark.frame.you', "You"), undefined, () => {
 +		you.setAttribute('aria-expanded', 'true');
 +		showRitemarkMenu(contextViewService, you, { className: 'ritemark-you-menu', ariaLabel: localize('ritemark.frame.you', "You"), align: 'right' }, [
@@ -2317,19 +2668,224 @@ index 00000000000..67f3b47cd9f
 +	getWindow(menu).setTimeout(() => rows[0]?.focus(), 0);
 +	return toDisposable(() => disposables.dispose());
 +}
-diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
+diff --git a/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
 new file mode 100644
-index 00000000000..4caf7650450
+index 00000000000..01be0d2bbb9
 --- /dev/null
-+++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,159 @@
++++ b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
+@@ -0,0 +1,198 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
 +/*
-+ * Ritemark 2.0: the left column's head on Documents (R10), as drawn (surfaces/README.md, Measurements).
++ * Ritemark 2.0: the window makes room for the document by itself (R14; framework.md, "Window sizes", drawn in
++ * experiences/variants). When the main window crosses a width:
++ * - below 1400, the AI's sheet narrows to 320;
++ * - below 1200, the left column hides; below 960, the AI's column hides too;
++ * - crossing back up undoes what the crossing down did, unless the person changed it since.
++ * A column the person opens or closes in between is left alone until the window crosses that width again, and
++ * each column's toggle brings it back taking room, as before. The widths are the workbench's pixels (points at
++ * zoom 0). What the crossings changed is kept per window's workspace, so a restart in a narrow window does not
++ * undo or repeat them. The columns coming over the desk instead of taking room are a later step.
++ */
++
++import { RunOnceScheduler } from '../../../base/common/async.js';
++import { Disposable } from '../../../base/common/lifecycle.js';
++import { ILogService } from '../../../platform/log/common/log.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
++import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
++
++/** The widths the window crosses, widest first: the AI narrows, the left column hides, the AI hides. */
++const RITEMARK_WINDOW_WIDTHS = [1400, 1200, 960];
++
++/** The AI's column when narrowed: its sheet with the chat rail, 320, and 8 on each side (400 at full width). */
++export const RITEMARK_AI_NARROW_COLUMN = 336;
++
++/** How many of the widths the window is below: 0 at 1400 and wider, 3 below 960. */
++export function ritemarkWindowBand(width: number): number {
++	return RITEMARK_WINDOW_WIDTHS.filter(crossing => width < crossing).length;
++}
++
++/** The two columns as they are now; the AI's width is unknown while it is hidden. */
++export interface IRitemarkColumns {
++	readonly leftVisible: boolean;
++	readonly aiVisible: boolean;
++	readonly aiWidth: number | undefined;
++}
++
++/** Where the window was, and what its crossings down changed, so that crossing back up can undo just that. */
++export interface IRitemarkWindowSizesMemory {
++	band: number;
++	aiWidthBefore?: number;
++	/** The width the narrowed AI's column actually got (the layout may give it a little less than asked). */
++	aiWidthSet?: number;
++	hidLeft?: boolean;
++	hidAi?: boolean;
++}
++
++/** One change to the columns. */
++export interface IRitemarkColumnChange {
++	readonly leftVisible?: boolean;
++	readonly aiVisible?: boolean;
++	readonly aiWidth?: number;
++}
++
++/**
++ * The changes for the window's move from `memory.band` to `band`, one crossing at a time in the order the window
++ * passes them. Updates `memory`.
++ */
++export function ritemarkCrossings(memory: IRitemarkWindowSizesMemory, band: number, columns: IRitemarkColumns): IRitemarkColumnChange[] {
++	const changes: IRitemarkColumnChange[] = [];
++	let { leftVisible, aiVisible, aiWidth } = columns;
++
++	while (memory.band < band) {
++		memory.band++;
++		if (memory.band === 1) {
++			// Below 1400: the AI's sheet narrows
++			memory.aiWidthBefore = memory.aiWidthSet = undefined;
++			if (aiVisible && aiWidth !== undefined && aiWidth > RITEMARK_AI_NARROW_COLUMN) {
++				memory.aiWidthBefore = aiWidth;
++				memory.aiWidthSet = aiWidth = RITEMARK_AI_NARROW_COLUMN;
++				changes.push({ aiWidth });
++			}
++		} else if (memory.band === 2) {
++			// Below 1200: the left column hides
++			memory.hidLeft = leftVisible;
++			if (leftVisible) {
++				leftVisible = false;
++				changes.push({ leftVisible });
++			}
++		} else {
++			// Below 960: the AI hides
++			memory.hidAi = aiVisible;
++			if (aiVisible) {
++				aiVisible = false;
++				aiWidth = undefined;
++				changes.push({ aiVisible });
++			}
++		}
++	}
++
++	while (memory.band > band) {
++		if (memory.band === 3) {
++			// 960 and wider: the AI comes back, if this window hid it
++			if (memory.hidAi && !aiVisible) {
++				aiVisible = true;
++				changes.push({ aiVisible });
++			}
++			memory.hidAi = undefined;
++		} else if (memory.band === 2) {
++			// 1200 and wider: the left column comes back, if this window hid it
++			if (memory.hidLeft && !leftVisible) {
++				leftVisible = true;
++				changes.push({ leftVisible });
++			}
++			memory.hidLeft = undefined;
++		} else {
++			// 1400 and wider: the AI's sheet widens again, unless the person resized it (a hidden one cannot be)
++			const untouched = aiWidth === undefined || Math.abs(aiWidth - (memory.aiWidthSet ?? RITEMARK_AI_NARROW_COLUMN)) <= 1;
++			if (memory.aiWidthBefore !== undefined && aiVisible && untouched) {
++				aiWidth = memory.aiWidthBefore;
++				changes.push({ aiWidth });
++			}
++			memory.aiWidthBefore = memory.aiWidthSet = undefined;
++		}
++		memory.band--;
++	}
++
++	return changes;
++}
++
++class RitemarkWindowSizes extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.ritemarkWindowSizes';
++
++	private static readonly STORAGE_KEY = 'ritemark.windowSizes';
++
++	private readonly memory: IRitemarkWindowSizesMemory;
++	private readonly scheduler = this._register(new RunOnceScheduler(() => this.update(), 50));
++
++	constructor(
++		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
++		@IStorageService private readonly storageService: IStorageService,
++		@ILogService private readonly logService: ILogService,
++	) {
++		super();
++
++		this.memory = this.load();
++		this.update();
++		this._register(layoutService.onDidLayoutMainContainer(() => this.scheduler.schedule()));
++	}
++
++	private update(): void {
++		const width = this.layoutService.mainContainerDimension.width;
++		const band = ritemarkWindowBand(width);
++		if (band === this.memory.band) {
++			return;
++		}
++		const from = this.memory.band;
++
++		const aiVisible = this.layoutService.isVisible(Parts.AUXILIARYBAR_PART);
++		const changes = ritemarkCrossings(this.memory, band, {
++			leftVisible: this.layoutService.isVisible(Parts.SIDEBAR_PART),
++			aiVisible,
++			aiWidth: aiVisible ? this.layoutService.getSize(Parts.AUXILIARYBAR_PART).width : undefined,
++		});
++
++		for (const change of changes) {
++			if (change.leftVisible !== undefined) {
++				this.layoutService.setPartHidden(!change.leftVisible, Parts.SIDEBAR_PART);
++			}
++			if (change.aiVisible !== undefined) {
++				this.layoutService.setPartHidden(!change.aiVisible, Parts.AUXILIARYBAR_PART);
++			}
++			if (change.aiWidth !== undefined) {
++				const { height } = this.layoutService.getSize(Parts.AUXILIARYBAR_PART);
++				this.layoutService.setSize(Parts.AUXILIARYBAR_PART, { width: change.aiWidth, height });
++				if (change.aiWidth === RITEMARK_AI_NARROW_COLUMN && this.memory.aiWidthSet !== undefined) {
++					this.memory.aiWidthSet = this.layoutService.getSize(Parts.AUXILIARYBAR_PART).width;
++				}
++			}
++		}
++		this.save();
++		this.logService.info(`[Ritemark] window sizes: ${Math.round(width)} wide, band ${from} -> ${band}; ${JSON.stringify(changes)}; ${JSON.stringify(this.memory)}`);
++	}
++
++	private load(): IRitemarkWindowSizesMemory {
++		try {
++			const stored = JSON.parse(this.storageService.get(RitemarkWindowSizes.STORAGE_KEY, StorageScope.WORKSPACE, '{}'));
++			if (typeof stored.band === 'number') {
++				return stored;
++			}
++		} catch {
++			// A window that has not crossed anything yet
++		}
++		return { band: 0 };
++	}
++
++	private save(): void {
++		this.storageService.store(RitemarkWindowSizes.STORAGE_KEY, JSON.stringify(this.memory), StorageScope.WORKSPACE, StorageTarget.MACHINE);
++	}
++}
++
++registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
+diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
+new file mode 100644
+index 00000000000..23ff99aa8d9
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
+@@ -0,0 +1,194 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0: the left column's head on Documents (R10) and on Agents (experience 31), as drawn (surfaces/README.md,
++ * Measurements).
 + *
 + * The project's mark (its initials in a 24 square of ink) and its whole name, with a chevron that opens the
 + * project's menu (the folder tools VS Code shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
@@ -2337,7 +2893,8 @@ index 00000000000..4caf7650450
 + * menu is drawn (experiences/home frame 2: 232 wide, 4 under the head). Their entries, words and icons
 + * come from the extension, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus
 + * (menusExtensionPoint.ts), so an extension release can change them; each menu group is set apart by a
-+ * hairline. Other places keep their own simple head.
++ * hairline. On Agents, New lists the library's four kinds and Search finds in the library; Documents adds its label
++ * over the tree. Other places keep their own simple head.
 + */
 +
 +import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
@@ -2355,9 +2912,19 @@ index 00000000000..4caf7650450
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
 +
-+const DOCUMENTS_CONTAINER = 'workbench.view.explorer';
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
-+const NEW_MENU = MenuId.for('ritemark/projectHead/new');
++
++/** The places with the project's head: what their New lists, what their Search runs, and the label over their content. */
++interface IRitemarkHeadPlace {
++	readonly newMenu: MenuId;
++	readonly search: string;
++	readonly group?: string;
++}
++
++const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>([
++	['workbench.view.explorer', { newMenu: MenuId.for('ritemark/projectHead/new'), search: 'workbench.view.search', group: localize('ritemark.project.documents', "Documents") }],
++	['workbench.view.extension.ritemark-agent-library', { newMenu: MenuId.for('ritemark/projectHead/agents/new'), search: 'ritemark.agentLibrary.search' }],
++]);
 +
 +/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
 +export function ritemarkProjectInitials(name: string): string {
@@ -2369,8 +2936,14 @@ index 00000000000..4caf7650450
 +
 +	private readonly label: HTMLElement;
 +	private readonly mark: HTMLElement;
++	private readonly name: HTMLElement;
 +	private readonly rows: HTMLElement;
-+	private active = false;
++	private readonly group: HTMLElement;
++	private place: IRitemarkHeadPlace | undefined;
++
++	private get active(): boolean {
++		return !!this.place;
++	}
 +
 +	constructor(
 +		private readonly part: HTMLElement,
@@ -2383,15 +2956,17 @@ index 00000000000..4caf7650450
 +	) {
 +		super();
 +
-+		// The head: the project's whole name and a chevron; the whole label opens the project's menu
++		// The head: the project's mark, its whole name (in place of the place's own title) and a chevron; the whole
++		// label opens the project's menu
 +		const label = this.label = titleArea.querySelector<HTMLElement>(':scope > .title-label')!;
 +		label.classList.add('ritemark-project-head');
 +		this.mark = $('span.ritemark-project-mark', { 'aria-hidden': 'true' });
-+		label.prepend(this.mark);
++		this.name = $('span.ritemark-project-name');
++		label.prepend(this.mark, this.name);
 +		append(label, renderIcon(Codicon.chevronDown)).classList.add('ritemark-project-chevron');
-+		this.updateMark();
-+		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this.updateMark()));
-+		this._register(this.workspaceService.onDidChangeWorkspaceName(() => this.updateMark()));
++		this.updateProject();
++		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this.updateProject()));
++		this._register(this.workspaceService.onDidChangeWorkspaceName(() => this.updateProject()));
 +		const openProjectMenu = () => this.showMenu(PROJECT_MENU, label, localize('ritemark.project.menu', "Project"));
 +		this._register(addDisposableListener(label, EventType.CLICK, () => {
 +			if (this.active) {
@@ -2406,32 +2981,46 @@ index 00000000000..4caf7650450
 +			}
 +		}));
 +
-+		// New and Search as rows, then the Documents label over the tree
++		// New and Search as rows, then the place's label over its content
 +		this.rows = $('.ritemark-project-rows');
 +		titleArea.after(this.rows);
 +		this._register({ dispose: () => this.rows.remove() });
 +		const newRow = this.row(Codicon.add, localize('ritemark.project.new', "New"));
 +		newRow.setAttribute('aria-haspopup', 'menu');
-+		this._register(addDisposableListener(newRow, EventType.CLICK, () => this.showMenu(NEW_MENU, newRow, localize('ritemark.project.newMenu', "New"))));
++		this._register(addDisposableListener(newRow, EventType.CLICK, () => {
++			if (this.place) {
++				this.showMenu(this.place.newMenu, newRow, localize('ritemark.project.newMenu', "New"));
++			}
++		}));
 +		const searchRow = this.row(Codicon.search, localize('ritemark.project.search', "Search"));
-+		this._register(addDisposableListener(searchRow, EventType.CLICK, () => this.commandService.executeCommand('workbench.view.search')));
-+		append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }, localize('ritemark.project.documents', "Documents")));
++		this._register(addDisposableListener(searchRow, EventType.CLICK, () => {
++			if (this.place) {
++				this.commandService.executeCommand(this.place.search);
++			}
++		}));
++		this.group = append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }));
 +	}
 +
-+	/** What the head adds above the content on Documents: its rows (the tree gets the rest). */
++	/** What the head adds above the content: its rows (the content gets the rest). */
 +	get rowsHeight(): number {
 +		return this.active ? this.rows.offsetHeight : 0;
 +	}
 +
-+	/** Documents open or not; returns whether the column's head changed. */
++	/** The place shown; returns whether the column's head changed. */
 +	update(compositeId: string | undefined): boolean {
-+		const active = compositeId === DOCUMENTS_CONTAINER && this.workspaceService.getWorkspace().folders.length > 0;
-+		if (active === this.active) {
++		const place = compositeId !== undefined && this.workspaceService.getWorkspace().folders.length > 0 ? HEAD_PLACES.get(compositeId) : undefined;
++		if (place === this.place) {
 +			return false;
 +		}
-+		this.active = active;
-+		this.part.classList.toggle('ritemark-documents', active);
-+		if (active) {
++		const wasActive = this.active;
++		this.place = place;
++		this.part.classList.toggle('ritemark-project-place', !!place);
++		this.group.textContent = place?.group ?? '';
++		this.group.style.display = place?.group ? '' : 'none';
++		if (this.active === wasActive) {
++			return true;
++		}
++		if (this.active) {
 +			this.label.setAttribute('role', 'button');
 +			this.label.setAttribute('aria-haspopup', 'menu');
 +			this.label.tabIndex = 0;
@@ -2443,9 +3032,10 @@ index 00000000000..4caf7650450
 +		return true;
 +	}
 +
-+	private updateMark(): void {
++	private updateProject(): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0];
 +		this.mark.textContent = folder ? ritemarkProjectInitials(folder.name) : '';
++		this.name.textContent = folder?.name ?? '';
 +	}
 +
 +	private row(icon: ThemeIcon, text: string): HTMLElement {
@@ -2483,7 +3073,7 @@ index 00000000000..4caf7650450
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index f269e7586a8..644bde193fe 100644
+index f269e7586a8..bdff8ff66d0 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -2517,7 +3107,7 @@ index f269e7586a8..644bde193fe 100644
 +	override create(parent: HTMLElement): void {
 +		super.create(parent);
 +
-+		// Ritemark 2.0: on Documents the column's head is the project, then New, Search and the Documents label (R10)
++		// Ritemark 2.0: on Documents and Agents the column's head is the project, then New and Search (R10; experience 31)
 +		const titleArea = parent.querySelector<HTMLElement>(':scope > .composite.title');
 +		if (titleArea) {
 +			const head = this.ritemarkHead = this._register(this.instantiationService.createInstance(RitemarkProjectHead, parent, titleArea));
@@ -2692,18 +3282,19 @@ index 683604c1cc7..880e0e927d2 100644
  	}
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 544300939e9..caa7912cf99 100644
+index 544300939e9..5ce62a1fad5 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
-@@ -28,7 +28,6 @@ import { NativeWindow } from './window.js';
+@@ -28,7 +28,7 @@ import { NativeWindow } from './window.js';
  import { ModifierKeyEmitter } from '../../base/browser/dom.js';
  import { applicationConfigurationNodeBase, securityConfigurationNodeBase } from '../common/configuration.js';
  import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from '../../platform/window/electron-browser/window.js';
 -import product from '../../platform/product/common/product.js';
++import '../browser/parts/ritemarkWindowSizes.js'; // Ritemark 2.0: the window makes room for the document (R14)
  
  // Actions
  (function registerActions(): void {
-@@ -279,7 +278,7 @@ import product from '../../platform/product/common/product.js';
+@@ -279,7 +279,7 @@ import product from '../../platform/product/common/product.js';
  						localize(`window.menuStyle.native`, "Use the native menu. This is ignored when {0} is set to {1}.", '`#window.titleBarStyle#`', '`custom`'),
  						localize(`window.menuStyle.inherit`, "Matches the menu style to the title bar style defined in {0}.", '`#window.titleBarStyle#`'),
  					],
@@ -2712,6 +3303,15 @@ index 544300939e9..caa7912cf99 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
+@@ -288,7 +288,7 @@ import product from '../../platform/product/common/product.js';
+ 			'window.dialogStyle': {
+ 				'type': 'string',
+ 				'enum': ['native', 'custom'],
+-				'default': 'native',
++				'default': 'custom', // Ritemark 2.0: Ritemark's own dialog, one sheet with the menus (experience 31); application-scoped, like window.menuStyle
+ 				'scope': ConfigurationScope.APPLICATION,
+ 				'description': localize('dialogStyle', "Adjust the appearance of dialogs to be native by the OS or custom.")
+ 			},
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
 index 6fe575a12dd..b43d7ea930e 100644
 --- a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
@@ -2844,10 +3444,10 @@ index 6fe575a12dd..b43d7ea930e 100644
  			if (newHeight !== this.cachedWindowControlHeight) {
  				this.cachedWindowControlHeight = newHeight;
 diff --git a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-index 2a2643375a2..3944f708192 100644
+index 2a2643375a2..84afbc2cd65 100644
 --- a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
 +++ b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-@@ -550,6 +550,17 @@ const apiMenus: IAPIMenu[] = [
+@@ -550,6 +550,22 @@ const apiMenus: IAPIMenu[] = [
  		description: localize('menus.chatNewSession', "The Chat new session menu."),
  		proposed: 'chatSessionsProvider'
  	},
@@ -2861,6 +3461,11 @@ index 2a2643375a2..3944f708192 100644
 +		key: 'ritemark/projectHead/new',
 +		id: MenuId.for('ritemark/projectHead/new'),
 +		description: localize('menus.ritemarkProjectHeadNew', "Ritemark: the New menu, at the head of the left column")
++	},
++	{
++		key: 'ritemark/projectHead/agents/new',
++		id: MenuId.for('ritemark/projectHead/agents/new'),
++		description: localize('menus.ritemarkProjectHeadAgentsNew', "Ritemark: the New menu at the head of the left column, on Agents")
 +	},
  ];
  
@@ -2900,3 +3505,104 @@ index 46243a4447e..bf92f42c53d 100644
  	if (!hasCustomTitlebar(configurationService)) {
  		return false;
  	}
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
+new file mode 100644
+index 00000000000..50a653619fa
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
+@@ -0,0 +1,95 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { IRitemarkColumnChange, IRitemarkColumns, IRitemarkWindowSizesMemory, ritemarkCrossings, ritemarkWindowBand } from '../../../browser/parts/ritemarkWindowSizes.js';
++
++/**
++ * Ritemark 2.0 (Sprint 132, R14): below 1400 the AI's sheet narrows to 320 (its column 336), below 1200 the left
++ * column hides, below 960 the AI hides; crossing back up undoes only what the crossing down did.
++ */
++suite('Ritemark window sizes', () => {
++
++	interface ILayout { leftVisible: boolean; aiVisible: boolean; aiWidth: number }
++
++	/** Walks the window through widths, applying each crossing's changes as the layout does: a hidden AI keeps its width. */
++	function walk(widths: number[], layout: ILayout, memory: IRitemarkWindowSizesMemory = { band: 0 }) {
++		const steps: { width: number; changes: IRitemarkColumnChange[] }[] = [];
++		for (const width of widths) {
++			const columns: IRitemarkColumns = { ...layout, aiWidth: layout.aiVisible ? layout.aiWidth : undefined };
++			const changes = ritemarkCrossings(memory, ritemarkWindowBand(width), columns);
++			for (const change of changes) {
++				layout = { ...layout, ...change };
++			}
++			steps.push({ width, changes });
++		}
++		return { steps, layout, memory };
++	}
++
++	test('the bands', () => {
++		assert.deepStrictEqual([1500, 1400, 1399, 1200, 1199, 960, 959, 600].map(ritemarkWindowBand), [0, 0, 1, 1, 2, 2, 3, 3]);
++	});
++
++	test('narrowing from 1500 to 900 and back (S42)', () => {
++		const { steps } = walk([1500, 1300, 1100, 900, 1100, 1300, 1500], { leftVisible: true, aiVisible: true, aiWidth: 400 });
++
++		assert.deepStrictEqual(steps, [
++			{ width: 1500, changes: [] },
++			{ width: 1300, changes: [{ aiWidth: 336 }] },
++			{ width: 1100, changes: [{ leftVisible: false }] },
++			{ width: 900, changes: [{ aiVisible: false }] },
++			{ width: 1100, changes: [{ aiVisible: true }] },
++			{ width: 1300, changes: [{ leftVisible: true }] },
++			{ width: 1500, changes: [{ aiWidth: 400 }] },
++		]);
++	});
++
++	test('a jump across every width takes each crossing in order', () => {
++		const down = walk([900], { leftVisible: true, aiVisible: true, aiWidth: 420 });
++		const up = walk([1600], down.layout, down.memory);
++
++		assert.deepStrictEqual({ down: down.steps[0].changes, up: up.steps[0].changes, after: up.layout }, {
++			down: [{ aiWidth: 336 }, { leftVisible: false }, { aiVisible: false }],
++			up: [{ aiVisible: true }, { leftVisible: true }, { aiWidth: 420 }],
++			after: { leftVisible: true, aiVisible: true, aiWidth: 420 },
++		});
++	});
++
++	test('a column the person opened stays open until the window crosses that width again (S43)', () => {
++		const narrow = walk([1100], { leftVisible: true, aiVisible: true, aiWidth: 400 });
++		// The person opens the left column at 1100
++		const opened = walk([1150, 1250, 1100], { ...narrow.layout, leftVisible: true }, narrow.memory);
++
++		assert.deepStrictEqual(opened.steps, [
++			{ width: 1150, changes: [] },
++			{ width: 1250, changes: [] },
++			{ width: 1100, changes: [{ leftVisible: false }] },
++		]);
++	});
++
++	test('the narrowed AI comes back even when the layout gave it a little less than 336', () => {
++		const narrowed = walk([1300], { leftVisible: true, aiVisible: true, aiWidth: 400 });
++		// The layout gave the narrowed column 333; the window remembers what it got
++		narrowed.memory.aiWidthSet = 333;
++		const widened = walk([1500], { ...narrowed.layout, aiWidth: 333 }, narrowed.memory);
++
++		assert.deepStrictEqual({ changes: widened.steps[0].changes, memory: widened.memory }, { changes: [{ aiWidth: 400 }], memory: { band: 0, aiWidthBefore: undefined, aiWidthSet: undefined } });
++	});
++
++	test('what the person changed is not undone', () => {
++		// The person hid the left column at 1500; then, at 1300, widened the narrowed AI to 360
++		const narrowed = walk([1300, 1100, 1250], { leftVisible: false, aiVisible: true, aiWidth: 400 });
++		const widened = walk([1500], { ...narrowed.layout, aiWidth: 360 }, narrowed.memory);
++
++		assert.deepStrictEqual({ narrowed: narrowed.steps.map(step => step.changes), widened: widened.steps[0].changes, after: widened.layout }, {
++			narrowed: [[{ aiWidth: 336 }], [], []],
++			widened: [],
++			after: { leftVisible: false, aiVisible: true, aiWidth: 360 },
++		});
++	});
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++});

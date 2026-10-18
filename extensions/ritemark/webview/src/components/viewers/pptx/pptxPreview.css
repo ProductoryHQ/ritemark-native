@@ -4,7 +4,8 @@
  */
 
 .ritemark-pptx {
-  --ritemark-pptx-surround: color-mix(in srgb, var(--r-ink-strong) 7%, var(--r-surface));
+  /* Ritemark 2.0 (the Experience lead): the pages lie on a canvas in the AI's colour, a step below the desk */
+  --ritemark-pptx-surround: var(--vscode-ritemark-aiSheet, var(--r-surface-muted));
 }
 
 .ritemark-pptx .pptx-scroller {

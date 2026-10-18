@@ -6,20 +6,26 @@ tab is as wide as its whole name, 120 to 200, and a tab's tooltip shows its path
 When the row is full, the tabs used longest ago fold into "N ⌄" (ritemarkFoldedTabs.ts) before the + at the
 right end of the row, which makes a new Text, Table, Web page or Terminal tab (ritemarkNewTab.ts, #199).
 Home and Tasks keep the front of the row (R9): once pinned, a person or a command cannot close, unpin or move
-them to another group, and no tab moves in front of them; only the extension disposes them.
+them to another group, and no tab moves in front of them; only the extension disposes them. A move command
+that made a new group for them takes the empty group away again (editorCommands.ts).
 A terminal is a tab (R8; Jarmo, 17 October): ritemarkTerminalTabs.ts moves any terminal that lands in the
 panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether each runs a command; the
 terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
 tab carries the working dot (terminalEditorInput.ts). A named terminal keeps its name as the title's source
 when the shell reports its folder, so it comes back named after a reload (terminalInstance.ts).
-The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later).
+The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later); it
+keeps the last name seen, since on Windows the shell type clears while a command runs. A terminal tab's menu
+adds only Rename to the usual tab items: no move into the panel, no Change Color, Change Icon or Size to Content
+Width (terminalMenus.ts; Windows round 1 and the Experience lead).
+Closing a terminal whose command still runs asks first, in experience 31's words ("Close Terminal 2?", Close terminal,
+Don't ask again; terminalEditorInput.ts), also from the bar's Close, which closes the tab (ritemarkTerminalBar.ts).
 Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
-Files: workbench/browser/parts/editor/{editor,editorGroupView,editorTabsControl,multiEditorTabsControl,
-ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
-terminalEditor,terminalEditorInput,terminalInstance}.ts; and the two tests above.
+Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorTabsControl,
+multiEditorTabsControl,ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
+terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index 28d0480ab86..08b6f36aa5f 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -34,6 +40,33 @@ index 28d0480ab86..08b6f36aa5f 100644
  }
  
  export interface IEditorGroupTitleHeight {
+diff --git a/src/vs/workbench/browser/parts/editor/editorCommands.ts b/src/vs/workbench/browser/parts/editor/editorCommands.ts
+index ef66fad7e3b..6d4ae8cb3bd 100644
+--- a/src/vs/workbench/browser/parts/editor/editorCommands.ts
++++ b/src/vs/workbench/browser/parts/editor/editorCommands.ts
+@@ -288,6 +288,7 @@ function registerEditorMoveCopyCommand(): void {
+ 		const configurationService = accessor.get(IConfigurationService);
+ 
+ 		let targetGroup: IEditorGroup | undefined;
++		const groupCount = editorGroupsService.count; // Ritemark 2.0
+ 
+ 		switch (args.to) {
+ 			case 'left':
+@@ -349,6 +350,14 @@ function registerEditorMoveCopyCommand(): void {
+ 				sourceGroup.copyEditors(editorsWithOptions, targetGroup);
+ 			}
+ 
++			// Ritemark 2.0: a pinned Home or Task board tab stays in its group, so a group
++			// made here for it would be left empty; take it away again
++			if (targetGroup.isEmpty && editorGroupsService.count > groupCount) {
++				editorGroupsService.removeGroup(targetGroup);
++				sourceGroup.focus();
++				return;
++			}
++
+ 			targetGroup.focus();
+ 		}
+ 	}
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 index a2344eaf8f2..a9e8b628053 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
@@ -822,10 +855,10 @@ index 00000000000..99967801216
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
-index 00000000000..d1b8dd87cc4
+index 00000000000..1699503e2b0
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,135 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -847,11 +880,18 @@ index 00000000000..d1b8dd87cc4
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { ITerminalInstance, ITerminalService } from './terminal.js';
 +import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
 +
 +/** The bar's fixed height, in the desk's pixels. */
 +export const RITEMARK_TERMINAL_BAR_HEIGHT = 52;
++
++/**
++ * Each terminal's shell, as last seen. On Windows the shell type clears while another program runs in the shell
++ * (Windows round 1: the bar read "Terminal 2" while running and "pwsh" when idle), so the bar keeps the last one.
++ */
++const shellNames = new WeakMap<ITerminalInstance, string>();
 +
 +export class RitemarkTerminalBar extends Disposable {
 +
@@ -865,6 +905,7 @@ index 00000000000..d1b8dd87cc4
 +		container: HTMLElement,
 +		@ITerminalService private readonly terminalService: ITerminalService,
 +		@IHoverService private readonly hoverService: IHoverService,
++		@IEditorService private readonly editorService: IEditorService,
 +	) {
 +		super();
 +
@@ -889,7 +930,7 @@ index 00000000000..d1b8dd87cc4
 +			this.terminalService.createTerminal({ location: { parentTerminal: instance } });
 +		});
 +		this.button(bar, 'ritemark-terminal-icon', Codicon.clearAll, undefined, localize('ritemark.terminal.clear', "Clear"), instance => instance.clearBuffer());
-+		this.button(bar, 'ritemark-terminal-icon', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close this terminal: its shell ends and the tab closes"), instance => this.terminalService.safeDisposeTerminal(instance));
++		this.button(bar, 'ritemark-terminal-icon', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close this terminal: its shell ends and the tab closes"), instance => this.close(instance));
 +
 +		this.update();
 +		this._register(ritemarkTerminalRunning.onDidChange(changed => {
@@ -910,9 +951,22 @@ index 00000000000..d1b8dd87cc4
 +		this.update();
 +	}
 +
++	/** Closes the terminal's tab, so a running command asks first (terminalEditorInput.ts, confirm; experience 31). */
++	private close(instance: ITerminalInstance): void {
++		const [tab] = this.editorService.findEditors(instance.resource);
++		if (tab) {
++			this.editorService.closeEditor(tab);
++		} else {
++			this.terminalService.safeDisposeTerminal(instance);
++		}
++	}
++
 +	private update(): void {
 +		const instance = this.instance;
-+		this.name.textContent = instance ? (instance.shellType ?? instance.processName) || instance.title : '';
++		if (instance?.shellType) {
++			shellNames.set(instance, instance.shellType);
++		}
++		this.name.textContent = instance ? shellNames.get(instance) || instance.processName || instance.title : '';
 +		const isRunning = !!instance && ritemarkTerminalRunning.isRunning(instance);
 +		this.runningChip.style.display = isRunning ? '' : 'none';
 +		this.stop.style.display = isRunning ? '' : 'none';
@@ -1130,7 +1184,7 @@ index 8b40d469375..42065eef04e 100644
  		this._lastDimension = dimension;
  	}
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
-index f7ce1dab62b..408ee855444 100644
+index f7ce1dab62b..cab412b5b77 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
 @@ -23,6 +23,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
@@ -1141,7 +1195,39 @@ index f7ce1dab62b..408ee855444 100644
  
  export class TerminalEditorInput extends EditorInput implements IEditorCloseHandler {
  
-@@ -162,7 +163,8 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+@@ -105,15 +106,25 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+ 	}
+ 
+ 	async confirm(terminals: ReadonlyArray<IEditorIdentifier>): Promise<ConfirmResult> {
+-		const { confirmed } = await this._dialogService.confirm({
++		// Ritemark 2.0 (experience 31): the question names the terminal and says what closing it does
++		const single = terminals.length === 1;
++		const { confirmed, checkboxChecked } = await this._dialogService.confirm({
+ 			type: Severity.Warning,
+-			message: localize('confirmDirtyTerminal.message', "Do you want to terminate running processes?"),
+-			primaryButton: localize({ key: 'confirmDirtyTerminal.button', comment: ['&& denotes a mnemonic'] }, "&&Terminate"),
+-			detail: terminals.length > 1 ?
+-				terminals.map(terminal => terminal.editor.getName()).join('\n') + '\n\n' + localize('confirmDirtyTerminals.detail', "Closing will terminate the running processes in the terminals.") :
+-				localize('confirmDirtyTerminal.detail', "Closing will terminate the running processes in this terminal.")
++			message: single ?
++				localize('ritemark.confirmCloseTerminal.message', "Close {0}?", terminals[0].editor.getName()) :
++				localize('ritemark.confirmCloseTerminals.message', "Close {0} terminals?", terminals.length),
++			primaryButton: single ?
++				localize({ key: 'ritemark.confirmCloseTerminal.button', comment: ['&& denotes a mnemonic'] }, "&&Close terminal") :
++				localize({ key: 'ritemark.confirmCloseTerminals.button', comment: ['&& denotes a mnemonic'] }, "&&Close terminals"),
++			detail: single ?
++				localize('ritemark.confirmCloseTerminal.detail', "A command is still running in it. Closing the terminal stops it.") :
++				terminals.map(terminal => terminal.editor.getName()).join('\n') + '\n\n' + localize('ritemark.confirmCloseTerminals.detail', "Commands are still running in them. Closing the terminals stops them."),
++			checkbox: { label: localize('ritemark.confirmCloseTerminal.dontAsk', "Don't ask again") }
+ 		});
+ 
++		if (confirmed && checkboxChecked) {
++			await this._configurationService.updateValue(TerminalSettingId.ConfirmOnKill, 'never');
++		}
+ 		return confirmed ? ConfirmResult.DONT_SAVE : ConfirmResult.CANCEL;
+ 	}
+ 
+@@ -162,7 +173,8 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
  			instance.onIconChanged(() => this._onDidChangeLabel.fire()),
  			instanceOnDidFocusListener,
  			instanceOnDidBlurListener,
@@ -1151,7 +1237,7 @@ index f7ce1dab62b..408ee855444 100644
  		];
  
  		this._register(toDisposable(() => {
-@@ -207,6 +209,9 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+@@ -207,6 +219,9 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
  			return [];
  		}
  		const extraClasses: string[] = ['terminal-tab', 'predefined-file-icon'];
@@ -1176,6 +1262,61 @@ index 50a4c0f4917..db53f732c98 100644
  		return title;
  	}
  
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+index 4e645b1cd3f..e13df38998a 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+@@ -663,14 +663,9 @@ export function setupTerminalMenus(): void {
+ 		]
+ 	);
+ 
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.MoveToTerminalPanel,
+-			title: terminalStrings.moveToTerminalPanel
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
++	// Ritemark 2.0: a terminal is a tab (R8). Its tab's menu adds only Rename to the usual tab items: no move into
++	// the panel 2.0 does not use, and no Change Color, Change Icon or Size to Content Width (the Experience lead,
++	// 18 October); those stay in the command palette.
+ 
+ 	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+ 		command: {
+@@ -681,32 +676,6 @@ export function setupTerminalMenus(): void {
+ 		group: '2_files'
+ 	});
+ 
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.ChangeColor,
+-			title: terminalStrings.changeColor
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.ChangeIcon,
+-			title: terminalStrings.changeIcon
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.SizeToContentWidth,
+-			title: terminalStrings.toggleSizeToContentWidth
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-
+ 	for (const menuId of [MenuId.EditorTitle, MenuId.CompactWindowEditorTitle]) {
+ 		MenuRegistry.appendMenuItem(menuId, {
+ 			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
 index 00000000000..5627ecf829b

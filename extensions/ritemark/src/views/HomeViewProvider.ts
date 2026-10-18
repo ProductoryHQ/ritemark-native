@@ -243,7 +243,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   }
   :root {
     --ink-strong: var(--vscode-sideBar-foreground, #1E1B4B);
-    --ink-muted: var(--vscode-descriptionForeground, #64748B);
+    --ink-muted: var(--vscode-descriptionForeground, #617187);
     --surface-soft: var(--vscode-list-hoverBackground, rgba(148,163,184,0.10));
     --accent: #4338CA;
     --accent-deep: #3730A3;

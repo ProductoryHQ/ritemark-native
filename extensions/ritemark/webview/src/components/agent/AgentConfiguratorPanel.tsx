@@ -21,6 +21,8 @@ import { Switch } from '../ui/switch'
 import { Pill } from '../ui/pill'
 import { Badge } from '../ui/badge'
 import { Icon } from '../ui/Icon'
+import { Button } from '../ui/button'
+import { Tooltip } from '../ui/tooltip'
 import { ProvenanceBadge } from './ProvenanceBadge'
 import { ScheduleEditor } from './ScheduleEditor'
 import {
@@ -32,6 +34,7 @@ import {
   parseToolsField,
   serializeToolsField,
 } from './agentSchema'
+import { describeSchedule } from './cronSchedule'
 
 export interface AgentSkill {
   id: string
@@ -57,22 +60,37 @@ interface AgentConfiguratorPanelProps {
   onCreateFlow: () => void
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+/**
+ * Ritemark 2.0 (experience 31; kit: theme.html .cfg): a setting is its label in the column's caps, 6 above the
+ * control, and 16 under it.
+ */
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted mt-4 mb-1 first:mt-0">
-      {children}
-    </p>
-  )
-}
-
-function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <Label htmlFor={htmlFor} className="text-[11px] font-medium text-ink-muted uppercase tracking-wide">
+    <div className="mb-4">
+      <Label htmlFor={htmlFor} className="mb-1.5 block text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-muted">
         {label}
       </Label>
       {children}
     </div>
+  )
+}
+
+/** Every field's box: 28 high, radius 8, the strong hairline, on the desk (kit: .cfg .in). */
+const FIELD_BOX = 'h-auto min-h-[28px] rounded-lg border-0 bg-surface px-2.5 py-[5px] text-[12px] leading-[18px] text-ink-strong shadow-[inset_0_0_0_1px_var(--r-hairline-strong)] focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_var(--r-accent)]'
+
+/** How many tools show before "N more" (the drawing shows six). */
+const TOOLS_FOLDED = 6
+
+function Check({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={'mt-px grid h-3.5 w-3.5 flex-none place-items-center rounded ' + (checked ? 'bg-[var(--r-accent)] text-[var(--vscode-button-foreground,#fff)]' : 'shadow-[inset_0_0_0_1px_var(--r-hairline-strong)]')}
+    >
+      {checked && (
+        <svg width="10" height="10" viewBox="0 0 256 256" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round"><polyline points="40 144 96 200 224 72" /></svg>
+      )}
+    </span>
   )
 }
 
@@ -95,6 +113,8 @@ export function AgentConfiguratorPanel({
   const [skillInput, setSkillInput] = useState('')
   const [customModelMode, setCustomModelMode] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [toolsExpanded, setToolsExpanded] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   const fm = frontmatter
   const description = typeof fm.description === 'string' ? fm.description : ''
@@ -178,126 +198,129 @@ export function AgentConfiguratorPanel({
     ? skills.filter(s => s.name.toLowerCase().includes(skillInput.toLowerCase()) && !agentSkills.includes(s.id))
     : []
 
+  const toolsShown = toolsExpanded ? CLAUDE_TOOLS : CLAUDE_TOOLS.slice(0, TOOLS_FOLDED)
+
   return (
     <div
-      className="w-[220px] flex-shrink-0 h-full overflow-y-auto border-r border-hairline"
-      style={{ background: 'var(--vscode-editor-background)' }}
+      className="h-full w-[240px] flex-shrink-0 overflow-y-auto border-r border-t border-hairline bg-surface pb-4 pl-4 pr-3 pt-2"
     >
-      <div className="flex flex-col gap-3 px-4 py-4">
-        {/* Header */}
-        <h2 className="text-[15px] font-semibold text-ink-strong">Agent</h2>
+      {/* Header */}
+      <h2 className="mb-3 mt-2 text-[13px] font-semibold leading-5 text-ink-strong">Agent</h2>
 
-        {/* ── Description (REQUIRED — routing text) ── */}
-        <SectionLabel>Description</SectionLabel>
-
-        <div className="flex flex-col gap-1">
-          <Textarea
-            id={descriptionId}
-            value={description}
-            onChange={e => set('description', e.target.value)}
-            placeholder="When should Claude use this agent?"
-            rows={4}
-            className="text-[12px] leading-snug"
-            aria-invalid={!description.trim()}
-          />
-          <p className="text-[10px] text-ink-muted leading-tight">
-            {description.trim()
-              ? 'Claude uses this to decide when to delegate to this agent.'
-              : 'Required — without a description Claude never delegates to this agent.'}
+      {/* ── Description (REQUIRED — routing text) ── */}
+      <Field label="Description" htmlFor={descriptionId}>
+        <Textarea
+          id={descriptionId}
+          value={description}
+          onChange={e => set('description', e.target.value)}
+          placeholder="When should Claude use this agent?"
+          rows={2}
+          className={FIELD_BOX + ' max-h-[126px] resize-none'}
+          style={{ fieldSizing: 'content' } as React.CSSProperties}
+          aria-invalid={!description.trim()}
+        />
+        {!description.trim() && (
+          <p className="mt-1.5 text-[11px] leading-[14px] text-ink-muted">
+            Required — without a description Claude never delegates to this agent.
           </p>
-        </div>
+        )}
+      </Field>
 
-        {/* ── Model ── */}
-        <SectionLabel>Model</SectionLabel>
+      {/* ── Model ── */}
+      <Field label="Model" htmlFor={modelId}>
+        <Select value={modelSelectValue} onValueChange={handleModelSelect}>
+          <SelectTrigger id={modelId} className={FIELD_BOX} aria-label="Model">
+            <SelectValue placeholder="Inherit (default)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNSET}>Inherit (default)</SelectItem>
+            <SelectItem value="sonnet">Sonnet</SelectItem>
+            <SelectItem value="opus">Opus</SelectItem>
+            <SelectItem value="haiku">Haiku</SelectItem>
+            <SelectItem value={CUSTOM_MODEL}>Custom model ID…</SelectItem>
+          </SelectContent>
+        </Select>
+        {modelSelectValue === CUSTOM_MODEL && (
+          <Input
+            value={isAlias ? '' : model}
+            onChange={e => set('model', e.target.value)}
+            placeholder="Provider model ID"
+            className={FIELD_BOX + ' mt-1.5'}
+          />
+        )}
+      </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Select value={modelSelectValue} onValueChange={handleModelSelect}>
-            <SelectTrigger id={modelId} className="text-[12px] h-7" aria-label="Model">
-              <SelectValue placeholder="Inherit (default)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET}>Inherit (default)</SelectItem>
-              <SelectItem value="sonnet">Sonnet</SelectItem>
-              <SelectItem value="opus">Opus</SelectItem>
-              <SelectItem value="haiku">Haiku</SelectItem>
-              <SelectItem value={CUSTOM_MODEL}>Custom model ID…</SelectItem>
-            </SelectContent>
-          </Select>
-          {modelSelectValue === CUSTOM_MODEL && (
-            <Input
-              value={isAlias ? '' : model}
-              onChange={e => set('model', e.target.value)}
-              placeholder="Provider model ID"
-              className="text-[12px] h-7"
-            />
-          )}
-        </div>
-
-        {/* ── Tools ── */}
-        <SectionLabel>Tools</SectionLabel>
-
+      {/* ── Tools ── */}
+      <Field label="Tools">
         {grantedTools.length === 0 && (
-          <p className="text-[11px] text-ink-muted leading-snug rounded px-2 py-1.5 bg-accent-soft">
+          <p className="mb-1.5 text-[11px] leading-[14px] text-ink-muted">
             Inherits <strong>all</strong> tools (no restriction). Check tools below to restrict
             this agent to a specific set.
           </p>
         )}
-
-        <div className="flex flex-col gap-0.5">
-          {CLAUDE_TOOLS.map(tool => {
+        <div className="flex flex-col">
+          {toolsShown.map(tool => {
             const checked = grantedTools.includes(tool.name)
             return (
-              <label
-                key={tool.name}
-                className="flex items-start gap-2 px-1 py-1 rounded cursor-pointer hover:bg-surface-soft group"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleTool(tool.name)}
-                  className="mt-0.5 accent-[var(--r-accent)] flex-shrink-0"
-                />
-                <span className="flex flex-col min-w-0">
-                  <span className="text-[12px] text-ink-strong leading-tight font-mono">{tool.name}</span>
-                  <span className="text-[10px] text-ink-muted leading-tight">{tool.description}</span>
+              <label key={tool.name} className="flex cursor-pointer items-start gap-2 rounded px-1 py-[3px] hover:bg-surface-soft">
+                <input type="checkbox" checked={checked} onChange={() => toggleTool(tool.name)} className="sr-only" />
+                <Check checked={checked} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-mono text-[12px] leading-4 text-ink-strong">{tool.name}</span>
+                  <span className="text-[11px] leading-[14px] text-ink-muted">{tool.description}</span>
                 </span>
               </label>
             )
           })}
         </div>
+        {CLAUDE_TOOLS.length > TOOLS_FOLDED && (
+          <Tooltip label={toolsExpanded ? 'Show the first tools only' : 'Show every tool'} className="self-start">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setToolsExpanded(open => !open)}
+              className="h-6 px-1 text-[12px] font-normal leading-5 text-ink-muted"
+              aria-expanded={toolsExpanded}
+            >
+              {toolsExpanded ? 'Fewer' : `${CLAUDE_TOOLS.length - TOOLS_FOLDED} more`}
+            </Button>
+          </Tooltip>
+        )}
 
         {/* Unknown / MCP tool names present in the file — preserved, never dropped */}
         {unknownTools.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <p className="text-[10px] text-ink-muted">Also granted (kept as-is):</p>
-            <div className="flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-col gap-1">
+            <p className="text-[11px] leading-[14px] text-ink-muted">Also granted (kept as-is):</p>
+            <div className="flex flex-wrap gap-1.5">
               {unknownTools.map(t => (
-                <Pill key={t} variant="accent" className="font-mono text-[10px]" title="Tool name not in the standard list — preserved">
+                <Pill key={t} variant="accent" className="font-mono text-[11px]" title="Tool name not in the standard list — preserved">
                   {t}
                 </Pill>
               ))}
             </div>
           </div>
         )}
+      </Field>
 
-        {/* ── Skills (preloaded into agent context) ── */}
-        <SectionLabel>Skills</SectionLabel>
-
+      {/* ── Skills (preloaded into agent context) ── */}
+      <Field label="Skills">
         {agentSkills.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
             {agentSkills.map(sid => {
               const skill = skills.find(s => s.id === sid)
-              return (
-                <Pill
-                  key={sid}
-                  variant="accent"
-                  className="cursor-pointer group"
-                  onClick={() => removeSkill(sid)}
-                  title="Click to remove"
-                >
-                  {skill?.name ?? sid}
-                  <span className="opacity-0 group-hover:opacity-100 ml-0.5">×</span>
-                </Pill>
+              return ( /* the skill's folder name, as the Agents column shows it */
+                <Tooltip key={sid} label={skill ? `${skill.name}: remove this skill` : 'Remove this skill'}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => removeSkill(sid)}
+                    aria-label={`Remove ${sid}`}
+                    className="h-6 gap-1 rounded-md bg-[var(--r-accent-soft)] pl-2 pr-1.5 text-[12px] font-medium leading-6 text-[var(--r-accent)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent)] has-[>svg]:pr-1.5"
+                  >
+                    {sid}
+                    <Icon name="x" size={12} tone="inherit" />
+                  </Button>
+                </Tooltip>
               )
             })}
           </div>
@@ -308,18 +331,15 @@ export function AgentConfiguratorPanel({
             value={skillInput}
             onChange={e => setSkillInput(e.target.value)}
             placeholder="Add skill…"
-            className="text-[12px] h-7"
+            className={FIELD_BOX}
           />
           {filteredSkillSuggestions.length > 0 && (
-            <div
-              className="absolute z-50 left-0 right-0 top-full mt-0.5 rounded border border-hairline shadow-md max-h-40 overflow-y-auto"
-              style={{ background: 'var(--vscode-editor-background)' }}
-            >
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-40 overflow-y-auto rounded-lg bg-surface p-1 shadow-[0_0_0_1px_var(--r-hairline),0_10px_24px_-6px_rgba(30,27,75,0.16)]">
               {filteredSkillSuggestions.map(s => (
                 <button
                   key={s.id}
                   type="button"
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[12px] text-ink-strong hover:bg-accent-soft hover:text-accent-deep text-left"
+                  className="flex h-7 w-full items-center justify-between rounded px-2 text-left text-[12px] text-ink-strong hover:bg-surface-soft"
                   onClick={() => addSkill(s.id)}
                 >
                   <span>{s.name}</span>
@@ -329,88 +349,44 @@ export function AgentConfiguratorPanel({
             </div>
           )}
         </div>
+      </Field>
 
-        {/* ── Advanced (collapsed) ── */}
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(o => !o)}
-          className="flex items-center gap-1 mt-4 text-[10px] font-semibold uppercase tracking-widest text-ink-muted hover:text-ink-strong"
-          aria-expanded={advancedOpen}
-        >
-          <Icon
-            name="caret-right"
-            size={12}
-            className={advancedOpen ? 'rotate-90 transition-transform' : 'transition-transform'}
-          />
-          Advanced
-        </button>
-
-        {advancedOpen && (
-          <div className="flex flex-col gap-3">
-            <FieldRow label="Effort">
-              <Select value={effort || UNSET} onValueChange={v => set('effort', v === UNSET ? '' : v)}>
-                <SelectTrigger className="text-[12px] h-7" aria-label="Effort">
-                  <SelectValue placeholder="Inherit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNSET}>Inherit</SelectItem>
-                  {EFFORT_OPTIONS.map(o => (
-                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldRow>
-
-            <FieldRow label="Memory">
-              <Select value={memory || UNSET} onValueChange={v => set('memory', v === UNSET ? '' : v)}>
-                <SelectTrigger className="text-[12px] h-7" aria-label="Memory">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNSET}>None</SelectItem>
-                  {MEMORY_OPTIONS.map(o => (
-                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldRow>
-
-            <FieldRow label="Color">
-              <Select value={color || UNSET} onValueChange={v => set('color', v === UNSET ? '' : v)}>
-                <SelectTrigger className="text-[12px] h-7" aria-label="Color">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNSET}>Default</SelectItem>
-                  {COLOR_OPTIONS.map(o => (
-                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldRow>
+      {/* ── Schedule ── */}
+      {/* The schedule is one field, as drawn ("Not scheduled", or when it runs); it opens the editor under it */}
+      <Field label="Schedule">
+        <Tooltip label={scheduleOpen ? 'Close the schedule' : 'Choose when this agent runs on its own'} className="w-full">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setScheduleOpen(open => !open)}
+            aria-expanded={scheduleOpen}
+            className={FIELD_BOX + ' flex w-full items-center justify-between text-left font-normal hover:bg-transparent'}
+          >
+            <span className={schedCron ? '' : 'text-ink-muted'}>{describeSchedule(schedCron)}</span>
+            <Icon name="caret-down" size={12} tone="inherit" className={scheduleOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </Button>
+        </Tooltip>
+        {scheduleOpen && (
+          <div className="mt-2">
+            <p className="mb-1.5 text-[11px] leading-[14px] text-ink-muted">Run this agent automatically on a cron schedule.</p>
+            <ScheduleEditor
+              cron={schedCron}
+              onCronChange={cron => setSchedule({ cron })}
+            />
           </div>
         )}
-
-        {/* ── Schedule ── */}
-        <SectionLabel>Schedule</SectionLabel>
-        <p className="text-[10px] text-ink-muted -mt-1">Run this agent automatically on a cron schedule.</p>
-
-        <div className="flex flex-col gap-2">
-          <ScheduleEditor
-            cron={schedCron}
-            onCronChange={cron => setSchedule({ cron })}
-          />
-
-          <FieldRow label="Label">
+      </Field>
+      {(scheduleOpen || !!schedCron) && (
+        <>
+          <Field label="Label">
             <Input
               value={schedLabel}
               onChange={e => setSchedule({ label: e.target.value })}
               placeholder="e.g. Daily standup"
-              className="text-[12px] h-7"
+              className={FIELD_BOX}
             />
-          </FieldRow>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          </Field>
+          <label className="mb-4 flex cursor-pointer select-none items-center gap-2">
             <Switch
               checked={schedEnabled}
               onCheckedChange={enabled => setSchedule({ enabled })}
@@ -418,50 +394,110 @@ export function AgentConfiguratorPanel({
             />
             <span className="text-[12px] text-ink-strong">Enable schedule</span>
           </label>
-        </div>
+        </>
+      )}
 
-        {/* ── Ritemark extension: linked flow ── */}
-        <SectionLabel>Linked flow</SectionLabel>
-        <p className="text-[10px] text-ink-muted -mt-1">Ritemark extension — not part of the Claude Code agent format.</p>
-
+      {/* ── Ritemark extension: linked flow ── */}
+      <Field label="Linked flow" htmlFor={flowId}>
+        <p className="mb-1.5 text-[11px] leading-[14px] text-ink-muted">Ritemark extension — not part of the Claude Code agent format.</p>
         {flows.length > 0 ? (
-          <FieldRow label="Flow" htmlFor={flowId}>
-            <Select
-              value={routine || UNSET}
-              onValueChange={val => set('routine', val === UNSET ? '' : val)}
-            >
-              <SelectTrigger id={flowId} className="text-[12px] h-7">
+          <Select
+            value={routine || UNSET}
+            onValueChange={val => set('routine', val === UNSET ? '' : val)}
+          >
+            <SelectTrigger id={flowId} className={FIELD_BOX}>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET}>None</SelectItem>
+              {flows.map(stem => (
+                <SelectItem key={stem} value={stem}>{stem}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        {/* the problem the Agents row warns about, here too, so the keyboard reaches it (the Experience lead) */}
+        {flows.length > 0 && routine && !flows.includes(routine) && (
+          <p className="mt-1.5 text-[11px] leading-[14px] text-[var(--vscode-editorWarning-foreground)]">The linked flow “{routine}” is not in this project.</p>
+        )}
+        {flows.length > 0 ? null : routine ? (
+          <>
+            <Badge variant="outline">{routine}</Badge>
+            <p className="mt-1.5 text-[11px] leading-[14px] text-ink-muted">Flow file not found in workspace.</p>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onCreateFlow}
+            className="text-[12px] leading-5 text-[var(--r-accent)] hover:underline"
+          >
+            + Create flow
+          </button>
+        )}
+      </Field>
+
+      {/* ── Advanced (collapsed) ── */}
+      <Tooltip label={advancedOpen ? 'Hide the advanced settings' : 'Show the advanced settings'} className="mb-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setAdvancedOpen(o => !o)}
+          className="h-auto gap-1 px-0 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-muted hover:bg-transparent has-[>svg]:px-0"
+          aria-expanded={advancedOpen}
+        >
+          <Icon
+            name="caret-right"
+            size={12}
+            tone="inherit"
+            className={advancedOpen ? 'rotate-90 transition-transform' : 'transition-transform'}
+          />
+          Advanced
+        </Button>
+      </Tooltip>
+
+      {advancedOpen && (
+        <div className="mt-2">
+          <Field label="Effort">
+            <Select value={effort || UNSET} onValueChange={v => set('effort', v === UNSET ? '' : v)}>
+              <SelectTrigger className={FIELD_BOX} aria-label="Effort">
+                <SelectValue placeholder="Inherit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>Inherit</SelectItem>
+                {EFFORT_OPTIONS.map(o => (
+                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="Memory">
+            <Select value={memory || UNSET} onValueChange={v => set('memory', v === UNSET ? '' : v)}>
+              <SelectTrigger className={FIELD_BOX} aria-label="Memory">
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={UNSET}>None</SelectItem>
-                {flows.map(stem => (
-                  <SelectItem key={stem} value={stem}>{stem}</SelectItem>
+                {MEMORY_OPTIONS.map(o => (
+                  <SelectItem key={o} value={o}>{o}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </FieldRow>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] text-ink-muted">No flows yet.</p>
-            <button
-              type="button"
-              onClick={onCreateFlow}
-              className="self-start text-[11px] text-accent-deep hover:underline"
-            >
-              + Create flow
-            </button>
-          </div>
-        )}
+          </Field>
 
-      </div>
-
-      {/* Routine value display (read-only if set from frontmatter directly) */}
-      {routine && flows.length === 0 && (
-        <div className="px-4 pb-4">
-          <SectionLabel>Linked flow</SectionLabel>
-          <Badge variant="outline">{routine}</Badge>
-          <p className="text-[10px] text-ink-muted mt-1">Flow file not found in workspace.</p>
+          <Field label="Color">
+            <Select value={color || UNSET} onValueChange={v => set('color', v === UNSET ? '' : v)}>
+              <SelectTrigger className={FIELD_BOX} aria-label="Color">
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>Default</SelectItem>
+                {COLOR_OPTIONS.map(o => (
+                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
       )}
     </div>

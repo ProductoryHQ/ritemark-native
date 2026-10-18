@@ -61,7 +61,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `ritemarkProjectHead.ts` in `sidebarPart.ts`: the name, chevron, New, Search and Documents at the drawing's positions (R10)
 - [x] `menusExtensionPoint.ts`: `ritemark/projectHead` and `ritemark/projectHead/new`; their items contributed from `package.json` (R10)
 - [x] `package.json`: `files.exclude` for `**/.ritemark` (R10)
-- [x] You: the outline circle; Settings and Help; ARIA as a menu button (R11)
+- [x] You: the outline circle; Settings and Help; ARIA as a menu button (R11). Merge 2: an icon button like the AI's toggle, the user-circle glyph in the toggles' muted ink (Jarmo, 18 October)
 - [x] `desktop.contribution.ts` (`window.menuStyle: custom`), `menu.ts`, `defaultStyles.ts`: Ritemark's menus; the macOS menu bar stays native (R12)
 - [x] Updating from v1.14.0: the places order once; terminals, Copilot Chat and other views out of the AI column (R16)
 
@@ -71,38 +71,40 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] Extension tests: the 2.0 defaults and the head's menus in `package.json` (E3)
 - [x] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
 - [x] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
-- [ ] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md`
+- [x] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md` (S4, S5, S6, S10, the native menu bar and Help are Jarmo's own pass, listed in the PR)
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
-- [ ] PR 1 opened; `qa-validator` review; Jarmo's "admin merge"
-- [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
-- [ ] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2)
-- [ ] After the merge: drift check, results in the release plan's risk register (E6)
-- [ ] Release plan tracker updated
+- [x] PR 1 opened; `qa-validator` review; Jarmo's "admin merge" (#443, merged 2026-10-17 as d781a0e1)
+- [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) (the Development manager, at d781a0e1: source verified, 19/19 patches on vanilla 1.117.0, both validations and provenance passed, the extension activates with no errors on a fresh profile)
+- [x] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2). Done 2026-10-18 by the Windows session: 11 of 13 pass, then S8 as reworded; S31 partial, S10 for Jarmo by hand
+- [x] After the merge: drift check, results in the release plan's risk register (E6) (15 of 19 fail on 1.142.0, in 58 file patches)
+- [x] Release plan tracker updated
 
 ## Phase 7: The theme and window sizes (W10, W11)
 
 - [x] Both themes: the ground, the AI's sheet, the desk; no lines between parts; no indigo tab line; `menu.*` keys (R13) (in merge 1, from the prototype, on Jarmo's instruction of 17 October; the surface-by-surface check below is still Phase 7)
 - [x] The seven `ritemark.*` colours in `package.json`, with high-contrast values (R13) (in merge 1)
 - [x] The product icon theme (50 icons) and the dark file icons (R13) (in merge 1: 65 icon mappings, from the prototype plus the head's menus)
-- [ ] `ritemarkSurfaces.css` cleaned: theme variables only; each remaining `!important` marked with why (R13)
+- [x] `ritemarkSurfaces.css` cleaned: theme variables only; each remaining `!important` marked with why (R13). No colour is written in it; of 113 `!important`s at the cleanup, 98 stayed (the later dialog, palette and notification styles add their own, each with its reason), each naming on its line the rule it beats (VS Code's, an inline style, or its own), and 15 went where nothing competes in any state (checked against every loaded stylesheet and in the running app; computed styles identical before and after, frame geometry 44 pass)
 - [x] Webviews: `index.css` and the AI sheet's components from `--vscode-ritemark-desk` (R13) (in merge 1, from the prototype)
-- [ ] Surface by surface against the drawings, both themes (W10's table) (R13)
-- [ ] Modal dialogs, Flows and the Agent Library, when their drawings arrive (R13)
+- [x] Surface by surface against the drawings, both themes (W10's table) (R13). Step 1's scope as the Experience lead set it on 18 October: the page canvas, the file icons, one-line CSV rows, the palette, notifications and Transcribe in the frame's sheet, rows and type; S39 in `qa-evidence.md`
+  - [x] The CSV grid is one area again (Jarmo's Mac pass on merge 1: "CSV looses the visual border around the 'area'"; the Experience lead's measurements, ritemark-dev 7f91d55): 16 in from the desk's sides, a hairline round it with radius 8; the formula bar a 32 field 12 under the document bar and the table 12 under it (24 without one); header 32 on the AI's colour; rows 32 with no vertical lines; row numbers 36, right-aligned; Add row inside the border; a short table never stretched; the chosen cell the soft indigo fill; the formula bar names a CSV cell "Row 2 · Item" (cut at 160) and an Excel cell "A3", beside the value's first line; its value field has no grip, grows while it has the keyboard to 5 lines (120) and then scrolls, and goes back to one line; an edit started there stays there (it lost the keyboard after one character before); a read-only .xls has no formula bar and starts 24 under the document bar; an .xlsx stays editable (the Experience lead corrected the drawings, ritemark-dev ebddab0) ([`qa/csv-grid-light.png`](qa/csv-grid-light.png), [`qa/csv-grid-dark.png`](qa/csv-grid-dark.png), [`qa/csv-formula-bar-grown.png`](qa/csv-formula-bar-grown.png), [`qa/xls-read-only.png`](qa/xls-read-only.png))
+  - [x] Ritemark Settings lies on the desk's colour, white in Light (Jarmo's Mac pass on merge 1: "Ritemark settings screen must have white bg"; experiences/settings frame 2 draws it on the desk)
+- [x] Modal dialogs, Flows and the Agent Library, when their drawings arrive (R13). Approved by the Experience lead in both themes on 18 October. Drawn in experience 31 (ritemark-dev 4be0be5, 17 October). Dialogs done: window.dialogStyle defaults to custom; the sheet, type and buttons as drawn; the terminal's close question in its words, also from the bar's Close; Ritemark Dark's 35 slate colours moved to the kit's dark tokens. The Agent Library done: the column's groups and rows, New and Search in the head, the agent's settings panel. Flows done: the desk bar, the palette, the nodes, the canvas and the right column as drawn; dark primaries in ink on the light indigo. the Note boxes became one help line under Timeout, as the Experience lead agreed; the {date} chip waits for a later step
   - The Agents place (the Experience lead, 17 October; Experience 31): the column's head is the project head (mark, name, chevron) as on every place but Home, with no "Agents" title row and no "6 skills · 1 flow" line; the search field becomes the Search row under New; Project / User become the This project / All projects switch; the six sections as column groups with muted counts and 32 rows; the view's remaining hard-coded light fills themed.
-- [ ] The contrast unit test (R13)
-- [ ] `ritemarkWindowSizes.ts`: the 1400, 1200 and 960 crossings; a column the person opened left alone (R14)
-- [ ] The fixes from Windows round 1 (R2)
+- [x] The contrast unit test (R13): `src/themeContrast.test.ts`, in `npm test`. It found the Light theme's muted ink #64748B at 4.34:1 on the ground; the Experience lead moved muted to #617187 (4.54 on the ground, ritemark-dev 10f2732), and the status bar takes body ink #475569, as drawn. The theme, the light file icons, the webviews' token and the fallbacks follow
+- [x] `ritemarkWindowSizes.ts`: the 1400, 1200 and 960 crossings; a column the person opened left alone (R14). 018, loaded by `desktop.contribution.ts`; 6 unit tests in `ritemarkWindowSizes.test.ts`; S42 and S43 checked in the dev instance
+- [x] The fixes from Windows round 1 (R2): a terminal tab's menu is the usual tab items plus Rename (no Move Terminal into Panel, Change Color, Change Icon or Size to Content Width; the Experience lead); no Run in the View menu; View → Copilot Chat and Ctrl+Alt+I open Copilot Chat as a tab, not in the panel; ritemark.app trusted; the terminal bar keeps the shell's name while a command runs. S8 reworded: Alt focuses the menu button, Enter or ↓ opens it (the Development manager)
 
 ## Phase 8: Merge 2, the theme and Windows, and closeout
 
-- [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3)
-- [ ] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist is not done yet)
-- [ ] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
-- [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand
-- [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge"
+- [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3). Script and set done: 9 scenes in light and dark from a fresh profile, in `docs/development/frame-baseline/` with its sample project; `--compare` diffs inside the running instance (no image library) and writes a side-by-side page. Re-taken on 18 October after the theme pass on a clean fresh profile (the first set carried earlier tabs and the shell's prompt); a second run matches it to the pixel. Waiting for Jarmo's approval
+- [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
+- [x] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
+- [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand (18 October, at 665f5ff2: both pass; the validator again before each later commit)
+- [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge" (#447 opened 2026-10-18; the review: ready with notes, its must-fixes done in 7f8db2d6; the merge waits for Jarmo)
 - [ ] After the merge: a production build from a clean-room worktree (E5); Windows round 2 from main: S7–S11 again, S39 and S42 on Windows
 - [ ] After the merge: drift check (E6)
 - [ ] Linked issues closed with evidence: [#276](https://github.com/ProductoryHQ/ritemark-native/issues/276), [#430](https://github.com/ProductoryHQ/ritemark-native/issues/430), [#199](https://github.com/ProductoryHQ/ritemark-native/issues/199)
-- [ ] `docs/CHANGELOG.md` and the v2.0.0 release notes draft
+- [x] `docs/CHANGELOG.md` and the v2.0.0 release notes draft (`docs/releases/v2.0.0/release-notes.md`, step 1; the changelog's 2.0.0 section stays Unreleased until 2.0 ships)
 - [ ] Release plan: tracker, feature-complete checklist rows and risk register updated
-- [ ] `node ./scripts/worktree-hygiene.mjs --check` reported (cleaning is Jarmo's call)
+- [x] `node ./scripts/worktree-hygiene.mjs --check` reported (cleaning is Jarmo's call). 18 October: 5 worktrees, none removable; `.worktrees/store-v1120` is BLOCKED by uncommitted changes, the rest are in use

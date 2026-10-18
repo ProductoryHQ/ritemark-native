@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { LLMNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -35,9 +34,8 @@ function LLMNodeComponent({ id, data, selected }: LLMNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Icon name="star-four" size={16} />}
+      type="llmNode"
       selected={selected}
-      headerColor="var(--vscode-charts-purple)"
       executionStep={executionStep}
     >
       <NodeField label="Model" value={modelName} />
@@ -51,10 +49,7 @@ function LLMNodeComponent({ id, data, selected }: LLMNodeProps) {
         label="Prompt"
         value={truncateText(data.userPrompt) || 'No prompt'}
       />
-      <div className="flex gap-4 mt-2 text-xs text-[var(--r-ink-muted)]">
-        <span>Temp: {data.temperature ?? 0.7}</span>
-        <span>Max: {data.maxTokens ?? 2000}</span>
-      </div>
+      <NodeField label="Settings" value={`Temp ${data.temperature ?? 0.7} · Max ${data.maxTokens ?? 2000}`} />
     </BaseNode>
   );
 }

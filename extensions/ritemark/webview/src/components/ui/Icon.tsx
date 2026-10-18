@@ -35,6 +35,7 @@ import {
   CellSignalMedium,
   Chat,
   ChatCircle,
+  ChatText,
   Check,
   CheckCircle,
   CheckSquare,
@@ -121,6 +122,7 @@ import {
   X,
   XCircle,
   type Icon as PhosphorIconComponent,
+  Waveform,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -162,6 +164,7 @@ const iconMap = {
   'cell-signal-medium': CellSignalMedium,
   'chat': Chat,
   'chat-circle': ChatCircle,
+  'chat-text': ChatText,
   'check': Check,
   'check-circle': CheckCircle,
   'check-square': CheckSquare,
@@ -211,6 +214,7 @@ const iconMap = {
   'lock-simple': LockSimple,
   'magnifying-glass': MagnifyingGlass,
   'microphone': Microphone,
+  'waveform': Waveform,
   'minus': Minus,
   'note-pencil': NotePencil,
   'palette': Palette,

@@ -196,7 +196,7 @@ const DialogButton = ({
   <button
     className={cn(
       'px-4 py-2 rounded-md text-[13px] font-medium border-none cursor-pointer transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]',
-      variant === 'primary' && 'bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-accent-deep hover:shadow-ritemark-accent-md',
+      variant === 'primary' && 'bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-primary-hover hover:shadow-ritemark-accent-md',
       variant === 'secondary' && 'bg-secondary text-secondary-foreground hover:bg-surface-soft',
       variant === 'danger' && 'bg-destructive text-white hover:opacity-90 focus-visible:ring-[var(--r-error-soft)]',
       className

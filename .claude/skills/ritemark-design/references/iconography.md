@@ -30,7 +30,7 @@ All icon properties are driven by tokens defined in `docs-internal/design/ritema
 | `$icon-size-sm` | `14` | Tree rows, tabs, dropdown items. |
 | `$icon-size-md` | `16` | Toolbar, titlebar, dialog headers, form-field prefixes. |
 | `$icon-size-lg` | `20` | Activity bar, section markers, settings headers. |
-| `$icon-color-muted` | `var(--r-ink-muted)` (#64748B) | Idle / default tone. |
+| `$icon-color-muted` | `var(--r-ink-muted)` (#617187) | Idle / default tone. |
 | `$icon-color-active` | `var(--r-accent)` (#4338CA) | Selected / active item. |
 | `$icon-color-disabled` | `var(--r-ink-disabled)` (#CBD5E1) | Disabled / read-only. |
 

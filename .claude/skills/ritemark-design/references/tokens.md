@@ -31,7 +31,7 @@ Always use role tokens in components. Raw tokens are for defining role tokens on
 |---|---|---|
 | `--r-ink-strong` | `#1E1B4B` → `#F8FAFC` | Body copy, H1–H3, primary labels. |
 | `--r-ink-body` | `#475569` → `#C7D2FE` | Paragraph body on light, warmth on dark. |
-| `--r-ink-muted` | `#64748B` → `#94A3B8` | Meta, captions, sidebar items not active. |
+| `--r-ink-muted` | `#617187` → `#94A3B8` | Meta, captions, sidebar items not active. |
 | `--r-ink-faint` | `#94A3B8` → `#64748B` | Placeholders, counts, inactive glyphs. |
 | `--r-ink-disabled` | `#CBD5E1` → `#475569` | Full-disabled states. |
 

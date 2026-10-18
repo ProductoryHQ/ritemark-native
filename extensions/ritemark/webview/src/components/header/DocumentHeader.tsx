@@ -53,7 +53,7 @@ export function DocumentHeader({
               onClick={onContentsClick}
               title={contentsActive ? 'Hide table of contents' : 'Contents'}
             >
-              <Icon name="list" size={14} tone={contentsActive ? 'active' : 'muted'} />
+              <Icon name="list" size={14} tone={contentsActive ? 'inherit' : 'muted'} />
             </Button>
           )}
 
@@ -66,7 +66,7 @@ export function DocumentHeader({
             onClick={onPropertiesClick}
             title={propertiesActive ? 'Hide properties' : 'Properties'}
           >
-            <Icon name="info" size={14} tone={propertiesActive ? 'active' : 'muted'} />
+            <Icon name="info" size={14} tone={propertiesActive ? 'inherit' : 'muted'} />
           </Button>
 
           {commentsSlot}
@@ -81,7 +81,7 @@ export function DocumentHeader({
               onClick={onAgentClick}
               title={agentActive ? 'Hide agent settings' : 'Agent settings'}
             >
-              <Icon name="robot" size={14} tone={agentActive ? 'active' : 'muted'} />
+              <Icon name="robot" size={14} tone={agentActive ? 'inherit' : 'muted'} />
             </Button>
           )}
         </div>

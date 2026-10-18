@@ -130,7 +130,7 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
               </button>
               <button
                 onClick={handleAddCustom}
-                className="flex-1 px-2 py-1.5 text-[12px] text-white bg-[var(--r-accent)] rounded-lg hover:opacity-90 transition-opacity"
+                className="flex-1 px-2 py-1.5 text-[12px] text-[var(--r-on-accent)] bg-[var(--r-accent)] rounded-lg hover:opacity-90 transition-opacity"
               >
                 Add
               </button>

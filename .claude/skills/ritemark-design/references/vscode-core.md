@@ -22,7 +22,7 @@ This file covers theming; patches are covered in [CLAUDE.md](../../../../CLAUDE.
 ```
 focusBorder         = #4338CA  (--ritemark-indigo)
 foreground          = #1E1B4B  (--ritemark-ink-strong, "Deep Space")
-descriptionForeground = #64748B  (--ritemark-ink-muted)
+descriptionForeground = #617187  (--ritemark-ink-muted)
 errorForeground     = #EF4444  (--ritemark-error)
 
 button.background   = #4338CA
@@ -36,10 +36,10 @@ activityBarBadge.foreground = #FFFFFF
 
 sideBar.background  = #F8FAFC
 sideBar.border      = #E2E8F0
-sideBar.foreground  = #64748B
+sideBar.foreground  = #617187
 
 statusBar.background = #F8FAFC
-statusBar.foreground = #64748B
+statusBar.foreground = #475569  (body ink: secondary text on the ground, accessibility.md finding 1)
 
 tab.activeBackground = #FFFFFF
 tab.activeBorderTop  = #4338CA  (the indigo accent)
@@ -69,13 +69,13 @@ Every tree in VS Code (Explorer, Search results, Outline, Problems, npm-scripts,
 
 | # | State | When visible | Background key | Foreground key | Border / outline key |
 |---|---|---|---|---|---|
-| 1 | **Idle** (not hovered, not selected, tree has no focus) | Most rows most of the time | (inherits `sideBar.background`) | `sideBar.foreground` = `#64748B` `--ritemark-ink-muted` | — |
+| 1 | **Idle** (not hovered, not selected, tree has no focus) | Most rows most of the time | (inherits `sideBar.background`) | `sideBar.foreground` = `#617187` `--ritemark-ink-muted` | — |
 | 2 | **Hover** | Mouse over a row | `list.hoverBackground` = `#F1F5F9` `--ritemark-surface-soft` | `list.hoverForeground` = `#1E1B4B` `--ritemark-ink-strong` | — |
 | 3 | **Selected — tree has focus** | Click a file; tree owns keyboard focus | `list.activeSelectionBackground` = `#E0E7FF` `--ritemark-indigo-soft` | `list.activeSelectionForeground` = `#1E1B4B` | `list.focusAndSelectionOutline` = `#4338CA` `--ritemark-indigo` |
 | 4 | **Selected — tree lost focus** (inactive selection) | File picked, then focus moves to editor or another view | `list.inactiveSelectionBackground` = `#F1F5F9` `--ritemark-surface-soft` | `list.inactiveSelectionForeground` = `#1E1B4B` | — |
 | 5 | **Focused unselected** (keyboard arrow moved but no commit yet) | Rare — typed search flow | `list.focusBackground` (unset by default → falls back to hover) | `list.focusForeground` (unset → inherits selection-fg) | `list.focusOutline` = `#4338CA` |
 | 6 | **Icon tint — active selection** | File/folder icon on selected focused row | — | `list.activeSelectionIconForeground` = `#4338CA` `--ritemark-indigo` | — |
-| 7 | **Icon tint — inactive selection** | File/folder icon on selected unfocused row | — | `list.inactiveSelectionIconForeground` = `#64748B` | — |
+| 7 | **Icon tint — inactive selection** | File/folder icon on selected unfocused row | — | `list.inactiveSelectionIconForeground` = `#617187` | — |
 | 8 | **Drag-over** (drop target) | Dragging a file into a folder | `list.dropBackground` = `#E0E7FF` | — | — |
 | 9 | **Highlight match** | Search match inside row text | — | `list.highlightForeground` = `#4338CA` | — |
 | 10 | **Focused highlight match** | Search match inside focused row | — | `list.focusHighlightForeground` = `#3730A3` `--ritemark-indigo-deep` | — |
@@ -133,7 +133,7 @@ Every tree in VS Code (Explorer, Search results, Outline, Problems, npm-scripts,
 
 | State | Background | Foreground | Border |
 |---|---|---|---|
-| **Idle** (folder open, no action) | `statusBar.background` = `#F8FAFC` | `statusBar.foreground` = `#64748B` | `statusBar.border` = `#E2E8F0` |
+| **Idle** (folder open, no action) | `statusBar.background` = `#F8FAFC` | `statusBar.foreground` = `#475569` (body ink on the ground) | `statusBar.border` = `#E2E8F0` |
 | **No folder** (empty window) | `statusBar.noFolderBackground` = `#F8FAFC` | inherits | — |
 | **Debugging** | `statusBar.debuggingBackground` = `#EF4444` | `statusBar.debuggingForeground` = `#FFFFFF` | — |
 | **Focus ring** | — | — | `statusBar.focusBorder` = `#4338CA` |
@@ -170,12 +170,12 @@ Ritemark deliberately breaks from VS Code's default amber / green / red palette 
 **The theme-key bindings (what you actually write in `ritemark-light.json`):**
 
 ```jsonc
-"gitDecoration.modifiedResourceForeground":     "#64748B",  // ink-muted (NOT amber)
-"gitDecoration.untrackedResourceForeground":    "#64748B",  // ink-muted (NOT green)
-"gitDecoration.addedResourceForeground":        "#64748B",  // ink-muted (NOT green)
+"gitDecoration.modifiedResourceForeground":     "#617187",  // ink-muted (NOT amber)
+"gitDecoration.untrackedResourceForeground":    "#617187",  // ink-muted (NOT green)
+"gitDecoration.addedResourceForeground":        "#617187",  // ink-muted (NOT green)
 "gitDecoration.deletedResourceForeground":      "#94A3B8",  // ink-faint, rendered with strikethrough by core
-"gitDecoration.renamedResourceForeground":      "#64748B",  // ink-muted
-"gitDecoration.stageModifiedResourceForeground":"#64748B",  // ink-muted
+"gitDecoration.renamedResourceForeground":      "#617187",  // ink-muted
+"gitDecoration.stageModifiedResourceForeground":"#617187",  // ink-muted
 "gitDecoration.stageDeletedResourceForeground": "#94A3B8",  // ink-faint
 "gitDecoration.conflictingResourceForeground":  "#EF4444",  // error — the ONLY colored git state
 "gitDecoration.ignoredResourceForeground":      "#CBD5E1",  // ink-disabled
@@ -225,7 +225,7 @@ Create `extensions/ritemark/themes/ritemark-dark.json`. Structure:
 
     "activityBar.background": "#191635",
     "activityBar.foreground": "#818CF8",
-    "activityBar.inactiveForeground": "#64748B",
+    "activityBar.inactiveForeground": "#617187",
     "activityBar.activeBorder": "#818CF8",
     "activityBar.border": "#3730A3",
     "activityBarBadge.background": "#818CF8",
@@ -272,7 +272,7 @@ Create `extensions/ritemark/themes/ritemark-dark.json`. Structure:
     "editorGroupHeader.tabsBackground": "#191635",
     "editorGroupHeader.tabsBorder": "#3730A3",
     "editorIndentGuide.background1": "#3730A3",
-    "editorLineNumber.foreground": "#64748B",
+    "editorLineNumber.foreground": "#617187",
     "editorLineNumber.activeForeground": "#818CF8",
     "editorOverviewRuler.border": "#3730A3",
     "editorWidget.background": "#1E1B4B",

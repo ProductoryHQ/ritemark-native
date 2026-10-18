@@ -6,7 +6,7 @@
  * - Connected upstream nodes
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { cn } from '../../lib/utils';
 import { useFlowEditorStore } from './stores/flowEditorStore';
 import type { TriggerNodeData } from './stores/flowEditorStore';
@@ -41,6 +41,21 @@ export function PromptTextArea({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Ritemark 2.0 (the Experience lead): no resize grip; the field grows with its text from its minimum up to
+  // 8 lines, then scrolls inside, as the CSV formula bar does
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) {
+      return;
+    }
+    const style = getComputedStyle(el);
+    const lineHeight = parseFloat(style.lineHeight) || 20;
+    const max = lineHeight * 8 + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+    el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
+  }, [value]);
 
   // Get available variables from store
   const nodes = useFlowEditorStore((state) => state.nodes);
@@ -260,7 +275,7 @@ export function PromptTextArea({
           'border border-[var(--vscode-input-border)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]',
           'placeholder:text-[var(--vscode-input-placeholderForeground)]',
-          'resize-y',
+          'resize-none',
           className
         )}
       />

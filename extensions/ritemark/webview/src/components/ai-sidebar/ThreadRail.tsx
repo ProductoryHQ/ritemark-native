@@ -81,7 +81,7 @@ export function ThreadRail() {
     <aside className="relative z-[60] w-[56px] shrink-0 bg-transparent px-2 pb-3 pt-0" aria-label="Conversations">
       <div className="flex h-full min-h-0 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden pb-2">
         <ConversationTooltip label="New conversation">
-          <button type="button" aria-label="New conversation" onClick={requestNew} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[var(--r-accent)] text-white shadow-md transition-colors motion-reduce:transition-none hover:bg-[var(--r-accent-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80">
+          <button type="button" aria-label="New conversation" onClick={requestNew} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[var(--r-accent)] text-[var(--r-on-accent)] shadow-md transition-colors motion-reduce:transition-none hover:bg-[var(--r-accent-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80">
             <Icon name="plus" size={16} tone="inherit" />
           </button>
         </ConversationTooltip>

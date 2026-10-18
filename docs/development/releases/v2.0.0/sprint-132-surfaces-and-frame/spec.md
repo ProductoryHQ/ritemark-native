@@ -99,7 +99,7 @@ As a writer with many documents, I want tabs I can read, and a way to make a new
 
 Acceptance criteria:
 - The tabs sit in the desk's strip, 36 high, each as wide as its whole name, up to 200 (no floor: the proof of concept, the Experience lead's review of 17 October). The gaps between names are equal.
-- Pointing at a tab shows its own shape in the frame's soft fill, and its close button takes the icon's place, so nothing moves.
+- Pointing at a tab shows its own shape in the frame's soft fill and its close button at its right edge, where the chosen tab has it; the icon stays. Every tab keeps the close button's room, 32 after the name, with the button hidden until the pointer is on the tab, so pointing never changes a tab's width (Jarmo, 18 October: the × can't sit on the tab's icon, and other apps put close on the right; the 32 room is the Experience lead's condition. It was: the close button takes the icon's place).
 - The tab's tooltip shows the path inside the project, never the system path.
 - The + sits at the right end of the tab row, 18 in from the desk's edge. It opens Ritemark's menu leftward over the desk: Text, Table (CSV data), Web page, Terminal.
 - When the row is full, the tabs used longest ago fold into "N ⌄" before the +; Home, Tasks and the open document never fold.
@@ -158,7 +158,7 @@ Acceptance criteria:
 As a writer, I want my menu in one quiet place.
 
 Acceptance criteria:
-- You is an outline circle at the AI toggle's weight, at the right end of the AI's strip (before the window buttons on Windows). The new-chat + is the corner's only filled shape.
+- You is an icon button like the AI's toggle beside it, at the right end of the AI's strip (before the window buttons on Windows): the person in a circle (Phosphor user-circle at 17), in the toggles' muted ink with no ring, the same 28 button with their hover fill (Jarmo, 18 October: "It must be smaller - visually aligned to the icon button on its left side"; it was an outline circle). The new-chat + is the corner's only filled shape.
 - Its menu holds Settings, which opens Ritemark's own settings page, and Help, which opens https://ritemark.app/en/support/.
 - ⌘, (Ctrl+, on Windows) opens Ritemark's own settings page, and Settings shows it (Jarmo, 17 October).
 - It works with the mouse, Enter and Space, and VoiceOver and Narrator announce it as a menu button.
@@ -189,6 +189,8 @@ Acceptance criteria:
   - the Markdown editor, CSV, the PDF, Word and PowerPoint previews, the browser, the task board, Transcribe;
   - the Settings page, notifications, the command palette and quick picks;
   - modal dialogs, Flows and the Agent Library once their drawings arrive.
+
+  In step 1 this means the scope the Experience lead set on 18 October (sprint-plan.md, Product Decisions); what a later step redraws keeps today's parts in 2.0's colours until then.
 - Webviews take the desk's colour from the theme, not from their own copy.
 - Text on the ground and the fine print meet 4.5:1.
 

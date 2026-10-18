@@ -7,9 +7,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
+import { stepInfo } from './stepKinds';
+import { PanelHeader } from './PanelHeader';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -45,9 +48,9 @@ export function NodeConfigPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="h-full p-4 bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-        <div className="text-center text-[var(--r-ink-muted)] mt-8">
-          <p className="text-sm">Select a node to edit its properties</p>
+      <div className="h-full px-4 py-3">
+        <div className="mt-8 text-center text-[var(--r-ink-muted)]">
+          <p className="text-[13px]">Select a step to edit it</p>
         </div>
       </div>
     );
@@ -71,29 +74,24 @@ export function NodeConfigPanel() {
   };
 
   const isTriggerNode = selectedNode.type === 'triggerNode';
+  const step = stepInfo(selectedNode.type);
   const nodeLabel = (selectedNode.data as { label?: string }).label || 'this node';
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-      {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-[var(--r-hairline)]">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-[var(--r-ink-strong)]">
-            {isTriggerNode ? 'Trigger Settings' : 'Node Properties'}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]"
-          >
-            <Icon name="x" size={16} />
-          </Button>
-        </div>
-      </div>
+    <div className="flex h-full flex-col">
+      {/* Header (kit: .props .top): the step's kind and name, and close */}
+      <PanelHeader
+        lead={
+          <span className={'rm-step-chip ' + (step?.kind ?? 'ai')} aria-hidden="true">
+            <Icon name={step?.icon ?? 'lightning'} size={14} tone="inherit" />
+          </span>
+        }
+        title={step?.name ?? 'Step'}
+        onClose={handleClose}
+      />
 
       {/* Content based on node type */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto space-y-4 px-4 pb-4">
         {selectedNode.type === 'triggerNode' && (
           <TriggerNodeConfig
             nodeId={selectedNode.id}
@@ -142,9 +140,11 @@ export function NodeConfigPanel() {
           />
         )}
 
+      </div>
+
         {/* Delete button at bottom (not for Trigger node) */}
         {!isTriggerNode && (
-          <div className="pt-4 mt-4 border-t border-[var(--r-hairline)]">
+          <div className="flex-none px-4 pb-4 pt-2">
             {showDeleteConfirm ? (
               <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
                 <p className="text-sm text-[var(--r-ink-strong)] mb-3">
@@ -171,19 +171,20 @@ export function NodeConfigPanel() {
                 </div>
               </div>
             ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDeleteClick}
-                className="w-full text-[var(--r-error)] hover:bg-[var(--vscode-inputValidation-errorBackground)]"
-              >
-                <Icon name="trash" size={14} className="mr-2" />
-                Delete Node
-              </Button>
+              <Tooltip label="Remove this step from the flow">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleDeleteClick}
+                  className="-ml-2 h-7 gap-1.5 px-2 text-[13px] text-[var(--r-error)] hover:text-[var(--r-error)] has-[>svg]:px-2" /* kit: .props .rm */
+                >
+                  <Icon name="trash" size={14} tone="inherit" />
+                  Delete node
+                </Button>
+              </Tooltip>
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }
@@ -279,7 +280,7 @@ function TriggerNodeConfig({ data, onUpdate }: TriggerNodeConfigProps) {
       <div className="pt-2 border-t border-[var(--r-hairline)]">
         <div className="flex items-center justify-between mb-3">
           <Label className="text-xs font-semibold text-[var(--r-ink-strong)]">
-            Flow Inputs
+            Flow inputs
           </Label>
           <Button
             variant="ghost"
@@ -288,7 +289,7 @@ function TriggerNodeConfig({ data, onUpdate }: TriggerNodeConfigProps) {
             className="h-7 px-2 text-xs"
           >
             <Icon name="plus" size={14} className="mr-1" />
-            Add Input
+            Add input
           </Button>
         </div>
 
@@ -498,7 +499,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
       <Field
         label="User Prompt"
-        description="Type / to insert variables"
+        description="Type / to use what an earlier step made."
       >
         <PromptTextArea
           value={data.userPrompt || ''}
@@ -750,7 +751,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
 
       <Field
         label="Prompt"
-        description="Type / to insert variables"
+        description="Type / to use what an earlier step made."
       >
         <PromptTextArea
           value={data.prompt || ''}
@@ -884,7 +885,7 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
 
       <Field
         label="Prompt"
-        description="Type / to insert variables. Describe the coding task for Claude Code."
+        description="Type / to use what an earlier step made."
       >
         <PromptTextArea
           value={data.prompt || ''}
@@ -895,10 +896,7 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         />
       </Field>
 
-      <Field
-        label="Timeout (minutes)"
-        description="1-60 minutes. Increase for complex tasks."
-      >
+      <Field label="Timeout (minutes)" description="Runs without asking you: its actions are approved for the run.">
         <Input
           type="number"
           min={1}
@@ -910,24 +908,6 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Tip:</strong>{' '}
-          Reference upstream file outputs using{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
-          Example: "Process the file at{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Save File}'}</code>"
-        </div>
-      </div>
-
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
-          Claude Code CLI must be installed and authenticated. Run{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}
-          in your terminal to set up.
-        </div>
-      </div>
     </>
   );
 }
@@ -967,7 +947,7 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
 
       <Field
         label="Prompt"
-        description="Type / to insert variables. Describe the coding task for Codex."
+        description="Type / to use what an earlier step made."
       >
         <PromptTextArea
           value={data.prompt || ''}
@@ -1002,10 +982,7 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         </Select>
       </Field>
 
-      <Field
-        label="Timeout (minutes)"
-        description="1-60 minutes. Increase for complex tasks."
-      >
+      <Field label="Timeout (minutes)" description="Runs without asking you: its actions are approved for the run.">
         <Input
           type="number"
           min={1}
@@ -1017,22 +994,6 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Tip:</strong>{' '}
-          Reference upstream file outputs using{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Node Label}'}</code>.
-          Example: "Process the file at{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">{'{Save File}'}</code>"
-        </div>
-      </div>
-
-      <div className="p-3 rounded bg-[var(--vscode-textBlockQuote-background)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
-          Codex CLI must be installed and authenticated via ChatGPT. Actions are auto-approved during flow execution.
-        </div>
-      </div>
     </>
   );
 }
@@ -1165,7 +1126,7 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
         </div>
       </Field>
 
-      <Field label="Filename" description="Type / to insert variables">
+      <Field label="Filename" description="Type / to use what an earlier step made.">
         <div className="relative">
           <div className="flex gap-2">
             <Input

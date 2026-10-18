@@ -136,7 +136,7 @@ const RITEMARK_THEMES = [
   {
     id: 'ritemark-dark',
     label: 'Ritemark Dark',
-    description: 'Slate editor surface with restrained indigo accents',
+    description: 'Deep indigo surfaces with light indigo accents',
     kind: 'dark' as const,
   },
 ];
@@ -514,7 +514,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       this.context.subscriptions
     );
 
+    // The Appearance choice follows the theme however it changes (the command palette, the OS's light and dark)
+    const themeListener = vscode.window.onDidChangeActiveColorTheme(() => {
+      void this.sendCurrentSettings(panel.webview);
+    });
+
     panel.onDidDispose(() => {
+      themeListener.dispose();
       if (RitemarkSettingsProvider.panel === panel) {
         RitemarkSettingsProvider.panel = undefined;
         RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener(null);

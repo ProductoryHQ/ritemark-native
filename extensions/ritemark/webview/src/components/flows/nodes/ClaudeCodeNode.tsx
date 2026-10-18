@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { ClaudeCodeNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -29,18 +28,15 @@ function ClaudeCodeNodeComponent({ id, data, selected }: ClaudeCodeNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Icon name="robot" size={16} />}
+      type="claudeCodeNode"
       selected={selected}
-      headerColor="var(--vscode-charts-orange)"
       executionStep={executionStep}
     >
       <NodeField
         label="Prompt"
         value={truncateText(data.prompt) || 'No prompt'}
       />
-      <div className="mt-2 text-xs text-[var(--r-ink-muted)]">
-        Timeout: {data.timeout || 5} min
-      </div>
+      <NodeField label="Timeout" value={`${data.timeout || 5} minute${(data.timeout || 5) === 1 ? '' : 's'}`} />
     </BaseNode>
   );
 }

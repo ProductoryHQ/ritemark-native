@@ -18,7 +18,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-accent-deep hover:shadow-ritemark-accent-md",
+        default: "bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-primary-hover hover:shadow-ritemark-accent-md",
         destructive:
           "bg-destructive text-white hover:opacity-90 focus-visible:ring-[var(--r-error-soft)]",
         outline:
@@ -30,7 +30,7 @@ const buttonVariants = cva(
         toolbar:
           "border border-transparent bg-transparent text-ink-strong font-medium " + // Ritemark 2.0: plain icon buttons, a fill on hover, never a box
           "hover:bg-surface-soft " +
-          "data-[state=active]:bg-[--r-accent-soft] data-[state=active]:text-[--r-accent] data-[state=active]:border-[--r-accent-soft] data-[state=active]:font-semibold",
+          "data-[state=active]:bg-surface-soft data-[state=active]:text-ink-strong data-[state=active]:font-medium", // a toggle that is on: the ground's fill and ink (kit: .docbar .icon.on)
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

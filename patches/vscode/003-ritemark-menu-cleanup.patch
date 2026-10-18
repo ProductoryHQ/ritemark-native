@@ -7,6 +7,10 @@ Sprint 55: Rebased onto VS Code 1.117.0
   - Disabling chat view registration in favor of Ritemark-owned surfaces
   - Removing classic Edit-menu items that conflict with the document-first UI
   - Added MenuId.MenubarViewMenuAdvanced wiring (for View > Advanced submenu)
+Sprint 132 (Ritemark 2.0, after Windows round 1, 2026-10-18):
+  - No Run entry in the View menu (a fresh profile showed one)
+  - No Chat entry for the panel's chat view; the View menu's Copilot Chat
+    opens it as a tab instead (patch 007)
 ---
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
 index 4b2a1461b9a..213d0674001 100644
@@ -253,7 +257,7 @@ index 8b8e25bb3d1..8f56387817e 100644
  // Register a placeholder action to the submenu so it appears (required for submenus)
  MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index 8ac8f531427..3051a1b66c9 100644
+index 8ac8f531427..f855a62edc7 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 @@ -45,7 +45,18 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
@@ -276,6 +280,15 @@ index 8ac8f531427..3051a1b66c9 100644
  
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
+@@ -58,7 +69,7 @@ const chatViewDescriptor: IViewDescriptor = {
+ 	openCommandActionDescriptor: {
+ 		id: ChatViewContainerId,
+ 		title: chatViewContainer.title,
+-		mnemonicTitle: localize({ key: 'miToggleChat', comment: ['&& denotes a mnemonic'] }, "&&Chat"),
++		// Ritemark 2.0: the View menu's Copilot Chat opens it as a tab instead (chatSetupContributions.ts, patch 007).
+ 		keybindings: {
+ 			primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI,
+ 			mac: {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 index bbce59557f4..4bacd71205f 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
@@ -330,7 +343,7 @@ index bbce59557f4..4bacd71205f 100644
  		let ariaLabel = localize('chatStatusAria', "Copilot status");
  		let kind: StatusbarEntryKind | undefined;
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-index 866c7bc8d33..f792a193d5a 100644
+index 866c7bc8d33..cdcd08eeee8 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 +++ b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 @@ -21,7 +21,7 @@ import { IQuickAccessRegistry, Extensions as QuickAccessExtensions } from '../..
@@ -361,6 +374,15 @@ index 866c7bc8d33..f792a193d5a 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarDebugMenu, {
  	group: '1_debug',
+@@ -456,7 +446,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+ 	title: nls.localize2('run and debug', "Run and Debug"),
+ 	openCommandActionDescriptor: {
+ 		id: VIEWLET_ID,
+-		mnemonicTitle: nls.localize({ key: 'miViewRun', comment: ['&& denotes a mnemonic'] }, "&&Run"),
++		// RiteMark: no Run entry in the View menu either (no mnemonicTitle); a fresh profile showed one.
+ 		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyD },
+ 		order: 3
+ 	},
 @@ -464,6 +454,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
  	icon: icons.runViewIcon,
  	alwaysUseContainerInfo: true,

@@ -156,3 +156,25 @@ export function cronToUi(cron: string): UiSchedule | null {
 
   return null
 }
+
+// ── A schedule in words (the agent panel's compact Schedule field) ──────────
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** "Not scheduled", "Every 15 minutes", "Weekdays at 09:00", "Mon, Thu at 16:00", or the cron itself. */
+export function describeSchedule(cron: string | undefined): string {
+  if (!cron || !cron.trim()) return 'Not scheduled'
+  const ui = cronToUi(cron)
+  if (!ui) return cron.trim()
+  if (ui.mode === 'interval') {
+    const unit = ui.intervalUnit === 'minutes' ? 'minute' : 'hour'
+    return ui.intervalN === 1 ? `Every ${unit}` : `Every ${ui.intervalN} ${unit}s`
+  }
+  const days = [...ui.days].sort((a, b) => a - b)
+  const key = days.join(',')
+  const when = days.length === 0 || days.length === 7 ? 'Every day'
+    : key === '1,2,3,4,5' ? 'Weekdays'
+    : key === '0,6' ? 'Weekends'
+    : [...days.filter(d => d !== 0), ...days.filter(d => d === 0)].map(d => DAY_NAMES[d]).join(', ')
+  return `${when} at ${ui.time}`
+}

@@ -1514,21 +1514,21 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Reload window
                   </button>
                 ) : settings.componentStatus.claudeCode.runtimeStatus.runtime === 'missing' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:install')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Install Claude
                   </button>
                 ) : settings.componentStatus.claudeCode.runtimeStatus.auth === 'sign_in_required' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Sign in with Claude.ai
                   </button>
@@ -1566,7 +1566,7 @@ export function RitemarkSettings() {
                 {settings.componentStatus.codex.runtimeStatus.auth === 'sign_in_required' ? (
                   <button
                     onClick={() => handleCodexAction('codex:startLogin')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Sign in with OpenAI
                   </button>
@@ -1892,26 +1892,27 @@ function ThemePreviewCard({
   onSelect: () => void;
 }) {
   const dark = theme.kind === 'dark';
+  // The themes' own colours (kit: the ground, the desk, the hairline, the inks and the accent)
   const swatches = dark
     ? {
-        frame: '#020617',
-        sidebar: '#020617',
-        surface: '#0F172A',
-        soft: '#1E293B',
-        hairline: '#334155',
+        frame: '#16132F',
+        sidebar: '#16132F',
+        surface: '#1E1B4B',
+        soft: 'rgba(129, 140, 248, 0.18)',
+        hairline: 'rgba(199, 210, 254, 0.12)',
         text: '#F8FAFC',
         muted: '#94A3B8',
-        body: '#CBD5E1',
+        body: '#C7D2FE',
         accent: '#818CF8',
       }
     : {
-        frame: '#F8FAFC',
-        sidebar: '#F8FAFC',
+        frame: '#F1F5F9',
+        sidebar: '#F1F5F9',
         surface: '#FFFFFF',
-        soft: '#F1F5F9',
-        hairline: '#CBD5E1',
+        soft: '#E0E7FF',
+        hairline: '#E2E8F0',
         text: '#1E1B4B',
-        muted: '#64748B',
+        muted: '#617187',
         body: '#475569',
         accent: '#4338CA',
       };
@@ -1992,7 +1993,7 @@ function ThemePreviewCard({
         </div>
         {selected && (
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Icon name="check" size={12} />
+            <Icon name="check" size={12} tone="inherit" />
           </span>
         )}
       </div>

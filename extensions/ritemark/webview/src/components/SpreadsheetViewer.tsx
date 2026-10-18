@@ -629,6 +629,7 @@ export function SpreadsheetViewer({
             onInsertRowAt={isEditable && fileType === 'csv' ? handleInsertRowAt : undefined}
             onDeleteRow={isEditable && fileType === 'csv' ? handleDeleteRow : undefined}
             getCellFormula={fileType === 'xlsx' ? getExcelCellFormula : undefined}
+            namedColumns={fileType === 'csv'}
           />
         </div>
       )}
