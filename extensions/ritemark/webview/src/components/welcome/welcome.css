@@ -16,6 +16,12 @@
   align-items: flex-start;
 }
 
+/* The page scrolls in a short window: a thin bar on the ground, not a white track */
+html { scrollbar-width: thin; scrollbar-color: var(--r-hairline-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--r-hairline-strong); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
 .rw-sheet {
   position: relative;
   width: 640px;

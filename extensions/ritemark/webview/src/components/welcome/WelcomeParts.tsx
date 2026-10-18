@@ -230,9 +230,15 @@ export function NewProjectForm({
   onCancel: () => void
 }) {
   const [name, setName] = useState('')
+  // The refusal belongs to the name that was refused: it goes as soon as the name changes.
+  const [submitted, setSubmitted] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => { input.current?.focus() }, [])
-  const create = () => send({ type: 'welcome/create-project', name })
+  const create = () => {
+    setSubmitted(name)
+    send({ type: 'welcome/create-project', name })
+  }
+  const shownError = error && submitted === name ? error : null
   return (
     <div className="rw-new" role="group" aria-label={COPY.newProject}>
       <div className="head">
@@ -245,7 +251,7 @@ export function NewProjectForm({
           value={name}
           placeholder={COPY.projectName}
           aria-label={COPY.projectName}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={shownError ? true : undefined}
           aria-describedby="rw-new-place rw-new-error"
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
@@ -260,10 +266,10 @@ export function NewProjectForm({
         <span className="path">{placePrefix}{name.trim() || '…'}</span>
         <SheetButton label={COPY.change} tooltip="Choose another place for the project" small onClick={() => send({ type: 'welcome/change-place' })} disabled={disabled} />
       </div>
-      {error && (
+      {shownError && (
         <div className="error" id="rw-new-error" role="alert">
           <Icon name="warning-circle" size={14} tone="inherit" />
-          {error}
+          {shownError}
         </div>
       )}
     </div>

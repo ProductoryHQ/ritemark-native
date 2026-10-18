@@ -18,6 +18,10 @@ interface SettingsData {
   codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
   codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
   agentRuntimePreference: 'bundled' | 'system';
+  /** Sprint 133 (R12): Git and Node.js for this computer's runtime (null with Ritemark's own). */
+  environment?: { gitInstalled: boolean; nodeInstalled: boolean; gitRequired: boolean; nodeRequired: boolean; restartRequired: boolean } | null;
+  /** Sprint 133 (R7): usage data, off until yes. */
+  usageData?: { on: boolean; fromRitemark1: boolean };
   updatesEnabled: boolean;
   agentTimeout: number;
   debugTrace: boolean;
@@ -398,6 +402,10 @@ export function RitemarkSettings() {
           <p className="text-xs text-ink-muted mt-1">
             Applies to both Codex and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
           </p>
+
+          {settings.agentRuntimePreference === 'system' && settings.environment && (
+            <SystemToolRows environment={settings.environment} />
+          )}
 
           <div className="mt-4 pt-4 border-t border-hairline space-y-2">
             <div className="text-xs font-medium text-ink-strong">Currently active</div>
@@ -1328,6 +1336,31 @@ export function RitemarkSettings() {
         </div>
       </section>
 
+      {/* Usage data (Sprint 133, R7): the welcome's choice and words, off until yes */}
+      <section className="mb-8" id="settings-section-usage-data">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon name="shield-check" size={20} className="text-ink-strong" />
+          <h2 className="text-lg font-semibold text-ink-strong">
+            Usage data
+          </h2>
+        </div>
+        <ToggleRow
+          label="Share anonymous usage data to improve Ritemark"
+          description={settings.usageData?.on
+            ? (settings.usageData.fromRitemark1
+              ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
+              : 'On. Never your documents, chats or names.')
+            : 'Off until you turn it on. Never your documents, chats or names.'}
+          checked={settings.usageData?.on ?? false}
+          onChange={(value) => vscode.postMessage({ type: 'usageData:set', on: value })}
+        />
+        <p className="text-xs text-ink-muted mt-2">
+          <button type="button" className="underline underline-offset-2 hover:text-ink-strong" onClick={() => vscode.postMessage({ type: 'openExternal', url: 'https://ritemark.app/en/privacy/' })}>Privacy Policy</button>
+          {' · '}
+          <button type="button" className="underline underline-offset-2 hover:text-ink-strong" onClick={() => vscode.postMessage({ type: 'openExternal', url: 'https://ritemark.app/en/terms/' })}>Terms of Use</button>
+        </p>
+      </section>
+
       {/* Updates Section */}
       <section>
         <div className="flex items-center gap-2 mb-4">
@@ -1998,6 +2031,38 @@ function ThemePreviewCard({
         )}
       </div>
     </button>
+  );
+}
+
+/**
+ * Sprint 133 (R12): 1.x's launch check rows, under the runtime choice, for this computer's runtime only. Words only:
+ * no download or install link (patch 016, Microsoft Store policy 10.1.5).
+ */
+function SystemToolRows({ environment }: { environment: NonNullable<SettingsData['environment']> }) {
+  const rows = [
+    { name: 'Git', installed: environment.gitInstalled, required: environment.gitRequired },
+    { name: 'Node.js', installed: environment.nodeInstalled, required: environment.nodeRequired },
+  ];
+  return (
+    <div className="mt-4 pt-4 border-t border-hairline space-y-2" aria-label="Git and Node.js">
+      <div className="text-xs font-medium text-ink-strong">This computer's tools</div>
+      {rows.map((row) => (
+        <div key={row.name} className="flex items-start gap-2 text-xs">
+          <Icon name={row.installed ? 'check-circle' : 'warning-circle'} size={14} tone="inherit" className={row.installed ? 'text-ink-strong mt-px' : 'text-ink-body mt-px'} />
+          <span className="text-ink-body">
+            <span className="font-medium text-ink-strong">{row.name}</span>
+            {row.installed
+              ? ' found on this computer.'
+              : row.required
+                ? ` isn’t installed, and Claude from this computer needs it. Use Ritemark’s own Claude instead, or install ${row.name} and restart Ritemark.`
+                : ' isn’t installed on this computer.'}
+          </span>
+        </div>
+      ))}
+      {environment.restartRequired && (
+        <div className="text-xs text-ink-body">Restart Ritemark to finish setting up Claude.</div>
+      )}
+    </div>
   );
 }
 

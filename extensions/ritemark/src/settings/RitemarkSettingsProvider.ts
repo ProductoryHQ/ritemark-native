@@ -29,6 +29,7 @@ import {
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
 import { runProcess } from '../utils/runProcess';
+import { setUsageData, usageDataState } from '../analytics/posthog';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -159,11 +160,19 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private disposeClaudeStatusListener: (() => void) | null = null;
   private disposeCodexStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
+  /** Sprint 133: the usage-data choice changes from the welcome too; the page shows it at once. */
+  private readonly usageDataListener: vscode.Disposable;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly updateService: UpdateService
   ) {
+    this.usageDataListener = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('ritemark.analytics.enabled') && RitemarkSettingsProvider.panel) {
+        void this.sendCurrentSettings(RitemarkSettingsProvider.panel.webview);
+      }
+    });
+
     // Initialize Codex integration if feature is enabled
     if (isEnabled('codex-integration')) {
       this.codexAppServer = new CodexAppServer();
@@ -268,7 +277,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Handle messages from webview
    */
   private async handleMessage(
-    message: { type: string; key?: string; value?: unknown; url?: unknown },
+    message: { type: string; key?: string; value?: unknown; url?: unknown; on?: unknown },
     webview: vscode.Webview
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
@@ -318,6 +327,14 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
             emitCodexStatusInvalidated('status-refresh');
           }
           // Send updated settings back
+          await this.sendCurrentSettings(webview);
+        }
+        break;
+
+      case 'usageData:set':
+        // Sprint 133 (R7): the same choice as the welcome's switch; it takes effect at once.
+        if (typeof message.on === 'boolean') {
+          await setUsageData(message.on, 'settings');
           await this.sendCurrentSettings(webview);
         }
         break;
@@ -628,6 +645,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           },
         };
 
+    const environment = config.get<string>('agentRuntime.preference', 'bundled') === 'system'
+      ? await getAgentEnvironmentStatus().catch(() => null)
+      : null;
+
     webview.postMessage({
       type: 'settings',
       data: {
@@ -643,6 +664,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Agent runtime preference (bundled vs system)
         agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
+        // Sprint 133 (R12): 1.x's launch check rows, Git and Node.js, for this computer's runtime only
+        environment,
+
+        // Sprint 133 (R7): usage data, off until the person's yes; the welcome's words
+        usageData: usageDataState(),
 
         // Updates
         updatesEnabled: config.get('updates.enabled', true),
@@ -1473,6 +1499,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Cleanup resources
    */
   dispose(): void {
+    this.usageDataListener.dispose();
     this.codexAppServer?.dispose();
     this.codexAuth?.removeAllListeners();
     this.codexAuth = null;

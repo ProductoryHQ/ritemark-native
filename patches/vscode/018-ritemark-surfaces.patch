@@ -65,7 +65,8 @@ parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPar
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
-Test: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14); run with ./scripts/test.sh --grep Ritemark.
+Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14) and base/test/browser/iconLabel.test.ts (Sprint 133,
+R13); run with ./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
 index 034c650442a..3b2312d89cd 100644
 --- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
@@ -223,6 +224,77 @@ index 29240b5c9a4..7cae3011235 100644
  	}
  
  	private updateLabels(titleElement: HTMLElement, buttonElement: HTMLElement, label: string): void {
+diff --git a/src/vs/base/test/browser/iconLabel.test.ts b/src/vs/base/test/browser/iconLabel.test.ts
+new file mode 100644
+index 00000000000..b5391e7c619
+--- /dev/null
++++ b/src/vs/base/test/browser/iconLabel.test.ts
+@@ -0,0 +1,65 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { IconLabel, ritemarkSplitExtension } from '../../browser/ui/iconLabel/iconLabel.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../common/utils.js';
++
++/** Ritemark 2.0 (Sprint 133, R13): a file's extension drawn apart from its name, for the stylesheet to mute. */
++suite('Ritemark IconLabel splitExtension', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	function nameHtml(label: IconLabel): string {
++		return label.element.querySelector('.label-name')!.innerHTML;
++	}
++
++	test('the split itself: the last dot, never a leading dot, never a trailing one', () => {
++		assert.deepStrictEqual(
++			['Brief.md', 'report.final.md', 'README', '.gitignore', 'file.', 'a.b'].map(ritemarkSplitExtension),
++			[
++				{ stem: 'Brief', extension: '.md' },
++				{ stem: 'report.final', extension: '.md' },
++				undefined,
++				undefined,
++				undefined,
++				{ stem: 'a', extension: '.b' },
++			]
++		);
++	});
++
++	test('a tab (no highlights): the extension in its own span inside the name, the text unchanged', () => {
++		const label = store.add(new IconLabel(document.createElement('div')));
++		label.setLabel('report.final.md', undefined, { splitExtension: true });
++		assert.strictEqual(nameHtml(label), 'report.final<span class="label-extension">.md</span>');
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'report.final.md');
++
++		label.setLabel('README', undefined, { splitExtension: true });
++		assert.strictEqual(nameHtml(label), 'README');
++
++		label.setLabel('Brief.md', undefined, {});
++		assert.strictEqual(nameHtml(label), 'Brief.md', 'only callers that ask get the split');
++	});
++
++	test('a tree row (highlights): a filter match across the dot is split with the name', () => {
++		const label = store.add(new IconLabel(document.createElement('div'), { supportHighlights: true }));
++		label.setLabel('Brief.md', undefined, { splitExtension: true, matches: [{ start: 3, end: 7 }] });
++		assert.strictEqual(
++			nameHtml(label),
++			'<span class="monaco-highlighted-label">Bri<span class="highlight">ef</span></span>'
++			+ '<span class="label-extension"><span class="monaco-highlighted-label"><span class="highlight">.m</span>d</span></span>'
++		);
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'Brief.md');
++	});
++
++	test('a reused row that becomes a folder drops the extension', () => {
++		const label = store.add(new IconLabel(document.createElement('div'), { supportHighlights: true }));
++		label.setLabel('Kickoff notes.md', undefined, { splitExtension: true });
++		assert.ok(label.element.querySelector('.label-extension'));
++		label.setLabel('Modules', undefined, {});
++		assert.strictEqual(label.element.querySelector('.label-extension'), null);
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'Modules');
++	});
++});
 diff --git a/src/vs/platform/quickinput/browser/quickInputList.ts b/src/vs/platform/quickinput/browser/quickInputList.ts
 index f71937903f3..22cce6eb73b 100644
 --- a/src/vs/platform/quickinput/browser/quickInputList.ts
