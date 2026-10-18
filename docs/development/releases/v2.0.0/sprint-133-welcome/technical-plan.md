@@ -70,7 +70,7 @@ This goes first: it changes what every part of Ritemark may send.
   - `false`: Opt Out, or turned off later in VS Code's settings. `no`, the switch off.
   - `true`: the person turned it on themselves. `yes`.
   - unset, with `hasSeenNotice` absent: never answered. `unknown`, the switch off, "Off until you turn it on."
-  - unset, with `hasSeenNotice` true: the notice was closed without Opt Out. Every OK is here, and so is every × and every link opened. See the open technical point below.
+  - unset, with `hasSeenNotice` true: the notice was closed without Opt Out. Every OK is here, and so is every × and every link opened. All of them count as the OK (decided below).
 - **A carried-over yes** is written once, as `ritemark.analytics.enabled: true` (Global) and `ritemark.analytics.answeredV2` with `from: '1.x'`, so Settings and the gate agree. The update welcome's switch shows it on, with "On, as you chose in Ritemark 1. Never your documents, chats or names." Turning it off there is a no, at once (R7). The yes holds from the first start, so `app_session_start` and the update welcome's `welcome_shown` are sent as they happen; nothing is held.
 - **Decided (Jarmo, 18 October): "closed, not opted out" counts as the OK.** 1.x stored that the notice closed, not which button closed it, and nothing else on the computer records it. Of the two ways it could be built, Jarmo chose the first, because 1.x counted those people anyway (its notice was opt-out):
   - read "closed, not opted out" as the OK. Everyone who pressed OK gets the carry-over, and so does everyone who closed the toast with its × or only opened Privacy Policy or Terms of Use;

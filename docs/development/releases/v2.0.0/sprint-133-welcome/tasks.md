@@ -19,7 +19,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; the Windows profile through the Development manager's Windows session; the decision
 - [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
 - [ ] The sample project's content, written before step 2 is built (R5): a small leadership programme as in the drawings, with a brief, modules, kickoff notes and a few tasks as board cards. Drafted by the Experience lead; checked that every card parses, and that no real person's name, path or account is in it; in `extensions/ritemark/sample-project/`
-- [ ] The open technical point on a 1.x OK (technical-plan.md, W1) decided by Jarmo; the reading written into `research/confirmations.md` (R7)
+- [x] The 1.x OK reading decided by Jarmo (18 October): a notice closed without Opt Out counts as the OK (technical-plan.md, W1); write it into `research/confirmations.md` (R7)
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: Consent and events (W1)

@@ -183,7 +183,7 @@ When this build starts on it
 Then the update welcome's switch is on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and events are sent from the first start, `welcome_shown` (`kind: update`) once
 When the person turns the switch off on the sheet
 Then nothing more is sent, from that moment, and Settings shows usage data off.
-(This holds under the first reading of the open technical point in technical-plan.md, W1. Under the second, this profile starts off, as S53.)
+(A notice closed without Opt Out counts as the OK: Jarmo, 18 October; technical-plan.md, W1.)
 
 ### S53: No answer to 1.x's notice starts off
 Given a v1.14.0 profile whose usage-data notice was never answered (the app quit while it showed)
