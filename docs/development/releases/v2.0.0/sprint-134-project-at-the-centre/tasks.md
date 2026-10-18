@@ -45,18 +45,19 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 ## Phase 4: The list, the head, switching (W6, W7, W8)
 
-- [ ] `src/views/ProjectsViewProvider.ts` in the `ritemark.homeView` slot: rows, counts, missing, search, Add a project…, ⌥ click (R7, R13)
-- [ ] `ritemark/projectHead`: Switch project ▸, Open a folder…, Reveal, About this project (R8)
+- [ ] `src/views/ProjectsViewProvider.ts` in the `ritemark.homeView` slot: rows, counts, Not found rows, search, Add a project…, ⌥ click (R7, R13)
+- [ ] Home's not-found box, Find it… at the nearest existing parent, another project's folder refused (R13)
+- [ ] `ritemark/projectHead`: Switch project ▸, Open a folder… through the switch, Reveal, About this project if Jarmo has decided its file (R8)
 - [ ] 018: `ritemarkMenu.ts` draws an extension-supplied submenu (`ritemark.projects.switcherItems`) (R8)
 - [ ] 018: `ritemark/fileMenu` mapped to the File menu; the extension contributes Switch project (R8)
-- [ ] `src/projects/switchProject.ts` + test: the guard, the switch, the Go back note if kept (R9)
+- [ ] `src/projects/switchProject.ts` + test: the dialog (Cancel, Switch and stop, Open in a new window), Switch and stop as Stop, the switch, the "Switched to…" note with Go back (R9)
 - [ ] VS Code's own Open Folder and Open Recent as the switch audit decided (R9)
 - [ ] 018 (and 001's dark default if kept): the splash in the ground's colour (R9)
 
 ## Phase 5: The document's bar, and removing the launcher (W9, W6)
 
 - [ ] `DocumentHeader.tsx`: Saved from `document:sync-state`; test (R12)
-- [ ] `ExportMenu.tsx` → Share, the same items and handlers; test (R12)
+- [ ] `ExportMenu.tsx` → Share as experience 26's frame 1, with today's handlers and every Google Docs state; test (R12)
 - [ ] R14's table checked row by row on the branch (S40)
 - [ ] `HomeViewProvider.ts` and its test deleted; `home-launcher` set to `disabled` with a tombstone in `flags.ts`; its `package.json` entries tidied (R14)
 
@@ -66,7 +67,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] The screenshot baseline gains Home, the list, the switcher and What moved, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md` (Projects), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions, `update-vscode.sh`'s checklist line (E6)
-- [ ] Manual QA on the Mac: S1–S40; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S40, S43; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"

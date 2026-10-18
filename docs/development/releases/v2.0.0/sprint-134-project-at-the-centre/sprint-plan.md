@@ -9,12 +9,12 @@ Status: Phase 2 (PLAN) drafted 2026-10-18, **awaiting Jarmo's approval**. Not st
 ## SDD Artifacts
 
 - [spec.md](spec.md): the behaviour contract, R1–R15 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S42, the manual QA matrix.
+- [scenarios.md](scenarios.md): S1–S43, the manual QA matrix.
 - [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W11, the four audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
 
-The release is [v2.0.0](../release-plan.md), step 3. The design is the Experience lead's experience 3 (Home, projects, switching), experience 29 (empty places), experience 32's frame 5 (What moved) and the comparison's document bar, in `ritemark-dev`: `product/design/experience/`.
+The release is [v2.0.0](../release-plan.md), step 3. The design is the Experience lead's experience 3 (Home, projects, switching), experience 29 (empty places), experience 32's frame 5 (What moved), experience 33 (a folder that is not found, switching while Claude works), experience 26's frame 1 (Share) and the comparison's document bar, in `ritemark-dev`: `product/design/experience/`.
 
 ## Goal
 
@@ -36,10 +36,10 @@ The project becomes the place a person works in. Each project opens on its own H
 | Home and Tasks, always the first two tabs | R5 |
 | On Home, the left column holds the projects | R7 |
 | The head's menu: Switch project ▸, About this project; File ▸ Switch project | R8 |
-| Switching in place, with the AI asked about first | R9 |
+| Switching in place; asking first while Claude works (Cancel, Switch and stop, Open in a new window) | R9 |
 | The welcome lands on Home; What moved, once | R10, R11 |
 | Saved and Share on the document's bar | R12 |
-| Missing, empty and boardless projects | R13 |
+| A folder that is not found, an empty project, a project with no board | R13 |
 | Nothing lost; Windows | R14, R15 |
 | One projects subsystem, Home in the shared bundle, tests, builds, docs, drift | E1–E7 |
 
@@ -61,7 +61,7 @@ The project becomes the place a person works in. Each project opens on its own H
 | Home launcher: Open document…, Open folder… | Add a project…; the head's Open a folder…; ⌘O | R7, R8, R14 |
 | Home launcher with no folder: recent folders | The projects list | R7, R14 |
 | The head's Switch project… (Sprint 132: VS Code's recent list) | Switch project ▸ with Ritemark's projects | R8 |
-| Export: PDF, Word, Google Docs, Copy as Markdown | Share, the same items | R12 |
+| Export: PDF, Word, Google Docs (every state), Copy as Markdown | Share: Send a copy, Google Docs, Copy as Markdown | R12 |
 | Opening a folder from VS Code's File menu | Still there; Ritemark's own paths ask first when the AI is working | R9 |
 
 The launcher's code is deleted only after every row above is checked on the branch, and its `home-launcher` flag is set to disabled with a tombstone (`CLAUDE.md`'s flag rule).
@@ -91,6 +91,13 @@ The launcher's code is deleted only after every row above is checked on the bran
 - **2026-10-16 (Jarmo):** Home and Tasks pinned as the first two tabs, icons only; "yes, yes, yes" to the projects list on Home and the count on the Tasks tab.
 - **2026-10-17 (Jarmo):** "when I click Tasks, the board ALWAYS opens too" (and Home the same); the Home tab comes in step 3 ("ok").
 - **2026-10-17 (engineering, on Jarmo's "You decide"):** the project list fills on the first 2.0 start from recent folders, chats and task boards.
+- **2026-10-18 (the Experience lead's answers to this plan's design questions):**
+  - Start something is on every Home, under Waiting for you;
+  - an empty project is experience 29's frame 1; a project with no board its frame 2, with no count on the Tasks tab;
+  - a folder that is not found and switching while Claude works are drawn as experience 33: the row keeps its place as Not found; clicking it shows Find it… on Home; any switch that reloads asks first, with Open in a new window as the default;
+  - the "Switched to…" note with Go back stays;
+  - What moved arrives with Home, once per profile;
+  - the bar is `comparison/after-write.png`; Share is experience 26's frame 1 ("Share, not Export").
 - **2026-10-18 (engineering, in this plan):**
   - one merge;
   - the Tasks tab's count is the Tasks place's badge, read in the shell, so the two can never differ; the project's total adds the chats that wait;
@@ -104,10 +111,9 @@ The launcher's code is deleted only after every row above is checked on the bran
 
 Each has a recommendation, listed in [spec.md](spec.md#open-questions) too.
 
-1. **Start something on a full project's Home.** The full Home drawing has no "start something" row, but 1.x's Home had New document, which must stay reachable from Home. I recommend showing Text, Table and Web page on every Home, under Waiting for you (asked of the Experience lead too).
-2. **What counts as a chat that waits.** I recommend a question or an approval the AI is waiting on, not an unread answer.
-3. **The Go back note after a switch.** I recommend keeping it for a few seconds, if the Experience lead keeps it in the drawing.
-4. **Removing 1.x's Home launcher.** I recommend deleting its code once every function on the table above is checked, and setting its `home-launcher` flag to disabled with a tombstone.
+1. **What counts as a chat that waits.** I recommend a question or an approval the AI is waiting on, not an unread answer.
+2. **Removing 1.x's Home launcher.** I recommend deleting its code once every function on the table above is checked, and setting its `home-launcher` flag to disabled with a tombstone.
+3. **About this project's file**, for the project's menu (the Experience lead kept it out of step 2 because it is still open in experience 24). I recommend `AGENTS.md` headed "About this project", with a one-line `CLAUDE.md` that points to it, so all three AIs read the same words. Without a decision by the sprint's start, the menu item is left out.
 
 ## Feature Flag Check
 
@@ -143,7 +149,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - **Sprint 132 merged:** the rule that keeps pinned Home and Task board tabs first (019), the head's place and menus (018), the tab row.
 - **Sprint 133 merged:** the landing (`src/welcome/landing.ts`), a new project (`src/welcome/newProject.ts`), the update marker `ritemark.updatedFrom1x`, the consent gate, and the decision on About this project's file.
-- **The Experience lead's drawings** for an empty project, a missing folder and a project with no board, and the answers to the design questions sent on 18 October (spec, Open Questions).
+- **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, and the answers of 18 October (spec, *Resolved Questions*).
 
 ## Pre-Implementation Gate
 

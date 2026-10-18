@@ -9,7 +9,7 @@ Status: Phase 2 (PLAN) drafted 2026-10-18, **awaiting Jarmo's approval**. Not st
 ## SDD Artifacts
 
 - [spec.md](spec.md): the behaviour contract, R1–R15 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S47, the manual QA matrix.
+- [scenarios.md](scenarios.md): S1–S49, the manual QA matrix.
 - [technical-plan.md](technical-plan.md): what exists today, workstreams W1–W11, the four audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
@@ -24,7 +24,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 
 - [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429): the first launch sometimes opens a `.md` twice (R11).
 - [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338): mark non-production runs in analytics (R9).
-- [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401): the extension host's first 8 s on a fresh Windows profile (R15; decided in this plan, Open Question 5).
+- [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401): the extension host's first 8 s on a fresh Windows profile (R15; decided in this plan, Open Question 4).
 - [#107](https://github.com/ProductoryHQ/ritemark-native/issues/107): watched; the bundle is measured before and after (E4).
 
 ## MVP Scope
@@ -35,8 +35,8 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 | Which AI do you use: ChatGPT, Claude, OpenCode; API keys (Anthropic only); Skip | R2 |
 | Each provider's own sign-in, with Cancel and Open the page again | R3 |
 | Each provider's state as its check answers; offline | R4 |
-| Set up project: Open a folder…, Start a new project; a missing Git or Node line | R5 |
-| Landing on the project with the AI ready | R6 |
+| Set up project: Open a folder…, Start a new project (a name, an empty folder); a missing Git or Node line | R5 |
+| Landing on the project with the AI ready; an empty desk offers Text, Table and Web page | R6 |
 | Usage data on the welcome, off until yes; the 1.x notice retired | R7 |
 | Four anonymous events; dev runs marked | R8, R9 |
 | Updating from 1.x: the welcome once | R10 |
@@ -49,7 +49,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 **Not in this sprint:**
 - Home, the project file and list, switching projects, What moved (step 3, Sprint 134);
 - a ChatGPT API key;
-- About this project written by Claude (experience 24);
+- About this project, written by Claude or created with a new project (experience 24's open questions);
 - the Settings redesign;
 - a VS Code update.
 
@@ -62,7 +62,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 | Getting Started: recent files and folders | The update welcome's projects; Switch project…; the project list in step 3 | R10, R12 |
 | Getting Started: Getting started, Support articles and Blog links | Help, under You | R12 |
 | Launch check: ChatGPT and Claude signed in, with log in | The welcome's states and Sign in; Settings' sign-in cards | R2–R4, R12 |
-| Launch check: Git, and Node when needed | A line on step 2 when missing; a row in Settings always | R5, R12 |
+| Launch check: Git, and Node when needed (Windows, this computer's Claude) | A line at the top of step 2 when missing, with Use Ritemark's own Claude; rows in Settings under the runtime choice | R5, R12 |
 | The usage-data notice, with Privacy Policy and Terms of Use | The welcome's switch; Settings, with both links | R7 |
 | The AI sheet's onboarding wizard and setup views | Unchanged, for anyone who skipped the welcome | R14 |
 | The AI sheet focused 4 s after start | Kept for project windows; not while the welcome shows | R1 |
@@ -81,7 +81,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 
 - **Round 1, before the merge:** the extension side through the test overlay on the latest Windows build from main (S45, S46).
 - **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (S45–S47, Getting Started gone, the welcome alone, the muted extension).
-- **#401:** audited on a fresh Windows profile; fixed here if the cause is Ritemark's start-up code (Open Question 5).
+- **#401:** audited on a fresh Windows profile; fixed here if the cause is Ritemark's start-up code (Open Question 4).
 
 ## Tests and the production build
 
@@ -96,6 +96,14 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 - **2026-10-15 (Jarmo):** OpenCode as the third choice; the 1.x Welcome tab's illustration as the header; sign-in buttons blue; a two-part progress bar on the header; "2 · Set up project".
 - **2026-10-17 (Jarmo):** the usage-data choice is on the welcome, nothing counted until yes; people updating from 1.x see the welcome once; the Home tab comes in step 3 ("ok").
 - **2026-10-17 (release plan):** the welcome is a Ritemark page; opening the folder reloads and the welcome writes where it is going.
+- **2026-10-18 (the Experience lead's answers to this plan's design questions):**
+  - the welcome alone is only the sheet on the ground; on Windows the caption buttons and no menu button;
+  - a first window opened with a file opens it and counts nothing; the welcome waits until a project has been opened from it;
+  - step 2 has no skip; a finished profile's window with no folder gets a short "Where do you want to start?" sheet;
+  - the missing Git or Node line: its place, words and Use Ritemark's own Claude; its Settings rows under the runtime choice;
+  - the landing's empty desk offers Text, Table and Web page as tiles, as every empty desk does;
+  - OpenCode's Set up and API keys open a small sheet over the welcome;
+  - Start a new project is a name field with Create and Change…; About this project stays out of step 2.
 - **2026-10-18 (Development manager's brief):** no ChatGPT API key in 2.0. The release plan still lists it as a recommendation, so this plan's approval confirms it. The OpenAI key Settings holds for OpenCode and other services is not affected.
 - **2026-10-18 (engineering, in this plan):**
   - one merge, not two: the shell part is small;
@@ -110,10 +118,8 @@ Each has a recommendation. They are listed in plain words, in [spec.md](spec.md#
 
 1. **The welcome's events before the yes.** The switch is on step 2, after both "welcome shown" and "signed in" have happened. I recommend holding those two in memory and sending them only if the person says yes, dropping them otherwise; nothing leaves the computer or is written before the answer. Without this, no fresh start is ever counted.
 2. **An OK on 1.x's notice.** I recommend it does not count as a yes, as the Experience lead drew it: everyone who did not opt out starts off and is asked once on the update sheet.
-3. **The sample project.** I recommend leaving "Try the sample project" out of this sprint, until there is real content for it.
-4. **About this project's file** in a new project. I recommend `AGENTS.md` headed "About this project", with a one-line `CLAUDE.md` that points to it, so all three AIs read the same words.
-5. **#401.** I recommend an audit first, and a fix in this sprint if the cause is in Ritemark's own start-up code.
-6. **A fresh profile opened with a file.** I recommend the file opens as asked and the welcome waits for the next window with no folder (the Experience lead is asked to confirm).
+3. **The sample project.** I recommend leaving "Try the sample project" out of this sprint, until there is real content for it. The Experience lead has asked Jarmo the same.
+4. **#401.** I recommend an audit first, and a fix in this sprint if the cause is in Ritemark's own start-up code.
 
 ## Feature Flag Check
 
@@ -148,7 +154,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 ## Depends on
 
 - **Sprint 132 merged** (both merges): the frame, the head, the + and New, Ritemark's menus, the terminal as a tab.
-- **The Experience lead's answers** to the design questions sent on 18 October (spec, Open Questions). Experience 32 already draws the states the release plan asked for: signed in, signed out, offline, checking and updating from 1.x.
+- **The Experience lead's drawings and answers:** experience 2 and experience 32 (signed in, signed out, offline, checking and updating from 1.x), and the answers of 18 October (spec, *Resolved Questions*).
 
 ## Pre-Implementation Gate
 

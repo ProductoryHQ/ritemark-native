@@ -43,7 +43,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
    - VS Code's recent folders, read once through `_workbench.getRecentlyOpened`;
    - the chat store's records, whose scopes carry their folder URIs;
    - task boards: a hand-off directory is named by a hash of its folder, so a board is found only through a known folder. The audit checks one more read-only source on this computer, VS Code's own record of every folder a window has opened (`workspaceStorage/*/workspace.json`, beside this window's `context.storageUri`), and whether folders found there that hold `.ritemark/tasks` are worth adding. If it is not reliable, boards in folders known from the other two sources are found, and the rest join the list when they are next opened.
-3. **`research/switch-audit.md`** (R9): what "the AI is working" means and where each part is known (a running turn in any chat of this window, a card's turn, a running flow, a scheduled run); which ways of switching Ritemark controls (the projects list, the head's switcher, File ▸ Switch project) and which it does not (VS Code's own File ▸ Open Folder… and Open Recent); whether a small shell veto on the workbench's shutdown with reason LOAD can ask the extension before VS Code's own routes switch, or whether those routes are left as today, where switching stops the work.
+3. **`research/switch-audit.md`** (R9): how the host knows a chat in this window is working (a running turn, a card's turn in its chat) and how Switch and stop stops it as Stop does; which ways of switching Ritemark controls (Home's list, the head's switcher and Open a folder…, File ▸ Switch project) and which it does not (VS Code's own File ▸ Open Folder… and Open Recent); whether a small shell veto on the workbench's shutdown with reason LOAD can ask the extension before VS Code's own routes switch, or whether those routes are left as today, where switching stops the work. Experience 33 asks for every switch that reloads the window.
 4. **`research/splash-audit.md`** (R9): how `partsSplash.ts` chooses its colours, which colour key carries the ground, the stored splash on a v1.14.0 profile, and the first window of a fresh profile in Light and Dark.
 
 `research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home.
@@ -102,7 +102,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 ## Workstream 6: The projects list in Home's place (R7, R14)
 
 - `src/views/ProjectsViewProvider.ts` (new): a webview view in the `ritemark.homeView` slot, in the shared bundle (`data-editor-type="projects"`), replacing `HomeViewProvider`.
-- **Rows**: from `ProjectList` (W2) with each project's mark and name (W1) and its waiting count (W3); the open one first, as the column's white row; missing ones muted with Missing, Find it… and Remove from the list.
+- **Rows**: from `ProjectList` (W2) with each project's mark and name (W1) and its waiting count (W3); the open one first, as the column's white row; one whose folder is not found keeps its place, muted, with a warning-circle and Not found and the old path in its tooltip (experience 33, frame 1); clicking it shows its Home's not-found box (W10) instead of switching.
 - **Search all projects** filters by name in the page.
 - **Add a project…** offers Open a folder… and Start a new project (Sprint 133's `src/welcome/newProject.ts`).
 - **A click** switches in place (W8); **⌥ click** (Alt on Windows) opens a new window (`vscode.openFolder(uri, { forceNewWindow: true })`).
@@ -110,33 +110,33 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Workstream 7: The head's menu, filled (R8)
 
-- `ritemark/projectHead` (`package.json`, `projectHeadCommands.ts`): Switch project ▸, Open a folder…, Reveal in Finder / File Explorer, About this project. New folder and Collapse folders stay where Sprint 132 put them, after these.
+- `ritemark/projectHead` (`package.json`, `projectHeadCommands.ts`): Switch project ▸, Open a folder…, Reveal in Finder / File Explorer, About this project (once Jarmo has decided its file; spec Open Question 3). New folder and Collapse folders stay where Sprint 132 put them, after these. Open a folder… goes through W8's switch, so it asks first too.
 - **Switch project ▸** is a submenu whose items come from the extension at the moment it opens: 018's `ritemarkMenu.ts` asks a command (`ritemark.projects.switcherItems`) for `{ id, label, mark, detail, checked }[]` and draws them, then All projects, on Home and Open in a new window. A static `package.json` menu cannot list projects, so this is the one shell change the head needs (per `research/confirmations.md`).
-- **About this project** opens the project's About this project file (Sprint 133's decision on its name), or offers to create it.
+- **About this project** opens the project's About this project file, or offers to create it, as Jarmo decides (spec Open Question 3); left out until then.
 - **File ▸ Switch project** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`; the extension contributes Switch project there. On the Mac it shows in the native File menu too.
 
 ## Workstream 8: Switching in place (R9)
 
-- `src/projects/switchProject.ts` (new): the one path every Ritemark switch takes (the projects list, the head's switcher, File ▸ Switch project).
-  - It asks whether the AI is working in this window (per `research/switch-audit.md`: running turns, card turns, running flows). If so, a Ritemark dialog says what will stop and offers Switch anyway or Stay.
+- `src/projects/switchProject.ts` (new): the one path every Ritemark switch takes (Home's list, the head's switcher and Open a folder…, File ▸ Switch project, Go back).
+  - It asks the AI sheet's host whether a chat in this window is working (per `research/switch-audit.md`). If so, it asks in a modal dialog drawn in experience 31's style (VS Code's custom dialog, which Sprint 132 themes), 440 wide: "Claude is still working in <project>" / "Switching projects stops it. Open <other> in a new window to let Claude finish.", with Cancel, Switch and stop, and Open in a new window as the default (experience 33, frame 3). Open in a new window opens the other project there; Switch and stop stops the chat as Stop would, then switches; Cancel does nothing. With nothing working it never asks.
   - It then opens the next folder in the same window (`vscode.openFolder(uri, { forceNewWindow: false })`).
   - VS Code keeps each folder's tabs in its own workspace state, so coming back restores them; the permanent tabs (W5) add Home and Tasks where missing and the window opens on Home.
-- **The Go back note** (experience 3, frame 3), if the Experience lead keeps it: the switch writes `ritemark.projects.switchedFrom` with the folder and the time; the next window shows a short notification ("Switched to X. Y is kept as you left it.") with Go back, once, and deletes the key.
+- **The "Switched to…" note** (experience 3, frame 3; kept in experience 33): the switch writes `ritemark.projects.switchedFrom` with the folder and the time; the next window's Home shows "Switched to <project>. <other> is kept as you left it." with Go back, once, and the key is deleted. Go back goes through the same switch.
 - **VS Code's own routes** (File ▸ Open Folder…, Open Recent): per the audit, either a small 018 veto asks the extension before a LOAD shutdown, or they are left as today and the audit records it.
 - **The splash** (per `research/splash-audit.md`): the window shows the ground's colour while it reloads, in Light and Dark. Expected: 018's hunk in `partsSplash.ts` saves the theme's `ritemark.ground` as the splash background when the theme defines it, and 001's dark default becomes the dark ground (`#16132F`) instead of `#1E1B4B`.
 - **⌥ click and Open in a new window** never switch this window.
 
 ## Workstream 9: The document's bar (R12)
 
-- `DocumentHeader.tsx`: **Saved** shows when `document:sync-state` is `synced`. `local-only` and `applying` show nothing (or Saving… if a save takes longer than a second, as the Experience lead answers). `conflict`, `apply-error` and `failed` keep today's actions in Saved's place.
-- `ExportMenu.tsx` becomes Share: the button's name, tooltip and icon change; its items stay in their groups and order (Export PDF, Export Word; Google Docs; Copy as Markdown) and keep their handlers.
-- Tests: the header's state from each sync state; the Share menu's items equal the Export menu's.
+- `DocumentHeader.tsx`, as `comparison/after-write.png` draws the bar: **Saved** shows when `document:sync-state` is `synced`. `local-only` and `applying` show nothing. `conflict`, `apply-error` and `failed` keep today's actions in Saved's place.
+- `ExportMenu.tsx` becomes Share, as experience 26's frame 1 draws it: Send a copy (PDF, for reading and printing; Word document, for people who edit in Word), Google Docs (Publish to Google Docs, one Google Doc you update from here), Copy as Markdown (for email and chat), and the foot line. Each item keeps today's handler. Once a document is linked, the Google Docs group lists today's actions for its state (`googleDocsMenu.ts`: Sync, Open, Remove link, Reconnect), reworded for 2.0. The chip and card of frame 2 are not in this sprint.
+- Tests: the header's state from each sync state; every 1.x Export action is reachable from Share in each Google Docs state.
 
 ## Workstream 10: Missing, empty and boardless projects (R13)
 
-- A missing folder: the list (W6) and the switcher (W7) mark it; choosing it opens Find it… (a folder picker; `ProjectList.relocate`) or Remove from the list; nothing opens an empty window.
+- A folder that is not found (experience 33): the list (W6) and the switcher (W7) mark it; choosing it keeps the window in the current project and shows, on the desk's Home, the project's head with a muted 56 mark and one box (radius 10, the strong hairline): "This project's folder is not where it was", the old path in a chip, Find it… (primary) and Remove from the list (ghost). Find it… opens the folder picker at the old path's nearest existing parent; the chosen folder replaces the old path (`ProjectList.relocate`) and the project opens there through W8's switch; a folder that is already another project's is refused in words and the list is kept.
 - An empty project: Home's empty state (W4).
-- No board: the Tasks tab opens the board's empty state (experience 29, frame 2); `BoardStore` writes nothing until a card is added (it already creates `.ritemark/tasks/` only on the first card, to be confirmed in `research/confirmations.md`).
+- No board: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and the tab has no count; `BoardStore` writes nothing until a card is added (it already creates `.ritemark/tasks/` only on the first card, to be confirmed in `research/confirmations.md`).
 
 ## Workstream 11: Tests, docs and builds (E3–E7)
 
@@ -176,7 +176,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | A stale `needs-user` after a crash counts a chat that waits on nothing | Only chats with a live owner count (audit) |
 | The first fill misses boards in folders known from nowhere else | The audit's extra source; otherwise they join when next opened, and the gap is said in the plan's QA evidence |
 | The permanent tabs fight the person's restored tabs at start | Run after restore; return to the person's tab; CDP checks across restarts |
-| Switching through VS Code's own Open Folder stops the AI without asking | The switch audit; at worst, today's behaviour, recorded |
+| Switching through VS Code's own Open Folder stops the AI without asking | The switch audit; at worst, today's behaviour, recorded. Every Ritemark route asks (experience 33) |
 | The splash hunk breaks on a VS Code update | One small hunk in 018; the screenshot check in `update-vscode.sh`'s checklist |
 | Removing 1.x's launcher loses a function | R14's table checked row by row before `HomeViewProvider.ts` is deleted |
 | The bundle grows | Images as files; measured before and after |

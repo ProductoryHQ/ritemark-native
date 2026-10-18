@@ -20,9 +20,9 @@ Ritemark 2.0's second step changes how Ritemark starts. A new window with no fol
 As someone opening Ritemark, I want one calm sheet that tells me what Ritemark is and asks me one thing at a time.
 
 Acceptance criteria:
-- A window with no folder opens the welcome, a Ritemark page in the shared React bundle (`webview/src`), built from the UI components. Once a profile has finished the welcome (R6, R10), a window with no folder opens it on step 2, "Where is your work?", with the AI states shown above it (the Experience lead is asked to confirm).
+- A window with no folder opens the welcome, a Ritemark page in the shared React bundle (`webview/src`), built from the UI components. Once a profile has finished the welcome (a project has been opened from it, R6 and R10), a window with no folder shows a short sheet on the ground instead: "Where do you want to start?" with the recent projects, Open another folder… and Start a new project. It is experience 32's frame 1 without Your AI and usage data (the Experience lead, 18 October).
 - The welcome is one raised sheet, 640 wide, centred on the flat ground, with the header illustration and the white Ritemark logo, a two-part progress bar on the header ("1 · Your AI", "2 · Set up project"), "Welcome to Ritemark" in Space Grotesk 40, and the North's one line (experience 2, frame 1).
-- While the welcome is open, nothing else shows: the side columns are closed, and the desk's strip, sheet and the status bar are hidden, as drawn. On the Mac the traffic lights stay; on Windows the window buttons stay at the top right.
+- While the welcome is open, nothing else shows: the side columns are closed, and the desk's strip, sheet and the status bar are hidden, as drawn. On the Mac the traffic lights stay; on Windows the window buttons stay at the top right, with no menu button (the Experience lead, 18 October).
 - VS Code's Getting Started page never opens: not at start, not from a menu, not from the command palette (R12).
 - The welcome works with the mouse and the keyboard (Tab order follows reading order; Enter and Space press; Escape cancels a sign-in in progress), and VoiceOver and Narrator read its question, each card and each state.
 - The welcome draws in Ritemark Light and Ritemark Dark. The header illustration is the one moment the brand's gradient appears (experience 2, decision 3).
@@ -37,8 +37,8 @@ Acceptance criteria:
   - ChatGPT and Claude each say "Sign in with the account you already use." and offer a blue Sign in (Jarmo, 15 October: sign-in buttons are blue).
   - OpenCode says "Open models, with an API key of your own." and offers Set up.
 - Under the cards: "You can use more than one.", an API keys link, and Skip for now.
-- The API keys link offers the Anthropic API key that Ritemark Settings already has (`anthropic-api-key`). ChatGPT is reached only through its own sign-in: no OpenAI key is offered as a way to use ChatGPT (see *Resolved Questions*). The OpenAI key Settings already has for OpenCode and other services stays where it is, for what it does today.
-- Skip for now goes to step 2 with no AI. Ritemark then works as an editor, and the AI's sheet offers the sign-ins (experience 13, frame 3, as Ritemark's AI sheet does today when nothing is connected).
+- The API keys link opens a small sheet over the welcome, in experience 31's dialog style, with the Anthropic API key field that Ritemark Settings already has (`anthropic-api-key`). Done goes back to the welcome with Claude marked as set up; Settings stays the place to change it later. ChatGPT is reached only through its own sign-in: no OpenAI key is offered as a way to use ChatGPT (see *Resolved Questions*). The OpenAI key Settings already has for OpenCode and other services stays where it is, for what it does today.
+- Skip for now goes to step 2 with no AI. Step 2 itself has no skip: a window needs a project, closing the window is the way out, and File ▸ Open still opens a loose file (the Experience lead, 18 October). Ritemark then works as an editor, and the AI's sheet offers the sign-ins (experience 13, frame 3, as Ritemark's AI sheet does today when nothing is connected).
 - A provider that is already signed in shows "Signed in" on its card, and its card's button becomes Continue.
 - Under a line: "Your documents stay on this computer. An AI reads only what you work on with it."
 
@@ -51,7 +51,7 @@ Acceptance criteria:
 - While it runs, the card says where to finish ("Your browser opened Claude's sign-in page."), with a spinner, "Finish there" and Cancel, and under the cards "Did nothing open? Open the page again" (experience 2, frame 2). The other cards fade but stay usable.
 - When the sign-in succeeds, the welcome moves to step 2 and says "Signed in to Claude" (or ChatGPT) above its question.
 - When it fails or is cancelled, the card returns to Sign in and says in one sentence what happened and what to do, with no error codes.
-- OpenCode's Set up opens Ritemark's existing OpenCode setup (its own API keys). When OpenCode is ready (a key set whose provider has models, as today), the welcome moves to step 2 as for the others.
+- OpenCode's Set up opens a small sheet over the welcome, in experience 31's dialog style, with the fields Ritemark's OpenCode setup has today (its own API keys). Done goes back to the welcome with OpenCode marked as set up; when OpenCode is ready (a key set whose provider has models, as today), the welcome moves to step 2 as for the others.
 - Where a step still needs a terminal (installing or repairing a runtime), it opens as a tab beside the welcome, never in the AI column (Sprint 132 R8), and the welcome learns when it finishes.
 - Signing in to a second provider from step 2 is possible through Add another (R10) or later in Settings; the welcome never asks twice.
 
@@ -72,11 +72,15 @@ As someone who has an AI ready, I want to point Ritemark at my work, or start so
 Acceptance criteria:
 - Step 2 asks "Where is your work?" with three rows (experience 2, frame 3):
   - **Open a folder…** opens the system's folder picker.
-  - **Start a new project** asks for a name and creates a folder for it under the person's Documents folder (`~/Documents/Ritemark/<name>` on the Mac, `Documents\Ritemark\<name>` on Windows), with About this project in it (see *Open Questions* for its file).
+  - **Start a new project** opens in place into a name field ("Project name") and Create. Under it, in muted ink: "In ~/Documents/Ritemark/<name>" (`Documents\Ritemark\<name>` on Windows), with Change… to pick another place. The person names it. The folder is created empty: About this project is not written at creation (its file and when to offer it are Jarmo's open questions in experience 24; the Experience lead, 18 October).
   - **Try the sample project**, only if Jarmo says yes (see *Open Questions*).
 - One line says what a project is: "A project is a folder on this computer. Claude works only inside it." (The AI's name follows the one signed in.)
 - A name that would create an existing folder or an invalid path is refused in place, in words, before anything is written.
-- When Git, or Node.js where a system runtime needs it (`nodeRequired`, patch 017's rule), is missing, one plain line on step 2 says so and what it means, as 1.x's launch check does today: words only, no download or install link (patch 016, Microsoft Store policy 10.1.5). Nothing else from the launch check shows when nothing is missing.
+- Git and Node.js are needed only on Windows with this computer's own Claude (`systemRuntimeToolsRequired`, `agent/setup.ts`), so this line is rare. When one is missing, one line sits under "Signed in to Claude" at the top of step 2, in body ink with a warning-circle icon (the Experience lead, 18 October):
+  - Git: "Claude from this computer needs Git, and Git isn't installed. Use Ritemark's own Claude instead, or install Git and restart Ritemark." with a quiet button, Use Ritemark's own Claude, which switches the runtime to Ritemark's own (`ritemark.agentRuntime.preference`);
+  - Node.js: the same sentence with Node.js;
+  - when a restart is needed: "Restart Ritemark to finish setting up Claude." with Restart.
+  No download or install link (patch 016, Microsoft Store policy 10.1.5). Nothing else from the launch check shows when nothing is missing.
 
 ### R6: Landing on the project
 
@@ -86,8 +90,8 @@ Acceptance criteria:
 - Choosing a folder or creating a project opens it in the same window. The window reloads, as VS Code always does when the folder changes.
 - After the reload the window shows the project:
   - Documents in the left column, with the project's name in its head (Sprint 132 R10);
-  - the AI's sheet open on a new chat with the AI the person signed in with, its message box naming the project ("Ask Claude about Leadership programme");
-  - the desk empty with its +, or About this project when Ritemark just created it.
+  - the AI's sheet open on a new chat with the AI the person signed in with, its message box reading "Ask Claude about this project";
+  - the desk empty, offering the + menu's three as tiles: Text, Table and Web page (experience 2, decision 6: an empty desk offers the same three as the +). Every empty desk offers them, not only the landing's.
 - The landing happens once for the folder the welcome sent the person to. Opening any other folder later does not repeat it, and a landing older than 10 minutes is dropped.
 - If the folder is gone after the reload, the window says so and shows the welcome's step 2 again.
 - In step 3 (Sprint 134) the landing also opens Home first. This sprint does not open Home.
@@ -145,7 +149,7 @@ Acceptance criteria:
   - Open another folder… and Start a new project under the list;
   - the usage-data switch at the foot, off (R7).
 - A project row opens its project. The project open when they left closes the sheet and restores the window as it was, without a reload; any other reloads into it (R6).
-- After a project is picked the update welcome never shows again on this profile; a later window with no folder opens the welcome on step 2, as for any finished profile (R1).
+- After a project is picked the update welcome never shows again on this profile; a later window with no folder shows the short "Where do you want to start?" sheet, as for any finished profile (R1).
 - A fresh profile never sees the update welcome.
 - What moved, the card on Home that says where the terminal, Copilot Chat and Settings went, arrives with Home in step 3 (Sprint 134).
 
@@ -154,7 +158,7 @@ Acceptance criteria:
 As someone whose first launch opens a document, I want that document, once.
 
 Acceptance criteria:
-- When a fresh profile's first window opens with a folder or a file (a `.md` double-clicked in Finder, a folder given on the command line), the folder or file opens as asked and the welcome does not cover it. The AI's sheet offers the sign-ins. The welcome shows the next time a window has no folder, until it has been finished once (see *Open Questions*).
+- When a fresh profile's first window opens with a folder or a file (a `.md` double-clicked in Finder, a folder given on the command line), the folder or file opens as asked and the welcome does not cover it. The AI's sheet offers the sign-ins. Nothing is counted. The welcome shows the next time a window has no folder, until it has been finished once, that is, until a project has been opened from it (the Experience lead, 18 October).
 - The same file never opens twice. In particular, the one-time stuck-tab healer (Sprint 107 R3) replaces a plain-text tab with the Ritemark editor instead of opening a second one beside it.
 - The issue's deterministic reproduction (a fresh profile with `"workbench.editorAssociations": {"*.md": "default"}`, launched with `<folder> <folder>/note.md`) ends with one tab, and 25 fresh launches with a `.md` end with one tab each.
 
@@ -172,7 +176,7 @@ Acceptance criteria:
   | Open folder | The welcome's step 2; the head's Open a folder… (Sprint 132) |
   | Recent files and folders | The update welcome's projects (R10); Switch project… (Sprint 132); the project list (Sprint 134) |
   | Launch check: ChatGPT and Claude signed in, "Click here to log in" | The welcome's provider states and Sign in (R2–R4); Settings' sign-in cards |
-  | Launch check: Git found, Node found (only when `nodeRequired`) | A line on step 2 when one is missing (R5); a row in Ritemark Settings always (new) |
+  | Launch check: Git found, Node found (only when needed) | A line at the top of step 2 when one is missing, with Use Ritemark's own Claude (R5); rows in Ritemark Settings under the runtime choice, shown for this computer's runtime (new) |
   | Links: Getting started, Support articles, Blog | Help, under You (Sprint 132 R11), which opens ritemark.app's support pages |
   | The logo and tagline | The welcome's header (R1) |
 
@@ -223,7 +227,7 @@ Acceptance criteria:
 
 - Extension unit tests for the welcome's state, the landing, the update detection, the consent gate and the events, and for the healer's replacement (#429).
 - A VS Code unit test for the resource label's muted extension (R13), if the patch adds logic beyond CSS.
-- CDP checks on a dev instance: the welcome alone (nothing else drawn), the sheet's size and place, the landing.
+- CDP checks on a dev instance: the welcome alone (nothing else drawn), the sheet's size and place, the landing, the empty desk's tiles.
 - The screenshot baseline of Sprint 132 gains the welcome's frames, light and dark.
 
 ### E4: The bundle ([#107](https://github.com/ProductoryHQ/ritemark-native/issues/107))
@@ -251,7 +255,7 @@ Acceptance criteria:
 
 - **Home, the project file and list, switching projects, and the What moved card** (step 3, Sprint 134).
 - **A ChatGPT (OpenAI) API key** anywhere in 2.0.
-- **About this project written by Claude** on the first look at a folder (experience 24). This sprint only creates the file for a new project.
+- **About this project**, whether written by Claude on the first look at a folder or created with a new project (experience 24). Its file and when to offer it are still Jarmo's open questions there.
 - **The Settings redesign** (experiences/settings). Settings keeps its 1.x page; this sprint adds the usage-data choice and the launch check's rows to it.
 - **A tour, a video or a changelog** in the welcome (experience 32, "Not on it").
 - **A VS Code update.** The pin stays at 1.117.0.
@@ -261,17 +265,16 @@ Acceptance criteria:
 - **2026-10-15 (Jarmo):** OpenCode is the third choice on step 1; the welcome uses the header illustration from 1.x's Welcome tab; sign-in buttons are blue; the steps are a two-part progress bar on the header; "2 · Set up project".
 - **2026-10-17 (Jarmo):** the usage-data choice is on the welcome, and nothing is counted until yes; people updating from 1.x see the welcome once; the Home tab comes in step 3 ("ok").
 - **2026-10-17 (release plan, engineering):** the welcome is a Ritemark page rather than the Getting Started page rewritten again; opening the folder reloads the window, and the welcome writes where it is going.
+- **2026-10-18 (the Experience lead's answers to this plan's design questions):** the welcome alone shows only the sheet on the ground (on Windows the caption buttons, no menu button); a first window opened with a file opens it, shows "No AI yet" and counts nothing, and the welcome waits until a project has been opened from it; step 2 has no skip; a finished profile's window with no folder gets the short "Where do you want to start?" sheet; the missing Git or Node line's place, words and Use Ritemark's own Claude, and its Settings rows under the runtime choice; the landing's empty desk offers Text, Table and Web page as tiles while Home does not exist yet; OpenCode's Set up and API keys open a small sheet over the welcome; Start a new project is a name field with Create and a Change… for the place; About this project stays out of step 2.
 - **No ChatGPT API key in 2.0.** Recommended in the release plan ("leave it out of 2.0 and add it if people ask") and listed as decided in the Development manager's brief of 18 October; the release plan still lists it as open, so this plan's approval confirms it. It means ChatGPT is reached only through its sign-in. The OpenAI key that Settings already holds (`openai-api-key`, used by OpenCode and other services) is not a ChatGPT key and stays (HARD RULE #1).
 
 ## Open Questions
 
-Each needs Jarmo's answer before or at this plan's approval, unless it says otherwise. Each has a recommendation.
+Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
 
 1. **The welcome's events before the yes.** Hold `welcome_shown` and `ai_signed_in` in memory and send them at the yes, or drop everything that happened before the switch was turned on? **Recommendation: hold and send.** Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
 2. **A 1.x OK.** 1.x's notice was opt-out: OK meant "go on counting". Does an OK on it count as a yes in 2.0? **Recommendation: no**, as experience 32 draws it: everyone who did not opt out starts off and is asked once on the update sheet. A 1.x Opt Out stays off.
-3. **The sample project.** Offer "Try the sample project" on step 2? It needs real content written and kept up. **Recommendation: not in this sprint**; the row is left out until the content exists, and the welcome is built so it can be added in an extension update.
-4. **About this project's file** for a new project (experience 24's open question). **Recommendation:** `AGENTS.md` whose first heading is "About this project", and a one-line `CLAUDE.md` holding `@AGENTS.md`, so Claude, ChatGPT and OpenCode all read the same words with no Ritemark plumbing. The tree shows the real names; calling it "About this project" everywhere waits for step 3's project menu.
-5. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee.
-6. **A fresh profile opened with a file or folder** (R11). **Recommendation:** the file or folder opens as asked and the welcome waits for the next window with no folder. The Experience lead is asked to confirm.
+3. **The sample project.** Offer "Try the sample project" on step 2? It needs real content written and kept up. **Recommendation: not in this sprint**; the row is left out until the content exists, and the welcome is built so it can be added in an extension update. The Experience lead has put the same question to Jarmo.
+4. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee.
 
-Design questions sent to the Experience lead on 18 October (their answers go into this spec before approval): the welcome alone on Windows; whether step 2 can be skipped and what a window with no folder shows once the welcome is finished; the missing-Git line's words and its row in Settings; the landing's desk before Home exists; where OpenCode's Set up and the API keys link open; the new project's folder and name.
+The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*).

@@ -18,6 +18,7 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | The AI sheet with nothing usable | `OnboardingWizard` (checklist, then "Almost there! Sign in…" with Claude and ChatGPT), or the selected runtime's setup view (`SetupWizard`, `CodexSetupView`, `OpenCodeSetupView`); the wizard's dismissal lives in memory | `webview/src/components/ai-sidebar/` (`sidebarGate.ts:51–62`, `AISidebar.tsx:224–335`, `OnboardingWizard.tsx`) |
 | A 1.x profile | No first-run marker. `ritemark.activation.lastConfirmedVersion` is empty on a fresh profile and `1.14.0` on an updated one; `lastAttemptedVersion` is overwritten early in `activate` | `update/activationIntegrity.ts:36–37`, `extension.ts:265`, `:960` |
 | A new project, About this project, a sample project | Nothing | — |
+| Git and Node.js | Needed only on Windows with this computer's own Claude (`systemRuntimeToolsRequired`); the runtime choice is `ritemark.agentRuntime.preference` | `agent/setup.ts:144–236` |
 | State across a reload | Only `ritemark.update.pendingRestartVersion` and the activation keys are written before a reload and read after it | `update/updateService.ts` |
 | The webview bundle | One IIFE; the root is picked by `data-editor-type` in `webview/src/main.tsx:85–121`; `media/webview.js` is 8,478,880 bytes | `webview/vite.config.ts:95–98` |
 
@@ -32,7 +33,7 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | Webview | The welcome page and the update sheet, in the shared bundle | `webview/src/components/welcome/` (new), `webview/src/main.tsx` |
 | Patch 001 | The Getting Started hunks leave; the files go back to upstream where nothing else of Ritemark's is in them | `patches/vscode/001-ritemark-branding.patch` |
 | Patches 016, 017 | 016 keeps only its Source Control part; 017 is retired | `patches/vscode/016-…`, `017-…` |
-| Patch 018 | The welcome alone (no strip, sheet or status bar while it is the only thing open); a file's extension in muted ink | `patches/vscode/018-ritemark-surfaces.patch` |
+| Patch 018 | The welcome alone (no strip, sheet or status bar while it is the only thing open); an empty desk's three tiles; a file's extension in muted ink | `patches/vscode/018-ritemark-surfaces.patch` |
 | Harness | The stacking check's known pairs; the welcome in the screenshot baseline and CDP checks | `scripts/check-patch-stacking.mjs`, `scripts/qa/` |
 
 The release tier is **shell** (`patches/`). One new webview ↔ host protocol (the welcome's) crosses the welcome subsystem's boundary only; `architecture.md` gets the welcome and the consent gate as a subsystem note (E6).
@@ -42,7 +43,7 @@ The release tier is **shell** (`patches/`). One new webview ↔ host protocol (t
 Four requirements carry real unknowns, so each gets an audit under `research/` before code (spec-driven-sprint skill, "Audit-First"):
 
 1. **`research/getting-started-retirement-audit.md`** (R12): every hunk of 001, 016 and 017 sorted into welcome-page-only or other; every way into the Getting Started page (start-up, Help, the command palette, `workbench.action.openWalkthrough` and friends, the `welcomeOnboarding` contribution that patch 007 keeps loadable because the start-up runner depends on `IOnboardingService`); where `workbench.startupEditor: none` must be set to win before the start-up runner reads it (`branding/product.json` through 013, or the extension's defaults); what `apply-patches.sh` stops copying; the stacking check's known pairs after 017 goes.
-2. **`research/welcome-alone-audit.md`** (R1): how the workbench learns that the welcome is the only thing open (a context key the extension sets, observed by a small 018 contribution that puts a class on the workbench), what the class hides (the desk's strip and sheet, the status bar), the Mac traffic lights and Windows' window buttons with it, and that nothing jumps when the first project opens.
+2. **`research/welcome-alone-audit.md`** (R1, R6): how the workbench learns that the welcome is the only thing open (a context key the extension sets, observed by a small 018 contribution that puts a class on the workbench), what the class hides (the desk's strip and sheet, the status bar), the Mac traffic lights and Windows' window buttons (no menu button) with it, and that nothing jumps when the first project opens. It also settles the empty desk's tiles: where an empty editor group draws (the area whose letterpress Sprint 132 removed), and how three tiles there run the +'s commands.
 3. **`research/muted-extension-audit.md`** (R13): where the tree and the tabs render a file's name (`base/browser/ui/iconLabel/iconLabel.ts`, `workbench/browser/labels.ts`), how filter highlights (`matches`) and descriptions run through it, and the smallest hunk that renders the name and the extension apart, with a class the stylesheet colours.
 4. **`research/ext-host-start-401-audit.md`** (R15, [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): a CPU profile of the extension host's first seconds on a fresh profile on the Mac (memory: `reference_ext_host_startup_profiling`), then on Windows in the Development manager's Windows session; what in `activate` blocks; the decision (fix here, or record and rely on R15's guarantee).
 
@@ -78,14 +79,16 @@ Per `research/getting-started-retirement-audit.md`:
 ## Workstream 3: The welcome page (R1, R2, R5)
 
 - **Host.** `src/welcome/WelcomePanel.ts` (new) opens a webview panel, view type `ritemark.welcome`, in the first group, with the shared bundle (`<div id="root" data-editor-type="welcome">`, nonce and CSP as `taskBoard/boardSurface.ts:198–228`). `retainContextWhenHidden` is on, so a sign-in's progress survives a moment in the background.
-- **When it opens.** In `activate`, after the update detection (W6): a window with no folder opens it (on step 1 until the profile has finished the welcome, on step 2 after), closes both side columns for it and sets the context key `ritemark.welcomeAlone`. The AI sheet's 4 s focus (`extension.ts:329–331`) and the start-up layout writes (`:318–326`) skip while it is open.
-- **The welcome alone** (018, per `research/welcome-alone-audit.md`): while `ritemark.welcomeAlone` is true and the welcome is the only editor, a class on the workbench hides the desk's strip and sheet and the status bar; the ground, the traffic lights and Windows' window buttons stay. The class goes as soon as anything else opens.
+- **When it opens.** In `activate`, after the update detection (W6): a window with no folder opens it, closes both side columns for it and sets the context key `ritemark.welcomeAlone`. Until the profile has finished the welcome (a project opened from it) it is the welcome; after that it is the short "Where do you want to start?" sheet (recent projects, Open another folder…, Start a new project), the same page in another state. The AI sheet's 4 s focus (`extension.ts:329–331`) and the start-up layout writes (`:318–326`) skip while it is open.
+- **The welcome alone** (018, per `research/welcome-alone-audit.md`): while `ritemark.welcomeAlone` is true and the welcome is the only editor, a class on the workbench hides the desk's strip and sheet and the status bar; the ground, the traffic lights and Windows' window buttons stay, with no menu button. The class goes as soon as anything else opens.
+- **An empty desk's tiles** (018, per the same audit): an empty editor group draws Text, Table and Web page as tiles that run the +'s own commands (`ritemark.newDocument`, `ritemark.newTable`, the browser's new tab command), at the landing and whenever a desk is empty.
 - **Protocol.** `src/welcome/protocol.ts` (new): an exact-field union of messages, decoded on both sides as the task board's `protocol.ts` does. Host → page: `welcome/state` (kind, step, providers, projects, usage-data answer, missing tools). Page → host: `welcome/sign-in`, `welcome/cancel-sign-in`, `welcome/reopen-sign-in`, `welcome/set-up-opencode`, `welcome/api-keys`, `welcome/skip`, `welcome/open-folder`, `welcome/new-project`, `welcome/open-recent`, `welcome/usage-data`, `welcome/open-link`.
 - **State.** `src/welcome/welcomeState.ts` (new, no `vscode` import): the kind (`fresh`, `update`, `done`), the step, each provider's state, and the transitions; unit tested.
 - **Page.** `webview/src/components/welcome/` (new): `WelcomeSheet`, `ProviderCard`, `ProviderRow` (the update sheet's rows), `ProjectRow`, `UsageDataSwitch`, from the UI components (`ui/button.tsx`, `ui/tooltip.tsx`, the dialog primitives where they fit). Space Grotesk 40 for the title only; everything else in Sofia Sans.
 - **The header illustration** is a resized copy of `branding/welcome/ritemark-welcome-hero-bg.png` (6.7 MB today) at 1280 wide, as WebP or JPEG, under `extensions/ritemark/media/welcome/`, loaded through the webview's resource roots; never inlined into `webview.js` (E4).
-- **API keys** opens the Anthropic key entry Settings already has (the Claude card's "Use Anthropic API key" input, `RitemarkSettingsProvider.ts:955–973`), or Settings' API keys section, as the Experience lead answers.
-- **Skip for now** moves to step 2 with no provider; the AI sheet keeps its `OnboardingWizard` for later.
+- **API keys** and **OpenCode's Set up** open a small sheet over the welcome, drawn in the page in experience 31's dialog style, with the fields Settings has today: the Anthropic key (stored as `anthropic-api-key` through the same host call as Settings' card, `RitemarkSettingsProvider.ts:955–973`), and OpenCode's provider keys. Done goes back to the welcome with that choice marked as set up.
+- **Skip for now** moves to step 2 with no provider; the AI sheet keeps its `OnboardingWizard` for later. Step 2 has no skip.
+- **The missing Git or Node line** (R5) reads `ritemark.getHealthStatus` and `systemRuntimeToolsRequired`; Use Ritemark's own Claude writes `ritemark.agentRuntime.preference` to Ritemark's own runtime and re-runs the Claude check; Restart runs the window reload.
 
 ## Workstream 4: Provider states (R3, R4)
 
@@ -98,12 +101,12 @@ Per `research/getting-started-retirement-audit.md`:
 ## Workstream 5: Set up project and the landing (R5, R6)
 
 - **Open a folder…** shows the system's folder picker (`vscode.window.showOpenDialog`, folders only).
-- **Start a new project** (`src/welcome/newProject.ts`, new, reused by Sprint 134's Add a project…) asks for a name in place on the sheet, checks it (no existing folder, no character the system refuses), and creates `<Documents>/Ritemark/<name>`. `<Documents>` is the system's Documents folder (`os.homedir()/Documents` on the Mac; the known folder on Windows, which a OneDrive-moved Documents folder can change, so it is read, not assumed). It then writes About this project as Jarmo decides (spec Open Question 4).
+- **Start a new project** (`src/welcome/newProject.ts`, new, reused by Sprint 134's Add a project…) opens into a "Project name" field and Create, with the place under it ("In ~/Documents/Ritemark/<name>") and Change… (a folder picker for another parent). It checks the name (no existing folder, no character the system refuses) and creates the folder, empty. `<Documents>` is the system's Documents folder (`os.homedir()/Documents` on the Mac; the known folder on Windows, which a OneDrive-moved Documents folder can change, so it is read, not assumed). No About this project is written (experience 24's open questions).
 - **The landing.** Before opening the folder, `src/welcome/landing.ts` (new) writes `ritemark.welcome.landing.v1` to globalState: the folder's URI, the provider, whether Ritemark created the project, and the time. Then `vscode.openFolder(uri, { forceNewWindow: false })`.
 - **After the reload**, `activate` reads the landing. If it names this window's folder and is younger than 10 minutes, it:
   - shows Documents (`workbench.view.explorer`);
-  - opens the AI's sheet on a new chat with that provider, its placeholder naming the project (through the sheet's existing new-chat path and its runtime selection, with the project's name sent in the bootstrap);
-  - opens About this project on the desk when Ritemark created the project;
+  - opens the AI's sheet on a new chat with that provider, its placeholder reading "Ask Claude about this project" (through the sheet's existing new-chat path and its runtime selection);
+  - leaves the desk empty, so it shows its three tiles;
   - sends `project_opened` through the gate;
   - deletes the landing.
   A landing for a folder that is gone shows a notification and opens the welcome's step 2. A landing that does not match, or is old, is deleted and ignored.
@@ -120,7 +123,7 @@ Per `research/getting-started-retirement-audit.md`:
 
 ## Workstream 7: A first window with a file, and #429 (R11)
 
-- The welcome opens only in a window with no folder (W3). A fresh profile whose first window has a folder or a file leaves the welcome for the next window with no folder, until `ritemark.welcome.finished` is written; the AI sheet's existing onboarding offers the sign-ins meanwhile. (Spec Open Question 6.)
+- The welcome opens only in a window with no folder (W3). A fresh profile whose first window has a folder or a file leaves the welcome for the next window with no folder, until `ritemark.welcome.finished` is written; the AI sheet's existing onboarding ("No AI yet") offers the sign-ins meanwhile, and nothing is counted (the Experience lead, 18 October).
 - **The healer** (`extension.ts:291–312`, `utils/stickyTabHealer.ts`): after `vscode.openWith(uri, 'ritemark.editor')` succeeds, it closes the plain-text tab it replaced (`vscode.window.tabGroups.close(tab)`), keeping the Ritemark tab in the text tab's place. The pure selection function gains the "replace" result and its test.
 - **Proof.** The issue's deterministic reproduction becomes a scripted check on a fresh profile (S39), and 25 fresh launches with a `.md` are run in the background (memory: no pop-up test windows).
 
@@ -128,7 +131,7 @@ Per `research/getting-started-retirement-audit.md`:
 
 - Ritemark Settings gains:
   - **Usage data**: the same switch and words as the welcome, with the Privacy Policy and Terms of Use links; it writes `ritemark.analytics.enabled` through the gate (W1);
-  - **This computer**: Git found or missing, and Node.js when `nodeRequired`, from `ritemark.getHealthStatus`, in words only (patch 016's Store rule: no download or install link).
+  - **Git and Node.js**: rows under the existing runtime choice (Ritemark's own Claude or this computer's), shown only for this computer's runtime, from `ritemark.getHealthStatus`, in words only (patch 016's Store rule: no download or install link). In the Settings redesign they move to Advanced, under the same choice (the Experience lead, 18 October).
 - The sign-in cards Settings has stay as they are.
 - The full Settings redesign (experiences/settings) is not in this sprint.
 

@@ -144,6 +144,7 @@ When the person opens the project's menu and points at Switch project
 Then a submenu lists the projects with "1 waits" where something waits, the open one ticked, then All projects, on Home and Open in a new window (⌥ click).
 
 ### S28: About this project
+Given Jarmo has decided About this project's file (spec Open Question 3; otherwise the item is not in the menu and this scenario is skipped)
 When the person picks About this project in a project that has one, and in one that has none
 Then the first opens it; the second offers to create it.
 
@@ -162,15 +163,21 @@ Then "Leadership programme" comes back on Home with its four documents as they w
 
 ### S31: The AI is working (negative)
 Given a chat turn running in "Leadership programme"
-When the person switches to another project
-Then a Ritemark dialog says the AI is working here and switching stops it, with Switch anyway and Stay
-When the person picks Stay
-Then nothing changes and the turn goes on.
+When the person switches to "Sales proposal Q4" from Home's list, then from the project's menu, then with Open a folder…
+Then each time a dialog asks first: "Claude is still working in Leadership programme" / "Switching projects stops it. Open Sales proposal Q4 in a new window to let Claude finish.", with Cancel, Switch and stop, and Open in a new window as the default
+When the person picks Cancel
+Then nothing changes and the turn goes on
+When the person picks Open in a new window
+Then "Sales proposal Q4" opens in a new window and this window and its turn go on
+When the person picks Switch and stop
+Then the turn stops as Stop would, and the window switches
+And with nothing working, switching never asks.
 
 ### S32: Go back
-Given the Experience lead keeps the note
-When a switch has just happened
-Then a short note says the other project is kept as it was left, with Go back, which switches back.
+When a switch to "Sales proposal Q4" has just happened
+Then its Home says "Switched to Sales proposal Q4. Leadership programme is kept as you left it." with Go back
+When the person clicks Go back
+Then the window switches back, and the note does not show again.
 
 ### S33: VS Code's own Open Folder
 When the person uses File ▸ Open Folder… while a turn runs
@@ -199,21 +206,32 @@ Then the bar shows Saved once the document is written; with a save failing (the 
 
 ### S37: Share
 When the person opens Share
-Then it lists Export PDF, Export Word, the Google Docs items for the document's state, and Copy as Markdown, and each works as Export's did.
+Then it shows Send a copy (PDF, for reading and printing; Word document, for people who edit in Word), Google Docs (Publish to Google Docs), Copy as Markdown (for email and chat) and the foot line, as experience 26's frame 1 draws it
+And each works as Export's did
+When the document is linked to a Google Doc
+Then the Google Docs group offers updating it, opening it, removing the link and reconnecting, as Export did.
 
 ## Feature: Missing, empty and boardless (R13)
 
-### S38: A missing project
+### S38: A project whose folder is not found
 Given "Moved" renamed outside Ritemark
-Then the list and the switcher mark it Missing
-When the person chooses it
-Then Find it… and Remove from the list are offered; Find it… with the new folder brings it back with its line, cover and board.
+When Home shows, or the window gains focus
+Then the list and the switcher show its row muted in its place, with a warning-circle and Not found, the old path in its tooltip
+When the person clicks it
+Then the window stays in the current project and the desk's Home shows "This project's folder is not where it was", the old path, Find it… and Remove from the list
+When the person uses Find it… and picks the renamed folder
+Then the list keeps the new place and the project opens there with its line, cover and board.
+
+### S43: Find it… on another project's folder (negative)
+Given "Moved" not found
+When the person uses Find it… and picks "Board report 2026"'s folder
+Then Ritemark says that folder is already another project's, and the list stays as it was.
 
 ### S39: An empty project and no board
 When the person opens "Empty"
 Then Home shows the empty state with Text, Table, Web page and a drop target; a file dropped on it is copied in and the original stays
 When the person opens the Tasks tab
-Then the board's empty state shows, and no board file is written until a card is added.
+Then it shows "Nothing waits for you" with New task, the tab has no count, and no board file is written until a card is added.
 
 ## Feature: Nothing is lost (R14)
 
@@ -231,4 +249,4 @@ Then each holds, with Windows paths, Alt click for a new window, Reveal in File 
 
 ### S42: Other drives
 Given projects on D: and on a network share, and one on a disconnected USB drive
-Then the first two are listed and open; the third shows as Missing.
+Then the first two are listed and open; the third shows as Not found.

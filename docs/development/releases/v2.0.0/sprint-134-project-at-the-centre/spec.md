@@ -6,7 +6,7 @@ Ritemark 2.0's third step makes the project the place a person works in. Each pr
 
 ## Principles
 
-- **The drawings are the contract.** Experience 3 (`ritemark-dev`: `product/design/experience/experiences/home/`), experience 29 (`empty/`), experience 32's frame 5 (`update/`) and the comparison's document bar. Where a drawing and this spec disagree, the drawing wins and this spec changes first.
+- **The drawings are the contract.** Experience 3 (`ritemark-dev`: `product/design/experience/experiences/home/`), experience 29 (`empty/`), experience 32's frame 5 (`update/`), experience 33 (`missing/`), experience 26's frame 1 (`share/`) and the comparison's document bar (`comparison/after-write.png`). Where a drawing and this spec disagree, the drawing wins and this spec changes first.
 - **The project is the place** (principle 1). Projects by name, never by path; where a project lives is one muted line.
 - **What needs the person comes first** (principle 4). The same number for the same thing everywhere: the projects list, Home, the Tasks tab and the Tasks place.
 - **The folder holds what the person owns, the computer holds the rest.** The project's name, mark, cover and line travel with the folder; the list of projects and what Ritemark knows about them stay on this computer (as the task board does, `architecture.md`).
@@ -34,7 +34,7 @@ As a writer with several projects, I want them all listed, from the first day of
 Acceptance criteria:
 - Ritemark keeps its own list of projects on this computer. A folder is added whenever a window opens it.
 - On the first start of this build, the list is filled once from what is already on the computer: VS Code's recent folders, every project that has chats in Ritemark's chat store, and every project that has a task board record (decided by engineering, 17 October).
-- A project whose folder is missing or moved stays in the list, shown as missing, with Find it… (pick its new place) and Remove from the list. It is never dropped silently.
+- A project whose folder is not found (moved, renamed, deleted, or on a drive that is not connected) stays in the list, shown as Not found (R13), with Find it… and Remove from the list. It is never dropped silently. Folders are checked when Home shows and when the window gains focus.
 - Remove from the list removes it from the list only; its folder, chats and board are untouched.
 - The list is ordered by when each project was last open, the open project first.
 - The list never contains a path the person did not open in Ritemark, and nothing in it leaves the computer.
@@ -66,7 +66,7 @@ Acceptance criteria:
   - the project's line, which the person can edit in place;
   - **Waiting for you**, with its count, listing what waits (a card's call or a chat's question), each opening where it waits;
   - one line for what waits in the other projects, which are counted in the list;
-  - **Start something in <project>**: Text, Table and Web page, as the + offers (experience 2, frame 4; experience 29, frame 1);
+  - **Start something in <project>**: Text, Table and Web page, as the + offers, on every Home, under Waiting for you and above Last changed (experience 2, frame 4; experience 29, frame 1; the Experience lead, 18 October);
   - **Last changed in <project>**: the documents changed last, each with its folder and when, each opening the document.
 - Project names, card titles, chat names and file names are shown as text, never as markup.
 - Home redraws when the board's calls, the chats' states or the project's files change, without losing its scroll or focus.
@@ -104,7 +104,7 @@ Acceptance criteria:
   - Projects: each project by its mark and name, with what waits in it as a muted count, the open one as the column's white row;
   - Add a project…, which offers Open a folder… and Start a new project (as on the welcome).
 - A click on a project switches to it in place (R9). ⌥ click (Alt click on Windows) opens it in a new window.
-- A missing project is drawn muted with "Missing" and offers Find it… and Remove from the list (R2).
+- A project whose folder is not found keeps its place: its row is muted, with a warning-circle and Not found at the right and the old path in its tooltip. Clicking it does not switch (R13).
 - This list replaces 1.x's Home launcher in the left column. What the launcher did keeps a home (R14).
 
 ### R8: The left column's head, filled
@@ -116,7 +116,7 @@ Acceptance criteria:
   - Switch project ▸, listing the projects with what waits in each ("1 waits"), the open one ticked, then All projects, on Home, and Open in a new window (⌥ click);
   - Open a folder…;
   - Reveal in Finder (Reveal in File Explorer on Windows);
-  - About this project, which opens the project's About this project file, or offers to create it.
+  - About this project, once Jarmo has decided its file and when to offer it (experience 24's open questions; *Open Questions* below). Until then the item is left out.
 - New and Search keep Sprint 132's behaviour.
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
 - On Windows, the menu button's File menu gains Switch project, where experiences/windows frame 2 draws it.
@@ -129,8 +129,12 @@ Acceptance criteria:
 - Switching opens the next project in the same window. The window reloads, as VS Code does when the folder changes (the release plan: its API offers no way around it).
 - While it reloads, the window shows the ground's colour, in Light and in Dark, not a dark block.
 - The next project opens on its Home, and keeps its own tabs: coming back to a project brings its tabs back as they were.
-- When the AI is working in the project being left (a turn running, a card's task running, a flow running), Ritemark says so before switching and offers to switch anyway or stay. Switching stops that work, as closing the window does today.
-- After switching, a short note says the other project is kept as it was left, with Go back (experience 3, frame 3), if the Experience lead keeps it.
+- Any switch that reloads the window (Home's list, the project's menu, Open a folder…) while a chat in this window is working (a card's turn runs in a chat too) asks first, in experience 31's dialog, 440 wide (experience 33, frame 3):
+  - title: "Claude is still working in <project>" (the AI's name as it is);
+  - detail: "Switching projects stops it. Open <other> in a new window to let Claude finish.";
+  - buttons: Cancel, Switch and stop, and Open in a new window as the default.
+  Open in a new window opens the other project in a new window and leaves this one as it is; Switch and stop stops the chat as Stop would, then switches; Cancel does nothing. With nothing working, switching never asks.
+- After a switch, Home's note says "Switched to <project>. <other> is kept as you left it." with Go back, which switches back (experience 3, frame 3; experience 33).
 - Open in a new window, and ⌥ click, open the project in a new window instead and leave this one as it is.
 
 ### R10: The welcome lands on Home
@@ -156,17 +160,25 @@ As a writer, I want to see that my document is saved, and find the ways to send 
 
 Acceptance criteria:
 - The document's bar shows Saved when the document on disk matches the editor, from the sync state the host already sends. It shows nothing while a save is in progress for less than a moment, and the save-problem actions (Review changes, Retry) in Saved's place when a save fails (as today).
-- Export becomes Share, with the same items in the same groups: Export PDF, Export Word, Google Docs (connect, create, sync, open, unlink, reconnect) and Copy as Markdown (comparison inventory, "Moved, renamed").
-- Every item works as it does today.
+- Export becomes Share ("Share, not Export"), one menu in experience 26's frame 1 order:
+  - **Send a copy**: PDF (for reading and printing), then Word document (for people who edit in Word);
+  - **Google Docs**: Publish to Google Docs (one Google Doc you update from here);
+  - **Copy as Markdown** (for email and chat);
+  - the foot line: the document stays on this computer; sharing sends a copy.
+- Every 1.x Export item keeps working from Share. Publish to Google Docs runs today's connect-and-create flow; once a document is linked, the Google Docs group holds today's actions for that state (update the Google Doc, open it, remove the link, reconnect), in 2.0's words.
+- The Google Doc chip and its card (experience 26, frame 2) and bringing edits back in (frame 3, a concept) are not in this sprint.
 
 ### R13: Missing, empty and boardless projects
 
 As a writer, I want Ritemark to say plainly when a project is not as expected.
 
 Acceptance criteria:
-- A missing or moved folder: in the projects list and the switcher it is muted and marked Missing; choosing it offers Find it… and Remove from the list; it never opens an empty window.
-- An empty project: Home as R4 says.
-- A project with no task board yet: the Tasks tab opens the board's empty state (experience 29, frame 2); no board file is written until the person adds a card.
+- A project whose folder is not found (experience 33, frames 1 and 2):
+  - in the projects list and the switcher its row is muted, with a warning-circle and Not found, the old path in its tooltip, in its place;
+  - clicking it does not switch: the window stays in the current project, and the desk's Home shows the project's head with a muted mark and one box: "This project's folder is not where it was", the old path, Find it… (primary) and Remove from the list;
+  - Find it… opens the folder picker at the old path's nearest existing parent; the chosen folder replaces the old path in the list and the project opens there; if the chosen folder is another project's, Ritemark says so and keeps the list as it was.
+- An empty project: Home as R4 says (experience 29, frame 1).
+- A project with no task board yet: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and its tab has no count; no board file is written until the person adds a card.
 - With the `task-board` flag off: no Tasks tab, no task counts; chats still count.
 
 ### R14: Nothing v1.14.0 does is lost
@@ -251,15 +263,15 @@ Acceptance criteria:
 - **2026-10-16 (Jarmo):** Home and Tasks pinned permanently as the first two tabs, icons only; "yes, yes, yes" to the projects list on Home, the count on the Tasks tab, and sending it to the Development manager.
 - **2026-10-17 (Jarmo):** "when I click Tasks, the board ALWAYS opens too"; the Home tab comes in step 3 ("ok").
 - **2026-10-17 (engineering, on Jarmo's "You decide"):** the project list fills on the first 2.0 start from recent folders, chats and task boards.
+- **2026-10-18 (the Experience lead's answers to this plan's design questions, and experience 33):** Start something is on every Home, under Waiting for you; an empty project is experience 29's frame 1 and a project with no board its frame 2, with no count on the Tasks tab; a folder that is not found and switching while Claude works are drawn as experience 33; What moved arrives with Home, once per profile; the "Switched to…" note with Go back stays; the document's bar is `comparison/after-write.png`, with Share as experience 26's frame 1.
 - **Release plan:** the reload stays; the splash takes the ground's colour; switching asks first when the AI is working; ⌥ click opens a new window.
 
 ## Open Questions
 
 Each has a recommendation; Jarmo answers at this plan's approval.
 
-1. **Home's Start something row for a project with content.** Experience 3's frame 1 has none; welcome frame 4 and experience 29 have it. HARD RULE #1 needs 1.x's New document reachable from Home. **Recommendation:** always show it, under Waiting for you. Asked of the Experience lead.
-2. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
-3. **The Go back note after a switch** (experience 3, frame 3). **Recommendation:** keep it, for a few seconds, if the Experience lead keeps it in the drawing.
-4. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
+1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
+2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
+3. **About this project's file**, for the project's menu (experience 24's open questions, which also kept it out of step 2). **Recommendation:** `AGENTS.md` whose first heading is "About this project", with a one-line `CLAUDE.md` holding `@AGENTS.md`, so Claude, ChatGPT and OpenCode read the same words with no Ritemark plumbing; the menu item opens it, or offers to create it. If Jarmo has not decided by Phase 0, the item is left out of this sprint.
 
-Design questions sent to the Experience lead on 18 October: Home's Start something row; the drawings for an empty project, a missing folder and a project with no board; What moved arriving with Home; the Go back note and the words when the AI is working in the project being left; the document's bar with Saved and Share.
+The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*).

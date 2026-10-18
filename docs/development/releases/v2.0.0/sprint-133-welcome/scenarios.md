@@ -31,13 +31,14 @@ And the word Codex appears nowhere.
 
 ### S5: API keys
 When the person clicks API keys
-Then the Anthropic API key can be entered, as in Settings, and no key is offered as a way to use ChatGPT
-When a valid key is saved
-Then Claude counts as ready and the welcome moves to step 2.
+Then a small sheet opens over the welcome, in experience 31's dialog style, where the Anthropic API key can be entered, as in Settings; no key is offered as a way to use ChatGPT
+When a valid key is saved and the person clicks Done
+Then the sheet closes, Claude is marked as set up, and the welcome moves to step 2.
 
 ### S6: Skip for now
 When the person clicks Skip for now
-Then the welcome moves to step 2 with no AI, and step 2's line about Claude names no AI.
+Then the welcome moves to step 2 with no AI, and step 2's line about Claude names no AI
+And step 2 offers no skip: closing the window is the way out.
 
 ### S7: Already signed in
 Given Claude Code is signed in on this computer before Ritemark's first start
@@ -68,8 +69,10 @@ Given the network drops during a sign-in, or the browser page is closed without 
 Then the card returns to Sign in with one sentence saying what happened and what to do, and no error code or "authentication" appears.
 
 ### S12: OpenCode
-When the person clicks OpenCode's Set up and enters a provider and key there
-Then OpenCode becomes ready and the welcome moves to step 2.
+When the person clicks OpenCode's Set up
+Then a small sheet opens over the welcome with today's OpenCode fields
+When the person enters a provider's key and clicks Done
+Then OpenCode is marked as set up, becomes ready, and the welcome moves to step 2.
 
 ### S13: A terminal for a sign-in
 Given a sign-in flow that opens a terminal
@@ -100,25 +103,32 @@ When the person clicks Open a folder… and picks a folder
 Then the window lands on that project (S20).
 
 ### S18: Start a new project
-When the person clicks Start a new project and names it "Board report 2026"
-Then a folder `~/Documents/Ritemark/Board report 2026` is created with About this project in it, and the window lands on it.
+When the person clicks Start a new project
+Then the row opens into a "Project name" field and Create, with "In ~/Documents/Ritemark/<name>" under it in muted ink and Change…
+When the person types "Board report 2026" and clicks Create
+Then an empty folder `~/Documents/Ritemark/Board report 2026` is created and the window lands on it
+When the person instead uses Change… to pick another place
+Then the line shows that place and the folder is created there.
 
 ### S19: A name that cannot be used (negative)
 When the person names a new project the same as an existing folder there, or with a character the system refuses
 Then the welcome says so in place, and nothing is created.
 
 ### S20: Missing Git
-Given a Mac with no Git (or a Windows PC whose system runtime needs Node.js, without it)
-Then step 2 shows one plain line saying what is missing and what it means, in words only, with no download or install link
-And with Git and Node.js present, no such line shows.
+Given a Windows PC set to this computer's own Claude, with no Git
+Then step 2 shows, under "Signed in to Claude", a warning-circle line: "Claude from this computer needs Git, and Git isn't installed. Use Ritemark's own Claude instead, or install Git and restart Ritemark." with Use Ritemark's own Claude, and no download or install link
+When the person clicks Use Ritemark's own Claude
+Then the runtime switches to Ritemark's own and the line goes
+And with Ritemark's own Claude, or on a Mac, no such line shows; the same holds for Node.js.
 
 ## Feature: Landing on the project (R6)
 
 ### S21: Landing
 Given the person signed in to Claude and picked a folder
 When the window reloads
-Then Documents is open in the left column with the project's name in its head, the AI's sheet is open on a new chat with Claude, its message box reads "Ask Claude about <project>", and the desk is empty with its +
-And for a new project, About this project is open on the desk.
+Then Documents is open in the left column with the project's name in its head, the AI's sheet is open on a new chat with Claude, its message box reads "Ask Claude about this project", and the empty desk offers Text, Table and Web page as tiles
+When the person clicks Table
+Then a new table opens as a tab, as the +'s Table does.
 
 ### S22: Landing once
 Given a landed project
@@ -227,7 +237,8 @@ Then VS Code's Getting Started page never shows: each opens Ritemark's welcome, 
 
 ### S41: The launch check's rows
 Given Ritemark Settings
-Then it shows whether Git is found and, when a system runtime needs it, Node.js, as 1.x's launch check did, and each AI's sign-in state with its Sign in
+Then, with this computer's own Claude chosen, the Git and Node.js rows show under the runtime choice, as 1.x's launch check did; with Ritemark's own Claude they do not show
+And each AI's sign-in state shows with its Sign in
 And it shows the usage-data choice with the welcome's words, with the Privacy Policy and Terms of Use links.
 
 ## Feature: The muted extension (R13)
@@ -237,6 +248,16 @@ Given a project with `Brief.md`, `report.final.md`, `README`, `.gitignore` and `
 Then in the tree and on tabs each name is in the body ink and its extension in the muted ink (`.md` of `report.final.md` only; none for `README`; `.gitignore` whole in the body ink)
 And on the chosen tab and the open row both parts are the body ink
 And in high contrast the extension keeps 4.5:1.
+
+### S48: A finished profile's window with no folder
+Given a profile that has opened a project from the welcome
+When the person opens a new window with no folder
+Then a short sheet on the ground asks "Where do you want to start?" with the recent projects, Open another folder… and Start a new project, and no Your AI or usage-data switch.
+
+### S49: Every empty desk
+Given a project window
+When the person closes every tab on a desk
+Then that desk offers Text, Table and Web page as tiles, and each opens its kind of tab.
 
 ## Feature: Nothing is lost (R14)
 

@@ -13,7 +13,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 ## Phase 1: Audits first
 
 - [ ] `research/getting-started-retirement-audit.md` (W2, R12): the hunks of 001, 016 and 017 sorted; every route into Getting Started; `IOnboardingService` (007); where `workbench.startupEditor: none` wins; the stacking check's pairs
-- [ ] `research/welcome-alone-audit.md` (W3, R1): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing
+- [ ] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
 - [ ] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
 - [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; the Windows profile through the Development manager's Windows session; the decision
 - [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); the sign-in entry points and their progress events; how the healer closes the text tab
@@ -46,16 +46,18 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `src/welcome/WelcomePanel.ts`: the panel in the shared bundle; opened for a window with no folder; columns closed; `ritemark.welcomeAlone` (R1)
 - [ ] `extension.ts`: the AI sheet's 4 s focus and the start-up layout writes skip while the welcome is open (R1)
 - [ ] 018: the welcome alone, per its audit (R1)
+- [ ] 018: an empty desk's three tiles running the +'s commands (R6)
+- [ ] The finished profile's "Where do you want to start?" sheet (R1)
 - [ ] `webview/src/main.tsx`: the `welcome` root
 - [ ] `webview/src/components/welcome/`: `WelcomeSheet`, `ProviderCard`, `UsageDataSwitch`, step 1 and step 2 (R1, R2, R5, R7)
 - [ ] `media/welcome/`: the resized header illustration (E4)
 - [ ] `src/welcome/providerStatus.ts`: the three providers through their existing checks; 20 s Try again; offline (R4)
 - [ ] Sign in, Cancel and Open the page again for Claude and ChatGPT through Settings' entry points; OpenCode's Set up (R3)
 - [ ] `src/welcome/words.ts`: failures in one sentence each (R3)
-- [ ] API keys: the Anthropic key entry (R2)
-- [ ] Start a new project: name check, `<Documents>/Ritemark/<name>`, About this project per Jarmo's answer (R5)
-- [ ] The missing Git or Node line on step 2 (R5)
-- [ ] `src/welcome/landing.ts` + test: written before `openFolder`, read after the reload, Documents, the AI's new chat naming the project, About this project, `project_opened`, deleted (R6)
+- [ ] The small sheets over the welcome: API keys (the Anthropic key) and OpenCode's Set up, with Done (R2, R3)
+- [ ] `src/welcome/newProject.ts` + test: the name field, Create, the place line and Change…, the name check, an empty `<Documents>/Ritemark/<name>` (R5)
+- [ ] The missing Git or Node line under "Signed in to Claude": its words, Use Ritemark's own Claude, Restart (R5)
+- [ ] `src/welcome/landing.ts` + test: written before `openFolder`, read after the reload, Documents, the AI's new chat ("Ask Claude about this project"), the empty desk, `project_opened`, deleted (R6)
 
 ## Phase 5: Updating, the first window with a file, Settings, the extension (W6, W7, W8, W9)
 
@@ -64,7 +66,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `ritemark.welcome.finished` and `ritemark.updatedFrom1x` written when a project is picked (R10)
 - [ ] A fresh profile's first window with a file or folder leaves the welcome for later (R11)
 - [ ] `utils/stickyTabHealer.ts` + `extension.ts`: the healer closes the text tab it replaced; test (R11, #429)
-- [ ] Ritemark Settings: Usage data with the links; This computer with Git and Node (R7, R12)
+- [ ] Ritemark Settings: Usage data with the links; Git and Node rows under the runtime choice, for this computer's runtime only (R7, R12)
 - [ ] 018: the muted extension per its audit; its VS Code unit test (R13)
 - [ ] #401: the fix in `activate` if the audit finds one in Ritemark's code; the welcome's queued click either way (R15)
 
@@ -74,7 +76,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] The screenshot baseline gains the welcome's frames, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md`, `CLAUDE.md`'s patch table, `PATCH-RULES.md`, `references/layout-invariants.md` (E6)
-- [ ] Manual QA on the Mac: S1–S44; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S44, S48, S49; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S45, S46 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge"
