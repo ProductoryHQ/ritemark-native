@@ -2275,10 +2275,10 @@ index 7c01c6202c3..f3bc6e1f1bc 100644
  	private offsetHelper: HTMLElement;
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index 22bfb325a6f..688a85a4774 100644
+index b00efadf3eb..a47b120fc44 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-@@ -856,6 +856,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -857,6 +857,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  			}
  		}
  

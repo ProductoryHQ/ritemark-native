@@ -101,10 +101,10 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
 - [x] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand (18 October, at 665f5ff2: both pass; the validator again before each later commit)
-- [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge" (#447 opened 2026-10-18; the review: ready with notes, its must-fixes done in 7f8db2d6; the merge waits for Jarmo)
-- [ ] After the merge: a production build from a clean-room worktree (E5); Windows round 2 from main: S7–S11 again, S39 and S42 on Windows
-- [ ] After the merge: drift check (E6)
+- [x] PR 2 opened; `qa-validator` review; Jarmo's "admin merge" (#447 opened 2026-10-18; the review: ready with notes, its must-fixes done in 7f8db2d6; merged 2026-10-18 as `cb59f4cd`). After it: S44's older defects ([#450](https://github.com/ProductoryHQ/ritemark-native/pull/450), `f492948b`) and new Text and Table in the project ([#451](https://github.com/ProductoryHQ/ritemark-native/pull/451), `de2b7d6b`)
+- [x] After the merge: a production build from a clean-room worktree (E5, passed at `f492948b`); Windows round 2 from main: S7–S11 again, S39 and S42 on Windows, with S23 and S37 (done 18 October at `f492948b`; Ctrl+Alt+I without Copilot Chat failed and is fixed in the closeout; S39's screenshots wait for the Experience lead's review)
+- [x] After the merge: drift check (E6): 15 of 19 patches fail on 1.142.0, in 60 file patches (`notes/drift.md`)
 - [ ] Linked issues closed with evidence: [#276](https://github.com/ProductoryHQ/ritemark-native/issues/276), [#430](https://github.com/ProductoryHQ/ritemark-native/issues/430), [#199](https://github.com/ProductoryHQ/ritemark-native/issues/199)
 - [x] `docs/CHANGELOG.md` and the v2.0.0 release notes draft (`docs/releases/v2.0.0/release-notes.md`, step 1; the changelog's 2.0.0 section stays Unreleased until 2.0 ships)
-- [ ] Release plan: tracker, feature-complete checklist rows and risk register updated
+- [x] Release plan: tracker and risk register updated at the closeout (the feature-complete checklist's rows are release-wide: none is met by step 1 alone)
 - [x] `node ./scripts/worktree-hygiene.mjs --check` reported (cleaning is Jarmo's call). 18 October: 5 worktrees, none removable; `.worktrees/store-v1120` is BLOCKED by uncommitted changes, the rest are in use

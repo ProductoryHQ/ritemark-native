@@ -438,8 +438,15 @@ supplies defaults, words and colours.
 - **Extension.** 2.0 defaults in `package.json` (`configurationDefaults`), the head's commands
   (`src/views/projectHeadCommands.ts`), the seven `ritemark.*` surface colours, the themes and the icon themes.
 
-TO BE: the theme pass on every surface (dialogs, Flows, the Agent Library) and the window-size crossings
-(`ritemarkWindowSizes.ts`) come with merge 2 of the sprint.
+- **Merge 2 (#447).**
+  - **The window sizes:** `ritemarkWindowSizes.ts`, loaded by `desktop.contribution.ts`, 018. Below 1400 the AI's column narrows to 336; below 1200 the left column hides; below 960 the AI hides. A column the person opened is left alone until the window crosses that width again.
+  - **The theme pass on the remaining surfaces:** dialogs, the palette, notifications, Transcribe, Flows and the Agent Library.
+  - **You,** an icon button like the AI's toggle.
+  - **Every tab** keeps its close button's room on the right.
+- **After merge 2:**
+  - **#450:** a debounced watcher on `.claude/{agents,commands,skills}` in `UnifiedViewProvider` sends @ and / their list again.
+  - **#451:** new Text and Table go in the project, in the folder chosen in the tree. 018's hidden `_ritemark.files.chosenFolder` (`fileCommands.ts`) gives the folder, and `src/newDocumentLocation.ts` names the file.
+  - **The closeout:** 007's Copilot Chat entries (More, the View menu, Ctrl+Alt+I) count only a Copilot Chat that is installed and not disabled. Ctrl+Alt+I is always Ritemark's, so VS Code's own Chat never opens in its place.
 
 ## Agent Runtime Architecture
 
@@ -1371,6 +1378,23 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-18 | Sprint 132 | **The 2.0 frame, merge 2 and closeout (#447, #450, #451, the closeout PR).** 018:
+- `ritemarkWindowSizes.ts`, the window sizes;
+- dialogs, palette and notifications styles (`quickInputList.ts`, `notificationsViewer.ts`);
+- You as an icon button and the frame toggles' muted ink;
+- every tab's close slot on the right;
+- `_ritemark.files.chosenFolder`.
+
+019: the terminal tab's menu and the move commands' empty-desk fix. 007: Copilot Chat counts only when installed and not disabled; Ctrl+Alt+I always Ritemark's. 003: the View menu's Run and Chat leftovers.
+
+Extension:
+- `newDocumentLocation.ts`, with Text and Table writing with `wx`;
+- the agent-file watcher in `UnifiedViewProvider`;
+- `ritemark.transcribe.openSettings`;
+- `DocumentSyncCoordinator`'s use-disk revert;
+- `sheetSort.ts`.
+
+Drift on VS Code 1.142.0: 15 of 19 patches fail, in 60 file patches. |
 | 2026-10-17 | Sprint 132 | **The 2.0 frame, merge 1 (#443).** Patch 002 shrinks to placement (places row on top in Ritemark's order once per profile, Copilot Chat behind More, the 1.x terminal guards removed); new 018 (no title row, 44 strips on the line at 26, sheets and gaps, zoom, Ritemark's menus, the left column head) and 019 (tab row, +, folded tabs, permanent Home/Task board tabs, terminals as tabs with their bar). Extension: 2.0 defaults, `projectHeadCommands.ts`, seven surface colours, themes and icon themes. New checks: `check-patch-stacking.mjs` (pre-commit Check 14), `qa/frame-geometry.mjs`, `check-vscode-drift.sh`. |
 | 2026-10-13 | Sprint 130 | **Task board (v1.14.0, #119).** New `src/taskBoard/`: card files in `.ritemark/tasks/` (`cardFile.ts`, `BoardStore.ts`, reads and writes an open card page through its document), `BoardController.ts` (derived who-moves-next, Your calls, Doing limit, conflict guard, auto-start, archive + 28-day Done window, idea review), `CardTaskStore.ts` + `CardHandoffLedger.ts` (Give to agent through the Sprint 117 queue: `newConversation`, `sourceKind: 'card'`, `attachTaskListener`; G1–G6), `cardPages.ts` (the Ritemark editor's card mode: `cardMode` in `editorSync/protocol.ts`, body spliced under the front matter), `ideaReview.ts` on the new shared `runtime/oneShotTurn.ts` (conversation titles moved onto it), surfaces `TasksViewProvider.ts` + `TaskBoardPanel.ts`. **Ritemark tool registry:** `runtime/ritemarkTools.ts` + `RitemarkToolsInjector.ts` + `RitemarkIpcServer.ts` replace `BrowserToolsInjector.ts`, `browserMcpServer.ts`, `codexBrowserTools.ts` and `browser/BrowserIpcServer.ts`; the OpenCode adapter is generic; Codex gets `codexDynamicTools` / `onDynamicToolCall` and a `toolSet` key in its continuation fingerprint; Claude gets a new MCP server per session (fixes browser tools reaching only the first open Claude conversation). `capabilityContext.ts` v2: `hasBoardTools` + TASK BOARD section. Flag `task-board` (default on). No patch change. |
 | 2026-10-12 | Sprint 131 | **Browser Recent records in-panel browsing (v1.14.0, #195).** Patch 009 gains `RitemarkBrowserHistoryContribution`, the browser bridge's first workbench→extension push (`ritemark.browser.didNavigate`), with no new hunk in upstream VS Code files. New `browser/browserNavigationRecorder.ts` owns every rule (validation, private sessions, failed loads, schemes, 1 s settle for client redirects, 10 s title window, fallback titles). `BrowserHistoryStore` gains titles, `historyKey` dedupe (case, slash, default port, fragment), `setTitle` and `pruneMissingFiles`. `openInIntegratedBrowser()` stops writing to the store. See *Browser Recent* under the subsystem map. |

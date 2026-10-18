@@ -24,13 +24,16 @@
 #   3. Sprint 132 (Ritemark 2.0 step 1, 2026-10-17): the AI column holds only
 #      Ritemark's AI, so Copilot Chat no longer moves into it. Its launcher sits
 #      in More (patch 002, compositeBar.ts), shows only while Copilot Chat is
-#      installed (paneCompositeBar.ts, the chatSetupInstalled context key), and
-#      opens Copilot Chat as a tab on the desk: an open one comes forward, or
-#      workbench.action.chat.openInEditor opens a new one
-#      (ritemark.copilotChat.openAsTab, chatSetupContributions.ts). The View
-#      menu's Copilot Chat and Ctrl+Alt+I (Ctrl+Cmd+I on the Mac) run it too,
-#      so neither opens Copilot Chat in the bottom panel (Windows round 1,
-#      2026-10-18; patch 003 drops the panel view's own View-menu entry).
+#      installed and not disabled (paneCompositeBar.ts, the chatSetupInstalled
+#      and chatSetupDisabled context keys), and opens Copilot Chat as a tab on
+#      the desk: an open one comes forward, or workbench.action.chat.openInEditor
+#      opens a new one (ritemark.copilotChat.openAsTab, chatSetupContributions.ts).
+#      The View menu's Copilot Chat and Ctrl+Alt+I (Ctrl+Cmd+I on the Mac) run
+#      it too, so neither opens Copilot Chat in the bottom panel (Windows round
+#      1, 2026-10-18; patch 003 drops the panel view's own View-menu entry). The
+#      shortcut is always Ritemark's, above VS Code's own Open Chat and Chat
+#      view bindings, and does nothing without a usable Copilot Chat: VS Code's
+#      own Chat never opens in its place (S21, Windows round 2, 2026-10-18).
 #
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
 #          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
@@ -39,7 +42,7 @@
 # Created: 2026-05-02
 #
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index bc6003e2f44..22bfb325a6f 100644
+index bc6003e2f44..b00efadf3eb 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 @@ -31,6 +31,13 @@ import { GestureEvent } from '../../../base/browser/touch.js';
@@ -60,10 +63,10 @@ index bc6003e2f44..22bfb325a6f 100644
  		this._register(this.viewDescriptorService.onDidChangeViewContainers(({ added, removed }) => this.onDidChangeViewContainers(added, removed)));
  		this._register(this.viewDescriptorService.onDidChangeContainerLocation(({ viewContainer, from, to }) => this.onDidChangeViewContainerLocation(viewContainer, from, to)));
  
-+		// Ritemark 2.0: Copilot Chat's launcher follows whether Copilot Chat is installed
-+		const copilotChatInstalledKey = new Set([ChatEntitlementContextKeys.Setup.installed.key]);
++		// Ritemark 2.0: Copilot Chat's launcher follows whether Copilot Chat is installed and not disabled
++		const copilotChatUsableKeys = new Set([ChatEntitlementContextKeys.Setup.installed.key, ChatEntitlementContextKeys.Setup.disabled.key]);
 +		this._register(this.contextKeyService.onDidChangeContext(e => {
-+			const launcher = e.affectsSome(copilotChatInstalledKey) ? this.getViewContainer(RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID) : undefined;
++			const launcher = e.affectsSome(copilotChatUsableKeys) ? this.getViewContainer(RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID) : undefined;
 +			if (launcher) {
 +				this.showOrHideViewContainer(launcher);
 +			}
@@ -72,18 +75,19 @@ index bc6003e2f44..22bfb325a6f 100644
  		// View Container Visibility Changes
  		this._register(this.paneCompositePart.onDidPaneCompositeOpen(e => this.onDidChangeViewContainerVisibility(e.getId(), true)));
  		this._register(this.paneCompositePart.onDidPaneCompositeClose(e => this.onDidChangeViewContainerVisibility(e.getId(), false)));
-@@ -431,6 +447,10 @@ export class PaneCompositeBar extends Disposable {
+@@ -431,6 +447,11 @@ export class PaneCompositeBar extends Disposable {
  		const viewContainer = isString(viewContainerOrId) ? this.getViewContainer(viewContainerOrId) : viewContainerOrId;
  		const viewContainerId = isString(viewContainerOrId) ? viewContainerOrId : viewContainerOrId.id;
  
-+		if (viewContainerId === RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID && !this.contextKeyService.getContextKeyValue<boolean>(ChatEntitlementContextKeys.Setup.installed.key)) {
++		// Ritemark 2.0: a disabled Copilot Chat counts as not installed; VS Code's own Chat would open in its place (S21)
++		if (viewContainerId === RITEMARK_COPILOT_CHAT_ACTIVITY_BAR_LAUNCHER_ID && (!this.contextKeyService.getContextKeyValue<boolean>(ChatEntitlementContextKeys.Setup.installed.key) || this.contextKeyService.getContextKeyValue<boolean>(ChatEntitlementContextKeys.Setup.disabled.key))) {
 +			return true;
 +		}
 +
  		if (viewContainer) {
  			if (viewContainer.hideIfEmpty) {
  				if (this.viewService.isViewContainerActive(viewContainerId)) {
-@@ -776,6 +796,7 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -776,6 +797,7 @@ class ViewContainerActivityAction extends CompositeBarAction {
  		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
  		@IConfigurationService private readonly configurationService: IConfigurationService,
  		@IActivityService private readonly activityService: IActivityService,
@@ -91,7 +95,7 @@ index bc6003e2f44..22bfb325a6f 100644
  	) {
  		super(compositeBarActionItem);
  		this.updateActivity();
-@@ -808,6 +829,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -808,6 +830,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  
  		const focus = (event && 'preserveFocus' in event) ? !event.preserveFocus : true;
  
@@ -136,7 +140,7 @@ index e76d44b8645..91b73daa38a 100644
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-index 2ea65ba8917..95d50335294 100644
+index 2ea65ba8917..b306396b330 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 @@ -7,6 +7,7 @@ import * as dom from '../../../../../base/browser/dom.js';
@@ -183,7 +187,7 @@ index 2ea65ba8917..95d50335294 100644
  import { chatViewsWelcomeRegistry } from '../viewsWelcome/chatViewsWelcome.js';
  import { ChatSetupAnonymous, ChatSetupStrategy } from './chatSetup.js';
  import { ChatSetupController } from './chatSetupController.js';
-@@ -66,6 +72,321 @@ const defaultChat = {
+@@ -66,6 +72,329 @@ const defaultChat = {
  };
  
  const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
@@ -192,6 +196,8 @@ index 2ea65ba8917..95d50335294 100644
 +// (⌃⌘I on the Mac) run this. Copilot Chat opens as a tab on the desk, never in the AI column,
 +// which holds only Ritemark's AI.
 +const RITEMARK_OPEN_COPILOT_CHAT_TAB_ID = 'ritemark.copilotChat.openAsTab';
++// Copilot Chat installed and not disabled: a disabled one counts as not installed (S21)
++const RITEMARK_COPILOT_CHAT_USABLE = ContextKeyExpr.and(ChatEntitlementContextKeys.Setup.installed, ChatEntitlementContextKeys.Setup.disabled.negate());
 +
 +export class ChatSetupActionsContribution extends Disposable implements IWorkbenchContribution {
 +
@@ -466,18 +472,19 @@ index 2ea65ba8917..95d50335294 100644
 +						mnemonicTitle: localize({ key: 'miRitemarkCopilotChat', comment: ['&& denotes a mnemonic'] }, "&&Copilot Chat"),
 +					},
 +					f1: false,
-+					// Copilot Chat's own shortcut and the View menu's entry open the tab too, not the panel (Windows round 1)
++					// Copilot Chat's own shortcut and the View menu's entry open the tab too, not the panel (Windows round 1).
++					// The shortcut is always Ritemark's, above VS Code's own two (Open Chat and the Chat view), so without a
++					// usable Copilot Chat it does nothing rather than open VS Code's Chat in a bottom panel (S21, Windows round 2)
 +					keybinding: {
 +						weight: KeybindingWeight.WorkbenchContrib + 1,
 +						primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI,
 +						mac: { primary: KeyMod.CtrlCmd | KeyMod.WinCtrl | KeyCode.KeyI },
-+						when: ChatEntitlementContextKeys.Setup.installed,
 +					},
 +					menu: {
 +						id: MenuId.MenubarViewMenu,
 +						group: '4_auxbar',
 +						order: 1,
-+						when: ChatEntitlementContextKeys.Setup.installed,
++						when: RITEMARK_COPILOT_CHAT_USABLE,
 +					},
 +				});
 +			}
@@ -485,6 +492,11 @@ index 2ea65ba8917..95d50335294 100644
 +			override async run(accessor: ServicesAccessor): Promise<void> {
 +				const editorService = accessor.get(IEditorService);
 +				const commandService = accessor.get(ICommandService);
++				const contextKeyService = accessor.get(IContextKeyService);
++
++				if (!contextKeyService.contextMatchesRules(RITEMARK_COPILOT_CHAT_USABLE)) {
++					return;
++				}
 +
 +				// Bring an open Copilot Chat tab forward, or open a new one on the desk
 +				const open = editorService.getEditors(EditorsOrder.MOST_RECENTLY_ACTIVE).find(({ editor }) => editor instanceof ChatEditorInput);
