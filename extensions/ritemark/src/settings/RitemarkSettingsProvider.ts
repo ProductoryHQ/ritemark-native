@@ -645,9 +645,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           },
         };
 
-    const environment = config.get<string>('agentRuntime.preference', 'bundled') === 'system'
-      ? await getAgentEnvironmentStatus().catch(() => null)
-      : null;
+    // Git's row shows whichever Claude runs (File changes needs Git); Node.js's only with this computer's runtime.
+    const environment = await getAgentEnvironmentStatus().catch(() => null);
 
     webview.postMessage({
       type: 'settings',
@@ -664,7 +663,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Agent runtime preference (bundled vs system)
         agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
-        // Sprint 133 (R12): 1.x's launch check rows, Git and Node.js, for this computer's runtime only
+        // Sprint 133 (R12): 1.x's launch check rows: Git always, Node.js for this computer's runtime
         environment,
 
         // Sprint 133 (R7): usage data, off until the person's yes; the welcome's words

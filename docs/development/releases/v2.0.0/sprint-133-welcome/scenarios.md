@@ -261,11 +261,12 @@ And 25 fresh launches with a `.md` each end with one tab.
 
 ### S40: Every way in
 When the person tries Help's welcome entry, the command palette's Welcome and walkthrough commands, and starts with `workbench.startupEditor` left at its default
-Then VS Code's Getting Started page never shows: each opens Ritemark's welcome, or is not offered.
+Then VS Code's Getting Started page never shows: each opens Ritemark's welcome, or is not offered
+And Help has Getting started beside Support, opening ritemark.app's Getting started guide, as 1.x's page did.
 
 ### S41: The launch check's rows
 Given Ritemark Settings
-Then, with this computer's own Claude chosen, the Git and Node.js rows show under the runtime choice, as 1.x's launch check did; with Ritemark's own Claude they do not show
+Then Git's row shows under the runtime choice whichever Claude runs, as 1.x's launch check did (File changes needs Git either way); Node.js's row shows only with this computer's own Claude
 And each AI's sign-in state shows with its Sign in
 And it shows the usage-data choice with the welcome's words, with the Privacy Policy and Terms of Use links.
 

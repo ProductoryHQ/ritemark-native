@@ -179,8 +179,8 @@ Acceptance criteria:
   | Open folder | The welcome's step 2; the head's Open a folder… (Sprint 132) |
   | Recent files and folders | The update welcome's projects (R10); Switch project… (Sprint 132); the project list (Sprint 134) |
   | Launch check: ChatGPT and Claude signed in, "Click here to log in" | The welcome's provider states and Sign in (R2–R4); Settings' sign-in cards |
-  | Launch check: Git found, Node found (only when needed) | A line at the top of step 2 when one is missing, with Use Ritemark's own Claude (R5); rows in Ritemark Settings under the runtime choice, shown for this computer's runtime (new) |
-  | Links: Getting started, Support articles, Blog | Help, under You (Sprint 132 R11), which opens ritemark.app's support pages |
+  | Launch check: Git found, Node found (only when needed) | A line at the top of step 2 when one is missing, with Use Ritemark's own Claude (R5); rows in Ritemark Settings under the runtime choice: Git always, since File changes needs it whichever Claude runs (as 1.x always showed it), and Node.js with this computer's runtime (the v1.14 parity list's G2, the Development manager, 18 October) |
+  | Links: Getting started, Support articles, Blog | Help's Getting started, opening the guide 1.x's page linked to (patch 015; the v1.14 parity list's G1, the Development manager, 18 October); Support in Help and under You (Sprint 132 R11), which opens ritemark.app's support pages. The Blog link is not carried: ritemark.app links it |
   | The logo and tagline | The welcome's header (R1) |
 
 - Patch 001's, 016's and 017's Getting Started hunks are removed, and the files they touched go back to upstream wherever nothing else in them is Ritemark's. Patch 016's Store rule still holds: no download link for Git or Node.js on any Ritemark surface.

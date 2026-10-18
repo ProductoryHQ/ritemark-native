@@ -403,8 +403,8 @@ export function RitemarkSettings() {
             Applies to both Codex and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
           </p>
 
-          {settings.agentRuntimePreference === 'system' && settings.environment && (
-            <SystemToolRows environment={settings.environment} />
+          {settings.environment && (
+            <SystemToolRows environment={settings.environment} showNode={settings.agentRuntimePreference === 'system'} />
           )}
 
           <div className="mt-4 pt-4 border-t border-hairline space-y-2">
@@ -2042,13 +2042,14 @@ function ThemePreviewCard({
  * Sprint 133 (R12): 1.x's launch check rows, under the runtime choice, for this computer's runtime only. Words only:
  * no download or install link (patch 016, Microsoft Store policy 10.1.5).
  */
-function SystemToolRows({ environment }: { environment: NonNullable<SettingsData['environment']> }) {
+/** 1.x's launch check rows (Sprint 133, R12): Git always, since File changes needs it; Node.js with this computer's runtime. */
+function SystemToolRows({ environment, showNode }: { environment: NonNullable<SettingsData['environment']>; showNode: boolean }) {
   const rows = [
-    { name: 'Git', installed: environment.gitInstalled, required: environment.gitRequired },
-    { name: 'Node.js', installed: environment.nodeInstalled, required: environment.nodeRequired },
+    { name: 'Git', installed: environment.gitInstalled, required: environment.gitRequired, missingNote: ' File changes needs it.' },
+    ...(showNode ? [{ name: 'Node.js', installed: environment.nodeInstalled, required: environment.nodeRequired, missingNote: '' }] : []),
   ];
   return (
-    <div className="mt-4 pt-4 border-t border-hairline space-y-2" aria-label="Git and Node.js">
+    <div className="mt-4 pt-4 border-t border-hairline space-y-2" aria-label={showNode ? 'Git and Node.js' : 'Git'}>
       <div className="text-xs font-medium text-ink-strong">This computer's tools</div>
       {rows.map((row) => (
         <div key={row.name} className="flex items-start gap-2 text-xs">
@@ -2059,7 +2060,7 @@ function SystemToolRows({ environment }: { environment: NonNullable<SettingsData
               ? ' found on this computer.'
               : row.required
                 ? ` isn’t installed, and Claude from this computer needs it. Use Ritemark’s own Claude instead, or install ${row.name} and restart Ritemark.`
-                : ' isn’t installed on this computer.'}
+                : ` isn’t installed on this computer.${row.missingNote}`}
           </span>
         </div>
       ))}

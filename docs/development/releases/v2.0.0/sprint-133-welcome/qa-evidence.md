@@ -86,6 +86,13 @@ The Experience lead approved all three, and asked for three more, done and check
 
 The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
 
+## The v1.14 parity list (PR #458, 18 October)
+
+The Development manager's parity check found three gaps in the welcome's scope; two are fixed here:
+- **G1:** 1.14's first page linked to Getting started and the Blog. Help now has Getting started beside Support (patch 015), opening `ritemark.app/en/support/getting-started`. Checked: the policy test lists it in Help's allowlist, and the palette offers "Help: Getting started". The native Mac menu was not read: it is installed only when the window has focus, and the test window stays in the background. The Blog link is not carried (ritemark.app links it).
+- **G2:** Settings' "This computer's tools" shows Git whichever Claude runs (File changes needs it), and Node.js with this computer's runtime. Checked live: Git alone with Ritemark's own Claude, Git and Node.js with this computer's.
+- **G8:** every walkthrough command opens the welcome, the accessibility one included. That walkthrough is VS Code's tour of its own tools (Accessibility Help, Accessible View, verbosity, signals, the palette, keyboard shortcuts, and code features: hover, Go to Symbol, folding, IntelliSense, VS Code's dictation). Every one of those commands stays available, and 1.14's first page did not link the walkthrough. Accepted for 2.0; a Ritemark page on accessibility in the user docs would be the place for it.
+
 ## Open findings
 
 Outside this sprint's files, for follow-up issues:
