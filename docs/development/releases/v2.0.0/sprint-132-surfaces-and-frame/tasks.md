@@ -101,7 +101,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
 - [x] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand (18 October, at 665f5ff2: both pass; the validator again before each later commit)
-- [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge"
+- [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge" (#447 opened 2026-10-18; the review: ready with notes, its must-fixes done in 7f8db2d6; the merge waits for Jarmo)
 - [ ] After the merge: a production build from a clean-room worktree (E5); Windows round 2 from main: S7–S11 again, S39 and S42 on Windows
 - [ ] After the merge: drift check (E6)
 - [ ] Linked issues closed with evidence: [#276](https://github.com/ProductoryHQ/ritemark-native/issues/276), [#430](https://github.com/ProductoryHQ/ritemark-native/issues/430), [#199](https://github.com/ProductoryHQ/ritemark-native/issues/199)
