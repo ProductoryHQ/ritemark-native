@@ -67,6 +67,9 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       columnHelper.accessor((row) => row[col], {
         id: col,
         header: col,
+        // numbers in number order and words in word order, whatever the first row holds ('auto' read the first
+        // row's value, so an empty first cell sorted 1200 before 300)
+        sortingFn: 'alphanumeric',
         cell: (info) => {
           const value = info.getValue()
           return value === null || value === undefined ? '' : String(value)
@@ -539,7 +542,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                         style={{ background: 'var(--r-error, #f44)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          onDeleteRow(virtualRow.index)
+                          onDeleteRow(row.index) // the row's place in the file, not its place in a sorted view
                           setConfirmDeleteRow(null)
                           setSelectedRow(null)
                         }}
@@ -584,7 +587,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                       onMouseLeave={() => setHoverInsertIndex(null)}
                       onClick={(e) => {
                         e.stopPropagation()
-                        onInsertRowAt(virtualRow.index)
+                        onInsertRowAt(row.index) // before this row in the file, also when the view is sorted
                       }}
                     >
                       {hoverInsertIndex === virtualRow.index && (

@@ -1,7 +1,9 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
-  darkMode: ['class'],
+  // dark: follows the webview's own dark class (utils/themeClass.ts sets ritemark-dark from VS Code's theme);
+  // a bare .dark is never set, so dark: variants never applied
+  darkMode: ['selector', '.ritemark-dark'],
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',

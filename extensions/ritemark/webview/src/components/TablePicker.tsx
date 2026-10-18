@@ -54,7 +54,7 @@ export function TablePicker({ editor, onClose }: TablePickerProps) {
   }
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-lg border">
+    <div className="p-4 bg-surface rounded-lg shadow-lg border">
       {/* Dimension label - shows current hover selection */}
       <div className="text-sm text-ink-body mb-2 text-center font-medium">
         {hoveredCell.row} × {hoveredCell.col}
@@ -75,7 +75,7 @@ export function TablePicker({ editor, onClose }: TablePickerProps) {
               className={`w-6 h-6 border-2 cursor-pointer transition-colors ${
                 isHighlighted
                   ? 'bg-blue-100 border-blue-400'
-                  : 'bg-white border-hairline-strong hover:border-ink-faint'
+                  : 'bg-surface border-hairline-strong hover:border-ink-faint'
               }`}
               onMouseEnter={() => handleCellHover(row, col)}
               onClick={() => handleCellClick(row, col)}
