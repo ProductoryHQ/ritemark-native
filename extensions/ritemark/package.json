@@ -96,6 +96,41 @@
         "icon": "$(folder)"
       },
       {
+        "command": "ritemark.projectHead.newAgent",
+        "title": "Agent",
+        "icon": "$(ritemark-robot)"
+      },
+      {
+        "command": "ritemark.projectHead.newSkill",
+        "title": "Skill",
+        "icon": "$(ritemark-sparkle)"
+      },
+      {
+        "command": "ritemark.projectHead.newCommand",
+        "title": "Command",
+        "icon": "$(ritemark-command)"
+      },
+      {
+        "command": "ritemark.agentLibrary.newAgent",
+        "title": "New Agent",
+        "category": "Agents"
+      },
+      {
+        "command": "ritemark.agentLibrary.newSkill",
+        "title": "New Skill",
+        "category": "Agents"
+      },
+      {
+        "command": "ritemark.agentLibrary.newCommand",
+        "title": "New Command",
+        "category": "Agents"
+      },
+      {
+        "command": "ritemark.agentLibrary.search",
+        "title": "Search Agents",
+        "category": "Agents"
+      },
+      {
         "command": "ritemark.configureApiKey",
         "title": "Ritemark: Configure OpenAI API Key"
       },
@@ -623,6 +658,18 @@
       "ritemark-flow": {
         "description": "A flow, in New",
         "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6ec" }
+      },
+      "ritemark-robot": {
+        "description": "An agent, in New on Agents",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e762" }
+      },
+      "ritemark-sparkle": {
+        "description": "A skill, in New on Agents",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6a2" }
+      },
+      "ritemark-command": {
+        "description": "A command, in New on Agents",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e1c4" }
       }
     },
     "menus": {
@@ -637,7 +684,10 @@
         { "command": "ritemark.projectHead.newTable", "when": "false" },
         { "command": "ritemark.projectHead.newFlow", "when": "false" },
         { "command": "ritemark.projectHead.newFile", "when": "false" },
-        { "command": "ritemark.projectHead.newFolderInNew", "when": "false" }
+        { "command": "ritemark.projectHead.newFolderInNew", "when": "false" },
+        { "command": "ritemark.projectHead.newAgent", "when": "false" },
+        { "command": "ritemark.projectHead.newSkill", "when": "false" },
+        { "command": "ritemark.projectHead.newCommand", "when": "false" }
       ],
       "ritemark/projectHead": [
         { "command": "ritemark.projectHead.switchProject", "group": "1_project@0" },
@@ -653,6 +703,12 @@
         { "command": "ritemark.projectHead.newFlow", "group": "2_flows@1" },
         { "command": "ritemark.projectHead.newFile", "group": "3_files@1" },
         { "command": "ritemark.projectHead.newFolderInNew", "group": "3_files@2" }
+      ],
+      "ritemark/projectHead/agents/new": [
+        { "command": "ritemark.projectHead.newAgent", "group": "1_library@1" },
+        { "command": "ritemark.projectHead.newSkill", "group": "1_library@2" },
+        { "command": "ritemark.projectHead.newCommand", "group": "1_library@3" },
+        { "command": "ritemark.projectHead.newFlow", "group": "1_library@4" }
       ],
       "editor/title": [
         {

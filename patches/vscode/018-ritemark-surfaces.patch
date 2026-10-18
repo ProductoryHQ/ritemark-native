@@ -19,9 +19,10 @@ height). Sheets (dialogs) hang from 44. The strips and the desk's tab row keep t
 The AI column (R4): no title rows and no row of icons; a guard sends any other view container that lands
 there back to its own home (Copilot Chat's container to the panel).
 The status bar is 24 with the remote and problems signals hidden; the tree's rows are 32 (R1).
-The left column's head on Documents (R10, ritemarkProjectHead.ts): the project's name with a chevron, New
-and Search, Documents over the tree; its menus come from the extension (ritemark/projectHead and
-ritemark/projectHead/new, menusExtensionPoint.ts).
+The left column's head on Documents (R10) and on Agents (experience 31; ritemarkProjectHead.ts): the project's mark
+and name with a chevron, New and Search, and on Documents the Documents label over the tree; its menus come from
+the extension (ritemark/projectHead, ritemark/projectHead/new and ritemark/projectHead/agents/new,
+menusExtensionPoint.ts).
 More (R5, R6): the places row's overflow opens Ritemark's menu as drawn: "More places", Copilot Chat first,
 then the places that do not fit, with Ritemark's names (compositeBarActions.ts, ritemarkMenu.ts).
 You (R11): Settings and Help, in the same menu. Ritemark's menus on every platform (R12): window.menuStyle
@@ -272,10 +273,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..448cfaa2eef
+index 00000000000..e7e7f8cc888
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1466 @@
+@@ -0,0 +1,1476 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1362,7 +1363,7 @@ index 00000000000..448cfaa2eef
 +
 +/* The project's mark (kit: .mark): its initials in a 24 square of ink before the name, as the prototype draws it;
 +   in the dark theme the square is the body colour with ground-coloured letters */
-+.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-mark {
++.monaco-workbench .part.sidebar.ritemark-project-place .ritemark-project-mark {
 +	display: block;
 +	flex: none;
 +	width: 24px;
@@ -1377,21 +1378,21 @@ index 00000000000..448cfaa2eef
 +	text-align: center;
 +}
 +
-+.monaco-workbench.vs-dark .part.sidebar.ritemark-documents .ritemark-project-mark {
++.monaco-workbench.vs-dark .part.sidebar.ritemark-project-place .ritemark-project-mark {
 +	background-color: var(--vscode-tab-inactiveForeground);
 +	color: var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-actions,
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .global-actions {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-actions,
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .global-actions {
 +	display: none !important; /* !important: core shows the title's actions; they live in the project's menu */
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title {
 +	overflow: visible; /* the head's box reaches 4 below the title area, as drawn */
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head {
 +	display: flex;
 +	align-items: center;
 +	gap: 8px;
@@ -1406,15 +1407,25 @@ index 00000000000..448cfaa2eef
 +	outline-offset: -1px;
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head:hover {
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head:hover {
 +	background-color: var(--rm-hover);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .composite.title > .title-label.ritemark-project-head h2 {
++/* the place's own title (Documents shows the folder's name there, Agents its own) gives way to the project's name */
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head h2 {
++	display: none;
++}
++
++.monaco-workbench .part.sidebar:not(.ritemark-project-place) .ritemark-project-name {
++	display: none;
++}
++
++.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head .ritemark-project-name {
 +	flex: 0 1 auto;
 +	min-width: 0;
-+	padding: 0 !important; /* !important: core pads the title */
 +	overflow: hidden;
++	font-weight: 600;
++	color: var(--vscode-sideBarTitle-foreground);
 +	text-overflow: ellipsis;
 +	white-space: nowrap;
 +	font-size: 14px;
@@ -1422,14 +1433,14 @@ index 00000000000..448cfaa2eef
 +	text-transform: none;
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents .ritemark-project-chevron {
++.monaco-workbench .part.sidebar.ritemark-project-place .ritemark-project-chevron {
 +	display: block;
 +	flex: none;
 +	font-size: 12px !important; /* !important: the codicon rule sets 16. Carets are 12 (framework.md, Icons) */
 +	color: var(--vscode-descriptionForeground);
 +}
 +
-+.monaco-workbench .part.sidebar.ritemark-documents > .ritemark-project-rows {
++.monaco-workbench .part.sidebar.ritemark-project-place > .ritemark-project-rows {
 +	display: block;
 +	padding: 12px 8px 8px;
 +}
@@ -2704,17 +2715,18 @@ index 00000000000..5374bc6ffbc
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..4caf7650450
+index 00000000000..23ff99aa8d9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,194 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
 +/*
-+ * Ritemark 2.0: the left column's head on Documents (R10), as drawn (surfaces/README.md, Measurements).
++ * Ritemark 2.0: the left column's head on Documents (R10) and on Agents (experience 31), as drawn (surfaces/README.md,
++ * Measurements).
 + *
 + * The project's mark (its initials in a 24 square of ink) and its whole name, with a chevron that opens the
 + * project's menu (the folder tools VS Code shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
@@ -2722,7 +2734,8 @@ index 00000000000..4caf7650450
 + * menu is drawn (experiences/home frame 2: 232 wide, 4 under the head). Their entries, words and icons
 + * come from the extension, through the `ritemark/projectHead` and `ritemark/projectHead/new` menus
 + * (menusExtensionPoint.ts), so an extension release can change them; each menu group is set apart by a
-+ * hairline. Other places keep their own simple head.
++ * hairline. On Agents, New lists the library's four kinds and Search finds in the library; Documents adds its label
++ * over the tree. Other places keep their own simple head.
 + */
 +
 +import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
@@ -2740,9 +2753,19 @@ index 00000000000..4caf7650450
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
 +
-+const DOCUMENTS_CONTAINER = 'workbench.view.explorer';
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
-+const NEW_MENU = MenuId.for('ritemark/projectHead/new');
++
++/** The places with the project's head: what their New lists, what their Search runs, and the label over their content. */
++interface IRitemarkHeadPlace {
++	readonly newMenu: MenuId;
++	readonly search: string;
++	readonly group?: string;
++}
++
++const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>([
++	['workbench.view.explorer', { newMenu: MenuId.for('ritemark/projectHead/new'), search: 'workbench.view.search', group: localize('ritemark.project.documents', "Documents") }],
++	['workbench.view.extension.ritemark-agent-library', { newMenu: MenuId.for('ritemark/projectHead/agents/new'), search: 'ritemark.agentLibrary.search' }],
++]);
 +
 +/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
 +export function ritemarkProjectInitials(name: string): string {
@@ -2754,8 +2777,14 @@ index 00000000000..4caf7650450
 +
 +	private readonly label: HTMLElement;
 +	private readonly mark: HTMLElement;
++	private readonly name: HTMLElement;
 +	private readonly rows: HTMLElement;
-+	private active = false;
++	private readonly group: HTMLElement;
++	private place: IRitemarkHeadPlace | undefined;
++
++	private get active(): boolean {
++		return !!this.place;
++	}
 +
 +	constructor(
 +		private readonly part: HTMLElement,
@@ -2768,15 +2797,17 @@ index 00000000000..4caf7650450
 +	) {
 +		super();
 +
-+		// The head: the project's whole name and a chevron; the whole label opens the project's menu
++		// The head: the project's mark, its whole name (in place of the place's own title) and a chevron; the whole
++		// label opens the project's menu
 +		const label = this.label = titleArea.querySelector<HTMLElement>(':scope > .title-label')!;
 +		label.classList.add('ritemark-project-head');
 +		this.mark = $('span.ritemark-project-mark', { 'aria-hidden': 'true' });
-+		label.prepend(this.mark);
++		this.name = $('span.ritemark-project-name');
++		label.prepend(this.mark, this.name);
 +		append(label, renderIcon(Codicon.chevronDown)).classList.add('ritemark-project-chevron');
-+		this.updateMark();
-+		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this.updateMark()));
-+		this._register(this.workspaceService.onDidChangeWorkspaceName(() => this.updateMark()));
++		this.updateProject();
++		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this.updateProject()));
++		this._register(this.workspaceService.onDidChangeWorkspaceName(() => this.updateProject()));
 +		const openProjectMenu = () => this.showMenu(PROJECT_MENU, label, localize('ritemark.project.menu', "Project"));
 +		this._register(addDisposableListener(label, EventType.CLICK, () => {
 +			if (this.active) {
@@ -2791,32 +2822,46 @@ index 00000000000..4caf7650450
 +			}
 +		}));
 +
-+		// New and Search as rows, then the Documents label over the tree
++		// New and Search as rows, then the place's label over its content
 +		this.rows = $('.ritemark-project-rows');
 +		titleArea.after(this.rows);
 +		this._register({ dispose: () => this.rows.remove() });
 +		const newRow = this.row(Codicon.add, localize('ritemark.project.new', "New"));
 +		newRow.setAttribute('aria-haspopup', 'menu');
-+		this._register(addDisposableListener(newRow, EventType.CLICK, () => this.showMenu(NEW_MENU, newRow, localize('ritemark.project.newMenu', "New"))));
++		this._register(addDisposableListener(newRow, EventType.CLICK, () => {
++			if (this.place) {
++				this.showMenu(this.place.newMenu, newRow, localize('ritemark.project.newMenu', "New"));
++			}
++		}));
 +		const searchRow = this.row(Codicon.search, localize('ritemark.project.search', "Search"));
-+		this._register(addDisposableListener(searchRow, EventType.CLICK, () => this.commandService.executeCommand('workbench.view.search')));
-+		append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }, localize('ritemark.project.documents', "Documents")));
++		this._register(addDisposableListener(searchRow, EventType.CLICK, () => {
++			if (this.place) {
++				this.commandService.executeCommand(this.place.search);
++			}
++		}));
++		this.group = append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }));
 +	}
 +
-+	/** What the head adds above the content on Documents: its rows (the tree gets the rest). */
++	/** What the head adds above the content: its rows (the content gets the rest). */
 +	get rowsHeight(): number {
 +		return this.active ? this.rows.offsetHeight : 0;
 +	}
 +
-+	/** Documents open or not; returns whether the column's head changed. */
++	/** The place shown; returns whether the column's head changed. */
 +	update(compositeId: string | undefined): boolean {
-+		const active = compositeId === DOCUMENTS_CONTAINER && this.workspaceService.getWorkspace().folders.length > 0;
-+		if (active === this.active) {
++		const place = compositeId !== undefined && this.workspaceService.getWorkspace().folders.length > 0 ? HEAD_PLACES.get(compositeId) : undefined;
++		if (place === this.place) {
 +			return false;
 +		}
-+		this.active = active;
-+		this.part.classList.toggle('ritemark-documents', active);
-+		if (active) {
++		const wasActive = this.active;
++		this.place = place;
++		this.part.classList.toggle('ritemark-project-place', !!place);
++		this.group.textContent = place?.group ?? '';
++		this.group.style.display = place?.group ? '' : 'none';
++		if (this.active === wasActive) {
++			return true;
++		}
++		if (this.active) {
 +			this.label.setAttribute('role', 'button');
 +			this.label.setAttribute('aria-haspopup', 'menu');
 +			this.label.tabIndex = 0;
@@ -2828,9 +2873,10 @@ index 00000000000..4caf7650450
 +		return true;
 +	}
 +
-+	private updateMark(): void {
++	private updateProject(): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0];
 +		this.mark.textContent = folder ? ritemarkProjectInitials(folder.name) : '';
++		this.name.textContent = folder?.name ?? '';
 +	}
 +
 +	private row(icon: ThemeIcon, text: string): HTMLElement {
@@ -2868,7 +2914,7 @@ index 00000000000..4caf7650450
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index f269e7586a8..644bde193fe 100644
+index f269e7586a8..bdff8ff66d0 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -2902,7 +2948,7 @@ index f269e7586a8..644bde193fe 100644
 +	override create(parent: HTMLElement): void {
 +		super.create(parent);
 +
-+		// Ritemark 2.0: on Documents the column's head is the project, then New, Search and the Documents label (R10)
++		// Ritemark 2.0: on Documents and Agents the column's head is the project, then New and Search (R10; experience 31)
 +		const titleArea = parent.querySelector<HTMLElement>(':scope > .composite.title');
 +		if (titleArea) {
 +			const head = this.ritemarkHead = this._register(this.instantiationService.createInstance(RitemarkProjectHead, parent, titleArea));
@@ -3239,10 +3285,10 @@ index 6fe575a12dd..b43d7ea930e 100644
  			if (newHeight !== this.cachedWindowControlHeight) {
  				this.cachedWindowControlHeight = newHeight;
 diff --git a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-index 2a2643375a2..3944f708192 100644
+index 2a2643375a2..84afbc2cd65 100644
 --- a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
 +++ b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-@@ -550,6 +550,17 @@ const apiMenus: IAPIMenu[] = [
+@@ -550,6 +550,22 @@ const apiMenus: IAPIMenu[] = [
  		description: localize('menus.chatNewSession', "The Chat new session menu."),
  		proposed: 'chatSessionsProvider'
  	},
@@ -3256,6 +3302,11 @@ index 2a2643375a2..3944f708192 100644
 +		key: 'ritemark/projectHead/new',
 +		id: MenuId.for('ritemark/projectHead/new'),
 +		description: localize('menus.ritemarkProjectHeadNew', "Ritemark: the New menu, at the head of the left column")
++	},
++	{
++		key: 'ritemark/projectHead/agents/new',
++		id: MenuId.for('ritemark/projectHead/agents/new'),
++		description: localize('menus.ritemarkProjectHeadAgentsNew', "Ritemark: the New menu at the head of the left column, on Agents")
 +	},
  ];
  
