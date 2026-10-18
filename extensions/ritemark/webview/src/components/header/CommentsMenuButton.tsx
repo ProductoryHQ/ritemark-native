@@ -221,7 +221,7 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
         title={`Comments (${summary.total})`}
         className="relative"
       >
-        <Icon name="chat-circle" size={14} tone={open ? 'active' : 'muted'} />
+        <Icon name="chat-circle" size={14} tone={open ? 'inherit' : 'muted'} />
         <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--r-accent)] text-[9px] font-semibold leading-[14px] text-white text-center">
           {summary.total}
         </span>

@@ -229,7 +229,7 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
       {/* Segmented mode control — only show if not forced into Advanced */}
       {!forcedAdvanced && (
         <div
-          className="flex w-full rounded-lg border border-hairline overflow-hidden"
+          className="inline-flex gap-0.5 self-start rounded-lg bg-[var(--r-hairline)] p-0.5" /* the kit's two-part switch (theme.html .seg) */
           role="group"
           aria-label="Schedule mode"
         >
@@ -245,10 +245,10 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
               variant="ghost"
               size="sm"
               className={
-                'flex-1 rounded-none h-8 text-[12px] ' +
+                'h-6 rounded-md px-2.5 text-[12px] font-medium leading-6 shadow-none ' +
                 (mode === value
-                  ? 'bg-[var(--r-accent)] text-white font-semibold hover:bg-[var(--r-accent)] hover:text-white'
-                  : 'text-ink-body')
+                  ? 'bg-surface text-ink-strong shadow-[0_1px_2px_rgba(30,27,75,0.08)] hover:bg-surface'
+                  : 'text-ink-body hover:bg-transparent')
               }
               onClick={() => handleModeSwitch(value)}
               aria-pressed={mode === value}

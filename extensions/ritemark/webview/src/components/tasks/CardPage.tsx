@@ -221,7 +221,7 @@ export function CardStrip({
                 data-state={historyOpen ? 'active' : undefined}
                 onClick={toggleHistory}
               >
-                <Icon name="clock-counter-clockwise" size={14} tone={historyOpen ? 'active' : 'muted'} />
+                <Icon name="clock-counter-clockwise" size={14} tone={historyOpen ? 'inherit' : 'muted'} />
               </Button>
             </Tooltip>
           ) : null}

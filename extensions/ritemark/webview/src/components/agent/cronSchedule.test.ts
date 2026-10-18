@@ -3,7 +3,7 @@
  * Run: npx tsx webview/src/components/agent/cronSchedule.test.ts
  */
 import assert from 'node:assert'
-import { uiToCron, cronToUi } from './cronSchedule'
+import { uiToCron, cronToUi, describeSchedule } from './cronSchedule'
 
 // ── interval minutes presets ─────────────────────────────────────────────────
 
@@ -90,5 +90,15 @@ assert.strictEqual(cronToUi('0 9 * * */2'), null, 'step on dow → null')
 // completely invalid
 assert.strictEqual(cronToUi('not a cron'), null, 'garbage → null')
 assert.strictEqual(cronToUi('* * * *'), null, 'only 4 fields → null')
+
+// a schedule in words (the agent panel's compact Schedule field)
+assert.strictEqual(describeSchedule(''), 'Not scheduled')
+assert.strictEqual(describeSchedule(undefined), 'Not scheduled')
+assert.strictEqual(describeSchedule('*/15 * * * *'), 'Every 15 minutes')
+assert.strictEqual(describeSchedule('0 */1 * * *'), 'Every hour')
+assert.strictEqual(describeSchedule('0 9 * * 1-5'), 'Weekdays at 09:00')
+assert.strictEqual(describeSchedule('0 16 * * 5,1'), 'Mon, Fri at 16:00')
+assert.strictEqual(describeSchedule('0 9 * * *'), 'Every day at 09:00')
+assert.strictEqual(describeSchedule('0,30 9 * * *'), '0,30 9 * * *')
 
 console.log('cronSchedule tests passed ✅')
