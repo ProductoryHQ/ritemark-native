@@ -31,8 +31,8 @@ A new window's columns are the drawn widths: the left column 256 (248 and the 8 
 Window sizes (R14, ritemarkWindowSizes.ts, loaded by desktop.contribution.ts): below 1400 the AI's column narrows
 to 336 (its sheet 320), below 1200 the left column hides, below 960 the AI's column hides; crossing back up undoes
 only what the crossing down did, and a column the person opens in between stays until the next crossing.
-The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; an !important says why on its line
-or in its group's comment (the theme pass finishes marking the rest).
+The stylesheet (media/ritemarkSurfaces.css) takes every colour from the theme; each !important says on its line which
+rule of VS Code's (or inline style, or of its own) it beats, and where none competes in any state there is none.
 Also: a click on the open place in the top row runs ritemark.placeClickedAgain, which the extension answers
 (Tasks brings its board forward); with a flow open, Ritemark's own .ritemark folder stays out of the tree.
 Built file by file from the Experience lead's proof of concept (branch poc/2.0-surfaces), without its
@@ -270,7 +270,7 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..4fbb6f15651
+index 00000000000..3d4d642f027
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 @@ -0,0 +1,1291 @@
@@ -294,8 +294,8 @@ index 00000000000..4fbb6f15651
 + *
 + * VS Code's class names are internal. Keep the selectors few and commented, and compare a screenshot of
 + * the base window, light and dark, after every VS Code update (update-vscode.sh's checklist). An !important
-+ * here beats a rule of VS Code's that an update can change silently; it says why on its line or in its group's
-+ * comment, and the theme pass (Phase 7) marks the few that still do not.
++ * here beats a rule of VS Code's (or an inline style) that an update can change silently, and says which on
++ * its line; where no rule of VS Code's competes in any state, there is none.
 + */
 +
 +.monaco-workbench {
@@ -359,7 +359,7 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.editor .editor-group-container > .title,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
 +	border-color: transparent !important; /* !important: the borders are set inline from the theme */
-+	box-shadow: none !important;
++	box-shadow: none !important; /* !important: the parts' own shadows (--vscode-shadow-md, titlebarpart.css) */
 +}
 +
 +.monaco-workbench .part.statusbar::after,
@@ -385,7 +385,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.sidebar > .header-or-footer {
 +	border-bottom: 0 !important; /* !important: core draws the header's border inline */
-+	box-shadow: none !important;
++	box-shadow: none;
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar {
@@ -393,17 +393,17 @@ index 00000000000..4fbb6f15651
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .actions-container {
-+	gap: 0 !important; /* VS Code measures each place to decide what fits; a gap would go uncounted */
++	gap: 0; /* VS Code measures each place to decide what fits; a gap would go uncounted */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item {
-+	width: 34px !important; /* a place: 32 fill + 1 either side, so places sit 34 apart (kit: ritemark.js Ritemark.more, 8, 42, 76 ... More at 212); sidebarPart.ts's overflowActionSize is 34 too */
++	width: 34px; /* a place: 32 fill + 1 either side, so places sit 34 apart (kit: ritemark.js Ritemark.more, 8, 42, 76 ... More at 212); sidebarPart.ts's overflowActionSize is 34 too */
 +	height: 32px !important; /* !important on the box: core sizes the items from the bar's own compact sizes */
-+	box-sizing: border-box !important;
-+	padding: 0 1px !important;
++	box-sizing: border-box;
++	padding: 0 1px !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
 +	background-clip: content-box;
-+	margin: 4px 0 !important;
-+	display: flex !important;
++	margin: 4px 0;
++	display: flex !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
 +	align-items: center;
 +	justify-content: center;
 +	border-radius: 6px;
@@ -411,9 +411,9 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .action-label {
 +	width: 20px !important; /* !important: core sizes the label for its own 16 icon box */
-+	height: 20px !important;
-+	margin: 0 !important;
-+	border-radius: 0 !important;
++	height: 20px !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
++	margin: 0 !important; /* !important: paneCompositePart.css's composite-bar rules are more specific */
++	border-radius: 0 !important; /* !important: paneCompositePart.css's composite-bar radius is more specific */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item:not(.checked):hover {
@@ -438,7 +438,7 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label.codicon,
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item.ritemark-chosen .action-label.codicon {
 +	color: var(--rm-place-foreground) !important; /* !important: core colours the glyph inline */
-+	background-color: transparent !important;
++	background-color: transparent !important; /* !important: paneCompositePart.css's rule here is !important itself */
 +}
 +
 +.monaco-workbench .part.sidebar > .header-or-footer .composite-bar .action-item .active-item-indicator {
@@ -635,7 +635,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .tabs-container > .tab {
 +	height: 36px !important; /* !important: core sizes tabs from --editor-group-tab-height (44, the strip) */
-+	line-height: 36px !important;
++	line-height: 36px;
 +	margin-top: 8px;
 +	-webkit-app-region: no-drag;
 +}
@@ -644,13 +644,13 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.editor .tabs-container > .tab .monaco-icon-label::before,
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions {
 +	line-height: 36px !important; /* !important: core sets these from the 44 strip height */
-+	height: 36px !important;
++	height: 36px !important; /* !important: editortabscontrol.css sizes the label's icon to the tab height in a more specific rule */
 +}
 +
 +/* A tab's own icon (a web page's favicon, for instance) sits on the label's line: its box is the tab's 36 */
 +.monaco-workbench .part.editor .tabs-container > .tab .monaco-icon-label-iconpath {
 +	height: 36px !important; /* !important: as above */
-+	background-position: center !important;
++	background-position: center !important; /* !important: the icon label sets its position inline */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .editor-actions {
@@ -694,7 +694,7 @@ index 00000000000..4fbb6f15651
 +}
 +
 +.monaco-workbench.windows.nosidebar .part.editor .editor-group-container.ritemark-left-edge.ritemark-top-edge > .title .tabs-and-actions-container {
-+	padding-left: 76px !important; /* the on-desk strip's 84 less the tabs container's own 8 */
++	padding-left: 76px !important; /* !important: our own rules above (no left column) and below (the row's padding) are !important. The on-desk strip's 84 less the tabs container's own 8 */
 +}
 +
 +.monaco-workbench.noauxiliarybar .part.editor .editor-group-container.ritemark-right-edge.ritemark-top-edge > .title .tabs-and-actions-container {
@@ -712,7 +712,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row {
 +	left: 8px !important; /* !important: the list positions its rows inline */
-+	width: calc(100% - 16px) !important;
++	width: calc(100% - 16px) !important; /* !important: the list sets a row's width inline while it measures it (listView.ts) */
 +	border-radius: 4px; /* rows: framework.md, Radius */
 +}
 +
@@ -720,10 +720,10 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.sidebar .monaco-list:focus .monaco-list-row.selected,
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row.selected.focused {
 +	background-color: var(--rm-desk) !important; /* !important: the list's selection colours are injected per list */
-+	color: var(--vscode-sideBarTitle-foreground) !important;
-+	box-shadow: none !important; /* the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
-+	border-radius: 4px !important;
-+	outline: none !important;
++	color: var(--vscode-sideBarTitle-foreground) !important; /* !important: the list's own style element (listWidget.ts) colours selected rows, some with !important */
++	box-shadow: none !important; /* !important: explorerviewlet.css draws the selected row's band with !important. the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
++	border-radius: 4px !important; /* !important: the list's own selection styles (listWidget.ts) */
++	outline: none !important; /* !important: the list's own focus outline (listWidget.ts) */
 +}
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row:not(.selected):hover {
@@ -739,7 +739,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .tabs-container > .tab {
 +	background-color: transparent !important; /* !important: tab colours are set inline from the theme */
-+	border-color: transparent !important;
++	border-color: transparent !important; /* !important: the tab's border is set inline (multiEditorTabsControl.ts) */
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab > .tab-border-top-container,
@@ -750,7 +750,7 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.editor .tabs-container > .tab.active {
 +	background-color: var(--rm-desk) !important; /* !important: as the tabs' rule above */
 +	border-radius: 8px 8px 0 0;
-+	box-shadow: 0 0 0 1px var(--rm-hairline) !important; /* not VS Code's inset shade, which greys the tab's top against the desk */
++	box-shadow: 0 0 0 1px var(--rm-hairline) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk */
 +	z-index: 2;
 +}
 +
@@ -762,7 +762,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active::after {
 +	content: '';
-+	display: block !important;
++	display: block;
 +	position: absolute;
 +	left: 0;
 +	right: 0;
@@ -780,8 +780,8 @@ index 00000000000..4fbb6f15651
 +	left: 0;
 +	right: 0;
 +	bottom: 0;
-+	height: 0 !important;
-+	background: transparent !important;
++	height: 0 !important; /* !important: multieditortabscontrol.css's tab-border-bottom rule is more specific */
++	background: transparent !important; /* !important: multieditortabscontrol.css's tab-border-bottom rule is more specific */
 +	z-index: 4;
 +	pointer-events: none;
 +}
@@ -821,7 +821,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label {
 +	font-size: 12px !important; /* !important: the codicon rule sets 16. Close is 12, muted (kit: .tb .x) */
-+	color: var(--vscode-descriptionForeground) !important;
++	color: var(--vscode-descriptionForeground) !important; /* !important: multieditortabscontrol.css's tab-actions colour is more specific */
 +}
 +
 +/* The chosen tab's own icon is indigo, where attention is (kit: .tb.on > .ph); a file's icon is an image and keeps its colours */
@@ -832,7 +832,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label:hover {
 +	background-color: var(--rm-hover) !important; /* !important: core paints the close button's hover inline */
-+	box-shadow: none !important;
++	box-shadow: none;
 +}
 +
 +/* The chosen tab stays the desk's colour on hover; the close button's container never paints its own band */
@@ -858,7 +858,7 @@ index 00000000000..4fbb6f15651
 +   18 in from the desk's edge. */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
 +	padding-left: 8px !important; /* !important: core pads the row inline for the editor actions. With the tabs container's 8, tabs start 16 into the desk (kit: .tabs at 272) */
-+	padding-right: 18px !important;
++	padding-right: 18px;
 +	box-sizing: border-box;
 +}
 +
@@ -872,9 +872,9 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-shrink > .tab-actions {
 +	flex: 0 0 20px !important; /* !important: core's tab sizing rules are as specific */
-+	width: 20px !important;
++	width: 20px;
 +	margin-left: 6px;
-+	overflow: visible !important;
++	overflow: visible !important; /* !important: multieditortabscontrol.css hides the overflow in a more specific rule */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions > .monaco-action-bar {
@@ -886,7 +886,7 @@ index 00000000000..4fbb6f15651
 +	min-width: 0;
 +	overflow: hidden;
 +	white-space: nowrap;
-+	text-overflow: ellipsis !important; /* VS Code clips here because it fades the end; Ritemark ends a long name with … */
++	text-overflow: ellipsis !important; /* !important: multieditortabscontrol.css clips the label in a more specific rule. VS Code clips here because it fades the end; Ritemark ends a long name with … */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed > .tab-label .monaco-icon-label-container {
@@ -900,9 +900,9 @@ index 00000000000..4fbb6f15651
 +	position: absolute !important; /* !important: as above */
 +	left: 6px; /* its glyph exactly where the icon was (the button pads it by 4) */
 +	top: 0;
-+	width: 20px !important;
-+	flex: none !important;
-+	margin: 0 !important;
++	width: 20px;
++	flex: none !important; /* !important: the slot's own rule above is !important (0 0 20px) */
++	margin: 0;
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed:not(.active):not(.dirty):hover > .tab-label::before {
@@ -916,23 +916,23 @@ index 00000000000..4fbb6f15651
 +	flex: 0 1 auto !important; /* !important: core sizes fixed tabs with a flex basis */
 +	width: auto;
 +	min-width: 0;
-+	max-width: 200px !important;
-+	padding-left: 12px !important;
-+	padding-right: 12px !important;
++	max-width: 200px !important; /* !important: multieditortabscontrol.css's fixed sizing sets it from a variable in a more specific rule */
++	padding-left: 12px !important; /* !important: multieditortabscontrol.css's tab padding is more specific */
++	padding-right: 12px !important; /* !important: VS Code's padding for tabs whose close button is off or on the left is more specific */
 +	border-right-width: 0 !important; /* !important: core keeps a 1px tab border even when tab.border is transparent; tabs touch, as drawn */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.dirty {
-+	padding-right: 6px !important; /* the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
++	padding-right: 6px !important; /* !important: VS Code's padding for tabs whose close button is off is as specific or more. the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active {
-+	flex: 0 0 auto !important; /* the open tab keeps its whole name */
++	flex: 0 0 auto !important; /* !important: multieditortabscontrol.css's tab sizing flex is as specific or more. the open tab keeps its whole name */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container.ritemark-measuring > .tab {
-+	flex: none !important; /* measured at its own width (ritemarkFoldTabs) */
++	flex: none !important; /* !important: multieditortabscontrol.css's tab sizing flex is as specific or more. measured at its own width (ritemarkFoldTabs) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.ritemark-folded {
@@ -944,11 +944,11 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.sticky-compact,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.sticky-compact.active {
 +	flex: 0 0 38px !important; /* !important: beats the tab widths above */
-+	width: 38px !important;
-+	min-width: 38px !important;
-+	max-width: 38px !important;
-+	padding: 0 !important;
-+	border-width: 0 !important;
++	width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	min-width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	max-width: 38px !important; /* !important: multieditortabscontrol.css's sticky-compact sizes are more specific */
++	padding: 0 !important; /* !important: multieditortabscontrol.css's tab padding is more specific */
++	border-width: 0 !important; /* !important: the tab's border is set inline (multiEditorTabsControl.ts) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label {
@@ -963,8 +963,8 @@ index 00000000000..4fbb6f15651
 +/* the icon on the tab's centre: no gap after it (there is no name) */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label::before {
 +	margin: 0 !important; /* !important: core spaces the icon */
-+	padding: 0 !important;
-+	background-position: center !important;
++	padding: 0;
++	background-position: center;
 +}
 +
 +/* a webview's tab (Home, Tasks) draws its icon in its own element; the label's empty icon slot would push it off centre */
@@ -974,7 +974,7 @@ index 00000000000..4fbb6f15651
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label > .monaco-icon-label-iconpath {
 +	margin: 0 !important; /* !important: as above */
-+	padding: 0 !important;
++	padding: 0;
 +}
 +
 +
@@ -1088,7 +1088,7 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .ritemark-new-tab-menu-item:hover {
 +	background-color: var(--vscode-menu-selectionBackground);
 +	color: var(--vscode-menu-selectionForeground);
-+	outline: none !important; /* the fill shows where the keyboard is, as in the other menus */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is as specific. the fill shows where the keyboard is, as in the other menus */
 +}
 +
 +.monaco-workbench .ritemark-new-tab-menu-icon {
@@ -1134,7 +1134,7 @@ index 00000000000..4fbb6f15651
 +	border-radius: 6px;
 +	color: inherit;
 +	font-size: 13px;
-+	outline: none !important; /* the fill shows where the keyboard is */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is more specific. the fill shows where the keyboard is */
 +}
 +
 +.monaco-workbench .ritemark-more-tabs-item:focus,
@@ -1265,7 +1265,7 @@ index 00000000000..4fbb6f15651
 +.monaco-workbench .ritemark-menu-item:hover {
 +	background-color: var(--vscode-menu-selectionBackground);
 +	color: var(--vscode-menu-selectionForeground);
-+	outline: none !important; /* the fill shows where the keyboard is, as in the other menus */
++	outline: none !important; /* !important: the workbench's focus outline (style.css, [tabindex]:focus) is as specific. the fill shows where the keyboard is, as in the other menus */
 +}
 +
 +.monaco-workbench .ritemark-menu-icon {
