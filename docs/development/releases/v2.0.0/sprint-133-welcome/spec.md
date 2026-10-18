@@ -127,7 +127,7 @@ Acceptance criteria:
 
 - No event carries a path, a folder or project name, a file name, a message, or an account or e-mail.
 - Every event carries the build channel (R9) and the existing shared properties.
-- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer. See *Open Questions*: this is Jarmo's call. On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
+- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer (Jarmo, 18 October; *Open Questions* 1). On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
 - `first_message_sent` is sent once per profile, and only if the switch is on when the message is sent.
 - Each event reaches PostHog once, verified in PostHog's live events, and none appears before an answer or after a no.
 
@@ -210,7 +210,7 @@ As a writer on Windows, I want the same welcome, with Windows' words.
 Acceptance criteria:
 - The welcome, both sign-ins, OpenCode's setup, Open a folder…, Start a new project and the landing work on a Windows PC with a build from main.
 - Paths show Windows' form; shortcuts say Ctrl; the folder picker is Windows'.
-- The welcome stays responsive during the extension host's first seconds on a fresh Windows profile ([#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): it draws at once, its checks show Checking… until they answer, and a click on Sign in is never lost. See *Open Questions* for the decision on #401 itself.
+- The welcome stays responsive during the extension host's first seconds on a fresh Windows profile ([#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): it draws at once, its checks show Checking… until they answer, and a click on Sign in is never lost. *Open Questions* 2 records the decision on #401 itself.
 
 ## Engineering requirements
 
@@ -278,10 +278,10 @@ Acceptance criteria:
 
 ## Open Questions
 
-Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
+Both are decided: Jarmo accepted both recommendations with the plan's approval (18 October, "approved with your proposals").
 
-1. **The welcome's events before the yes.** Hold `welcome_shown` and `ai_signed_in` in memory and send them at the yes, or drop everything that happened before the switch was turned on? **Recommendation: hold and send.** Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
-2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee. The case to profile is the first start after a clean install or an update, with Defender on. The logs on Jarmo's Windows PC (18 October) show first starts taking 32–54 s to be fully up, the extension host starting 14–18 s late with three or four "unresponsive" periods, and later starts about 7 s; a fresh profile alone does not reproduce it.
+1. **The welcome's events before the yes: decided, hold and send.** `welcome_shown` and `ai_signed_in` are held in memory, sent at the yes, and dropped otherwise. Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
+2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan left it to this plan. **Decided: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee. The case to profile is the first start after a clean install or an update, with Defender on. The logs on Jarmo's Windows PC (18 October) show first starts taking 32–54 s to be fully up, the extension host starting 14–18 s late with three or four "unresponsive" periods, and later starts about 7 s; a fresh profile alone does not reproduce it.
 
 The technical point on recognising a 1.x OK is decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK (technical plan, W1).
 

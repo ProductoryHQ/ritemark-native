@@ -1,11 +1,11 @@
 # Sprint 133 Tasks
 
-Nothing here starts before Jarmo approves the sprint plan, and not before Sprint 132 is merged (both merges). Tick a box only when the change is on the sprint branch. W numbers are workstreams in [technical-plan.md](technical-plan.md), R and E numbers are requirements in [spec.md](spec.md), and S numbers are scenarios in [scenarios.md](scenarios.md).
+Jarmo approved the sprint plan on 18 October ("approved with your proposals"), after Sprint 132's two merges. Tick a box only when the change is on the sprint branch. W numbers are workstreams in [technical-plan.md](technical-plan.md), R and E numbers are requirements in [spec.md](spec.md), and S numbers are scenarios in [scenarios.md](scenarios.md).
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Sprint 132's merge 2 is on `origin/main`
-- [ ] `git checkout -b sprint-133-welcome` from `origin/main`; `git branch --show-current` shows it
+- [x] Sprint 132's merge 2 is on `origin/main` (`cb59f4cd`, then #450 and #451; the branch starts at `de2b7d6b`)
+- [x] `git checkout -b sprint-133-welcome` from `origin/main`; `git branch --show-current` shows it
 - [ ] VS Code at the pin with patches 001–019 from reset + clean + apply (copy-on-write clone for the worktree)
 - [ ] Record patch 001's and 016's file lists and hunk counts in `notes/patches-before.md` (`PATCH-RULES.md` §8)
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
@@ -27,7 +27,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `analytics/consent.ts`: the gate; `ritemark.analytics.enabled` default false in `package.json`; the kill switch through `isEnabled('analytics')` (R7, E1)
 - [ ] `posthog.ts`: the client made only after a yes; every send through the gate; the notice retired and `hasSeenNotice` no longer written (R7)
 - [ ] The 1.x answers: read once before the gate starts (`hasSeenNotice`, `inspect('analytics.enabled')`); a carried-over yes written as `analytics.enabled: true` and `answeredV2` from 1.x; an Opt Out or no answer off; the closed-notice case as decided (R7, E1)
-- [ ] `analytics/welcomeEvents.ts`: held events, sent at a yes, dropped at a no (R8; per Jarmo's answer to Open Question 1)
+- [ ] `analytics/welcomeEvents.ts`: held events, sent at a yes, dropped at a no (R8; Jarmo, 18 October: hold and send)
 - [ ] `events.ts`: `welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent` with R8's properties
 - [ ] `first_message_sent` from the AI sheet's host, once per profile (R8)
 - [ ] `build_channel` in the shared properties (R9)

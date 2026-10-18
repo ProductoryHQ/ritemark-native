@@ -2,9 +2,9 @@
 
 Track: SDD (15 user-facing requirements; the extension, the webview, three patches shrinking and one gaining two hunks; privacy)
 Override with: "use plain full track"
-Branch: `sprint-133-welcome` (created only after approval, and only once Sprint 132 is merged)
+Branch: `sprint-133-welcome` (created 2026-10-18 from `origin/main` `de2b7d6b`, after Sprint 132's merges)
 Release tier: shell (patches 001, 016, 017 and 018; there is no release from main until 2.0)
-Status: Phase 2 (PLAN) drafted 2026-10-18, **awaiting Jarmo's approval**. Not started.
+Status: **Phase 3 (IMPLEMENT)**. Plan approved by Jarmo on 2026-10-18 ("approved with your proposals"), accepting both recommendations under *Decisions for Jarmo*.
 
 ## SDD Artifacts
 
@@ -71,7 +71,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 
 - **Nothing is counted before yes** (Jarmo, 17 October; refined on 18 October: an OK on 1.x's notice is that yes). From this sprint, `ritemark.analytics.enabled` defaults to off; the PostHog client is not even created before a yes; every send passes one gate. This holds for the existing events too, not only the new four.
 - **The four events** (`welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent`) carry no path, name, file, message or account, only the properties in R8 and the existing shared ones, plus `build_channel`.
-- **The held events** (Open Question 1): if Jarmo agrees, the welcome's first two events wait in memory until the person answers, and are dropped at a no.
+- **The held events** (decided, Jarmo, 18 October): the welcome's first two events wait in memory until the person answers, are sent at a yes, and are dropped at a no.
 - **1.x answers** (Jarmo, 18 October): an OK on 1.x's notice carries over as a yes. The update sheet's switch shows it on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and the person can turn it off there. An Opt Out, or no answer, starts off, with "Off until you turn it on." 1.x stored only that its notice was closed, not which button closed it, so any notice closed without Opt Out counts as the OK (Jarmo, 18 October; [technical-plan.md](technical-plan.md), W1; Decision 3 below).
 - **Dev runs** carry `build_channel: dev` (#338), and the automation profiles never answer yes, so they send nothing.
 - **Expected effect:** PostHog's numbers drop to the people who say yes, or said OK in 1.x. That is the rule working, and the Development manager tells whoever reads the numbers.
@@ -81,7 +81,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 
 - **Round 1, before the merge:** the extension side through the test overlay on the latest Windows build from main (S45, S46).
 - **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (S45–S47, Getting Started gone, the welcome alone, the muted extension).
-- **#401:** audited on a fresh Windows profile; fixed here if the cause is Ritemark's start-up code (Open Question 2).
+- **#401:** audited on the first start after an install or update; fixed here if the cause is Ritemark's start-up code (decided, Jarmo, 18 October).
 
 ## Tests and the production build
 
@@ -119,10 +119,10 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 
 ## Decisions for Jarmo
 
-The first two have a recommendation. They are listed in plain words, in [spec.md](spec.md#open-questions) too.
+All three are decided. Jarmo accepted both recommendations with the plan's approval (18 October, "approved with your proposals"); [spec.md](spec.md#open-questions) records the same.
 
-1. **The welcome's events before the yes.** The switch is on step 2, after both "welcome shown" and "signed in" have happened. I recommend holding those two in memory and sending them only if the person says yes, dropping them otherwise; nothing leaves the computer or is written before the answer. Without this, no fresh start is ever counted.
-2. **#401.** I recommend an audit first, and a fix in this sprint if the cause is in Ritemark's own start-up code.
+1. **The welcome's events before the yes: decided (Jarmo, 18 October), as recommended.** The switch is on step 2, after both "welcome shown" and "signed in" have happened. Those two are held in memory and sent only if the person says yes, and dropped otherwise; nothing leaves the computer or is written before the answer. Without this, no fresh start would ever be counted.
+2. **#401: decided (Jarmo, 18 October), as recommended.** An audit first, and a fix in this sprint if the cause is in Ritemark's own start-up code.
 3. **How a 1.x OK is recognised: decided.** 1.x wrote the same note when the notice was closed with its ×, or left through Privacy Policy or Terms of Use, as when OK was pressed. Jarmo chose (18 October) that any notice closed without Opt Out counts as the OK, because 1.x counted those people anyway; they see the switch on and can turn it off ([technical-plan.md](technical-plan.md), W1).
 
 ## Feature Flag Check
@@ -170,4 +170,4 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan: "approved with your proposals" (2026-10-18), accepting both recommendations under *Decisions for Jarmo*.
