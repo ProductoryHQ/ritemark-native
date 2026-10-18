@@ -270,10 +270,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..3d4d642f027
+index 00000000000..ccd01c73466
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1291 @@
+@@ -0,0 +1,1309 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -358,13 +358,24 @@ index 00000000000..3d4d642f027
 +.monaco-workbench .part.sidebar .pane-header,
 +.monaco-workbench .part.editor .editor-group-container > .title,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container {
-+	border-color: transparent !important; /* !important: the borders are set inline from the theme */
 +	box-shadow: none !important; /* !important: the parts' own shadows (--vscode-shadow-md, titlebarpart.css) */
 +}
 +
-+.monaco-workbench .part.statusbar::after,
-+.monaco-workbench .part.titlebar::after,
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-and-actions-container::after,
++/* High contrast keeps the lines: there each part keeps its theme's border, since the sheets' own edges are clipped
++   where they meet the window and the tab row (R13: every border readable) */
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.titlebar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.statusbar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.sidebar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.auxiliarybar,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.sidebar .pane-header,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title .tabs-and-actions-container {
++	border-color: transparent !important; /* !important: the borders are set inline from the theme */
++}
++
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.statusbar::after,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.titlebar::after,
++.monaco-workbench:not(.hc-black):not(.hc-light) .part.editor .editor-group-container > .title .tabs-and-actions-container::after,
 +.monaco-workbench .part.editor::after /* the 1.117 editor depth shadow */ {
 +	display: none !important; /* !important: these lines are drawn by more specific core rules */
 +}
@@ -724,6 +735,13 @@ index 00000000000..3d4d642f027
 +	box-shadow: none !important; /* !important: explorerviewlet.css draws the selected row's band with !important. the desk's colour alone, radius 4 like every row, no border (the Experience lead's review) */
 +	border-radius: 4px !important; /* !important: the list's own selection styles (listWidget.ts) */
 +	outline: none !important; /* !important: the list's own focus outline (listWidget.ts) */
++}
++
++/* High contrast: the open document's row keeps an outline in the theme's active border (R13: every chosen state visible) */
++.monaco-workbench.hc-black .part.sidebar .monaco-list .monaco-list-row.selected,
++.monaco-workbench.hc-light .part.sidebar .monaco-list .monaco-list-row.selected {
++	outline: 1px solid var(--vscode-contrastActiveBorder) !important; /* !important: the rule above removes the outline with !important */
++	outline-offset: -1px;
 +}
 +
 +.monaco-workbench .part.sidebar .monaco-list .monaco-list-row:not(.selected):hover {
@@ -2328,10 +2346,10 @@ index 00000000000..67f3b47cd9f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
 new file mode 100644
-index 00000000000..85b6a362543
+index 00000000000..5374bc6ffbc
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,193 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2377,6 +2395,8 @@ index 00000000000..85b6a362543
 +export interface IRitemarkWindowSizesMemory {
 +	band: number;
 +	aiWidthBefore?: number;
++	/** The width the narrowed AI's column actually got (the layout may give it a little less than asked). */
++	aiWidthSet?: number;
 +	hidLeft?: boolean;
 +	hidAi?: boolean;
 +}
@@ -2400,10 +2420,10 @@ index 00000000000..85b6a362543
 +		memory.band++;
 +		if (memory.band === 1) {
 +			// Below 1400: the AI's sheet narrows
-+			memory.aiWidthBefore = undefined;
++			memory.aiWidthBefore = memory.aiWidthSet = undefined;
 +			if (aiVisible && aiWidth !== undefined && aiWidth > RITEMARK_AI_NARROW_COLUMN) {
 +				memory.aiWidthBefore = aiWidth;
-+				aiWidth = RITEMARK_AI_NARROW_COLUMN;
++				memory.aiWidthSet = aiWidth = RITEMARK_AI_NARROW_COLUMN;
 +				changes.push({ aiWidth });
 +			}
 +		} else if (memory.band === 2) {
@@ -2441,12 +2461,12 @@ index 00000000000..85b6a362543
 +			memory.hidLeft = undefined;
 +		} else {
 +			// 1400 and wider: the AI's sheet widens again, unless the person resized it (a hidden one cannot be)
-+			const untouched = aiWidth === undefined || Math.abs(aiWidth - RITEMARK_AI_NARROW_COLUMN) <= 1;
++			const untouched = aiWidth === undefined || Math.abs(aiWidth - (memory.aiWidthSet ?? RITEMARK_AI_NARROW_COLUMN)) <= 1;
 +			if (memory.aiWidthBefore !== undefined && aiVisible && untouched) {
 +				aiWidth = memory.aiWidthBefore;
 +				changes.push({ aiWidth });
 +			}
-+			memory.aiWidthBefore = undefined;
++			memory.aiWidthBefore = memory.aiWidthSet = undefined;
 +		}
 +		memory.band--;
 +	}
@@ -2486,7 +2506,6 @@ index 00000000000..85b6a362543
 +			aiVisible,
 +			aiWidth: aiVisible ? this.layoutService.getSize(Parts.AUXILIARYBAR_PART).width : undefined,
 +		});
-+		this.save();
 +
 +		for (const change of changes) {
 +			if (change.leftVisible !== undefined) {
@@ -2498,8 +2517,12 @@ index 00000000000..85b6a362543
 +			if (change.aiWidth !== undefined) {
 +				const { height } = this.layoutService.getSize(Parts.AUXILIARYBAR_PART);
 +				this.layoutService.setSize(Parts.AUXILIARYBAR_PART, { width: change.aiWidth, height });
++				if (change.aiWidth === RITEMARK_AI_NARROW_COLUMN && this.memory.aiWidthSet !== undefined) {
++					this.memory.aiWidthSet = this.layoutService.getSize(Parts.AUXILIARYBAR_PART).width;
++				}
 +			}
 +		}
++		this.save();
 +	}
 +
 +	private load(): IRitemarkWindowSizesMemory {
@@ -3106,10 +3129,10 @@ index 46243a4447e..bf92f42c53d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
 new file mode 100644
-index 00000000000..e675d60dd1a
+index 00000000000..50a653619fa
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,95 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3180,6 +3203,15 @@ index 00000000000..e675d60dd1a
 +			{ width: 1250, changes: [] },
 +			{ width: 1100, changes: [{ leftVisible: false }] },
 +		]);
++	});
++
++	test('the narrowed AI comes back even when the layout gave it a little less than 336', () => {
++		const narrowed = walk([1300], { leftVisible: true, aiVisible: true, aiWidth: 400 });
++		// The layout gave the narrowed column 333; the window remembers what it got
++		narrowed.memory.aiWidthSet = 333;
++		const widened = walk([1500], { ...narrowed.layout, aiWidth: 333 }, narrowed.memory);
++
++		assert.deepStrictEqual({ changes: widened.steps[0].changes, memory: widened.memory }, { changes: [{ aiWidth: 400 }], memory: { band: 0, aiWidthBefore: undefined, aiWidthSet: undefined } });
 +	});
 +
 +	test('what the person changed is not undone', () => {
