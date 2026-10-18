@@ -144,9 +144,18 @@ When the person opens the project's menu and points at Switch project
 Then a submenu lists the projects with "1 waits" where something waits, the open one ticked, then All projects, on Home and Open in a new window (⌥ click).
 
 ### S28: About this project
-Given Jarmo has decided About this project's file (spec Open Question 3; otherwise the item is not in the menu and this scenario is skipped)
-When the person picks About this project in a project that has one, and in one that has none
-Then the first opens it; the second offers to create it.
+Given "Leadership programme" with an `AGENTS.md` of its own, and "Board report 2026" with neither `AGENTS.md` nor `CLAUDE.md`
+When the person picks About this project from the project's menu in each
+Then in "Leadership programme" its `AGENTS.md` opens, its tab named About this project
+And in "Board report 2026" Ritemark offers to create it; Create writes `AGENTS.md`, headed "About this project", and a `CLAUDE.md` holding only `@AGENTS.md`, and opens it
+And Documents and Home's Last changed name it About this project, as `research/about-file-audit.md` settled
+When the person writes a line in it and asks Claude, then ChatGPT, in a new chat, what the project is about
+Then each answer uses that line.
+
+### S44: A `CLAUDE.md` of the person's own (negative)
+Given a project with its own `CLAUDE.md` and no `AGENTS.md`
+When the person picks About this project and Create
+Then `AGENTS.md` is written, `CLAUDE.md` is left byte for byte as it was, and Ritemark tells the person what the about-file audit settled.
 
 ### S29: File ▸ Switch project
 On the Mac's File menu and on Windows' menu button's File menu

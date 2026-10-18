@@ -116,7 +116,12 @@ Acceptance criteria:
   - Switch project ▸, listing the projects with what waits in each ("1 waits"), the open one ticked, then All projects, on Home, and Open in a new window (⌥ click);
   - Open a folder…;
   - Reveal in Finder (Reveal in File Explorer on Windows);
-  - About this project, once Jarmo has decided its file and when to offer it (experience 24's open questions; *Open Questions* below). Until then the item is left out.
+  - About this project, which opens the project's About this project file or offers to create it (Jarmo, 18 October; below).
+- About this project is one file in the project's folder: `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, holding `@AGENTS.md` (Jarmo, 18 October):
+  - when the folder has an `AGENTS.md`, the item opens it;
+  - when it has none, the item offers to create it. Create writes `AGENTS.md`, headed "About this project", and the one-line `CLAUDE.md` when the folder has no `CLAUDE.md`, then opens it;
+  - a `CLAUDE.md` or `AGENTS.md` already in the folder is never overwritten or changed.
+- Ritemark shows the file as "About this project" everywhere, never as `AGENTS.md`: the menu, its tab, Documents and Home's Last changed (Jarmo, 18 October). How each of these draws the name, and whether the one-line `CLAUDE.md` shows in Documents at all, is audited first (technical plan, Phase 1).
 - New and Search keep Sprint 132's behaviour.
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
 - On Windows, the menu button's File menu gains Switch project, where experiences/windows frame 2 draws it.
@@ -224,7 +229,7 @@ Acceptance criteria:
 
 ### E3: Tests
 
-- Extension unit tests: the project file, the list (first fill, add, remove, missing, order), what waits (counts from fixtures of boards and chats), the permanent tabs' restore order, the switch guard.
+- Extension unit tests: the project file, the list (first fill, add, remove, missing, order), what waits (counts from fixtures of boards and chats), the permanent tabs' restore order, the switch guard, About this project (open, create, an existing `CLAUDE.md` or `AGENTS.md` left as it is).
 - Webview unit tests for Home's states (full, empty, missing, no board) and for escaping.
 - CDP checks on a dev instance: Home and Tasks first, Close all, the count on the Tasks tab, switching both ways with tabs restored.
 - The screenshot baseline gains Home, the projects list and the switcher, light and dark.
@@ -254,7 +259,7 @@ Acceptance criteria:
 - **Sub-projects inside one big folder** (experience 3, open question 1).
 - **Recent documents across projects** on Home (experience 3, open question 2).
 - **Picking an icon or picture as a project's mark.** Marks are initials in ink.
-- **About this project written by Claude** (experience 24).
+- **About this project written by Claude**, or offered at other moments than the project's menu (experience 24's open question on when to offer it).
 - **A VS Code update.** The pin stays at 1.117.0.
 
 ## Resolved Questions
@@ -264,6 +269,10 @@ Acceptance criteria:
 - **2026-10-17 (Jarmo):** "when I click Tasks, the board ALWAYS opens too"; the Home tab comes in step 3 ("ok").
 - **2026-10-17 (engineering, on Jarmo's "You decide"):** the project list fills on the first 2.0 start from recent folders, chats and task boards.
 - **2026-10-18 (the Experience lead's answers to this plan's design questions, and experience 33):** Start something is on every Home, under Waiting for you; an empty project is experience 29's frame 1 and a project with no board its frame 2, with no count on the Tasks tab; a folder that is not found and switching while Claude works are drawn as experience 33; What moved arrives with Home, once per profile; the "Switched to…" note with Go back stays; the document's bar is `comparison/after-write.png`, with Share as experience 26's frame 1.
+- **2026-10-18 (Jarmo, via the Experience lead's question form):**
+  - **About this project** is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere in the UI as "About this project". The project's menu item opens it or offers to create it (R8).
+  - **The sample project:** yes. Ritemark ships one, offered on the welcome's step 2 (Sprint 133). Here it is an ordinary project in the list; it gains its line on Home (R1).
+  - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes, shown on and changeable on the update sheet; anyone who opted out or never answered starts off (Sprint 133). This sprint adds no event (*Analytics and privacy* in the sprint plan).
 - **Release plan:** the reload stays; the splash takes the ground's colour; switching asks first when the AI is working; ⌥ click opens a new window.
 
 ## Open Questions
@@ -272,6 +281,5 @@ Each has a recommendation; Jarmo answers at this plan's approval.
 
 1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
 2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
-3. **About this project's file**, for the project's menu (experience 24's open questions, which also kept it out of step 2). **Recommendation:** `AGENTS.md` whose first heading is "About this project", with a one-line `CLAUDE.md` holding `@AGENTS.md`, so Claude, ChatGPT and OpenCode read the same words with no Ritemark plumbing; the menu item opens it, or offers to create it. If Jarmo has not decided by Phase 0, the item is left out of this sprint.
 
-The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*).
+The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file.

@@ -16,12 +16,14 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `research/first-fill-audit.md` (W2, R2): the three sources, the boards found only through a known folder, VS Code's own record of opened folders as a read-only extra
 - [ ] `research/switch-audit.md` (W8, R9): what "the AI is working" means and where it is known; Ritemark's switch paths; VS Code's own Open Folder and Open Recent
 - [ ] `research/splash-audit.md` (W8, R9): `partsSplash.ts`'s colours; the ground in Light and Dark; a v1.14.0 profile's stored splash
+- [ ] `research/about-file-audit.md` (W7, R8): where a file's name is drawn (menu, tab, Documents, Home, the AI sheet) and how each says About this project; the one-line `CLAUDE.md` in Documents or hidden; a folder with its own `CLAUDE.md` and no `AGENTS.md`, and the Experience lead's words for it
 - [ ] `research/confirmations.md`: `ritemarkMenu.ts` and a submenu; `revealFileInOS` on Windows; opening the AI's new chat from Home; `BoardStore` writing nothing until the first card
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: The projects subsystem (W1, W2, W3)
 
 - [ ] `src/projects/projectFile.ts` + test (R1)
+- [ ] The sample project's `.ritemark/project.json` with its line, in the Experience lead's words (R1)
 - [ ] `media/home/cover.jpg` and the Home tab icons as image files (E4)
 - [ ] `src/projects/ProjectList.ts` + test (R2)
 - [ ] `src/projects/firstFill.ts` + test, once per profile (R2)
@@ -47,7 +49,9 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 - [ ] `src/views/ProjectsViewProvider.ts` in the `ritemark.homeView` slot: rows, counts, Not found rows, search, Add a project…, ⌥ click (R7, R13)
 - [ ] Home's not-found box, Find it… at the nearest existing parent, another project's folder refused (R13)
-- [ ] `ritemark/projectHead`: Switch project ▸, Open a folder… through the switch, Reveal, About this project if Jarmo has decided its file (R8)
+- [ ] `ritemark/projectHead`: Switch project ▸, Open a folder… through the switch, Reveal, About this project (R8)
+- [ ] `src/projects/aboutFile.ts` + test: open `AGENTS.md`, or ask and create it with the one-line `CLAUDE.md`; never over an existing `CLAUDE.md` or `AGENTS.md` (R8)
+- [ ] The file shown as About this project in the menu, its tab, Documents and Home, per the about-file audit (R8)
 - [ ] 018: `ritemarkMenu.ts` draws an extension-supplied submenu (`ritemark.projects.switcherItems`) (R8)
 - [ ] 018: `ritemark/fileMenu` mapped to the File menu; the extension contributes Switch project (R8)
 - [ ] `src/projects/switchProject.ts` + test: the dialog (Cancel, Switch and stop, Open in a new window), Switch and stop as Stop, the switch, the "Switched to…" note with Go back (R9)
@@ -67,7 +71,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] The screenshot baseline gains Home, the list, the switcher and What moved, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md` (Projects), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions, `update-vscode.sh`'s checklist line (E6)
-- [ ] Manual QA on the Mac: S1–S40, S43; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S40, S43, S44; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"

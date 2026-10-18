@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Ritemark 2.0's second step changes how Ritemark starts. A new window with no folder opens on one calm sheet that asks one question, "Which AI do you use?", then where the person's work is, and lands them on a project with their AI ready beside it. Someone updating from Ritemark 1 sees a shorter sheet once, already signed in, and goes straight back to their work. The usage-data choice is part of the sheet, and nothing is counted until the person says yes. Four anonymous events tell whether people reach a project.
+Ritemark 2.0's second step changes how Ritemark starts. A new window with no folder opens on one calm sheet that asks one question, "Which AI do you use?", then where the person's work is, and lands them on a project with their AI ready beside it. Someone updating from Ritemark 1 sees a shorter sheet once, already signed in, and goes straight back to their work. The usage-data choice is part of the sheet, and nothing is counted until the person says yes; for someone updating, an OK on Ritemark 1's notice is that yes. Four anonymous events tell whether people reach a project.
 
 ## Principles
 
 - **The drawings are the contract.** Experience 2 (`ritemark-dev`: `product/design/experience/experiences/welcome/`) for a fresh start, experience 32 (`experiences/update/`) for updating from 1.x and the welcome's states. Where a drawing and this spec disagree, the drawing wins and this spec changes first (Jarmo, 17 October: match the Experience prototype exactly).
 - **Two questions, in order, and nothing else.** The AI first, the folder second (experience 2, decision 1).
 - **People's names for things.** ChatGPT and Claude, never Codex; no "authenticated", "runtime" or "workspace" in the main path (experience 2, decisions 2 and 4).
-- **Nothing is counted before yes** (Jarmo, 17 October). Not the four events, not any other event, not on a dev run.
+- **Nothing is counted before yes** (Jarmo, 17 October). Not the four events, not any other event, not on a dev run. For someone updating from 1.x, an OK on 1.x's usage-data notice is that yes (Jarmo, 18 October).
 - **Nothing is lost** (HARD RULE #1). Everything the 1.x first window does — the Getting Started page, its launch check, the usage-data notice and the AI's setup wizard — keeps a home in 2.0.
 - **A Ritemark page, not a patched VS Code page.** The welcome lives in the extension, so its words can change without a full app release.
 
@@ -67,13 +67,13 @@ Acceptance criteria:
 
 ### R5: Set up project
 
-As someone who has an AI ready, I want to point Ritemark at my work, or start something new.
+As someone who has an AI ready, I want to point Ritemark at my work, start something new, or try Ritemark on a sample first.
 
 Acceptance criteria:
 - Step 2 asks "Where is your work?" with three rows (experience 2, frame 3):
   - **Open a folder…** opens the system's folder picker.
-  - **Start a new project** opens in place into a name field ("Project name") and Create. Under it, in muted ink: "In ~/Documents/Ritemark/<name>" (`Documents\Ritemark\<name>` on Windows), with Change… to pick another place. The person names it. The folder is created empty: About this project is not written at creation (its file and when to offer it are Jarmo's open questions in experience 24; the Experience lead, 18 October).
-  - **Try the sample project**, only if Jarmo says yes (see *Open Questions*).
+  - **Start a new project** opens in place into a name field ("Project name") and Create. Under it, in muted ink: "In ~/Documents/Ritemark/<name>" (`Documents\Ritemark\<name>` on Windows), with Change… to pick another place. The person names it. The folder is created empty: About this project is not written at creation (the Experience lead, 18 October). Its file is decided (Jarmo, 18 October: `AGENTS.md`, with a `CLAUDE.md` that points to it), and the project's menu offers it in step 3 (Sprint 134); when else to offer it is still open in experience 24.
+  - **Try the sample project**, "A small leadership programme, with documents to work on." (experience 2, frame 3; Jarmo, 18 October: Ritemark ships a sample project). It copies Ritemark's sample, a small leadership programme with a brief, modules, kickoff notes and a few tasks, into `~/Documents/Ritemark/Leadership programme` (`Documents\Ritemark\Leadership programme` on Windows), and the window lands on it (R6). The person works on their copy; Ritemark's own stays as shipped. A folder of that name that is already there is never written into: the copy takes the next free name ("Leadership programme 2"). The sample's content is real, written for it before step 2 is built.
 - One line says what a project is: "A project is a folder on this computer. Claude works only inside it." (The AI's name follows the one signed in.)
 - A name that would create an existing folder or an invalid path is refused in place, in words, before anything is written.
 - Git and Node.js are needed only on Windows with this computer's own Claude (`systemRuntimeToolsRequired`, `agent/setup.ts`), so this line is rare. When one is missing, one line sits under "Signed in to Claude" at the top of step 2, in body ink with a warning-circle icon (the Experience lead, 18 October):
@@ -101,12 +101,15 @@ Acceptance criteria:
 As someone starting Ritemark, I want to choose about usage data myself, and know nothing is counted before I say yes.
 
 Acceptance criteria:
-- Step 2 ends with a switch: "Share anonymous usage data to improve Ritemark" / "Off until you turn it on. Never your documents, chats or names." It is off when the welcome opens (experience 2, frame 3; experience 32, frame 1).
+- Step 2 ends with a switch: "Share anonymous usage data to improve Ritemark" / "Off until you turn it on. Never your documents, chats or names." It is off when the welcome opens (experience 2, frame 3). The update welcome's switch shows the person's 1.x answer instead (the last criterion here; R10).
 - **Nothing is sent to PostHog until the switch is turned on**, from any part of Ritemark: not the welcome's events, not the existing events, not on a dev run. Turning it off stops sending at once.
 - Leaving the welcome without turning it on is a no. The welcome never asks again; the choice stays in Settings.
 - The 1.x usage-data notice (the toast with OK, Opt Out, Privacy Policy and Terms of Use) no longer shows. Its Privacy Policy and Terms of Use links stay reachable: beside the switch on the welcome, and in Settings.
 - Ritemark Settings gains the same choice with the same words (it has none today; the only switch is VS Code's `ritemark.analytics.enabled`), and changing it there takes effect at once.
-- A 1.x profile whose person chose Opt Out keeps Off. A 1.x profile that never answered, or pressed OK on the 1.x notice (which wrote no yes, only that the notice was seen), starts Off and is asked on the update sheet (R10); see *Open Questions* for Jarmo's confirmation.
+- Someone updating from 1.x keeps the answer they gave to 1.x's notice (Jarmo, 18 October, refining the 17 October rule; experience 32, frame 1, redrawn to match):
+  - an OK carries over as a yes. The update welcome's switch is on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and they can turn it off there;
+  - Opt Out, or no answer, is off, with "Off until you turn it on. Never your documents, chats or names."
+  1.x's OK wrote no yes, only that the notice was closed, and it wrote the same when the notice was closed in other ways. So any notice closed without Opt Out counts as the OK (Jarmo, 18 October; technical plan, W1).
 
 ### R8: Four events
 
@@ -124,7 +127,7 @@ Acceptance criteria:
 
 - No event carries a path, a folder or project name, a file name, a message, or an account or e-mail.
 - Every event carries the build channel (R9) and the existing shared properties.
-- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer. See *Open Questions*: this is Jarmo's call.
+- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer. See *Open Questions*: this is Jarmo's call. On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
 - `first_message_sent` is sent once per profile, and only if the switch is on when the message is sent.
 - Each event reaches PostHog once, verified in PostHog's live events, and none appears before an answer or after a no.
 
@@ -147,7 +150,7 @@ Acceptance criteria:
   - Your AI: one row for each AI the profile was signed in to, with its state (R4), and Add another, which offers step 1's choices;
   - Where do you want to start?: up to three recent folders, the one open when the person last quit first with "Open when you left", the others with when they were last open, each a 56 row with the project's mark;
   - Open another folder… and Start a new project under the list;
-  - the usage-data switch at the foot, off (R7).
+  - the usage-data switch at the foot: on, with "On, as you chose in Ritemark 1.", for someone who pressed OK on 1.x's notice; off, with "Off until you turn it on.", for anyone else (R7).
 - A project row opens its project. The project open when they left closes the sheet and restores the window as it was, without a reload; any other reloads into it (R6).
 - After a project is picked the update welcome never shows again on this profile; a later window with no folder shows the short "Where do you want to start?" sheet, as for any finished profile (R1).
 - A fresh profile never sees the update welcome.
@@ -215,7 +218,7 @@ Acceptance criteria:
 
 - Every send to PostHog passes one function that reads the person's answer. No caller sends around it.
 - `ritemark.analytics.enabled` defaults to off. The kill-switch flag `analytics` stays as it is (a flag that turns analytics off, never on).
-- Unit tests prove: no send before an answer; none after a no; the held welcome events sent once after a yes and dropped after a no; `build_channel` on every event.
+- Unit tests prove: no send before an answer; none after a no; the held welcome events sent once after a yes and dropped after a no; `build_channel` on every event; a 1.x OK carried over as a yes, and a 1.x Opt Out or no answer off.
 
 ### E2: The welcome's host side is small and testable
 
@@ -255,7 +258,7 @@ Acceptance criteria:
 
 - **Home, the project file and list, switching projects, and the What moved card** (step 3, Sprint 134).
 - **A ChatGPT (OpenAI) API key** anywhere in 2.0.
-- **About this project**, whether written by Claude on the first look at a folder or created with a new project (experience 24). Its file and when to offer it are still Jarmo's open questions there.
+- **About this project**, whether written by Claude on the first look at a folder or created with a new project (experience 24). Its file is decided (Jarmo, 18 October) and the project's menu offers it in Sprint 134; when else to offer it is still open in experience 24.
 - **The Settings redesign** (experiences/settings). Settings keeps its 1.x page; this sprint adds the usage-data choice and the launch check's rows to it.
 - **A tour, a video or a changelog** in the welcome (experience 32, "Not on it").
 - **A VS Code update.** The pin stays at 1.117.0.
@@ -266,6 +269,10 @@ Acceptance criteria:
 - **2026-10-17 (Jarmo):** the usage-data choice is on the welcome, and nothing is counted until yes; people updating from 1.x see the welcome once; the Home tab comes in step 3 ("ok").
 - **2026-10-17 (release plan, engineering):** the welcome is a Ritemark page rather than the Getting Started page rewritten again; opening the folder reloads the window, and the welcome writes where it is going.
 - **2026-10-18 (the Experience lead's answers to this plan's design questions):** the welcome alone shows only the sheet on the ground (on Windows the caption buttons, no menu button); a first window opened with a file opens it, shows "No AI yet" and counts nothing, and the welcome waits until a project has been opened from it; step 2 has no skip; a finished profile's window with no folder gets the short "Where do you want to start?" sheet; the missing Git or Node line's place, words and Use Ritemark's own Claude, and its Settings rows under the runtime choice; the landing's empty desk offers Text, Table and Web page as tiles while Home does not exist yet; OpenCode's Set up and API keys open a small sheet over the welcome; Start a new project is a name field with Create and a Change… for the place; About this project stays out of step 2.
+- **2026-10-18 (Jarmo, via the Experience lead's question form):**
+  - **About this project** is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere as "About this project". The project's menu item that opens it or offers to create it is built in Sprint 134; a new project here still starts empty (R5).
+  - **The sample project:** yes. Ritemark ships one, and step 2 offers "Try the sample project" (R5). Its content is written before step 2 is built; the Experience lead offered to draft it.
+  - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes. They see the switch on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and can turn it off there. Anyone who opted out or never answered sees it off, with "Off until you turn it on." This refines the 17 October rule (R7, R10). Experience 32's frame 1 was redrawn to match (`ritemark-dev` a82c852).
 - **No ChatGPT API key in 2.0.** Recommended in the release plan ("leave it out of 2.0 and add it if people ask") and listed as decided in the Development manager's brief of 18 October; the release plan still lists it as open, so this plan's approval confirms it. It means ChatGPT is reached only through its sign-in. The OpenAI key that Settings already holds (`openai-api-key`, used by OpenCode and other services) is not a ChatGPT key and stays (HARD RULE #1).
 
 ## Open Questions
@@ -273,8 +280,8 @@ Acceptance criteria:
 Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
 
 1. **The welcome's events before the yes.** Hold `welcome_shown` and `ai_signed_in` in memory and send them at the yes, or drop everything that happened before the switch was turned on? **Recommendation: hold and send.** Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
-2. **A 1.x OK.** 1.x's notice was opt-out: OK meant "go on counting". Does an OK on it count as a yes in 2.0? **Recommendation: no**, as experience 32 draws it: everyone who did not opt out starts off and is asked once on the update sheet. A 1.x Opt Out stays off.
-3. **The sample project.** Offer "Try the sample project" on step 2? It needs real content written and kept up. **Recommendation: not in this sprint**; the row is left out until the content exists, and the welcome is built so it can be added in an extension update. The Experience lead has put the same question to Jarmo.
-4. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee.
+2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee.
 
-The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*).
+The technical point on recognising a 1.x OK is decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK (technical plan, W1).
+
+The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*). Jarmo's answers of the same day, through the Experience lead's question form, settled the sample project, the 1.x OK and About this project's file.

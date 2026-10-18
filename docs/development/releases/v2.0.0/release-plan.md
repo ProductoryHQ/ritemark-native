@@ -114,9 +114,9 @@ Ritemark 2.0 is one new Ritemark, with three things together:
   - Each provider's state is shown as its check arrives (each check takes up to 5 s).
   - Under Other ways to connect, the Anthropic API key that Settings already has.
   - Recommended: no OpenAI key for ChatGPT in 2.0, confirmed in this step's plan.
-- **Set up project:** a folder the person has, or a new folder that Ritemark creates with About this project in it.
+- **Set up project:** a folder the person has, a new folder that Ritemark creates, or the sample project, which Ritemark ships and copies into the person's Documents (Jarmo, 18 October). A new folder starts empty: About this project is one file, `AGENTS.md` with a `CLAUDE.md` that points to it (Jarmo, 18 October), and step 3's project menu offers it.
 - **Landing:** opening the folder reloads the window. The welcome writes where it is going, and after the reload Ritemark opens the documents and the AI, with the project in the AI's first message. In step 3 the landing also opens Home first.
-- **The usage-data choice is part of the welcome sheet**, and nothing is counted until the person says yes (Jarmo, 17 October). It replaces today's separate notice.
+- **The usage-data choice is part of the welcome sheet**, and nothing is counted until the person says yes (Jarmo, 17 October). It replaces today's separate notice. Refined for people updating from 1.x (Jarmo, 18 October): an OK on 1.x's notice carries over as the yes, so the update sheet shows the switch on, and they can turn it off there; anyone who opted out or never answered starts off. 1.x stored only that its notice was closed, not which button closed it, so any notice closed without Opt Out counts as the OK (Jarmo, 18 October; [Sprint 133's technical plan](sprint-133-welcome/technical-plan.md), W1).
 - **Four analytics events:** welcome shown, AI signed in, project opened, first message sent. They go through Ritemark's PostHog (`src/analytics/posthog.ts`), are anonymous, and are sent only after a yes.
 - **People updating from 1.x see the welcome once** (Jarmo, 17 October). It shows them as already signed in; they confirm and pick a project.
 - **A file's extension in muted ink** in the tree and on tabs (the body colour on the chosen tab and the open row), as the framework draws it. It needs VS Code's resource label to render the name and the extension apart, a patch, so it waits for this step (the Experience lead's review of Sprint 132, 17 October).
@@ -147,7 +147,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 - **Home and Tasks as the first two tabs, permanent and pinned as icons** (`permanentTabs.ts` on step 1's rule). A fresh window opens on Home, and the Home place always brings Home's tab forward. Main's [#431](https://github.com/ProductoryHQ/ritemark-native/pull/431) already does this for Tasks.
 - **The Tasks tab carries the waiting count**, the same number as the Tasks place.
 - **On Home the left column holds the projects list**, in place of the launcher view.
-- **The left column's head**, filled: the switcher menu, New and Search.
+- **The left column's head**, filled: the switcher menu, About this project (Jarmo, 18 October: one file, `AGENTS.md`, opened or created from the menu), New and Search.
 - **Switching in place:**
   - the reload stays (VS Code restarts the extension host when the folder changes, and its API offers no way around that);
   - the splash takes the ground's colour;
@@ -255,9 +255,9 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 
 ### Gate 2 checklist (first draft, completed by each sprint)
 
-- **A fresh profile** on the Mac and on Windows: the welcome, a provider's sign-in, the usage-data choice, a new project, landing on Home with the AI ready.
+- **A fresh profile** on the Mac and on Windows: the welcome, a provider's sign-in, the usage-data choice, a new project and the sample project, landing on Home with the AI ready.
 - **An update from v1.14.0** with a lived-in profile (several projects, chats, task boards, a terminal in the AI column, a moved view, the person's own theme):
-  - the welcome shows once;
+  - the welcome shows once, with the usage-data switch as the person answered 1.x's notice;
   - the person's settings are kept;
   - the terminal comes back as a tab;
   - the project list is filled;
@@ -279,6 +279,12 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 - **Copilot Chat:** behind More.
 - **Usage data:** the choice is on the welcome, and nothing is counted until yes.
 - **Updating from 1.x:** the welcome shows once.
+
+**Jarmo, 18 October (via the Experience lead's question form):**
+
+- **About this project:** one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere as "About this project". The project's menu opens it or offers to create it (step 3).
+- **The sample project:** yes. Ritemark ships one, and the welcome offers "Try the sample project" (step 2).
+- **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes, shown on and changeable on the update sheet; anyone who opted out or never answered starts off (step 2). This refines the 17 October rule.
 
 **Engineering, on Jarmo's "You decide":**
 

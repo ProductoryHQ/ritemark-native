@@ -9,8 +9,8 @@ Status: Phase 2 (PLAN) drafted 2026-10-18, **awaiting Jarmo's approval**. Not st
 ## SDD Artifacts
 
 - [spec.md](spec.md): the behaviour contract, R1–R15 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S43, the manual QA matrix.
-- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W11, the four audits, one merge.
+- [scenarios.md](scenarios.md): S1–S44, the manual QA matrix.
+- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W11, the five audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
 
@@ -35,7 +35,7 @@ The project becomes the place a person works in. Each project opens on its own H
 | Home, the project's own page | R4 |
 | Home and Tasks, always the first two tabs | R5 |
 | On Home, the left column holds the projects | R7 |
-| The head's menu: Switch project ▸, About this project; File ▸ Switch project | R8 |
+| The head's menu: Switch project ▸, About this project (`AGENTS.md`, opened or created); File ▸ Switch project | R8 |
 | Switching in place; asking first while Claude works (Cancel, Switch and stop, Open in a new window) | R9 |
 | The welcome lands on Home; What moved, once | R10, R11 |
 | Saved and Share on the document's bar | R12 |
@@ -70,7 +70,7 @@ The launcher's code is deleted only after every row above is checked on the bran
 
 - **No new events in this sprint.** The four from Sprint 133 are enough to see whether people reach a project; Home and switching add none. If Jarmo wants one (for example "project switched"), it goes through Sprint 133's consent gate and carries no name or path.
 - **Nothing leaves the computer.** The project list, what waits and the first fill read only what is already on it: VS Code's recent folders, Ritemark's chat store, the boards' files and this computer's hand-off records.
-- **The folder holds only what the person chose to change.** `.ritemark/project.json` is written only on a change, and holds the name, line and cover, never a path or an account.
+- **The folder holds only what the person chose to change.** `.ritemark/project.json` is written only on a change, and holds the name, line and cover, never a path or an account. About this project's `AGENTS.md` and `CLAUDE.md` are written only when the person picks Create.
 
 ## Windows
 
@@ -98,6 +98,10 @@ The launcher's code is deleted only after every row above is checked on the bran
   - the "Switched to…" note with Go back stays;
   - What moved arrives with Home, once per profile;
   - the bar is `comparison/after-write.png`; Share is experience 26's frame 1 ("Share, not Export").
+- **2026-10-18 (Jarmo, via the Experience lead's question form):**
+  - About this project is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere in the UI as "About this project". This sprint builds the project menu's item, which opens the file or offers to create it.
+  - The sample project: yes. Ritemark ships one, offered on the welcome (Sprint 133). Here it is an ordinary project, and it gains its line on Home.
+  - Usage data for people updating from 1.x: an OK on 1.x's notice carries over as a yes; anyone who opted out or never answered starts off (Sprint 133). Nothing changes here.
 - **2026-10-18 (engineering, in this plan):**
   - one merge;
   - the Tasks tab's count is the Tasks place's badge, read in the shell, so the two can never differ; the project's total adds the chats that wait;
@@ -113,11 +117,10 @@ Each has a recommendation, listed in [spec.md](spec.md#open-questions) too.
 
 1. **What counts as a chat that waits.** I recommend a question or an approval the AI is waiting on, not an unread answer.
 2. **Removing 1.x's Home launcher.** I recommend deleting its code once every function on the table above is checked, and setting its `home-launcher` flag to disabled with a tombstone.
-3. **About this project's file**, for the project's menu (the Experience lead kept it out of step 2 because it is still open in experience 24). I recommend `AGENTS.md` headed "About this project", with a one-line `CLAUDE.md` that points to it, so all three AIs read the same words. Without a decision by the sprint's start, the menu item is left out.
 
 ## Feature Flag Check
 
-No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-board` flag keeps working: with it off, Home is first alone and nothing counts tasks (R5, R13). The `home-launcher` flag is retired with the launcher (Decision 4), as `CLAUDE.md` asks when a feature's code goes.
+No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-board` flag keeps working: with it off, Home is first alone and nothing counts tasks (R5, R13). The `home-launcher` flag is retired with the launcher (Decision 2), as `CLAUDE.md` asks when a feature's code goes.
 
 ## Success Criteria
 
@@ -129,6 +132,7 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 - [ ] Switching asks first when the AI is working; the reload shows the ground's colour (R9).
 - [ ] What moved shows once on an updated profile, never on a fresh one (R11).
 - [ ] Saved and Share work, and every Export item works from Share (R12).
+- [ ] About this project opens or creates `AGENTS.md`, shown as About this project; a `CLAUDE.md` already in the folder is never changed (R8).
 - [ ] Everything Home's launcher did in v1.14.0 can be done from 2.0's Home (R14).
 - [ ] Light, Dark and Windows checked (R15).
 - [ ] A production build from a clean-room worktree succeeds after the merge; the drift is recorded (E5, E7).
@@ -142,13 +146,14 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 | The first fill misses boards known from nowhere else | Audit; otherwise they join when next opened |
 | Switching through VS Code's own Open Folder stops the AI without asking | Audit; at worst today's behaviour, recorded |
 | Removing the launcher loses a function | The table above, checked before the code goes |
+| A folder already has its own `CLAUDE.md` (a code project) | Create never overwrites or changes it; the about-file audit settles what the person is told; S44 |
 
 The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprint).
 
 ## Depends on
 
 - **Sprint 132 merged:** the rule that keeps pinned Home and Task board tabs first (019), the head's place and menus (018), the tab row.
-- **Sprint 133 merged:** the landing (`src/welcome/landing.ts`), a new project (`src/welcome/newProject.ts`), the update marker `ritemark.updatedFrom1x`, the consent gate, and the decision on About this project's file.
+- **Sprint 133 merged:** the landing (`src/welcome/landing.ts`), a new project (`src/welcome/newProject.ts`), the sample project (`extensions/ritemark/sample-project/`), the update marker `ritemark.updatedFrom1x` and the consent gate.
 - **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, and the answers of 18 October (spec, *Resolved Questions*).
 
 ## Pre-Implementation Gate

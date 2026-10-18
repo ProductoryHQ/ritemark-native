@@ -9,6 +9,7 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | Home's place | 1.x's launcher: the view `ritemark.homeView` in the container `ritemark-home`, its own HTML (no shared bundle, no CSP), behind the experimental flag `home-launcher`. It offers New document (`ritemark.newDocument`), New AI conversation (`ritemark.newChat`), Task board (`ritemark.openTaskBoard`), Open document… , New table (`ritemark.newTable`) and Open folder…; recent documents (five newest `.md`) with a folder, recent folders (`_workbench.getRecentlyOpened`) without one (`views/HomeViewProvider.ts:23–181`; `extension.ts:474–478`) | `ProjectsViewProvider.ts` takes the same slot: the open folder first, then up to 12 folders from `_workbench.getRecentlyOpened` that still exist; HTML with `innerHTML` |
 | Home's tab | None. Patch 019 already reserves the permanent view type `mainThreadWebview-ritemark.home` (`RITEMARK_PERMANENT_VIEW_TYPES`) | `HomePanel.ts`, view type `ritemark.home`: cover, mark, name, folder, line, what waits (the board's calls only, no chats), last changed (five newest of several kinds); `innerHTML` with an escape helper; redraws on file changes (1.5 s), on show and on board changes |
 | The project file | None | `.ritemark/project.json` with `about` (200 characters) and `cover` (a path under `.ritemark/`); read-merge-write on a change; a new cover copied to `.ritemark/cover<ext>` |
+| About this project | None. Claude Code reads a project's `CLAUDE.md` and the files it imports with `@` (`@AGENTS.md`); Codex and OpenCode read `AGENTS.md` | — |
 | Home and Tasks pinned | Patch 019's rule keeps a **pinned** Home or Task board tab first and permanent. Nothing on main pins the board: `TaskBoardPanel.show` only respects a restored pinned tab (`taskBoard/TaskBoardPanel.ts:25–33`) | `permanentTabs.ts`: opens whichever is missing in group 1 after 800 ms, pins it (`workbench.action.pinEditor`), moves Home first, returns to the previous tab; again 400 ms after one is closed or unpinned |
 | The Tasks place's count | A hidden tree view `ritemark.tasksBadge` carries `snapshot.attention.count`, the board's calls (`taskBoardHost.ts:100–106`; `BoardController.ts:266–340`) | — |
 | The Tasks tab's count | None | A hunk in the PoC's patch reads the Tasks container's badge from `IActivityService` and draws it on the board's tab (`multiEditorTabsControl.ts`) |
@@ -26,7 +27,7 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 |---|---|---|
 | Extension: a new `projects` subsystem | The project file; the project list and its first fill; what waits, in each project and across them; switching | `src/projects/` (new) |
 | Extension: views | Home's tab; the projects list in Home's place; the permanent tabs; What moved | `src/views/HomePanel.ts`, `ProjectsViewProvider.ts`, `permanentTabs.ts` (new); `HomeViewProvider.ts` replaced |
-| Extension: the head | Switch project ▸ with the projects; About this project | `src/views/projectHeadCommands.ts`, `package.json` |
+| Extension: the head | Switch project ▸ with the projects; About this project (`AGENTS.md`, opened or created) | `src/views/projectHeadCommands.ts`, `src/projects/aboutFile.ts` (new), `package.json` |
 | Extension: the board | Opened and pinned by the permanent tabs; Home's place clicked again | `src/taskBoard/taskBoardHost.ts`, `TaskBoardPanel.ts` |
 | Webview | Home and the projects list in the shared bundle; Saved and Share on the document's bar | `webview/src/components/home/` (new), `webview/src/main.tsx`, `components/header/` |
 | Patch 019 | The Tasks tab's count | `patches/vscode/019-ritemark-tab-row.patch` |
@@ -45,6 +46,12 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
    - task boards: a hand-off directory is named by a hash of its folder, so a board is found only through a known folder. The audit checks one more read-only source on this computer, VS Code's own record of every folder a window has opened (`workspaceStorage/*/workspace.json`, beside this window's `context.storageUri`), and whether folders found there that hold `.ritemark/tasks` are worth adding. If it is not reliable, boards in folders known from the other two sources are found, and the rest join the list when they are next opened.
 3. **`research/switch-audit.md`** (R9): how the host knows a chat in this window is working (a running turn, a card's turn in its chat) and how Switch and stop stops it as Stop does; which ways of switching Ritemark controls (Home's list, the head's switcher and Open a folder…, File ▸ Switch project) and which it does not (VS Code's own File ▸ Open Folder… and Open Recent); whether a small shell veto on the workbench's shutdown with reason LOAD can ask the extension before VS Code's own routes switch, or whether those routes are left as today, where switching stops the work. Experience 33 asks for every switch that reloads the window.
 4. **`research/splash-audit.md`** (R9): how `partsSplash.ts` chooses its colours, which colour key carries the ground, the stored splash on a v1.14.0 profile, and the first window of a fresh profile in Light and Dark.
+5. **`research/about-file-audit.md`** (R8): where Ritemark draws a file's name, and how each place can say About this project for the project's own `AGENTS.md` (Jarmo, 18 October: shown everywhere by that name):
+   - the head's menu (the extension's words);
+   - its tab (the Ritemark editor's title for a `.md`);
+   - Documents (the resource label, whose name and extension 018 already draws apart since Sprint 133);
+   - Home's Last changed (W4), and the AI sheet where it names a file.
+   It also settles whether the one-line `CLAUDE.md` shows in Documents or is hidden as `.ritemark` is, and what happens in a folder that has its own `CLAUDE.md` but no `AGENTS.md`: Create writes `AGENTS.md` and leaves `CLAUDE.md` as it is, so Claude does not read the new file until `@AGENTS.md` is in it. What the person is told then is a small question for the Experience lead, through the Development manager.
 
 `research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home.
 
@@ -57,6 +64,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
   - Schema: `{ "ritemark": "project/1", "name"?, "line"?, "cover"? }`. The PoC's `about` is read as `line` once.
 - The default cover is `media/home/cover.jpg` (the PoC's 78 KB file), an image file, never inlined.
 - Tests: `projectFile.test.ts` with a fake file system: defaults, a bad file kept, unknown keys kept, the cover's copy, a read-only folder.
+- **The sample project** (Sprint 133's `extensions/ritemark/sample-project/`) gains its `.ritemark/project.json` with the line experience 2's frame 4 draws ("A sample project to try things on: a leadership programme, with documents to work on."), so a fresh copy's Home shows it. Its words are the Experience lead's, with the rest of the sample.
 
 ## Workstream 2: The project list and its first fill (R2)
 
@@ -110,9 +118,14 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Workstream 7: The head's menu, filled (R8)
 
-- `ritemark/projectHead` (`package.json`, `projectHeadCommands.ts`): Switch project ▸, Open a folder…, Reveal in Finder / File Explorer, About this project (once Jarmo has decided its file; spec Open Question 3). New folder and Collapse folders stay where Sprint 132 put them, after these. Open a folder… goes through W8's switch, so it asks first too.
+- `ritemark/projectHead` (`package.json`, `projectHeadCommands.ts`): Switch project ▸, Open a folder…, Reveal in Finder / File Explorer, About this project (Jarmo, 18 October). New folder and Collapse folders stay where Sprint 132 put them, after these. Open a folder… goes through W8's switch, so it asks first too.
 - **Switch project ▸** is a submenu whose items come from the extension at the moment it opens: 018's `ritemarkMenu.ts` asks a command (`ritemark.projects.switcherItems`) for `{ id, label, mark, detail, checked }[]` and draws them, then All projects, on Home and Open in a new window. A static `package.json` menu cannot list projects, so this is the one shell change the head needs (per `research/confirmations.md`).
-- **About this project** opens the project's About this project file, or offers to create it, as Jarmo decides (spec Open Question 3); left out until then.
+- **About this project** (`src/projects/aboutFile.ts`, new, no `vscode` import in its rules, an injected file system): the file is `AGENTS.md` at the project's root.
+  - When it is there, the item opens it in the Ritemark editor.
+  - When it is not, the item asks first, in experience 31's dialog style, with Create and Cancel. Create writes `AGENTS.md` headed "About this project" and, when the folder has no `CLAUDE.md`, a `CLAUDE.md` holding only `@AGENTS.md`; each atomically (a temporary file, then rename), never over a file that is there. Then it opens `AGENTS.md`.
+  - A `CLAUDE.md` or `AGENTS.md` already in the folder is never overwritten or changed. A folder that cannot be written says so, as R1 does.
+  - The name About this project is drawn where `research/about-file-audit.md` says; if Documents needs a hunk, it goes into 018's resource-label hunk from Sprint 133.
+  - Tests: `aboutFile.test.ts`: open, create both files, an existing `CLAUDE.md` left byte for byte, an existing `AGENTS.md` opened, a read-only folder.
 - **File ▸ Switch project** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`; the extension contributes Switch project there. On the Mac it shows in the native File menu too.
 
 ## Workstream 8: Switching in place (R9)
@@ -140,7 +153,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Workstream 11: Tests, docs and builds (E3–E7)
 
-- **Extension unit tests** (added to `package.json`'s `test` script): `projects/projectFile.test.ts`, `ProjectList.test.ts`, `firstFill.test.ts`, `waiting.test.ts`, `switchProject.test.ts` (the guard's decisions), `protocol.test.ts`, `views/permanentTabs.test.ts`.
+- **Extension unit tests** (added to `package.json`'s `test` script): `projects/projectFile.test.ts`, `ProjectList.test.ts`, `firstFill.test.ts`, `waiting.test.ts`, `switchProject.test.ts` (the guard's decisions), `aboutFile.test.ts`, `protocol.test.ts`, `views/permanentTabs.test.ts`.
 - **Webview tests**: Home's states (full, empty, missing cover, What moved), escaping (a project named `<img src=x onerror=…>` renders as text), the projects list's filter, the document bar's Saved.
 - **VS Code unit test**: the Tasks tab's count (019).
 - **CDP checks** (`scripts/qa/`): Home and Tasks first after a fresh window, a restart and Close all; the count on the Tasks tab equal to the place's; switching both ways with tabs restored; the splash's colour during a switch.
@@ -151,7 +164,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Delivery plan: one merge
 
-1. Before the merge: Mac QA (S1–S40), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching).
+1. Before the merge: Mac QA (S1–S40, S43, S44), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching).
 2. The merge.
 3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash and File ▸ Switch project), and the drift check. Fixes from the Windows round go in a small follow-up PR.
 
@@ -166,7 +179,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | `media/home-cover.jpg`, `home-tab-*.svg` | W1 and W4, as image files |
 | The patch's Tasks tab count (`multiEditorTabsControl.ts`) | W3, into 019 |
 | `RITEMARK_PLACE_TABS` | Not at all: the extension's `placeClickedAgain` (W5) |
-| `ritemark.poc.addSampleProjects`, the sample project | Not at all |
+| `ritemark.poc.addSampleProjects`, the sample project | Not at all: the welcome's sample project is Sprint 133's own, with content written for it |
 
 ## Risks inside the sprint
 
@@ -179,4 +192,6 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | Switching through VS Code's own Open Folder stops the AI without asking | The switch audit; at worst, today's behaviour, recorded. Every Ritemark route asks (experience 33) |
 | The splash hunk breaks on a VS Code update | One small hunk in 018; the screenshot check in `update-vscode.sh`'s checklist |
 | Removing 1.x's launcher loses a function | R14's table checked row by row before `HomeViewProvider.ts` is deleted |
+| About this project's Create touches a `CLAUDE.md` the person wrote | Never written over or changed; the about-file audit settles what the person is told; S44 |
+| Showing `AGENTS.md` as About this project needs a shell hunk in Documents | The about-file audit; expected: one more case in 018's resource-label hunk, which the tree and the tabs share |
 | The bundle grows | Images as files; measured before and after |

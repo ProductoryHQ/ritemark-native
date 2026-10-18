@@ -121,6 +121,18 @@ When the person clicks Use Ritemark's own Claude
 Then the runtime switches to Ritemark's own and the line goes
 And with Ritemark's own Claude, or on a Mac, no such line shows; the same holds for Node.js.
 
+### S50: Try the sample project
+Given step 2, with the switch on
+When the person clicks Try the sample project ("A small leadership programme, with documents to work on.")
+Then a folder `~/Documents/Ritemark/Leadership programme` is made with the sample's brief, modules, kickoff notes and tasks, and the window lands on it (S21): Documents lists them, and the task board shows the sample's tasks
+And `project_opened` arrives once with `source: sample`
+And the sample inside the app is unchanged.
+
+### S51: A sample folder already there (negative)
+Given `~/Documents/Ritemark/Leadership programme` already exists (the person's own folder of that name, or an earlier copy of the sample with edits in it)
+When the person clicks Try the sample project
+Then nothing in that folder changes; the copy goes to `~/Documents/Ritemark/Leadership programme 2`, and the window lands there.
+
 ## Feature: Landing on the project (R6)
 
 ### S21: Landing
@@ -163,7 +175,23 @@ Then the 1.x usage-data toast never shows, and the Privacy Policy and Terms of U
 ### S28: A 1.x Opt Out stays off
 Given a v1.14.0 profile whose person chose Opt Out
 When the update welcome shows
-Then its switch is off and nothing is sent, before or after the person picks a project.
+Then its switch is off, with "Off until you turn it on. Never your documents, chats or names.", and nothing is sent, before or after the person picks a project.
+
+### S52: A 1.x OK carries over
+Given a v1.14.0 profile whose person pressed OK on the usage-data notice, with PostHog's live events open
+When this build starts on it
+Then the update welcome's switch is on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and events are sent from the first start, `welcome_shown` (`kind: update`) once
+When the person turns the switch off on the sheet
+Then nothing more is sent, from that moment, and Settings shows usage data off.
+(This holds under the first reading of the open technical point in technical-plan.md, W1. Under the second, this profile starts off, as S53.)
+
+### S53: No answer to 1.x's notice starts off
+Given a v1.14.0 profile whose usage-data notice was never answered (the app quit while it showed)
+When this build starts on it
+Then the update welcome's switch is off, with "Off until you turn it on. Never your documents, chats or names.", and nothing is sent
+When the person turns the switch on
+Then events are sent from that moment.
+A profile whose notice was closed with its ×, or left through Privacy Policy or Terms of Use, stored the same as an OK. It follows the reading Jarmo picks (technical-plan.md, W1), and its scenario is written then.
 
 ## Feature: Four events (R8, R9)
 
@@ -193,7 +221,7 @@ And a run of the `ritemark-automation` skill's throwaway profile sends nothing.
 ### S33: The update welcome
 Given a v1.14.0 profile signed in to Claude and ChatGPT, with three recent folders and the window last closed on "Leadership programme"
 When this build starts on it
-Then the update welcome shows once: "Welcome to Ritemark 2.0", Your AI with Claude and ChatGPT (Checking…, then Signed in), Leadership programme first with "Open when you left", two more with when they were last open, Open another folder…, Start a new project and the switch, off.
+Then the update welcome shows once: "Welcome to Ritemark 2.0", Your AI with Claude and ChatGPT (Checking…, then Signed in), Leadership programme first with "Open when you left", two more with when they were last open, Open another folder…, Start a new project and the switch, showing the profile's 1.x answer (S28, S52, S53).
 
 ### S34: Back to where they left
 When the person clicks "Open when you left"
@@ -273,8 +301,8 @@ Then the AI's sheet offers Sign in to ChatGPT, Sign in to Claude and Other ways 
 
 ### S45: The welcome on Windows
 Given a Windows build from main (after the merge) or the test overlay on the latest one (before it), and a fresh profile
-When the person goes through the welcome with ChatGPT, then again with Claude, with an existing folder and a new project
-Then each works, paths are in Windows' form, the folder picker is Windows', every shortcut says Ctrl, and the window buttons stay at the top right.
+When the person goes through the welcome with ChatGPT, then again with Claude, with an existing folder, a new project and the sample project
+Then each works, paths are in Windows' form (the sample in `Documents\Ritemark\Leadership programme`), the folder picker is Windows', every shortcut says Ctrl, and the window buttons stay at the top right.
 
 ### S46: The first seconds on Windows (#401)
 Given a fresh Windows profile
