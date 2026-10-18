@@ -25,7 +25,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S4 Moving the window | Open (Jarmo) | Needs a real pointer on the window: a synthetic press cannot move a window by its drag region. |
 | S5 The traffic lights after a restart | Partial | After restarts the lights sit on the line at the same pixels as before ([`qa/s13-zoom-after-restart.png`](qa/s13-zoom-after-restart.png)). Full screen and back is for Jarmo's pass (it takes over the screen). |
 | S6 A sheet dialog | Open (Jarmo) | A native sheet would come up over Jarmo's work. |
-| S7–S11 | Windows | Windows round 1 (below): S7, S9 and S11 pass; S8 partial (Alt focuses the menu button and Enter or ↓ opens it); S10 for Jarmo by hand. |
+| S7–S11 | Windows | Windows round 1 (below): S7, S8 (as reworded), S9 and S11 pass; S10 for Jarmo by hand. |
 | S12 Zoom in and out | Pass | Native captures of the top 52 points at zoom 1.0, 1.2, 1.44 and 0.83 ([`qa/s12-zoom-top-band.png`](qa/s12-zoom-top-band.png)): the lights, toggles, You and the tabs keep their size and the line; the lights' pixels are identical; only the columns under the strip change width. |
 | S13 Zoom across a restart | Pass | Zoomed to 1.2, quit and relaunched: zoom 1.2 came back, the lights and toggles at the same pixels as at zoom 1.0 ([`qa/s13-zoom-after-restart.png`](qa/s13-zoom-after-restart.png)). |
 | S14 Only the AI | Pass | After a fresh start, restarts and the v1.14 profile (S45), the AI column shows only the AI's sheet with its chat rail: no VS Code title row, no row of icons ([`qa/s1-fresh-start.png`](qa/s1-fresh-start.png)). |
@@ -93,7 +93,7 @@ as expected until 2.0's version bump. Screenshots stay on the Windows PC.
 | Scenario | Result | Notes |
 | --- | --- | --- |
 | S7 No title row | Pass | Window buttons at full height from x=1304 of 1440; strip 43. |
-| S8 The menu | Partial | The menu button opens File, Edit, View and Help with Ctrl shortcuts; arrows and Escape work. Alt alone focuses the menu button, and Enter or ↓ opens it (Windows' own rule, and 1.14's); the scenario says Alt opens it. |
+| S8 The menu | Pass | The menu button opens File, Edit, View and Help with Ctrl shortcuts; arrows and Escape work. Alt alone focuses the menu button, and Enter or ↓ opens it (Windows' own rule, and 1.14's). The scenario said Alt opens it; reworded to this with the Development manager. |
 | S9 The AI hidden | Pass | |
 | S10 Snapping and dragging | Not run | Needs a real pointer; Jarmo checks it by hand. |
 | S11 No ⌘ on Windows | Pass | Ctrl everywhere. |

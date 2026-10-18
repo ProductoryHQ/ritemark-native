@@ -43,8 +43,9 @@ When Ritemark opens
 Then there is no title row; the menu button and the left toggle sit at the start of the left strip, and minimise, maximise and close sit at full height at the right end of the AI's strip, after the AI's toggle and You.
 
 ### S8: The menu
-When the person clicks the menu button, or presses Alt
+When the person clicks the menu button, or presses Alt and then Enter or ↓
 Then File, Edit, View and Help open with today's items and Ctrl shortcuts, and the arrow keys and Escape work.
+Alt alone focuses the menu button, as Windows does and 1.14 did (reworded after Windows round 1, with the Development manager, 18 October).
 
 ### S9: The AI hidden on Windows
 When the person hides the AI
