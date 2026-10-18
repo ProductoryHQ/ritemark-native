@@ -211,7 +211,7 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | 1 — Surfaces and frame: [Sprint 132](sprint-132-surfaces-and-frame/sprint-plan.md) | `sprint-132-surfaces-and-frame` | Plan: [#438](https://github.com/ProductoryHQ/ritemark-native/pull/438); merge 1 (the frame): [#443](https://github.com/ProductoryHQ/ritemark-native/pull/443) | #276, #430, #199 (closed at merge 2) | Phase 6: merge 1 open 2026-10-17, waits for Jarmo's admin merge | Mac QA in [qa-evidence.md](sprint-132-surfaces-and-frame/qa-evidence.md); Jarmo's pass, the production build and Windows round 1 after the merge | Changelog at 2.0.0 |
 | 2 — The welcome | `sprint-NN-welcome` | — | #429, #338 | Not planned | — | — |
 | 3 — The project at the centre | `sprint-NN-project-at-the-centre` | — | — | Not planned | — | — |
-| Update — VS Code: [Sprint 135](sprint-135-vscode-update/sprint-plan.md) | `sprint-135-vscode-update` | Plan: this PR | — | Plan drafted 2026-10-18, awaiting Jarmo's approval; starts after Steps 1–3 merge | — | — |
+| Update — VS Code: [Sprint 135](sprint-135-vscode-update/sprint-plan.md) | `sprint-135-vscode-update` | Plan: [#445](https://github.com/ProductoryHQ/ritemark-native/pull/445) | — | Plan drafted 2026-10-18, awaiting Jarmo's approval; starts after Steps 1–3 merge | — | — |
 | 4 — 2.0 as one release | the release worktree and version bump | — | — | Not planned | — | — |
 
 ## Feature-Complete Checklist
