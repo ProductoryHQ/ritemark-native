@@ -92,7 +92,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [ ] Modal dialogs, Flows and the Agent Library, when their drawings arrive (R13)
   - The Agents place (the Experience lead, 17 October; Experience 31): the column's head is the project head (mark, name, chevron) as on every place but Home, with no "Agents" title row and no "6 skills · 1 flow" line; the search field becomes the Search row under New; Project / User become the This project / All projects switch; the six sections as column groups with muted counts and 32 rows; the view's remaining hard-coded light fills themed.
 - [ ] The contrast unit test (R13)
-- [ ] `ritemarkWindowSizes.ts`: the 1400, 1200 and 960 crossings; a column the person opened left alone (R14)
+- [x] `ritemarkWindowSizes.ts`: the 1400, 1200 and 960 crossings; a column the person opened left alone (R14). 018, loaded by `desktop.contribution.ts`; 5 unit tests in `ritemarkWindowSizes.test.ts`; S42 and S43 checked in the dev instance
 - [x] The fixes from Windows round 1 (R2): a terminal tab's menu is the usual tab items plus Rename (no Move Terminal into Panel, Change Color, Change Icon or Size to Content Width; the Experience lead); no Run in the View menu; View → Copilot Chat and Ctrl+Alt+I open Copilot Chat as a tab, not in the panel; ritemark.app trusted; the terminal bar keeps the shell's name while a command runs. S8 reworded: Alt focuses the menu button, Enter or ↓ opens it (the Development manager)
 
 ## Phase 8: Merge 2, the theme and Windows, and closeout

@@ -84,6 +84,13 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 - **Jarmo's Mac pass on merge 1:** Ritemark Settings must lie on white, and the CSV grid lost its edge; both are fixed for merge 2 (tasks.md, Phase 7).
 - **More's tooltip over its open menu** (seen by the Development manager on a scripted click): not reproduced, either hovering first or clicking at once and waiting. Found instead and fixed: while the pointer was on More, its glyph painted VS Code's toolbar hover box inside the place's fill.
 
+## Merge 2
+
+| Scenario | Status | Evidence and notes |
+| --- | --- | --- |
+| S42 Narrowing the window | Pass | The workbench laid out at each width in turn (CDP viewport emulation in the dev instance: the workbench sees a resize, the window itself does not move), AI column 400 at the start. Columns (left, AI, desk): 1500: 260, 400, 840; 1300: 260, 336, 704; 1100: hidden, 336, 764; 900: hidden, hidden, 900; and back: 1100 brings the AI back, 1300 the left column, 1500 the AI's 400. The desk never went below 704. `ritemarkWindowSizes.test.ts` covers the same walk, a jump across every width, and a column the person resized. |
+| S43 A column the person opened | Pass | At 1100 the left column had hidden itself; its toggle on the desk's strip brought it back, taking room (desk 504, as a toggle does today). It stayed open at 1150 and 1250 and hid again when the window crossed 1200 going down ([`qa/s43-left-opened-1100.png`](qa/s43-left-opened-1100.png)). |
+
 ## Windows round 1
 
 Tested by the Windows session on Jarmo's PC: CI build of `d781a0e1` (run 39048820235), installed over 1.14.0 (exit
