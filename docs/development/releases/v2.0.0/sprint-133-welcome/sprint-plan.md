@@ -72,7 +72,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 - **Nothing is counted before yes** (Jarmo, 17 October; refined on 18 October: an OK on 1.x's notice is that yes). From this sprint, `ritemark.analytics.enabled` defaults to off; the PostHog client is not even created before a yes; every send passes one gate. This holds for the existing events too, not only the new four.
 - **The four events** (`welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent`) carry no path, name, file, message or account, only the properties in R8 and the existing shared ones, plus `build_channel`.
 - **The held events** (Open Question 1): if Jarmo agrees, the welcome's first two events wait in memory until the person answers, and are dropped at a no.
-- **1.x answers** (Jarmo, 18 October): an OK on 1.x's notice carries over as a yes. The update sheet's switch shows it on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and the person can turn it off there. An Opt Out, or no answer, starts off, with "Off until you turn it on." 1.x stored only that its notice was closed, not which button closed it, so how an OK is recognised is an open technical point ([technical-plan.md](technical-plan.md), W1; Decision 3 below).
+- **1.x answers** (Jarmo, 18 October): an OK on 1.x's notice carries over as a yes. The update sheet's switch shows it on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and the person can turn it off there. An Opt Out, or no answer, starts off, with "Off until you turn it on." 1.x stored only that its notice was closed, not which button closed it, so any notice closed without Opt Out counts as the OK (Jarmo, 18 October; [technical-plan.md](technical-plan.md), W1; Decision 3 below).
 - **Dev runs** carry `build_channel: dev` (#338), and the automation profiles never answer yes, so they send nothing.
 - **Expected effect:** PostHog's numbers drop to the people who say yes, or said OK in 1.x. That is the rule working, and the Development manager tells whoever reads the numbers.
 - **Privacy policy:** opt-in and `build_channel` may need a line on ritemark.app. The Development manager takes it to the web side (cross-repo; nothing here changes it). GeoIP and what the existing events carry are not changed, and are listed in the same note.
@@ -107,6 +107,7 @@ A window with no folder opens on one calm sheet. It asks which AI the person use
 - **2026-10-18 (Jarmo, via the Experience lead's question form):**
   - About this project is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere as "About this project". Sprint 134 builds the project menu's item; a new project here still starts empty.
   - The sample project: yes. Ritemark ships one, and step 2 offers "Try the sample project". Its content is written before step 2 is built, and this plan asks the Experience lead, who offered, to draft it.
+- **2026-10-18 (the sample project's content):** written by the Experience lead and approved by Jarmo ("files look good!"): `ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`, copied as it is. The copy sets the cards' placeholder dates to the time of copying.
   - Usage data for people updating from 1.x: an OK on 1.x's notice carries over as a yes, shown on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and changeable on the update sheet. Anyone who opted out or never answered sees it off, with "Off until you turn it on." This refines the 17 October rule. Experience 32's frame 1 was redrawn to match (`ritemark-dev` a82c852).
 - **2026-10-18 (Development manager's brief):** no ChatGPT API key in 2.0. The release plan still lists it as a recommendation, so this plan's approval confirms it. The OpenAI key Settings holds for OpenCode and other services is not affected.
 - **2026-10-18 (engineering, in this plan):**
@@ -160,7 +161,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - **Sprint 132 merged** (both merges): the frame, the head, the + and New, Ritemark's menus, the terminal as a tab.
 - **The Experience lead's drawings and answers:** experience 2 and experience 32 (signed in, signed out, offline, checking and updating from 1.x), and the answers of 18 October (spec, *Resolved Questions*).
-- **The sample project's content**, written before step 2 is built. The Experience lead offered to draft it, and this plan asks them to, through the Development manager: a small leadership programme as in the drawings, with a brief, modules, kickoff notes and a few tasks (tasks.md, Phase 1).
+- **The sample project's content:** done. Written by the Experience lead and approved by Jarmo on 18 October: `ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme` (tasks.md, Phase 1).
 
 ## Pre-Implementation Gate
 

@@ -9,17 +9,17 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] VS Code at the pin with patches 001–019 from reset + clean + apply (copy-on-write clone for the worktree)
 - [ ] Record patch 001's and 016's file lists and hunk counts in `notes/patches-before.md` (`PATCH-RULES.md` §8)
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
-- [ ] The Experience lead asked, through the Development manager, to draft the sample project's content, as they offered (R5)
+- [x] The Experience lead asked, through the Development manager, to draft the sample project's content, as they offered (R5). Written and approved by Jarmo, 18 October
 
 ## Phase 1: Audits first
 
 - [ ] `research/getting-started-retirement-audit.md` (W2, R12): the hunks of 001, 016 and 017 sorted; every route into Getting Started; `IOnboardingService` (007); where `workbench.startupEditor: none` wins; the stacking check's pairs
 - [ ] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
 - [ ] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
-- [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; the Windows profile through the Development manager's Windows session; the decision
+- [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; on Windows, the first start after a clean install with Defender on (process start to extension host, MsMpEng's CPU, a CPU profile, then a second start to compare), through the Development manager's Windows session; the decision
 - [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
-- [ ] The sample project's content, written before step 2 is built (R5): a small leadership programme as in the drawings, with a brief, modules, kickoff notes and a few tasks as board cards. Drafted by the Experience lead; checked that every card parses, and that no real person's name, path or account is in it; in `extensions/ritemark/sample-project/`
-- [ ] The open technical point on a 1.x OK (technical-plan.md, W1) decided by Jarmo; the reading written into `research/confirmations.md` (R7)
+- [ ] The sample project's content (R5): written by the Experience lead and approved by Jarmo, 18 October (`ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`). Copied as it is into `extensions/ritemark/sample-project/`, with `.ritemark/tasks/` and the one-line `CLAUDE.md`; checked that every card parses, and that no real person's name, path or account is in it
+- [x] The 1.x OK reading decided by Jarmo (18 October): a notice closed without Opt Out counts as the OK (technical-plan.md, W1); write it into `research/confirmations.md` (R7)
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: Consent and events (W1)
@@ -60,7 +60,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `src/welcome/words.ts`: failures in one sentence each (R3)
 - [ ] The small sheets over the welcome: API keys (the Anthropic key) and OpenCode's Set up, with Done (R2, R3)
 - [ ] `src/welcome/newProject.ts` + test: the name field, Create, the place line and Change…, the name check, an empty `<Documents>/Ritemark/<name>` (R5)
-- [ ] `src/welcome/sampleProject.ts` + test: Try the sample project copies `extensions/ritemark/sample-project/` into `<Documents>/Ritemark/Leadership programme`, never writing over a folder, the next free name, a failed copy in one sentence, then the landing with `source: sample` (R5, R6, R8)
+- [ ] `src/welcome/sampleProject.ts` + test: Try the sample project copies `extensions/ritemark/sample-project/` into `<Documents>/Ritemark/Leadership programme`, never writing over a folder, the next free name, the cards' `created` and `updated` set to the time of copying, a failed copy in one sentence, then the landing with `source: sample` (R5, R6, R8)
 - [ ] `scripts/check-bundled-extension-complete.sh`: fails when the sample is missing from the bundled extension (R5)
 - [ ] The missing Git or Node line under "Signed in to Claude": its words, Use Ritemark's own Claude, Restart (R5)
 - [ ] `src/welcome/landing.ts` + test: written before `openFolder`, read after the reload, Documents, the AI's new chat ("Ask Claude about this project"), the empty desk, `project_opened`, deleted (R6)
