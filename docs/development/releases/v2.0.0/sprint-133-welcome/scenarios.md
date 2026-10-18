@@ -305,7 +305,7 @@ When the person goes through the welcome with ChatGPT, then again with Claude, w
 Then each works, paths are in Windows' form (the sample in `Documents\Ritemark\Leadership programme`), the folder picker is Windows', every shortcut says Ctrl, and the window buttons stay at the top right.
 
 ### S46: The first seconds on Windows (#401)
-Given a fresh Windows profile
+Given the first start after a clean install on Windows, with Defender on
 When the person clicks Sign in as soon as the welcome draws
 Then the click is not lost: the sign-in starts once the extension host answers, and the card shows Checking… or its progress meanwhile.
 
