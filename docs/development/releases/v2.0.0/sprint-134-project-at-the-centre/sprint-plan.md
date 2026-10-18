@@ -100,6 +100,7 @@ The launcher's code is deleted only after every row above is checked on the bran
   - the bar is `comparison/after-write.png`; Share is experience 26's frame 1 ("Share, not Export").
 - **2026-10-18 (Jarmo, via the Experience lead's question form):**
   - About this project is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere in the UI as "About this project". This sprint builds the project menu's item, which opens the file or offers to create it.
+- **2026-10-18 (the Experience lead, About this project's details):** a folder with its own `CLAUDE.md` gets a note with Add the line and Not now, and that `CLAUDE.md` never changes without the click; Documents hides only Ritemark's pointer-only `CLAUDE.md`; the tab and the Documents row read About this project with the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT".
   - The sample project: yes. Ritemark ships one, offered on the welcome (Sprint 133). Here it is an ordinary project, and it gains its line on Home.
   - Usage data for people updating from 1.x: an OK on 1.x's notice carries over as a yes; anyone who opted out or never answered starts off (Sprint 133). Nothing changes here.
 - **2026-10-18 (engineering, in this plan):**
@@ -132,7 +133,7 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 - [ ] Switching asks first when the AI is working; the reload shows the ground's colour (R9).
 - [ ] What moved shows once on an updated profile, never on a fresh one (R11).
 - [ ] Saved and Share work, and every Export item works from Share (R12).
-- [ ] About this project opens or creates `AGENTS.md`, shown as About this project; a `CLAUDE.md` already in the folder is never changed (R8).
+- [ ] About this project opens or creates `AGENTS.md`, shown as About this project; a `CLAUDE.md` already in the folder changes only through Add the line (R8).
 - [ ] Everything Home's launcher did in v1.14.0 can be done from 2.0's Home (R14).
 - [ ] Light, Dark and Windows checked (R15).
 - [ ] A production build from a clean-room worktree succeeds after the merge; the drift is recorded (E5, E7).
@@ -146,7 +147,7 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 | The first fill misses boards known from nowhere else | Audit; otherwise they join when next opened |
 | Switching through VS Code's own Open Folder stops the AI without asking | Audit; at worst today's behaviour, recorded |
 | Removing the launcher loses a function | The table above, checked before the code goes |
-| A folder already has its own `CLAUDE.md` (a code project) | Create never overwrites or changes it; the about-file audit settles what the person is told; S44 |
+| A folder already has its own `CLAUDE.md` (a code project) | Create never writes over it; the note offers Add the line, which keeps every other byte; S44 |
 
 The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprint).
 

@@ -120,8 +120,12 @@ Acceptance criteria:
 - About this project is one file in the project's folder: `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, holding `@AGENTS.md` (Jarmo, 18 October):
   - when the folder has an `AGENTS.md`, the item opens it;
   - when it has none, the item offers to create it. Create writes `AGENTS.md`, headed "About this project", and the one-line `CLAUDE.md` when the folder has no `CLAUDE.md`, then opens it;
-  - a `CLAUDE.md` or `AGENTS.md` already in the folder is never overwritten or changed.
-- Ritemark shows the file as "About this project" everywhere, never as `AGENTS.md`: the menu, its tab, Documents and Home's Last changed (Jarmo, 18 October). How each of these draws the name, and whether the one-line `CLAUDE.md` shows in Documents at all, is audited first (technical plan, Phase 1).
+  - an `AGENTS.md` or `CLAUDE.md` already in the folder is never written over. The person's own `CLAUDE.md` changes only when they click Add the line (below).
+- When the folder has its own `CLAUDE.md` without `@AGENTS.md`, About this project shows one line at the top of the page, in body ink with an info icon: "Claude reads this project's CLAUDE.md. Add one line to it so Claude reads this page too." The buttons are Add the line (primary) and Not now (Experience lead, 18 October):
+  - Add the line writes `@AGENTS.md` as `CLAUDE.md`'s first line and changes nothing else, then the note goes;
+  - Not now leaves the note on this page only, and Ritemark doesn't ask anywhere else.
+- Ritemark shows the file as "About this project" everywhere, never as `AGENTS.md`: the menu, its tab, Documents and Home's Last changed (Jarmo, 18 October). The tab and the Documents row read "About this project" with the book-open icon, and the tooltip reads "AGENTS.md, read by Claude and ChatGPT". It is the one file shown by its plain name (Experience lead, 18 October). How each place draws the name is audited first (technical plan, Phase 1).
+- Documents hides only a `CLAUDE.md` that Ritemark wrote and that holds nothing but the pointer. A `CLAUDE.md` with the person's own words stays visible as it is, extension and all (Experience lead, 18 October).
 - New and Search keep Sprint 132's behaviour.
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
 - On Windows, the menu button's File menu gains Switch project, where experiences/windows frame 2 draws it.
@@ -273,6 +277,7 @@ Acceptance criteria:
   - **About this project** is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere in the UI as "About this project". The project's menu item opens it or offers to create it (R8).
   - **The sample project:** yes. Ritemark ships one, offered on the welcome's step 2 (Sprint 133). Here it is an ordinary project in the list; it gains its line on Home (R1).
   - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes, shown on and changeable on the update sheet; anyone who opted out or never answered starts off (Sprint 133). This sprint adds no event (*Analytics and privacy* in the sprint plan).
+- **2026-10-18 (the Experience lead, About this project's details):** a folder with its own `CLAUDE.md` gets the note and Add the line or Not now, and its `CLAUDE.md` never changes without that click; Documents hides only Ritemark's pointer-only `CLAUDE.md`; the tab and the Documents row read About this project with the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT" (R8).
 - **Release plan:** the reload stays; the splash takes the ground's colour; switching asks first when the AI is working; ⌥ click opens a new window.
 
 ## Open Questions
@@ -282,4 +287,4 @@ Each has a recommendation; Jarmo answers at this plan's approval.
 1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
 2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
 
-The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file.
+The design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides.

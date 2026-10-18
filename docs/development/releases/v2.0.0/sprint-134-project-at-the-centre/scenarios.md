@@ -148,14 +148,20 @@ Given "Leadership programme" with an `AGENTS.md` of its own, and "Board report 2
 When the person picks About this project from the project's menu in each
 Then in "Leadership programme" its `AGENTS.md` opens, its tab named About this project
 And in "Board report 2026" Ritemark offers to create it; Create writes `AGENTS.md`, headed "About this project", and a `CLAUDE.md` holding only `@AGENTS.md`, and opens it
-And Documents and Home's Last changed name it About this project, as `research/about-file-audit.md` settled
+And Documents and Home's Last changed name it About this project, as `research/about-file-audit.md` settled; the tab and the Documents row show the book-open icon, with the tooltip "AGENTS.md, read by Claude and ChatGPT"
+And the one-line `CLAUDE.md` is not shown in Documents
 When the person writes a line in it and asks Claude, then ChatGPT, in a new chat, what the project is about
 Then each answer uses that line.
 
 ### S44: A `CLAUDE.md` of the person's own (negative)
-Given a project with its own `CLAUDE.md` and no `AGENTS.md`
+Given a project with its own `CLAUDE.md`, in the person's words without `@AGENTS.md`, and no `AGENTS.md`
 When the person picks About this project and Create
-Then `AGENTS.md` is written, `CLAUDE.md` is left byte for byte as it was, and Ritemark tells the person what the about-file audit settled.
+Then `AGENTS.md` is written and opens, and `CLAUDE.md` is left byte for byte as it was and stays visible in Documents as `CLAUDE.md`
+And the top of the page shows, with an info icon, "Claude reads this project's CLAUDE.md. Add one line to it so Claude reads this page too.", with Add the line and Not now
+When the person clicks Not now
+Then `CLAUDE.md` is unchanged, and no other place in Ritemark asks about it
+When the person clicks Add the line instead
+Then `CLAUDE.md`'s first line is `@AGENTS.md` and every other byte is as it was, the note goes, and a new chat with Claude uses a line written in About this project.
 
 ### S29: File ▸ Switch project
 On the Mac's File menu and on Windows' menu button's File menu

@@ -51,7 +51,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
    - its tab (the Ritemark editor's title for a `.md`);
    - Documents (the resource label, whose name and extension 018 already draws apart since Sprint 133);
    - Home's Last changed (W4), and the AI sheet where it names a file.
-   It also settles whether the one-line `CLAUDE.md` shows in Documents or is hidden as `.ritemark` is, and what happens in a folder that has its own `CLAUDE.md` but no `AGENTS.md`: Create writes `AGENTS.md` and leaves `CLAUDE.md` as it is, so Claude does not read the new file until `@AGENTS.md` is in it. What the person is told then is a small question for the Experience lead, through the Development manager.
+   It also settles how Documents hides the one-line `CLAUDE.md` (decided: only Ritemark's pointer-only file is hidden; a `CLAUDE.md` with the person's words stays visible), and how the tab and the Documents row draw the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT". A folder that has its own `CLAUDE.md` but no `AGENTS.md` is decided (Experience lead, 18 October): Create writes `AGENTS.md` and leaves `CLAUDE.md` as it is, and the page shows the note with Add the line and Not now (spec R8).
 
 `research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home.
 
@@ -123,9 +123,11 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 - **About this project** (`src/projects/aboutFile.ts`, new, no `vscode` import in its rules, an injected file system): the file is `AGENTS.md` at the project's root.
   - When it is there, the item opens it in the Ritemark editor.
   - When it is not, the item asks first, in experience 31's dialog style, with Create and Cancel. Create writes `AGENTS.md` headed "About this project" and, when the folder has no `CLAUDE.md`, a `CLAUDE.md` holding only `@AGENTS.md`; each atomically (a temporary file, then rename), never over a file that is there. Then it opens `AGENTS.md`.
-  - A `CLAUDE.md` or `AGENTS.md` already in the folder is never overwritten or changed. A folder that cannot be written says so, as R1 does.
+  - An `AGENTS.md` or `CLAUDE.md` already in the folder is never written over. A folder that cannot be written says so, as R1 does.
+  - **The note.** When the folder's own `CLAUDE.md` has no line `@AGENTS.md`, the Ritemark editor shows the note at the top of About this project, with Add the line and Not now (spec R8). Add the line rereads `CLAUDE.md`, writes `@AGENTS.md` and a newline in front of its bytes (a temporary file, then rename), and drops the note; if the file changed since the note was drawn, it rereads before writing. Not now writes nothing and shows nothing elsewhere.
+  - **Pointer-only.** A `CLAUDE.md` whose whole content is `@AGENTS.md` (and a line ending) is Ritemark's pointer and is hidden in Documents; Create and the sample project both write exactly that. Any other `CLAUDE.md` stays visible.
   - The name About this project is drawn where `research/about-file-audit.md` says; if Documents needs a hunk, it goes into 018's resource-label hunk from Sprint 133.
-  - Tests: `aboutFile.test.ts`: open, create both files, an existing `CLAUDE.md` left byte for byte, an existing `AGENTS.md` opened, a read-only folder.
+  - Tests: `aboutFile.test.ts`: open, create both files, an existing `CLAUDE.md` left byte for byte, the note's condition, Add the line (first line, every other byte kept), Not now writing nothing, pointer-only recognised and a `CLAUDE.md` with more not, an existing `AGENTS.md` opened, a read-only folder.
 - **File ▸ Switch project** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`; the extension contributes Switch project there. On the Mac it shows in the native File menu too.
 
 ## Workstream 8: Switching in place (R9)
@@ -192,6 +194,6 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | Switching through VS Code's own Open Folder stops the AI without asking | The switch audit; at worst, today's behaviour, recorded. Every Ritemark route asks (experience 33) |
 | The splash hunk breaks on a VS Code update | One small hunk in 018; the screenshot check in `update-vscode.sh`'s checklist |
 | Removing 1.x's launcher loses a function | R14's table checked row by row before `HomeViewProvider.ts` is deleted |
-| About this project's Create touches a `CLAUDE.md` the person wrote | Never written over or changed; the about-file audit settles what the person is told; S44 |
+| About this project's Create touches a `CLAUDE.md` the person wrote | Never written over; changed only by Add the line, which keeps every other byte; S44 |
 | Showing `AGENTS.md` as About this project needs a shell hunk in Documents | The about-file audit; expected: one more case in 018's resource-label hunk, which the tree and the tabs share |
 | The bundle grows | Images as files; measured before and after |

@@ -272,6 +272,7 @@ Acceptance criteria:
 - **2026-10-18 (Jarmo, via the Experience lead's question form):**
   - **About this project** is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere as "About this project". The project's menu item that opens it or offers to create it is built in Sprint 134; a new project here still starts empty (R5).
   - **The sample project:** yes. Ritemark ships one, and step 2 offers "Try the sample project" (R5). Its content is written before step 2 is built; the Experience lead offered to draft it.
+- **2026-10-18 (the sample project's content):** written by the Experience lead and approved by Jarmo the same day ("files look good!"). It is `ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`, copied as it is into `extensions/ritemark/sample-project/`. Its README lists what each file sets up. The four cards' `created` and `updated` are placeholders (2026-01-01), which the copy sets to the time of copying (R5).
   - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes. They see the switch on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and can turn it off there. Anyone who opted out or never answered sees it off, with "Off until you turn it on." This refines the 17 October rule (R7, R10). Experience 32's frame 1 was redrawn to match (`ritemark-dev` a82c852).
 - **No ChatGPT API key in 2.0.** Recommended in the release plan ("leave it out of 2.0 and add it if people ask") and listed as decided in the Development manager's brief of 18 October; the release plan still lists it as open, so this plan's approval confirms it. It means ChatGPT is reached only through its sign-in. The OpenAI key that Settings already holds (`openai-api-key`, used by OpenCode and other services) is not a ChatGPT key and stays (HARD RULE #1).
 
@@ -284,4 +285,4 @@ Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
 
 The technical point on recognising a 1.x OK is decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK (technical plan, W1).
 
-The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*). Jarmo's answers of the same day, through the Experience lead's question form, settled the sample project, the 1.x OK and About this project's file.
+The design questions sent to the Experience lead on 18 October were all answered the same day (*Resolved Questions*). Jarmo's answers of the same day, through the Experience lead's question form, settled the sample project, the 1.x OK and About this project's file. The sample project's content was written and approved the same day.
