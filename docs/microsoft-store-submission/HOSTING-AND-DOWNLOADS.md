@@ -1,6 +1,6 @@
 # Installer hosting and downloads
 
-Last HTTP/TLS recheck: **2026-09-11**. Dashboard configuration verified 2026-09-07; v1.10.1 full download/hash verified 2026-09-10.
+Last HTTP/TLS/full-download verification: **2026-10-17**. The v1.14.0 destination returned `404` before upload; after upload, immediately before submission approval, and again after Partner Center accepted the submission, the anonymous response and complete fresh-download SHA-256 matched the approved candidate.
 
 ## Current status
 
@@ -12,7 +12,8 @@ Last HTTP/TLS recheck: **2026-09-11**. Dashboard configuration verified 2026-09-
 | TLS | Minimum TLS 1.2; Cloudflare-managed certificate | Valid certificate and TLS 1.3 connection verified |
 | Development URL | Bucket `r2.dev` hostname | Disabled |
 | Safe probe | `/probe/hosting-test-v1.txt` | Passed end to end; removed after verification |
-| Production installer | `/windows/v1.10.1/Ritemark-Setup.exe` | Published; exact fresh-download size and SHA-256 verified |
+| Current Store candidate | `/windows/v1.14.0/Ritemark-Setup.exe` | Published; exact fresh-download headers, size, and SHA-256 reverified 2026-10-17 |
+| Previous Store installers | Versioned keys including v1.10.0, v1.10.1, and v1.12.0 | Preserve unchanged; never overwrite or delete |
 | Guarded upload tooling | `scripts/publish-store-installer.mjs` | Implemented; tests, production publish, verification, and existing-key refusal pass |
 | Production upload credential | One-year, bucket-scoped R2 Account API token | Created; held by Jarmo outside the repository |
 | Production immutability | `windows-immutable`, prefix `windows/`, indefinite retention | Active and verified in Cloudflare Dashboard |
@@ -33,10 +34,10 @@ Production Windows installers use this exact shape:
 windows/v{VERSION}/Ritemark-Setup.exe
 ```
 
-For v1.10.0 the final URL is:
+For v1.14.0 the candidate URL is:
 
 ```text
-https://getritemark.com/windows/v1.10.0/Ritemark-Setup.exe
+https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe
 ```
 
 Rules:
@@ -51,7 +52,7 @@ Rules:
 
 ## Upload procedure
 
-The commands below document the original v1.10.0 publication and must not be rerun to replace it. Both v1.10.0 and v1.10.1 keys already exist: `plan` must refuse them. For a future build, supply its new version/candidate key and approved size/hash. Run dependency setup only at repository root; publishing does not require the VS Code development dependencies.
+The examples below use the current v1.14.0 candidate. After its first successful upload they become verification history, not a command to replace that object. Existing version keys must always be refused. For every future build, supply a new version/candidate key and its approved size/hash. Publishing does not require the VS Code development dependencies.
 
 The v1.10.0 installer is larger than the Cloudflare Dashboard's 300 MB browser-upload limit. Production upload therefore uses Cloudflare R2's S3-compatible API through [`scripts/publish-store-installer.mjs`](../../scripts/publish-store-installer.mjs). The script uses an atomic `PutObject` request with `If-None-Match: *`; R2 returns `412 PreconditionFailed` instead of replacing an existing object.
 
@@ -70,10 +71,10 @@ For each installer, load the three credential values into an ephemeral shell env
 ```bash
 npm ci
 npm run store-hosting -- plan \
-  --version 1.10.0 \
+  --version 1.14.0 \
   --file /absolute/path/to/Ritemark-Setup.exe \
-  --size 430929984 \
-  --sha256 7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3
+  --size 475059168 \
+  --sha256 8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48
 ```
 
 The plan hashes the entire local file and requires a cache-busted public `404` for the destination. It does not access R2 credentials or upload anything.
@@ -82,11 +83,11 @@ After an operator confirms the exact bucket, key, file, size, and hash, publish 
 
 ```bash
 npm run store-hosting -- publish \
-  --version 1.10.0 \
+  --version 1.14.0 \
   --file /absolute/path/to/Ritemark-Setup.exe \
-  --size 430929984 \
-  --sha256 7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3 \
-  --confirm-key windows/v1.10.0/Ritemark-Setup.exe
+  --size 475059168 \
+  --sha256 8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48 \
+  --confirm-key windows/v1.14.0/Ritemark-Setup.exe
 ```
 
 `publish` repeats the local identity and public `404` checks, performs an authenticated R2 `HeadObject`, and makes the conditional upload. It sets a binary content type, attachment filename, and `public, max-age=31536000, immutable` cache policy. It then streams a fresh anonymous download directly into SHA-256 verification without leaving another installer file on disk. Unset the credential environment variables immediately afterwards.
@@ -101,7 +102,7 @@ The approved v1.10.0 source asset is the GitHub Release file `Ritemark-Setup.exe
 
 ## Current Store candidate
 
-v1.10.1 candidate 3 is hosted at `https://getritemark.com/windows/v1.10.1/Ritemark-Setup.exe`, 436614200 bytes, SHA-256 `93f9adce13529c727cbb4b407822897f0043d65c62ff5dab0eab95fc54d77250`. See [candidate record](./release-candidates/v1.10.1-candidate-3.md). v1.10.0 remains immutable but is superseded for Store submission.
+v1.14.0 candidate 2 is hosted at `https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe`, `475059168` bytes, SHA-256 `8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48`. The anonymous verification and existing-key refusal passed on 2026-10-16; a fresh pre-submit full-download verification matched again on 2026-10-17. See the [candidate record](./release-candidates/v1.14.0-candidate-2.md) and [hosting evidence](./evidence/hosting-v1.14.0-2026-10-16.md). Every earlier Store object remains immutable and superseded, not replaced.
 
 ## Verification commands
 
@@ -109,15 +110,15 @@ Run these from a clean shell without a cookie jar or authenticated proxy:
 
 ```bash
 npm run store-hosting -- verify \
-  --version 1.10.0 \
-  --size 430929984 \
-  --sha256 7ada28ad639eb798205a13f22bf1f9844e1856e032737c924738c1b8033232f3
+  --version 1.14.0 \
+  --size 475059168 \
+  --sha256 8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48
 
-curl -sS --max-redirs 0 --dump-header headers.txt --output Ritemark-Setup.downloaded.exe --write-out 'status=%{http_code}\nredirects=%{num_redirects}\ncontent_type=%{content_type}\nsize_download=%{size_download}\nssl_verify=%{ssl_verify_result}\n' https://getritemark.com/windows/v1.10.0/Ritemark-Setup.exe
+curl -sS --max-redirs 0 --dump-header headers.txt --output Ritemark-Setup.downloaded.exe --write-out 'status=%{http_code}\nredirects=%{num_redirects}\ncontent_type=%{content_type}\nsize_download=%{size_download}\nssl_verify=%{ssl_verify_result}\n' https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe
 shasum -a 256 Ritemark-Setup.downloaded.exe
 ```
 
-Acceptance requires HTTP `200`, zero redirects, successful TLS verification, `Content-Type: application/vnd.microsoft.portable-executable`, `Content-Length: 430929984`, no `Location` or `Set-Cookie` header, and the approved SHA-256. Remove the manual verification download after recording its hash.
+Acceptance requires HTTP `200`, zero redirects, successful TLS verification, `Content-Type: application/vnd.microsoft.portable-executable`, `Content-Length: 475059168`, no `Location` or `Set-Cookie` header, and the approved SHA-256. Remove the manual verification download after recording its hash.
 
 ## Rollback and failure handling
 
