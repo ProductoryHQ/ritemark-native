@@ -158,19 +158,27 @@ export function FlowCanvas({ onNodeSelect }: FlowCanvasProps) {
 
   const nodes = useFlowEditorStore((state) => state.nodes);
 
-  // The first fit, once React Flow has measured the steps; the canvas shows only after it, so the flow never jumps
+  // The first fit, once the flow has loaded and React Flow has measured its steps; the canvas shows only after it,
+  // so the flow never jumps. A flow with no steps shows at once (React Flow never reports zero nodes as measured).
+  const flowLoaded = useFlowEditorStore((state) => state.flowId !== '');
   const nodesInitialized = useNodesInitialized();
+  const placingRef = useRef(false);
   const [placed, setPlaced] = useState(false);
   useEffect(() => {
-    if (placed || !nodesInitialized) {
+    if (placingRef.current || !flowLoaded) {
       return;
     }
     if (nodes.length === 0) {
+      placingRef.current = true;
       setPlaced(true);
       return;
     }
+    if (!nodesInitialized) {
+      return;
+    }
+    placingRef.current = true;
     void fitFlow().then(() => setPlaced(true));
-  }, [placed, nodesInitialized, nodes.length, fitFlow]);
+  }, [flowLoaded, nodesInitialized, nodes.length, fitFlow]);
   const onFitView = useCallback(() => {
     fittedRef.current = true;
     void fitFlow();

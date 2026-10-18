@@ -15,13 +15,13 @@ export interface StepInfo {
 }
 
 export const STEPS: readonly StepInfo[] = [
-  { type: 'triggerNode', name: 'Trigger', icon: 'lightning', kind: 'start', description: 'Starting point - define flow inputs here (1 per flow)' },
-  { type: 'llmNode', name: 'LLM prompt', icon: 'chat-text', kind: 'ai', description: 'Generate text with LLM' },
-  { type: 'imageNode', name: 'Image generation', icon: 'image', kind: 'ai', description: 'Generate images with AI' },
-  { type: 'claudeCodeNode', name: 'Claude Code', icon: 'robot', kind: 'ai', description: 'Run autonomous coding tasks with Claude Code' },
-  { type: 'codexNode', name: 'Codex', icon: 'code', kind: 'ai', description: 'Run autonomous coding tasks with OpenAI Codex' },
-  { type: 'saveFileNode', name: 'Save file', icon: 'floppy-disk', kind: 'action', description: 'Save to file and output the path for downstream nodes' },
-  { type: 'inputNode', name: 'Input', icon: 'file-text', kind: 'start', description: 'A flow input' },
+  { type: 'triggerNode', name: 'Trigger', icon: 'lightning', kind: 'start', description: 'Where the flow starts, with the inputs it asks for. A flow has one.' },
+  { type: 'llmNode', name: 'LLM prompt', icon: 'chat-text', kind: 'ai', description: 'Writes text with a language model.' },
+  { type: 'imageNode', name: 'Image generation', icon: 'image', kind: 'ai', description: 'Makes an image with AI.' },
+  { type: 'claudeCodeNode', name: 'Claude Code', icon: 'robot', kind: 'ai', description: 'Gives a task to Claude Code, which can read and change the project\'s files.' },
+  { type: 'codexNode', name: 'Codex', icon: 'code', kind: 'ai', description: 'Gives a task to Codex, which can read and change the project\'s files.' },
+  { type: 'saveFileNode', name: 'Save file', icon: 'floppy-disk', kind: 'action', description: 'Saves what an earlier step made to a file in the project.' },
+  { type: 'inputNode', name: 'Input', icon: 'file-text', kind: 'start', description: 'A flow input.' },
 ];
 
 export const STEP_CATEGORIES: readonly { readonly name: string; readonly kind: StepKind }[] = [

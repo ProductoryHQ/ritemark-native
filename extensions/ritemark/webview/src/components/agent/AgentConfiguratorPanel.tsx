@@ -21,6 +21,8 @@ import { Switch } from '../ui/switch'
 import { Pill } from '../ui/pill'
 import { Badge } from '../ui/badge'
 import { Icon } from '../ui/Icon'
+import { Button } from '../ui/button'
+import { Tooltip } from '../ui/tooltip'
 import { ProvenanceBadge } from './ProvenanceBadge'
 import { ScheduleEditor } from './ScheduleEditor'
 import {
@@ -272,14 +274,17 @@ export function AgentConfiguratorPanel({
           })}
         </div>
         {CLAUDE_TOOLS.length > TOOLS_FOLDED && (
-          <button
-            type="button"
-            onClick={() => setToolsExpanded(open => !open)}
-            className="px-1 text-left text-[12px] leading-5 text-ink-muted hover:text-ink-strong"
-            aria-expanded={toolsExpanded}
-          >
-            {toolsExpanded ? 'Fewer' : `${CLAUDE_TOOLS.length - TOOLS_FOLDED} more`}
-          </button>
+          <Tooltip label={toolsExpanded ? 'Show the first tools only' : 'Show every tool'} className="self-start">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setToolsExpanded(open => !open)}
+              className="h-6 px-1 text-[12px] font-normal leading-5 text-ink-muted"
+              aria-expanded={toolsExpanded}
+            >
+              {toolsExpanded ? 'Fewer' : `${CLAUDE_TOOLS.length - TOOLS_FOLDED} more`}
+            </Button>
+          </Tooltip>
         )}
 
         {/* Unknown / MCP tool names present in the file — preserved, never dropped */}
@@ -304,16 +309,18 @@ export function AgentConfiguratorPanel({
             {agentSkills.map(sid => {
               const skill = skills.find(s => s.id === sid)
               return ( /* the skill's folder name, as the Agents column shows it */
-                <button
-                  key={sid}
-                  type="button"
-                  onClick={() => removeSkill(sid)}
-                  title={skill ? `${skill.name}: remove this skill` : 'Remove this skill'}
-                  className="inline-flex h-6 items-center gap-1 rounded-md bg-[var(--r-accent-soft)] pl-2 pr-1.5 text-[12px] font-medium leading-6 text-[var(--r-accent)]"
-                >
-                  {sid}
-                  <svg aria-hidden="true" width="10" height="10" viewBox="0 0 256 256" fill="none" stroke="currentColor" strokeWidth="24" strokeLinecap="round"><line x1="200" y1="56" x2="56" y2="200" /><line x1="200" y1="200" x2="56" y2="56" /></svg>
-                </button>
+                <Tooltip key={sid} label={skill ? `${skill.name}: remove this skill` : 'Remove this skill'}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => removeSkill(sid)}
+                    aria-label={`Remove ${sid}`}
+                    className="h-6 gap-1 rounded-md bg-[var(--r-accent-soft)] pl-2 pr-1.5 text-[12px] font-medium leading-6 text-[var(--r-accent)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent)] has-[>svg]:pr-1.5"
+                  >
+                    {sid}
+                    <Icon name="x" size={12} tone="inherit" />
+                  </Button>
+                </Tooltip>
               )
             })}
           </div>
@@ -347,15 +354,18 @@ export function AgentConfiguratorPanel({
       {/* ── Schedule ── */}
       {/* The schedule is one field, as drawn ("Not scheduled", or when it runs); it opens the editor under it */}
       <Field label="Schedule">
-        <button
-          type="button"
-          onClick={() => setScheduleOpen(open => !open)}
-          aria-expanded={scheduleOpen}
-          className={FIELD_BOX + ' flex w-full items-center justify-between text-left'}
-        >
-          <span className={schedCron ? '' : 'text-ink-muted'}>{describeSchedule(schedCron)}</span>
-          <Icon name="caret-down" size={12} className={scheduleOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
-        </button>
+        <Tooltip label={scheduleOpen ? 'Close the schedule' : 'Choose when this agent runs on its own'} className="w-full">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setScheduleOpen(open => !open)}
+            aria-expanded={scheduleOpen}
+            className={FIELD_BOX + ' flex w-full items-center justify-between text-left font-normal hover:bg-transparent'}
+          >
+            <span className={schedCron ? '' : 'text-ink-muted'}>{describeSchedule(schedCron)}</span>
+            <Icon name="caret-down" size={12} tone="inherit" className={scheduleOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </Button>
+        </Tooltip>
         {scheduleOpen && (
           <div className="mt-2">
             <p className="mb-1.5 text-[11px] leading-[14px] text-ink-muted">Run this agent automatically on a cron schedule.</p>
@@ -427,19 +437,23 @@ export function AgentConfiguratorPanel({
       </Field>
 
       {/* ── Advanced (collapsed) ── */}
-      <button
-        type="button"
-        onClick={() => setAdvancedOpen(o => !o)}
-        className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-muted hover:text-ink-strong"
-        aria-expanded={advancedOpen}
-      >
-        <Icon
-          name="caret-right"
-          size={12}
-          className={advancedOpen ? 'rotate-90 transition-transform' : 'transition-transform'}
-        />
-        Advanced
-      </button>
+      <Tooltip label={advancedOpen ? 'Hide the advanced settings' : 'Show the advanced settings'} className="mb-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setAdvancedOpen(o => !o)}
+          className="h-auto gap-1 px-0 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-muted hover:bg-transparent has-[>svg]:px-0"
+          aria-expanded={advancedOpen}
+        >
+          <Icon
+            name="caret-right"
+            size={12}
+            tone="inherit"
+            className={advancedOpen ? 'rotate-90 transition-transform' : 'transition-transform'}
+          />
+          Advanced
+        </Button>
+      </Tooltip>
 
       {advancedOpen && (
         <div className="mt-2">

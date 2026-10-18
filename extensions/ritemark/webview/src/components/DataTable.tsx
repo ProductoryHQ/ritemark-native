@@ -11,6 +11,7 @@ import {
 import { Icon } from './ui/Icon'
 import { writeClipboard, readClipboard } from '../lib/clipboard'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { compareCells } from './sheetSort'
 
 export interface DataTableProps {
   data: Record<string, unknown>[]
@@ -67,9 +68,8 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       columnHelper.accessor((row) => row[col], {
         id: col,
         header: col,
-        // numbers in number order and words in word order, whatever the first row holds ('auto' read the first
-        // row's value, so an empty first cell sorted 1200 before 300)
-        sortingFn: 'alphanumeric',
+        // numbers in number order and text in natural order, whatever the first row holds (sheetSort.ts)
+        sortingFn: (rowA, rowB, columnId) => compareCells(rowA.getValue(columnId), rowB.getValue(columnId)),
         cell: (info) => {
           const value = info.getValue()
           return value === null || value === undefined ? '' : String(value)

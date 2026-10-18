@@ -329,10 +329,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..116b2bdb847
+index 00000000000..561e1e29337
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1588 @@
+@@ -0,0 +1,1589 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1683,7 +1683,7 @@ index 00000000000..116b2bdb847
 +
 +.monaco-workbench.vs-dark .monaco-dialog-box,
 +.monaco-workbench.hc-black .monaco-dialog-box {
-+	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px var(--rm-shadow), 0 8px 16px -8px var(--rm-shadow) !important; /* !important: as above */
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px var(--rm-shadow), 0 8px 16px -8px var(--rm-shadow) !important; /* !important: the dialog sets its shadow inline from the widget shadow */
 +}
 +
 +.monaco-workbench.hc-black .monaco-dialog-box,
@@ -1772,6 +1772,7 @@ index 00000000000..116b2bdb847
 +	width: auto;
 +	min-width: 0;
 +	height: 32px;
++	white-space: nowrap; /* a button's words stay on one line */
 +	margin: 0;
 +	padding: 0 14px;
 +	border-radius: 8px;

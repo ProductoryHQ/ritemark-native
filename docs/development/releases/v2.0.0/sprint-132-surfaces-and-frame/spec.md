@@ -189,6 +189,8 @@ Acceptance criteria:
   - the Markdown editor, CSV, the PDF, Word and PowerPoint previews, the browser, the task board, Transcribe;
   - the Settings page, notifications, the command palette and quick picks;
   - modal dialogs, Flows and the Agent Library once their drawings arrive.
+
+  In step 1 this means the scope the Experience lead set on 18 October (sprint-plan.md, Product Decisions); what a later step redraws keeps today's parts in 2.0's colours until then.
 - Webviews take the desk's colour from the theme, not from their own copy.
 - Text on the ground and the fine print meet 4.5:1.
 

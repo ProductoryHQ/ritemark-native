@@ -307,7 +307,7 @@ function Section({
   return (
     <div className="mb-1">
       {/* the column's group head (kit: .group): 11 semibold uppercase in ink, the count in muted ink */}
-      <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[12px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-strong">
+      <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-strong">
         <span>{title}</span>
         {count !== undefined && <span className="font-normal normal-case tracking-normal text-ink-muted">{count}</span>}
       </div>

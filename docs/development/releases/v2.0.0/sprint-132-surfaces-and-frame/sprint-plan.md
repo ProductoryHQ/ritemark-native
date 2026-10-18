@@ -102,6 +102,20 @@ Modal dialogs, Flows and the Agent Library wait for their drawings. If those com
 - **2026-10-17, during Phase 6 (the Experience lead's review of the screenshots):** fixed in merge 1: the project's mark (its initials in a 24 square of ink) before the name; tabs as wide as their names with no 120 floor (the prototype); an empty desk keeps its sheet and its + and shows no letterpress; in the places row only Ritemark's six take a spot, every other place lives in More (which takes the chosen fill while one of them is open); the Agent Library's section headers in ink with no band (dark was unreadable); the project's menu holds project things only, Switch project… first and no All commands (it stays on ⇧⌘P and in the View menu); the open tree row is the desk's colour, radius 4, no border; `.flow.json` files get the flow icon. Moved to step 2: the extension in muted ink, which needs a patch to VS Code's resource label (release plan, step 2).
 - **2026-10-17, during Phase 6 (Experience lead's answers, confirmed by Jarmo):** the proof of concept at 4bca3078 is the reference for the frame, theme, sizes and behaviour, and the drawings for what it does not build (the Windows top, More's contents, the terminal's bar, the +'s words); file names keep their extension; the terminal bar's shell name is a plain label in step 1; a fresh window's left column is 248 and the AI's sheet 384 (with the 8 gaps: 256 and 400).
 - **2026-10-17, merge 2 (Jarmo, through the Experience lead):** "Excel must stay editable!!!" An .xlsx stays editable in 2.0, as since Sprint 81; only a legacy .xls is read-only. The drawings that said "read-only, as today" were corrected (ritemark-dev ebddab0).
+- **2026-10-18, merge 2 (the Experience lead): step 1's surface scope.** The surface-by-surface pass (R13, S39) does in step 1:
+  - the page canvas under PDF, Word and PowerPoint;
+  - the file icons;
+  - one-line CSV rows;
+  - the command palette, notifications and Transcribe in the frame's sheet, rows and type, with today's parts and words;
+  - dialogs, Flows and the Agent Library as experience 31 draws them.
+
+  It leaves these for the steps that redraw them:
+  - the PDF bar's words and Share (step 3's document bar);
+  - the editor's type and column (raised with Jarmo before step 3);
+  - the redrawn Task board, Transcribe and Browser places;
+  - the AI's empty state and the status bar's items (the AI step);
+  - the indigo icon on the open row (a font icon theme, later).
+- **2026-10-18, merge 2 (the Experience lead; ritemark-dev c8108e7, experience 31):** the Agents place's sections have no carets and do not collapse, and the per-section + goes, since New in the head makes all four kinds. Collapse was a 1.x convenience; this is a change to an existing behaviour, so Jarmo's yes is asked for with the PR (CLAUDE.md, hard rule 1).
 
 ## Feature Flag Check
 

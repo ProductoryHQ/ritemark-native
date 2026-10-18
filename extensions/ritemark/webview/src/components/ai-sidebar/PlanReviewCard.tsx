@@ -109,7 +109,7 @@ export function PlanReviewCard({
           onClick={onApprove}
           className="flex flex-1 basis-[45%] items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary-hover shadow-ritemark-accent active:scale-[0.98] transition-transform"
         >
-          <Icon name="check" size={12} className="text-white" />
+          <Icon name="check" size={12} tone="inherit" />
           {approveLabel}
         </button>
         <button
