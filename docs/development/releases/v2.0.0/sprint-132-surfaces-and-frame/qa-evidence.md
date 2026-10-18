@@ -38,7 +38,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S21 Copilot Chat not installed | Pass | On the clean-room production build of d781a0e1 (the Development manager's E5 run), More lists Search, File changes and Extensions and no Copilot Chat. |
 | S22 Readable tabs | Pass | Each tab is its name plus the kit's padding (34 before the name, 12 after; 32 after on the chosen tab, for its close button), at most 200, with no floor (the prototype; the Experience lead's review): Brief.md 93, Module 1.md 118, Proposal.md (chosen) 135 ([`qa/review-light.png`](qa/review-light.png)). Fixed on the way: core's transparent 1px tab border made every tab 1 wider, and the chosen tab's close button sat 3–5 off the kit (its glyph now centred 16 from the edge). |
 | S23 Pointing at a tab | Pass (revised in merge 2) | Under the pointer a tab that is not chosen fills softly and its close button takes the icon's place exactly (both centred 20 from the tab's left); nothing moves. Revised on 18 October: the close button is on the right (see merge 2). The tooltip shows the path inside the project ("Modules/Module 1.md"; "Brief.md" at the top level). |
-| S24 A new tab | Partial | The + menu matches the drawing (Text, Table, Web page, Terminal). Terminal from it checked (S28); the other three not run yet. |
+| S24 A new tab | Pass (closeout) | The + menu matches the drawing (Text, Table, Web page, Terminal). Terminal from it checked (S28). At the closeout, Web page opened a Browser tab, and Text showed that Text and Table made their file in `~/Documents/Ritemark/`, not in the project as the menu says; fixed (see the closeout section). |
 | S25 Many tabs | Pass | 13 documents and the pinned board: the tabs used longest ago fold into "N ⌄" before the +; no tab narrower than 120 (121); the row never scrolls. Desk 880 (both columns): 9 fold; desk 1180 (AI hidden): 8; full width: 7. With both columns hidden some still fold, because these 13 names (up to "Workshop outline for spring.md") need about 2,000 wide; the scenario's "none" holds for shorter names. Tabs show in most-recently-used order and stop at the first that does not fit, so a tab used longer ago never shows while a newer one is folded. |
 | S26 Bringing a folded tab back | Pass | "N ⌄" lists the folded tabs most recent first, each with its folder and a close button under the pointer, then "Close these N tabs" ([`qa/s26-folded-tabs-menu.png`](qa/s26-folded-tabs-menu.png)). Picking Agenda brought it back in its own place as the chosen tab (it fitted, so nothing else folded); "Close these 7 tabs" closed the folded ones and left the row. |
 | S27 Menus close outside | Pass | The +, "N ⌄", the project menu, New, More and You each close on a press in the tree, in a document and on a second press of their button, and on Escape. Before the fix only a press inside a webview closed them (a press in the tree left them open); now one rule in `ritemarkMenu.ts` covers all of them. |
@@ -146,3 +146,25 @@ Findings, fixed on the merge-2 branch:
 
 Still open from round 1: the View menu's Problems, Output and Debug Console entries (when those views exist) open
 VS Code's bottom panel, as in 1.14.
+
+## Closeout
+
+- **New Text and Table now go in the project (S24).** The + offers "Text: A new document in this project". The
+  left column's New also has Text and Table. All four ran 1.x's `ritemark.newDocument` / `ritemark.newTable`, which
+  always wrote "Untitled N.md/.csv" to `~/Documents/Ritemark/`, outside the project. On the Mac that folder already
+  held Untitled 1–19 from earlier tests. The Development manager decided the rule on 18 October, since the + already
+  promised it: with a project open, Text and Table make "Untitled.md" / "Untitled.csv", then "Untitled 2" and so on.
+  The file goes in the folder chosen in the tree, else the project's root, never over an existing file, and opens as
+  a tab. With no project open, it goes in the drafts folder as before.
+  - The shell gives the tree's chosen folder by New File's own rule (018, `_ritemark.files.chosenFolder` in
+    `fileCommands.ts`).
+  - The extension names and places the file (`newDocumentLocation.ts`, with tests in `npm test`), and writes it
+    with `wx` so it never replaces a file.
+  - Checked on a fresh profile with the sample project, all four from the +:
+    - Brief.md open, Text: `Untitled.md` at the root.
+    - The Modules folder chosen in the tree, Table: `Modules/Untitled.csv`.
+    - Module 1.md open, Text: `Modules/Untitled.md`.
+    - Brief.md again, Text: `Untitled 2.md` at the root.
+  - `~/Documents/Ritemark/` kept its 29 entries ([`qa/s24-new-in-project.png`](qa/s24-new-in-project.png)).
+  - The left column's New runs the same two commands. The no-project case is covered by the tests only: a live run
+    would write into the real drafts folder.

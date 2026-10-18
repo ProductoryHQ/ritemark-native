@@ -58,6 +58,7 @@ import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
+import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -108,18 +109,23 @@ function getDraftsDirectory(): string {
   return draftsDir;
 }
 
-function getUniqueDraftPath(extension: string): string {
-  const draftsDir = getDraftsDirectory();
-  let index = 1;
-
-  while (true) {
-    const filename = index === 1 ? `Untitled.${extension}` : `Untitled ${index}.${extension}`;
-    const filePath = path.join(draftsDir, filename);
-    if (!fs.existsSync(filePath)) {
-      return filePath;
-    }
-    index += 1;
+/** The folder chosen in the tree (the shell's New File rule), when the shell has the command and it is a file folder. */
+async function getChosenTreeFolder(): Promise<string | undefined> {
+  try {
+    const folder = await vscode.commands.executeCommand<vscode.Uri | undefined>('_ritemark.files.chosenFolder');
+    return folder?.scheme === 'file' ? folder.fsPath : undefined;
+  } catch {
+    return undefined;
   }
+}
+
+/** Text and Table: in the project (the folder chosen in the tree, else its root), or the drafts folder with no project open. */
+async function getNewDocumentFolder(): Promise<string> {
+  const projectRoots = (vscode.workspace.workspaceFolders ?? [])
+    .filter(folder => folder.uri.scheme === 'file')
+    .map(folder => folder.uri.fsPath);
+  const chosen = projectRoots.length > 0 ? await getChosenTreeFolder() : undefined;
+  return newDocumentFolder(projectRoots, chosen) ?? getDraftsDirectory();
 }
 
 async function createDraftAndOpen(
@@ -127,9 +133,21 @@ async function createDraftAndOpen(
   viewType: string,
   initialContent?: string
 ): Promise<void> {
-  const filePath = getUniqueDraftPath(extension);
+  const folder = await getNewDocumentFolder();
+  let filePath = nextUntitledPath(folder, extension, fs.existsSync);
+  // Never over an existing file: 'wx' fails if a file of that name appeared meanwhile, and the next name is tried
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.promises.writeFile(filePath, initialContent ?? '', { encoding: 'utf8', flag: 'wx' });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 2) {
+        throw error;
+      }
+      filePath = nextUntitledPath(folder, extension, fs.existsSync);
+    }
+  }
   const uri = vscode.Uri.file(filePath);
-  await vscode.workspace.fs.writeFile(uri, Buffer.from(initialContent ?? '', 'utf8'));
   await vscode.commands.executeCommand('vscode.openWith', uri, viewType, {
     preview: false,
     preserveFocus: false,

@@ -3243,6 +3243,23 @@ index 9250ef3f280..fdd208cd50b 100644
  import { registerThemingParticipant } from '../../platform/theme/common/themeService.js';
  import { WORKBENCH_BACKGROUND, TITLE_BAR_ACTIVE_BACKGROUND } from '../common/theme.js';
  import { isWeb, isIOS } from '../../base/common/platform.js';
+diff --git a/src/vs/workbench/contrib/files/browser/fileCommands.ts b/src/vs/workbench/contrib/files/browser/fileCommands.ts
+index c8fc8aa2dd2..39566af5ecd 100644
+--- a/src/vs/workbench/contrib/files/browser/fileCommands.ts
++++ b/src/vs/workbench/contrib/files/browser/fileCommands.ts
+@@ -728,3 +728,12 @@ CommandsRegistry.registerCommand({
+ 		});
+ 	}
+ });
++
++// Ritemark 2.0: the folder chosen in the tree, by New File's own rule (a chosen folder, a chosen file's folder, else the
++// project's root), so the extension's Text and Table make their file there ("A new document in this project", S24)
++CommandsRegistry.registerCommand('_ritemark.files.chosenFolder', (accessor: ServicesAccessor): URI | undefined => {
++	const explorerService = accessor.get(IExplorerService);
++	const stat = explorerService.getContext(false)[0];
++	const folder = stat ? (stat.isDirectory ? stat : (stat.parent ?? explorerService.roots[0])) : explorerService.roots[0];
++	return folder?.resource;
++});
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 index ed7dbe07826..b985501d431 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
