@@ -145,7 +145,9 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
     attachDomListeners()
     editor.on('create', attachDomListeners)
 
-    window.addEventListener('scroll', updateTablePositions)
+    // The document scrolls in a container between the editor and the window, and scroll events do not bubble:
+    // listen in the capture phase, so any scroll moves the handles with their table
+    document.addEventListener('scroll', updateTablePositions, true)
     window.addEventListener('resize', updateTablePositions)
 
     // Initial update deferred to next frame to ensure DOM ready
@@ -161,7 +163,7 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
         editorElement.removeEventListener('scroll', updateTablePositions)
         editorElement.removeEventListener('mousemove', handleMouseMove)
       }
-      window.removeEventListener('scroll', updateTablePositions)
+      document.removeEventListener('scroll', updateTablePositions, true)
       window.removeEventListener('resize', updateTablePositions)
     }
   }, [editor])

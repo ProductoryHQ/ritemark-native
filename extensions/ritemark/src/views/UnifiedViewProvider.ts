@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as os from 'os';
 import { randomBytes, randomUUID } from 'crypto';
 import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
 import { openReportMail } from '../reporting/reportTransport';
@@ -280,6 +281,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   /** Sprint 78 (stretch): BYOK secret-change subscription (see constructor). */
   private _secretsChangeListener?: vscode.Disposable;
+  /** Watches the project's and the user's .claude agents, commands and skills, so @ and / list new ones at once. */
+  private readonly _agentFileWatchers: vscode.Disposable[] = [];
+  private _agentDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
 
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
@@ -308,6 +312,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         void this._sendAcpProviders();
       }
     });
+    this._watchAgentFiles();
 
     this._runtimeRegistry = new RuntimeRegistry(new Map<AgentId, AgentRuntime>([
       ['claude-code', createRuntime('claude-code')],
@@ -2125,6 +2130,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._disposeCodexStatusListener?.();
     this._disposeClaudeStatusListener?.();
     this._secretsChangeListener?.dispose();
+    for (const watcher of this._agentFileWatchers.splice(0)) watcher.dispose();
+    if (this._agentDiscoveryTimer) clearTimeout(this._agentDiscoveryTimer);
     this._runtimeRegistry.dispose(); // Sprint 79
     if (this._browserContextPoll) {
       clearInterval(this._browserContextPoll);
@@ -2341,6 +2348,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       case 'claude-code': await this._sendClaudeSidebarStatus(); break;
       case 'codex': await this._sendCodexSidebarStatus(); break;
       case 'opencode': await this._sendAcpProviders(); break;
+    }
+  }
+
+  /**
+   * @ agents and / commands were listed once, when the sidebar started, so files added while the window was open
+   * appeared only after a reload. Any change under .claude/agents, commands or skills, in the project or the
+   * user's home, sends the list again (debounced; discovery reads the files synchronously).
+   */
+  private _watchAgentFiles(): void {
+    const pattern = '.claude/{agents,commands,skills}/**';
+    const roots = [this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, os.homedir()]
+      .filter((root): root is string => !!root);
+    for (const root of new Set(roots)) {
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(root), pattern));
+      const changed = () => {
+        if (this._agentDiscoveryTimer) clearTimeout(this._agentDiscoveryTimer);
+        this._agentDiscoveryTimer = setTimeout(() => {
+          this._agentDiscoveryTimer = undefined;
+          void this._sendAgentDiscovery();
+        }, 300);
+      };
+      this._agentFileWatchers.push(watcher, watcher.onDidCreate(changed), watcher.onDidChange(changed), watcher.onDidDelete(changed));
     }
   }
 

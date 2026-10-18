@@ -17,6 +17,7 @@ interface PropertiesPanelProps {
 
 export function PropertiesPanel({ properties, onChange }: PropertiesPanelProps) {
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [addedKey, setAddedKey] = useState<string | null>(null) // the property just added opens its field
 
   const handlePropertyChange = useCallback((key: string, value: unknown) => {
     onChange({ ...properties, [key]: value })
@@ -34,6 +35,7 @@ export function PropertiesPanel({ properties, onChange }: PropertiesPanelProps) 
     else if (type === 'status') initialValue = 'draft'
     else if (type === 'date') initialValue = new Date().toISOString().split('T')[0]
     onChange({ ...properties, [key]: initialValue })
+    setAddedKey(key)
     setShowAddMenu(false)
   }, [properties, onChange])
 
@@ -68,6 +70,7 @@ export function PropertiesPanel({ properties, onChange }: PropertiesPanelProps) 
             type={getPropertyType(key)}
             onChange={(newValue) => handlePropertyChange(key, newValue)}
             onDelete={() => handlePropertyDelete(key)}
+            startInEdit={key === addedKey}
           />
         ))
       )}

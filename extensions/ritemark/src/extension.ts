@@ -697,6 +697,11 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Transcribe's gear opens Settings at transcription's own settings, not at the top of the page
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ritemark.transcribe.openSettings', () => settingsProvider?.open('transcription'))
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.codexLogin', async () => {
       await settingsProvider?.startCodexLoginFromCommand();

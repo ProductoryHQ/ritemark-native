@@ -216,7 +216,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
           void ensureModelDownloaded().then(() => this._pushState());
           break;
         case 'transcribe:openSettings':
-          void vscode.commands.executeCommand('ritemark.aiSettings');
+          // at transcription's own settings (the ElevenLabs key, transcription data), not the top of the page
+          void vscode.commands.executeCommand('ritemark.aiSettings', 'transcription');
           break;
         case 'transcribe:setScope':
           this._showAllProjects = message.showAll === true;

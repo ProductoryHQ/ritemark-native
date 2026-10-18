@@ -1155,7 +1155,7 @@ export function RitemarkSettings() {
             Optional: on-device transcription needs no key. What the key buys is
             speaker separation, which the on-device engine cannot do at all. */}
         {settings.transcriptionEnabled && (
-          <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <div id="settings-section-transcription" className="mt-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-ink-strong">
                 ElevenLabs API Key

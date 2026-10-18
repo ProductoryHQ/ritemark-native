@@ -38,6 +38,8 @@ interface ThinkingEffortControlProps {
   value: ThinkingEffort;
   onChange: (value: ThinkingEffort) => void;
   running: boolean;
+  /** The conversation column: the popover stays inside the AI's sheet, never over the chat rail, as the composer's other menus */
+  boundary?: HTMLElement | null;
 }
 
 export function ThinkingEffortControl({
@@ -47,6 +49,7 @@ export function ThinkingEffortControl({
   value,
   onChange,
   running,
+  boundary,
 }: ThinkingEffortControlProps) {
   const levels = capability?.selectable ?? [];
   const supported = levels.length > 0;
@@ -105,7 +108,8 @@ export function ThinkingEffortControl({
             align="start"
             sideOffset={8}
             collisionPadding={8}
-            className="z-[90] w-[min(300px,calc(100vw-16px))] rounded-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-3 shadow-[0_10px_28px_rgba(26,24,67,0.18)] focus:outline-none"
+            collisionBoundary={boundary ?? undefined}
+            className="z-[90] w-[min(300px,calc(100vw-16px))] max-w-[var(--radix-popover-content-available-width)] rounded-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-3 shadow-[0_10px_28px_rgba(26,24,67,0.18)] focus:outline-none"
           >
             <div className="flex items-center justify-between gap-3 text-[13px] font-medium text-[var(--r-ink-strong)]">
               <span>Thinking effort</span>

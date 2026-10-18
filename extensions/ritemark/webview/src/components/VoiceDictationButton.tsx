@@ -76,6 +76,7 @@ export function VoiceDictationButton() {
   const [recentLanguages, setRecentLanguages] = useState<string[]>(['et', 'en'])
   const [lastLanguage, setLastLanguage] = useState<string>('et')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const dropdownTriggerRef = useRef<HTMLButtonElement>(null)
 
   // Load settings on mount
   useEffect(() => {
@@ -103,9 +104,21 @@ export function VoiceDictationButton() {
         setShowDropdown(false)
       }
     }
+    // Escape closes it too and hands the keyboard back to the button that opened it, as Ritemark's other menus
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      setShowDropdown(false)
+      dropdownTriggerRef.current?.focus()
+    }
     if (showDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown, true)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleKeyDown, true)
+      }
     }
   }, [showDropdown])
 
@@ -199,6 +212,7 @@ export function VoiceDictationButton() {
       {/* Dropdown trigger */}
       <Tooltip label={isActive ? 'Stop dictation to change the language' : 'Select language'}>
         <button
+          ref={dropdownTriggerRef}
           className="dictation-dropdown-trigger"
           aria-label="Dictation language"
           aria-expanded={showDropdown}

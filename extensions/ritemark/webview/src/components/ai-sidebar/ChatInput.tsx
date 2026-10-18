@@ -1632,6 +1632,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               value={composerThinkingEffort}
               onChange={setThinkingEffort}
               running={isLoading}
+              boundary={menuBoundary}
             />
           ) : null}
 
