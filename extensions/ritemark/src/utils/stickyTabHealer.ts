@@ -44,6 +44,21 @@ export interface StuckTabCandidate<T extends TabLike = TabLike> {
  * file URI when the input is a plain TEXT editor on a file:// resource,
  * null otherwise (custom editors, diffs, untitled, webviews, notebooks).
  */
+/**
+ * Sprint 133 (#429): the text tab to close once the Ritemark editor has opened
+ * for the same file. Looked up again after the open, because the extension
+ * host can replace its tab objects when the tabs change, and a tab captured
+ * before the open may no longer be closable. A dirty tab is left alone.
+ */
+export function findReplacedTextTab<T extends TabLike>(
+  tabGroups: readonly { viewColumn: number; tabs: readonly T[] }[],
+  resolveTextInput: (input: unknown) => { path: string } | null,
+  target: { path: string; viewColumn: number },
+): T | undefined {
+  const group = tabGroups.find((candidate) => candidate.viewColumn === target.viewColumn);
+  return group?.tabs.find((tab) => resolveTextInput(tab.input)?.path === target.path && tab.isDirty !== true);
+}
+
 export function findStuckMarkdownTabs<T extends TabLike>(
   tabGroups: readonly { viewColumn: number; tabs: readonly T[] }[],
   resolveTextInput: (input: unknown) => { path: string } | null,

@@ -2,7 +2,7 @@
  * Sprint 107 R3 — stuck-tab candidate selection tests over fabricated groups.
  */
 import assert from 'node:assert/strict';
-import { findStuckMarkdownTabs, type TabGroupLike } from './stickyTabHealer';
+import { findReplacedTextTab, findStuckMarkdownTabs, type TabGroupLike } from './stickyTabHealer';
 
 // Fabricated inputs: TEXT = plain text editor on file://, others must be ignored.
 const TEXT = (path: string) => ({ kind: 'text', path });
@@ -49,5 +49,22 @@ assert.equal(found[0].tab, groups[0].tabs[0], 'the candidate carries its own tab
 // Zero stuck tabs → empty, no throw (healer must be inert).
 assert.deepEqual(findStuckMarkdownTabs([], resolve), []);
 assert.deepEqual(findStuckMarkdownTabs([{ viewColumn: 1, tabs: [{ input: CUSTOM('/a.md'), isActive: false, isPinned: false }] }], resolve), []);
+
+// Sprint 133 (#429): after the Ritemark editor opened, the text tab is found again, in its own group only.
+const afterOpen = [
+  { viewColumn: 1, tabs: [
+    { input: TEXT('/ws/notes.md'), isActive: false, isPinned: false },
+    { input: CUSTOM('/ws/notes.md'), isActive: true, isPinned: false },
+  ] },
+  { viewColumn: 2, tabs: [{ input: TEXT('/ws/notes.md'), isActive: true, isPinned: false }] },
+];
+assert.equal(findReplacedTextTab(afterOpen, resolve, { path: '/ws/notes.md', viewColumn: 1 }), afterOpen[0].tabs[0]);
+assert.equal(findReplacedTextTab(afterOpen, resolve, { path: '/ws/notes.md', viewColumn: 2 }), afterOpen[1].tabs[0]);
+assert.equal(findReplacedTextTab(afterOpen, resolve, { path: '/ws/other.md', viewColumn: 1 }), undefined);
+assert.equal(
+  findReplacedTextTab([{ viewColumn: 1, tabs: [{ input: TEXT('/ws/notes.md'), isActive: false, isPinned: false, isDirty: true }] }], resolve, { path: '/ws/notes.md', viewColumn: 1 }),
+  undefined,
+  'a dirty text tab is not closed',
+);
 
 console.log('stickyTabHealer tests passed.');

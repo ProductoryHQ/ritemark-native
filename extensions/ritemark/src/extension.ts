@@ -56,7 +56,7 @@ import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
 import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/browserNavigationRecorder';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
-import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome, type WelcomeHost } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
@@ -332,8 +332,17 @@ export function activate(context: vscode.ExtensionContext) {
             viewColumn: candidate.viewColumn,
           });
           // Sprint 133 (R11, #429): replace the text tab instead of leaving it beside the Ritemark tab.
+          // Found again after the open: the host may have replaced the tab objects meanwhile.
           if (candidate.replace) {
-            await vscode.window.tabGroups.close(candidate.tab, true).then(undefined, () => undefined);
+            const textTab = findReplacedTextTab(vscode.window.tabGroups.all, resolveTextInput, {
+              path: candidate.uri.path,
+              viewColumn: candidate.viewColumn,
+            });
+            if (textTab) {
+              await vscode.window.tabGroups.close(textTab, true).then(undefined, (error: unknown) => {
+                console.warn('[Ritemark] the healer could not close the text tab', error);
+              });
+            }
           }
         }
       } catch {
