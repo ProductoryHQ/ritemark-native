@@ -1911,7 +1911,7 @@ function ThemePreviewCard({
         soft: '#F1F5F9',
         hairline: '#CBD5E1',
         text: '#1E1B4B',
-        muted: '#64748B',
+        muted: '#617187',
         body: '#475569',
         accent: '#4338CA',
       };

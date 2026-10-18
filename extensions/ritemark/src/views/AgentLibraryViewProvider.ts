@@ -484,7 +484,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       --r-hairline: rgba(148, 163, 184, 0.2);
       --r-hairline-strong: rgba(148, 163, 184, 0.4);
       --r-ink-strong: var(--vscode-foreground, #1E1B4B);
-      --r-ink-muted: var(--vscode-descriptionForeground, #64748B);
+      --r-ink-muted: var(--vscode-descriptionForeground, #617187);
       --r-ink-faint: rgba(100, 116, 139, 0.65);
       --r-radius-component: 10px;
       --r-radius-input: 6px;

@@ -129,7 +129,7 @@ export class BrowserPanelProvider
       --r-accent-soft: rgba(67, 56, 202, 0.10);
       --r-surface: var(--vscode-sideBar-background, #FFFFFF);
       --r-ink-strong: var(--vscode-foreground, #1E1B4B);
-      --r-ink-muted: var(--vscode-descriptionForeground, #64748B);
+      --r-ink-muted: var(--vscode-descriptionForeground, #617187);
       --r-ink-faint: rgba(100, 116, 139, 0.65);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }

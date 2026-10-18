@@ -52,7 +52,7 @@
   --ritemark-hairline-strong: #cbd5e1;
   --ritemark-ink-strong: #1e1b4b;
   --ritemark-ink-body: #475569;
-  --ritemark-ink-muted: #64748b;
+  --ritemark-ink-muted: #617187; /* the kit's muted, 4.5:1 on the ground (Sprint 132) */
   --ritemark-ink-faint: #94a3b8;
   --ritemark-ink-disabled: #cbd5e1;
   --ritemark-indigo: #4338ca;
@@ -413,7 +413,7 @@ body {
   border: 1px solid var(--ritemark-hairline, #e2e8f0);
   border-radius: 6px; padding: 6px 9px;
   font-family: var(--ritemark-ui-font-family); font-size: 12px;
-  color: var(--ritemark-ink-muted, #64748b); cursor: pointer;
+  color: var(--ritemark-ink-muted, #617187); cursor: pointer;
   box-shadow: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
 }
 .rm-marker:hover { border-color: var(--ritemark-hairline-strong, #cbd5e1); }
@@ -562,7 +562,7 @@ body {
   background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
 }
 .rm-mention-opt-alias { font-weight: 600; }
-.rm-mention-opt-label { color: var(--ritemark-ink-muted, #64748b); }
+.rm-mention-opt-label { color: var(--ritemark-ink-muted, #617187); }
 .rm-mention-opt[data-active="true"] .rm-mention-opt-label { color: inherit; }
 
 /* Send / Open conversation / recovery actions in a comment bubble */
@@ -615,7 +615,7 @@ body {
   word-break: break-word;
 }
 .rm-task-glyph { flex: none; font-size: 10px; line-height: inherit; }
-.rm-task-status--idle      { color: var(--r-ink-muted, #64748b); }
+.rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
 .rm-task-status--success   { color: var(--r-success); }
@@ -627,7 +627,7 @@ body {
   font-family: var(--ritemark-ui-font-family);
   font-size: 11px;
   line-height: 1.35;
-  color: var(--r-ink-muted, #64748b);
+  color: var(--r-ink-muted, #617187);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
