@@ -9,6 +9,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] VS Code at the pin with patches 001–019 from reset + clean + apply (copy-on-write clone for the worktree)
 - [ ] Record patch 001's and 016's file lists and hunk counts in `notes/patches-before.md` (`PATCH-RULES.md` §8)
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [ ] The Experience lead asked, through the Development manager, to draft the sample project's content, as they offered (R5)
 
 ## Phase 1: Audits first
 
@@ -16,13 +17,16 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
 - [ ] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
 - [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; the Windows profile through the Development manager's Windows session; the decision
-- [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); the sign-in entry points and their progress events; how the healer closes the text tab
+- [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
+- [ ] The sample project's content, written before step 2 is built (R5): a small leadership programme as in the drawings, with a brief, modules, kickoff notes and a few tasks as board cards. Drafted by the Experience lead; checked that every card parses, and that no real person's name, path or account is in it; in `extensions/ritemark/sample-project/`
+- [ ] The open technical point on a 1.x OK (technical-plan.md, W1) decided by Jarmo; the reading written into `research/confirmations.md` (R7)
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: Consent and events (W1)
 
 - [ ] `analytics/consent.ts`: the gate; `ritemark.analytics.enabled` default false in `package.json`; the kill switch through `isEnabled('analytics')` (R7, E1)
-- [ ] `posthog.ts`: the client made only after a yes; every send through the gate; the notice and `hasSeenNotice` retired (R7)
+- [ ] `posthog.ts`: the client made only after a yes; every send through the gate; the notice retired and `hasSeenNotice` no longer written (R7)
+- [ ] The 1.x answers: read once before the gate starts (`hasSeenNotice`, `inspect('analytics.enabled')`); a carried-over yes written as `analytics.enabled: true` and `answeredV2` from 1.x; an Opt Out or no answer off; the closed-notice case as decided (R7, E1)
 - [ ] `analytics/welcomeEvents.ts`: held events, sent at a yes, dropped at a no (R8; per Jarmo's answer to Open Question 1)
 - [ ] `events.ts`: `welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent` with R8's properties
 - [ ] `first_message_sent` from the AI sheet's host, once per profile (R8)
@@ -56,13 +60,15 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `src/welcome/words.ts`: failures in one sentence each (R3)
 - [ ] The small sheets over the welcome: API keys (the Anthropic key) and OpenCode's Set up, with Done (R2, R3)
 - [ ] `src/welcome/newProject.ts` + test: the name field, Create, the place line and Change…, the name check, an empty `<Documents>/Ritemark/<name>` (R5)
+- [ ] `src/welcome/sampleProject.ts` + test: Try the sample project copies `extensions/ritemark/sample-project/` into `<Documents>/Ritemark/Leadership programme`, never writing over a folder, the next free name, a failed copy in one sentence, then the landing with `source: sample` (R5, R6, R8)
+- [ ] `scripts/check-bundled-extension-complete.sh`: fails when the sample is missing from the bundled extension (R5)
 - [ ] The missing Git or Node line under "Signed in to Claude": its words, Use Ritemark's own Claude, Restart (R5)
 - [ ] `src/welcome/landing.ts` + test: written before `openFolder`, read after the reload, Documents, the AI's new chat ("Ask Claude about this project"), the empty desk, `project_opened`, deleted (R6)
 
 ## Phase 5: Updating, the first window with a file, Settings, the extension (W6, W7, W8, W9)
 
 - [ ] `src/welcome/updateDetection.ts` + test, read before `extension.ts:265` (R10)
-- [ ] The update sheet: Your AI rows, Add another, up to three projects, Open when you left without a reload, Open another folder…, Start a new project, the switch (R10)
+- [ ] The update sheet: Your AI rows, Add another, up to three projects, Open when you left without a reload, Open another folder…, Start a new project, the switch with the 1.x answer and its words (R7, R10)
 - [ ] `ritemark.welcome.finished` and `ritemark.updatedFrom1x` written when a project is picked (R10)
 - [ ] A fresh profile's first window with a file or folder leaves the welcome for later (R11)
 - [ ] `utils/stickyTabHealer.ts` + `extension.ts`: the healer closes the text tab it replaced; test (R11, #429)
@@ -76,14 +82,14 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] The screenshot baseline gains the welcome's frames, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md`, `CLAUDE.md`'s patch table, `PATCH-RULES.md`, `references/layout-invariants.md` (E6)
-- [ ] Manual QA on the Mac: S1–S44, S48, S49; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S44, S48–S53; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S45, S46 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round from main: S45–S47 and the shell parts (Getting Started gone, the welcome alone, the muted extension); findings in `qa-evidence.md`
 - [ ] After the merge: the drift check into the release plan's risk register (E7)
-- [ ] PostHog: the four events seen live after a yes on a production build; none before an answer or after a no (S24–S30)
+- [ ] PostHog: the four events seen live after a yes on a production build; none before an answer or after a no; a 1.x OK sending from the first start (S24–S30, S52, S53)
 - [ ] Linked issues closed with evidence: [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429), [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338); [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401) closed or updated with the audit
 - [ ] The privacy note (opt-in, `build_channel`) sent to the Development manager for ritemark.app (E6)
 - [ ] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
