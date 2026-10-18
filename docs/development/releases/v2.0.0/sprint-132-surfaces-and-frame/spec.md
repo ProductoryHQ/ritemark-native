@@ -158,7 +158,7 @@ Acceptance criteria:
 As a writer, I want my menu in one quiet place.
 
 Acceptance criteria:
-- You is an outline circle at the AI toggle's weight, at the right end of the AI's strip (before the window buttons on Windows). The new-chat + is the corner's only filled shape.
+- You is an icon button like the AI's toggle beside it, at the right end of the AI's strip (before the window buttons on Windows): the person in a circle (Phosphor user-circle at 17), in the toggles' muted ink with no ring, the same 28 button with their hover fill (Jarmo, 18 October: "It must be smaller - visually aligned to the icon button on its left side"; it was an outline circle). The new-chat + is the corner's only filled shape.
 - Its menu holds Settings, which opens Ritemark's own settings page, and Help, which opens https://ritemark.app/en/support/.
 - ⌘, (Ctrl+, on Windows) opens Ritemark's own settings page, and Settings shows it (Jarmo, 17 October).
 - It works with the mouse, Enter and Space, and VoiceOver and Narrator announce it as a menu button.

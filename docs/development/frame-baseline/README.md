@@ -2,7 +2,7 @@
 
 Ritemark 2.0's frame (the window, the places, the tab row, the columns and the menus) in 9 scenes, in Ritemark Light and Ritemark Dark. It is the picture of how the frame should look. The later steps of 2.0 and every VS Code update compare against it, because the frame rests on VS Code's internal class names, which an update can change without warning.
 
-**Status:** captured on 18 October 2026 from Sprint 132's merge 2 (the dev build at aad4cdd9, on a fresh profile), waiting for Jarmo's approval. A second run matched it to the pixel in all 18 scenes. A new baseline replaces these files only when Jarmo approves it.
+**Status:** captured on 18 October 2026 from Sprint 132's merge 2, on a fresh profile. It was re-taken the same day after You became an icon button in the toggles' muted ink; against the aad4cdd9 set, every scene changed by 0.04%, in the toggles and You only. It is waiting for Jarmo's approval. A second run matched it to the pixel in all 18 scenes. A new baseline replaces these files only when Jarmo approves it.
 
 ## The scenes
 

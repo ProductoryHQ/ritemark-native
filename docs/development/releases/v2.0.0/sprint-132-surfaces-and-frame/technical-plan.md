@@ -212,7 +212,7 @@ All of this is patch 019, from the proof of concept:
 
 ## Workstream 9: You and Ritemark's menus (R11, R12)
 
-- **You** (`ritemarkFrameStrip.ts`) is an outline circle at the AI toggle's weight. Its menu holds Settings (`ritemark.aiSettings`) and Help (`workbench.action.openDocumentationUrl`; `product.json`'s `documentationUrl` is already `https://ritemark.app/en/support/`). Its ARIA role is button with `aria-haspopup="menu"`.
+- **You** (`ritemarkFrameStrip.ts`) is an icon button like the AI's toggle: the user-circle glyph through the product icon theme's `account`, in the toggles' muted ink (Jarmo, 18 October; it was an outline circle). Its menu holds Settings (`ritemark.aiSettings`) and Help (`workbench.action.openDocumentationUrl`; `product.json`'s `documentationUrl` is already `https://ritemark.app/en/support/`). Its ARIA role is button with `aria-haspopup="menu"`.
 - **Ritemark's menus.**
   - `desktop.contribution.ts`: `window.menuStyle` defaults to `custom`. An extension's `configurationDefaults` cannot set an application-scoped setting, so it is set in the shell.
   - `menu.ts`: the sheet with radius 10, padding 6, rows 32 with radius 6.

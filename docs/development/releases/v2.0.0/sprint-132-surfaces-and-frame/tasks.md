@@ -61,7 +61,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `ritemarkProjectHead.ts` in `sidebarPart.ts`: the name, chevron, New, Search and Documents at the drawing's positions (R10)
 - [x] `menusExtensionPoint.ts`: `ritemark/projectHead` and `ritemark/projectHead/new`; their items contributed from `package.json` (R10)
 - [x] `package.json`: `files.exclude` for `**/.ritemark` (R10)
-- [x] You: the outline circle; Settings and Help; ARIA as a menu button (R11)
+- [x] You: the outline circle; Settings and Help; ARIA as a menu button (R11). Merge 2: an icon button like the AI's toggle, the user-circle glyph in the toggles' muted ink (Jarmo, 18 October)
 - [x] `desktop.contribution.ts` (`window.menuStyle: custom`), `menu.ts`, `defaultStyles.ts`: Ritemark's menus; the macOS menu bar stays native (R12)
 - [x] Updating from v1.14.0: the places order once; terminals, Copilot Chat and other views out of the AI column (R16)
 
