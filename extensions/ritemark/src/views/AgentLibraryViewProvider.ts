@@ -745,10 +745,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       user-select: none;
     }
     .btn-primary {
-      background: var(--r-accent); color: #FFFFFF;
-      border-color: var(--r-accent);
+      /* the theme's button colours: white on indigo in Light, ink on the lighter indigo in Dark (kit: .dark .btn.primary) */
+      background: var(--vscode-button-background, var(--r-accent)); color: var(--vscode-button-foreground, #FFFFFF);
+      border-color: var(--vscode-button-background, var(--r-accent));
       box-shadow: var(--r-accent-shadow);
     }
+    body.vscode-dark .btn-primary { box-shadow: none; }
     .btn-primary:hover:not(:disabled) { background: var(--r-accent-hover); border-color: var(--r-accent-hover); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
     .btn-secondary {
