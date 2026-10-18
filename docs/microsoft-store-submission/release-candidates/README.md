@@ -11,3 +11,5 @@ Copy [`../templates/release-candidate-record.md`](../templates/release-candidate
 If bytes change, create a new candidate record and a new hosted path. Never overwrite a submitted candidate's version, URL, or SHA-256 to describe another build.
 
 The Store process remains release-independent even though each binary has a release version. This directory is the bridge between the reusable submission hub and release-specific build evidence.
+
+Current update candidate: [`v1.14.0-candidate-2.md`](./v1.14.0-candidate-2.md).
