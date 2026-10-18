@@ -13,6 +13,7 @@
 
 import { create } from 'zustand';
 import { defaultCodexModelId } from './modelPresentation';
+import { resolveAvailableRuntimeModel } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import {
   listConversations,
@@ -308,6 +309,12 @@ interface AISidebarState {
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
+  /**
+   * Sprint 133 (R6): the welcome's landing — "Ask Claude about this project"
+   * in the new chat's message box, until that chat has a message.
+   */
+  landingPlaceholder: { conversationId: string; runtimeId: AgentId; text: string } | null;
+  openLandingChat: (runtimeId: AgentId, text: string) => void;
   conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
   /** Current host flag; absent on an older host means enabled. */
   durableAgentConversationsEnabled: boolean;
@@ -1001,6 +1008,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     savedConversations: [],
     showHistoryPanel: false,
+    landingPlaceholder: null,
     conversationRolloutMode: 'unknown',
     durableAgentConversationsEnabled: true,
     hostConversations: [],
@@ -2121,6 +2129,28 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
      * wipes the current one and no longer resets any provider session — the old
      * "new chat destroys the live one" semantic is gone.
      */
+    openLandingChat: (runtimeId, text) => {
+      get().startNewConversation();
+      const conversation = activeConversation();
+      if (!conversation) return;
+      if (conversation.selectedAgent !== runtimeId) {
+        const state = get();
+        const modelId = resolveAvailableRuntimeModel(runtimeId, {
+          claude: conversation.selectedModel,
+          codex: conversation.codexSelectedModel,
+          opencode: conversation.opencodeSelectedModel,
+        }, {
+          claude: state.models,
+          codex: state.codexModels,
+          opencode: state.byokProviderModels,
+          acpProviders: state.acpProviders,
+        });
+        if (modelId) get().selectRuntimeModel(runtimeId, modelId);
+        else get().selectAgent(runtimeId);
+      }
+      set({ landingPlaceholder: { conversationId: conversation.id, runtimeId, text } });
+    },
+
     startNewConversation: () => {
       const id = get().activeConversationId;
       if (id) persistConversation(id);
@@ -2862,6 +2892,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'ai-stopped':
           patchConversation(state.activeConversationId, () => ({ isStreaming: false, streamingContent: '' }));
+          break;
+
+        case 'landing:new-chat':
+          get().openLandingChat(message.runtimeId, message.placeholder);
           break;
 
         case 'clear-chat':

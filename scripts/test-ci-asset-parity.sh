@@ -34,14 +34,9 @@ git -C "$TMP_ROOT" config user.name "Ritemark CI Asset Parity"
 git -C "$TMP_ROOT" commit --allow-empty -qm "Initialize CI asset parity fixture"
 
 cp "$PROJECT_ROOT/scripts/apply-patches.sh" "$TMP_ROOT/scripts/"
-cp "$PROJECT_ROOT/scripts/copy-welcome-assets.sh" "$TMP_ROOT/scripts/"
 cp "$PROJECT_ROOT/scripts/vscode-derived-state.mjs" "$TMP_ROOT/scripts/"
 cp -R "$PROJECT_ROOT/patches/vscode" "$TMP_ROOT/patches/"
 cp "$PROJECT_ROOT/branding/product.json" "$TMP_ROOT/branding/"
-
-if [ -d "$PROJECT_ROOT/branding/welcome" ]; then
-  cp -R "$PROJECT_ROOT/branding/welcome" "$TMP_ROOT/branding/"
-fi
 
 cp "$PROJECT_ROOT/extensions/ritemark/webview/src/assets/fonts/SofiaSans-latin.woff2" \
    "$TMP_ROOT/extensions/ritemark/webview/src/assets/fonts/"
@@ -110,18 +105,5 @@ run_css_bundle_check \
 run_css_bundle_check \
   "$TMP_ROOT/vscode/src/vs/base/browser/ui/codicons/codicon/codicon.css" \
   "$TMP_ROOT/codicon.bundle.css"
-
-WELCOME_DEST="$TMP_ROOT/VSCode-darwin-x64/Ritemark.app/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
-bash "$TMP_ROOT/scripts/copy-welcome-assets.sh" "$WELCOME_DEST" >/dev/null
-
-for path in \
-  "$WELCOME_DEST/ritemark-welcome-logo-full.svg" \
-  "$WELCOME_DEST/ritemark-welcome-hero-bg.png"
-do
-  if [ ! -f "$path" ]; then
-    echo "ERROR: Missing copied Welcome packaging asset: $path"
-    exit 1
-  fi
-done
 
 echo "CI asset parity OK"

@@ -153,7 +153,6 @@ jobs:
           BUILD_DIR="VSCode-darwin-x64"
           APP_PATH="$BUILD_DIR/Ritemark.app"
           EXT_DEST="$APP_PATH/Contents/Resources/app/extensions/ritemark"
-          WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: App bundle not found at $APP_PATH"
@@ -169,7 +168,6 @@ jobs:
           # darwin-x64/ inside binaries/agents/, removes darwin-arm64/ and
           # win32-x64/ if present. Allowlist-based and idempotent.
           ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" darwin x64
-          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
       # =========================================================================
@@ -356,12 +354,12 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # Check welcome assets
-          if [ -f "$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-logo-full.svg" ] && \
-             [ -f "$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-hero-bg.png" ]; then
-            echo "OK: Welcome assets present"
+          # Check the welcome's assets and the sample project (Sprint 133)
+          if [ -f "$APP_PATH/Contents/Resources/app/extensions/ritemark/media/welcome/welcome-hero.jpg" ] && \
+             [ -f "$APP_PATH/Contents/Resources/app/extensions/ritemark/sample-project/Leadership programme/Brief.md" ]; then
+            echo "OK: welcome assets and sample project present"
           else
-            echo "FAIL: Welcome assets missing"
+            echo "FAIL: welcome assets or sample project missing"
             ERRORS=$((ERRORS + 1))
           fi
 

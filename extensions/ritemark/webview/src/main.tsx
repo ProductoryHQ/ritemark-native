@@ -46,6 +46,11 @@ const TaskBoard = lazy(() =>
   import('./components/tasks/TaskBoard').then((m) => ({ default: m.TaskBoard }))
 )
 
+// The welcome (Sprint 133): a window with no folder, the update welcome, the start sheet.
+const WelcomePage = lazy(() =>
+  import('./components/welcome/WelcomePage').then((m) => ({ default: m.WelcomePage }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -115,6 +120,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'task-board' ? (
       <Suspense fallback={<LoadingFallback />}>
         <TaskBoard />
+      </Suspense>
+    ) : editorType === 'welcome' ? (
+      <Suspense fallback={null}>
+        <WelcomePage />
       </Suspense>
     ) : (
       <App />

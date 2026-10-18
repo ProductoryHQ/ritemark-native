@@ -454,6 +454,8 @@ export type ExtensionMessage =
   | { type: 'comment-task/drop'; taskId: string }
   // Sprint 117: "Open conversation" on a comment reveals the task's own thread.
   | { type: 'conversation/select'; conversationId: string }
+  // Sprint 133 (R6): the welcome's landing opens a new chat with the AI the person signed in with.
+  | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)

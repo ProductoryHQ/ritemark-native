@@ -1,0 +1,193 @@
+/*
+ * The welcome (Sprint 133): experience 2 (the welcome) and experience 32 (the
+ * update welcome), to the kit's numbers (ritemark-dev: product/design/
+ * experience/kit/ritemark.css, .wsheet and its parts). Colours come from the
+ * theme tokens, so Ritemark Light and Ritemark Dark both follow.
+ */
+
+.rw-ground {
+  min-height: 100vh;
+  background: var(--vscode-ritemark-ground, var(--r-surface-soft));
+  font-family: var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  padding: 32px 16px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.rw-sheet {
+  position: relative;
+  width: 640px;
+  max-width: 100%;
+  border-radius: 10px;
+  background: var(--vscode-ritemark-desk, var(--r-surface));
+  box-shadow: 0 0 0 1px var(--r-hairline), 0 4px 6px -1px rgba(30, 27, 75, 0.08), 0 2px 4px -2px rgba(30, 27, 75, 0.06);
+  padding: 0 32px 28px;
+  overflow: hidden;
+}
+
+/* The header: Ritemark's own illustration with the white logo; the one moment the brand's gradient appears. */
+.rw-head {
+  position: relative;
+  height: 168px;
+  margin: 0 -32px 24px;
+  background-position: 62% 38%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.rw-head.short { height: 120px; }
+.rw-head img { position: absolute; left: 32px; bottom: 46px; width: 122px; height: auto; }
+.rw-head.short img { bottom: 22px; }
+
+/* The two-part progress, muted on the header: the buttons matter more (Jarmo, 15 October). */
+.rw-prog { position: absolute; left: 32px; right: 32px; bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rw-prog .bar { display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.3); }
+.rw-prog .bar.done { background: rgba(255, 255, 255, 0.6); }
+.rw-prog .bar.on { background: #fff; }
+.rw-prog .lb { display: block; margin-top: 4px; font: 500 11px/14px var(--ritemark-ui-font-family); color: rgba(255, 255, 255, 0.8); }
+.rw-prog .lb.on { color: #fff; font-weight: 600; }
+
+.rw-sheet h1 {
+  margin: 0 0 6px;
+  font: 700 40px/44px 'Space Grotesk', var(--ritemark-ui-font-family);
+  letter-spacing: -0.5px;
+  color: var(--r-ink-strong);
+}
+.rw-one { margin: 0 0 28px; font: 400 15px/22px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rw-one.tight { margin-bottom: 16px; }
+.rw-one.update { margin-bottom: 22px; }
+.rw-sheet h2 { margin: 0 0 14px; font: 600 17px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+
+.rw-notice {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 0 16px; padding: 10px 14px; border-radius: 10px;
+  background: var(--vscode-ritemark-ground, var(--r-surface-soft));
+  box-shadow: 0 0 0 1px var(--r-hairline);
+  font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body);
+}
+
+/* Small buttons on the sheet: the kit's .btn (28 high, 13px). The shadcn Button carries the colours and focus ring. */
+.rw-btn.rw-btn { height: 28px; padding: 0 10px; border-radius: 6px; font: 500 13px/28px var(--ritemark-ui-font-family); gap: 6px; }
+.rw-btn.quiet { padding: 0 8px; color: var(--r-ink-body); }
+.rw-btn.quiet:hover { color: var(--r-ink-strong); }
+.rw-btn.small { height: 24px; line-height: 24px; padding: 0 4px; }
+
+/* Step 1: three cards. */
+.rw-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.rw-choice { border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); padding: 16px; display: flex; flex-direction: column; gap: 4px; min-height: 136px; transition: background-color 120ms, box-shadow 120ms; }
+.rw-choice .name { font: 600 17px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-choice .line { font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-choice .foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.rw-choice.wait { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 0 0 4px var(--vscode-ritemark-ground, var(--r-surface-soft)); }
+.rw-choice.wait .w { margin-top: auto; display: flex; align-items: center; gap: 8px; font: 500 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); padding-top: 8px; }
+.rw-choice.faded { background: var(--vscode-ritemark-aiSheet, var(--r-surface-muted)); box-shadow: 0 0 0 1px var(--r-hairline); }
+.rw-choice.faded .name { color: var(--r-ink-body); }
+
+.rw-state { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); white-space: nowrap; }
+.rw-state.quiet { color: var(--r-ink-muted); }
+.rw-state svg { color: var(--r-ink-strong); }
+.rw-state.quiet svg { color: var(--r-ink-muted); }
+
+.rw-spin { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--r-hairline-strong); border-top-color: var(--r-ink-strong); flex: none; animation: rw-spin 0.9s linear infinite; }
+@keyframes rw-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rw-spin { animation-duration: 3s; } }
+
+.rw-links { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
+.rw-links .note { font: 400 13px/28px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-links .grow { flex: 1; }
+
+.rw-fine { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--r-hairline); font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); display: flex; align-items: center; gap: 10px; }
+.rw-fine .grow { flex: 1; }
+
+/* Step 2. */
+.rw-done { display: flex; align-items: center; gap: 6px; font: 500 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); margin-bottom: 2px; }
+.rw-done svg { color: var(--r-ink-strong); }
+.rw-tool { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 12px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rw-tool svg { color: var(--r-ink-body); margin-top: 3px; flex: none; }
+.rw-tool .text { flex: 1; }
+
+.rw-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); margin-bottom: 10px; background: transparent; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.rw-row:hover { background: var(--vscode-ritemark-aiSheet, var(--r-surface-muted)); }
+.rw-row:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
+.rw-row .ic { width: 36px; height: 36px; border-radius: 8px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; color: var(--r-ink-body); }
+.rw-row .t { flex: 1; display: grid; min-width: 0; }
+.rw-row .t b { font: 600 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-row .t span { font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-row > svg { flex: none; color: var(--r-ink-muted); }
+.rw-row.first { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 1px 3px rgba(30, 27, 75, 0.06); }
+.rw-row.first .ic { background: var(--r-accent-soft); color: var(--r-accent); }
+
+/* Start a new project, opened in place. */
+.rw-new { border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); margin-bottom: 10px; padding: 12px 14px; }
+.rw-new .head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rw-new .ic { width: 36px; height: 36px; border-radius: 8px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; color: var(--r-ink-body); }
+.rw-new .head b { font: 600 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-new .field { display: flex; gap: 8px; align-items: center; }
+.rw-new input {
+  flex: 1; height: 32px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--r-hairline-strong); background: var(--vscode-ritemark-desk, var(--r-surface));
+  font: 400 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong);
+}
+.rw-new input:focus { outline: none; border-color: var(--r-accent); box-shadow: 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
+.rw-new .place { display: flex; align-items: center; gap: 4px; margin-top: 6px; font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-new .place .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rw-new .error { margin-top: 6px; font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); display: flex; gap: 6px; align-items: flex-start; }
+
+/* The update sheet: Your AI, and their projects. */
+.rw-h2row { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
+.rw-h2row h2 { margin: 0; }
+.rw-airbox { border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); overflow: hidden; margin-bottom: 24px; }
+.rw-airow { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 14px; }
+.rw-airow + .rw-airow { border-top: 1px solid var(--r-hairline); }
+.rw-airow .t { flex: 1; display: grid; }
+.rw-airow .t b { font: 600 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-airow .t span { font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-offline { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); border-bottom: 1px solid var(--r-hairline); font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rw-offline svg { margin-top: 2px; color: var(--r-ink-body); flex: none; }
+.rw-offline.alone { border-radius: 10px; border-bottom: 0; box-shadow: 0 0 0 1px var(--r-hairline); margin-bottom: 14px; }
+
+.rw-project { display: flex; align-items: center; gap: 12px; width: 100%; height: 56px; padding: 0 14px; border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); margin-bottom: 8px; background: transparent; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.rw-project:hover { background: var(--vscode-ritemark-aiSheet, var(--r-surface-muted)); }
+.rw-project:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
+.rw-project.first { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 1px 3px rgba(30, 27, 75, 0.06); }
+.rw-project .mark { width: 28px; height: 28px; border-radius: 7px; background: var(--r-ink-strong); color: var(--vscode-ritemark-desk, #fff); font: 700 10px/28px var(--ritemark-ui-font-family); text-align: center; letter-spacing: 0.2px; flex: none; }
+.rw-project .t { flex: 1; display: grid; min-width: 0; }
+.rw-project .t b { font: 600 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-project .t span { font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rw-project .when { font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; }
+.rw-project > svg { flex: none; color: var(--r-ink-muted); }
+.rw-wl2 { display: flex; gap: 4px; margin: 4px 0 0 -8px; }
+
+/* Usage data: off until yes. */
+.rw-usage { display: flex; align-items: center; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--r-hairline); }
+.rw-usage.after-line { margin-top: 8px; padding-top: 0; border-top: 0; }
+.rw-usage .t { flex: 1; display: grid; }
+.rw-usage .t b { font: 500 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-usage .t span { font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rw-usage .t .legal { margin-top: 2px; }
+.rw-usage .t .legal a { color: var(--r-ink-body); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.rw-usage .t .legal a:hover { color: var(--r-ink-strong); }
+.rw-usage .rw-switch[data-state='unchecked'] { background: var(--r-hairline-strong); }
+
+/* The small sheets over the welcome (API keys, OpenCode's Set up). */
+.rw-keyfield { margin-bottom: 14px; }
+.rw-keyfield label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font: 600 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rw-keyfield label .set { display: inline-flex; align-items: center; gap: 4px; font: 500 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rw-keyfield input {
+  width: 100%; height: 34px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--r-hairline-strong); background: var(--vscode-ritemark-desk, var(--r-surface));
+  font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong);
+}
+.rw-keyfield input:focus { outline: none; border-color: var(--r-accent); box-shadow: 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
+.rw-keynote { font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); margin: 0 0 14px; }
+.rw-keyerror { font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); margin-top: 4px; }
+
+/* A narrow window: the cards stack. */
+@media (max-width: 600px) {
+  .rw-choices { grid-template-columns: 1fr; }
+  .rw-choice { min-height: 0; }
+  .rw-sheet { padding: 0 20px 24px; }
+  .rw-head { margin: 0 -20px 20px; }
+  .rw-head img, .rw-prog { left: 20px; }
+}

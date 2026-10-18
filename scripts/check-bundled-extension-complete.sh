@@ -232,6 +232,21 @@ else
   ok "media/office-preview.NOTICES.txt present"
 fi
 
+# Sprint 133: the welcome's sample project, its task cards included (.ritemark/tasks),
+# and the welcome's own assets (served to the page, never inlined into webview.js).
+SAMPLE_DIR="$EXT_DIR/sample-project/Leadership programme"
+SAMPLE_CARDS=$(find "$SAMPLE_DIR/.ritemark/tasks" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+if [[ -s "$SAMPLE_DIR/Brief.md" && -s "$SAMPLE_DIR/AGENTS.md" && -s "$SAMPLE_DIR/CLAUDE.md" && "$SAMPLE_CARDS" -ge 1 ]]; then
+  ok "sample-project/ present ($SAMPLE_CARDS task card(s))"
+else
+  fail "sample-project/Leadership programme missing or incomplete (Brief.md, AGENTS.md, CLAUDE.md, .ritemark/tasks) in the bundled extension"
+fi
+for asset in welcome-hero.jpg ritemark-logo-white.svg SpaceGrotesk-latin.woff2; do
+  if [[ ! -s "$EXT_DIR/media/welcome/$asset" ]]; then
+    fail "media/welcome/$asset missing from the bundled extension"
+  fi
+done
+
 echo ""
 echo "========================================"
 if [[ $ERRORS -gt 0 ]]; then

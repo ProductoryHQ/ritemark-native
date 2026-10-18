@@ -333,12 +333,6 @@ jobs:
             echo "Kept only: $(ls $SDK_VENDOR/ripgrep/ 2>/dev/null || echo 'none')"
           fi
 
-      - name: Remove conflicting files before patching
-        shell: bash
-        working-directory: r/vscode
-        run: |
-          rm -f src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStartedGuide.css 2>/dev/null || true
-
       - name: Strip non-Windows binaries from built-in copilot extension
         # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot). Its
         # nested claude-agent-sdk vendors macOS/Linux native binaries that
@@ -495,7 +489,6 @@ jobs:
         run: |
           BUILD_DIR="VSCode-win32-x64"
           EXT_DEST="$BUILD_DIR/resources/app/extensions/ritemark"
-          WELCOME_DEST="$BUILD_DIR/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
           if [ ! -d "$BUILD_DIR" ]; then
             echo "ERROR: Build output not found at $BUILD_DIR"
@@ -510,7 +503,6 @@ jobs:
           fi
 
           cp -R "$STAGED_EXTENSION" "$EXT_DEST"
-          ./scripts/copy-welcome-assets.sh "$WELCOME_DEST"
           echo "Extension copied successfully"
 
       - name: Strip bundled copilot extension from output
@@ -685,11 +677,12 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          if [ -f "$BUILD_DIR/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-logo-full.svg" ] && \
-             [ -f "$BUILD_DIR/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media/ritemark-welcome-hero-bg.png" ]; then
-            echo "OK: Welcome assets present"
+          # The welcome's assets and the sample project (Sprint 133)
+          if [ -f "$BUILD_DIR/resources/app/extensions/ritemark/media/welcome/welcome-hero.jpg" ] && \
+             [ -f "$BUILD_DIR/resources/app/extensions/ritemark/sample-project/Leadership programme/Brief.md" ]; then
+            echo "OK: welcome assets and sample project present"
           else
-            echo "FAIL: Welcome assets missing"
+            echo "FAIL: welcome assets or sample project missing"
             ERRORS=$((ERRORS + 1))
           fi
 
