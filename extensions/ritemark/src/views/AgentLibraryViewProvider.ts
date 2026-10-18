@@ -661,7 +661,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-size: 13px; line-height: 32px;
     }
-    .row-meta { flex: none; font-size: 12px; line-height: 32px; color: var(--r-ink-muted); padding-right: 2px; }
+    .row-ext { color: var(--r-ink-muted); }
+    .item.open .row-ext { color: var(--r-ink-muted); font-weight: 400; }
+    .row-meta { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 32px; color: var(--r-ink-muted); padding-right: 2px; }
+    .row-meta.failed { color: var(--r-ink-body); }
+    .row-meta .ph { font-size: 14px; }
+    .row-meta svg { width: 12px; height: 12px; }
     .row-meta.warn, .row-warn { color: var(--r-warn); }
     .row-meta.warn { cursor: pointer; }
     .row-warn { flex: none; font-size: 14px; }
@@ -706,31 +711,11 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     @keyframes sched-spin { to { transform: rotate(360deg); } }
 
     /* === Empty state === */
+    /* experience 31: an empty list is one line in muted ink */
     .empty-state {
-      padding: 32px 16px 24px;
-      text-align: center;
-    }
-    .empty-state-title {
-      font-size: 13px; font-weight: 500;
-      color: var(--r-ink-strong);
-      margin-bottom: 16px;
-    }
-    .empty-state-actions {
-      display: flex; gap: 8px;
-      justify-content: center;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .empty-state-footnote {
-      font-size: 11px;
+      padding: 12px 8px;
+      font-size: 13px; line-height: 20px;
       color: var(--r-ink-muted);
-      line-height: 1.5;
-    }
-    .empty-state-footnote code {
-      background: var(--r-surface-muted);
-      border-radius: 3px;
-      padding: 1px 4px;
-      font-size: 10px;
     }
 
     /* === Buttons === */
@@ -1242,7 +1227,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (!html && filter) {
-        html = '<div class="empty-state"><div class="empty-state-title">No matches for "' + escapeHtml(filter) + '"</div></div>';
+        html = '<div class="empty-state">No matches for \u201c' + escapeHtml(filter) + '\u201d</div>';
       }
 
       contentEl.innerHTML = html;
@@ -1280,11 +1265,17 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     function rowHtml(row) {
       let html = '<div class="item' + (row.open ? ' open' : '') + (row.extraClass ? ' ' + row.extraClass : '') + '"' + (row.attrs || '') + ' title="' + escapeHtml(row.title) + '">';
       html += '<i class="ph row-icon" aria-hidden="true">' + row.icon + '</i>';
-      html += '<span class="row-label">' + escapeHtml(row.label) + '</span>';
+      html += '<span class="row-label">' + labelHtml(row.label) + '</span>';
       if (row.warn) html += '<i class="ph row-warn" role="img" aria-label="' + escapeHtml(row.warn) + '">' + ICON.warning + '</i>';
-      if (row.meta) html += '<span class="row-meta' + (row.metaClass ? ' ' + row.metaClass : '') + '"' + (row.metaAttrs || '') + '>' + escapeHtml(row.meta) + '</span>';
+      if (row.meta || row.metaHtml) html += '<span class="row-meta' + (row.metaClass ? ' ' + row.metaClass : '') + '"' + (row.metaAttrs || '') + '>' + (row.metaHtml || escapeHtml(row.meta)) + '</span>';
       if (row.more) html += moreButton();
       return html + '</div>';
+    }
+
+    // The name in the row's ink, its extension in muted ink (experience 31)
+    function labelHtml(label) {
+      const m = /^(.+?)(\\.flow\\.json|\\.[^.\\s]+)$/i.exec(label || '');
+      return m ? escapeHtml(m[1]) + '<span class="row-ext">' + escapeHtml(m[2]) + '</span>' : escapeHtml(label);
     }
 
     // Files show their extension (framework.md); a skill is a folder and shows its folder's name
@@ -1376,10 +1367,15 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         const dur = run.durationMs ? ' (' + (run.durationMs / 1000).toFixed(1) + 's)' : '';
         const blocked = run.outcome === 'blocked';
         const runAttrs = ' data-task="' + escapeHtml(label) + '" data-run="' + escapeHtml(run.runId || '') + '"';
+        // experience 31: the run's time when done, a spinner while it runs, "Approval needed" in amber (it opens
+        // the review), "Failed" in body ink with a warning; the details in the tooltip
+        const running = meta.cls === 'run';
+        const failed = run.outcome === 'errored';
         html += rowHtml({
           icon: ICON.scheduled, label, extraClass: 'sched-item', attrs: runAttrs,
-          meta: blocked ? 'Approval needed' : relativeTime(run.startedAt),
-          metaClass: blocked ? 'warn sched-approve' : '',
+          meta: blocked ? 'Approval needed' : failed ? '' : relativeTime(run.startedAt),
+          metaHtml: running ? meta.icon : failed ? '<i class="ph" aria-hidden="true">' + ICON.warning + '</i>Failed' : '',
+          metaClass: blocked ? 'warn sched-approve' : failed ? 'failed' : '',
           metaAttrs: blocked ? runAttrs : '',
           title: [meta.label + dur, desc].filter(Boolean).join('\\n'),
         });
@@ -1387,25 +1383,11 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       return html;
     }
 
+    // experience 31: an empty list is one line in muted ink; New in the head makes every kind
     function renderEmptyState() {
-      const pathHint = activeScope === 'project' ? '.claude/' : '~/.claude/';
-      contentEl.innerHTML =
-        '<div class="empty-state">' +
-          '<div class="empty-state-title">No skills or agents yet</div>' +
-          '<div class="empty-state-actions">' +
-            '<button class="btn btn-primary" id="emptyNewSkillBtn">' + plusSvg() + 'New skill</button>' +
-            '<button class="btn btn-primary" id="emptyNewAgentBtn">' + plusSvg() + 'New agent</button>' +
-          '</div>' +
-          '<div class="empty-state-footnote">Helpers live in <code>' + pathHint + '</code> — they\\u2019re just markdown files.</div>' +
-        '</div>';
-      const sBtn = document.getElementById('emptyNewSkillBtn');
-      const aBtn = document.getElementById('emptyNewAgentBtn');
-      if (sBtn) sBtn.addEventListener('click', () => openModal('skill'));
-      if (aBtn) aBtn.addEventListener('click', () => openModal('agent'));
-    }
-
-    function plusSvg() {
-      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+      contentEl.innerHTML = '<div class="empty-state">' + (activeScope === 'project'
+        ? 'Agents, skills, commands and flows for this project live here. New makes one.'
+        : 'Agents, skills and commands for all your projects live here. New makes one.') + '</div>';
     }
 
     function renderSection(title, kind, items) {
