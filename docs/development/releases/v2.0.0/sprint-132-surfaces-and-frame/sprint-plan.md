@@ -111,11 +111,13 @@ Modal dialogs, Flows and the Agent Library wait for their drawings. If those com
 
   It leaves these for the steps that redraw them:
   - the PDF bar's words and Share (step 3's document bar);
-  - the editor's type and column (raised with Jarmo before step 3);
+  - the editor's type and column: closed with no work, since Jarmo kept today's (18 October, below);
   - the redrawn Task board, Transcribe and Browser places;
   - the AI's empty state and the status bar's items (the AI step);
   - the indigo icon on the open row (a font icon theme, later).
 - **2026-10-18, merge 2 (the Experience lead; ritemark-dev c8108e7, experience 31):** the Agents place's sections have no carets and do not collapse, and the per-section + goes, since New in the head makes all four kinds. Collapse was a 1.x convenience; this is a change to an existing behaviour, so Jarmo's yes is asked for with the PR (CLAUDE.md, hard rule 1).
+- **2026-10-18, merge 2 (Jarmo, through the Experience lead): the documents' type stays as today ("A · Today").** The system font at 18/1.7, a 32 title, in the editor's own column. The open item "the editor's type and column" is closed with no work, and step 3 does not take it up.
+- **2026-10-18, merge 2 (Jarmo, through the Experience lead and the Development manager): You is an icon button.** Jarmo: "this account icon/avatar bothers me a lot. It must be smaller - visually aligned to the icon button on its left side". You is now the person in a circle (Phosphor user-circle at 17), in muted ink with no ring, in the same 28 button with the same hover fill as the AI's toggle (kit `.avatar`, ritemark-dev). The frame's toggles take the kit's muted ink as well, as the kit draws them; they had been the foreground ink at 80%. You and the toggle beside it now share one ink, and its menu is unchanged.
 
 ## Feature Flag Check
 

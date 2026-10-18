@@ -329,10 +329,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..561e1e29337
+index 00000000000..4905f4d95ae
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1589 @@
+@@ -0,0 +1,1579 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -366,6 +366,7 @@ index 00000000000..561e1e29337
 +	--rm-place-foreground: var(--vscode-ritemark-placeActiveForeground, var(--vscode-list-activeSelectionForeground));
 +	--rm-hover: var(--vscode-toolbar-hoverBackground);
 +	--rm-body: var(--vscode-tab-inactiveForeground); /* the kit's body ink: #475569 in Light, #C7D2FE in Dark */
++	--rm-muted: var(--vscode-descriptionForeground); /* the kit's muted ink: #617187 in Light, #94A3B8 in Dark */
 +	--rm-radius: 10px;
 +	/* the room the window controls take at the left (the Mac's traffic lights) and the right (Windows' buttons) */
 +	--rm-lights: 0px;
@@ -622,41 +623,30 @@ index 00000000000..561e1e29337
 +	width: 28px;
 +	height: 28px;
 +	border-radius: 6px;
-+	color: var(--vscode-foreground);
++	color: var(--rm-muted); /* the kit draws the toggles and You in its muted ink */
 +	outline-offset: -1px;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-frame-button {
 +	font-size: 16px;
-+	opacity: 0.8;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-frame-button:hover {
 +	background-color: var(--rm-hover);
-+	opacity: 1;
 +}
 +
-+/* You (R11): quiet, an outline circle at the AI toggle's weight, so the new-chat + below stays the corner's one filled
-+   shape (Jarmo, 17 October) */
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you {
-+	border-radius: 50%;
-+	background-color: transparent;
-+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-foreground) 24%, transparent);
-+	opacity: 0.8;
-+	font-size: 15px;
++/* You (R11) is an icon button like the AI's toggle beside it (Jarmo, 18 October: "It must be smaller - visually aligned
++   to the icon button on its left side"; kit: .avatar): the user-circle glyph at 17, its circle 14 across as the toggle's
++   glyph is 14 wide, in the toggles' ink, no ring; the same 28 button with their hover fill, also while its menu is open */
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you > .codicon {
++	font-size: 17px;
++	color: inherit;
 +}
 +
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-you:hover,
-+.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible {
-+	background-color: var(--rm-hover);
-+	opacity: 1;
-+}
-+
-+/* open, You keeps its outline and gains a soft ring (experiences/settings frame 1) */
++.monaco-workbench .ritemark-frame-strip > a.ritemark-you:focus-visible,
 +.monaco-workbench .ritemark-frame-strip > a.ritemark-you[aria-expanded="true"] {
-+	background-color: transparent;
-+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-foreground) 24%, transparent), 0 0 0 2px var(--rm-place-background);
-+	opacity: 1;
++	background-color: var(--rm-hover);
 +}
 +
 +/* Phosphor has one side-panel glyph; the AI's toggle shows it mirrored */
@@ -2428,7 +2418,7 @@ index 00000000000..05ea0275947
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
 new file mode 100644
-index 00000000000..20613e775a9
+index 00000000000..16a18d72338
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFrameStrip.ts
 @@ -0,0 +1,106 @@
@@ -2523,8 +2513,8 @@ index 00000000000..20613e775a9
 +	const aiToggle = control('ritemark-frame-button', localize('ritemark.frame.toggleAI', "Show or Hide the AI"), TOGGLE_AI, () => commandService.executeCommand(TOGGLE_AI));
 +	aiToggle.classList.add(...ThemeIcon.asClassNameArray(Codicon.layoutSidebarRight));
 +
-+	// You (R11): an outline circle, a person, where a project is a square. Its menu holds only Settings
-+	// (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October; experiences/settings frame 1).
++	// You (R11): an icon button like the AI's toggle beside it, the person in a circle (Jarmo, 18 October). Its menu holds
++	// only Settings (Ritemark's own page) and Help (Ritemark's support pages) (Jarmo, 17 October; experiences/settings frame 1).
 +	const you: HTMLElement = control('ritemark-you', localize('ritemark.frame.you', "You"), undefined, () => {
 +		you.setAttribute('aria-expanded', 'true');
 +		showRitemarkMenu(contextViewService, you, { className: 'ritemark-you-menu', ariaLabel: localize('ritemark.frame.you', "You"), align: 'right' }, [
