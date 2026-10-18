@@ -3,7 +3,7 @@
 Track: SDD (15 user-facing requirements; the extension, the webview, three patches shrinking and one gaining two hunks; privacy)
 Override with: "use plain full track"
 Branch: `sprint-133-welcome` (created 2026-10-18 from `origin/main` `de2b7d6b`, after Sprint 132's merges)
-Release tier: shell (patches 001, 016, 017 and 018; there is no release from main until 2.0)
+Release tier: shell (patches 001, 016, 017, 018 and 019, and the build harness; there is no release from main until 2.0)
 Status: **Phase 3 (IMPLEMENT)**. Plan approved by Jarmo on 2026-10-18 ("approved with your proposals"), accepting both recommendations under *Decisions for Jarmo*.
 
 ## SDD Artifacts

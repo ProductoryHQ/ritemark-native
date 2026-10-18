@@ -6,21 +6,21 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 
 - [x] Sprint 132's merge 2 is on `origin/main` (`cb59f4cd`, then #450 and #451; the branch starts at `de2b7d6b`)
 - [x] `git checkout -b sprint-133-welcome` from `origin/main`; `git branch --show-current` shows it
-- [ ] VS Code at the pin with patches 001–019 from reset + clean + apply (copy-on-write clone for the worktree)
-- [ ] Record patch 001's and 016's file lists and hunk counts in `notes/patches-before.md` (`PATCH-RULES.md` §8)
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] VS Code at the pin with patches 001–019 from reset + clean + apply (copy-on-write clone for the worktree)
+- [x] Record patch 001's and 016's file lists and hunk counts in `notes/patches-before.md` (`PATCH-RULES.md` §8)
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [x] The Experience lead asked, through the Development manager, to draft the sample project's content, as they offered (R5). Written and approved by Jarmo, 18 October
 
 ## Phase 1: Audits first
 
-- [ ] `research/getting-started-retirement-audit.md` (W2, R12): the hunks of 001, 016 and 017 sorted; every route into Getting Started; `IOnboardingService` (007); where `workbench.startupEditor: none` wins; the stacking check's pairs
-- [ ] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
-- [ ] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
-- [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac; on Windows, the first start after a clean install with Defender on (process start to extension host, MsMpEng's CPU, a CPU profile, then a second start to compare), through the Development manager's Windows session; the decision
-- [ ] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
+- [x] `research/getting-started-retirement-audit.md` (W2, R12): the hunks of 001, 016 and 017 sorted; every route into Getting Started; `IOnboardingService` (007); where `workbench.startupEditor: none` wins; the stacking check's pairs
+- [x] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
+- [x] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
+- [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac (done 18 October); on Windows, the first start after a clean install with Defender on (process start to extension host, MsMpEng's CPU, a CPU profile, then a second start to compare), through the Development manager's Windows session; the decision
+- [x] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
 - [ ] The sample project's content (R5): written by the Experience lead and approved by Jarmo, 18 October (`ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`). Copied as it is into `extensions/ritemark/sample-project/`, with `.ritemark/tasks/` and the one-line `CLAUDE.md`; checked that every card parses, and that no real person's name, path or account is in it
 - [x] The 1.x OK reading decided by Jarmo (18 October): a notice closed without Opt Out counts as the OK (technical-plan.md, W1); write it into `research/confirmations.md` (R7)
-- [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
+- [x] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol): none did; the plan's refinements are in technical-plan.md, *What the audits changed*
 
 ## Phase 2: Consent and events (W1)
 

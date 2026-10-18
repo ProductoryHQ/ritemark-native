@@ -35,8 +35,9 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | Webview | The welcome page and the update sheet, in the shared bundle | `webview/src/components/welcome/` (new), `webview/src/main.tsx` |
 | Patch 001 | The Getting Started hunks leave; the files go back to upstream where nothing else of Ritemark's is in them | `patches/vscode/001-ritemark-branding.patch` |
 | Patches 016, 017 | 016 keeps only its Source Control part; 017 is retired | `patches/vscode/016-…`, `017-…` |
-| Patch 018 | The welcome alone (no strip, sheet or status bar while it is the only thing open); an empty desk's three tiles; a file's extension in muted ink | `patches/vscode/018-ritemark-surfaces.patch` |
-| Harness | The stacking check's known pairs; the welcome in the screenshot baseline and CDP checks; the sample in the bundled-extension check | `scripts/check-patch-stacking.mjs`, `scripts/qa/`, `scripts/check-bundled-extension-complete.sh` |
+| Patch 018 | The welcome alone (no strip, sheet or status bar while it is the only thing open); the drawing of an empty desk's three tiles; a file's extension in muted ink (the label split and the tree) | `patches/vscode/018-ritemark-surfaces.patch` |
+| Patch 019 | An empty desk's three tiles (the +'s kinds); the tabs opt in to the muted extension (audits, 18 October) | `patches/vscode/019-ritemark-tab-row.patch` |
+| Harness | The stacking check's known pairs; the welcome in the screenshot baseline and CDP checks; the sample in the bundled-extension check; the Getting Started assets' copy and checks retired | `scripts/check-patch-stacking.mjs`, `scripts/qa/`, `scripts/check-bundled-extension-complete.sh`, `scripts/copy-welcome-assets.sh` and its callers |
 
 The release tier is **shell** (`patches/`). One new webview ↔ host protocol (the welcome's) crosses the welcome subsystem's boundary only; `architecture.md` gets the welcome and the consent gate as a subsystem note (E6).
 
@@ -50,6 +51,17 @@ Four requirements carry real unknowns, so each gets an audit under `research/` b
 4. **`research/ext-host-start-401-audit.md`** (R15, [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): a CPU profile of the extension host's first seconds on a fresh profile on the Mac (memory: `reference_ext_host_startup_profiling`), then on Windows in the Development manager's Windows session; what in `activate` blocks; the decision (fix here, or record and rely on R15's guarantee). The case to profile is the first start after a clean install or an update, with Defender on. The logs on Jarmo's Windows PC (18 October) show first starts taking 32–54 s to be fully up, the extension host starting 14–18 s late with three or four "unresponsive" periods, and later starts about 7 s; a fresh profile alone does not reproduce it. On Windows the session measures process start to extension host, MsMpEng's CPU during the start and a CPU profile of that first launch, then a second start to compare, so the audit can tell Ritemark's start-up code from once-per-install work (Defender scanning newly written files, a cold code cache, the extension scan cache).
 
 A short `research/confirmations.md` also records: the signal for a 1.x profile (`lastConfirmedVersion`, read before line 265); 1.x's usage-data keys (`hasSeenNotice`, and `inspect('analytics.enabled')`) on four v1.14.0 profiles, after OK, Opt Out, the toast's × and no answer, to confirm what W1 says 1.x stored; the provider entry points the welcome calls; how the healer finds and closes the text tab.
+
+## What the audits changed (18 October)
+
+The four audits and the confirmations are in `research/`. No requirement changed; these are the plan's refinements:
+
+- **W2:** `workbench.startupEditor: none` goes in `branding/product.json` (the extension's defaults arrive too late on a first start), with `workbench.welcomePage.walkthroughs.openOnInstall: false`. `workbench.action.openWalkthrough` and `welcome.showAllWalkthroughs` run `ritemark.welcome.open` (one hunk in 001's `gettingStarted.contribution.ts`); the page's editor serializer is no longer registered, so a saved Getting Started tab is dropped. The Getting Started assets are copied and checked in eight build scripts and workflows, not only `apply-patches.sh`; `copy-welcome-assets.sh` and every call and check go with the page.
+- **W3:** the welcome alone is the extension closing both columns through VS Code's commands and setting `ritemark.welcomeAlone`, and a small 018 contribution (`ritemarkWelcomeAlone.ts`) putting a class on the workbench while that key holds and the welcome is the only editor. Strips keep their boxes (they drag the window); only their contents, the sheet's paint and the status bar hide. Windows' menu button is not mounted, `RitemarkWindowSizes` stands down, and the AI sheet's 4 s focus is skipped in a window with no folder.
+- **The empty desk's tiles** are 019's (the +'s kinds live in 019's `ritemarkNewTab.ts`), drawn by 018's stylesheet.
+- **W4:** each provider's state comes from `UnifiedViewProvider.runtimeAvailability()`, the host's one definition; ChatGPT's sign-in goes through the AI sheet's own Codex runtime (`beginLogin`, `startLoginPolling`), which the landing's chat then uses.
+- **W6:** this build's version is still 1.14.0 until step 4, so the welcome's kind is decided once, on the profile's first start of this build, and stored (`ritemark.welcome.kind`).
+- **W9:** the split is an opt-in option on the resource label (018: `iconLabel.ts`, `labels.ts`, the tree); the tabs opt in from 019, which owns them.
 
 ## Workstream 1: Consent and the four events (R7, R8, R9, E1)
 
