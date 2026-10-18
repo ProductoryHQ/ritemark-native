@@ -71,3 +71,10 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 ## Fixes
 
 - **Settings follows the theme.** When you changed the theme elsewhere, Appearance in Settings kept showing the old one. It now follows.
+- **New documents land in your project.** **Text** and **Table** make "Untitled.md" or "Untitled.csv" in the folder you chose in the left column, or your project's top folder. Before, they went to Documents/Ritemark.
+- **Saving after a conflict.** After **Use disk version**, saving works again.
+- **Tables.** A table's + and delete handles stay on their rows when you scroll.
+- **New agents show up at once.** Agents, commands and skills you add appear under @ and / without a reload.
+- **Document properties.** The Add menu fits, and a property you add is ready to type in.
+- **Small menus.** The thinking-effort menu stays inside the AI's sheet, and Escape closes the dictation language menu.
+- **Transcribe's gear** opens its own settings.

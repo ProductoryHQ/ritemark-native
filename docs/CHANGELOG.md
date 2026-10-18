@@ -41,6 +41,13 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 ### Fixed
 - **Updating keeps the theme you chose (Sprint 132).** Ritemark re-applied its theme set-up whenever the version changed, so every update reset a theme picked by hand. The set-up now runs once per profile.
 - **Settings' Appearance follows the theme (Sprint 132).** When the theme changed elsewhere, Appearance kept showing the theme it opened with. It now follows.
+- **New Text and Table go in your project (Sprint 132).** Text and Table, from the + and from New, made their file in Documents/Ritemark, outside the project. With a project open, they now make "Untitled.md" or "Untitled.csv" in the folder chosen in the tree, or the project's top folder, and never over another file.
+- **Saving after Use disk version (Sprint 132).** After choosing **Use disk version** in a conflict, every save failed until **Overwrite**. It saves again.
+- **Table handles follow the page (Sprint 132).** A table's + and delete handles sat off their rows after the document scrolled.
+- **New agents and commands without a reload (Sprint 132).** @ and / now list agents, commands and skills added while the window is open.
+- **Document properties (Sprint 132).** The Add menu fits its panel, and a property you add takes the cursor.
+- **Menus in the AI's sheet (Sprint 132).** The thinking-effort menu stays inside the AI's sheet, and the dictation language menu closes with Escape.
+- **Transcribe's settings (Sprint 132).** Transcribe's gear opens Settings at transcription's own settings, not at the top of the page.
 
 ## [1.14.0] — Unreleased
 

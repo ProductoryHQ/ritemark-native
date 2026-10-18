@@ -92,6 +92,22 @@ VS Code 1.142.0: 13 of 17 patches fail in 46 file patches
 Against Phase 0 (13 of 17, 46 file patches): the stack is two patches and 12 file patches bigger, because 018 (12 files fail) and 019 (3) are new. 002 fails in 12 files rather than 15: the terminal guards left it (`terminalConfigurationService.ts` and its test, `terminalEditorSerializer.ts`, `terminalView.ts`), and `editorTabsControl.ts` moved to 019. Most of 018's failures are files VS Code changed around the title bar and the window (`window.ts`, `windowImpl.ts`, `defaultStyles.ts`, the title bar parts), which the VS Code update sprint after step 3 re-cuts with the frame's screenshots as the check.
 
 
-## Merge 2
+## Merge 2 (2026-10-18, `origin/main` `f492948b`, patches 001–019, #447 and #450 merged)
 
-Measured after merge 2 is merged (tasks.md, Phase 8: E6).
+| VS Code | Result |
+|---|---|
+| 1.117.0 (the pin) | 0 of 19 patches fail (E5's preflight: 19 of 19 apply on vanilla 1.117.0) |
+| 1.142.0 (newest, 14 October; still the newest on 18 October) | **15 of 19 patches fail, in 60 file patches** |
+
+Against merge 1 (15 of 19, 58 file patches), the stack is two file patches bigger. Both are in 018, from merge 2's work:
+- `notificationsViewer.ts`, for the notifications' 20 line;
+- `desktop.contribution.ts`, which loads the window sizes contribution.
+
+Every other patch fails in the same files as at merge 1:
+- 001: 7; 002: 12; 003: 8; 004: 1; 005: 2; 007: 3; 008: 1;
+- 009: 2; 010: 2; 013: 1; 015: 2; 016: 1; 017: 1;
+- 018: 14; 019: 3.
+
+006, 011, 012 and 014 apply.
+
+Measured again on the closeout branch, with #451 (`fileCommands.ts` in 018) and the closeout's change to 007 (`paneCompositeBar.ts`, `chatSetupContributions.ts`): the same 15 of 19, in 60 file patches, with the same per-patch counts. `fileCommands.ts` and 007's `paneCompositeBar.ts` hunks apply on 1.142.0.
