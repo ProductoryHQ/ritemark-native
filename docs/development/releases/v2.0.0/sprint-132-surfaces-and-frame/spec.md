@@ -99,7 +99,7 @@ As a writer with many documents, I want tabs I can read, and a way to make a new
 
 Acceptance criteria:
 - The tabs sit in the desk's strip, 36 high, each as wide as its whole name, up to 200 (no floor: the proof of concept, the Experience lead's review of 17 October). The gaps between names are equal.
-- Pointing at a tab shows its own shape in the frame's soft fill, and its close button takes the icon's place, so nothing moves.
+- Pointing at a tab shows its own shape in the frame's soft fill and its close button at its right edge, where the chosen tab has it; the icon stays. Every tab keeps the close button's room, 32 after the name, with the button hidden until the pointer is on the tab, so pointing never changes a tab's width (Jarmo, 18 October: the × can't sit on the tab's icon, and other apps put close on the right; the 32 room is the Experience lead's condition. It was: the close button takes the icon's place).
 - The tab's tooltip shows the path inside the project, never the system path.
 - The + sits at the right end of the tab row, 18 in from the desk's edge. It opens Ritemark's menu leftward over the desk: Text, Table (CSV data), Web page, Terminal.
 - When the row is full, the tabs used longest ago fold into "N ⌄" before the +; Home, Tasks and the open document never fold.

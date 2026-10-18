@@ -119,8 +119,11 @@ Then each tab is as wide as its name (up to 200), and the gaps between names are
 
 ### S23: Pointing at a tab
 When the person points at a tab that is not chosen
-Then its own shape fills softly, its close button takes the icon's place, and nothing else moves
+Then its own shape fills softly, its close button shows at its right edge, where the chosen tab has it, and its icon stays
+And no tab changes width and nothing else moves, since every tab keeps the close button's room (32 after the name)
 And its tooltip shows its path inside the project.
+
+(Revised 18 October, Jarmo, after Windows round 1: "x (Close) ei saa olla sedasi tab-ikooni peal, sest seda ei ole kasutajale näha... x-close on teistes äppides ikka paremal?", that is, the × can't sit on the tab's icon, where people don't see it, and other apps put close on the right. The 32 room on every tab is the Experience lead's condition. It was: the close button takes the icon's place.)
 
 ### S24: A new tab
 When the person clicks the +
