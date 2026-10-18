@@ -82,7 +82,9 @@ Also from the qa-validator: the welcome now saves an OpenRouter key only with `o
 The Experience lead approved all three, and asked for three more, done and checked live:
 - Done carries experience 31's default-button ring (2 px of the sheet's colour, then the accent at 28%, 40% in Dark), since Enter in a key field presses it; keyboard focus shows the ring in the full accent.
 - The composer reads "Ask ChatGPT… (type / for commands)" for Codex: visible words say ChatGPT.
-- The feedback box says under its field "What you write here is sent with your feedback." (the usage-data switch promises never your documents, chats or names). VS Code's input box draws that line in its own ink, not muted, and appends its "(Press 'Enter' to confirm…)" hint; muting it would restyle every input box.
+- The feedback box says under its field "What you write here is sent with your feedback." (the usage-data switch promises never your documents, chats or names). VS Code's input box draws that line in its own ink, not muted, and appends its "(Press 'Enter' to confirm…)" hint; muting it would restyle every input box. The Experience lead accepted it as VS Code draws it.
+
+The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
 
 ## Open findings
 
