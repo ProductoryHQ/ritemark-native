@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 interface InputNodeData {
   label: string;
@@ -26,10 +25,9 @@ function InputNodeComponent({ data, selected }: InputNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={isFile ? <Icon name="file" size={16} /> : <Icon name="file-text" size={16} />}
+      type="inputNode"
       selected={selected}
       showTargetHandle={false}
-      headerColor="var(--vscode-inputValidation-infoBackground)"
     >
       <NodeField label="Type" value={isFile ? 'File' : 'Text'} />
       <NodeField label="Required" value={data.required ? 'Yes' : 'No'} />

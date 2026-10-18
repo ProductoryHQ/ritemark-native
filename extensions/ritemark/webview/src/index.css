@@ -164,6 +164,8 @@
   --ring: var(--r-accent);
   --primary: var(--r-accent);
   --primary-foreground: #ffffff;
+  --primary-hover: var(--r-accent-deep);
+  --r-on-accent: #ffffff; /* text and icons on an indigo fill */
   --secondary: var(--r-surface-soft);
   --secondary-foreground: var(--r-ink-strong);
   --accent: var(--r-accent-soft);
@@ -229,7 +231,15 @@ body[data-vscode-theme-kind='vscode-dark'],
      shadcn role tokens on :root kept their light values in dark mode
      (bg-background stayed #ffffff, bg-secondary #f1f5f9, measured in 1.13.0).
      Re-declared here, so outline and secondary buttons follow the theme.
-     --primary is left as it ships. */
+     Primary (Ritemark 2.0, kit: Ritemark Dark): the light indigo with the ground's
+     ink on it, lighter on hover, as the theme's button colours. */
+  --primary: var(--r-accent);
+  --primary-foreground: var(--r-on-accent);
+  --primary-hover: #a5b4fc;
+  /* kit: text on indigo becomes the ground's ink (white on the lighter indigo is below 4.5:1), and the primary loses its glow */
+  --r-on-accent: #16132f;
+  --ritemark-shadow-indigo-sm: none;
+  --ritemark-shadow-indigo-md: none;
   --background: var(--r-surface);
   --foreground: var(--r-ink-strong);
   --muted: var(--r-surface-soft);
@@ -647,3 +657,58 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* === Ritemark 2.0 (experience 31): a flow ============================================================ */
+/* each kind of step keeps one colour, in both themes (kit: theme.html .ic) */
+.rm-step-chip { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; flex: none; }
+.rm-step-chip.start { background: var(--r-accent-soft); color: var(--r-accent); }
+.rm-step-chip.ai { background: #FEF3C7; color: #B45309; }
+.rm-step-chip.action { background: #DCFCE7; color: #15803D; }
+body.vscode-dark .rm-step-chip.ai, body.ritemark-dark .rm-step-chip.ai, .dark .rm-step-chip.ai { background: rgba(251, 191, 36, 0.16); color: #FCD34D; }
+body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, .dark .rm-step-chip.action { background: rgba(74, 222, 128, 0.14); color: #86EFAC; }
+
+/* a step's sheet, and the chosen one's ring (kit: .node, .node.on) */
+.rm-step-node { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.10); }
+.rm-step-node-on { box-shadow: 0 0 0 2px var(--r-accent), 0 4px 12px -4px rgba(67, 56, 202, 0.25); }
+
+/* the zoom controls: one 28-wide stack, radius 8, at the bottom left (kit: .canvas .zoom) */
+.rm-flow-canvas .react-flow__controls {
+  margin: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--r-surface);
+  box-shadow: 0 0 0 1px var(--r-hairline), 0 1px 2px rgba(30, 27, 75, 0.06);
+}
+.rm-flow-canvas .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--r-hairline);
+  background: var(--r-surface);
+  color: var(--r-ink-body);
+}
+.rm-flow-canvas .react-flow__controls-button:last-child { border-bottom: 0; }
+.rm-flow-canvas .react-flow__controls-button:hover { background: var(--r-surface-soft); }
+.rm-flow-canvas .react-flow__controls-button svg { width: 12px; height: 12px; max-width: 12px; max-height: 12px; fill: currentColor; }
+
+/* the settings column: labels 12 in body ink, fields 32 with radius 8 on the desk (kit: .props) */
+.rm-flow-props label { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--r-ink-body); }
+.rm-flow-props input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+.rm-flow-props textarea,
+.rm-flow-props button[role='combobox'] {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--r-ink-strong);
+}
+.rm-flow-props input:focus-visible,
+.rm-flow-props textarea:focus-visible,
+.rm-flow-props button[role='combobox']:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--r-accent); }
+.rm-flow-props textarea { min-height: 120px; }

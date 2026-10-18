@@ -13,6 +13,7 @@ import { Label } from '../ui/label';
 import type { Flow } from './stores/flowEditorStore';
 import { vscode } from '../../lib/vscode';
 import { validateFlowForExecution } from './executionValidation';
+import { PanelHeader } from './PanelHeader';
 
 interface ExecutionStep {
   nodeId: string;
@@ -204,36 +205,23 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--r-hairline)]">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm text-[var(--r-ink-strong)]">
-            {phase === 'input' ? 'Run Flow' : 'Results'}
+    <div className="h-full flex flex-col">
+      {/* Header (kit: .props .top) */}
+      <PanelHeader title={phase === 'input' ? 'Run flow' : 'Results'} onClose={onClose}>
+        {phase === 'complete' && (
+          <span className="px-2 py-0.5 text-xs font-medium leading-4 rounded-full bg-[var(--vscode-testing-iconPassed)]/20 text-[var(--vscode-testing-iconPassed)] border border-[var(--vscode-testing-iconPassed)]/30">
+            Finished
           </span>
-          {phase === 'complete' && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-[var(--vscode-testing-iconPassed)]/20 text-[var(--vscode-testing-iconPassed)] border border-[var(--vscode-testing-iconPassed)]/30">
-              Workflow Finished
-            </span>
-          )}
-          {phase === 'error' && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-[var(--vscode-testing-iconFailed)]/20 text-[var(--vscode-testing-iconFailed)] border border-[var(--vscode-testing-iconFailed)]/30">
-              Failed
-            </span>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-6 w-6 p-0"
-        >
-          <Icon name="x" size={16} />
-        </Button>
-      </div>
+        )}
+        {phase === 'error' && (
+          <span className="px-2 py-0.5 text-xs font-medium leading-4 rounded-full bg-[var(--vscode-testing-iconFailed)]/20 text-[var(--vscode-testing-iconFailed)] border border-[var(--vscode-testing-iconFailed)]/30">
+            Failed
+          </span>
+        )}
+      </PanelHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         {/* Input Collection Phase */}
         {phase === 'input' && (
           <div className="space-y-4">
@@ -242,7 +230,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
               <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
                 <div className="flex items-center gap-2 text-sm font-medium text-[var(--r-error)] mb-2">
                   <Icon name="warning" size={16} />
-                  Cannot Run Flow
+                  This flow can't run yet
                 </div>
                 <ul className="text-xs text-[var(--r-error)] space-y-1 ml-6">
                   {validationErrors.map((err, i) => (
@@ -307,14 +295,14 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
               </>
             ) : canRun ? (
               <p className="text-xs text-[var(--r-ink-muted)]">
-                This flow has no inputs. Click Run to execute.
+                This flow has no inputs.
               </p>
             ) : null}
 
             {canRun && (
               <Button onClick={handleRun} className="w-full mt-4">
                 <Icon name="play" size={16} className="mr-2" />
-                Run Flow
+                Run flow
               </Button>
             )}
           </div>
@@ -402,7 +390,7 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                 variant="secondary"
                 className="w-full mt-4"
               >
-                Run Again
+                Run again
               </Button>
             )}
           </div>

@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { SaveFileNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -19,9 +18,9 @@ interface SaveFileNodeProps {
 
 // Format display names
 const formatNames: Record<string, string> = {
-  markdown: 'Markdown (.md)',
-  csv: 'CSV (.csv)',
-  image: 'Image (auto)',
+  markdown: 'Markdown',
+  csv: 'CSV',
+  image: 'Image',
 };
 
 function SaveFileNodeComponent({ id, data, selected }: SaveFileNodeProps) {
@@ -30,23 +29,21 @@ function SaveFileNodeComponent({ id, data, selected }: SaveFileNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Icon name="floppy-disk" size={16} />}
+      type="saveFileNode"
       selected={selected}
       showSourceHandle={true}
-      headerColor="var(--vscode-charts-orange)"
       executionStep={executionStep}
     >
-      <NodeField
-        label="Filename"
-        value={data.filename || 'output.md'}
-      />
+      {/* As drawn (experience 31): the format and the folder; the step it saves is chosen in its settings */}
       <NodeField
         label="Format"
         value={formatNames[data.format] || data.format}
       />
-      {data.sourceNodeId && (
-        <NodeField label="Source" value={data.sourceNodeId} />
-      )}
+      <NodeField label="Folder" value={data.folder || 'The project'} />
+      <NodeField
+        label="Filename"
+        value={data.filename || 'output.md'}
+      />
     </BaseNode>
   );
 }

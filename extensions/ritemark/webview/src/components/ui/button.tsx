@@ -18,7 +18,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-accent-deep hover:shadow-ritemark-accent-md",
+        default: "bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-primary-hover hover:shadow-ritemark-accent-md",
         destructive:
           "bg-destructive text-white hover:opacity-90 focus-visible:ring-[var(--r-error-soft)]",
         outline:

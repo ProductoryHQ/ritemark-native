@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { PanelHeader } from './PanelHeader';
 import {
   Select,
   SelectContent,
@@ -136,16 +137,9 @@ export function FlowSettingsPanel({
 
   if (!featureEnabled) {
     return (
-      <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--r-hairline)]">
-          <div className="text-sm font-semibold text-[var(--r-ink-strong)]">
-            Flow Schedule
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <Icon name="x" size={16} />
-          </Button>
-        </div>
-        <div className="p-4 text-sm text-[var(--r-ink-muted)]">
+      <div className="h-full flex flex-col">
+        <PanelHeader title="Flow schedule" onClose={onClose} />
+        <div className="px-4 pb-4 text-sm text-[var(--r-ink-muted)]">
           Scheduled flow runs are currently disabled by feature flag.
         </div>
       </div>
@@ -154,19 +148,11 @@ export function FlowSettingsPanel({
 
   if (!flowSchedule) {
     return (
-      <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--r-hairline)]">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--r-ink-strong)]">
-            <Icon name="clock" size={16} />
-            Flow Schedule
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <Icon name="x" size={16} />
-          </Button>
-        </div>
+      <div className="h-full flex flex-col">
+        <PanelHeader lead={<Icon name="clock" size={16} tone="inherit" />} title="Flow schedule" onClose={onClose} />
 
-        <div className="flex-1 p-4 space-y-4">
-          <div className="rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 space-y-2">
+        <div className="flex-1 px-4 pb-4 space-y-4">
+          <div className="rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] p-4 space-y-2">
             <div className="text-sm font-medium text-[var(--r-ink-strong)]">
               No schedule configured
             </div>
@@ -179,7 +165,7 @@ export function FlowSettingsPanel({
             className="w-full"
             onClick={() => setFlowSchedule(ensureSchedule(null))}
           >
-            Add Schedule
+            Add schedule
           </Button>
         </div>
       </div>
@@ -192,24 +178,16 @@ export function FlowSettingsPanel({
   const saveLabel = hasUnsavedChanges
     ? saveState === 'saving'
       ? 'Saving...'
-      : 'Save Schedule'
+      : 'Save schedule'
     : 'Saved';
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-sideBar-background)] border-l border-[var(--r-hairline)]">
-      <div className="flex items-center justify-between p-4 border-b border-[var(--r-hairline)]">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--r-ink-strong)]">
-          <Icon name="clock" size={16} />
-          Flow Schedule
-        </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <Icon name="x" size={16} />
-        </Button>
-      </div>
+    <div className="h-full flex flex-col">
+      <PanelHeader lead={<Icon name="clock" size={16} tone="inherit" />} title="Flow schedule" onClose={onClose} />
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="p-3 rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] space-y-1">
-          <div className="text-xs uppercase tracking-wide text-[var(--r-ink-muted)]">
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+        <div className="p-3 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] space-y-1">
+          <div className="text-xs font-medium text-[var(--r-ink-muted)]">
             Summary
           </div>
           <div className="text-sm text-[var(--r-ink-strong)]">
@@ -222,7 +200,7 @@ export function FlowSettingsPanel({
 
         <div className="space-y-1.5">
           <Label className="text-xs">Active</Label>
-          <div className="flex items-center justify-between rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] px-3 py-3">
+          <div className="flex items-center justify-between rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-3">
             <div>
               <div className="text-sm font-medium text-[var(--r-ink-strong)]">
                 {schedule.enabled ? 'Active' : 'Paused'}
@@ -253,7 +231,7 @@ export function FlowSettingsPanel({
             className="w-full text-[var(--r-error)]"
             onClick={() => setFlowSchedule(null)}
           >
-            Remove Schedule
+            Remove schedule
           </Button>
         </div>
 
@@ -275,7 +253,7 @@ export function FlowSettingsPanel({
               <SelectItem value="weekdays">Weekdays</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
               <SelectItem value="hourly">Hourly</SelectItem>
-              <SelectItem value="interval">Every N Minutes</SelectItem>
+              <SelectItem value="interval">Every few minutes</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -300,7 +278,7 @@ export function FlowSettingsPanel({
 
         {schedule.type === 'hourly' && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Minute Past Hour</Label>
+            <Label className="text-xs">Minutes past the hour</Label>
             <Input
               type="number"
               min={0}
@@ -321,7 +299,7 @@ export function FlowSettingsPanel({
 
         {schedule.type === 'interval' && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Every N Minutes</Label>
+            <Label className="text-xs">Minutes between runs</Label>
             <Input
               type="number"
               min={1}
@@ -365,9 +343,9 @@ export function FlowSettingsPanel({
           </div>
         )}
 
-        <div className="p-3 rounded-md border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] space-y-2">
-          <div className="text-xs uppercase tracking-wide text-[var(--r-ink-muted)]">
-            Last Scheduled Run
+        <div className="p-3 rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] space-y-2">
+          <div className="text-xs font-medium text-[var(--r-ink-muted)]">
+            Last scheduled run
           </div>
           <div className="text-sm text-[var(--r-ink-strong)]">
             Status: {runtimeStatus?.lastStatus ?? 'idle'}

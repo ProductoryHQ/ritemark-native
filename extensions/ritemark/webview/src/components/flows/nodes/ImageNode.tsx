@@ -6,7 +6,6 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
 import { BaseNode, NodeField } from './BaseNode';
 import type { ImageNodeData } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
@@ -35,9 +34,8 @@ function ImageNodeComponent({ id, data, selected }: ImageNodeProps) {
   return (
     <BaseNode
       label={data.label}
-      icon={<Icon name="image" size={16} />}
+      type="imageNode"
       selected={selected}
-      headerColor="var(--vscode-charts-green)"
       executionStep={executionStep}
     >
       <NodeField
@@ -45,10 +43,7 @@ function ImageNodeComponent({ id, data, selected }: ImageNodeProps) {
         value={providerNames[data.provider] || data.provider}
       />
       <NodeField label="Prompt" value={truncateText(data.prompt) || 'No prompt'} />
-      <div className="flex gap-4 mt-2 text-xs text-[var(--r-ink-muted)]">
-        <span>{data.size || '1024x1024'}</span>
-        <span>{data.quality || 'standard'}</span>
-      </div>
+      <NodeField label="Size" value={`${data.size || '1024x1024'} · ${data.quality || 'standard'}`} />
     </BaseNode>
   );
 }

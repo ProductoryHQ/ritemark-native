@@ -107,7 +107,7 @@ export function PlanReviewCard({
       <div className="flex flex-wrap items-center gap-2 px-2.5 py-2 border-t border-[var(--r-hairline)]">
         <button
           onClick={onApprove}
-          className="flex flex-1 basis-[45%] items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white bg-[var(--r-accent)] hover:bg-[var(--r-accent-deep)] shadow-[0_4px_6px_-1px_rgba(67,56,202,0.25)] active:scale-[0.98] transition-transform"
+          className="flex flex-1 basis-[45%] items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary-hover shadow-ritemark-accent active:scale-[0.98] transition-transform"
         >
           <Icon name="check" size={12} className="text-white" />
           {approveLabel}

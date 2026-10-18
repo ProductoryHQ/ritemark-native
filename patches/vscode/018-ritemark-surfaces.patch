@@ -2516,10 +2516,10 @@ index 00000000000..67f3b47cd9f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
 new file mode 100644
-index 00000000000..5374bc6ffbc
+index 00000000000..01be0d2bbb9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,198 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2539,6 +2539,7 @@ index 00000000000..5374bc6ffbc
 +
 +import { RunOnceScheduler } from '../../../base/common/async.js';
 +import { Disposable } from '../../../base/common/lifecycle.js';
++import { ILogService } from '../../../platform/log/common/log.js';
 +import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
@@ -2656,6 +2657,7 @@ index 00000000000..5374bc6ffbc
 +	constructor(
 +		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
 +		@IStorageService private readonly storageService: IStorageService,
++		@ILogService private readonly logService: ILogService,
 +	) {
 +		super();
 +
@@ -2665,10 +2667,12 @@ index 00000000000..5374bc6ffbc
 +	}
 +
 +	private update(): void {
-+		const band = ritemarkWindowBand(this.layoutService.mainContainerDimension.width);
++		const width = this.layoutService.mainContainerDimension.width;
++		const band = ritemarkWindowBand(width);
 +		if (band === this.memory.band) {
 +			return;
 +		}
++		const from = this.memory.band;
 +
 +		const aiVisible = this.layoutService.isVisible(Parts.AUXILIARYBAR_PART);
 +		const changes = ritemarkCrossings(this.memory, band, {
@@ -2693,6 +2697,7 @@ index 00000000000..5374bc6ffbc
 +			}
 +		}
 +		this.save();
++		this.logService.info(`[Ritemark] window sizes: ${Math.round(width)} wide, band ${from} -> ${band}; ${JSON.stringify(changes)}; ${JSON.stringify(this.memory)}`);
 +	}
 +
 +	private load(): IRitemarkWindowSizesMemory {

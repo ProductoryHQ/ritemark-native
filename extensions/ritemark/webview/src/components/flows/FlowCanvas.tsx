@@ -5,20 +5,19 @@
  * drag-drop support, and ELKjs auto-layout.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
-  ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
+  type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import ELK from 'elkjs/lib/elk.bundled.js';
-import { Icon } from '../ui/Icon';
 import { nodeTypes } from './nodes';
 import { useFlowEditorStore } from './stores/flowEditorStore';
-import { Button } from '../ui/button';
 
 // ELK instance for auto-layout
 const elk = new ELK();
@@ -33,22 +32,155 @@ const elkOptions = {
 };
 
 interface FlowCanvasProps {
-  onRunFlow?: () => void;
   onNodeSelect?: () => void;
 }
 
-function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
+/** a small flow at 100%, as drawn; a larger one shrinks to fit */
+const FIT_OPTIONS = { padding: 0.2, maxZoom: 1 };
+/** experience 31: the flow starts 56 below the canvas's top edge */
+const FIT_TOP = 56;
+
+/**
+ * Fits the flow to the canvas as experience 31 draws it: centred across, at the top rather than in the middle, so a
+ * flow reads from its first step down. React Flow's own fit sets the zoom and the centre; this moves the flow up.
+ */
+function useFitFlow() {
+  const { fitView, getNodes, getNodesBounds, getViewport, setViewport } = useReactFlow();
+  return useCallback(async () => {
+    await fitView(FIT_OPTIONS);
+    const nodes = getNodes();
+    if (nodes.length === 0) {
+      return;
+    }
+    const { x, zoom } = getViewport();
+    await setViewport({ x, y: FIT_TOP - getNodesBounds(nodes).y * zoom, zoom });
+  }, [fitView, getNodes, getNodesBounds, getViewport, setViewport]);
+}
+
+/**
+ * Auto-arrange (ELKjs): lays the steps out top to bottom and fits the view. Ritemark 2.0 (experience 31): the desk's
+ * bar runs it, so it needs the ReactFlowProvider that FlowEditor puts round the bar and the canvas.
+ */
+export function useFlowAutoArrange() {
+  const fitFlow = useFitFlow();
+  const nodes = useFlowEditorStore((state) => state.nodes);
+  const edges = useFlowEditorStore((state) => state.edges);
+  const setNodes = useFlowEditorStore((state) => state.setNodes);
+
+  return useCallback(async () => {
+    if (nodes.length === 0) return;
+
+    const graph = {
+      id: 'root',
+      layoutOptions: elkOptions,
+      children: nodes.map((node) => ({
+        id: node.id,
+        width: 220,
+        height: 120,
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+      })),
+    };
+
+    try {
+      const layoutedGraph = await elk.layout(graph);
+
+      if (layoutedGraph.children) {
+        const layoutedNodes = nodes.map((node) => {
+          const layoutedNode = layoutedGraph.children?.find(
+            (n) => n.id === node.id
+          );
+          if (layoutedNode) {
+            return {
+              ...node,
+              position: {
+                x: layoutedNode.x || 0,
+                y: layoutedNode.y || 0,
+              },
+            };
+          }
+          return node;
+        });
+
+        setNodes(layoutedNodes);
+
+        // Fit view after layout with a small delay
+        setTimeout(() => {
+          void fitFlow();
+        }, 50);
+      }
+    } catch (error) {
+      console.error('Auto-layout failed:', error);
+    }
+  }, [nodes, edges, setNodes, fitFlow]);
+}
+
+
+export function FlowCanvas({ onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
+  const fitFlow = useFitFlow();
+
+  // Ritemark 2.0: the canvas narrows when a step's settings open beside it, so the flow stays fitted to it until
+  // the person pans or zooms (then their view is theirs)
+  const fittedRef = useRef(true);
+  // a press on the empty canvas also starts a "move", so only a view that really changed counts
+  const moveStartRef = useRef<Viewport | null>(null);
+  const onMoveStart = useCallback((event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+    moveStartRef.current = event ? viewport : null;
+  }, []);
+  const onMoveEnd = useCallback((event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+    const start = moveStartRef.current;
+    moveStartRef.current = null;
+    if (event && start && (start.x !== viewport.x || start.y !== viewport.y || start.zoom !== viewport.zoom)) {
+      fittedRef.current = false;
+    }
+  }, []);
+  useEffect(() => {
+    const wrapper = reactFlowWrapper.current;
+    if (!wrapper) {
+      return;
+    }
+    let width = wrapper.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (Math.abs(wrapper.clientWidth - width) > 1 && fittedRef.current) {
+        // after React Flow has measured the new size itself
+        requestAnimationFrame(() => requestAnimationFrame(() => void fitFlow()));
+      }
+      width = wrapper.clientWidth;
+    });
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [fitFlow]);
 
   const nodes = useFlowEditorStore((state) => state.nodes);
+
+  // The first fit, once React Flow has measured the steps; the canvas shows only after it, so the flow never jumps
+  const nodesInitialized = useNodesInitialized();
+  const [placed, setPlaced] = useState(false);
+  useEffect(() => {
+    if (placed || !nodesInitialized) {
+      return;
+    }
+    if (nodes.length === 0) {
+      setPlaced(true);
+      return;
+    }
+    void fitFlow().then(() => setPlaced(true));
+  }, [placed, nodesInitialized, nodes.length, fitFlow]);
+  const onFitView = useCallback(() => {
+    fittedRef.current = true;
+    void fitFlow();
+  }, [fitFlow]);
   const edges = useFlowEditorStore((state) => state.edges);
   const onNodesChange = useFlowEditorStore((state) => state.onNodesChange);
   const onEdgesChange = useFlowEditorStore((state) => state.onEdgesChange);
   const onConnect = useFlowEditorStore((state) => state.onConnect);
   const addNode = useFlowEditorStore((state) => state.addNode);
   const selectNode = useFlowEditorStore((state) => state.selectNode);
-  const setNodes = useFlowEditorStore((state) => state.setNodes);
 
   // Handle drag over for node drop
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -96,59 +228,8 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
     selectNode(null);
   }, [selectNode]);
 
-  // Auto-layout using ELKjs
-  const onAutoLayout = useCallback(async () => {
-    if (nodes.length === 0) return;
-
-    const graph = {
-      id: 'root',
-      layoutOptions: elkOptions,
-      children: nodes.map((node) => ({
-        id: node.id,
-        width: 220,
-        height: 120,
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        sources: [edge.source],
-        targets: [edge.target],
-      })),
-    };
-
-    try {
-      const layoutedGraph = await elk.layout(graph);
-
-      if (layoutedGraph.children) {
-        const layoutedNodes = nodes.map((node) => {
-          const layoutedNode = layoutedGraph.children?.find(
-            (n) => n.id === node.id
-          );
-          if (layoutedNode) {
-            return {
-              ...node,
-              position: {
-                x: layoutedNode.x || 0,
-                y: layoutedNode.y || 0,
-              },
-            };
-          }
-          return node;
-        });
-
-        setNodes(layoutedNodes);
-
-        // Fit view after layout with a small delay
-        setTimeout(() => {
-          fitView({ padding: 0.2 });
-        }, 50);
-      }
-    } catch (error) {
-      console.error('Auto-layout failed:', error);
-    }
-  }, [nodes, edges, setNodes, fitView]);
-
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full relative">
+    <div ref={reactFlowWrapper} className="rm-flow-canvas relative h-full flex-1 border-x border-t border-[var(--r-hairline)]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -159,57 +240,31 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
         onDrop={onDrop}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onMoveStart={onMoveStart}
+        onMoveEnd={onMoveEnd}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={FIT_OPTIONS}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: {
-            stroke: 'var(--vscode-editorWidget-border)',
-            strokeWidth: 1,
+            stroke: 'var(--r-hairline-strong)', /* kit: .edge, 2 in the strong hairline */
+            strokeWidth: 2,
           },
         }}
         style={{
-          background: 'var(--vscode-editor-background)',
+          background: 'var(--r-surface)',
+          opacity: placed ? 1 : 0,
         }}
       >
         <Background
-          color="var(--r-hairline)"
+          color="var(--r-hairline-strong)" /* kit: .canvas, a dot every 20 */
           gap={20}
           size={1}
         />
-        <Controls
-          style={{
-            background: 'var(--vscode-sideBar-background)',
-            border: '1px solid var(--r-hairline)',
-            borderRadius: '4px',
-          }}
-        />
+        {/* The zoom controls, one 28-wide stack at the bottom left (index.css, .rm-flow-canvas) */}
+        <Controls position="bottom-left" onFitView={onFitView} />
       </ReactFlow>
-
-      {/* Toolbar */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onAutoLayout}
-          className="flex items-center gap-1.5"
-        >
-          <Icon name="squares-four" size={14} />
-          Auto-arrange
-        </Button>
-        {onRunFlow && (
-          <Button
-            size="sm"
-            onClick={onRunFlow}
-            className="flex items-center gap-1.5"
-          >
-            <Icon name="play" size={14} />
-            Run Flow
-          </Button>
-        )}
-      </div>
 
       {/* Note: VS Code's tab shows dirty indicator (dot), no need for custom badge */}
 
@@ -217,20 +272,11 @@ function FlowCanvasInner({ onRunFlow, onNodeSelect }: FlowCanvasProps) {
       {nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center text-[var(--r-ink-muted)]">
-            <p className="text-lg mb-2">Empty Flow</p>
-            <p className="text-sm">Drag nodes from the left panel to get started</p>
+            <p className="mb-2 text-[15px] font-semibold text-[var(--r-ink-strong)]">Empty flow</p>
+            <p className="text-[13px]">Drag steps from the left to get started</p>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-// Wrap with ReactFlowProvider
-export function FlowCanvas(props: FlowCanvasProps) {
-  return (
-    <ReactFlowProvider>
-      <FlowCanvasInner {...props} />
-    </ReactFlowProvider>
   );
 }

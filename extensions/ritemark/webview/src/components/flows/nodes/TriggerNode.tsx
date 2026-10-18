@@ -7,9 +7,7 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../ui/Icon';
-import { Handle, Position } from '@xyflow/react';
-import { cn } from '../../../lib/utils';
+import { BaseNode, NodeField } from './BaseNode';
 import type { FlowInput } from '../stores/flowEditorStore';
 import { useFlowEditorStore } from '../stores/flowEditorStore';
 
@@ -28,75 +26,20 @@ function TriggerNodeComponent({ id, data, selected }: TriggerNodeProps) {
   const inputs = data.inputs || [];
   const executionStep = useFlowEditorStore((state) => state.executionOrder.get(id));
 
+  // Ritemark 2.0 (experience 31): the trigger is a step like the others, its inputs in one row
   return (
-    <div
-      className={cn(
-        'min-w-[220px] rounded-lg border shadow-sm',
-        'bg-[var(--vscode-editor-background)]',
-        'border-[var(--r-hairline)]',
-        selected && 'ring-2 ring-[var(--vscode-focusBorder)]'
-      )}
+    <BaseNode
+      type="triggerNode"
+      label={data.label || 'Trigger'}
+      selected={selected}
+      showTargetHandle={false}
+      executionStep={executionStep}
     >
-      {/* Header - Blue for Trigger */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-[var(--r-hairline)]"
-        style={{ background: 'var(--r-accent)' }}
-      >
-        {/* Execution step badge */}
-        {executionStep !== undefined && (
-          <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-white/20 text-white">
-            {executionStep}
-          </span>
-        )}
-        <Icon name="lightning" className="text-white opacity-80" size={16} />
-        <span className="text-sm font-medium text-white truncate">
-          {data.label || 'Trigger'}
-        </span>
-      </div>
-
-      {/* Content - List of inputs */}
-      <div className="p-3">
-        {inputs.length === 0 ? (
-          <div className="text-xs text-[var(--r-ink-muted)] italic">
-            No inputs configured
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {inputs.map((input) => (
-              <div
-                key={input.id}
-                className="flex items-center gap-2 text-sm"
-              >
-                {input.type === 'text' ? (
-                  <Icon name="file-text" size={14} className="text-[var(--r-ink-muted)]" />
-                ) : (
-                  <Icon name="file" size={14} className="text-[var(--r-ink-muted)]" />
-                )}
-                <span className="text-[var(--r-ink-strong)] truncate flex-1">
-                  {input.label}
-                </span>
-                {input.required && (
-                  <span className="text-[var(--r-error)] text-xs">*</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-2 pt-2 border-t border-[var(--r-hairline)]">
-          <div className="text-xs text-[var(--r-ink-muted)]">
-            {inputs.length} input{inputs.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
-
-      {/* Source handle - Trigger only outputs */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!w-3 !h-3 !bg-[var(--r-accent)] !border-[var(--r-hairline)]"
+      <NodeField
+        label="Inputs"
+        value={inputs.length === 0 ? 'none' : inputs.map((input) => input.label + (input.required ? ' *' : '')).join(', ')}
       />
-    </div>
+    </BaseNode>
   );
 }
 

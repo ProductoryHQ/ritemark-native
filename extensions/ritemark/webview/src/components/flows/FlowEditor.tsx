@@ -8,17 +8,34 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { Icon } from '../ui/Icon';
 import { NodePalette } from './NodePalette';
-import { FlowCanvas } from './FlowCanvas';
+import { ReactFlowProvider } from '@xyflow/react';
+import { FlowCanvas, useFlowAutoArrange } from './FlowCanvas';
 import { NodeConfigPanel } from './NodeConfigPanel';
 import { ExecutionPanel } from './ExecutionPanel';
 import { FlowSettingsPanel } from './FlowSettingsPanel';
 import { useFlowEditorStore } from './stores/flowEditorStore';
 import type { Flow } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { Tooltip } from '../ui/tooltip';
 import { vscode } from '../../lib/vscode';
 import { setModelConfig } from '../../config/modelConfig';
 import { formatScheduleDateTime, formatScheduleSummary, getNextScheduledRun } from './flowScheduleUi';
+
+/** A quiet button in the desk's bar (kit: .btn.quiet). */
+/** the desk bar's quiet buttons (kit: .fbar .btn.ghost) */
+const BAR_QUIET = 'h-7 gap-1.5 px-2 text-[13px] text-[var(--r-ink-body)]';
+
+function AutoArrangeButton() {
+  const autoArrange = useFlowAutoArrange();
+  return (
+    <Tooltip label="Lay the steps out in order">
+      <Button type="button" variant="toolbar" onClick={() => void autoArrange()} className={BAR_QUIET}>
+        <Icon name="squares-four" size={14} tone="inherit" />
+        Auto-arrange
+      </Button>
+    </Tooltip>
+  );
+}
 
 interface FlowFeatureFlags {
   scheduledFlowRuns: boolean;
@@ -281,7 +298,7 @@ export function FlowEditor() {
       <div className="h-full flex items-center justify-center bg-[var(--vscode-editor-background)]">
         <div className="max-w-md p-6 text-center">
           <div className="text-[var(--r-error)] text-lg mb-2">
-            Error Loading Flow
+            Couldn't open this flow
           </div>
           <div className="text-sm text-[var(--r-ink-muted)] mb-4">
             {error}
@@ -301,66 +318,87 @@ export function FlowEditor() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[var(--vscode-editor-background)]">
-      {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--r-hairline)] bg-[var(--vscode-sideBar-background)]">
-        <Input
-          value={localName}
-          onChange={(e) => setLocalName(e.target.value)}
-          onFocus={() => setIsNameFocused(true)}
-          onBlur={() => {
-            setIsNameFocused(false);
-            if (localName !== flowName) {
-              setFlowName(localName);
-            }
-          }}
-          className="max-w-[200px] font-semibold"
-          placeholder="Flow name..."
-        />
-        <Input
-          value={localDescription}
-          onChange={(e) => setLocalDescription(e.target.value)}
-          onFocus={() => setIsDescFocused(true)}
-          onBlur={() => {
-            setIsDescFocused(false);
-            if (localDescription !== flowDescription) {
-              setFlowDescription(localDescription);
-            }
-          }}
-          className="flex-1 text-sm"
-          placeholder="Description (optional)..."
-        />
+    <ReactFlowProvider>
+    <div className="flex h-full flex-col bg-[var(--r-surface)]">
+      {/* Ritemark 2.0 (experience 31; kit: theme.html .fbar): the header is the desk's bar, like every document's:
+          the name, the description in muted ink, the schedule, then Auto-arrange and Run flow */}
+      <div className="relative h-[52px] flex-none">
+        <div className="absolute inset-x-1 top-1 flex h-8 items-center gap-1">
+          <input
+            value={localName}
+            onChange={(e) => setLocalName(e.target.value)}
+            onFocus={() => setIsNameFocused(true)}
+            onBlur={() => {
+              setIsNameFocused(false);
+              if (localName !== flowName) {
+                setFlowName(localName);
+              }
+            }}
+            aria-label="Flow name"
+            placeholder="Flow name..."
+            size={Math.max(8, localName.length)}
+            className="ml-3 min-w-0 max-w-[260px] rounded bg-transparent text-[13px] font-semibold leading-7 text-[var(--r-ink-strong)] outline-none placeholder:text-[var(--r-ink-muted)] focus:shadow-[inset_0_-1px_0_var(--r-accent)]"
+          />
+          <input
+            value={localDescription}
+            onChange={(e) => setLocalDescription(e.target.value)}
+            onFocus={() => setIsDescFocused(true)}
+            onBlur={() => {
+              setIsDescFocused(false);
+              if (localDescription !== flowDescription) {
+                setFlowDescription(localDescription);
+              }
+            }}
+            aria-label="Description"
+            placeholder="Description (optional)..."
+            className="ml-2 min-w-0 flex-1 truncate rounded bg-transparent text-[13px] leading-7 text-[var(--r-ink-muted)] outline-none placeholder:text-[var(--r-ink-faint)] focus:shadow-[inset_0_-1px_0_var(--r-accent)]"
+          />
 
-        {featureFlags.scheduledFlowRuns && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openFlowSettings}
-            className="gap-2"
-          >
-            <Icon name="clock" size={14} />
-            <span>{formatScheduleSummary(flowSchedule)}</span>
-            {flowSchedule?.enabled && (
-              <span className="text-xs text-[var(--r-ink-muted)]">
-                {formatScheduleDateTime(nextScheduledRun)}
-              </span>
-            )}
-          </Button>
-        )}
+          {featureFlags.scheduledFlowRuns && (
+            <Tooltip label={flowSchedule ? 'Change when this flow runs on its own' : 'Run this flow on a schedule'}>
+              <Button
+                type="button"
+                variant="toolbar"
+                onClick={openFlowSettings}
+                data-state={showFlowSettings ? 'active' : undefined}
+                className="h-7 gap-1.5 px-2.5 text-[12px]"
+              >
+                <Icon name="clock" size={14} className="text-[var(--r-ink-body)]" tone="inherit" />
+                <span>{formatScheduleSummary(flowSchedule)}</span>
+                {flowSchedule?.enabled && (
+                  <span className="font-normal text-[var(--r-ink-muted)]">
+                    · next {formatScheduleDateTime(nextScheduledRun)}
+                  </span>
+                )}
+              </Button>
+            </Tooltip>
+          )}
 
-        {/* Validation warnings button */}
-        {validationWarnings.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowWarnings(!showWarnings)}
-            className="flex items-center gap-1.5 text-[var(--vscode-editorWarning-foreground)]"
-          >
-            <Icon name="warning" size={14} />
-            {validationWarnings.length} warning
-            {validationWarnings.length > 1 ? 's' : ''}
-          </Button>
-        )}
+          {/* Validation warnings button */}
+          {validationWarnings.length > 0 && (
+            <Tooltip label={showWarnings ? 'Hide the steps to check' : 'Show the steps to check'}>
+              <Button
+                type="button"
+                variant="toolbar"
+                onClick={() => setShowWarnings(!showWarnings)}
+                data-state={showWarnings ? 'active' : undefined}
+                className={BAR_QUIET + ' text-[var(--vscode-editorWarning-foreground)] hover:text-[var(--vscode-editorWarning-foreground)] data-[state=active]:text-[var(--vscode-editorWarning-foreground)]'}
+              >
+                <Icon name="warning" size={14} tone="inherit" />
+                {validationWarnings.length} warning
+                {validationWarnings.length > 1 ? 's' : ''}
+              </Button>
+            </Tooltip>
+          )}
+
+          <AutoArrangeButton />
+          <Tooltip label="Run this flow now">
+            <Button type="button" onClick={handleRunFlow} className="h-7 gap-1.5 px-2.5 text-[13px] has-[>svg]:px-2.5">
+              <Icon name="play" size={14} tone="inherit" />
+              Run flow
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Validation warnings panel */}
@@ -370,7 +408,7 @@ export function FlowEditor() {
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm font-medium text-[var(--vscode-inputValidation-warningForeground)] mb-1">
                 <Icon name="warning" size={14} />
-                Validation Warnings
+                Check these steps
               </div>
               <ul className="text-xs text-[var(--r-ink-strong)] space-y-0.5 ml-5">
                 {validationWarnings.map((warning, i) => (
@@ -392,17 +430,17 @@ export function FlowEditor() {
 
       {/* Main content - 3 column layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Node Palette */}
-        <div className="w-[220px] flex-shrink-0">
+        {/* Left: the steps (176, kit: .palette) */}
+        <div className="w-[176px] flex-shrink-0">
           <NodePalette />
         </div>
 
         {/* Center: Flow Canvas */}
-        <FlowCanvas onRunFlow={handleRunFlow} onNodeSelect={handleNodeSelect} />
+        <FlowCanvas onNodeSelect={handleNodeSelect} />
 
-        {/* Right: Config Panel or Execution Panel (hidden when nothing selected) */}
+        {/* Right: the chosen step's settings, a run, or the flow's schedule (248, kit: .props) */}
         {(isRunning || selectedNodeId || showFlowSettings) && (
-          <div className="w-[280px] flex-shrink-0">
+          <div className="rm-flow-props w-[248px] flex-shrink-0 border-t border-[var(--r-hairline)]">
             {isRunning ? (
               <ExecutionPanel
                 flow={toFlow()}
@@ -425,5 +463,6 @@ export function FlowEditor() {
         )}
       </div>
     </div>
+    </ReactFlowProvider>
   );
 }

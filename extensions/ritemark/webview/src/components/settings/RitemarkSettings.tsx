@@ -1514,21 +1514,21 @@ export function RitemarkSettings() {
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Reload window
                   </button>
                 ) : settings.componentStatus.claudeCode.runtimeStatus.runtime === 'missing' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:install')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Install Claude
                   </button>
                 ) : settings.componentStatus.claudeCode.runtimeStatus.auth === 'sign_in_required' ? (
                   <button
                     onClick={() => handleClaudeAction('claude:login')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Sign in with Claude.ai
                   </button>
@@ -1566,7 +1566,7 @@ export function RitemarkSettings() {
                 {settings.componentStatus.codex.runtimeStatus.auth === 'sign_in_required' ? (
                   <button
                     onClick={() => handleCodexAction('codex:startLogin')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-accent-deep hover:shadow-ritemark-accent-md"
+                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
                   >
                     Sign in with OpenAI
                   </button>

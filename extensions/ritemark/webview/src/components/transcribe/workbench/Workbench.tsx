@@ -731,7 +731,7 @@ function HighlightedSegmentText({
           data-search-current={piece.kind === 'current' ? '' : undefined}
           className={
             piece.kind === 'current'
-              ? 'rounded-[2px] bg-accent text-white'
+              ? 'rounded-[2px] bg-accent text-[var(--r-on-accent)]'
               : 'rounded-[2px] bg-accent-soft text-ink-strong shadow-[inset_0_-2px_0_var(--r-accent)]'
           }
         >
