@@ -183,7 +183,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
 | `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
-| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 API compatibility fixes |
+| `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 API compatibility fixes, and Copilot Chat's place in 2.0 (Sprint 132): a launcher in More while Copilot Chat is installed and not disabled, opening it as a tab on the desk; the View menu's Copilot Chat and Ctrl+Alt+I (⌃⌘I) open the same tab, and the shortcut does nothing without it |
 | `008-ritemark-windows-binary-strip.patch` | Strip non-Windows native binaries from the bundled Copilot and Agent SDK packages so Windows packaging (`rcedit`) does not fail |
 | `009-ritemark-browser-context-bridge.patch` | Exposes the active browser tab's context to the extension host for AI chat, and pushes each navigation to the extension for Browser Recent (`ritemark.browser.didNavigate`, Sprint 131) |
 | `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser |
@@ -193,8 +193,8 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `014-ritemark-save-receipts.patch` | Text-file save receipts through the extension-host document protocol, so a save is acknowledged against the exact written snapshot |
 | `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries |
 | `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion: the Git download button in Source Control (Microsoft Store policy 10.1.5) |
-| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus, the left column's head; the welcome alone on the ground, an empty desk's tiles drawn, a file's extension in muted ink (Sprint 133) |
-| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs with their bar; an empty desk's Text, Table and Web page tiles (Sprint 133) |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame and surfaces (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus and dialogs, the left column's head, You, the window sizes (`ritemarkWindowSizes.ts`), the theme pass on the palette and notifications (toasts wrap to 3 lines), the tabs' sizes and close button on the right, and the tree's chosen folder for new documents (`_ritemark.files.chosenFolder`); the welcome alone on the ground, an empty desk's tiles drawn, a file's extension in muted ink (Sprint 133) |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): folded tabs ("N ⌄"), the +, permanent Home and Task board tabs (and the move commands that leave no empty desk), terminals as tabs with their bar and a tab menu of the usual items plus Rename; an empty desk's Text, Table and Web page tiles (Sprint 133) |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 
