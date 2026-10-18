@@ -1,15 +1,23 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 
 interface TagsInputProps {
   tags: string[]
   onChange: (tags: string[]) => void
+  /** Put the cursor in the field when it first appears (a property just added) */
+  autoFocus?: boolean
 }
 
-export function TagsInput({ tags, onChange }: TagsInputProps) {
+export function TagsInput({ tags, onChange, autoFocus = false }: TagsInputProps) {
   const [inputValue, setInputValue] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus()
+    // only when the field first appears
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {

@@ -442,6 +442,20 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
         this.fail(record, view, 'VS Code rejected the disk version.');
         return;
       }
+      // The model now holds the disk text, but VS Code still marks it dirty against the older disk version it
+      // saw, so every later save failed as "newer" until Overwrite. A same-content revert refreshes that version
+      // and clears the dirty marker, as Keep my version does below; it preserves the undo stack.
+      try {
+        view.panel.reveal(view.panel.viewColumn, false);
+        await vscode.commands.executeCommand('workbench.action.files.revert');
+      } catch (error) {
+        this.fail(record, view, error instanceof Error ? error.message : 'Could not use the disk version.');
+        return;
+      }
+      if (record.document.isDirty || logicalHash(record.document.getText()) !== currentDisk.logicalHash) {
+        await this.reconcile(record, 'use-disk-verification');
+        return;
+      }
       record.modelHash = logicalHash(record.document.getText());
       record.revision += 1;
       this.setBase(record, currentDisk, record.modelHash);

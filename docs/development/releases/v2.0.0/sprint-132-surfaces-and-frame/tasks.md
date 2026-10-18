@@ -71,7 +71,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] Extension tests: the 2.0 defaults and the head's menus in `package.json` (E3)
 - [x] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
 - [x] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
-- [x] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md` (S4, S5, S6, S10, the native menu bar and Help are Jarmo's own pass, listed in the PR)
+- [x] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md` (S4, S5, S6, the native menu bar and Help are Jarmo's own pass, listed in the PR; S10 he passed by hand on Windows, 18 October)
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [x] PR 1 opened; `qa-validator` review; Jarmo's "admin merge" (#443, merged 2026-10-17 as d781a0e1)
 - [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) (the Development manager, at d781a0e1: source verified, 19/19 patches on vanilla 1.117.0, both validations and provenance passed, the extension activates with no errors on a fresh profile)
@@ -97,7 +97,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 ## Phase 8: Merge 2, the theme and Windows, and closeout
 
-- [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3). Script and set done: 9 scenes in light and dark from a fresh profile, in `docs/development/frame-baseline/` with its sample project; `--compare` diffs inside the running instance (no image library) and writes a side-by-side page. Re-taken on 18 October after the theme pass on a clean fresh profile (the first set carried earlier tabs and the shell's prompt); a second run matches it to the pixel. Waiting for Jarmo's approval
+- [x] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3). Script and set done: 9 scenes in light and dark from a fresh profile, in `docs/development/frame-baseline/` with its sample project; `--compare` diffs inside the running instance (no image library) and writes a side-by-side page. Re-taken on 18 October after the theme pass on a clean fresh profile (the first set carried earlier tabs and the shell's prompt); a second run matches it to the pixel. Re-taken again for You and the tab ×. Jarmo approved it on 18 October ("baseline ok")
 - [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
 - [x] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand (18 October, at 665f5ff2: both pass; the validator again before each later commit)

@@ -11,12 +11,14 @@ interface PropertyRowProps {
   type: PropertyType
   onChange: (value: unknown) => void
   onDelete: () => void
+  /** A property just added: open its field at once, so typing goes into it rather than the document */
+  startInEdit?: boolean
 }
 
 const inputClasses =
   'w-full rounded-md border border-hairline-strong bg-surface-muted px-2 py-1.5 text-[12px] text-ink-strong placeholder:text-ink-faint outline-none focus:ring-1 focus:ring-[--r-accent]'
 
-export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onChange, onDelete }: PropertyRowProps) {
+export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onChange, onDelete, startInEdit = false }: PropertyRowProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -28,6 +30,12 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
       setIsEditing(true)
     }
   }
+
+  useEffect(() => {
+    if (startInEdit) startEditing()
+    // a row opens its field only when it first appears
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!isEditing) return
@@ -55,7 +63,7 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
 
   const renderControl = () => {
     if (type === 'tags') {
-      return <TagsInput tags={Array.isArray(value) ? value.map(String) : []} onChange={(tags) => onChange(tags)} />
+      return <TagsInput tags={Array.isArray(value) ? value.map(String) : []} onChange={(tags) => onChange(tags)} autoFocus={startInEdit} />
     }
 
     if (type === 'status') {

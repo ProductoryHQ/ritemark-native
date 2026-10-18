@@ -73,7 +73,7 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
   return (
     <div
       ref={menuRef}
-      className="absolute left-0 top-full mt-1 w-52 bg-surface border border-hairline rounded-xl shadow-lg z-50 overflow-hidden"
+      className="absolute left-0 top-full mt-1 w-52 max-w-full bg-surface border border-hairline rounded-xl shadow-lg z-50 overflow-hidden" /* never wider than its panel */
     >
       {availableProperties.length > 0 && (
         <div className="p-2">
