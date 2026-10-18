@@ -192,7 +192,13 @@ const SCENES = [
 	['terminal', async () => {
 		await key('Backquote', 2, '`'); // Ctrl+` on every platform (⌃` on the Mac)
 		await sleep(2500);
-		return async () => key('KeyW', MOD, 'w');
+		// The scene is the terminal's tab and bar. Its text (the shell's prompt, with the computer's and the account's
+		// names, and the first-run hint) differs from machine to machine, so it is blanked while the scene is taken.
+		await evaluate(`(() => { const style = document.createElement('style'); style.id = 'frame-screenshots-terminal'; style.textContent = '.part.editor .xterm-screen { visibility: hidden !important; }'; document.head.append(style); })()`);
+		return async () => {
+			await evaluate(`document.getElementById('frame-screenshots-terminal')?.remove()`);
+			await key('KeyW', MOD, 'w');
+		};
 	}],
 	['many-tabs', async () => {
 		// Open the folders, so there are enough documents to fold the row

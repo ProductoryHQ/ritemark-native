@@ -2,7 +2,7 @@
 
 Ritemark 2.0's frame (the window, the places, the tab row, the columns and the menus) in 9 scenes, in Ritemark Light and Ritemark Dark. It is the picture of how the frame should look. The later steps of 2.0 and every VS Code update compare against it, because the frame rests on VS Code's internal class names, which an update can change without warning.
 
-**Status:** captured on 18 October 2026 from Sprint 132's merge 2 (the dev build), waiting for Jarmo's approval. A new baseline replaces these files only when Jarmo approves it.
+**Status:** captured on 18 October 2026 from Sprint 132's merge 2 (the dev build, commit 1f49269f's frame, on a fresh profile), waiting for Jarmo's approval. A second run matched it to the pixel in all 18 scenes. A new baseline replaces these files only when Jarmo approves it.
 
 ## The scenes
 
@@ -13,7 +13,7 @@ Ritemark 2.0's frame (the window, the places, the tab row, the columns and the m
 | `*-left-hidden.png`, `*-ai-hidden.png`, `*-both-hidden.png` | One column hidden, then both |
 | `*-new-tab-menu.png` | The + menu open |
 | `*-more-menu.png` | More (⋯) open |
-| `*-terminal.png` | A terminal tab |
+| `*-terminal.png` | A terminal tab, its text blanked (the prompt names the computer and the account, and differs per machine) |
 | `*-many-tabs.png` | Twelve documents: the tab row folds into "N ⌄" |
 
 The dev build lists Copilot Chat and "Chat Debug" in More, from VS Code's built-in Copilot extension. A production build has neither unless Copilot Chat is installed.
