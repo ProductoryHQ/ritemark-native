@@ -1352,7 +1352,11 @@ export function RitemarkSettings() {
               : 'On. Never your documents, chats or names.')
             : 'Off until you turn it on. Never your documents, chats or names.'}
           checked={settings.usageData?.on ?? false}
-          onChange={(value) => vscode.postMessage({ type: 'usageData:set', on: value })}
+          onChange={(value) => {
+            // Answer the click at once, as the theme choice does; the host's resend confirms it.
+            setSettings((prev) => prev ? { ...prev, usageData: { on: value, fromRitemark1: false } } : prev);
+            vscode.postMessage({ type: 'usageData:set', on: value });
+          }}
         />
         <p className="text-xs text-ink-muted mt-2">
           <button type="button" className="underline underline-offset-2 hover:text-ink-strong" onClick={() => vscode.postMessage({ type: 'openExternal', url: 'https://ritemark.app/en/privacy/' })}>Privacy Policy</button>

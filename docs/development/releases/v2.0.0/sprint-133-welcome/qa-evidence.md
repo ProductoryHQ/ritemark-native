@@ -1,0 +1,96 @@
+# Sprint 133 QA evidence
+
+Run on 18 October 2026, on the Mac (Apple Silicon), from `sprint-133-welcome`, on dev instances of this worktree launched in the background (`open -n -g`) with their own short user-data and extensions directories and their own debugging port, driven over CDP. Nothing ran on Jarmo's own profile. "Fresh" is an empty profile; "v1.14.0 profile" is one made with the installed v1.14.0, copied before each run. Usage-data sends went to a local stand-in for PostHog (`127.0.0.1:9450`) that records each request.
+
+The screenshots are in [qa-evidence/](qa-evidence/), at 1440 × 900 for the welcome's own scenes (`scripts/qa/welcome-screenshots.mjs`) and 1200 × 800 for the rest.
+
+Windows (S45–S47 and R15's Windows half) is not in this file yet: it runs through the Development manager's Windows session, as the plan says.
+
+## Results
+
+| Scenario | Result | Evidence and notes |
+|---|---|---|
+| S1 A fresh start with no folder | Pass | `scripts/qa/welcome-check.mjs --expect alone`: 8 of 8 (the welcome open and alone, both columns closed, no tabs, no status bar, the sheet 640 wide and centred, no Getting Started). `light-welcome-step-1.png`, `dark-welcome-step-1.png`. No terminal opened. |
+| S2 The keyboard and a screen reader | Pass for the keyboard; VoiceOver not run | Tab goes Continue/Sign in for ChatGPT, then Claude, Set up OpenCode, API keys, Skip for now, and round again. Enter and Space press; Escape closes the sheets. Two fixes from this run (below): each card's button now names its AI and is described by the card's words and state ("Continue with Claude", described "Sign in with the account you already use. / Signed in"), and focus goes back to the button that opened a sheet. VoiceOver was not turned on (a system setting on Jarmo's Mac); the accessible names and descriptions were read from the page instead. |
+| S3 Dark | Pass for the sheet's text; one label open | Every text on the sheet measured against its ground: lowest 6.03:1 in Dark, all above 4.5:1 in Light. The header's step labels sit on the illustration: "1 · Your AI" about 6.5:1 at the median pixel, but "2 · Set up project" (80% white, the kit's value, `ritemark.css:677`) about 3.4:1 on step 1. Taken to the Experience lead (below). |
+| S4 The three cards | Pass | Step 1 as drawn: ChatGPT and Claude with "Sign in with the account you already use.", OpenCode with "Open models, with an API key of your own.", "You can use more than one.", API keys, Skip for now. "Codex" appears nowhere on the page. |
+| S5 API keys | Partly | The sheet opens over the welcome with the Anthropic key only (`light-welcome-key-sheet.png`); the protocol refuses an OpenAI key as a way to use ChatGPT (`welcomeState.test.ts`). Saving a real Anthropic key was not run: there is no spare key, and this Mac's Claude is signed in. The saved-key path (Checking…, then step 2) is unit-tested and was fixed in `d3cfd860`. |
+| S6 Skip for now | Pass | Step 2 with "Your AI works only inside it."; no skip on step 2. |
+| S7 Already signed in | Pass | This Mac is signed in to Claude and ChatGPT: both cards show Checking…, then Signed in with Continue. |
+| S8–S11 Signing in, cancelling, failing | Not run | Each opens Jarmo's browser on his real accounts. The card states, the one-sentence failures and their words are unit-tested (`welcomeState.test.ts`: no code, "authentication", "Codex" or "runtime" in any of them). Needs a run on a signed-out machine (the Windows round can cover it). |
+| S12 OpenCode | Pass | A provider key in Set up: OpenCode marked set up, step 2 says "OpenCode is set up" (`s12-opencode-set-up.png`). |
+| S13 A terminal for a sign-in | Does not arise | Neither sign-in opens a terminal in this build: Claude's runs its own CLI in the background, ChatGPT's goes through Codex's app server. |
+| S14 Checking does not block | Pass | On every fresh start the cards showed Checking… and changed on their own as each check answered. Skip for now and API keys have no waiting state: they are live from the first draw (by code). |
+| S15 A check that does not answer | Unit-tested | 20 s to "Couldn't check. Try again." with a retry (`CHECK_TIMEOUT_MS`, `welcomeState.test.ts`). A hanging binary was not swapped into the bundled runtimes. |
+| S16 Offline | Unit-tested | "Not checked yet" and the offline line (`welcomeState.test.ts`); the network was not turned off on Jarmo's Mac. |
+| S17 Open a folder | Partly | The macOS folder picker can't be driven over CDP. What happens after a pick is the same landing as S18 and S50, which passed. |
+| S18 Start a new project | Pass for Create | "R133 landing test" made in `~/Documents/Ritemark` and landed on. Change… opens the native picker: not run. |
+| S19 A name that cannot be used | Pass | "a/b": "A project name can't contain "/"." in place, nothing made (`s19-name-in-use.png`). A name already taken there is refused the same way in `newProject.test.ts`. |
+| S20 Missing Git | Mac half pass | On the Mac no line shows, with either runtime. The Windows half is in the Windows round. |
+| S50 Try the sample project | Pass | `~/Documents/Ritemark/Leadership programme` made with the brief, modules, notes and tasks; the board shows the cards; `project_opened` with `source: sample` once (`s50-sample-landing.png`). |
+| S51 A sample folder already there | Pass | The second copy went to "Leadership programme 2"; the first was untouched. |
+| S21 Landing | Pass | Documents open with the project's name in the head, a new chat with "Ask Claude about this project" (and "Ask OpenCode about this project" for OpenCode, `s21-opencode-landing.png`), the empty desk's three tiles. Table opens a new table. |
+| S22 Landing once | Pass | On a profile that had landed: a second folder opened, then Switch project from the head's menu back to the landed one. Neither window landed again (the message box kept its own words, no new chat forced). |
+| S23 A folder gone during the reload | Pass, with a finding | The new project's folder deleted while the window reloaded: "The folder "R133 gone" isn't there any more. Choose where your work is." over step 2 (`s23-folder-gone.png`). Ritemark's Flows storage then recreated the folder by making `.ritemark/flows` in it (below). |
+| S24 Off until yes | Pass | On fresh profiles nothing reached the stand-in until the switch was turned on (S25's run); the Opt Out profile sent nothing through a project (S28); with usage data off, opening documents sent nothing (S26). |
+| S25 Yes | Pass | The switch turned on in step 2: `app_session_start`, then the held `welcome_shown` (`kind: fresh`) and `ai_signed_in`, once each. |
+| S26 Turning it off | Pass | On in Settings: `app_session_start` and `feature_used` arrived. Off in Settings: two documents opened, nothing more arrived. |
+| S27 The 1.x notice is gone | Pass | No toast on fresh or v1.14.0 profiles. Privacy Policy and Terms of Use beside the switch and in Settings. |
+| S28 A 1.x Opt Out stays off | Pass | Off with "Off until you turn it on. …"; nothing sent before or after a project (`*-welcome-update-off.png`). |
+| S52 A 1.x OK carries over | Pass | On with "On, as you chose in Ritemark 1. …"; `app_session_start` and `welcome_shown` (`kind: update`, `build_channel: dev`) from the first start; off on the sheet stopped sends at once, and Settings showed off (`*-welcome-update-on.png`). |
+| S53 No answer starts off | Pass | Off; turning it on sent `app_session_start` and the held `welcome_shown`. |
+| S29 The events after a yes | Pass, with other paths | Seen: `welcome_shown` (`fresh`), `ai_signed_in` (`opencode`, `api_key`), `project_opened` (`sample`, `has_ai: true`), `first_message_sent` (`claude`), each once with `build_channel`. The Claude-account and existing-folder paths were not run (S8, S17). No property holds a path, name, file, message or account. |
+| S30 After a no | Pass | Off profiles sent nothing, before and after a restart. |
+| S31 A second first message | By code | The marker is global and set before the send (`posthog.ts`, `trackFirstMessageSent`); the profile that sent it has `ritemark.analytics.firstMessageSent: true`. A second real message was not sent. |
+| S32 Dev runs | Pass | Every event carried `build_channel: dev`. A throwaway automation profile is a fresh profile, so it is off and sends nothing (S24). |
+| S33 The update welcome | Pass | "Welcome to Ritemark 2.0", Claude and ChatGPT Signed in, Leadership programme first with "Open when you left", two more with "Today". |
+| S34 Back to where they left | Pass | The sheet closed with no reload; a restart showed no welcome (`s34-open-when-you-left.png`). |
+| S35 Another project | Pass | Sales proposal Q4 picked: the window reloaded into it, `ritemark.welcome.finished` written, no welcome after a restart. |
+| S36 One AI signed out | Not run | ChatGPT is signed in on this Mac. The row's words are unit-tested. |
+| S37 A fresh profile never sees it | Pass | Fresh profiles only ever showed the fresh welcome. |
+| S38 A document on the first launch | Pass | `<folder> <folder>/note.md` on a fresh profile: one tab, in the Ritemark editor, no welcome (`s38-first-launch-with-file.png`); a new window then showed the welcome alone (`s38-then-new-window.png`). The AI's sheet showed chat, not sign-ins, because this Mac is signed in. |
+| S39 #429's reproduction | Pass | With the folder really open (see the harness note): 5 of 5 fresh launches with `"*.md": "default"` and 25 of 25 without it ended with one tab, in the Ritemark editor. |
+| S40 Every way in | Pass | Help: Welcome, Welcome: Open Walkthrough…, Chat: Open Walkthrough, Get Started with Accessibility Features and the default `startupEditor` all open Ritemark's welcome or nothing; Getting Started never showed (`s40-help-welcome.png`). |
+| S41 The launch check's rows | Pass | With this computer's Claude: "This computer's tools: Git found … Node.js found …" under the runtime choice; with Ritemark's own, no rows. Sign-in states with Sign Out; Usage data with the welcome's words and both links (`s41-settings-this-computers-tools.png`). |
+| S42 The tree and the tabs | Pass | Name in body ink, extension muted (`.md` only for `report.final.md`; none for `README`; `.gitignore` whole); both parts body ink when chosen. In Dark and Light High Contrast the extension takes the body ink (21:1 and about 14.7:1) (`s42-*.png`). |
+| S48 A finished profile's window with no folder | Pass | "Where do you want to start?" with the recent projects, Open another folder… and Start a new project, no AI or switch (`*-welcome-start.png`). |
+| S49 Every empty desk | Pass | In a project window with every tab closed: Text opened a new document, Table a new table, Web page a browser tab (`s49-empty-desk-tiles.png`). The new files went into the project (#451 unchanged). |
+| S43 The inventory | Partly | The launch check's rows live in Settings (S41) and the welcome (S20); "You are interacting with AI" shows on the AI's sheet. The sign-in, setup, repair and recovery cards need signed-out or broken runtimes: not run here. |
+| S44 Skipped, then signing in later | Not run | Both AIs are signed in on this Mac, so the AI's sheet shows no sign-in cards. |
+| S45–S47 Windows | Waiting | The Windows round, through the Development manager. |
+
+## Fixed during this QA
+
+Each is in the commit that adds this file.
+
+1. **Screen-reader names (S2).** The cards' buttons said only "Continue" or "Sign in". They now name their AI ("Sign in to Claude", "Set up OpenCode", "Cancel Claude sign-in") and point at the card's words and state.
+2. **Focus after a sheet closes (S2).** The keys sheet has no Radix trigger, so focus fell to the page on Escape. It now goes back to the button that opened it.
+3. **Switches that answer at once (S26, R7).** The Settings switch and the welcome's switch waited for the settings write, about 0.7 s and on a session's first write over 3 s, and looked dead meanwhile. Both now flip on the click; the host's state confirms them.
+4. **The welcome's scrollbar rules leaked into every webview.** `welcome.css` is in the bundle every Ritemark webview loads, and its unscoped `html` and `::-webkit-scrollbar` rules restyled the editor's, the AI sheet's and Settings' scrollbars (Chromium ignores the `::-webkit-scrollbar` styles once `scrollbar-width` is set). They are now scoped to the welcome's page; the bundle's global scrollbar rules match main's again.
+5. **The update sheet at 1440 × 900.** With three projects it overflowed by 24 px and the scrollbar pushed the sheet 6 px left. The short sheets now keep 12 px below as above, and the scrollbar's room is kept on both edges.
+6. **A Sign in click shows progress at once (R15, #401).** On a busy first start the host can take seconds to answer; the card now shows Checking… from the click until the host's next word about that AI, so a second click can't happen (`welcomeState.test.ts`).
+
+## Open findings
+
+For the Experience lead:
+- "2 · Set up project" in 80% white on the header illustration is about 3.4:1 (11 px). Full white would be about 4.3:1; passing needs a soft shade under the progress bar or a darker crop.
+- The keys sheet's dimming covers the page, not the window's top band or edges, because it lives inside the page.
+- The AI's sheet says "Claude can work with your files" whatever the AI (`EmptyState.tsx`, from before this sprint). The landing now shows it to people who chose ChatGPT or OpenCode.
+
+Outside this sprint's files, for follow-up issues:
+- Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open.
+- Ritemark Settings doesn't redraw when the runtime choice changes outside the page (in `settings.json`); its own select does.
+
+## The frame baseline
+
+`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The baseline is unchanged; the welcome's own scenes are in `qa-evidence/` for Jarmo to approve into the baseline (`docs/development/frame-baseline/README.md`: a new baseline only with his approval).
+
+## Checks
+
+- `npm test` in `extensions/ritemark`: pass (the welcome's six test files, consent, analytics and the healer included).
+- Webview and extension TypeScript: clean. `compile-check-ts-native` on the patched VS Code: clean.
+- Patches: 18 apply from pristine, a second run is clean, and the result is identical (Phase 3).
+
+## A harness note
+
+The background launcher first put the folder and file after Chromium's value-less switches (`--disable-background-timer-throttling` and its two partners), and argv parsing read the folder as that switch's value. Those first S38/S39 runs opened `note.md` in an empty window. They were rerun with the folder first; the results above are from the reruns.

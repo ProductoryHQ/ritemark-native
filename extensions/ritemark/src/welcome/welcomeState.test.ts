@@ -15,7 +15,10 @@ import {
   providerOfRuntime,
   providerView,
   runtimeOfProvider,
+  signInAnswered,
+  startSignIn,
   updateRows,
+  withStartingSignIn,
   type ProviderMemory,
 } from './welcomeState';
 import { CHECK_TIMED_OUT } from './words';
@@ -56,6 +59,16 @@ for (const id of ['claude', 'chatgpt', 'opencode'] as const) {
 const views = [providerView('chatgpt', answered('needs-auth', { signInEnded: true })), providerView('claude', answered('ready')), providerView('opencode', answered('needs-configuration'))];
 assert.deepEqual(updateRows(views).map((v) => v.id), ['claude', 'chatgpt'], 'Claude, then ChatGPT; OpenCode only once set up');
 assert.deepEqual(updateRows([...views.slice(0, 2), providerView('opencode', answered('ready'))]).map((v) => v.id), ['claude', 'chatgpt', 'opencode']);
+
+// ── R15: a Sign in click shows Checking… until the host answers ──
+const signedOut = [providerView('chatgpt', answered('needs-auth')), providerView('claude', answered('needs-auth')), providerView('opencode', answered('needs-configuration'))];
+const starting = startSignIn(signedOut, 'claude');
+assert.deepEqual(withStartingSignIn(signedOut, starting).map((v) => v.phase), ['sign-in', 'checking', 'sign-in'], 'only the clicked card');
+assert.deepEqual(withStartingSignIn(signedOut, null), signedOut);
+assert.equal(signInAnswered(signedOut, starting), false, 'no word from the host yet');
+assert.equal(signInAnswered([signedOut[0], signedOut[1], providerView('opencode', answered('ready'))], starting), false, 'another AI changing is not the answer');
+assert.equal(signInAnswered([signedOut[0], providerView('claude', { ...answered('needs-auth'), signingIn: true }), signedOut[2]], starting), true, 'the host says signing in');
+assert.equal(signInAnswered([signedOut[0], providerView('claude', { ...answered('needs-auth'), problem: 'could-not-start' }), signedOut[2]], starting), true, 'the host says it failed');
 
 // ── Steps ──
 assert.deepEqual(afterProviderReady({ kind: 'fresh', step: 1, readyProvider: null }, 'claude'), { kind: 'fresh', step: 2, readyProvider: 'claude' }, 'S8');

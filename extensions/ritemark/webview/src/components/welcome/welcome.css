@@ -17,13 +17,18 @@
   justify-content: center;
   align-items: flex-start;
 }
-.rw-ground.short { padding-top: 12px; }
+/* The update and start sheets keep 12 above and below, so experience 32's three projects fit 1440 x 900 */
+.rw-ground.short { padding-top: 12px; padding-bottom: 12px; }
 
-/* The page scrolls in a short window: a thin bar on the ground, not a white track */
-html { scrollbar-width: thin; scrollbar-color: var(--r-hairline-strong) transparent; }
-::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--r-hairline-strong); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+/* The page scrolls in a short window: a thin bar on the ground, not a white track. Its room is kept on both
+   edges, on the ground's colour, so the centred sheet does not move when the bar comes and goes. Scoped to the
+   welcome's page: this sheet is in the bundle every Ritemark webview loads. */
+html:has(.rw-ground) {
+  background: var(--vscode-ritemark-ground, var(--r-surface-soft));
+  scrollbar-width: thin;
+  scrollbar-color: var(--r-hairline-strong) transparent;
+  scrollbar-gutter: stable both-edges;
+}
 
 .rw-sheet {
   position: relative;

@@ -40,5 +40,5 @@ None of this is Ritemark's start-up logic; it is the cost of new files on disk. 
 
 - The welcome's page draws from its own bundle as soon as the webview loads; it does not wait for any provider check.
 - Each provider shows Checking… until its own check answers; a check with no answer after 20 s shows "Couldn't check. Try again." (R4).
-- A click on Sign in while the host is busy is sent as a message; the host queues messages, so the click is acted on when the host answers, and the card shows its progress state at once (the page sets it optimistically and the host's answer confirms it).
-- The welcome's own start-up work is a few `globalState` reads and one webview panel; it adds no synchronous work to `activate()` (measured again on the branch in the QA evidence).
+- A click on Sign in while the host is busy is sent as a message; the host queues messages, so the click is acted on when the host answers. The card shows Checking… from the click until the host's next word about that AI (`welcomeState.ts`, `startSignIn` / `signInAnswered`, tested), so the Sign in button is gone and a second click can't start a second sign-in.
+- The welcome's own start-up work is a few `globalState` reads and one webview panel, all after `activate()`'s synchronous part. It is profiled on Windows with the round's numbers, not yet on the branch.

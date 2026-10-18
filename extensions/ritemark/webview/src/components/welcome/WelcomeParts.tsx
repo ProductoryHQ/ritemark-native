@@ -29,6 +29,7 @@ export function SheetButton({
   onClick,
   disabled,
   ariaLabel,
+  ariaDescribedBy,
 }: {
   label: string
   tooltip: string
@@ -37,7 +38,9 @@ export function SheetButton({
   icon?: React.ReactNode
   onClick: () => void
   disabled?: boolean
+  /** The name a screen reader reads; it keeps the visible label's words (WCAG 2.5.3). */
   ariaLabel?: string
+  ariaDescribedBy?: string
 }) {
   return (
     <Tooltip label={tooltip}>
@@ -47,6 +50,7 @@ export function SheetButton({
         onClick={onClick}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
       >
         {icon}
         {label}
@@ -73,21 +77,25 @@ export function ProviderCard({
   const name = PROVIDER_NAMES[view.id]
   const isOpenCode = view.id === 'opencode'
   const titleId = `rw-card-${view.id}`
+  // A button names its AI and is described by the card's words and state (S2).
+  const describedBy = `${titleId}-line ${titleId}-state`
   const line = view.reason ?? (isOpenCode ? COPY.openCodeLine : COPY.accountLine)
 
   if (view.phase === 'signing-in') {
     return (
       <section className="rw-choice wait" aria-labelledby={titleId} aria-busy="true">
         <span className="name" id={titleId}>{name}</span>
-        <span className="line">{browserOpened(view.id)}</span>
+        <span className="line" id={`${titleId}-line`}>{browserOpened(view.id)}</span>
         <span className="w">
           <Spinner />
-          {isOpenCode ? COPY.checking : COPY.finishThere}
+          <span id={`${titleId}-state`}>{isOpenCode ? COPY.checking : COPY.finishThere}</span>
           {!isOpenCode && (
             <span style={{ marginLeft: 'auto' }}>
               <SheetButton
                 label={COPY.cancel}
                 tooltip={`Stop waiting for ${name}’s sign-in (Escape)`}
+                ariaLabel={`${COPY.cancel} ${name} sign-in`}
+                ariaDescribedBy={describedBy}
                 small
                 onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })}
               />
@@ -101,29 +109,39 @@ export function ProviderCard({
   return (
     <section className={`rw-choice${faded ? ' faded' : ''}`} aria-labelledby={titleId}>
       <span className="name" id={titleId}>{name}</span>
-      <span className="line">{line}</span>
+      <span className="line" id={`${titleId}-line`}>{line}</span>
       <span className="foot">
         {view.phase === 'ready' ? (
           <>
             <SheetButton
               label={COPY.continue}
               tooltip={`Go on with ${name}`}
+              ariaLabel={`${COPY.continue} with ${name}`}
+              ariaDescribedBy={describedBy}
               primary
               onClick={onContinue}
             />
-            <span className="rw-state"><Icon name="check-circle" size={14} tone="inherit" />{isOpenCode ? COPY.setUpDone : COPY.signedIn}</span>
+            <span className="rw-state" id={`${titleId}-state`}><Icon name="check-circle" size={14} tone="inherit" />{isOpenCode ? COPY.setUpDone : COPY.signedIn}</span>
           </>
         ) : view.phase === 'unavailable' ? (
-          <SheetButton label={COPY.openSettings} tooltip={`Repair ${name} in Ritemark Settings`} onClick={() => send({ type: 'welcome/open-settings' })} />
+          <SheetButton
+            label={COPY.openSettings}
+            tooltip={`Repair ${name} in Ritemark Settings`}
+            ariaLabel={`${COPY.openSettings} for ${name}`}
+            ariaDescribedBy={`${titleId}-line`}
+            onClick={() => send({ type: 'welcome/open-settings' })}
+          />
         ) : (
           <>
             <SheetButton
               label={isOpenCode ? COPY.setUp : COPY.signIn}
               tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+              ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
+              ariaDescribedBy={describedBy}
               primary
               onClick={isOpenCode ? onSetUp : onSignIn}
             />
-            <ProviderState view={view} />
+            <ProviderState view={view} id={`${titleId}-state`} />
           </>
         )}
       </span>
@@ -132,14 +150,15 @@ export function ProviderCard({
 }
 
 /** Checking…, Not checked yet, or Try again, beside a card's button or on a row. */
-export function ProviderState({ view }: { view: ProviderView }) {
-  if (view.phase === 'checking') return <span className="rw-state quiet"><Spinner />{COPY.checking}</span>
-  if (view.phase === 'not-checked') return <span className="rw-state quiet"><Icon name="clock" size={14} tone="inherit" />{COPY.notChecked}</span>
+export function ProviderState({ view, id }: { view: ProviderView; id?: string }) {
+  if (view.phase === 'checking') return <span className="rw-state quiet" id={id}><Spinner />{COPY.checking}</span>
+  if (view.phase === 'not-checked') return <span className="rw-state quiet" id={id}><Icon name="clock" size={14} tone="inherit" />{COPY.notChecked}</span>
   if (view.retry) {
     return (
       <SheetButton
         label={COPY.tryAgain}
         tooltip={`Check ${PROVIDER_NAMES[view.id]} again`}
+        ariaLabel={`${COPY.tryAgain} for ${PROVIDER_NAMES[view.id]}`}
         small
         onClick={() => send({ type: 'welcome/retry-check', provider: view.id })}
       />
@@ -150,15 +169,16 @@ export function ProviderState({ view }: { view: ProviderView }) {
 
 // ── The update sheet's rows (R10, experience 32) ───────────────────────────
 
-export function ProviderRow({ view, onSetUp }: { view: ProviderView; onSetUp: () => void }) {
+export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; onSetUp: () => void; onSignIn: () => void }) {
   const name = PROVIDER_NAMES[view.id]
   const isOpenCode = view.id === 'opencode'
+  const wordsId = `rw-row-${view.id}-words`
   return (
     <div className="rw-airow" role="listitem">
       <span className="t">
         <b>{name}</b>
-        {view.phase === 'signing-in' && <span>{browserOpened(view.id)}</span>}
-        {view.reason && view.phase !== 'signing-in' && <span>{view.reason}</span>}
+        {view.phase === 'signing-in' && <span id={wordsId}>{browserOpened(view.id)}</span>}
+        {view.reason && view.phase !== 'signing-in' && <span id={wordsId}>{view.reason}</span>}
       </span>
       {view.phase === 'ready' && <span className="rw-state"><Icon name="check-circle" size={14} tone="inherit" />{isOpenCode ? COPY.setUpDone : COPY.signedIn}</span>}
       {view.phase === 'checking' && <span className="rw-state quiet"><Spinner />{COPY.checking}</span>}
@@ -166,11 +186,11 @@ export function ProviderRow({ view, onSetUp }: { view: ProviderView; onSetUp: ()
       {view.phase === 'signing-in' && !isOpenCode && (
         <span className="rw-state quiet">
           <Spinner />{COPY.finishThere}
-          <SheetButton label={COPY.cancel} tooltip={`Stop waiting for ${name}’s sign-in (Escape)`} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
+          <SheetButton label={COPY.cancel} tooltip={`Stop waiting for ${name}’s sign-in (Escape)`} ariaLabel={`${COPY.cancel} ${name} sign-in`} ariaDescribedBy={wordsId} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
         </span>
       )}
       {view.phase === 'unavailable' && (
-        <SheetButton label={COPY.openSettings} tooltip={`Repair ${name} in Ritemark Settings`} onClick={() => send({ type: 'welcome/open-settings' })} />
+        <SheetButton label={COPY.openSettings} tooltip={`Repair ${name} in Ritemark Settings`} ariaLabel={`${COPY.openSettings} for ${name}`} onClick={() => send({ type: 'welcome/open-settings' })} />
       )}
       {view.phase === 'sign-in' && (
         <span className="rw-state">
@@ -178,8 +198,10 @@ export function ProviderRow({ view, onSetUp }: { view: ProviderView; onSetUp: ()
           <SheetButton
             label={isOpenCode ? COPY.setUp : COPY.signIn}
             tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+            ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
+            ariaDescribedBy={view.reason ? wordsId : undefined}
             primary
-            onClick={isOpenCode ? onSetUp : () => send({ type: 'welcome/sign-in', provider: view.id as 'claude' | 'chatgpt' })}
+            onClick={isOpenCode ? onSetUp : onSignIn}
           />
         </span>
       )}
@@ -298,8 +320,13 @@ export function ProjectRow({ project, first, disabled }: { project: ProjectView;
 
 // ── Usage data (R7) ────────────────────────────────────────────────────────
 
-export function UsageData({ on, fromRitemark1, afterLine }: { on: boolean; fromRitemark1: boolean; afterLine?: boolean }) {
-  const words = on ? (fromRitemark1 ? COPY.usageOn : COPY.usageOnHere) : COPY.usageOff
+export function UsageData({ on: hostOn, fromRitemark1, afterLine }: { on: boolean; fromRitemark1: boolean; afterLine?: boolean }) {
+  // The switch answers the click at once; the host's state takes over once it says the same. A session's
+  // first settings write can take seconds, and the switch must not look dead meanwhile.
+  const [asked, setAsked] = useState<boolean | null>(null)
+  useEffect(() => { if (asked === hostOn) setAsked(null) }, [asked, hostOn])
+  const on = asked ?? hostOn
+  const words = on ? (fromRitemark1 && asked === null ? COPY.usageOn : COPY.usageOnHere) : COPY.usageOff
   return (
     <div className={`rw-usage${afterLine ? ' after-line' : ''}`}>
       <span className="t">
@@ -315,7 +342,7 @@ export function UsageData({ on, fromRitemark1, afterLine }: { on: boolean; fromR
         <Switch
           className="rw-switch"
           checked={on}
-          onCheckedChange={(checked) => send({ type: 'welcome/usage-data', on: checked })}
+          onCheckedChange={(checked) => { setAsked(checked); send({ type: 'welcome/usage-data', on: checked }) }}
           aria-labelledby="rw-usage-title"
           aria-describedby="rw-usage-words"
         />
@@ -348,6 +375,12 @@ export function KeySheet({
 }) {
   const [values, setValues] = useState<Partial<Record<WelcomeKeyName, string>>>({})
   const [saving, setSaving] = useState(false)
+  // The sheet has no Radix Trigger, so Radix has nowhere to put focus back on close: remember the button
+  // that opened it, read while rendering the opening, before the sheet takes focus (S2).
+  const opener = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  if (target !== null && !wasOpen.current) opener.current = document.activeElement as HTMLElement | null
+  wasOpen.current = target !== null
   useEffect(() => { setValues({}); setSaving(false) }, [target])
   useEffect(() => {
     if (!result) return
@@ -368,6 +401,9 @@ export function KeySheet({
       <DialogContent aria-describedby="rw-keys-note" onOpenAutoFocus={(event) => {
         event.preventDefault()
         ;(document.querySelector('.rw-keyfield input') as HTMLInputElement | null)?.focus()
+      }} onCloseAutoFocus={(event) => {
+        event.preventDefault()
+        if (opener.current?.isConnected) opener.current.focus()
       }}>
         <DialogHeader icon={<Icon name="key" size={16} />} onClose={onClose}>
           <DialogTitle className="text-[15px] font-semibold">{target === 'claude' ? COPY.apiKeys : 'Set up OpenCode'}</DialogTitle>

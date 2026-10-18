@@ -10,8 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { WelcomeMessage, WelcomeState } from '../../../../src/welcome/protocol'
-import { projectLine, updateRows } from '../../../../src/welcome/welcomeState'
+import type { AccountProviderId, WelcomeMessage, WelcomeState } from '../../../../src/welcome/protocol'
+import { CHECK_TIMEOUT_MS, projectLine, signInAnswered, startSignIn, updateRows, withStartingSignIn, type StartingSignIn } from '../../../../src/welcome/welcomeState'
 import { Icon } from '../ui/Icon'
 import { COPY, PROVIDER_NAMES, missingToolLine, readyLine, spokenState } from './welcomeCopy'
 import {
@@ -54,6 +54,7 @@ export function WelcomePage() {
   const [keysResult, setKeysResult] = useState<{ ok: boolean; message: string | null } | null>(null)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [addAnother, setAddAnother] = useState(false)
+  const [starting, setStarting] = useState<StartingSignIn | null>(null)
 
   useEffect(() => {
     const listener = (event: MessageEvent<WelcomeMessage>) => {
@@ -66,8 +67,25 @@ export function WelcomePage() {
     return () => window.removeEventListener('message', listener)
   }, [])
 
-  const view = state ?? INITIAL
+  const hostView = state ?? INITIAL
+  // A Sign in the host has not answered yet shows Checking… on its card (R15, #401).
+  const view = useMemo(() => (starting ? { ...hostView, providers: withStartingSignIn(hostView.providers, starting) } : hostView), [hostView, starting])
   const signingIn = isSigningIn(view.providers)
+
+  useEffect(() => {
+    if (!starting) return
+    if (signInAnswered(hostView.providers, starting)) {
+      setStarting(null)
+      return
+    }
+    const timer = setTimeout(() => setStarting(null), CHECK_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [hostView.providers, starting])
+
+  const signIn = useCallback((id: AccountProviderId) => {
+    setStarting(startSignIn(hostView.providers, id))
+    send({ type: 'welcome/sign-in', provider: id })
+  }, [hostView.providers])
 
   // Escape cancels a sign-in in progress (R1).
   useEffect(() => {
@@ -95,7 +113,7 @@ export function WelcomePage() {
           <div className="rw-notice" role="status"><Icon name="warning-circle" size={16} tone="inherit" />{view.notice}</div>
         )}
         {view.kind === 'fresh' && view.step === 1 && (
-          <StepOne view={view} signingIn={signingIn} onKeys={openKeys} />
+          <StepOne view={view} signingIn={signingIn} onKeys={openKeys} onSignIn={signIn} />
         )}
         {view.kind === 'fresh' && view.step === 2 && (
           <StepTwo view={view} newProjectOpen={newProjectOpen} setNewProjectOpen={setNewProjectOpen} />
@@ -108,6 +126,7 @@ export function WelcomePage() {
             newProjectOpen={newProjectOpen}
             setNewProjectOpen={setNewProjectOpen}
             onKeys={openKeys}
+            onSignIn={signIn}
           />
         )}
         {view.kind === 'start' && (
@@ -137,18 +156,18 @@ function SheetHead({ hero, logo, kind, step }: { hero: string; logo: string; kin
 
 // ── Step 1: which AI do you use? ────────────────────────────────────────────
 
-function StepOne({ view, signingIn, onKeys }: { view: WelcomeState; signingIn: string | null; onKeys: (target: KeySheetTarget) => void }) {
+function StepOne({ view, signingIn, onKeys, onSignIn }: { view: WelcomeState; signingIn: string | null; onKeys: (target: KeySheetTarget) => void; onSignIn: (id: AccountProviderId) => void }) {
   return (
     <>
       <h1 id="rw-title">{COPY.freshTitle}</h1>
       <p className="rw-one">{COPY.freshLine}</p>
-      <AiChoices view={view} signingIn={signingIn} onKeys={onKeys} />
+      <AiChoices view={view} signingIn={signingIn} onKeys={onKeys} onSignIn={onSignIn} />
       <div className="rw-fine"><Icon name="lock-simple" size={14} tone="inherit" />{COPY.privacyLine}</div>
     </>
   )
 }
 
-function AiChoices({ view, signingIn, onKeys, skip = true }: { view: WelcomeState; signingIn: string | null; onKeys: (target: KeySheetTarget) => void; skip?: boolean }) {
+function AiChoices({ view, signingIn, onKeys, onSignIn, skip = true }: { view: WelcomeState; signingIn: string | null; onKeys: (target: KeySheetTarget) => void; onSignIn: (id: AccountProviderId) => void; skip?: boolean }) {
   return (
     <>
       <h2>{COPY.whichAi}</h2>
@@ -161,7 +180,7 @@ function AiChoices({ view, signingIn, onKeys, skip = true }: { view: WelcomeStat
             key={provider.id}
             view={provider}
             faded={signingIn !== null && provider.id !== signingIn}
-            onSignIn={() => send({ type: 'welcome/sign-in', provider: provider.id as 'claude' | 'chatgpt' })}
+            onSignIn={() => onSignIn(provider.id as AccountProviderId)}
             onSetUp={() => onKeys('opencode')}
             onContinue={() => send({ type: 'welcome/continue', provider: provider.id })}
           />
@@ -283,6 +302,7 @@ function UpdateSheet({
   newProjectOpen,
   setNewProjectOpen,
   onKeys,
+  onSignIn,
 }: {
   view: WelcomeState
   addAnother: boolean
@@ -290,6 +310,7 @@ function UpdateSheet({
   newProjectOpen: boolean
   setNewProjectOpen: (open: boolean) => void
   onKeys: (target: KeySheetTarget) => void
+  onSignIn: (id: AccountProviderId) => void
 }) {
   const rows = updateRows(view.providers)
   const signingIn = isSigningIn(view.providers)
@@ -299,7 +320,7 @@ function UpdateSheet({
       <p className="rw-one update">{COPY.updateLine}</p>
       {addAnother ? (
         <div style={{ marginBottom: 24 }}>
-          <AiChoices view={view} signingIn={signingIn} onKeys={onKeys} skip={false} />
+          <AiChoices view={view} signingIn={signingIn} onKeys={onKeys} onSignIn={onSignIn} skip={false} />
           <div className="rw-links" style={{ marginTop: 4 }}>
             <SheetButton label="Done" tooltip="Back to your AI and projects" onClick={() => setAddAnother(false)} />
           </div>
@@ -312,7 +333,7 @@ function UpdateSheet({
           </div>
           <div className="rw-airbox" role="list" aria-label={COPY.yourAi}>
             {view.offline && <div className="rw-offline" role="status"><Icon name="wifi-slash" size={16} tone="inherit" />{COPY.offline}</div>}
-            {rows.map((provider) => <ProviderRow key={provider.id} view={provider} onSetUp={() => onKeys('opencode')} />)}
+            {rows.map((provider) => <ProviderRow key={provider.id} view={provider} onSetUp={() => onKeys('opencode')} onSignIn={() => onSignIn(provider.id as AccountProviderId)} />)}
           </div>
         </>
       )}

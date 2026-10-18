@@ -107,6 +107,30 @@ export function afterSkip(state: StepInput): StepInput {
   return state.kind === 'fresh' ? { ...state, step: 2, readyProvider: null } : state;
 }
 
+/**
+ * A Sign in the page sent that the host has not answered yet (R15, #401): on a busy first start the host can take
+ * seconds, so the card shows Checking… at once instead of a button that seems to do nothing. The host's next word
+ * about that AI (any change to its card) ends the page's guess.
+ */
+export interface StartingSignIn {
+  id: AccountProviderId;
+  /** The card as it was when the person clicked. */
+  seen: string;
+}
+
+export function startSignIn(providers: readonly ProviderView[], id: AccountProviderId): StartingSignIn {
+  return { id, seen: JSON.stringify(providers.find((view) => view.id === id) ?? null) };
+}
+
+export function signInAnswered(providers: readonly ProviderView[], starting: StartingSignIn): boolean {
+  return JSON.stringify(providers.find((view) => view.id === starting.id) ?? null) !== starting.seen;
+}
+
+export function withStartingSignIn(providers: readonly ProviderView[], starting: StartingSignIn | null): ProviderView[] {
+  if (!starting) return [...providers];
+  return providers.map((view) => (view.id === starting.id ? { ...view, phase: 'checking', reason: null, retry: false } : view));
+}
+
 /** Whether a provider's sign-in is the welcome's own (Claude and ChatGPT), or a set-up sheet (OpenCode). */
 export function isAccountProvider(id: WelcomeProviderId): id is AccountProviderId {
   return id === 'claude' || id === 'chatgpt';
