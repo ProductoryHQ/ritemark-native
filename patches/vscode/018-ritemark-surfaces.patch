@@ -329,10 +329,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..4905f4d95ae
+index 00000000000..7119cab4f60
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1579 @@
+@@ -0,0 +1,1561 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -934,9 +934,11 @@ index 00000000000..4905f4d95ae
 +	padding: 0 8px; /* multiEditorTabsControl.ts RITEMARK_TABS_INSET */
 +}
 +
-+/* The close button has its own slot inside the tab (VS Code lets it spill past the tab's edge): its 20 box (a 16 button
++/* The close button has its own slot inside every tab (VS Code lets it spill past the tab's edge): its 20 box (a 16 button
 +   padded by 2) 6 after the name and 6 from the tab's edge, so its glyph is centred 16 from the edge and the name ends 32
-+   from it (kit: .tb.on padding-right 32, .tb .x 16 at right 8) */
++   from it (kit: .tb padding-right 32, .tb .x 16 at right 8). VS Code shows the button on the chosen tab, a changed one
++   and the tab under the pointer, so a pointed-at tab shows it at its right edge, its icon stays, and no tab changes
++   width (R7, S23; Jarmo, 18 October: "x-close on teistes äppides ikka paremal?") */
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed > .tab-actions,
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-shrink > .tab-actions {
 +	flex: 0 0 20px !important; /* !important: core's tab sizing rules are as specific */
@@ -962,21 +964,6 @@ index 00000000000..4905f4d95ae
 +	max-width: 100%;
 +}
 +
-+/* Only the chosen tab (and a changed one) keeps room for its close button, at its right. On the others the close
-+   button takes the icon's place under the pointer: no tab keeps empty room, pointing moves nothing (R7, S23) */
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.tab-actions-right.sizing-fixed:not(.active):not(.dirty) > .tab-actions {
-+	position: absolute !important; /* !important: as above */
-+	left: 6px; /* its glyph exactly where the icon was (the button pads it by 4) */
-+	top: 0;
-+	width: 20px;
-+	flex: none !important; /* !important: the slot's own rule above is !important (0 0 20px) */
-+	margin: 0;
-+}
-+
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed:not(.active):not(.dirty):hover > .tab-label::before {
-+	visibility: hidden;
-+}
-+
 +/* Each tab is as wide as its whole name, up to 200, with no floor, so the gaps between names are equal (R7, S22; the
 +   prototype: a shown tab keeps its measured width, ritemarkFoldTabs). A crowded row folds the tabs used longest ago
 +   rather than shorten names. */
@@ -986,13 +973,8 @@ index 00000000000..4905f4d95ae
 +	min-width: 0;
 +	max-width: 200px !important; /* !important: multieditortabscontrol.css's fixed sizing sets it from a variable in a more specific rule */
 +	padding-left: 12px !important; /* !important: multieditortabscontrol.css's tab padding is more specific */
-+	padding-right: 12px !important; /* !important: VS Code's padding for tabs whose close button is off or on the left is more specific */
++	padding-right: 6px !important; /* !important: VS Code's padding for tabs whose close button is off or on the left is more specific. the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
 +	border-right-width: 0 !important; /* !important: core keeps a 1px tab border even when tab.border is transparent; tabs touch, as drawn */
-+}
-+
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active,
-+.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.dirty {
-+	padding-right: 6px !important; /* !important: VS Code's padding for tabs whose close button is off is as specific or more. the close button's slot ends 6 from the tab's edge (see the slot's rule above) */
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sizing-fixed.active {
