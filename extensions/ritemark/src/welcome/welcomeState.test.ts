@@ -41,6 +41,7 @@ assert.equal(providerView('claude', answered('error')).retry, true);
 
 // ── R3: signing in, and what happened when it did not finish ──
 assert.equal(providerView('claude', { ...answered('needs-auth'), signingIn: true }).phase, 'signing-in');
+assert.equal(providerView('claude', { ...answered('ready'), keySaved: true }).phase, 'checking', 'a saved key: Checking…, never "your browser opened"');
 const failed = providerView('claude', { ...answered('needs-auth'), problem: 'failed' });
 assert.equal(failed.phase, 'sign-in');
 assert.ok(failed.reason && !/error|code|authenticat|codex/i.test(failed.reason), 'one sentence, no codes, no "authenticated"');

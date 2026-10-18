@@ -88,7 +88,7 @@ export function WelcomePage() {
   const spoken = useMemo(() => view.providers.map(spokenState).join(' '), [view.providers])
 
   return (
-    <div className="rw-ground">
+    <div className={`rw-ground${view.kind === 'fresh' ? '' : ' short'}`}>
       <main className="rw-sheet" aria-labelledby="rw-title">
         <SheetHead hero={hero} logo={logo} kind={view.kind} step={view.step} />
         {view.notice && (

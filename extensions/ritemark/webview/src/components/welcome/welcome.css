@@ -10,11 +10,14 @@
   background: var(--vscode-ritemark-ground, var(--r-surface-soft));
   font-family: var(--ritemark-ui-font-family);
   color: var(--r-ink-strong);
-  padding: 32px 16px 40px;
+  /* The page starts under the 44 strip: the sheet's top at 84 from the window's (experience 2), 56 for the
+     shorter update and start sheets (experience 32) */
+  padding: 40px 16px 40px;
   display: flex;
   justify-content: center;
   align-items: flex-start;
 }
+.rw-ground.short { padding-top: 12px; }
 
 /* The page scrolls in a short window: a thin bar on the ground, not a white track */
 html { scrollbar-width: thin; scrollbar-color: var(--r-hairline-strong) transparent; }
@@ -175,6 +178,11 @@ html { scrollbar-width: thin; scrollbar-color: var(--r-hairline-strong) transpar
 .rw-usage .t .legal a { color: var(--r-ink-body); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .rw-usage .t .legal a:hover { color: var(--r-ink-strong); }
 .rw-usage .rw-switch[data-state='unchecked'] { background: var(--r-hairline-strong); }
+/* The kit's switch: 28 x 16, a 12 knob */
+.rw-usage .rw-switch { width: 28px; height: 16px; padding: 0 2px; }
+.rw-usage .rw-switch [data-slot='switch-thumb'] { width: 12px; height: 12px; background: #fff; }
+.rw-usage .rw-switch[data-state='checked'] [data-slot='switch-thumb'] { transform: translateX(12px); }
+.rw-usage .rw-switch[data-state='unchecked'] [data-slot='switch-thumb'] { transform: translateX(0); }
 
 /* The small sheets over the welcome (API keys, OpenCode's Set up). */
 .rw-keyfield { margin-bottom: 14px; }

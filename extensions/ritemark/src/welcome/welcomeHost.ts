@@ -435,11 +435,14 @@ class WelcomeController implements vscode.Disposable {
       if (this.checkTokens[id] !== token) return;
       const method = availability.state === 'ready' ? await this.methodOf(id) : null;
       const signInEnded = availability.state === 'needs-auth' && id === 'chatgpt' && codexSignInWasThere();
-      const wasReady = memory.check.kind === 'answered' && memory.check.availability.state === 'ready';
       memory.check = { kind: 'answered', availability, method, signInEnded };
-      if (availability.state === 'ready' && !wasReady && memory.signingIn) {
+      // Ready after a sign-in or a key saved from the welcome: step 2 (R3). A key for a provider that was
+      // already ready (Claude signed in, then an Anthropic key) also goes on, as the key's method.
+      if (availability.state === 'ready' && (memory.signingIn || memory.keySaved)) {
+        const how = memory.keySaved ? 'api_key' : (method ?? 'account');
         memory.signingIn = false;
-        this.providerReadyFromWelcome(id, method ?? 'account');
+        memory.keySaved = false;
+        this.providerReadyFromWelcome(id, how);
       }
       this.push();
     })();
@@ -656,11 +659,11 @@ class WelcomeController implements vscode.Disposable {
     reply(true, null);
     const provider: WelcomeProviderId = target === 'claude' ? 'claude' : 'opencode';
     // Ready when its check says so; then step 2, as for a sign-in (S5, S12).
-    this.memories[provider].signingIn = true;
+    this.memories[provider].keySaved = true;
     this.check(provider);
     setTimeout(() => {
-      if (this.memories[provider].signingIn) {
-        this.memories[provider].signingIn = false;
+      if (this.memories[provider].keySaved) {
+        this.memories[provider].keySaved = false;
         this.push();
       }
     }, CHECK_TIMEOUT_MS);
