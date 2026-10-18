@@ -12,14 +12,16 @@ panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether
 terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
 tab carries the working dot (terminalEditorInput.ts). A named terminal keeps its name as the title's source
 when the shell reports its folder, so it comes back named after a reload (terminalInstance.ts).
-The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later).
+The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later); it
+keeps the last name seen, since on Windows the shell type clears while a command runs. A terminal tab's menu
+offers no move into the panel (terminalMenus.ts; Windows round 1).
 Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorGroupView,editorTabsControl,multiEditorTabsControl,
 ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
-terminalEditor,terminalEditorInput,terminalInstance}.ts; and the two tests above.
+terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index 28d0480ab86..08b6f36aa5f 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -822,10 +824,10 @@ index 00000000000..99967801216
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
-index 00000000000..d1b8dd87cc4
+index 00000000000..1139dbc84a4
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,123 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -852,6 +854,12 @@ index 00000000000..d1b8dd87cc4
 +
 +/** The bar's fixed height, in the desk's pixels. */
 +export const RITEMARK_TERMINAL_BAR_HEIGHT = 52;
++
++/**
++ * Each terminal's shell, as last seen. On Windows the shell type clears while another program runs in the shell
++ * (Windows round 1: the bar read "Terminal 2" while running and "pwsh" when idle), so the bar keeps the last one.
++ */
++const shellNames = new WeakMap<ITerminalInstance, string>();
 +
 +export class RitemarkTerminalBar extends Disposable {
 +
@@ -912,7 +920,10 @@ index 00000000000..d1b8dd87cc4
 +
 +	private update(): void {
 +		const instance = this.instance;
-+		this.name.textContent = instance ? (instance.shellType ?? instance.processName) || instance.title : '';
++		if (instance?.shellType) {
++			shellNames.set(instance, instance.shellType);
++		}
++		this.name.textContent = instance ? shellNames.get(instance) || instance.processName || instance.title : '';
 +		const isRunning = !!instance && ritemarkTerminalRunning.isRunning(instance);
 +		this.runningChip.style.display = isRunning ? '' : 'none';
 +		this.stop.style.display = isRunning ? '' : 'none';
@@ -1176,6 +1187,26 @@ index 50a4c0f4917..db53f732c98 100644
  		return title;
  	}
  
+diff --git a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+index 4e645b1cd3f..b1dcc8b10f7 100644
+--- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
++++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
+@@ -663,14 +663,7 @@ export function setupTerminalMenus(): void {
+ 		]
+ 	);
+ 
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.MoveToTerminalPanel,
+-			title: terminalStrings.moveToTerminalPanel
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
++	// Ritemark 2.0: a terminal is a tab (R8), so its tab offers no move into the panel 2.0 does not use.
+ 
+ 	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+ 		command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
 index 00000000000..5627ecf829b

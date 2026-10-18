@@ -75,7 +75,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [x] PR 1 opened; `qa-validator` review; Jarmo's "admin merge" (#443, merged 2026-10-17 as d781a0e1)
 - [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) (the Development manager, at d781a0e1: source verified, 19/19 patches on vanilla 1.117.0, both validations and provenance passed, the extension activates with no errors on a fresh profile)
-- [ ] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2)
+- [x] After the merge: Windows round 1 from main: S7–S11, S28–S33, S37, S38 on a Windows PC; findings in `qa-evidence.md` (R2). Done 2026-10-18 by the Windows session: 11 of 13 pass, S8 and S31 partial, S10 for Jarmo by hand
 - [x] After the merge: drift check, results in the release plan's risk register (E6) (15 of 19 fail on 1.142.0, in 58 file patches)
 - [ ] Release plan tracker updated
 
@@ -93,7 +93,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
   - The Agents place (the Experience lead, 17 October; Experience 31): the column's head is the project head (mark, name, chevron) as on every place but Home, with no "Agents" title row and no "6 skills · 1 flow" line; the search field becomes the Search row under New; Project / User become the This project / All projects switch; the six sections as column groups with muted counts and 32 rows; the view's remaining hard-coded light fills themed.
 - [ ] The contrast unit test (R13)
 - [ ] `ritemarkWindowSizes.ts`: the 1400, 1200 and 960 crossings; a column the person opened left alone (R14)
-- [ ] The fixes from Windows round 1 (R2)
+- [x] The fixes from Windows round 1 (R2): no Move Terminal into Panel on a terminal tab; no Run in the View menu; View → Copilot Chat and Ctrl+Alt+I open Copilot Chat as a tab, not in the panel; ritemark.app trusted; the terminal bar keeps the shell's name while a command runs. Open: whether a terminal tab keeps Change Color, Change Icon and Size to Content Width (Experience lead), and S8's wording (Alt focuses the menu button)
 
 ## Phase 8: Merge 2, the theme and Windows, and closeout
 

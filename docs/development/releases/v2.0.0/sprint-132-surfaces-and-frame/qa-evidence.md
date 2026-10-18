@@ -25,7 +25,7 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S4 Moving the window | Open (Jarmo) | Needs a real pointer on the window: a synthetic press cannot move a window by its drag region. |
 | S5 The traffic lights after a restart | Partial | After restarts the lights sit on the line at the same pixels as before ([`qa/s13-zoom-after-restart.png`](qa/s13-zoom-after-restart.png)). Full screen and back is for Jarmo's pass (it takes over the screen). |
 | S6 A sheet dialog | Open (Jarmo) | A native sheet would come up over Jarmo's work. |
-| S7–S11 | Windows | Windows round 1, after merge 1. |
+| S7–S11 | Windows | Windows round 1 (below): S7, S9 and S11 pass; S8 partial (Alt focuses the menu button and Enter or ↓ opens it); S10 for Jarmo by hand. |
 | S12 Zoom in and out | Pass | Native captures of the top 52 points at zoom 1.0, 1.2, 1.44 and 0.83 ([`qa/s12-zoom-top-band.png`](qa/s12-zoom-top-band.png)): the lights, toggles, You and the tabs keep their size and the line; the lights' pixels are identical; only the columns under the strip change width. |
 | S13 Zoom across a restart | Pass | Zoomed to 1.2, quit and relaunched: zoom 1.2 came back, the lights and toggles at the same pixels as at zoom 1.0 ([`qa/s13-zoom-after-restart.png`](qa/s13-zoom-after-restart.png)). |
 | S14 Only the AI | Pass | After a fresh start, restarts and the v1.14 profile (S45), the AI column shows only the AI's sheet with its chat rail: no VS Code title row, no row of icons ([`qa/s1-fresh-start.png`](qa/s1-fresh-start.png)). |
@@ -45,17 +45,17 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 | S28 A terminal from the + | Pass | Opens a tab named "Terminal", then "Terminal 2"; names survive a reload and a restart. The terminal's bar shows the shell's name as a plain label, then Split, Clear and Close (the Experience lead's answer 3, confirmed by Jarmo: the shell menu comes later). |
 | S29 Running and Stop | Pass | Running shows while a command runs; Stop ends it. |
 | S30 Working behind other tabs | Pass | The working dot shows on a busy terminal's tab behind other tabs. |
-| S31 Ritemark's own terminals | Open | |
+| S31 Ritemark's own terminals | Partial | Windows round 1: Codex Repair with the bundled runtime opens no terminal, by design (it says Codex ships with Ritemark and cannot be repaired on its own). Claude Login not run: Claude is connected, and reaching Sign in would sign Jarmo out. The others not run yet. |
 | S32 No terminal at start | Pass | No terminal opens on start; the panel stays hidden after restarts. |
 | S33 Terminals across a restart | Pass | After a restart, all four terminals came back as tabs; no panel. |
 | S34 A pinned Task board tab | Pass | In the app, with the board pinned: ⌘W leaves it and brings the next tab forward; ⌘K ⇧⌘↵ (Unpin) leaves it pinned; ⌃⌘→ leaves it on its desk; ⌘K ⇧⌘← on a document beside it leaves the document behind it; a slip of my palette driver closed every other tab and the emptied desk (most likely Close All Editors) and left only the board; Close all is confirmed by the unit test. `ritemarkPermanentTabs.test.ts` (5 tests) covers the same rules plus a tab opened or dragged to the front, Close others and disposal; it found that a tab *opened* at the front went in front of the board (fixed). Minor: ⌃⌘→ still opens an empty desk to the right before the refused move (listed under Open findings). |
 | S35 The head on Documents | Pass | The project's mark ("HL", a 24 square of ink at 16, 98) before its name at 48; New at 136, Search at 168, Documents at 214, the tree from 236, the name centred at 110 (geometry). The tree at 8 with 16 per level (icon 16 and 32, label 38 and 54), as the Experience lead's answer 6 asks. |
 | S36 The project's menu and New | Pass | Both are Ritemark menus at 16, 4 under their row, 232 wide, with icons and hairlines. The project's menu (after the Experience lead's review): Switch project… (opens the recent folders), Open a folder…, Reveal in Finder, then New folder and Collapse folders ([`qa/s36-project-menu.png`](qa/s36-project-menu.png), [`qa/s36-new-menu.png`](qa/s36-new-menu.png)). Switch project…, New folder, Collapse folders, Text, Table (CSV data), Flow, Other file… and Folder each worked. Open a folder… and Reveal in Finder were not run: they open a system dialog and Finder in front of Jarmo's work. Reveal's wiring is unit-tested. |
 | S37 You | Partial | The menu matches experiences/settings frame 1: "Settings ⌘," and Help. ⌘, opens Ritemark Settings (Jarmo's answer of 17 October). By keyboard: You is a button with `aria-haspopup=menu`; Enter and Space open the menu, ↑ ↓ move, Enter on Settings opens Ritemark Settings, Escape closes it and returns focus to You (it did not before; fixed for every Ritemark menu). Not run: Help (it opens ritemark.app in the system browser in front of Jarmo's work) and VoiceOver (it speaks aloud); both for Jarmo's pass. |
-| S38 Ritemark's menus | Partial | More, You, the +, "N ⌄" and the head's menus are Ritemark menus (S17, S24, S26, S27, S36, S37). The macOS menu bar staying native is for Jarmo's pass (the app cannot read native menus here without accessibility access); the Windows application menu is for the Windows round. |
+| S38 Ritemark's menus | Partial | More, You, the +, "N ⌄" and the head's menus are Ritemark menus (S17, S24, S26, S27, S36, S37). The macOS menu bar staying native is for Jarmo's pass (the app cannot read native menus here without accessibility access); Windows round 1: the application menu is Ritemark's own (32 rows, radius 8, Sofia Sans 13, the indigo chosen row), Pass. |
 | S44 The inventory | Partial | The window section, which this sprint moves, walked row by row: Home; the file list on Documents; the + (Text, Table, Web page, Terminal); Search under New; New file and folder in New; open editors as tabs; Source control (File changes) and Extensions from More; Terminal from the + and ⌃`; All commands in the project's menu; Settings in You; one toggle per side; the breadcrumb and the remote and problems items gone; the status bar with notifications, Report AI issue, AI Ready and the word count. The editor, the other kinds of file and the AI are untouched by this sprint and were used throughout the QA (Markdown, CSV, a flow, the Task board, a web page, the AI's sheet); a row-by-row walk of those sections is still to do. Not checkable here: the macOS menu bar (Jarmo's pass). Note: File changes opens with VS Code's head, "Source Control". |
 | S45 A lived-in profile | Pass | A v1.14.0 profile made with the installed app (its own instance and profile, in the background): a terminal and Search in the AI column, the Chat view once opened, Agent Library dragged to the top, Ritemark Dark chosen by hand. Opened with this build: the places row on top in R5's order (the drag replaced once), the AI column only the AI, Search in the left column (in More), Chat moved to the panel, the theme still Ritemark Dark ([`qa/s45-lived-in-profile.png`](qa/s45-lived-in-profile.png), taken before the Agents view was renamed: its head reads "Agents: Agent Library", and after the rename it reads "Agents"). Three fixes came out of it (below). Not exercisable: v1.14 keeps no terminal across a quit (its saved buffer state is empty), so there is none to bring over; Copilot Chat is not installed in the shipped app, and Outline is hidden in 1.x, so Search stood in for it. |
-| S46 The terminal shortcut | Partial | ⌃` opens a new terminal tab from the tree and from inside a terminal; no panel. The View menu (native on the Mac) is for Jarmo's pass; on Windows it is checked in round 1. |
+| S46 The terminal shortcut | Partial | ⌃` opens a new terminal tab from the tree and from inside a terminal; no panel. The View menu (native on the Mac) is for Jarmo's pass. Windows round 1: Ctrl+` opens terminal tabs and the View menu has no Terminal entry, Pass. |
 
 ## Found and fixed during QA
 
@@ -83,3 +83,48 @@ Status: **Pass**, **Partial** (what was not run is named), **Open** (not run yet
 - **Drift at merge 1:** 15 of 19 patches fail on VS Code 1.142.0, in 58 file patches ([`notes/drift.md`](notes/drift.md)).
 - **Jarmo's Mac pass on merge 1:** Ritemark Settings must lie on white, and the CSV grid lost its edge; both are fixed for merge 2 (tasks.md, Phase 7).
 - **More's tooltip over its open menu** (seen by the Development manager on a scripted click): not reproduced, either hovering first or clicking at once and waiting. Found instead and fixed: while the pointer was on More, its glyph painted VS Code's toolbar hover box inside the place's fill.
+
+## Windows round 1
+
+Tested by the Windows session on Jarmo's PC: CI build of `d781a0e1` (run 39048820235), installed over 1.14.0 (exit
+0), SHA-256 matching, Authenticode valid (Productory Services OÜ), a fresh profile. The build still reports 1.14.0,
+as expected until 2.0's version bump. Screenshots stay on the Windows PC.
+
+| Scenario | Result | Notes |
+| --- | --- | --- |
+| S7 No title row | Pass | Window buttons at full height from x=1304 of 1440; strip 43. |
+| S8 The menu | Partial | The menu button opens File, Edit, View and Help with Ctrl shortcuts; arrows and Escape work. Alt alone focuses the menu button, and Enter or ↓ opens it (Windows' own rule, and 1.14's); the scenario says Alt opens it. |
+| S9 The AI hidden | Pass | |
+| S10 Snapping and dragging | Not run | Needs a real pointer; Jarmo checks it by hand. |
+| S11 No ⌘ on Windows | Pass | Ctrl everywhere. |
+| S28–S30, S32, S33 | Pass | |
+| S31 Ritemark's own terminals | Partial | See the merge 1 table. |
+| S37 You | Pass | Settings (Ctrl+,) and Help. |
+| S38 Ritemark's menus | Pass | |
+| S46 The terminal shortcut | Pass | |
+
+Findings, fixed on the merge-2 branch:
+
+- **A terminal tab's menu offered "Move Terminal into Panel"**, a way back into the panel R8 removed (it showed on
+  the Mac too). Removed from the tab's menu (019, `terminalMenus.ts`); the command stays in the palette, and a terminal
+  that reaches the panel still moves back onto the desk ([`qa/w1-terminal-tab-menu.png`](qa/w1-terminal-tab-menu.png)). "Change Color…", "Change Icon…" and "Size to Content Width"
+  are in the same menu: asked the Experience lead whether they stay.
+- **The View menu had "Run" (Ctrl+Shift+D) and "Chat" (Ctrl+Alt+I).** Run is the Run and Debug place, which a fresh
+  profile counts as in use until the debugger settles; its View-menu entry is gone (003), as its top-level menu was
+  already. Chat opened Copilot Chat in VS Code's bottom panel on the desk (found while checking it on the Mac:
+  ⌃⌘I did the same), where 2.0 opens it as a tab from More. The View menu's entry is now "Copilot Chat" and, with
+  Ctrl+Alt+I (⌃⌘I), opens the same tab as More, bringing an open one forward (007; 003 drops the panel view's own
+  entry). Checked on the Mac: ⌃⌘I opens one "Chat" tab and a second press brings it forward; the panel stays shut
+  (before: [`qa/w1-copilot-chat-panel-before.png`](qa/w1-copilot-chat-panel-before.png); after:
+  [`qa/w1-copilot-chat-tab.png`](qa/w1-copilot-chat-tab.png)).
+- **"Browser Ctrl+Alt+ä"** is VS Code's own shortcut for View → Browser (Ctrl+Alt+/), labelled with the key that types
+  "/" on the Estonian layout. It is the same in 1.14; no change.
+- **Help → Support asked "Do you want Ritemark to open the external website?"** on a fresh profile. `ritemark.app`
+  and its subdomains are now trusted link domains (`linkProtectionTrustedDomains` in both product.json files);
+  View License (github.com) still asks.
+- **The terminal bar read "Terminal 2" while a command ran and "pwsh" when idle.** On Windows the shell type clears
+  while another program runs in the shell; the bar now keeps the last shell name it saw (019,
+  `ritemarkTerminalBar.ts`). The Mac keeps its name either way; Windows round 2 confirms the fix.
+
+Still open from round 1: the View menu's Problems, Output and Debug Console entries (when those views exist) open
+VS Code's bottom panel, as in 1.14.
