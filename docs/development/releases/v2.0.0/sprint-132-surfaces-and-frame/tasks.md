@@ -71,7 +71,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] Extension tests: the 2.0 defaults and the head's menus in `package.json` (E3)
 - [x] `scripts/qa/frame-geometry.mjs` on a dev instance launched without focus; results in `qa/` (E3)
 - [x] Docs: `references/layout-invariants.md`, `architecture.md` (the locked decision and a frame note), `CLAUDE.md`'s patch table and count, `PATCH-RULES.md`'s table (E4)
-- [x] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md` (S4, S5, S6, S10, the native menu bar and Help are Jarmo's own pass, listed in the PR)
+- [x] Manual QA on the Mac: S1–S6, S12–S38, S44–S46; evidence in `qa-evidence.md` (S4, S5, S6, the native menu bar and Help are Jarmo's own pass, listed in the PR; S10 he passed by hand on Windows, 18 October)
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree
 - [x] PR 1 opened; `qa-validator` review; Jarmo's "admin merge" (#443, merged 2026-10-17 as d781a0e1)
 - [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) (the Development manager, at d781a0e1: source verified, 19/19 patches on vanilla 1.117.0, both validations and provenance passed, the extension activates with no errors on a fresh profile)

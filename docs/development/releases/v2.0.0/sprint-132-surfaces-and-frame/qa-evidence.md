@@ -111,7 +111,7 @@ as expected until 2.0's version bump. Screenshots stay on the Windows PC.
 | S7 No title row | Pass | Window buttons at full height from x=1304 of 1440; strip 43. |
 | S8 The menu | Pass | The menu button opens File, Edit, View and Help with Ctrl shortcuts; arrows and Escape work. Alt alone focuses the menu button, and Enter or ↓ opens it (Windows' own rule, and 1.14's). The scenario said Alt opens it; reworded to this with the Development manager. |
 | S9 The AI hidden | Pass | |
-| S10 Snapping and dragging | Not run | Needs a real pointer; Jarmo checks it by hand. |
+| S10 Snapping and dragging | Pass (Jarmo, by hand) | Jarmo checked it by hand on Windows with 2.0 on 18 October: snap layouts on the maximise button, dragging the strip to a screen edge, and double-clicking the strip. His result: "It worked fine." (relayed by the Development manager). |
 | S11 No ⌘ on Windows | Pass | Ctrl everywhere. |
 | S28–S30, S32, S33 | Pass | |
 | S31 Ritemark's own terminals | Partial | See the merge 1 table. |
