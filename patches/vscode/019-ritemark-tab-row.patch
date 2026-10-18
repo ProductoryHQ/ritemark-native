@@ -16,6 +16,8 @@ The terminal's bar shows the shell's name as a plain label in step 1 (its menu o
 keeps the last name seen, since on Windows the shell type clears while a command runs. A terminal tab's menu
 adds only Rename to the usual tab items: no move into the panel, no Change Color, Change Icon or Size to Content
 Width (terminalMenus.ts; Windows round 1 and the Experience lead).
+Closing a terminal whose command still runs asks first, in experience 31's words ("Close Terminal 2?", Close terminal,
+Don't ask again; terminalEditorInput.ts), also from the bar's Close, which closes the tab (ritemarkTerminalBar.ts).
 Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
@@ -825,10 +827,10 @@ index 00000000000..99967801216
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
-index 00000000000..1139dbc84a4
+index 00000000000..1699503e2b0
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,135 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -850,6 +852,7 @@ index 00000000000..1139dbc84a4
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { ITerminalInstance, ITerminalService } from './terminal.js';
 +import { ritemarkTerminalRunning } from './ritemarkTerminalTabs.js';
 +
@@ -874,6 +877,7 @@ index 00000000000..1139dbc84a4
 +		container: HTMLElement,
 +		@ITerminalService private readonly terminalService: ITerminalService,
 +		@IHoverService private readonly hoverService: IHoverService,
++		@IEditorService private readonly editorService: IEditorService,
 +	) {
 +		super();
 +
@@ -898,7 +902,7 @@ index 00000000000..1139dbc84a4
 +			this.terminalService.createTerminal({ location: { parentTerminal: instance } });
 +		});
 +		this.button(bar, 'ritemark-terminal-icon', Codicon.clearAll, undefined, localize('ritemark.terminal.clear', "Clear"), instance => instance.clearBuffer());
-+		this.button(bar, 'ritemark-terminal-icon', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close this terminal: its shell ends and the tab closes"), instance => this.terminalService.safeDisposeTerminal(instance));
++		this.button(bar, 'ritemark-terminal-icon', Codicon.trash, undefined, localize('ritemark.terminal.close', "Close this terminal: its shell ends and the tab closes"), instance => this.close(instance));
 +
 +		this.update();
 +		this._register(ritemarkTerminalRunning.onDidChange(changed => {
@@ -917,6 +921,16 @@ index 00000000000..1139dbc84a4
 +			disposables.add(instance.onDidChangeShellType(() => this.update()));
 +		}
 +		this.update();
++	}
++
++	/** Closes the terminal's tab, so a running command asks first (terminalEditorInput.ts, confirm; experience 31). */
++	private close(instance: ITerminalInstance): void {
++		const [tab] = this.editorService.findEditors(instance.resource);
++		if (tab) {
++			this.editorService.closeEditor(tab);
++		} else {
++			this.terminalService.safeDisposeTerminal(instance);
++		}
 +	}
 +
 +	private update(): void {
@@ -1142,7 +1156,7 @@ index 8b40d469375..42065eef04e 100644
  		this._lastDimension = dimension;
  	}
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
-index f7ce1dab62b..408ee855444 100644
+index f7ce1dab62b..cab412b5b77 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalEditorInput.ts
 @@ -23,6 +23,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
@@ -1153,7 +1167,39 @@ index f7ce1dab62b..408ee855444 100644
  
  export class TerminalEditorInput extends EditorInput implements IEditorCloseHandler {
  
-@@ -162,7 +163,8 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+@@ -105,15 +106,25 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+ 	}
+ 
+ 	async confirm(terminals: ReadonlyArray<IEditorIdentifier>): Promise<ConfirmResult> {
+-		const { confirmed } = await this._dialogService.confirm({
++		// Ritemark 2.0 (experience 31): the question names the terminal and says what closing it does
++		const single = terminals.length === 1;
++		const { confirmed, checkboxChecked } = await this._dialogService.confirm({
+ 			type: Severity.Warning,
+-			message: localize('confirmDirtyTerminal.message', "Do you want to terminate running processes?"),
+-			primaryButton: localize({ key: 'confirmDirtyTerminal.button', comment: ['&& denotes a mnemonic'] }, "&&Terminate"),
+-			detail: terminals.length > 1 ?
+-				terminals.map(terminal => terminal.editor.getName()).join('\n') + '\n\n' + localize('confirmDirtyTerminals.detail', "Closing will terminate the running processes in the terminals.") :
+-				localize('confirmDirtyTerminal.detail', "Closing will terminate the running processes in this terminal.")
++			message: single ?
++				localize('ritemark.confirmCloseTerminal.message', "Close {0}?", terminals[0].editor.getName()) :
++				localize('ritemark.confirmCloseTerminals.message', "Close {0} terminals?", terminals.length),
++			primaryButton: single ?
++				localize({ key: 'ritemark.confirmCloseTerminal.button', comment: ['&& denotes a mnemonic'] }, "&&Close terminal") :
++				localize({ key: 'ritemark.confirmCloseTerminals.button', comment: ['&& denotes a mnemonic'] }, "&&Close terminals"),
++			detail: single ?
++				localize('ritemark.confirmCloseTerminal.detail', "A command is still running in it. Closing the terminal stops it.") :
++				terminals.map(terminal => terminal.editor.getName()).join('\n') + '\n\n' + localize('ritemark.confirmCloseTerminals.detail', "Commands are still running in them. Closing the terminals stops them."),
++			checkbox: { label: localize('ritemark.confirmCloseTerminal.dontAsk', "Don't ask again") }
+ 		});
+ 
++		if (confirmed && checkboxChecked) {
++			await this._configurationService.updateValue(TerminalSettingId.ConfirmOnKill, 'never');
++		}
+ 		return confirmed ? ConfirmResult.DONT_SAVE : ConfirmResult.CANCEL;
+ 	}
+ 
+@@ -162,7 +173,8 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
  			instance.onIconChanged(() => this._onDidChangeLabel.fire()),
  			instanceOnDidFocusListener,
  			instanceOnDidBlurListener,
@@ -1163,7 +1209,7 @@ index f7ce1dab62b..408ee855444 100644
  		];
  
  		this._register(toDisposable(() => {
-@@ -207,6 +209,9 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
+@@ -207,6 +219,9 @@ export class TerminalEditorInput extends EditorInput implements IEditorCloseHand
  			return [];
  		}
  		const extraClasses: string[] = ['terminal-tab', 'predefined-file-icon'];

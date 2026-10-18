@@ -26,6 +26,8 @@ More (R5, R6): the places row's overflow opens Ritemark's menu as drawn: "More p
 then the places that do not fit, with Ritemark's names (compositeBarActions.ts, ritemarkMenu.ts).
 You (R11): Settings and Help, in the same menu. Ritemark's menus on every platform (R12): window.menuStyle
 defaults to custom, and menu.ts draws them; the chosen row is the theme's menu selection (defaultStyles.ts).
+Dialogs (experience 31): window.dialogStyle defaults to custom too, so a dialog is Ritemark's own sheet, drawn in
+ritemarkSurfaces.css (400 wide, the title, the detail, Don't ask again beside the buttons, the default button ringed).
 A new window's columns are the drawn widths: the left column 256 (248 and the 8 to the desk), the AI column
 400 (the 8, the AI's sheet 340 and its rail 52), so the desk is 784 at 1440 (layout.ts).
 Window sizes (R14, ritemarkWindowSizes.ts, loaded by desktop.contribution.ts): below 1400 the AI's column narrows
@@ -270,10 +272,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..ccd01c73466
+index 00000000000..448cfaa2eef
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1309 @@
+@@ -0,0 +1,1466 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -306,6 +308,7 @@ index 00000000000..ccd01c73466
 +	--rm-place-background: var(--vscode-ritemark-placeActiveBackground, var(--vscode-list-activeSelectionBackground));
 +	--rm-place-foreground: var(--vscode-ritemark-placeActiveForeground, var(--vscode-list-activeSelectionForeground));
 +	--rm-hover: var(--vscode-toolbar-hoverBackground);
++	--rm-body: var(--vscode-tab-inactiveForeground); /* the kit's body ink: #475569 in Light, #C7D2FE in Dark */
 +	--rm-radius: 10px;
 +	/* the room the window controls take at the left (the Mac's traffic lights) and the right (Windows' buttons) */
 +	--rm-lights: 0px;
@@ -1582,6 +1585,162 @@ index 00000000000..ccd01c73466
 +	background-color: var(--rm-place-foreground);
 +	box-shadow: 0 0 0 2px var(--rm-ground);
 +	pointer-events: none;
++}
++
++/* Dialogs (experience 31; kit: theme.html .dim, .dialog): Ritemark's own sheet, as the menus are (window.dialogStyle defaults
++   to custom), over the window dimmed in ink. 400 wide, padding 20, radius 12; no icon and no close X (Escape and Cancel close
++   it); the title, the detail, then one row: Don't ask again, Cancel, and the default button ringed, as Enter presses it. */
++.monaco-workbench .monaco-dialog-modal-block.dimmed {
++	background: color-mix(in srgb, var(--vscode-foreground) 18%, transparent);
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-modal-block.dimmed,
++.monaco-workbench.hc-black .monaco-dialog-modal-block.dimmed {
++	background: color-mix(in srgb, color-mix(in srgb, var(--rm-ground), black 50%) 50%, transparent); /* near-black, from the ground */
++}
++
++.monaco-workbench .monaco-dialog-box {
++	position: relative;
++	margin-top: -40px; /* its top at 360 in a 900 window, a little above the centre (theme.html) */
++	width: 400px;
++	min-width: 400px;
++	min-height: 0;
++	padding: 20px;
++	box-sizing: border-box;
++	border-radius: 12px;
++	background-color: var(--rm-desk) !important; /* !important: the dialog sets its colours inline from the editor widget's */
++	color: var(--vscode-foreground) !important; /* !important: as above */
++	border: none !important; /* !important: as above */
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px color-mix(in srgb, var(--vscode-foreground) 28%, transparent), 0 8px 16px -8px color-mix(in srgb, var(--vscode-foreground) 12%, transparent) !important; /* !important: as above */
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-box,
++.monaco-workbench.hc-black .monaco-dialog-box {
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px var(--rm-shadow), 0 8px 16px -8px var(--rm-shadow) !important; /* !important: as above */
++}
++
++.monaco-workbench.hc-black .monaco-dialog-box,
++.monaco-workbench.hc-light .monaco-dialog-box {
++	outline: 1px solid var(--vscode-contrastBorder);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-toolbar-row,
++.monaco-workbench .monaco-dialog-box .dialog-message-row > .dialog-icon {
++	display: none;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row {
++	padding: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container {
++	padding: 0;
++	margin: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message {
++	min-height: 0; /* dialog.css keeps 22 */
++	margin: 0 0 6px;
++	font-size: 15px;
++	line-height: 20px;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message-text {
++	font-size: 15px;
++	font-weight: 600;
++	line-height: 20px;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-message-detail {
++	margin: 0 0 20px;
++	font-size: 13px;
++	line-height: 20px;
++	color: var(--rm-body);
++	opacity: 1;
++}
++
++/* Don't ask again sits on the buttons' row, at its left */
++.monaco-workbench .monaco-dialog-box .dialog-message-row .dialog-message-container .dialog-checkbox-row {
++	position: absolute;
++	left: 20px;
++	bottom: 20px;
++	height: 32px;
++	display: flex;
++	align-items: center;
++	gap: 8px;
++	padding: 0;
++	margin: 0;
++	font-size: 13px;
++	line-height: 20px;
++	color: var(--rm-body);
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-checkbox-row .dialog-checkbox-message {
++	padding: 0;
++	margin: 0;
++}
++
++.monaco-workbench .monaco-dialog-box .dialog-checkbox-row .monaco-checkbox {
++	width: 14px !important; /* !important: the checkbox sets its size inline */
++	height: 14px !important; /* !important: as above */
++	font-size: 12px !important; /* !important: as above (the tick) */
++	margin: 0;
++	border-radius: 4px;
++	box-sizing: border-box;
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row {
++	padding: 0;
++	margin: 0;
++	overflow: visible; /* the ring reaches 4 outside the button */
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons {
++	gap: 8px;
++	overflow: visible;
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button {
++	width: auto;
++	min-width: 0;
++	height: 32px;
++	margin: 0;
++	padding: 0 14px;
++	border-radius: 8px;
++	font-size: 13px;
++	font-weight: 500;
++	line-height: 32px;
++	border: none !important; /* !important: the buttons set their colours and border inline */
++}
++
++/* Cancel and the other buttons are ghosts: the desk with the strong hairline */
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button.secondary {
++	background-color: var(--rm-desk) !important; /* !important: as above */
++	color: var(--vscode-foreground) !important; /* !important: as above */
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:not(.secondary) {
++	background-color: var(--vscode-button-background) !important; /* !important: the button paints its focus in the hover colour, inline */
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:not(.secondary):hover {
++	background-color: var(--vscode-button-hoverBackground) !important; /* !important: as above */
++}
++
++/* The ring marks the button Enter presses: the default one when the dialog opens, then whichever has the keyboard */
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:focus {
++	outline: none !important; /* !important: the workbench's focus outline (style.css) is as specific */
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
++}
++
++.monaco-workbench.vs-dark .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button:focus {
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
++}
++
++.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button.secondary:focus {
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border), 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
 +}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 index 4aaccf3c849..31f3520c15a 100644
@@ -2918,7 +3077,7 @@ index 683604c1cc7..880e0e927d2 100644
  	}
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 544300939e9..23123ef5dfb 100644
+index 544300939e9..5ce62a1fad5 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
 @@ -28,7 +28,7 @@ import { NativeWindow } from './window.js';
@@ -2939,6 +3098,15 @@ index 544300939e9..23123ef5dfb 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
+@@ -288,7 +288,7 @@ import product from '../../platform/product/common/product.js';
+ 			'window.dialogStyle': {
+ 				'type': 'string',
+ 				'enum': ['native', 'custom'],
+-				'default': 'native',
++				'default': 'custom', // Ritemark 2.0: Ritemark's own dialog, one sheet with the menus (experience 31); application-scoped, like window.menuStyle
+ 				'scope': ConfigurationScope.APPLICATION,
+ 				'description': localize('dialogStyle', "Adjust the appearance of dialogs to be native by the OS or custom.")
+ 			},
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
 index 6fe575a12dd..b43d7ea930e 100644
 --- a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
