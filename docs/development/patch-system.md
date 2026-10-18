@@ -10,7 +10,7 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 
 | Patch | Purpose |
 |-------|---------|
-| `001-ritemark-branding.patch` | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
+| `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome and walkthroughs open Ritemark's welcome (Sprint 133) |
 | `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
@@ -25,10 +25,9 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `013-ritemark-configuration-defaults.patch` | Product configuration defaults |
 | `014-ritemark-save-receipts.patch` | Exact successful-save identity for editor–disk synchronization |
 | `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars |
-| `016-ritemark-store-acquisition-policy.patch` | No external software-acquisition promotion: no Git download button in Source Control, no install links in the welcome page launch check (Microsoft Store policy 10.1.5) |
-| `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when a runtime needs Node.js (`nodeRequired` from `ritemark.getHealthStatus`) |
-| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame: no title row, the strips and sheets, zoom, Ritemark's menus, the left column's head |
-| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row: tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs |
+| `016-ritemark-store-acquisition-policy.patch` | No external software-acquisition promotion: no Git download button in Source Control (Microsoft Store policy 10.1.5) |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame: no title row, the strips and sheets, zoom, Ritemark's menus, the left column's head; the welcome alone, an empty desk's tiles drawn, a file's extension muted |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row: tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs, an empty desk's tiles |
 
 ## Commands
 

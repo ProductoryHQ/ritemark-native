@@ -6,11 +6,11 @@ This document captures hard-won knowledge from the patch consolidation incident 
 
 ## 1. Patch Architecture (Current State)
 
-Nineteen patches, numbered 001 through 019, each owning a specific domain:
+Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started page in Sprint 133), each owning a specific domain:
 
 | Patch | Domain | Summary |
 |-------|--------|---------|
-| `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
+| `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal |
 | `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 14 files -- Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug/Extensions hidden, defaultChatAgent null-safety |
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip |
@@ -25,10 +25,9 @@ Nineteen patches, numbered 001 through 019, each owning a specific domain:
 | `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |
 | `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts |
 | `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark |
-| `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion |
-| `017-ritemark-launch-check-node.patch` | Welcome | The launch check's Node line only when needed |
-| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head (sizes and drawing) |
-| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs |
+| `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button) |
+| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted (sizes and drawing) |
+| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles |
 
 **Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
 `auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's

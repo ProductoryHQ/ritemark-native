@@ -173,11 +173,11 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (19)
+### Current patches (18)
 
 | Patch | Purpose |
 | --- | --- |
-| `001-ritemark-branding.patch` | Theme, fonts, icons, welcome page, about dialog, breadcrumbs |
+| `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; every way into VS Code's Getting Started page (Help: Welcome, walkthroughs) opens Ritemark's welcome instead (Sprint 133) |
 | `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code dev features (chat, debug, go menu) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip |
@@ -192,10 +192,9 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `013-ritemark-configuration-defaults.patch` | product.json `configurationDefaults` apply on desktop (trust off, `*.md` → Ritemark editor, theme/tree/preview defaults) |
 | `014-ritemark-save-receipts.patch` | Text-file save receipts through the extension-host document protocol, so a save is acknowledged against the exact written snapshot |
 | `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries |
-| `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion — the Git download button in Source Control and the Git/Node "Click here to install" actions on the welcome page (Microsoft Store policy 10.1.5) |
-| `017-ritemark-launch-check-node.patch` | Welcome page launch check shows its Node line only when `ritemark.getHealthStatus` reports `nodeRequired` (a system-installed runtime on Windows); the bundled runtimes need no Node.js |
-| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus, the left column's head |
-| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs with their bar |
+| `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion: the Git download button in Source Control (Microsoft Store policy 10.1.5) |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus, the left column's head; the welcome alone on the ground, an empty desk's tiles drawn, a file's extension in muted ink (Sprint 133) |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs with their bar; an empty desk's Text, Table and Web page tiles (Sprint 133) |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 

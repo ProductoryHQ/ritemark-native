@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-13 (Sprint 130: Task board — cards in the project folder, Give to agent, one registry for Ritemark's agent tools)
+**Last updated:** 2026-10-18 (Sprint 133: the welcome, one consent gate for usage data, the landing, Getting Started retired)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -155,6 +155,8 @@ extensions/ritemark/src/
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
 ├── export/          PDF/DOCX export
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
+├── welcome/         The welcome (Sprint 133) — profile kind, provider states, protocol, landing, new project, sample project
+├── analytics/       PostHog through one consent gate (consent.ts, Sprint 133), events, reactions
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts, transcriptWorkbenchProvider.ts
 ```
 
@@ -440,6 +442,27 @@ supplies defaults, words and colours.
 
 TO BE: the theme pass on every surface (dialogs, Flows, the Agent Library) and the window-size crossings
 (`ritemarkWindowSizes.ts`) come with merge 2 of the sprint.
+
+### The welcome and usage data (Sprint 133)
+
+A window with no folder opens on the welcome, an extension page in the shared bundle (`webview/src/components/welcome/`,
+`data-editor-type="welcome"`), not VS Code's Getting Started page, which retired with patch 017 and 001's rewrite.
+
+| Module | Owns |
+|---|---|
+| `welcome/updateDetection.ts` | Someone new or someone updating from Ritemark 1, decided once per profile on its first start of this build (`ritemark.welcome.kind`) from `ritemark.activation.lastConfirmedVersion` read before it is confirmed; finished once a project is opened from the welcome (`ritemark.welcome.finished`) |
+| `welcome/welcomeState.ts`, `words.ts` | Each provider's card or row from `UnifiedViewProvider.runtimeAvailability()` (the host's one definition), a 20 s check timeout, the steps, the words |
+| `welcome/protocol.ts` | The exact-field `welcome/*` request union and the state the page draws |
+| `welcome/landing.ts` | The landing record (`ritemark.welcome.landing.v1`) written before `vscode.openFolder` reloads the window, read once after: Documents, a new chat with the AI the person set up ("Ask Claude about this project"), `project_opened`; dropped for another folder or after 10 minutes |
+| `welcome/newProject.ts`, `sampleProject.ts`, `recentProjects.ts` | An empty folder in `<Documents>/Ritemark/` (Windows' Documents read from the registry); the sample (`sample-project/`, shipped with the app) copied under the next free name with its cards' dates set to the copy's time; the update sheet's recent folders |
+| `welcome/welcomeHost.ts`, `welcomePanel.ts` | Composition: the panel, the context key `ritemark.welcomeAlone`, sign-ins through `beginClaudeLogin` and the AI sheet's own Codex runtime (`UnifiedViewProvider.startCodexSignIn`), keys stored as Settings stores them |
+
+**Invariants.**
+
+- **Nothing is counted before yes.** `analytics/consent.ts` is the one gate: `ritemark.analytics.enabled` defaults to false, no PostHog client and no anonymous id exist before a yes, the `analytics` flag and `ritemark.features.analytics` can only turn it off. The welcome's `welcome_shown` and `ai_signed_in` wait in memory until the answer and are dropped at a no or when the welcome closes. Every event carries `build_channel` (`dev` for a run from source). Ritemark 1's notice is retired; an OK on it (any notice closed without Opt Out) carries over as a yes, written once (`ritemark.analytics.answeredV2`, `from: '1.x'`).
+- **The welcome alone is a class, not a layout.** The extension closes both columns in the empty window's own layout and sets `ritemark.welcomeAlone`; patch 018's `ritemarkWelcomeAlone.ts` hides the strips' controls, the tab row, the desk's paint and the status bar while the welcome is in front. Nothing is written, and opening a folder loads that folder's layout.
+- **A document wins over the welcome.** A first window opened with a file or folder opens it and shows no welcome; a document opened while the welcome shows in a window with no folder closes the welcome.
+- **The sign-ins are today's.** The welcome never re-implements a provider: Claude's CLI sign-in, the AI sheet's Codex polling, OpenCode's keys in SecretStorage.
 
 ## Agent Runtime Architecture
 
@@ -1371,6 +1394,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-18 | Sprint 133 | **The welcome (2.0, step 2).** New `src/welcome/` (see *The welcome and usage data*) and `analytics/consent.ts` (one gate, off until yes, held welcome events, `build_channel`, the 1.x answer carried over); four events (`welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent`). `UnifiedViewProvider` gains `openLandingChat`, `startCodexSignIn`/`stopCodexSignIn` and the first-message event. Settings gains Usage data and the Git and Node.js rows. The sticky-tab healer replaces the text tab (#429). Patches: 001 loses the Getting Started rewrite and reroutes Help: Welcome and walkthroughs to `ritemark.welcome.open`; 016 keeps only Source Control; 017 retired; 018 gains `ritemarkWelcomeAlone.ts` and the muted extension (`iconLabel.ts` `splitExtension`); 019 gains `ritemarkEmptyDesk.ts`. `product.json`: `workbench.startupEditor: none`. `copy-welcome-assets.sh` and its build steps retired. |
 | 2026-10-17 | Sprint 132 | **The 2.0 frame, merge 1 (#443).** Patch 002 shrinks to placement (places row on top in Ritemark's order once per profile, Copilot Chat behind More, the 1.x terminal guards removed); new 018 (no title row, 44 strips on the line at 26, sheets and gaps, zoom, Ritemark's menus, the left column head) and 019 (tab row, +, folded tabs, permanent Home/Task board tabs, terminals as tabs with their bar). Extension: 2.0 defaults, `projectHeadCommands.ts`, seven surface colours, themes and icon themes. New checks: `check-patch-stacking.mjs` (pre-commit Check 14), `qa/frame-geometry.mjs`, `check-vscode-drift.sh`. |
 | 2026-10-13 | Sprint 130 | **Task board (v1.14.0, #119).** New `src/taskBoard/`: card files in `.ritemark/tasks/` (`cardFile.ts`, `BoardStore.ts`, reads and writes an open card page through its document), `BoardController.ts` (derived who-moves-next, Your calls, Doing limit, conflict guard, auto-start, archive + 28-day Done window, idea review), `CardTaskStore.ts` + `CardHandoffLedger.ts` (Give to agent through the Sprint 117 queue: `newConversation`, `sourceKind: 'card'`, `attachTaskListener`; G1–G6), `cardPages.ts` (the Ritemark editor's card mode: `cardMode` in `editorSync/protocol.ts`, body spliced under the front matter), `ideaReview.ts` on the new shared `runtime/oneShotTurn.ts` (conversation titles moved onto it), surfaces `TasksViewProvider.ts` + `TaskBoardPanel.ts`. **Ritemark tool registry:** `runtime/ritemarkTools.ts` + `RitemarkToolsInjector.ts` + `RitemarkIpcServer.ts` replace `BrowserToolsInjector.ts`, `browserMcpServer.ts`, `codexBrowserTools.ts` and `browser/BrowserIpcServer.ts`; the OpenCode adapter is generic; Codex gets `codexDynamicTools` / `onDynamicToolCall` and a `toolSet` key in its continuation fingerprint; Claude gets a new MCP server per session (fixes browser tools reaching only the first open Claude conversation). `capabilityContext.ts` v2: `hasBoardTools` + TASK BOARD section. Flag `task-board` (default on). No patch change. |
 | 2026-10-12 | Sprint 131 | **Browser Recent records in-panel browsing (v1.14.0, #195).** Patch 009 gains `RitemarkBrowserHistoryContribution`, the browser bridge's first workbench→extension push (`ritemark.browser.didNavigate`), with no new hunk in upstream VS Code files. New `browser/browserNavigationRecorder.ts` owns every rule (validation, private sessions, failed loads, schemes, 1 s settle for client redirects, 10 s title window, fallback titles). `BrowserHistoryStore` gains titles, `historyKey` dedupe (case, slash, default port, fragment), `setTitle` and `pruneMissingFiles`. `openInIntegratedBrowser()` stops writing to the store. See *Browser Recent* under the subsystem map. |
