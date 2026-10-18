@@ -53,7 +53,7 @@ Text hierarchy in Ritemark is always a **four-step ladder**, and every surface u
 |---|---|---|---|---|
 | ink-strong | `--r-ink-strong` | `#1E1B4B` | `#F8FAFC` | Body copy, headings, primary labels |
 | ink-body | `--r-ink-body` | `#475569` | `#C7D2FE` | Paragraph body, secondary labels |
-| ink-muted | `--r-ink-muted` | `#64748B` | `#94A3B8` | Captions, helper text, metadata |
+| ink-muted | `--r-ink-muted` | `#617187` | `#94A3B8` | Captions, helper text, metadata |
 | ink-faint | `--r-ink-faint` | `#94A3B8` | `#64748B` | Placeholders, disabled, counters |
 
 If you find yourself reaching for a fifth tone, you're overdrawing the hierarchy — collapse something.

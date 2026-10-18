@@ -158,7 +158,7 @@ Examples: `transcribe/TranscribePanel.tsx` (RecordingRow), `ai-sidebar/Conversat
 | Anti-pattern | Why bad | Fix |
 |---|---|---|
 | `background: var(--vscode-editor-background)` on a new Ritemark dialog | Surface we own reads as VS Code | `background: var(--r-surface)` |
-| `color: #64748b` hardcoded in a new component | Drift; breaks dark mode | `color: var(--r-ink-muted)` |
+| `color: #617187` hardcoded in a new component | Drift; breaks dark mode | `color: var(--r-ink-muted)` |
 | `border: 2px solid var(--r-hairline)` on an input | Too heavy; shadcn default; breaks visual rhythm | `border: 1px solid var(--r-hairline-strong)` |
 | `box-shadow: 0 4px 6px rgba(0,0,0,0.1)` on a primary button | Missed the indigo signature | `box-shadow: var(--ritemark-shadow-indigo-sm)` |
 | `rounded-xl` on a dialog (12px) | Off-grid | `rounded-[10px]` or `rounded-[var(--ritemark-radius-lg)]` |

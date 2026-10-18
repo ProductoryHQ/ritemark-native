@@ -683,6 +683,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       color: var(--r-ink-muted);
       opacity: 0;
     }
+    /* a row with a warning keeps it in sight: the ⋯ sits just before it */
+    .item.has-warn .item-more-btn { right: 26px; }
     .item:hover .item-more-btn,
     .item-more-btn.menu-open,
     .item-more-btn:focus-visible { opacity: 1; }
@@ -699,14 +701,15 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       background: var(--r-hover);
     }
     .consent-label { font-size: 12px; line-height: 16px; color: var(--r-ink-body); flex: 1; min-width: 0; }
+    /* kit: .btn.quiet, body ink with no fill until hovered */
     .consent-btn {
-      flex-shrink: 0; height: 24px; padding: 0 10px;
+      flex-shrink: 0; height: 24px; padding: 0 8px;
       border: 0; border-radius: 6px;
       font-family: inherit; font-size: 12px; font-weight: 500; line-height: 24px;
       cursor: pointer;
-      background: var(--vscode-button-background, #4338CA); color: var(--vscode-button-foreground, #FFFFFF);
+      background: transparent; color: var(--r-ink-body);
     }
-    .consent-btn:hover { background: var(--vscode-button-hoverBackground, #3730A3); }
+    .consent-btn:hover { background: var(--r-hover); color: var(--r-ink-strong); }
     .run-spin { animation: sched-spin 1.1s linear infinite; display: inline-block; }
     @keyframes sched-spin { to { transform: rotate(360deg); } }
 
@@ -1248,7 +1251,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     }
 
     // The kit's icons (Phosphor), by kind of row
-    const ICON = { instructions: '&#xe23a;', agent: '&#xe762;', skill: '&#xe6a2;', command: '&#xe1c4;', scheduled: '&#xe19a;', flow: '&#xe6ec;', warning: '&#xe4e0;' };
+    const ICON = { instructions: '&#xe23a;', agent: '&#xe762;', skill: '&#xe6a2;', command: '&#xe1c4;', scheduled: '&#xe19a;', flow: '&#xe6ec;', warning: '&#xe4e0;', warningCircle: '&#xe4e2;' };
 
     function moreButton() {
       return '<button class="item-more-btn" data-more="1" title="More actions" aria-label="More actions">' +
@@ -1263,7 +1266,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     // A row (kit: ritemark.css .row): the kind's icon, the name, then what it needs to say at the right
     function rowHtml(row) {
-      let html = '<div class="item' + (row.open ? ' open' : '') + (row.extraClass ? ' ' + row.extraClass : '') + '"' + (row.attrs || '') + ' title="' + escapeHtml(row.title) + '">';
+      let html = '<div class="item' + (row.open ? ' open' : '') + (row.warn ? ' has-warn' : '') + (row.extraClass ? ' ' + row.extraClass : '') + '"' + (row.attrs || '') + ' title="' + escapeHtml(row.title) + '">';
       html += '<i class="ph row-icon" aria-hidden="true">' + row.icon + '</i>';
       html += '<span class="row-label">' + labelHtml(row.label) + '</span>';
       if (row.warn) html += '<i class="ph row-warn" role="img" aria-label="' + escapeHtml(row.warn) + '">' + ICON.warning + '</i>';
@@ -1290,7 +1293,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       const lines = [displayPath(item)];
       const desc = (item.description || '').trim();
       if (desc) lines.push(desc);
-      if (item.provenance) lines.push(item.provenance === 'shared' ? 'For Claude Code and Codex' : 'For ' + (item.provenance === 'codex' ? 'Codex' : 'Claude Code'));
+      // the badge's words (the Experience lead): For Claude, For ChatGPT, Shared
+      if (item.provenance) lines.push(item.provenance === 'shared' ? 'Shared' : item.provenance === 'codex' ? 'For ChatGPT' : 'For Claude');
       if (extra) lines.push(extra);
       return lines.join('\\n');
     }
@@ -1374,7 +1378,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         html += rowHtml({
           icon: ICON.scheduled, label, extraClass: 'sched-item', attrs: runAttrs,
           meta: blocked ? 'Approval needed' : failed ? '' : relativeTime(run.startedAt),
-          metaHtml: running ? meta.icon : failed ? '<i class="ph" aria-hidden="true">' + ICON.warning + '</i>Failed' : '',
+          metaHtml: running ? meta.icon : failed ? '<i class="ph" aria-hidden="true">' + ICON.warningCircle + '</i>Failed' : '',
           metaClass: blocked ? 'warn sched-approve' : failed ? 'failed' : '',
           metaAttrs: blocked ? runAttrs : '',
           title: [meta.label + dur, desc].filter(Boolean).join('\\n'),

@@ -51,6 +51,12 @@ export async function executeClaudeCodeNode(
   console.log('[ClaudeCode] Interpolated prompt:', interpolatedPrompt.substring(0, 100) + '...');
 
   const setupStatus = await getSetupStatus({ refresh: true });
+  // Ritemark 2.0: the step's settings no longer carry a sign-in note, so the run says what to do and where
+  if (setupStatus.state !== 'ready') {
+    throw new Error(setupStatus.state === 'needs-auth' || setupStatus.state === 'auth-in-progress'
+      ? 'Claude Code is not signed in. Open Settings and sign in under Agent Runtime, then run the flow again.'
+      : 'Claude Code is not set up. Open Settings and set it up under Agent Runtime, then run the flow again.');
+  }
 
   const result = await runAgent({
     prompt: interpolatedPrompt,

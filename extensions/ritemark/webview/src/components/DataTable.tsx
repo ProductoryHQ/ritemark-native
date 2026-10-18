@@ -753,7 +753,9 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                           }}
                         />
                       ) : (
-                        <span className="block w-full pointer-events-none" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
+                        // Ritemark 2.0 (the Experience lead): a row stays one line, 32 high, cut with an ellipsis; the
+                        // formula bar is where a long value is read and edited
+                        <span className="block w-full truncate pointer-events-none">
                           {rawValue || '\u00A0'}
                         </span>
                       )}

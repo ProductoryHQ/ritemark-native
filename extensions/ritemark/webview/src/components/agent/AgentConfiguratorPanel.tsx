@@ -405,7 +405,12 @@ export function AgentConfiguratorPanel({
               ))}
             </SelectContent>
           </Select>
-        ) : routine ? (
+        ) : null}
+        {/* the problem the Agents row warns about, here too, so the keyboard reaches it (the Experience lead) */}
+        {flows.length > 0 && routine && !flows.includes(routine) && (
+          <p className="mt-1.5 text-[11px] leading-[14px] text-[var(--vscode-editorWarning-foreground)]">The linked flow “{routine}” is not in this project.</p>
+        )}
+        {flows.length > 0 ? null : routine ? (
           <>
             <Badge variant="outline">{routine}</Badge>
             <p className="mt-1.5 text-[11px] leading-[14px] text-ink-muted">Flow file not found in workspace.</p>

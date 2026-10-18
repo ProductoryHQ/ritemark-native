@@ -77,6 +77,42 @@
     },
     "_folder_open_dark": {
       "iconPath": "./icons/dark/folder-open.svg"
+    },
+    "_file_pdf": {
+      "iconPath": "./icons/file-pdf.svg"
+    },
+    "_file_pdf_dark": {
+      "iconPath": "./icons/dark/file-pdf.svg"
+    },
+    "_file_doc": {
+      "iconPath": "./icons/file-doc.svg"
+    },
+    "_file_doc_dark": {
+      "iconPath": "./icons/dark/file-doc.svg"
+    },
+    "_file_xls": {
+      "iconPath": "./icons/file-xls.svg"
+    },
+    "_file_xls_dark": {
+      "iconPath": "./icons/dark/file-xls.svg"
+    },
+    "_file_csv": {
+      "iconPath": "./icons/file-csv.svg"
+    },
+    "_file_csv_dark": {
+      "iconPath": "./icons/dark/file-csv.svg"
+    },
+    "_file_ppt": {
+      "iconPath": "./icons/file-ppt.svg"
+    },
+    "_file_ppt_dark": {
+      "iconPath": "./icons/dark/file-ppt.svg"
+    },
+    "_file_audio": {
+      "iconPath": "./icons/waveform.svg"
+    },
+    "_file_audio_dark": {
+      "iconPath": "./icons/dark/waveform.svg"
     }
   },
   "file": "_file_dark",
@@ -116,7 +152,18 @@
     "yml": "_file_config_dark",
     "toml": "_file_config_dark",
     "ini": "_file_config_dark",
-    "env": "_file_config_dark"
+    "env": "_file_config_dark",
+    "pdf": "_file_pdf_dark",
+    "doc": "_file_doc_dark",
+    "docx": "_file_doc_dark",
+    "xls": "_file_xls_dark",
+    "xlsx": "_file_xls_dark",
+    "csv": "_file_csv_dark",
+    "ppt": "_file_ppt_dark",
+    "pptx": "_file_ppt_dark",
+    "m4a": "_file_audio_dark",
+    "mp3": "_file_audio_dark",
+    "wav": "_file_audio_dark"
   },
   "fileNames": {
     "package.json": "_file_package_dark",
@@ -179,7 +226,18 @@
       "yml": "_file_config",
       "toml": "_file_config",
       "ini": "_file_config",
-      "env": "_file_config"
+      "env": "_file_config",
+      "pdf": "_file_pdf",
+      "doc": "_file_doc",
+      "docx": "_file_doc",
+      "xls": "_file_xls",
+      "xlsx": "_file_xls",
+      "csv": "_file_csv",
+      "ppt": "_file_ppt",
+      "pptx": "_file_ppt",
+      "m4a": "_file_audio",
+      "mp3": "_file_audio",
+      "wav": "_file_audio"
     },
     "fileNames": {
       "package.json": "_file_package",

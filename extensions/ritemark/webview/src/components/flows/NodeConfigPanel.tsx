@@ -896,7 +896,7 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         />
       </Field>
 
-      <Field label="Timeout (minutes)">
+      <Field label="Timeout (minutes)" description="Runs without asking you: its actions are approved for the run.">
         <Input
           type="number"
           min={1}
@@ -908,14 +908,6 @@ function ClaudeCodeNodeConfig({ nodeId, data, onUpdate }: ClaudeCodeNodeConfigPr
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--r-surface-muted)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
-          Claude Code CLI must be installed and authenticated. Run{' '}
-          <code className="px-1 bg-[var(--vscode-editor-background)] rounded">claude</code>{' '}
-          in your terminal to set up.
-        </div>
-      </div>
     </>
   );
 }
@@ -990,7 +982,7 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         </Select>
       </Field>
 
-      <Field label="Timeout (minutes)">
+      <Field label="Timeout (minutes)" description="Runs without asking you: its actions are approved for the run.">
         <Input
           type="number"
           min={1}
@@ -1002,12 +994,6 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
         />
       </Field>
 
-      <div className="p-3 rounded bg-[var(--r-surface-muted)] border border-[var(--r-hairline)]">
-        <div className="text-xs text-[var(--r-ink-muted)]">
-          <strong className="text-[var(--r-ink-strong)]">Note:</strong>{' '}
-          Codex CLI must be installed and authenticated via ChatGPT. Actions are auto-approved during flow execution.
-        </div>
-      </div>
     </>
   );
 }
