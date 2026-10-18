@@ -644,7 +644,7 @@
         {
           "type": "webview",
           "id": "ritemark.browserView",
-          "name": "Recent",
+          "name": "Browser",
           "contextualTitle": "Browser",
           "visibility": "visible"
         }

@@ -531,10 +531,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..91583d77eed
+index 00000000000..01610913be4
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1691 @@
+@@ -0,0 +1,1701 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2071,6 +2071,16 @@ index 00000000000..91583d77eed
 +	height: 20px;
 +}
 +
++/* A toast's message wraps to 3 lines, then ends in an ellipsis; the row grows with it (notificationsViewer.ts). The
++   centre keeps one line, its full text behind the expand toggle (the Experience lead, Windows round 2) */
++.monaco-workbench > .notifications-toasts .notifications-list-container .notification-list-item:not(.expanded) .notification-list-item-message {
++	white-space: normal;
++	word-wrap: break-word;
++	display: -webkit-box;
++	-webkit-box-orient: vertical;
++	-webkit-line-clamp: 3;
++}
++
 +.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-source {
 +	color: var(--vscode-descriptionForeground);
 +}
@@ -2594,7 +2604,7 @@ index bd77caab75a..e6802457ead 100644
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
-index 7c01c6202c3..f3bc6e1f1bc 100644
+index 7c01c6202c3..d05d50f3035 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
 @@ -37,7 +37,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
@@ -2606,11 +2616,43 @@ index 7c01c6202c3..f3bc6e1f1bc 100644
  
  	private offsetHelper: HTMLElement;
  
+@@ -51,6 +51,12 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+ 
+ 	getHeight(notification: INotificationViewItem): number {
+ 		if (!notification.expanded) {
++			// Ritemark 2.0: a toast's message wraps to 3 lines, then ends in an ellipsis (ritemarkSurfaces.css; the Experience
++			// lead, Windows round 2). The notification centre keeps one line, its full text behind the expand toggle.
++			if (this.offsetHelper.closest('.notification-toast')) {
++				const lines = Math.ceil(this.computePreferredHeight(notification, true) / NotificationsListDelegate.LINE_HEIGHT);
++				return NotificationsListDelegate.ROW_HEIGHT + (Math.min(Math.max(lines, 1), 3) - 1) * NotificationsListDelegate.LINE_HEIGHT;
++			}
+ 			return NotificationsListDelegate.ROW_HEIGHT; // return early if there are no more rows to show
+ 		}
+ 
+@@ -79,15 +85,15 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+ 		return expandedHeight;
+ 	}
+ 
+-	private computePreferredHeight(notification: INotificationViewItem): number {
++	private computePreferredHeight(notification: INotificationViewItem, ritemarkWrappedToast = false): number {
+ 
+ 		// Prepare offset helper depending on toolbar actions count
+ 		let actions = 0;
+ 		if (!notification.hasProgress) {
+ 			actions++; // close
+ 		}
+-		if (notification.canCollapse) {
+-			actions++; // expand/collapse
++		if (notification.canCollapse && !ritemarkWrappedToast) {
++			actions++; // expand/collapse (Ritemark 2.0: a wrapped toast's message does not overflow, so it has none)
+ 		}
+ 		if (isNonEmptyArray(notification.actions?.secondary)) {
+ 			actions++; // secondary actions
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index 22bfb325a6f..688a85a4774 100644
+index b00efadf3eb..a47b120fc44 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-@@ -856,6 +856,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -857,6 +857,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  			}
  		}
  
