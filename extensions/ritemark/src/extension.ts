@@ -58,6 +58,7 @@ import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
+import { prepareWelcome, registerWelcome, type WelcomeHost } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
@@ -89,6 +90,9 @@ let flowScheduler: FlowScheduler | null = null;
 
 // Settings provider
 let settingsProvider: RitemarkSettingsProvider | null = null;
+
+// The welcome (Sprint 133)
+let welcomeHost: WelcomeHost | null = null;
 
 // Sprint 118: Transcribe panel, so shutdown can close an in-progress recording cleanly
 let transcribeView: { prepareForShutdown(): Promise<void> } | null = null;
@@ -259,6 +263,11 @@ export function activate(context: vscode.ExtensionContext) {
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
 
+  // Sprint 133 (R7, R10): someone new or someone updating from Ritemark 1, decided once
+  // per profile before the activation keys are confirmed; Ritemark 1's usage-data answer
+  // is carried over before analytics starts.
+  const welcomeProfileKind = prepareWelcome(context);
+
   // Sprint 93 R9: rollback safety. If THIS exact version already started
   // activating on a prior launch but never confirmed success (a runtime
   // crash mid-activation), quarantine it now so the next restart falls
@@ -305,7 +314,8 @@ export function activate(context: vscode.ExtensionContext) {
   // same pattern as the theme migration above), reopen every file-scheme
   // .md/.markdown TEXT tab in Ritemark's editor, best-effort preserving
   // active state and view column. Named tradeoff (spec R3): a deliberate
-  // per-tab "Reopen With → Text Editor" choice is lost once, silently.
+  // per-tab "Reopen With → Text Editor" choice is lost once, silently. Since
+  // Sprint 133 (#429) it replaces the text tab, so the file ends with one tab.
   const stickyTabHealerVersion = 'sprint-107-v1';
   if (context.globalState.get<string>('ritemark.stickyTabHealerVersion') !== stickyTabHealerVersion) {
     setTimeout(async () => {
@@ -321,6 +331,10 @@ export function activate(context: vscode.ExtensionContext) {
             preserveFocus: !candidate.isActive,
             viewColumn: candidate.viewColumn,
           });
+          // Sprint 133 (R11, #429): replace the text tab instead of leaving it beside the Ritemark tab.
+          if (candidate.replace) {
+            await vscode.window.tabGroups.close(candidate.tab, true).then(undefined, () => undefined);
+          }
         }
       } catch {
         // Inert on any failure — the healer must never produce user-visible noise.
@@ -344,7 +358,9 @@ export function activate(context: vscode.ExtensionContext) {
   })();
 
   // Focus AI panel after extension views register (terminal init finishes first and grabs focus).
+  // Not while the welcome is open: it is alone in the window (Sprint 133, R1).
   setTimeout(() => {
+    if (welcomeHost?.isOpen()) return;
     vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }, 4000);
 
@@ -358,7 +374,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
 
-  // Initialize analytics (anonymous usage tracking + reactions)
+  // Initialize analytics: off until the person's yes (Sprint 133, R7)
   initAnalytics(context);
   registerReactionCommand(context);
 
@@ -701,6 +717,15 @@ export function activate(context: vscode.ExtensionContext) {
     { dispose: () => settingsProvider?.dispose() }
   );
 
+  // The welcome (Sprint 133): a window with no folder opens on one sheet, and the
+  // landing after it reloads into a folder. Its checks and sign-ins are the AI sheet's.
+  welcomeHost = registerWelcome(context, welcomeProfileKind, {
+    runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
+    startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
+    stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
+    openLandingChat: (runtimeId, placeholder) => unifiedViewProvider.openLandingChat(runtimeId, placeholder),
+  });
+
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.chatHistory', () => {
@@ -732,7 +757,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register health status command (used by Welcome page health check)
+  // Health status: Git, Node.js and each AI's sign-in (1.x's launch check; Settings and the welcome read the same sources)
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.getHealthStatus', async () => {
       return settingsProvider?.getHealthStatus() ?? null;

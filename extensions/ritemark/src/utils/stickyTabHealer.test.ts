@@ -36,8 +36,15 @@ const groups: TabGroupLike[] = [
 
 const found = findStuckMarkdownTabs(groups, resolve);
 assert.equal(found.length, 2, 'exactly the two stuck markdown text tabs');
-assert.deepEqual(found[0], { uri: { path: '/ws/notes.md' }, isActive: true, isPinned: false, viewColumn: 1 });
-assert.deepEqual(found[1], { uri: { path: '/ws/README.MARKDOWN' }, isActive: false, isPinned: true, viewColumn: 2 });
+assert.deepEqual(found[0], { uri: { path: '/ws/notes.md' }, isActive: true, isPinned: false, viewColumn: 1, tab: groups[0].tabs[0], replace: true });
+assert.deepEqual(found[1], { uri: { path: '/ws/README.MARKDOWN' }, isActive: false, isPinned: true, viewColumn: 2, tab: groups[1].tabs[0], replace: true });
+
+// Sprint 133 (R11, #429): the healer replaces the text tab, so the file ends with one tab.
+// A text tab with unsaved changes is kept: closing it would ask to save.
+const dirty = findStuckMarkdownTabs([{ viewColumn: 1, tabs: [{ input: TEXT('/ws/draft.md'), isActive: true, isPinned: false, isDirty: true }] }], resolve);
+assert.equal(dirty.length, 1);
+assert.equal(dirty[0].replace, false, 'a dirty text tab is not closed');
+assert.equal(found[0].tab, groups[0].tabs[0], 'the candidate carries its own tab, to close it');
 
 // Zero stuck tabs → empty, no throw (healer must be inert).
 assert.deepEqual(findStuckMarkdownTabs([], resolve), []);

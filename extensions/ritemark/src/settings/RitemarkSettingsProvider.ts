@@ -142,10 +142,10 @@ const RITEMARK_THEMES = [
 ];
 
 /** Settings sections other features can open the page at. */
-export type SettingsSection = 'google-docs' | 'transcription';
+export type SettingsSection = 'google-docs' | 'transcription' | 'usage-data';
 
 export function isSettingsSection(value: unknown): value is SettingsSection {
-  return value === 'google-docs' || value === 'transcription';
+  return value === 'google-docs' || value === 'transcription' || value === 'usage-data';
 }
 
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {

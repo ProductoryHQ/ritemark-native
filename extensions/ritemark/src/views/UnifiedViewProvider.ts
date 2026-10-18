@@ -69,6 +69,7 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
+import { trackFirstMessageSent } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
@@ -194,6 +195,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * request waits for `sidebar/ready` instead of being fired blindly.
    */
   private _pendingOpenReport = false;
+  /**
+   * The welcome's landing (Sprint 133, R6): a new chat with the AI the person
+   * signed in with, held until the sidebar's page can hear it, as the report
+   * window is.
+   */
+  private _pendingLandingChat: { runtimeId: AgentId; placeholder: string } | null = null;
   /**
    * Set once the CURRENT webview instance has signalled `sidebar/ready`.
    * `_view` existing only means a view object was created — its page may
@@ -566,6 +573,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._pendingOpenReport = false;
             void webviewView.webview.postMessage(this._reportOpenMessage());
           }
+          if (this._pendingLandingChat) {
+            const landing = this._pendingLandingChat;
+            this._pendingLandingChat = null;
+            void webviewView.webview.postMessage({ type: 'landing:new-chat', ...landing });
+          }
           break;
 
         case 'conversation/active':
@@ -643,6 +655,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-execute': {
           const { agentId, model, attachments } = message;
+          // Sprint 133 (R8): the profile's first message, once, only with usage data on.
+          void trackFirstMessageSent(String(agentId));
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
@@ -1609,6 +1623,56 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._pendingOpenReport = true;
+  }
+
+  /**
+   * The welcome's landing (Sprint 133, R6): open the AI's sheet on a new chat
+   * with this runtime, its message box reading "Ask Claude about this project".
+   * Held until the sidebar's page is ready, like the report window.
+   */
+  public async openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void> {
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    if (this._view && this._sidebarReady) {
+      void this._view.webview.postMessage({ type: 'landing:new-chat', runtimeId, placeholder });
+      return;
+    }
+    this._pendingLandingChat = { runtimeId, placeholder };
+  }
+
+  /**
+   * ChatGPT's sign-in, started from the welcome (Sprint 133, R3): the same
+   * Codex runtime and polling as the sidebar's own Sign in, so the landing's
+   * chat runs on the account that was just signed in. `onStatus` hears every
+   * poll; it returns the page to open, or null when Codex cannot start.
+   */
+  public async startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void): Promise<string | null> {
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+    const status = await rt.getCodexSidebarStatus();
+    if (status.state === 'broken-install' || status.state === 'disabled') return null;
+    rt.setLoginInProgress(true);
+    this._postCodexSidebarStatus({ ...status, state: 'auth-in-progress', error: null });
+    rt.startLoginPolling((next) => {
+      this._postCodexSidebarStatus(next);
+      onStatus(next.state);
+    });
+    try {
+      const authUrl = await rt.beginLogin();
+      emitCodexStatusInvalidated('login-started');
+      return authUrl;
+    } catch (error) {
+      rt.stopLoginPolling();
+      rt.setLoginInProgress(false);
+      this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
+      throw error;
+    }
+  }
+
+  /** Stop waiting for a ChatGPT sign-in the welcome started (Codex has no call that cancels one). */
+  public async stopCodexSignIn(): Promise<void> {
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+    rt.stopLoginPolling();
+    rt.setLoginInProgress(false);
+    this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
   }
 
   /**

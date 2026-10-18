@@ -14,6 +14,7 @@ export interface TabLike {
   input: unknown;
   isActive: boolean;
   isPinned: boolean;
+  isDirty?: boolean;
 }
 
 export interface TabGroupLike {
@@ -21,12 +22,20 @@ export interface TabGroupLike {
   tabs: readonly TabLike[];
 }
 
-export interface StuckTabCandidate {
+export interface StuckTabCandidate<T extends TabLike = TabLike> {
   /** The text tab's file URI (opaque — handed back to vscode.openWith). */
   uri: { path: string };
   isActive: boolean;
   isPinned: boolean;
   viewColumn: number;
+  /** The text tab itself, closed once the Ritemark editor has opened (#429). */
+  tab: T;
+  /**
+   * Sprint 133 (R11, #429): the healer replaces the text tab instead of
+   * opening the Ritemark editor beside it. A text tab with unsaved changes is
+   * kept (closing it would ask to save); it stays beside the Ritemark tab.
+   */
+  replace: boolean;
 }
 
 /**
@@ -35,17 +44,17 @@ export interface StuckTabCandidate {
  * file URI when the input is a plain TEXT editor on a file:// resource,
  * null otherwise (custom editors, diffs, untitled, webviews, notebooks).
  */
-export function findStuckMarkdownTabs(
-  tabGroups: readonly TabGroupLike[],
+export function findStuckMarkdownTabs<T extends TabLike>(
+  tabGroups: readonly { viewColumn: number; tabs: readonly T[] }[],
   resolveTextInput: (input: unknown) => { path: string } | null,
-): StuckTabCandidate[] {
-  const out: StuckTabCandidate[] = [];
+): StuckTabCandidate<T>[] {
+  const out: StuckTabCandidate<T>[] = [];
   for (const group of tabGroups) {
     for (const tab of group.tabs) {
       const uri = resolveTextInput(tab.input);
       if (!uri) continue;
       if (!/\.(md|markdown)$/i.test(uri.path)) continue;
-      out.push({ uri, isActive: tab.isActive, isPinned: tab.isPinned, viewColumn: group.viewColumn });
+      out.push({ uri, isActive: tab.isActive, isPinned: tab.isPinned, viewColumn: group.viewColumn, tab, replace: tab.isDirty !== true });
     }
   }
   return out;

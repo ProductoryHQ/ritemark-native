@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import { trackEvent } from './posthog';
+import { trackEvent, usageDataState } from './posthog';
 
 interface ReactionChoice {
   label: string;
@@ -23,6 +23,19 @@ const REACTION_CHOICES: ReactionChoice[] = [
 
 export function registerReactionCommand(context: vscode.ExtensionContext): void {
   const disposable = vscode.commands.registerCommand('ritemark.reactions', async () => {
+    // Feedback travels with usage data, which is off until the person turns it
+    // on (Sprint 133, R7): say so before asking for anything.
+    if (!usageDataState().on) {
+      const choice = await vscode.window.showInformationMessage(
+        'Feedback is sent with usage data, which is off. Turn it on in Settings to send feedback.',
+        'Open Settings',
+      );
+      if (choice === 'Open Settings') {
+        await vscode.commands.executeCommand('ritemark.aiSettings', 'usage-data');
+      }
+      return;
+    }
+
     const picked = await vscode.window.showQuickPick(
       REACTION_CHOICES.map((c) => ({ label: c.label, value: c.value })),
       {
