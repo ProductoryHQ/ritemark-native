@@ -237,3 +237,16 @@ Seen, not Sprint 132's to fix (drafts for issues in the closeout notes):
   - The Experience lead's review of round 2's S39 screenshots.
   - Closing #276, #430 and #199, which the Development manager posts with Jarmo's OK.
   - The two issues seen in round 2. Drafts are in the closeout notes; filing them is the Development manager's, with Jarmo's OK.
+- **The Experience lead's review of Windows round 2:** S23 and S37 approved, and S39 approved but for three things:
+  - **Toasts wrap (S39).** A toast without buttons (VS Code shows those collapsed) was cut to one line: "…If it does n…".
+    - Its message now wraps to 3 lines and ends in an ellipsis. The row grows by 20 per line, measured by `notificationsViewer.ts` at the toast's own width (no expand toggle: a wrapped message doesn't overflow sideways).
+    - The notification centre keeps one line, its full text behind the expand toggle.
+    - Checked in the dev build with three "File not found" toasts (the editor's own message for a link to a missing file, sent from its webview):
+      - a short one: 42, one line;
+      - a long one: 82, three lines;
+      - a longer one: 82, three lines ending "…word…" ([`qa/s39-toast-wraps.png`](qa/s39-toast-wraps.png)).
+  - **The places' heads (S39).** Browser's column read "Browser: Recent", because its only view was named "Recent". The view is now named "Browser", so the column reads "Browser" ([`qa/s39-browser-title.png`](qa/s39-browser-title.png)). Tasks and Transcribe already read "Tasks" and "Transcribe". The project head on these places comes in step 3 (sprint-plan.md, 18 October).
+  - **The narrowed AI's width (S42).** At 1280, against experience 9's drawing, mine on top ([`qa/s42-ai-1280-vs-drawing.png`](qa/s42-ai-1280-vs-drawing.png)):
+    - The desk ends at 944 and the sheet starts at 952 in both.
+    - The sheet and rail end 8 before the window's edge, 320 in all.
+    - The drawing's rail buttons are 32 wide (the kit's `.rail .rl`) and the product's 40, so its sheet ends at about 1229 and ours at 1224. That's the rail, not the narrowing. Asked the Experience lead.
