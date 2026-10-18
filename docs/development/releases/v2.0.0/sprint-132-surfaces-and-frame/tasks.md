@@ -99,12 +99,12 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 
 - [ ] `scripts/qa/frame-screenshots.mjs`: the baseline set; Jarmo approves it (E3). Script and set done: 9 scenes in light and dark from a fresh profile, in `docs/development/frame-baseline/` with its sample project; `--compare` diffs inside the running instance (no image library) and writes a side-by-side page. Re-taken on 18 October after the theme pass on a clean fresh profile (the first set carried earlier tabs and the shell's prompt); a second run matches it to the pixel. Waiting for Jarmo's approval
 - [x] `scripts/check-vscode-drift.sh`, and `update-vscode.sh`'s checklist with the screenshot check (E4, E6) (the drift script is in merge 1; the checklist's frame step, geometry and screenshots, is in merge 2)
-- [ ] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
+- [x] Manual QA: S39–S43, S44 again, S45 again; evidence in `qa-evidence.md`
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand (18 October, at 665f5ff2: both pass; the validator again before each later commit)
 - [ ] PR 2 opened; `qa-validator` review; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree (E5); Windows round 2 from main: S7–S11 again, S39 and S42 on Windows
 - [ ] After the merge: drift check (E6)
 - [ ] Linked issues closed with evidence: [#276](https://github.com/ProductoryHQ/ritemark-native/issues/276), [#430](https://github.com/ProductoryHQ/ritemark-native/issues/430), [#199](https://github.com/ProductoryHQ/ritemark-native/issues/199)
-- [ ] `docs/CHANGELOG.md` and the v2.0.0 release notes draft
+- [x] `docs/CHANGELOG.md` and the v2.0.0 release notes draft (`docs/releases/v2.0.0/release-notes.md`, step 1; the changelog's 2.0.0 section stays Unreleased until 2.0 ships)
 - [ ] Release plan: tracker, feature-complete checklist rows and risk register updated
-- [ ] `node ./scripts/worktree-hygiene.mjs --check` reported (cleaning is Jarmo's call)
+- [x] `node ./scripts/worktree-hygiene.mjs --check` reported (cleaning is Jarmo's call). 18 October: 5 worktrees, none removable; `.worktrees/store-v1120` is BLOCKED by uncommitted changes, the rest are in use

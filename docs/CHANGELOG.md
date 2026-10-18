@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] — Unreleased
+
+Ritemark 2.0.0 is built on main in three steps and released as one version. This section covers step 1, Surfaces and frame (Sprint 132). Steps 2 and 3 add to it.
+
+### Added
+- **The places row (Sprint 132).** Ritemark's places sit in one row at the top of the left column: Home, Documents, Tasks, Browser, Agents, Transcribe, then **More** (⋯). More holds Copilot Chat, File changes, Extensions, Search and any other place. A place can be dragged to another spot in the row, and the order is kept.
+- **The left column's head (Sprint 132).** The column starts with the project's mark and name, with a menu, then **New** and **Search**. New makes a document, folder, agent, skill, command or flow.
+- **A + on the tab row (Sprint 132).** The **+** at the end of the tab row makes a new Text, Table, Web page or Terminal tab.
+- **You (Sprint 132).** A menu at the top right with **Settings** and **Help**.
+- **Narrow windows make room for the document (Sprint 132).** Below 1400 points wide the AI's column narrows. Below 1200 the left column hides, and below 960 the AI hides too. Widening the window brings back only what narrowing hid. A column you open yourself stays open until the window narrows past that width again.
+- **File icons (Sprint 132).** PDF, Word, Excel, CSV, PowerPoint, image and audio files have their own icons in the file tree.
+- **New → Command in Agents (Sprint 132).** New in Agents makes agents, skills, commands and flows. Commands are new: New → Command makes a command in `.claude/commands/` and opens it.
+- **Closing a running terminal asks first (Sprint 132).** When a terminal's command is still running, closing it asks before stopping the command, with **Don't ask again**.
+
+### Changed
+- **No title row (Sprint 132).** On the Mac and on Windows, each column starts with a strip that holds its controls on one line: the traffic lights or Windows' buttons, a toggle for each side column, the tabs and **You**.
+- **Three levels, no lines (Sprint 132).** The window has a flat ground, the AI on its own sheet, and the documents on a raised desk. There are no lines between the parts.
+- **Ritemark Light and Ritemark Dark redrawn (Sprint 132).** Ritemark Dark uses deep indigo surfaces instead of slate, and its buttons are the light indigo with dark text. Muted text in Ritemark Light is darker (#617187), so it is easier to read.
+- **Copilot Chat moves behind More (Sprint 132).** It no longer takes the AI's column. Choosing it in More opens it as a tab on the desk.
+- **The terminal is a tab (Sprint 132).** A terminal opens as a tab on the desk, named "Terminal", "Terminal 2" and so on. Its bar shows **Running** while a command runs, with **Stop**, **Split**, **Clear** and **Close**. Ctrl+` (⌃` on the Mac) opens a new terminal tab. The terminal panel is gone.
+- **Tabs as wide as their names (Sprint 132).** Each tab takes the room its name needs. When the row is full, the tabs used longest ago fold into "N ⌄" instead of scrolling. "N ⌄" lists them and brings one back.
+- **The pinned Task board tab stays first (Sprint 132).** Once pinned, the Task board tab stays first in the row and can't be closed or moved by mistake.
+- **⌘, opens Ritemark Settings (Sprint 132).** Ctrl+, on Windows. **Settings** in You opens the same page.
+- **Ritemark's own menus and dialogs (Sprint 132).** On the Mac and on Windows, Ritemark draws its menus and dialogs itself, with 32-high rows and the chosen row in indigo. Menus close on any click outside them. The command palette and notifications share the look: the same sheet, 32-high rows and 32-high buttons.
+- **The file tree (Sprint 132).** No carets, and rows are 32 high.
+- **The flow editor redrawn (Sprint 132).** A bar with the flow's name, description, schedule, **Auto-arrange** and **Run flow**. The steps you can add are listed by kind. Each step's card shows its settings, and a step's settings open in a column beside the flow. Claude Code and Codex steps say plainly that they run without asking, because their actions are approved for the run. If Claude Code or Codex isn't signed in, the run says to sign in under **Settings > Agent Runtime**. The prompt field grows with its text.
+- **The Agent Library is Agents (Sprint 132).** Each item is one line: its file name with its extension. Its description and who it is for (Claude, ChatGPT or shared) are in the tooltip and in the agent's settings. The agent's settings sit in a panel beside its instructions, and its schedule is one field.
+- **PDF, Word and PowerPoint pages on a canvas (Sprint 132).** The pages sit on a soft canvas below the viewer's bar.
+- **CSV rows stay one line (Sprint 132).** Long values are read in the formula bar.
+- **The places row gets Ritemark's order once (Sprint 132).** On the first start of 2.0, a 1.14 profile's places row takes Ritemark's order. Places moved after that stay where they are put.
+
+### Fixed
+- **Updating keeps the theme you chose (Sprint 132).** Ritemark re-applied its theme set-up whenever the version changed, so every update reset a theme picked by hand. The set-up now runs once per profile.
+- **Settings' Appearance follows the theme (Sprint 132).** When the theme changed elsewhere, Appearance kept showing the theme it opened with. It now follows.
+
 ## [1.14.0] — Unreleased
 
 ### Added
