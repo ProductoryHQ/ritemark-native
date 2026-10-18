@@ -528,7 +528,7 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
           ref={containerRef}
           tabIndex={-1}
           onScroll={handleScroll}
-          style={{ flex: 1, overflow: 'auto', padding: '16px 0' }}
+          style={{ flex: 1, overflow: 'auto', padding: '16px 0', background: 'var(--vscode-ritemark-aiSheet, var(--r-surface-muted))' }} /* the pages on the AI's colour (Ritemark 2.0) */
         >
           <Document
             file={fileData}

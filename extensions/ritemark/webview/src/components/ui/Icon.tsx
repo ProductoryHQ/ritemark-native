@@ -122,6 +122,7 @@ import {
   X,
   XCircle,
   type Icon as PhosphorIconComponent,
+  Waveform,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -213,6 +214,7 @@ const iconMap = {
   'lock-simple': LockSimple,
   'magnifying-glass': MagnifyingGlass,
   'microphone': Microphone,
+  'waveform': Waveform,
   'minus': Minus,
   'note-pencil': NotePencil,
   'palette': Palette,
