@@ -102,7 +102,9 @@ html:has(.rw-ground) {
 .rw-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .rw-choice { border-radius: 10px; box-shadow: 0 0 0 1px var(--r-hairline-strong); padding: 16px; display: flex; flex-direction: column; gap: 4px; min-height: 136px; transition: background-color 120ms, box-shadow 120ms; }
 .rw-choice .name { font: 600 17px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
-.rw-choice .line { font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+/* Three lines kept for the card's words, so the button stays put when a check answers with a longer reason ("Your
+   sign-in has ended…"): on Windows a click landed where the button had been (the Windows round, S46). */
+.rw-choice .line { font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); min-height: 60px; }
 .rw-choice .foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding-top: 8px; }
 .rw-choice.wait { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 0 0 4px var(--vscode-ritemark-ground, var(--r-surface-soft)); }
 .rw-choice.wait .w { margin-top: auto; display: flex; align-items: center; gap: 8px; font: 500 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); padding-top: 8px; }

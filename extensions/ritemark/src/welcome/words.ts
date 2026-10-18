@@ -12,7 +12,7 @@ export const PROVIDER_NAMES: Record<WelcomeProviderId, string> = {
   opencode: 'OpenCode',
 };
 
-export type SignInProblem = 'failed' | 'timed-out' | 'could-not-start' | 'not-ready';
+export type SignInProblem = 'failed' | 'timed-out' | 'could-not-start' | 'not-ready' | 'not-opened';
 
 export function signInProblem(provider: WelcomeProviderId, problem: SignInProblem): string {
   const name = PROVIDER_NAMES[provider];
@@ -21,6 +21,7 @@ export function signInProblem(provider: WelcomeProviderId, problem: SignInProble
     case 'timed-out': return `The sign-in page wasn’t finished in time. Sign in again when you’re ready.`;
     case 'could-not-start': return `${name}’s sign-in couldn’t start. Try again in a moment.`;
     case 'not-ready': return `${name} can’t start on this computer yet. Open Settings to repair it.`;
+    case 'not-opened': return `${name}’s sign-in page didn’t open. Sign in again to open it.`;
   }
 }
 

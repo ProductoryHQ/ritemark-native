@@ -732,6 +732,7 @@ export function activate(context: vscode.ExtensionContext) {
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
     stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
+    verifyCodexSignIn: () => unifiedViewProvider.verifyCodexSignIn(),
     openLandingChat: (runtimeId, placeholder) => unifiedViewProvider.openLandingChat(runtimeId, placeholder),
   });
 

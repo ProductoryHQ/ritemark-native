@@ -57,7 +57,7 @@ Windows (S45–S47 and R15's Windows half) is not in this file yet: it runs thro
 | S49 Every empty desk | Pass | In a project window with every tab closed: Text opened a new document, Table a new table, Web page a browser tab (`s49-empty-desk-tiles.png`). The new files went into the project (#451 unchanged). |
 | S43 The inventory | Partly | The launch check's rows live in Settings (S41) and the welcome (S20); "You are interacting with AI" shows on the AI's sheet. The sign-in, setup, repair and recovery cards need signed-out or broken runtimes: not run here. |
 | S44 Skipped, then signing in later | Not run | Both AIs are signed in on this Mac, so the AI's sheet shows no sign-in cards. |
-| S45–S47 Windows | Waiting | The Windows round, through the Development manager. |
+| S45–S47 Windows | S45, S46 on the overlay: see *The Windows overlay round* | Four findings fixed; S47 and the shell parts wait for the round from main. |
 
 ## Fixed during this QA
 
@@ -85,6 +85,27 @@ The Experience lead approved all three, and asked for three more, done and check
 - The feedback box says under its field "What you write here is sent with your feedback." (the usage-data switch promises never your documents, chats or names). VS Code's input box draws that line in its own ink, not muted, and appends its "(Press 'Enter' to confirm…)" hint; muting it would restyle every input box. The Experience lead accepted it as VS Code draws it.
 
 The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
+
+## The Windows overlay round (18 October)
+
+Run by the Development manager's Windows session with overlay run 39159831343 (head 2149ecc8) on the installed round 2 build of main `f492948b`, fresh profiles, the installed app untouched.
+
+Passed: step 1's cards, the card's Cancel and Escape; Open a folder… with Windows' picker; the sample project and "Leadership programme 2" (all files, 4 cards); Documents is the real folder (OneDrive exists but doesn't redirect it, so the moved case was not testable); the landing with Claude; Settings' tool rows with this computer's runtime; usage data off with no PostHog lookups; Privacy Policy and Terms of Use open in Edge with no question; the keys sheet's Done ring. As the spec has it: the new-project line reads "In Documents\Ritemark\<name>", and `\` and `:` are refused in place.
+
+Four findings, fixed in this PR:
+1. **ChatGPT sign-in.** VS Code asked "Do you want Ritemark to open the external website? https://auth.openai.com/…" while the card already said the browser had opened, and kept saying so after Cancel; Codex's listener on 127.0.0.1:1455 stayed until the window closed.
+   - The sign-in hosts are trusted link domains, as ritemark.app is (`branding/product.json`: auth.openai.com, claude.com, platform.claude.com, claude.ai, console.anthropic.com). This takes effect with the 2.0 app build.
+   - The card shows Checking… until the page has opened. If the question is answered with Cancel (or nothing opens it), the card returns to Sign in with "ChatGPT's sign-in page didn't open. Sign in again to open it."
+   - Cancel stops Codex's listener. The bundled Codex has no call that cancels a login, so its app-server is stopped when no conversation has a thread on it, and the next use starts a fresh one.
+   - A second click while a sign-in starts is ignored.
+   - Checked on the Mac with the dev build, where auth.openai.com is not yet trusted, so VS Code asks; Codex was pointed at an empty `CODEX_HOME`, leaving the person's own sign-in untouched. With the question up, the card read Checking…; Cancel on the question gave the sentence and freed port 1455. Two quick clicks gave one question and one listener. The card's own Cancel after the page opened uses the same stop, and was not run here because it would open the real sign-in page.
+2. **S46, an early click.** The check answered as the click arrived, the card's words grew to three lines, and the button moved 20 px down. The cards now keep three lines for their words, so the button stays where it was: every reason a check or sign-in can show fits, and the button stays at the same height through all of them. The cards are 160 high instead of 140 (`*-welcome-step-*.png` captured again).
+3. **This computer's Codex said Signed in** with an ended sign-in, because it reports `auth.json` without testing it, and the landing then found it signed out. After Codex says ready, the welcome makes one request with the sign-in (the plan's usage). If that fails as a sign-in failure, or Codex then has no account, the card says the sign-in has ended. No token refresh is forced: refresh tokens rotate, and a forced refresh could sign out the person's other Codex apps. The failure test is unit-tested (`CodexRuntime.test.ts`, test 16); the case itself needs the Windows PC.
+4. **Recents showed "c:\…".** A URI's path has a lowercase drive letter; the welcome now writes it "C:" (`recentProjects.test.ts`).
+
+Noted, not this PR:
+- The second Welcome tab with the old Getting Started page is the round 2 shell's: the overlay carries only the extension, and patch 001's retirement comes with the 2.0 app build.
+- `window.autoDetectColorScheme` set to true on a fresh profile's first run is the first-run theme setup (`extension.ts`, Sprint 52, once per profile since Sprint 132), not the welcome. A theme set in settings.json before the first start is overridden by it; worth its own issue.
 
 ## The v1.14 parity list (PR #458, 18 October)
 

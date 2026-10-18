@@ -167,7 +167,7 @@
   "linuxIconName": "ritemark",
   "licenseFileName": "LICENSE",
   "documentationUrl": "https://ritemark.app/en/support/",
-  "linkProtectionTrustedDomains": ["https://*.ritemark.app"],
+  "linkProtectionTrustedDomains": ["https://*.ritemark.app", "https://auth.openai.com", "https://claude.com", "https://platform.claude.com", "https://claude.ai", "https://console.anthropic.com"],
   "reportIssueUrl": "https://github.com/jarmo-productory/ritemark-native/issues/new",
   "urlProtocol": "ritemark",
   "win32ContextMenu": {

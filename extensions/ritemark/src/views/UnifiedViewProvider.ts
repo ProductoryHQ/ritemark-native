@@ -1667,12 +1667,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Stop waiting for a ChatGPT sign-in the welcome started (Codex has no call that cancels one). */
+  /**
+   * Stop a ChatGPT sign-in the welcome started: the polling, and Codex's local listener (the bundled Codex has no
+   * call that cancels a login, so its app-server is stopped when no conversation uses it).
+   */
   public async stopCodexSignIn(): Promise<void> {
     const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
     rt.stopLoginPolling();
     rt.setLoginInProgress(false);
+    rt.stopLoginServer();
     this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
+  }
+
+  /** Whether ChatGPT's sign-in works as a turn will use it (the welcome's check, Sprint 133). */
+  public async verifyCodexSignIn(): Promise<boolean> {
+    const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+    return rt.verifySignIn();
   }
 
   /**

@@ -17,6 +17,8 @@ assert.equal(projectMark('!!!'), '?', 'a name with no letters or digits gets a p
 assert.equal(displayPlace('/Users/a/Documents/Board report 2026', '/Users/a', 'darwin'), '~/Documents/Board report 2026');
 assert.equal(displayPlace('/Volumes/Work/X', '/Users/a', 'darwin'), '/Volumes/Work/X');
 assert.equal(displayPlace('C:\\Users\\a\\Documents\\X', 'C:\\Users\\a', 'win32'), 'C:\\Users\\a\\Documents\\X');
+assert.equal(displayPlace('c:\\Users\\a\\Documents\\X', 'C:\\Users\\a', 'win32'), 'C:\\Users\\a\\Documents\\X', 'a URI fsPath\'s lowercase drive letter, as Windows writes it');
+assert.equal(displayPlace('\\\\server\\share\\X', 'C:\\Users\\a', 'win32'), '\\\\server\\share\\X', 'a share path unchanged');
 
 const now = new Date('2026-10-18T15:00:00').getTime();
 const at = (iso: string) => new Date(iso).getTime();

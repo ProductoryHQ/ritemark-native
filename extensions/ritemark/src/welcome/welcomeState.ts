@@ -24,6 +24,8 @@ export interface ProviderMemory {
   check: CheckResult;
   /** A sign-in the welcome started and that is still open in the browser. */
   signingIn: boolean;
+  /** A sign-in the welcome is starting: its page is not open yet (VS Code may still ask whether to open it). */
+  starting: boolean;
   /** A key saved from the welcome's sheet, waiting for the provider's check to say ready (R2, R3). */
   keySaved: boolean;
   /** The last sign-in's problem, shown until the next attempt. */
@@ -31,14 +33,14 @@ export interface ProviderMemory {
 }
 
 export function initialMemory(): ProviderMemory {
-  return { check: { kind: 'pending' }, signingIn: false, keySaved: false, problem: null };
+  return { check: { kind: 'pending' }, signingIn: false, starting: false, keySaved: false, problem: null };
 }
 
 /** The card or row for one provider. */
 export function providerView(id: WelcomeProviderId, memory: ProviderMemory): ProviderView {
   const base = { id, reason: null, retry: false, method: null } satisfies Partial<ProviderView>;
   if (memory.signingIn) return { ...base, phase: 'signing-in' };
-  if (memory.keySaved) return { ...base, phase: 'checking' };
+  if (memory.starting || memory.keySaved) return { ...base, phase: 'checking' };
   const problem = memory.problem ? signInProblem(id, memory.problem) : null;
   const check = memory.check;
   switch (check.kind) {

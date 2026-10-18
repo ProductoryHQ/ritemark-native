@@ -45,11 +45,13 @@ assert.equal(providerView('claude', answered('error')).retry, true);
 // ── R3: signing in, and what happened when it did not finish ──
 assert.equal(providerView('claude', { ...answered('needs-auth'), signingIn: true }).phase, 'signing-in');
 assert.equal(providerView('claude', { ...answered('ready'), keySaved: true }).phase, 'checking', 'a saved key: Checking…, never "your browser opened"');
+assert.equal(providerView('chatgpt', { ...answered('needs-auth'), starting: true }).phase, 'checking', 'a sign-in starting: Checking… until its page is open (the Windows round)');
+assert.match(providerView('chatgpt', { ...answered('needs-auth'), problem: 'not-opened' }).reason ?? '', /didn’t open/);
 const failed = providerView('claude', { ...answered('needs-auth'), problem: 'failed' });
 assert.equal(failed.phase, 'sign-in');
 assert.ok(failed.reason && !/error|code|authenticat|codex/i.test(failed.reason), 'one sentence, no codes, no "authenticated"');
 for (const id of ['claude', 'chatgpt', 'opencode'] as const) {
-  for (const problem of ['failed', 'timed-out', 'could-not-start', 'not-ready'] as const) {
+  for (const problem of ['failed', 'timed-out', 'could-not-start', 'not-ready', 'not-opened'] as const) {
     const reason = providerView(id, { ...answered('needs-auth'), problem }).reason ?? '';
     assert.doesNotMatch(reason, /codex|authenticat|runtime/i, `${id} ${problem}: people's words`);
   }

@@ -511,6 +511,11 @@ export class CodexSession implements RuntimeSession {
   }
 }
 
+/** Whether a failed Codex request failed on the sign-in (expired, refused or signed out), not on the network. */
+export function isCodexSignInFailure(message: string): boolean {
+  return /\b401\b|unauthori[sz]ed|(access|refresh|id)[ _]token|token[ _](is )?(expired|invalid|revoked)|\bexpired\b|sign(ed)?[ -]?out|log(ged)?[ -]?out|(sign|log)[ -]?in again|not (signed|logged) in|re-?authenticat/i.test(message);
+}
+
 export class CodexRuntime implements AgentRuntime {
   readonly id: AgentId = 'codex';
 
@@ -620,6 +625,42 @@ export class CodexRuntime implements AgentRuntime {
         }
       })();
     }, 2000);
+  }
+
+  /**
+   * Stop a ChatGPT sign-in's local listener (127.0.0.1:1455). The bundled Codex's app-server has no call that
+   * cancels a login, and the listener lives in its process, so an app-server no conversation has a thread on is
+   * stopped; the next use starts a fresh one. With a conversation on it, the listener is left to Codex.
+   */
+  stopLoginServer(): boolean {
+    if (!this._appServer || this._sessionsByThread.size > 0) return false;
+    this.stopLoginPolling();
+    this._loginInProgress = false;
+    const appServer = this._appServer;
+    this._appServer = null;
+    this._auth = null;
+    appServer.dispose();
+    return true;
+  }
+
+  /**
+   * Whether ChatGPT's sign-in works the way a turn will use it (Sprint 133, the Windows round). `account/read`
+   * only reports auth.json, and an older Codex reports an ended sign-in as signed in until a request fails. Reading
+   * the plan's usage is one request with the sign-in; when it fails as a sign-in failure, or Codex then has no
+   * account, the sign-in has ended. No token refresh is forced: refresh tokens rotate, and a forced refresh could
+   * sign out the person's other Codex apps.
+   */
+  async verifySignIn(): Promise<boolean> {
+    this._ensureAppServer();
+    const auth = this._auth!;
+    try {
+      await this._appServer!.getAccountRateLimits();
+      return true;
+    } catch (error) {
+      if (isCodexSignInFailure(error instanceof Error ? error.message : String(error))) return false;
+      const status = await auth.getStatus();
+      return status.authenticated;
+    }
   }
 
   async beginLogin(): Promise<string> {

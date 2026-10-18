@@ -85,6 +85,8 @@ export interface WelcomeAiSheet {
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
   startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void): Promise<string | null>;
   stopCodexSignIn(): Promise<void>;
+  /** Whether ChatGPT's sign-in works as a turn will use it, beyond what auth.json says. */
+  verifyCodexSignIn(): Promise<boolean>;
   openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void>;
 }
 
@@ -431,6 +433,12 @@ class WelcomeController implements vscode.Disposable {
       } catch (error) {
         availability = { state: 'error', usable: false, detail: error instanceof Error ? error.message : String(error) };
       }
+      // ChatGPT: a sign-in auth.json still holds can have ended; an older Codex says ready until a request fails
+      // (the Windows round, this computer's Codex). Check it as a turn will use it before the welcome promises it.
+      if (id === 'chatgpt' && availability.state === 'ready' && !memory.signingIn) {
+        const works = await this.aiSheet.verifyCodexSignIn().catch(() => true);
+        if (!works) availability = { state: 'needs-auth', usable: false, detail: null };
+      }
       clearTimeout(timer);
       // A later check owns the answer; an answer after the 20 s still shows the real state (S15).
       if (this.checkTokens[id] !== token) return;
@@ -548,6 +556,7 @@ class WelcomeController implements vscode.Disposable {
 
   private async signInClaude(): Promise<void> {
     const memory = this.memories.claude;
+    if (memory.signingIn) return;
     memory.problem = null;
     memory.signingIn = true;
     this.push();
@@ -595,8 +604,12 @@ class WelcomeController implements vscode.Disposable {
 
   private async signInChatGpt(): Promise<void> {
     const memory = this.memories.chatgpt;
+    // One sign-in at a time: a second click while it starts or runs would start Codex's login again.
+    if (memory.starting || memory.signingIn) return;
     memory.problem = null;
-    memory.signingIn = true;
+    // Checking… until the page is open: VS Code can ask "Do you want Ritemark to open the external website?", and
+    // the card must not say the browser opened before it has (the Windows round).
+    memory.starting = true;
     this.push();
     try {
       const page = await this.aiSheet.startCodexSignIn((state) => {
@@ -611,14 +624,25 @@ class WelcomeController implements vscode.Disposable {
         }
       });
       if (!page) {
-        memory.signingIn = false;
+        memory.starting = false;
         memory.problem = 'not-ready';
         this.push();
         return;
       }
       this.signInPages.chatgpt = page;
-      await vscode.env.openExternal(vscode.Uri.parse(page));
+      const opened = await vscode.env.openExternal(vscode.Uri.parse(page));
+      memory.starting = false;
+      if (!opened) {
+        // The question was answered with Cancel (or Copy), or nothing could open the page: stop Codex's listener.
+        await this.aiSheet.stopCodexSignIn();
+        memory.problem = 'not-opened';
+        this.push();
+        return;
+      }
+      memory.signingIn = true;
+      this.push();
     } catch {
+      memory.starting = false;
       memory.signingIn = false;
       memory.problem = 'could-not-start';
       this.push();

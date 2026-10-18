@@ -24,7 +24,8 @@ function firstChar(word: string): string {
 
 /** The folder as the person reads it: `~/Documents/…` on the Mac, the full path on Windows. */
 export function displayPlace(fsPath: string, home: string, platform: NodeJS.Platform): string {
-  if (platform === 'win32') return fsPath;
+  // A URI's fsPath has a lowercase drive letter (c:\Users…); Windows writes it C:.
+  if (platform === 'win32') return fsPath.replace(/^([a-z]):/, (_, drive: string) => `${drive.toUpperCase()}:`);
   const trimmedHome = home.replace(/\/+$/, '');
   if (trimmedHome && (fsPath === trimmedHome || fsPath.startsWith(`${trimmedHome}/`))) return `~${fsPath.slice(trimmedHome.length)}`;
   return fsPath;
