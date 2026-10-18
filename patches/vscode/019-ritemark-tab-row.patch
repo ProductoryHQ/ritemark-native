@@ -14,7 +14,8 @@ tab carries the working dot (terminalEditorInput.ts). A named terminal keeps its
 when the shell reports its folder, so it comes back named after a reload (terminalInstance.ts).
 The terminal's bar shows the shell's name as a plain label in step 1 (its menu of other shells comes later); it
 keeps the last name seen, since on Windows the shell type clears while a command runs. A terminal tab's menu
-offers no move into the panel (terminalMenus.ts; Windows round 1).
+adds only Rename to the usual tab items: no move into the panel, no Change Color, Change Icon or Size to Content
+Width (terminalMenus.ts; Windows round 1 and the Experience lead).
 Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
@@ -1188,10 +1189,10 @@ index 50a4c0f4917..db53f732c98 100644
  	}
  
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
-index 4e645b1cd3f..b1dcc8b10f7 100644
+index 4e645b1cd3f..e13df38998a 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
-@@ -663,14 +663,7 @@ export function setupTerminalMenus(): void {
+@@ -663,14 +663,9 @@ export function setupTerminalMenus(): void {
  		]
  	);
  
@@ -1203,10 +1204,45 @@ index 4e645b1cd3f..b1dcc8b10f7 100644
 -		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
 -		group: '2_files'
 -	});
-+	// Ritemark 2.0: a terminal is a tab (R8), so its tab offers no move into the panel 2.0 does not use.
++	// Ritemark 2.0: a terminal is a tab (R8). Its tab's menu adds only Rename to the usual tab items: no move into
++	// the panel 2.0 does not use, and no Change Color, Change Icon or Size to Content Width (the Experience lead,
++	// 18 October); those stay in the command palette.
  
  	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
  		command: {
+@@ -681,32 +676,6 @@ export function setupTerminalMenus(): void {
+ 		group: '2_files'
+ 	});
+ 
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.ChangeColor,
+-			title: terminalStrings.changeColor
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.ChangeIcon,
+-			title: terminalStrings.changeIcon
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
+-		command: {
+-			id: TerminalCommandId.SizeToContentWidth,
+-			title: terminalStrings.toggleSizeToContentWidth
+-		},
+-		when: ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeTerminal),
+-		group: '2_files'
+-	});
+-
+ 	for (const menuId of [MenuId.EditorTitle, MenuId.CompactWindowEditorTitle]) {
+ 		MenuRegistry.appendMenuItem(menuId, {
+ 			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
 index 00000000000..5627ecf829b

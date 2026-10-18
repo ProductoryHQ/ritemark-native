@@ -106,9 +106,11 @@ as expected until 2.0's version bump. Screenshots stay on the Windows PC.
 Findings, fixed on the merge-2 branch:
 
 - **A terminal tab's menu offered "Move Terminal into Panel"**, a way back into the panel R8 removed (it showed on
-  the Mac too). Removed from the tab's menu (019, `terminalMenus.ts`); the command stays in the palette, and a terminal
-  that reaches the panel still moves back onto the desk ([`qa/w1-terminal-tab-menu.png`](qa/w1-terminal-tab-menu.png)). "Change Color…", "Change Icon…" and "Size to Content Width"
-  are in the same menu: asked the Experience lead whether they stay.
+  the Mac too), next to "Change Color…", "Change Icon…" and "Toggle Size to Content Width"
+  ([`qa/w1-terminal-tab-menu.png`](qa/w1-terminal-tab-menu.png)). The tab's menu is now the usual tab items plus
+  Rename…, as the Experience lead decided ([`qa/w1-terminal-tab-menu-after.png`](qa/w1-terminal-tab-menu-after.png));
+  the four commands stay in the palette, and a terminal that reaches the panel still moves back onto the desk (019,
+  `terminalMenus.ts`).
 - **The View menu had "Run" (Ctrl+Shift+D) and "Chat" (Ctrl+Alt+I).** Run is the Run and Debug place, which a fresh
   profile counts as in use until the debugger settles; its View-menu entry is gone (003), as its top-level menu was
   already. Chat opened Copilot Chat in VS Code's bottom panel on the desk (found while checking it on the Mac:
