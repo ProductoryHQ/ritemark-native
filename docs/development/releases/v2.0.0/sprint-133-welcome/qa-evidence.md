@@ -1,6 +1,6 @@
 # Sprint 133 QA evidence
 
-Run on 18 October 2026, on the Mac (Apple Silicon), from `sprint-133-welcome`, on dev instances of this worktree launched in the background (`open -n -g`) with their own short user-data and extensions directories and their own debugging port, driven over CDP. Nothing ran on Jarmo's own profile. "Fresh" is an empty profile; "v1.14.0 profile" is one made with the installed v1.14.0, copied before each run. Usage-data sends went to a local stand-in for PostHog (`127.0.0.1:9450`) that records each request.
+Run on 18 October 2026, on the Mac (Apple Silicon), from `sprint-133-welcome` (rechecked after main's #452 was merged in), on dev instances of this worktree launched in the background (`open -n -g`) with their own short user-data and extensions directories and their own debugging port, driven over CDP. Nothing ran on Jarmo's own profile. "Fresh" is an empty profile; "v1.14.0 profile" is one made with the installed v1.14.0, copied before each run. Usage-data sends went to a local stand-in for PostHog (`127.0.0.1:9450`) that records each request.
 
 The screenshots are in [qa-evidence/](qa-evidence/), at 1440 × 900 for the welcome's own scenes (`scripts/qa/welcome-screenshots.mjs`) and 1200 × 800 for the rest.
 
@@ -12,9 +12,9 @@ Windows (S45–S47 and R15's Windows half) is not in this file yet: it runs thro
 |---|---|---|
 | S1 A fresh start with no folder | Pass | `scripts/qa/welcome-check.mjs --expect alone`: 8 of 8 (the welcome open and alone, both columns closed, no tabs, no status bar, the sheet 640 wide and centred, no Getting Started). `light-welcome-step-1.png`, `dark-welcome-step-1.png`. No terminal opened. |
 | S2 The keyboard and a screen reader | Pass for the keyboard; VoiceOver not run | Tab goes Continue/Sign in for ChatGPT, then Claude, Set up OpenCode, API keys, Skip for now, and round again. Enter and Space press; Escape closes the sheets. Two fixes from this run (below): each card's button now names its AI and is described by the card's words and state ("Continue with Claude", described "Sign in with the account you already use. / Signed in"), and focus goes back to the button that opened a sheet. VoiceOver was not turned on (a system setting on Jarmo's Mac); the accessible names and descriptions were read from the page instead. |
-| S3 Dark | Pass for the sheet's text; one label open | Every text on the sheet measured against its ground: lowest 6.03:1 in Dark, all above 4.5:1 in Light. The header's step labels sit on the illustration: "1 · Your AI" about 6.5:1 at the median pixel, but "2 · Set up project" (80% white, the kit's value, `ritemark.css:677`) about 3.4:1 on step 1. Taken to the Experience lead (below). |
+| S3 Dark | Pass | Every text on the sheet measured against its ground: lowest 6.03:1 in Dark, all above 4.5:1 in Light. The header's step labels sit on the illustration; at first "2 · Set up project" (80% white, the kit's value) was about 3.4:1. With the Experience lead's shade at the header's foot it was still 4.3:1 at its worst pixel, so both labels are full white: worst pixel 5.66:1, median 6.9:1, on steps 1 and 2 (measured against the header captured with the labels hidden). |
 | S4 The three cards | Pass | Step 1 as drawn: ChatGPT and Claude with "Sign in with the account you already use.", OpenCode with "Open models, with an API key of your own.", "You can use more than one.", API keys, Skip for now. "Codex" appears nowhere on the page. |
-| S5 API keys | Partly | The sheet opens over the welcome with the Anthropic key only (`light-welcome-key-sheet.png`); the protocol refuses an OpenAI key as a way to use ChatGPT (`welcomeState.test.ts`). Saving a real Anthropic key was not run: there is no spare key, and this Mac's Claude is signed in. The saved-key path (Checking…, then step 2) is unit-tested and was fixed in `d3cfd860`. |
+| S5 API keys | Partly | The sheet opens over the welcome with the Anthropic key only, drawn as experience 31's dialog (`*-welcome-key-sheet.png`: 440 wide, radius 12, padding 20, 32-high buttons, no X; dim 18% ink in Light, 50% near-black in Dark); the protocol refuses an OpenAI key as a way to use ChatGPT (`welcomeState.test.ts`). Saving a real Anthropic key was not run: there is no spare key, and this Mac's Claude is signed in. The saved-key path (Checking…, then step 2) is unit-tested and was fixed in `d3cfd860`. |
 | S6 Skip for now | Pass | Step 2 with "Your AI works only inside it."; no skip on step 2. |
 | S7 Already signed in | Pass | This Mac is signed in to Claude and ChatGPT: both cards show Checking…, then Signed in with Continue. |
 | S8–S11 Signing in, cancelling, failing | Not run | Each opens Jarmo's browser on his real accounts. The card states, the one-sentence failures and their words are unit-tested (`welcomeState.test.ts`: no code, "authentication", "Codex" or "runtime" in any of them). Needs a run on a signed-out machine (the Windows round can cover it). |
@@ -70,12 +70,16 @@ Each is in the commit that adds this file.
 5. **The update sheet at 1440 × 900.** With three projects it overflowed by 24 px and the scrollbar pushed the sheet 6 px left. The short sheets now keep 12 px below as above, and the scrollbar's room is kept on both edges.
 6. **A Sign in click shows progress at once (R15, #401).** On a busy first start the host can take seconds to answer; the card now shows Checking… from the click until the host's next word about that AI, so a second click can't happen (`welcomeState.test.ts`).
 
-## Open findings
+## The Experience lead's review (18 October)
 
-For the Experience lead:
-- "2 · Set up project" in 80% white on the header illustration is about 3.4:1 (11 px). Full white would be about 4.3:1; passing needs a soft shade under the progress bar or a darker crop.
-- The keys sheet's dimming covers the page, not the window's top band or edges, because it lives inside the page.
-- The AI's sheet says "Claude can work with your files" whatever the AI (`EmptyState.tsx`, from before this sprint). The landing now shows it to people who chose ChatGPT or OpenCode.
+The welcome matches experiences 2 and 32 in both themes. Their three calls, done in `719b4db7`:
+1. A soft shade at the foot of all three headers (`linear-gradient(to top, rgba(22,19,47,.45), transparent 72px)`); over it the 80% label was still 4.3:1 at its worst pixel, so both step labels are full white, their fallback (S3).
+2. The keys sheet is experience 31's dialog (S5). The dim stays inside the welcome's page: letting the page cover the whole window would put a webview over the window's drag area and Windows' buttons, more than a small change, which they accepted for step 2.
+3. The AI's sheet names the AI in use: "Claude / OpenCode can work with your files" (`EmptyState.tsx`), "ChatGPT can work with your files" (Codex's own empty state). Checked live for Claude and ChatGPT; OpenCode by code (no key on the test profile). The composer's "Ask Codex…" is unchanged, from before this sprint.
+
+Also from the qa-validator: the welcome now saves an OpenRouter key only with `opencode-integration` on, as Settings does.
+
+## Open findings
 
 Outside this sprint's files, for follow-up issues:
 - Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open.
@@ -83,13 +87,14 @@ Outside this sprint's files, for follow-up issues:
 
 ## The frame baseline
 
-`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The baseline is unchanged; the welcome's own scenes are in `qa-evidence/` for Jarmo to approve into the baseline (`docs/development/frame-baseline/README.md`: a new baseline only with his approval).
+`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The same after main's #452 was merged in. The baseline is unchanged; the welcome's own scenes are in `qa-evidence/` for Jarmo to approve into the baseline (`docs/development/frame-baseline/README.md`: a new baseline only with his approval).
 
 ## Checks
 
 - `npm test` in `extensions/ritemark`: pass (the welcome's six test files, consent, analytics and the healer included).
 - Webview and extension TypeScript: clean. `compile-check-ts-native` on the patched VS Code: clean.
 - Patches: 18 apply from pristine, a second run is clean, and the result is identical (Phase 3).
+- After merging main (#452, the Sprint 132 closeout): patch 018's `ritemarkSurfaces.css` section rebuilt from a three-way merge of the CSS itself; all 18 patches apply to a pristine tree, which differs from before the merge in exactly #452's three VS Code files and the CSS. The stacking check, `compile-check-ts-native`, 102 VS Code tests (Ritemark, labels, Explorer, notifications), `npm test` and `validate-qa.sh` pass, and the welcome's scenes were captured again.
 
 ## A harness note
 

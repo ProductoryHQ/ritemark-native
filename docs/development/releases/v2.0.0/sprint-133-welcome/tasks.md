@@ -16,7 +16,7 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 - [x] `research/getting-started-retirement-audit.md` (W2, R12): the hunks of 001, 016 and 017 sorted; every route into Getting Started; `IOnboardingService` (007); where `workbench.startupEditor: none` wins; the stacking check's pairs
 - [x] `research/welcome-alone-audit.md` (W3, R1, R6): the context key and the class; what it hides; the traffic lights and Windows' buttons; no jump at the landing; the empty desk's tiles
 - [x] `research/muted-extension-audit.md` (W9, R13): the label path for the tree and the tabs; highlights; the hunk's shape
-- [ ] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac (done 18 October); on Windows, the first start after a clean install with Defender on (process start to extension host, MsMpEng's CPU, a CPU profile, then a second start to compare), through the Development manager's Windows session; the decision
+- [x] `research/ext-host-start-401-audit.md` (W10, R15): a CPU profile of a fresh profile's first seconds on the Mac (done 18 October); on Windows, the first start after a clean install with Defender on (process start to extension host, MsMpEng's CPU, a CPU profile, then a second start to compare), through the Development manager's Windows session; the decision — Windows round 2's numbers in; decided 18 October: Defender's first reads, not Ritemark's code
 - [x] `research/confirmations.md`: the 1.x signal (`lastConfirmedVersion`); 1.x's usage-data keys on v1.14.0 profiles after OK, Opt Out, the toast's × and no answer; the sign-in entry points and their progress events; how the healer closes the text tab
 - [x] The sample project's content (R5): written by the Experience lead and approved by Jarmo, 18 October (`ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`). Copied as it is into `extensions/ritemark/sample-project/`, with `.ritemark/tasks/` and the one-line `CLAUDE.md`; checked that every card parses, and that no real person's name, path or account is in it
 - [x] The 1.x OK reading decided by Jarmo (18 October): a notice closed without Opt Out counts as the OK (technical-plan.md, W1); write it into `research/confirmations.md` (R7)
@@ -74,7 +74,7 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 - [x] `utils/stickyTabHealer.ts` + `extension.ts`: the healer closes the text tab it replaced; test (R11, #429)
 - [x] Ritemark Settings: Usage data with the links; Git and Node rows under the runtime choice, for this computer's runtime only (R7, R12)
 - [x] 018: the muted extension per its audit; its VS Code unit test (R13)
-- [ ] #401: the fix in `activate` if the audit finds one in Ritemark's code; the welcome's queued click either way (R15) — the welcome's side is in (a Sign in click shows Checking… until the host answers; the Mac's profile found nothing in `activate`); the decision waits for the Windows numbers
+- [x] #401: the fix in `activate` if the audit finds one in Ritemark's code; the welcome's queued click either way (R15) — the welcome's side is in (a Sign in click shows Checking… until the host answers; the Mac's profile found nothing in `activate`); nothing to move in `activate` (the audit's decision)
 
 ## Phase 6: QA, merge and closeout
 
