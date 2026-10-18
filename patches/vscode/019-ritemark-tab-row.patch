@@ -6,7 +6,8 @@ tab is as wide as its whole name, 120 to 200, and a tab's tooltip shows its path
 When the row is full, the tabs used longest ago fold into "N ⌄" (ritemarkFoldedTabs.ts) before the + at the
 right end of the row, which makes a new Text, Table, Web page or Terminal tab (ritemarkNewTab.ts, #199).
 Home and Tasks keep the front of the row (R9): once pinned, a person or a command cannot close, unpin or move
-them to another group, and no tab moves in front of them; only the extension disposes them.
+them to another group, and no tab moves in front of them; only the extension disposes them. A move command
+that made a new group for them takes the empty group away again (editorCommands.ts).
 A terminal is a tab (R8; Jarmo, 17 October): ritemarkTerminalTabs.ts moves any terminal that lands in the
 panel onto the desk, names new ones "Terminal", "Terminal 2", and tracks whether each runs a command; the
 terminal's bar (ritemarkTerminalBar.ts, in terminalEditor.ts) shows Running and Stop, and a busy terminal's
@@ -22,8 +23,8 @@ Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
-Files: workbench/browser/parts/editor/{editor,editorGroupView,editorTabsControl,multiEditorTabsControl,
-ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
+Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorTabsControl,
+multiEditorTabsControl,ritemarkFoldedTabs,ritemarkNewTab}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
 terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index 28d0480ab86..08b6f36aa5f 100644
@@ -39,6 +40,33 @@ index 28d0480ab86..08b6f36aa5f 100644
  }
  
  export interface IEditorGroupTitleHeight {
+diff --git a/src/vs/workbench/browser/parts/editor/editorCommands.ts b/src/vs/workbench/browser/parts/editor/editorCommands.ts
+index ef66fad7e3b..6d4ae8cb3bd 100644
+--- a/src/vs/workbench/browser/parts/editor/editorCommands.ts
++++ b/src/vs/workbench/browser/parts/editor/editorCommands.ts
+@@ -288,6 +288,7 @@ function registerEditorMoveCopyCommand(): void {
+ 		const configurationService = accessor.get(IConfigurationService);
+ 
+ 		let targetGroup: IEditorGroup | undefined;
++		const groupCount = editorGroupsService.count; // Ritemark 2.0
+ 
+ 		switch (args.to) {
+ 			case 'left':
+@@ -349,6 +350,14 @@ function registerEditorMoveCopyCommand(): void {
+ 				sourceGroup.copyEditors(editorsWithOptions, targetGroup);
+ 			}
+ 
++			// Ritemark 2.0: a pinned Home or Task board tab stays in its group, so a group
++			// made here for it would be left empty; take it away again
++			if (targetGroup.isEmpty && editorGroupsService.count > groupCount) {
++				editorGroupsService.removeGroup(targetGroup);
++				sourceGroup.focus();
++				return;
++			}
++
+ 			targetGroup.focus();
+ 		}
+ 	}
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 index a2344eaf8f2..a9e8b628053 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
