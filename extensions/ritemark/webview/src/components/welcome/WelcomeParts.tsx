@@ -436,7 +436,7 @@ export function KeySheet({
         </div>
         <div className="rw-dialog-foot">
           <Tooltip label="Close without saving"><Button variant="ghost" className="rw-dbtn ghost" onClick={onClose}>{COPY.cancel}</Button></Tooltip>
-          <Tooltip label="Save the keys and go on"><Button className="rw-dbtn" onClick={done} disabled={saving}>Done</Button></Tooltip>
+          <Tooltip label="Save the keys and go on"><Button className="rw-dbtn default" onClick={done} disabled={saving}>Done</Button></Tooltip>
         </div>
       </DialogContent>
     </Dialog>

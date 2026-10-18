@@ -54,7 +54,8 @@ export function registerReactionCommand(context: vscode.ExtensionContext): void 
     const message = await vscode.window.showInputBox({
       title: 'Want to tell us more?',
       placeHolder: 'Optional — type your feedback and press Enter',
-      prompt: 'Your message is sent anonymously.',
+      // Under the field, so the usage-data switch's "never your documents, chats or names" stays honest (Sprint 133).
+      prompt: 'What you write here is sent with your feedback.',
     });
 
     // Track the reaction (even if message was dismissed)

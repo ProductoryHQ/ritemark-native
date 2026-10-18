@@ -219,6 +219,12 @@ body.vscode-high-contrast:not(.vscode-high-contrast-light) .rw-dim.rw-dim { back
 .rw-dbtn.rw-dbtn { height: 32px; padding: 0 14px; border-radius: 8px; font: 500 13px/32px var(--ritemark-ui-font-family); }
 .rw-dbtn.ghost { background: var(--vscode-ritemark-desk, var(--r-surface)); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); color: var(--r-ink-strong); }
 .rw-dbtn.ghost:hover { background: var(--vscode-ritemark-ground, var(--r-surface-soft)); }
+/* Done is the default button, as Enter in a key field presses it: experience 31's ring, 2 px of the sheet's colour,
+   then 2 px of the accent at 28% (40% in Dark). Keyboard focus shows the ring in the full accent. */
+.rw-dbtn.rw-dbtn.default { box-shadow: 0 0 0 2px var(--vscode-ritemark-desk, var(--r-surface)), 0 0 0 4px color-mix(in srgb, var(--r-accent) 28%, transparent); }
+body.vscode-dark .rw-dbtn.rw-dbtn.default,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .rw-dbtn.rw-dbtn.default { box-shadow: 0 0 0 2px var(--vscode-ritemark-desk, var(--r-surface)), 0 0 0 4px color-mix(in srgb, var(--r-accent) 40%, transparent); }
+.rw-dbtn.rw-dbtn.default:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--vscode-ritemark-desk, var(--r-surface)), 0 0 0 4px var(--r-accent); }
 .rw-keyfield { margin-bottom: 14px; }
 .rw-keyfield label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
 .rw-keyfield label .set { display: inline-flex; align-items: center; gap: 4px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-body); }

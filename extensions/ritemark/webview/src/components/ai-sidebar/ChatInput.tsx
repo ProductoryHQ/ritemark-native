@@ -338,7 +338,8 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
       : isClaudeCode
         ? 'Ask Claude... (type @ to mention an agent, / for commands)'
         : isCodex
-          ? 'Ask Codex... (type / for commands)'
+          // Visible words say ChatGPT, never Codex (Sprint 133, the Experience lead).
+          ? 'Ask ChatGPT... (type / for commands)'
           : isOpenCode
             ? 'Ask OpenCode... (type / for commands)'
             : 'Ask anything... (type / for commands)';
