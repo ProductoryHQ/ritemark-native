@@ -249,4 +249,4 @@ Seen, not Sprint 132's to fix (drafts for issues in the closeout notes):
   - **The narrowed AI's width (S42).** At 1280, against experience 9's drawing, mine on top ([`qa/s42-ai-1280-vs-drawing.png`](qa/s42-ai-1280-vs-drawing.png)):
     - The desk ends at 944 and the sheet starts at 952 in both.
     - The sheet and rail end 8 before the window's edge, 320 in all.
-    - The drawing's rail buttons are 32 wide (the kit's `.rail .rl`) and the product's 40, so its sheet ends at about 1229 and ours at 1224. That's the rail, not the narrowing. Asked the Experience lead.
+    - The drawing's rail buttons are 32 wide (the kit's `.rail .rl`) and the product's 40, so its sheet ends at about 1229 and ours at 1224. That's the rail, not the narrowing. The Experience lead agreed the narrowing matches (S42 passes), and the kit follows the product's 40-wide rail buttons (Jarmo, 15 October: keep the rail "as it is now").
