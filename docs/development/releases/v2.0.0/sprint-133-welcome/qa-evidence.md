@@ -121,7 +121,7 @@ Jarmo's test at `d726a382`: the first window on his 1728 × 1084 MacBook opened 
   | The update sheet, two AIs, three projects | 681 |
   | The start sheet | 256 |
 
-  Captured in Light and Dark in `qa-evidence/765/`.
+  Captured in Light and Dark in `qa-evidence/765/`. The Experience lead approved the compact rhythm and both departures; on their review the 72-high header's logo was set by its drawing, not its box: the SVG keeps about 20 of empty space under the drawn logo at 122 wide, so the box sits 2 below the foot and the drawn logo's foot is 18 from it, about 23 from the top.
 
 ## The v1.14 parity list (PR #458, 18 October)
 

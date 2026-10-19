@@ -252,7 +252,9 @@ body.vscode-high-contrast:not(.vscode-high-contrast-light) .rw-dbtn.rw-dbtn.defa
   .rw-head { height: 104px; margin-bottom: 16px; }
   .rw-head.short { height: 72px; }
   .rw-head img { bottom: 40px; }
-  .rw-head.short img { bottom: 18px; }
+  /* The drawn logo's foot 18 from the 72 header's foot: the SVG keeps about 20 of empty space under its drawing at 122
+     wide, so the image box sits 2 below the foot. The logo then sits low in the band, about 23 from the top. */
+  .rw-head.short img { bottom: -2px; }
   .rw-prog { bottom: 10px; }
   .rw-sheet h1 { margin-bottom: 4px; font-size: 32px; line-height: 38px; }
   .rw-one, .rw-one.tight, .rw-one.update { margin-bottom: 14px; }
