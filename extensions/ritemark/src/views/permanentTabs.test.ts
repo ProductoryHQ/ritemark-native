@@ -27,9 +27,11 @@ async function main(): Promise<void> {
   assert.deepEqual(planPermanentTabs([other, home(false), board()], true), [{ kind: 'home', action: 'pin' }]);
   assert.deepEqual(planPermanentTabs([board(), home()], true), [{ kind: 'home', action: 'pin' }]);
   assert.deepEqual(planPermanentTabs([home(), other, board(false)], true), [{ kind: 'board', action: 'pin' }]);
-  // S22: the board flag off: Home alone; a board tab is left as it is.
+  // S22: the board flag off: Home alone, and a board tab the window restored goes.
   assert.deepEqual(planPermanentTabs([], false), [{ kind: 'home', action: 'open' }]);
   assert.deepEqual(planPermanentTabs([home(), other], false), []);
+  assert.deepEqual(planPermanentTabs([home(), board(), other], false), [{ kind: 'board', action: 'remove' }]);
+  assert.deepEqual(planPermanentTabs([board(), other], false), [{ kind: 'home', action: 'open' }, { kind: 'board', action: 'remove' }]);
 
   console.log('views/permanentTabs: all assertions passed');
 }

@@ -293,6 +293,12 @@ class WelcomeController implements vscode.Disposable {
   async openNewProject(): Promise<void> {
     const wasOpen = this.panel !== null && this.panel !== undefined;
     this.newProjectRequested = true;
+    // A fresh welcome the person never finished opens on its project step, where the form is, as Skip for now
+    // would take it: they asked to start a project, not to pick an AI (S25)
+    if (this.kind === 'fresh' && this.step === 1) {
+      this.step = afterSkip({ kind: this.kind, step: this.step, readyProvider: this.readyProvider }).step;
+      void this.refreshMissingTool();
+    }
     await this.open({ reason: 'command' });
     // A sheet already showing takes it now; a new one when its page says it is ready ('welcome/ready')
     if (wasOpen) {

@@ -34,10 +34,11 @@ export interface TabFact {
 /**
  * What to do with the first group's tabs, in order. Home: open it when it is
  * missing, or pin it and move it first when it is not; the board the same,
- * pinned after Home. Empty when all is as it should be.
+ * pinned after Home. With the board turned off, a board tab the window
+ * restored goes. Empty when all is as it should be.
  */
-export function planPermanentTabs(tabs: readonly TabFact[], boardEnabled: boolean): { kind: PermanentKind; action: 'open' | 'pin' }[] {
-  const plan: { kind: PermanentKind; action: 'open' | 'pin' }[] = [];
+export function planPermanentTabs(tabs: readonly TabFact[], boardEnabled: boolean): { kind: PermanentKind; action: 'open' | 'pin' | 'remove' }[] {
+  const plan: { kind: PermanentKind; action: 'open' | 'pin' | 'remove' }[] = [];
   const homeIndex = tabs.findIndex((tab) => tab.kind === 'home');
   if (homeIndex < 0) plan.push({ kind: 'home', action: 'open' });
   else if (!tabs[homeIndex].pinned || homeIndex !== 0) plan.push({ kind: 'home', action: 'pin' });
@@ -45,6 +46,8 @@ export function planPermanentTabs(tabs: readonly TabFact[], boardEnabled: boolea
     const boardIndex = tabs.findIndex((tab) => tab.kind === 'board');
     if (boardIndex < 0) plan.push({ kind: 'board', action: 'open' });
     else if (!tabs[boardIndex].pinned) plan.push({ kind: 'board', action: 'pin' });
+  } else if (tabs.some((tab) => tab.kind === 'board')) {
+    plan.push({ kind: 'board', action: 'remove' });
   }
   return plan;
 }
@@ -93,6 +96,15 @@ export async function ensurePermanentTabs(deps: PermanentTabsDependencies): Prom
   if (plan.length === 0) return;
   for (const step of plan) {
     const existing = facts().find((fact) => fact.kind === step.kind)?.tab;
+    if (step.action === 'remove') {
+      // S22: only the extension can close a permanent tab (patch 019), by disposing its panel, and VS Code revives
+      // a restored webview only when it is shown. Shown, the board's serializer disposes it (the board is off).
+      if (existing) await revealTab(existing);
+      for (let waited = 0; facts().some((fact) => fact.kind === 'board') && waited < 3000; waited += 50) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      continue;
+    }
     if (step.action === 'pin' && existing) await revealTab(existing);
     else if (step.kind === 'home') await deps.openHome();
     else await deps.openBoard();
