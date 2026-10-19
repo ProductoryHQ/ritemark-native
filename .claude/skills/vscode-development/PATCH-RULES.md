@@ -19,7 +19,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `007-ritemark-vscode-1117-compat.patch` | Compatibility | Copilot Chat compatibility (since 1.117; rebased onto 1.142): the narrow setup actions instead of `ChatSetupContribution`, the onboarding module's fallback, the Copilot Chat launcher opens Copilot Chat as a tab; `webviewEditor.ts` opens a custom editor with no options (upstream's later fix, Sprint 135) |
 | `008-ritemark-windows-binary-strip.patch` | Windows packaging | Strips the Claude Agent SDK's non-Windows native binaries (upstream strips Copilot's itself since 1.142) |
 | `009-ritemark-browser-context-bridge.patch` | Browser | The active browser tab's context for AI chat; navigation pushes for Browser Recent |
-| `010-ritemark-browser-action-bridge.patch` | Browser | AI agent actions in the integrated browser |
+| `010-ritemark-browser-action-bridge.patch` | Browser | AI agent actions in the integrated browser; the bar: no Add Element to Chat, Developer tools in ⋯ (Sprint 135) |
 | `011-ritemark-cloud-file-error.patch` | Windows | OneDrive/SharePoint cloud-file read errors |
 | `012-ritemark-shell-watchdog.patch` | Updates | Quarantines a broken user-dir extension copy |
 | `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |

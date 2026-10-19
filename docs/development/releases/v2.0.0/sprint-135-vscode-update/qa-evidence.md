@@ -33,7 +33,7 @@ Each was found by comparing the two builds, and each fix was checked on 1.142 af
 | S11 Windows CI | After the merge | D4: the Development manager dispatches it on the merged commit. |
 | S12 The frame on Windows | After the merge | |
 | S13 No difference | Pass for 32 of 34 scenes | [`qa/screenshot-diff.md`](qa/screenshot-diff.md). |
-| S14 A difference upstream forced | Waiting for review | The share question's browser bar: VS Code's Add Element to Chat (only with Copilot Chat installed) and the new Developer Tools icon. To the Experience lead, then Jarmo; the baseline is not changed. |
+| S14 A difference upstream forced | Reviewed; baseline waits for Jarmo | The share question's browser bar. The Experience lead decided (D5): Add Element to Chat stays off the bar, Developer tools goes into ⋯; both are in patch 010 and checked on 1.142 ([image](qa/browser-bar-more-menu-1142.png)). The baseline's share-question scenes change only with Jarmo's approval. |
 | S15 A difference from a default | Pass | Six settings pinned in `configurationDefaults`; the table is in `qa/screenshot-diff.md`. |
 | S16 The frame's numbers | Pass | `frame-geometry.mjs`, all four scenes, 0 FAIL ([`qa/frame-geometry-*.json`](qa/)); the numbers match Sprint 132 merge 2's, with Sprint 134's permanent tabs. |
 | S17 Sprint 132's scenarios | Mostly pass | Table below. |

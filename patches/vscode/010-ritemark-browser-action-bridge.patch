@@ -13,11 +13,20 @@
 #   its own label key (ritemark.browser.htmlEditorLabel), beside upstream's new
 #   .html entry, which stays (Ritemark's has default priority and wins); the
 #   actions take RITEMARK_PLAYWRIGHT_SESSION.
+#   The bar, as the Experience lead set it (D5): back, forward, reload, the
+#   address, Show Claude this page, ⋯. 1.142's Add Element to Chat split button
+#   is left off the bar even with Copilot Chat installed (it sends to Copilot
+#   Chat, not to the AI beside the page; its command and shortcut stay), and the
+#   empty tab's subtitle no longer points at it. Developer tools moves into ⋯
+#   (hidden by default, which the bar puts in its ⋯ menu), in sentence case.
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
-#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
+#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
 # Created: 2026-05-13
 # Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
@@ -207,6 +216,77 @@ index 9d39a07860c..926afddea2a 100644
  	}
  }
  
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
+index 5832512f349..647a560fa65 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
+@@ -49,7 +49,7 @@ class ToggleDevToolsAction extends Action2 {
+ 	constructor() {
+ 		super({
+ 			id: ToggleDevToolsAction.ID,
+-			title: localize2('browser.toggleDevToolsAction', 'Developer Tools'),
++			title: localize2('browser.toggleDevToolsAction', 'Developer tools'),
+ 			category: BrowserActionCategory,
+ 			icon: Codicon.developerTools,
+ 			f1: true,
+@@ -59,6 +59,9 @@ class ToggleDevToolsAction extends Action2 {
+ 				id: MenuId.BrowserActionsToolbar,
+ 				group: BrowserActionGroup.Tools,
+ 				order: 2,
++				// Ritemark (Sprint 135, the Experience lead's drawings): in the bar's ⋯ menu, not on the bar. The bar puts
++				// an item hidden by default in its ⋯ menu
++				isHiddenByDefault: true,
+ 			},
+ 			keybinding: {
+ 				weight: KeybindingWeight.WorkbenchContrib,
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
+index 079394d0068..b460413eaed 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
+@@ -1109,7 +1109,10 @@ MenuRegistry.appendMenuItem(MenuId.BrowserActionsToolbar, {
+ 	icon: Codicon.inspect,
+ 	group: BrowserActionGroup.Tools,
+ 	order: 1,
+-	when: ChatContextKeys.enabled,
++	// Ritemark (Sprint 135, the Experience lead): not on Ritemark's bar, even with Copilot Chat installed. It sends to
++	// Copilot Chat, not to the AI beside the page, and would sit next to Show Claude this page. Its command and
++	// shortcut stay for Copilot Chat's users
++	when: ContextKeyExpr.false(),
+ 	isSplitButton: {
+ 		togglePrimaryAction: true,
+ 		primaryActionIds: [AddElementToChatAction.ID, AddElementCommentToChatAction.ID]
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
+index 62a4c272e93..20fb0cdb554 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
+@@ -5,8 +5,6 @@
+ 
+ import { localize } from '../../../../../nls.js';
+ import { DisposableStore } from '../../../../../base/common/lifecycle.js';
+-import { IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
+-import { ChatContextKeys } from '../../../chat/common/actions/chatContextKeys.js';
+ import { createBrowserWelcome } from '../../browser/browserWelcome.js';
+ import { IBrowserViewModel } from '../../common/browserView.js';
+ import { BrowserEditorInput } from '../../common/browserEditorInput.js';
+@@ -28,16 +26,13 @@ export class BrowserWelcomeFeature extends BrowserEditorContribution {
+ 
+ 	constructor(
+ 		editor: BrowserEditor,
+-		@IContextKeyService contextKeyService: IContextKeyService,
+ 	) {
+ 		super(editor);
+ 
+-		const chatEnabled = contextKeyService.getContextKeyValue<boolean>(ChatContextKeys.enabled.key);
++		// Ritemark (Sprint 135): one subtitle. The chat one pointed at Add Element to Chat, which Ritemark's bar leaves out
+ 		this._container = createBrowserWelcome(
+ 			localize('browser.welcomeTitle', "Browser"),
+-			chatEnabled
+-				? localize('browser.welcomeSubtitleChat', "Use Add Element to Chat to reference UI elements in chat prompts.")
+-				: localize('browser.welcomeSubtitle', "Enter a URL above to get started."),
++			localize('browser.welcomeSubtitle', "Enter a URL above to get started."),
+ 		);
+ 
+ 		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
 index 00000000000..e358a3e8a8c

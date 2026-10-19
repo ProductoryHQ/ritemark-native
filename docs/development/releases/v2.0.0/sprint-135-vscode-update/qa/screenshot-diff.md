@@ -27,6 +27,8 @@ Full windows: [Light](share-question-light-1142.png), [Dark](share-question-dark
 3. **The address field is shorter** by the new button's width (follows from 1).
 4. **The test page's own text** is drawn a little differently by Chromium 150 (Electron 43): edge pixels of the heading and paragraph. Nothing to pin.
 
+**The Experience lead's decision (D5, 19 October):** (a) Add Element to Chat stays off Ritemark's bar even with Copilot Chat installed: it would sit beside Show Claude this page and send to Copilot Chat, not to the AI beside it. (b) Developer tools goes into the bar's ⋯ menu, as the drawings have it. Both are in patch 010. The 1.142 bar now reads back, forward, reload, the address, Show Claude this page, ⋯, with Developer tools (F12) in ⋯ ([the bar and its ⋯ menu](browser-bar-more-menu-1142.png)). The baseline's share-question scenes still differ (the bar has one button fewer than 1.117's); the baseline changes only with Jarmo's approval.
+
 Pinned, so it no longer differs (S15): 1.142 added a "Share with Agent" toggle to the same bar. `workbench.browser.enableChatTools` is pinned off in `branding/product.json`.
 
 ## Defaults pinned back (S15, D5: engineering pins what a setting brings back)

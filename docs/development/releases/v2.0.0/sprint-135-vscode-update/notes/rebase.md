@@ -78,10 +78,11 @@ Re-cut onto upstream's reworked `browserView` as `research/browser-bridge-audit.
 - Behavioural difference, a choice: Browser Recent's `ephemeral` flag now covers every in-memory tab (`isInMemoryStorageScope`: private tabs and upstream's new `Agent` storage, used by tabs VS Code's chat opens and by the isolated copies a share opens). At the pin only private tabs existed; recording the new kinds would be new behaviour.
 - The extension-facing contract (16 commands, the event and the context key; audit §4) is unchanged; the extension needs no change.
 
-### 010 browser actions: 4 → 4 files, 12 → 13 hunks
+### 010 browser actions: 4 → 7 files, 12 → 18 hunks
 - workbench `common/browserView.ts`: **re-based** beside 009's lines, and **re-cut** where it hooked `_setSharedWithAgent`: revoking control when the share goes moves into 009's audience listener; `setSharedWithAgentForControl` uses the same guard as `setAnnotationMode`.
 - `browserView.contribution.ts`: the `generateUuid` import is **dropped, upstream** (the file imports it at 1.142.0 for its own `.html` opener; carrying it would import it twice). `IEditorService` and the action feature's import **re-based**; the constructor takes `IEditorService` after upstream's new `ITelemetryService`. The `.html`/`.htm` resolver is **re-cut**: `browserViewWorkbenchService.getOrCreateLazy` instead of `createInstance(BrowserEditorInput, …)` (its constructor changed), and its label key is renamed `ritemark.browser.htmlEditorLabel`, because upstream's own `.html` entry in the same file now uses `browser.htmlEditorLabel` with another message. Upstream's entry (`file:/**/*.{html,htm,mhtml,mht}`, `option` priority, resource-backed) stays; Ritemark's (`default`) wins. "Open With…" may list both.
 - `features/ritemarkBrowserActionFeature.ts` (created): **re-cut**. `BrowserActionCategory` from `browserEditor.ts`; `getSummary` and `invokeFunction` take `RITEMARK_PLAYWRIGHT_SESSION` (imported from 009's feature); the snapshot's read-consent gate reads `ritemarkSharedWithAgent`.
+- **New in this sprint, the Experience lead's decision on the browser bar (D5, after the screenshot comparison):** `browserEditorChatFeatures.ts`: 1.142's Add Element to Chat split button ("Add to Chat") is left off the bar (`when: ContextKeyExpr.false()`), even with Copilot Chat installed, since it sends to Copilot Chat and not to the AI beside the page; its command and shortcut stay. `browserDevToolsFeature.ts`: Developer tools is hidden by default, which puts it in the bar's ⋯ menu, and its label is in sentence case. `browserWelcomeFeature.ts`: an empty tab always says "Enter a URL above to get started." (the chat subtitle pointed at the hidden button). Three files join 010 (7).
 - Behavioural differences against main's patch: none beyond the above. S26 and S55–S57 run twice: with Copilot Chat off and on.
 
 ### 011 cloud-file error, 012 shell watchdog, 014 save receipts, 016 store policy
@@ -128,7 +129,7 @@ At 1.142.0, by `grep '^diff --git'`. Every difference from the lists above is ex
 | `007-ritemark-vscode-1117-compat.patch` | 4 | 5 | 13 | 16 | out: `src/vs/workbench/contrib/chat/browser/chat.contribution.ts`; in: `src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts`; in: `src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts` |
 | `008-ritemark-windows-binary-strip.patch` | 1 | 1 | 1 | 1 | — |
 | `009-ritemark-browser-context-bridge.patch` | 4 | 4 | 9 | 12 | — |
-| `010-ritemark-browser-action-bridge.patch` | 4 | 4 | 12 | 13 | — |
+| `010-ritemark-browser-action-bridge.patch` | 4 | 7 | 12 | 18 | in: `src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts`; in: `src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts`; in: `src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts` |
 | `011-ritemark-cloud-file-error.patch` | 1 | 1 | 1 | 1 | — |
 | `012-ritemark-shell-watchdog.patch` | 1 | 1 | 5 | 5 | — |
 | `013-ritemark-configuration-defaults.patch` | 2 | 2 | 3 | 3 | — |
