@@ -295,7 +295,7 @@ if (flag('share-question')) {
 		const homeInFront = ((await tabs()).find(tab => tab.active)?.label ?? '').startsWith('Home');
 		await click('the +', `document.querySelector('.part.editor .ritemark-new-tab')`);
 		await sleep(800);
-		const menuOpen = await evaluate(`!!document.querySelector('.context-view .monaco-menu, .context-view .ritemark-menu')`);
+		const menuOpen = await evaluate(`!!document.querySelector('.context-view .ritemark-new-tab-menu')`);
 		await key('Escape', 0, 'Escape');
 		check('the tab row works while the share question waits', homeInFront && menuOpen, `Home came forward: ${homeInFront}; the +'s menu opened: ${menuOpen}`);
 	}

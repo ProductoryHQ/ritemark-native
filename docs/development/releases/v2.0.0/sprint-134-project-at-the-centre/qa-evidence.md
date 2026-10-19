@@ -135,6 +135,13 @@ Fixed after run C on the build of `d35e3e57`, and checked live on run 1's instan
 
 **One more harness incident** (run 1, `project-check.mjs`'s first version): after a switch, the AI's sheet restored its last chat and took the keyboard from File ▸ Open Recent's picker a moment later, so the folder name the script typed, and its Enter, went to Claude as a follow-up in a chat of the test project Sales proposal Q4 (`/tmp/r134`). Claude read a card and asked how to apply the words; the turn was stopped at once, nothing in `/tmp/r134` changed (no file newer than the run's start). The script now types only into a focused quick pick or the browser's address, and stops otherwise.
 
+### After the baseline was approved
+
+- **Main's #465 merged in** (Sprint 133's closeout): on the chosen tab and the open row a file's extension is a step quieter, in body ink (patch 018's `ritemarkSurfaces.css`); the conflicts were the docs' lines and 018's header, and the stack matches the working tree.
+- **The tab's × in the middle of its box** (the Development manager, from Jarmo): the 12 glyph sat 2 px left of its 20 × 20 box's centre, because core lays the button out from the left. `justify-content: center` on the tab action's button (patch 018) centres it, and the pinned and changed glyphs, which use the same element. Measured in zoomed crops of the chosen and the pointed-at tab: −2.0 px before, 0.0 after, Light and Dark; vertically within 0.3 px.
+- **The project's head as wide as the column** (Jarmo, 19 October): the head's box ran 8 to 240 with a long name and shorter with a short one; it is now a select box from 8 to 248, as wide as New and Search, the name taking the room and the chevron at its right end (patch 018). `frame-geometry.mjs` checks the box's edges.
+- **An unexplained file** (a capture run on a reused profile): in the baseline's third run, `AGENTS.md` (`# About this project`) and a `CLAUDE.md` of `@AGENTS.md` appeared in the sample's copy at 13:27:54, between two scenes, and the new AGENTS.md opened in a tab. They are exactly what About this project's Create writes, and the only path that writes them is the project menu's About this project after its dialog's Create. No capture showed the menu or the dialog, and a fourth run with a watcher (every 150 ms: any dialog or Ritemark menu, the tab in front, the focus, and the file) did not reproduce it. Since then every baseline run starts from a fresh profile and a fresh copy of the sample.
+
 ## Left open
 
 Found during QA and not changed in this sprint, each small or outside its scope:

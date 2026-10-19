@@ -136,8 +136,44 @@ async function theme(name) {
 	await sleep(2000);
 }
 
+/**
+ * What a webview shows (a document, Ritemark Settings, the AI's sheet): each one is a frame of its own, reached
+ * through the debugging port's list. Runs `expression` (with `doc`, the frame's document) in the first frame whose
+ * text has `text`, and returns its value, or undefined when no frame has the text.
+ */
+async function inWebview(text, expression = 'true') {
+	const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).filter(target => target.type === 'iframe');
+	for (const target of targets) {
+		const frame = new WebSocket(target.webSocketDebuggerUrl);
+		try {
+			await new Promise((resolve, reject) => { frame.addEventListener('open', resolve, { once: true }); frame.addEventListener('error', reject, { once: true }); });
+			const value = await new Promise(resolve => {
+				frame.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.id === 1) { resolve(message.result?.result?.value); } });
+				frame.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `(() => { const doc = [document, ...[...document.querySelectorAll('iframe')].map(f => { try { return f.contentDocument; } catch { return null; } })].find(d => d?.body?.innerText.includes(${JSON.stringify(text)})); return doc ? (${expression}) : undefined; })()` } }));
+				setTimeout(() => resolve(undefined), 1500);
+			});
+			if (value !== undefined) {
+				return value;
+			}
+		} catch {
+			// a frame that went away
+		} finally {
+			frame.close();
+		}
+	}
+	return undefined;
+}
+
 async function capture(name) {
+	// A webview keeps the hover it last saw until the pointer moves inside it again: the document's block handle (+ ⋮⋮)
+	// can stay beside a line. The pointer passes over an empty corner of the desk first, then rests off every control.
+	const corner = await evaluate(`(() => { const r = document.querySelector('.part.editor').getBoundingClientRect(); return [r.right - 40, r.bottom - 40]; })()`);
+	await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: corner[0], y: corner[1] });
+	await sleep(300);
 	await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 2, y: 600 }); // the pointer off every control, on the left column's edge
+	// The keyboard out of the AI's sheet: a scene that leaves it there (a webview taking the focus as it closes) would
+	// draw the sheet's + with its tooltip and focus ring, which no scene is about
+	await evaluate(`(() => { const element = document.activeElement; if (element && element.closest('.part.auxiliarybar')) { element.blur(); } })()`);
 	await sleep(1200);
 	const { w, h, ratio } = await evaluate(`({ w: innerWidth, h: innerHeight, ratio: devicePixelRatio })`);
 	const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: w, height: h, scale: 1 / ratio } });
@@ -264,12 +300,25 @@ const SCENES = [
 	}]),
 	['settings-foot', async () => {
 		await key('Comma', MOD, ',');
-		await sleep(2500);
-		// Scroll Ritemark Settings to its foot, where Advanced settings is (R23)
+		// Wait for the page to be drawn whole, its components' readiness settled (no "Checking"), so its height is the
+		// same in every run; then scroll it to its foot, where Advanced settings is (R23)
+		let settled = false;
+		for (let wait = 0; wait < 30 && !settled; wait++) {
+			await sleep(500);
+			settled = await inWebview('Advanced settings', `!doc.body.innerText.includes('Checking')`) === true;
+		}
+		if (!settled) {
+			throw new Error('Ritemark Settings did not settle (Advanced settings drawn, nothing "Checking")');
+		}
 		const centre = await evaluate(`(() => { const r = document.querySelector('.part.editor .editor-container').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
 		for (let i = 0; i < 12; i++) {
 			await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: centre[0], y: centre[1], deltaX: 0, deltaY: 2000 });
 			await sleep(100);
+		}
+		await sleep(800);
+		const inView = await inWebview('Advanced settings', `(() => { const link = [...doc.querySelectorAll('a, button')].find(element => element.textContent.trim() === 'Advanced settings'); const r = link?.getBoundingClientRect(); return !!r && r.bottom <= doc.defaultView.innerHeight && r.top >= 0; })()`);
+		if (!inView) {
+			throw new Error('Advanced settings is not in view after scrolling Ritemark Settings to its foot');
 		}
 		return async () => key('KeyW', MOD, 'w');
 	}],
