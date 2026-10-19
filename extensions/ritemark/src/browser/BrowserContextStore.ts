@@ -105,6 +105,12 @@ export class BrowserContextStore {
   private autoSharedPageIds = new Set<string>();
   /** The share question the AI's sheet shows now (Sprint 134, R20). */
   private shownQuestion: ShareQuestion | null = null;
+  /**
+   * A share request the workbench is still answering. An older shell (patch 009 before Sprint 134) answers it with
+   * its own modal dialog, which takes as long as the person does, while the AI's sheet polls every 1.5 s: each poll
+   * would queue one more dialog, so answering one brought the next (Windows round, 19 October). One request at a time.
+   */
+  private asking = false;
   private autoControlSharedPageIds = new Set<string>();
 
   public getLastSnapshot(): BrowserContextSnapshot | null {
@@ -155,13 +161,20 @@ export class BrowserContextStore {
     };
     if (!snapshot?.pageId || !snapshot.url || snapshot.sharedWithAgent || this.autoSharedPageIds.has(snapshot.pageId)) return withdraw();
     if (shown?.pageId === snapshot.pageId) return { kind: 'unchanged' };
+    if (this.asking) return { kind: 'unchanged' };
 
     let result: unknown;
+    this.asking = true;
     try {
       result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND);
     } catch {
       return withdraw(); // the workbench failed: nothing shared, asked again on a later poll
+    } finally {
+      this.asking = false;
     }
+    // A reply that needs no answer from the sheet settles the page asked about, even when another page is in front by
+    // now: an older shell asked the person in its own dialog, and a page is asked at most once per window.
+    if (isUsableSnapshot(result) && !result.error && !result.needsAnswer) this.autoSharedPageIds.add(snapshot.pageId);
     if (!isUsableSnapshot(result) || result.error || result.pageId !== snapshot.pageId) return withdraw();
     this.lastSnapshot = { ...snapshot, ...result };
     if (!result.needsAnswer) {

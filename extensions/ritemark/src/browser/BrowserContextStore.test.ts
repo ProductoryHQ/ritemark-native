@@ -14,6 +14,9 @@ const workbench = {
   front: null as Page | null,
   withoutAsking: false,
   calls: [] as unknown[][],
+  /** An older shell (patch 009 before Sprint 134): the request opens its own modal and answers when the person does. */
+  olderShell: false,
+  modals: [] as ((shared: boolean) => void)[],
 };
 
 function dto(page: Page) {
@@ -31,6 +34,12 @@ const commands = {
       case 'workbench.action.browser.getActiveSummary':
         return { ...dto(page), summary: `The text of ${page.url}` };
       case 'workbench.action.browser.ensureActiveBrowserShared': {
+        if (workbench.olderShell) {
+          return new Promise((resolve) => workbench.modals.push((shared) => {
+            page.shared = shared;
+            resolve(dto(page));
+          }));
+        }
         const answer = args[0] as { pageId: string; answer: 'share' | 'notNow'; withoutAsking: boolean } | undefined;
         if (answer) {
           if (answer.pageId !== page.pageId) return { ...dto(page), stale: true };
@@ -71,6 +80,8 @@ async function main(): Promise<void> {
     workbench.front = null;
     workbench.withoutAsking = false;
     workbench.calls = [];
+    workbench.olderShell = false;
+    workbench.modals = [];
     return new BrowserContextStore();
   };
   const poll = async (store: InstanceType<typeof BrowserContextStore>) => {
@@ -167,6 +178,45 @@ async function main(): Promise<void> {
     workbench.withoutAsking = true;
     workbench.front = site();
     assert.deepEqual(await poll(store), { kind: 'unchanged' });
+    assert.equal(workbench.front.shared, true);
+  });
+
+  /** A poll that waits on a second dialog would hang: here it fails instead. */
+  const settles = <T,>(promise: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error('the poll waited on another dialog')), 1000); });
+    return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+  };
+
+  await test('an older shell asks in its own dialog: one dialog for the page, never one per poll', async () => {
+    const store = fresh();
+    workbench.olderShell = true;
+    workbench.front = site();
+    const ensures = () => workbench.calls.filter(([id]) => id === 'workbench.action.browser.ensureActiveBrowserShared').length;
+    // The sheet polls every 1.5 s while the dialog waits for the person
+    const first = poll(store);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(await settles(poll(store)), { kind: 'unchanged' });
+    assert.deepEqual(await settles(poll(store)), { kind: 'unchanged' });
+    assert.equal(ensures(), 1, 'one request, so one dialog');
+    // The person answers Deny: the page is settled for the window
+    workbench.modals.shift()!(false);
+    assert.deepEqual(await first, { kind: 'unchanged' });
+    for (let i = 0; i < 3; i++) assert.deepEqual(await poll(store), { kind: 'unchanged' });
+    assert.equal(ensures(), 1, 'never asked again after Deny');
+    assert.equal(workbench.modals.length, 0);
+  });
+
+  await test('an older shell: Allow shares the page and nothing more is asked', async () => {
+    const store = fresh();
+    workbench.olderShell = true;
+    workbench.front = site();
+    const first = poll(store);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    workbench.modals.shift()!(true);
+    await first;
+    assert.deepEqual(await poll(store), { kind: 'unchanged' });
+    assert.equal(workbench.calls.filter(([id]) => id === 'workbench.action.browser.ensureActiveBrowserShared').length, 1);
     assert.equal(workbench.front.shared, true);
   });
 
