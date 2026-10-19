@@ -110,14 +110,45 @@ async function pickRow(label) {
 	}
 }
 
-async function theme(name) {
+/**
+ * Types into the quick input once it has the keyboard. On VS Code 1.142 a fresh window's first palette can open a
+ * moment before its input takes focus; text typed then goes to the welcome's page instead.
+ */
+async function typeInQuickInput(text) {
+	const focused = `document.activeElement === document.querySelector('.quick-input-widget input')`;
+	for (let waited = 0; waited < 3000 && !(await page.evaluate(focused)); waited += 150) {
+		await sleep(150);
+	}
+	await page.send('Input.insertText', { text });
+	await sleep(300);
+	if (!(await page.evaluate(`(document.querySelector('.quick-input-widget input')?.value || '').endsWith(${JSON.stringify(text)})`))) {
+		await page.evaluate(`(() => { const input = document.querySelector('.quick-input-widget input'); input.focus(); input.value = (input.value.startsWith('>') ? '>' : '') + ${JSON.stringify(text)}; input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+	}
+}
+
+async function openPalette() {
+	const open = `(() => { const w = document.querySelector('.quick-input-widget'); return !!w && w.style.display !== 'none' && !!w.querySelector('input'); })()`;
 	await key('KeyP', MOD | 8, 'p');
 	await sleep(600);
-	await page.send('Input.insertText', { text: 'Preferences: Color Theme' });
+	// The welcome's page can keep the keyboard on a fresh window's first shortcut: a press on the empty ground beside
+	// the sheet hands it to the workbench, as a person's click would, then the shortcut again
+	for (let attempt = 0; attempt < 3 && !(await page.evaluate(open)); attempt++) {
+		for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+			await page.send('Input.dispatchMouseEvent', { type, x: 40, y: Math.round(height / 2), button: 'left', clickCount: 1 });
+		}
+		await sleep(400);
+		await key('KeyP', MOD | 8, 'p');
+		await sleep(800);
+	}
+}
+
+async function theme(name) {
+	await openPalette();
+	await typeInQuickInput('Preferences: Color Theme');
 	await sleep(900);
 	await pickRow('Preferences: Color Theme');
 	await sleep(1200);
-	await page.send('Input.insertText', { text: name });
+	await typeInQuickInput(name);
 	await sleep(900);
 	await pickRow(name);
 	await sleep(2000);
