@@ -19,6 +19,29 @@ Sprint 134 (Ritemark 2.0, step 3; R21, #456):
     menus and shortcuts still run them. The list is research/palette-audit.md §7.
     Test: contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts.
 ---
+diff --git a/extensions/git/package.json b/extensions/git/package.json
+index 8c8e8ce632a..0195e79ad08 100644
+--- a/extensions/git/package.json
++++ b/extensions/git/package.json
+@@ -4373,18 +4373,6 @@
+         "view": "scm",
+         "contents": "%view.workbench.scm.closedRepositories%",
+         "when": "config.git.enabled && !git.missing && git.state == initialized && git.closedRepositoryCount > 1"
+-      },
+-      {
+-        "view": "explorer",
+-        "contents": "%view.workbench.cloneRepository%",
+-        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
+-        "group": "5_scm@1"
+-      },
+-      {
+-        "view": "explorer",
+-        "contents": "%view.workbench.learnMore%",
+-        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
+-        "group": "5_scm@10"
+       }
+     ]
+   },
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
 index 4b2a1461b9a..213d0674001 100644
 --- a/src/vs/editor/contrib/comment/browser/comment.ts
@@ -58,10 +81,10 @@ index 4b2a1461b9a..213d0674001 100644
  		});
  	}
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
-index 910c40db359..861a8cda935 100644
+index 6ed9a9a6170..0df05b689ce 100644
 --- a/src/vs/platform/actions/common/actions.ts
 +++ b/src/vs/platform/actions/common/actions.ts
-@@ -134,6 +134,7 @@ export class MenuId {
+@@ -143,6 +143,7 @@ export class MenuId {
  	static readonly MenubarTerminalMenu = new MenuId('MenubarTerminalMenu');
  	static readonly MenubarTerminalSuggestStatusMenu = new MenuId('MenubarTerminalSuggestStatusMenu');
  	static readonly MenubarViewMenu = new MenuId('MenubarViewMenu');
@@ -70,10 +93,10 @@ index 910c40db359..861a8cda935 100644
  	static readonly OpenEditorsContext = new MenuId('OpenEditorsContext');
  	static readonly OpenEditorsContextShare = new MenuId('OpenEditorsContextShare');
 diff --git a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
-index 04763c87d10..9714a04c4ef 100644
+index e506b83187c..b4fe19cc4a7 100644
 --- a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
 +++ b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
-@@ -953,7 +953,7 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
+@@ -984,7 +984,7 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
  		if (checked.indexOf(extension) !== -1) {
  			return [];
  		}
@@ -83,10 +106,10 @@ index 04763c87d10..9714a04c4ef 100644
  		}
  		checked.push(extension);
 diff --git a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-index a87ed6646f4..d1ef73e6774 100644
+index b00f8d12879..9034e595f7e 100644
 --- a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
 +++ b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
-@@ -1170,10 +1170,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1158,10 +1158,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  
  			const result: IGalleryExtension[] = [];
  			let defaultChatAgentExtension: IGalleryExtension | undefined;
@@ -99,7 +122,7 @@ index a87ed6646f4..d1ef73e6774 100644
  					defaultChatAgentExtension = extension;
  				} else {
  					result.push(extension);
-@@ -2005,15 +2006,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+@@ -1977,15 +1978,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
  			}
  		}
  
@@ -127,21 +150,63 @@ index a87ed6646f4..d1ef73e6774 100644
  
  		return { malicious, deprecated, search, autoUpdate };
  	}
+diff --git a/src/vs/workbench/browser/actions/workspaceActions.ts b/src/vs/workbench/browser/actions/workspaceActions.ts
+index 795ac6e007f..83de7a115b7 100644
+--- a/src/vs/workbench/browser/actions/workspaceActions.ts
++++ b/src/vs/workbench/browser/actions/workspaceActions.ts
+@@ -376,45 +376,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	when: ContextKeyExpr.and(IsMacNativeContext, OpenFolderWorkspaceSupportContext)
+ });
+ 
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '2_open',
+-	command: {
+-		id: OpenWorkspaceAction.ID,
+-		title: localize({ key: 'miOpenWorkspace', comment: ['&& denotes a mnemonic'] }, "Open Wor&&kspace from File...")
+-	},
+-	order: 3,
+-	when: EnterMultiRootWorkspaceSupportContext
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: ADD_ROOT_FOLDER_COMMAND_ID,
+-		title: localize({ key: 'miAddFolderToWorkspace', comment: ['&& denotes a mnemonic'] }, "A&&dd Folder to Workspace...")
+-	},
+-	when: ContextKeyExpr.and(ContextKeyExpr.or(EnterMultiRootWorkspaceSupportContext, WorkbenchStateContext.isEqualTo('workspace')), IsSessionsWindowContext.negate()),
+-	order: 1
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: SaveWorkspaceAsAction.ID,
+-		title: localize('miSaveWorkspaceAs', "Save Workspace As...")
+-	},
+-	order: 2,
+-	when: ContextKeyExpr.and(EnterMultiRootWorkspaceSupportContext, IsSessionsWindowContext.negate())
+-});
+-
+-MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-	group: '3_workspace',
+-	command: {
+-		id: DuplicateWorkspaceInNewWindowAction.ID,
+-		title: localize('duplicateWorkspace', "Duplicate Workspace")
+-	},
+-	order: 3,
+-	when: ContextKeyExpr.and(EnterMultiRootWorkspaceSupportContext, IsSessionsWindowContext.negate())
+-});
++// Ritemark: workspace/.code-workspace menu items are hidden — writers work in
++// folders; the actions stay reachable via the command palette.
+ 
+ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+ 	group: '6_close',
 diff --git a/src/vs/workbench/browser/parts/editor/editor.contribution.ts b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-index 7d24435fc9e..6ebc6f888d2 100644
+index 5f4cad341b6..fff43e4aae2 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.contribution.ts
 +++ b/src/vs/workbench/browser/parts/editor/editor.contribution.ts
-@@ -11,8 +11,7 @@ import {
- 	TextCompareEditorActiveContext, ActiveEditorPinnedContext, EditorGroupEditorsCountContext, ActiveEditorStickyContext, ActiveEditorAvailableEditorIdsContext,
- 	EditorPartMultipleEditorGroupsContext, ActiveEditorDirtyContext, ActiveEditorGroupLockedContext, ActiveEditorCanSplitInGroupContext, SideBySideEditorActiveContext,
- 	EditorTabsVisibleContext, ActiveEditorLastInGroupContext, EditorPartMaximizedEditorGroupContext, MultipleEditorGroupsContext, InEditorZenModeContext,
--	IsAuxiliaryWindowContext, ActiveCompareEditorCanSwapContext, MultipleEditorsSelectedInGroupContext, SplitEditorsVertically,
--	IsSessionsWindowContext
-+	IsAuxiliaryWindowContext, ActiveCompareEditorCanSwapContext, MultipleEditorsSelectedInGroupContext, SplitEditorsVertically
- } from '../../../common/contextkeys.js';
- import { SideBySideEditorInput, SideBySideEditorInputSerializer } from '../../../common/editor/sideBySideEditorInput.js';
- import { TextResourceEditor } from './textResourceEditor.js';
-@@ -685,22 +684,9 @@ MenuRegistry.appendMenuItem(MenuId.MenubarRecentMenu, {
+@@ -789,22 +789,9 @@ MenuRegistry.appendMenuItem(MenuId.MenubarRecentMenu, {
  	order: 1
  });
  
@@ -166,11 +231,11 @@ index 7d24435fc9e..6ebc6f888d2 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarLayoutMenu, {
  	group: '1_split',
-diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 2c1d45ea6aa..0891dba1122 100644
---- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-+++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-@@ -65,15 +65,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+diff --git a/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts b/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts
+index 4794c30c9ec..8716b6de49f 100644
+--- a/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts
++++ b/src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts
+@@ -27,15 +27,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	order: 2
  });
  
@@ -188,7 +253,7 @@ index 2c1d45ea6aa..0891dba1122 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarViewMenu,
-@@ -85,25 +78,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
+@@ -47,25 +40,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	order: 4
  });
  
@@ -216,10 +281,10 @@ index 2c1d45ea6aa..0891dba1122 100644
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarHelpMenu,
 diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-index 8b8e25bb3d1..8f56387817e 100644
+index 0613afc017f..cdc98147c9a 100644
 --- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-@@ -10,7 +10,6 @@ import { EnterAgentSessionProjectionAction, ExitAgentSessionProjectionAction, To
+@@ -10,11 +10,9 @@ import { EnterAgentSessionProjectionAction, ExitAgentSessionProjectionAction, To
  import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../../../common/contributions.js';
  import { AgentTitleBarStatusRendering } from './agentTitleBarStatusWidget.js';
  import { AgentTitleBarStatusService, IAgentTitleBarStatusService } from './agentTitleBarStatusService.js';
@@ -227,7 +292,11 @@ index 8b8e25bb3d1..8f56387817e 100644
  import { localize } from '../../../../../../nls.js';
  import { ContextKeyExpr } from '../../../../../../platform/contextkey/common/contextkey.js';
  import { ProductQualityContext } from '../../../../../../platform/contextkey/common/contextkeys.js';
-@@ -243,34 +242,7 @@ registerSingleton(IAgentTitleBarStatusService, AgentTitleBarStatusService, Insta
+-import { InEditorZenModeContext } from '../../../../../common/contextkeys.js';
+ import { ChatAgentLocation, ChatConfiguration } from '../../../common/constants.js';
+ import { ChatContextKeys } from '../../../common/actions/chatContextKeys.js';
+ import { Disposable, DisposableStore, IDisposable } from '../../../../../../base/common/lifecycle.js';
+@@ -250,35 +248,7 @@ registerSingleton(IAgentTitleBarStatusService, AgentTitleBarStatusService, Insta
  registerWorkbenchContribution2(AgentTitleBarStatusRendering.ID, AgentTitleBarStatusRendering, WorkbenchPhase.AfterRestored);
  registerWorkbenchContribution2(AgentSessionReadyContribution.ID, AgentSessionReadyContribution, WorkbenchPhase.AfterRestored);
  
@@ -239,7 +308,8 @@ index 8b8e25bb3d1..8f56387817e 100644
 -	when: ContextKeyExpr.and(
 -		ChatContextKeys.enabled,
 -		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, 'hidden'),
--		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, false)
+-		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, false),
+-		InEditorZenModeContext.negate()
 -	),
 -	order: 10002 // to the right of the chat button
 -});
@@ -264,10 +334,10 @@ index 8b8e25bb3d1..8f56387817e 100644
  // Register a placeholder action to the submenu so it appears (required for submenus)
  MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-index 8ac8f531427..f855a62edc7 100644
+index 89200842232..f73eac2b646 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts
-@@ -45,7 +45,18 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
+@@ -47,7 +47,18 @@ const chatViewContainer: ViewContainer = Registry.as<IViewContainersRegistry>(Vi
  	storageId: ChatViewContainerId,
  	hideIfEmpty: true,
  	order: 1,
@@ -287,7 +357,7 @@ index 8ac8f531427..f855a62edc7 100644
  
  const chatViewDescriptor: IViewDescriptor = {
  	id: ChatViewId,
-@@ -58,7 +69,7 @@ const chatViewDescriptor: IViewDescriptor = {
+@@ -60,7 +71,7 @@ const chatViewDescriptor: IViewDescriptor = {
  	openCommandActionDescriptor: {
  		id: ChatViewContainerId,
  		title: chatViewContainer.title,
@@ -297,28 +367,19 @@ index 8ac8f531427..f855a62edc7 100644
  			primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyI,
  			mac: {
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
-index bbce59557f4..4bacd71205f 100644
+index 4c547b3e523..dec7338380d 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
 @@ -7,7 +7,7 @@ import './media/chatStatus.css';
- import { Disposable, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
+ import { Disposable, DisposableStore, MutableDisposable, toDisposable } from '../../../../../base/common/lifecycle.js';
  import { localize } from '../../../../../nls.js';
  import { IWorkbenchContribution } from '../../../../common/contributions.js';
--import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarAlignment, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js';
-+import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, ShowTooltipCommand, StatusbarEntryKind } from '../../../../services/statusbar/browser/statusbar.js';
- import { ChatEntitlement, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
- import { CancellationToken } from '../../../../../base/common/cancellation.js';
- import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
-@@ -37,7 +37,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
- 	constructor(
- 		@IChatEntitlementService private readonly chatEntitlementService: ChatEntitlementService,
- 		@IInstantiationService private readonly instantiationService: IInstantiationService,
--		@IStatusbarService private readonly statusbarService: IStatusbarService,
-+		@IStatusbarService private readonly _statusbarService: IStatusbarService,
- 		@IEditorService private readonly editorService: IEditorService,
- 		@IConfigurationService private readonly configurationService: IConfigurationService,
- 		@IInlineCompletionsService private readonly completionsService: IInlineCompletionsService,
-@@ -53,18 +53,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+-import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, StatusbarAlignment, StatusbarEntryKind, ToggleTooltipCommand } from '../../../../services/statusbar/browser/statusbar.js';
++import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService, StatusbarEntryKind, ToggleTooltipCommand } from '../../../../services/statusbar/browser/statusbar.js';
+ import { ChatEntitlement, ChatEntitlementContextKeys, ChatEntitlementService, getQuotaReset, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
+ import { CancellationToken, CancellationTokenSource } from '../../../../../base/common/cancellation.js';
+ import { disposableLongTimeout, disposableTimeout } from '../../../../../base/common/async.js';
+@@ -190,18 +190,9 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
  	}
  
  	private update(): void {
@@ -336,24 +397,15 @@ index bbce59557f4..4bacd71205f 100644
 -		}
 +		this.entry?.dispose();
 +		this.entry = undefined;
-+		void this._getEntryProps;
++		void this.getEntryProps;
  	}
  
  	private registerListeners(): void {
-@@ -105,7 +96,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
- 		}
- 	}
- 
--	private getEntryProps(): IStatusbarEntry {
-+	private _getEntryProps(): IStatusbarEntry { void this._statusbarService;
- 		let text = '$(copilot)';
- 		let ariaLabel = localize('chatStatusAria', "Copilot status");
- 		let kind: StatusbarEntryKind | undefined;
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-index 866c7bc8d33..cdcd08eeee8 100644
+index 2b745000cb1..60767c75806 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 +++ b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
-@@ -21,7 +21,7 @@ import { IQuickAccessRegistry, Extensions as QuickAccessExtensions } from '../..
+@@ -20,7 +20,7 @@ import { IQuickAccessRegistry, Extensions as QuickAccessExtensions } from '../..
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
  import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
@@ -362,7 +414,7 @@ index 866c7bc8d33..cdcd08eeee8 100644
  import { IWorkbenchContributionsRegistry, Extensions as WorkbenchExtensions, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
  import { EditorExtensions } from '../../../common/editor.js';
  import { IViewContainersRegistry, IViewsRegistry, ViewContainer, ViewContainerLocation, Extensions as ViewExtensions } from '../../../common/views.js';
-@@ -257,17 +257,7 @@ if (isMacintosh) {
+@@ -256,17 +256,7 @@ if (isMacintosh) {
  
  MenuRegistry.appendMenuItem(MenuId.EditorTitle, { submenu: MenuId.EditorTitleRun, isSplitButton: { togglePrimaryAction: true }, title: nls.localize2('run', "Run or Debug..."), icon: icons.debugRun, group: 'navigation', order: -1 });
  
@@ -381,7 +433,7 @@ index 866c7bc8d33..cdcd08eeee8 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarDebugMenu, {
  	group: '1_debug',
-@@ -456,7 +446,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+@@ -455,7 +445,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
  	title: nls.localize2('run and debug', "Run and Debug"),
  	openCommandActionDescriptor: {
  		id: VIEWLET_ID,
@@ -390,7 +442,7 @@ index 866c7bc8d33..cdcd08eeee8 100644
  		keybindings: { primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyD },
  		order: 3
  	},
-@@ -464,6 +454,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+@@ -463,6 +453,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
  	icon: icons.runViewIcon,
  	alwaysUseContainerInfo: true,
  	order: 3,
@@ -398,7 +450,7 @@ index 866c7bc8d33..cdcd08eeee8 100644
  }, ViewContainerLocation.Sidebar);
  
  // Register default debug views
-@@ -472,7 +463,7 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
+@@ -471,7 +462,7 @@ viewsRegistry.registerViews([{ id: VARIABLES_VIEW_ID, name: nls.localize2('varia
  viewsRegistry.registerViews([{ id: WATCH_VIEW_ID, name: nls.localize2('watch', "Watch"), containerIcon: icons.watchViewIcon, ctorDescriptor: new SyncDescriptor(WatchExpressionsView), order: 20, weight: 10, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusWatchView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: CALLSTACK_VIEW_ID, name: nls.localize2('callStack', "Call Stack"), containerIcon: icons.callStackViewIcon, ctorDescriptor: new SyncDescriptor(CallStackView), order: 30, weight: 30, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusCallStackView' }, when: CONTEXT_DEBUG_UX.isEqualTo('default') }], viewContainer);
  viewsRegistry.registerViews([{ id: BREAKPOINTS_VIEW_ID, name: nls.localize2('breakpoints', "Breakpoints"), containerIcon: icons.breakpointsViewIcon, ctorDescriptor: new SyncDescriptor(BreakpointsView), order: 40, weight: 20, canToggleVisibility: true, canMoveView: true, focusCommand: { id: 'workbench.debug.action.focusBreakpointsView' }, when: ContextKeyExpr.or(CONTEXT_BREAKPOINTS_EXIST, CONTEXT_DEBUG_UX.isEqualTo('default'), CONTEXT_HAS_DEBUGGED) }], viewContainer);
@@ -437,10 +489,10 @@ index ba98845660f..b465da5a1d6 100644
  		});
  
 diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
-index 49b3ec6a6eb..021fdb0a86d 100644
+index 7d9de121739..7ebebf982c6 100644
 --- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
 +++ b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
-@@ -2758,7 +2758,7 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
+@@ -2851,7 +2851,7 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
  		}
  
  		const extensionsToUninstall: UninstallExtensionInfo[] = [{ extension: extension.local }];
@@ -449,124 +501,20 @@ index 49b3ec6a6eb..021fdb0a86d 100644
  			for (const packExtension of this.getAllPackedExtensions(extension, this.local)) {
  				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
  					extensionsToUninstall.push({ extension: packExtension.local });
-diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-index be4e0b92675..ff8736fa3f4 100644
---- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-+++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
-@@ -33,7 +33,7 @@ import { isString } from '../../../../base/common/types.js';
- import { Delayer } from '../../../../base/common/async.js';
- import { IProductService } from '../../../../platform/product/common/productService.js';
- import { isWeb } from '../../../../base/common/platform.js';
--import { ChatEntitlementService, IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
-+import { IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
- 
- const SOURCE = 'IWorkbenchExtensionEnablementService';
- 
-@@ -101,8 +101,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
- 		this._register(allowedExtensionsService.onDidChangeAllowedExtensionsConfigValue(() => this._onDidChangeExtensions([], [], false)));
- 
- 		// Extension unification
--		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
--		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
-+		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
-+		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
- 		const unificationExtensions = [this._completionsExtensionId, this._chatExtensionId].filter(id => !!id);
- 
- 		// Disabling extension unification should immediately disable the unified extension flow
-@@ -136,37 +136,10 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
- 			});
- 		}
- 
--		if (!this.environmentService.isSessionsWindow && !this.environmentService.skipBuiltinExtensions?.some(id => id.toLowerCase() === this._chatExtensionId)) {
--			const builtinChatExtensionEnablementMigrationKey = 'builtinChatExtensionEnablementMigration';
--			const builtinChatExtensionEnablementMigration = this.storageService.getBoolean(builtinChatExtensionEnablementMigrationKey, StorageScope.PROFILE) === true;
--			if (!builtinChatExtensionEnablementMigration) {
--				this.logService.debug('Running builtin chat extension enablement migration');
--				this.storageService.store(builtinChatExtensionEnablementMigrationKey, true, StorageScope.PROFILE, StorageTarget.MACHINE);
--				const context = (chatEntitlementService as ChatEntitlementService).context;
--				if (context) {
--					if (context.value.state.completed) {
--						// User has used chat features before
--						if (this._isDisabledGlobally({ id: this._chatExtensionId })) {
--							// User had specifically disabled the chat extension to disable AI features
--							if (this.configurationService.getValue('chat.disableAIFeatures') !== true) {
--								// Honor that choice by disabling AI features
--								this.logService.debug('Disabling AI features because builtin chat extension is disabled');
--								this.configurationService.updateValue('chat.disableAIFeatures', true)
--									.catch(err => this.logService.error('Failed to update chat.disableAIFeatures setting during builtin chat extension enablement migration', err));
--							}
--						}
--					} else {
--						try {
--							// User has not used chat features before so avoid activating the chat extension by disabling it
--							this.logService.debug('Disabling builtin chat extension as chat set up is not completed');
--							this._disableExtension({ id: this._chatExtensionId });
--						} catch (error) {
--							this.logService.error('Failed to disable builtin chat extension during enablement migration', error);
--						}
--					}
--				}
--			}
--		}
-+		// Ritemark: ChatSetupContribution is intentionally disabled, so VS Code's
-+		// builtin chat migration would strand Marketplace-installed Copilot Chat in
-+		// a globally disabled state before the user can use it.
-+		void chatEntitlementService;
- 	}
- 
- 	private get hasWorkspace(): boolean {
-diff --git a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
-index 16802452df2..be2ca64f668 100644
---- a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
-+++ b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
-@@ -69,8 +69,8 @@ export class InlineCompletionsUnificationImpl extends Disposable implements IInl
- 		@IProductService productService: IProductService
- 	) {
- 		super();
--		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
--		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
-+		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
-+		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
- 		const relevantExtensions = [this._completionsExtensionId, this._chatExtensionId].filter((id): id is string => !!id);
- 
- 		this.isRunningUnificationExperiment = isRunningUnificationExperiment.bindTo(this._contextKeyService);
-diff --git a/extensions/git/package.json b/extensions/git/package.json
-index 0af7ea21268..f7b59d22d3a 100644
---- a/extensions/git/package.json
-+++ b/extensions/git/package.json
-@@ -4329,18 +4329,6 @@
-         "view": "scm",
-         "contents": "%view.workbench.scm.closedRepositories%",
-         "when": "config.git.enabled && !git.missing && git.state == initialized && git.closedRepositoryCount > 1"
--      },
--      {
--        "view": "explorer",
--        "contents": "%view.workbench.cloneRepository%",
--        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
--        "group": "5_scm@1"
--      },
--      {
--        "view": "explorer",
--        "contents": "%view.workbench.learnMore%",
--        "when": "config.git.enabled && git.state == initialized && scm.providerCount == 0",
--        "group": "5_scm@10"
-       }
-     ]
-   },
 diff --git a/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts b/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
-index 6cd04336cfb..1f1d0d15aa6 100644
+index c525a5e5191..222e1e49c5a 100644
 --- a/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
 +++ b/src/vs/workbench/contrib/files/browser/fileActions.contribution.ts
 @@ -20,7 +20,7 @@ import { CLOSE_SAVED_EDITORS_COMMAND_ID, CLOSE_EDITORS_IN_GROUP_COMMAND_ID, CLOS
  import { AutoSaveAfterShortDelayContext } from '../../../services/filesConfiguration/common/filesConfigurationService.js';
  import { WorkbenchListDoubleSelection } from '../../../../platform/list/browser/listService.js';
  import { Schemas } from '../../../../base/common/network.js';
--import { DirtyWorkingCopiesContext, EnterMultiRootWorkspaceSupportContext, HasWebFileSystemAccess, WorkbenchStateContext, WorkspaceFolderCountContext, SidebarFocusContext, ActiveEditorCanRevertContext, ActiveEditorContext, ResourceContextKey, ActiveEditorAvailableEditorIdsContext, MultipleEditorsSelectedInGroupContext, TwoEditorsSelectedInGroupContext, SelectedEditorsInGroupFileOrUntitledResourceContextKey } from '../../../common/contextkeys.js';
-+import { DirtyWorkingCopiesContext, EnterMultiRootWorkspaceSupportContext, HasWebFileSystemAccess, WorkbenchStateContext, WorkspaceFolderCountContext, SidebarFocusContext, ActiveEditorContext, ResourceContextKey, ActiveEditorAvailableEditorIdsContext, MultipleEditorsSelectedInGroupContext, TwoEditorsSelectedInGroupContext, SelectedEditorsInGroupFileOrUntitledResourceContextKey } from '../../../common/contextkeys.js';
+-import { DirtyWorkingCopiesContext, EnterMultiRootWorkspaceSupportContext, HasWebFileSystemAccess, IsSessionsWindowContext, WorkbenchStateContext, WorkspaceFolderCountContext, SidebarFocusContext, ActiveEditorCanRevertContext, ActiveEditorContext, ActiveEditorDirtyContext, ResourceContextKey, ActiveEditorAvailableEditorIdsContext, MultipleEditorsSelectedInGroupContext, TwoEditorsSelectedInGroupContext, SelectedEditorsInGroupFileOrUntitledResourceContextKey } from '../../../common/contextkeys.js';
++import { DirtyWorkingCopiesContext, EnterMultiRootWorkspaceSupportContext, HasWebFileSystemAccess, IsSessionsWindowContext, WorkbenchStateContext, WorkspaceFolderCountContext, SidebarFocusContext, ActiveEditorContext, ActiveEditorDirtyContext, ResourceContextKey, ActiveEditorAvailableEditorIdsContext, MultipleEditorsSelectedInGroupContext, TwoEditorsSelectedInGroupContext, SelectedEditorsInGroupFileOrUntitledResourceContextKey } from '../../../common/contextkeys.js';
  import { IsWebContext } from '../../../../platform/contextkey/common/contextkeys.js';
  import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
  import { ThemeIcon } from '../../../../base/common/themables.js';
-@@ -675,15 +675,26 @@ for (const menuId of [MenuId.EmptyEditorGroupContext, MenuId.EditorTabsBarContex
+@@ -677,15 +677,26 @@ for (const menuId of [MenuId.EmptyEditorGroupContext, MenuId.EditorTabsBarContex
  
  // File menu
  
@@ -595,7 +543,7 @@ index 6cd04336cfb..1f1d0d15aa6 100644
  MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
  	group: '4_save',
  	command: {
-@@ -724,20 +735,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+@@ -726,20 +737,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
  	order: 1
  });
  
@@ -618,95 +566,6 @@ index 6cd04336cfb..1f1d0d15aa6 100644
  
  MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
  	group: '6_close',
-diff --git a/src/vs/workbench/browser/actions/workspaceActions.ts b/src/vs/workbench/browser/actions/workspaceActions.ts
-index d722b697988..b2aa54ebe94 100644
---- a/src/vs/workbench/browser/actions/workspaceActions.ts
-+++ b/src/vs/workbench/browser/actions/workspaceActions.ts
-@@ -376,45 +376,8 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
- 	when: ContextKeyExpr.and(IsMacNativeContext, OpenFolderWorkspaceSupportContext, IsSessionsWindowContext.negate())
- });
- 
--MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
--	group: '2_open',
--	command: {
--		id: OpenWorkspaceAction.ID,
--		title: localize({ key: 'miOpenWorkspace', comment: ['&& denotes a mnemonic'] }, "Open Wor&&kspace from File...")
--	},
--	order: 3,
--	when: ContextKeyExpr.and(EnterMultiRootWorkspaceSupportContext, IsSessionsWindowContext.negate())
--});
--
--MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
--	group: '3_workspace',
--	command: {
--		id: ADD_ROOT_FOLDER_COMMAND_ID,
--		title: localize({ key: 'miAddFolderToWorkspace', comment: ['&& denotes a mnemonic'] }, "A&&dd Folder to Workspace...")
--	},
--	when: ContextKeyExpr.and(ContextKeyExpr.or(EnterMultiRootWorkspaceSupportContext, WorkbenchStateContext.isEqualTo('workspace')), IsSessionsWindowContext.negate()),
--	order: 1
--});
--
--MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
--	group: '3_workspace',
--	command: {
--		id: SaveWorkspaceAsAction.ID,
--		title: localize('miSaveWorkspaceAs', "Save Workspace As...")
--	},
--	order: 2,
--	when: ContextKeyExpr.and(EnterMultiRootWorkspaceSupportContext, IsSessionsWindowContext.negate())
--});
--
--MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
--	group: '3_workspace',
--	command: {
--		id: DuplicateWorkspaceInNewWindowAction.ID,
--		title: localize('duplicateWorkspace', "Duplicate Workspace")
--	},
--	order: 3,
--	when: ContextKeyExpr.and(EnterMultiRootWorkspaceSupportContext, IsSessionsWindowContext.negate())
--});
-+// Ritemark: workspace/.code-workspace menu items are hidden — writers work in
-+// folders; the actions stay reachable via the command palette.
- 
- MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
- 	group: '6_close',
-diff --git a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
-index 3619cc731c3..29bef88289f 100644
---- a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
-+++ b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
-@@ -36,12 +36,7 @@ registerAction2(class extends Action2 {
- 				primary: KeyMod.Alt + KeyMod.CtrlCmd + KeyMod.WinCtrl + KeyCode.KeyN,
- 				weight: KeybindingWeight.WorkbenchContrib,
- 			},
--			menu: {
--				id: MenuId.MenubarFileMenu,
--				group: '1_new',
--				order: 2,
--				when: IsSessionsWindowContext.negate()
--			}
-+			// Ritemark: not in the File menu — palette only
- 		});
- 	}
- 
-diff --git a/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts b/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
-index c1de3497f5d..a425599808a 100644
---- a/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
-+++ b/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
-@@ -202,13 +202,7 @@ export class UserDataProfilesWorkbenchContribution extends Disposable implements
- 	}
- 
- 	private registerOpenProfileSubMenu(): void {
--		MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
--			title: localize('New Profile Window', "New Window with Profile"),
--			submenu: OpenProfileMenu,
--			group: '1_new',
--			order: 4,
--			when: IsSessionsWindowContext.negate()
--		});
-+		// Ritemark: profiles are a developer concept — no File-menu entry.
- 	}
- 
- 	private readonly profilesDisposable = this._register(new MutableDisposable<DisposableStore>());
 diff --git a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts b/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
 index bb8dd6560d4..2b6123c13bc 100644
 --- a/src/vs/workbench/contrib/outline/browser/outline.contribution.ts
@@ -727,19 +586,6 @@ index bb8dd6560d4..2b6123c13bc 100644
  	focusCommand: { id: 'outline.focus' }
  }], VIEW_CONTAINER);
  
-diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-index acf3e73a07c..895e0953a02 100644
---- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-+++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
-@@ -37,7 +37,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
- 	readonly canToggleVisibility = true;
- 	readonly hideByDefault = false;
- 	readonly canMoveView = true;
--	readonly when = TimelineHasProviderContext;
-+	readonly when = ContextKeyExpr.false(); // Ritemark: no Timeline section in the Folder view
- 
- 	focusCommand = { id: 'timeline.focus' };
- }
 diff --git a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
 index e05b71bd72c..f7f25a9d934 100644
 --- a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
@@ -1162,3 +1008,145 @@ index 00000000000..de2ac0a670f
 +		]);
 +	});
 +});
+diff --git a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+index 64c6b1a52f0..937b937e256 100644
+--- a/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
++++ b/src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts
+@@ -36,7 +36,7 @@ export class TimelinePaneDescriptor implements IViewDescriptor {
+ 	readonly canToggleVisibility = true;
+ 	readonly hideByDefault = false;
+ 	readonly canMoveView = true;
+-	readonly when = TimelineHasProviderContext;
++	readonly when = ContextKeyExpr.false(); // Ritemark: no Timeline section in the Folder view
+ 
+ 	focusCommand = { id: 'timeline.focus' };
+ }
+diff --git a/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts b/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
+index 4f071ed670b..0535cc034ca 100644
+--- a/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
++++ b/src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts
+@@ -198,12 +198,7 @@ export class UserDataProfilesWorkbenchContribution extends Disposable implements
+ 	}
+ 
+ 	private registerOpenProfileSubMenu(): void {
+-		MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+-			title: localize('New Profile Window', "New Window with Profile"),
+-			submenu: OpenProfileMenu,
+-			group: '1_new',
+-			order: 4,
+-		});
++		// Ritemark: profiles are a developer concept — no File-menu entry.
+ 	}
+ 
+ 	private readonly profilesDisposable = this._register(new MutableDisposable<DisposableStore>());
+diff --git a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
+index 3619cc731c3..29bef88289f 100644
+--- a/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts
+@@ -36,12 +36,7 @@ registerAction2(class extends Action2 {
+ 				primary: KeyMod.Alt + KeyMod.CtrlCmd + KeyMod.WinCtrl + KeyCode.KeyN,
+ 				weight: KeybindingWeight.WorkbenchContrib,
+ 			},
+-			menu: {
+-				id: MenuId.MenubarFileMenu,
+-				group: '1_new',
+-				order: 2,
+-				when: IsSessionsWindowContext.negate()
+-			}
++			// Ritemark: not in the File menu — palette only
+ 		});
+ 	}
+ 
+diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+index d7672e8c7e9..c1cec2180fb 100644
+--- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
++++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+@@ -14,7 +14,6 @@ import { IStorageService, StorageScope, StorageTarget } from '../../../../platfo
+ import { IWorkbenchEnvironmentService } from '../../environment/common/environmentService.js';
+ import { ExtensionType, IExtension, IExtensionManifest, isAuthenticationProviderExtension, isLanguagePackExtension, isResolverExtension } from '../../../../platform/extensions/common/extensions.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+-import { ChatAIDisabledSettingId } from '../../../../platform/chat/common/chatSettings.js';
+ import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
+ import { StorageManager } from '../../../../platform/extensionManagement/common/extensionEnablementService.js';
+ import { webWorkerExtHostConfig, WebWorkerExtHostConfigValue } from '../../extensions/common/extensions.js';
+@@ -35,7 +34,7 @@ import { isString } from '../../../../base/common/types.js';
+ import { Delayer } from '../../../../base/common/async.js';
+ import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { isWeb } from '../../../../base/common/platform.js';
+-import { ChatEntitlementService, IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
++import { IChatEntitlementService } from '../../chat/common/chatEntitlementService.js';
+ import { IDefaultAccountService } from '../../../../platform/defaultAccount/common/defaultAccount.js';
+ 
+ const SOURCE = 'IWorkbenchExtensionEnablementService';
+@@ -114,8 +113,8 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+ 		this._register(this.storageService.onDidChangeValue(StorageScope.APPLICATION, MALICIOUS_EXTENSIONS_STORAGE_KEY, this._store)(() => this._maliciousExtensionsCache = undefined));
+ 
+ 		// Extension unification
+-		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
+-		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
++		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
++		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
+ 		this._sessionsWindowAllowedExtensions = new Set<string>((productService.sessionsWindowAllowedExtensions ?? []).map(id => id.toLowerCase()));
+ 		const unificationExtensions = [this._completionsExtensionId, this._chatExtensionId].filter(id => !!id);
+ 
+@@ -156,41 +155,10 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+ 	}
+ 
+ 	private ensureChatExtensionInitialDisabledState(): void {
+-		if (!this._chatExtensionId || this.environmentService.isSessionsWindow || this.environmentService.skipBuiltinExtensions?.some(id => id.toLowerCase() === this._chatExtensionId)) {
+-			return;
+-		}
+-
+-		const builtinChatExtensionEnablementMigrationKey = 'builtinChatExtensionEnablementMigration';
+-		const builtinChatExtensionEnablementMigration = this.storageService.getBoolean(builtinChatExtensionEnablementMigrationKey, StorageScope.PROFILE) === true;
+-		if (builtinChatExtensionEnablementMigration) {
+-			return;
+-		}
+-
+-		this.logService.debug('Running builtin chat extension enablement migration');
+-		this.storageService.store(builtinChatExtensionEnablementMigrationKey, true, StorageScope.PROFILE, StorageTarget.MACHINE);
+-		const context = (this.chatEntitlementService as ChatEntitlementService).context;
+-		if (context) {
+-			if (context.value.state.completed) {
+-				// User has used chat features before
+-				if (this._isDisabledGlobally({ id: this._chatExtensionId })) {
+-					// User had specifically disabled the chat extension to disable AI features
+-					if (this.configurationService.getValue(ChatAIDisabledSettingId) !== true) {
+-						// Honor that choice by disabling AI features
+-						this.logService.debug('Disabling AI features because builtin chat extension is disabled');
+-						this.configurationService.updateValue(ChatAIDisabledSettingId, true)
+-							.catch(err => this.logService.error('Failed to update chat.disableAIFeatures setting during builtin chat extension enablement migration', err));
+-					}
+-				}
+-			} else {
+-				try {
+-					// User has not used chat features before so avoid activating the chat extension by disabling it
+-					this.logService.debug('Disabling builtin chat extension as chat set up is not completed');
+-					this._disableExtension({ id: this._chatExtensionId });
+-				} catch (error) {
+-					this.logService.error('Failed to disable builtin chat extension during enablement migration', error);
+-				}
+-			}
+-		}
++		// Ritemark: ChatSetupContribution is intentionally disabled, so VS Code's
++		// builtin chat migration would strand Marketplace-installed Copilot Chat in
++		// a globally disabled state before the user can use it.
++		void this.chatEntitlementService;
+ 	}
+ 
+ 	private get hasWorkspace(): boolean {
+diff --git a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
+index b3b6f2ca3d9..335e87005f2 100644
+--- a/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
++++ b/src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts
+@@ -69,8 +69,8 @@ export class InlineCompletionsUnificationImpl extends Disposable implements IInl
+ 		@IProductService productService: IProductService
+ 	) {
+ 		super();
+-		this._completionsExtensionId = productService.defaultChatAgent?.extensionId.toLowerCase();
+-		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId.toLowerCase();
++		this._completionsExtensionId = productService.defaultChatAgent?.extensionId?.toLowerCase();
++		this._chatExtensionId = productService.defaultChatAgent?.chatExtensionId?.toLowerCase();
+ 		const relevantExtensions = [this._completionsExtensionId, this._chatExtensionId].filter((id): id is string => !!id);
+ 
+ 		this.isRunningUnificationExperiment = isRunningUnificationExperiment.bindTo(this._contextKeyService);
