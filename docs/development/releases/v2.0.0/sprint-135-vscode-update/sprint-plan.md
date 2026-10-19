@@ -4,7 +4,7 @@ Track: SDD (one move with many parts: target, patches, toolchain, native modules
 Override with: "use plain full track"
 Branch: `sprint-135-vscode-update` (created only after approval, and only after Steps 1–3 are merged)
 Release tier: shell (`vscode`, `patches/vscode/`, `branding/product.json`, `.github/workflows/build-*`, listed scripts)
-Status: Phase 2 (PLAN) drafted 2026-10-18, awaiting Jarmo's approval. Target: frozen at Phase 0 by R1's rule (1.142.0 if the sprint started on 18 October)
+Status: **Phase 3 (implementation)** on `sprint-135-vscode-update`, from `origin/main` `3c8a7c30` (Steps 1–3 merged). Plan approved by Jarmo on 2026-10-19 ("Approved, all five as recommended"), with D1–D5 as recommended. Target: **1.142.0**, frozen 2026-10-19 by R1's rule (commit `d956e8a6`, Node 24.18.0, Electron 43.7.7; [notes/freeze.md](notes/freeze.md))
 
 ## SDD Artifacts
 
@@ -90,6 +90,8 @@ Patch 018 carries the frame without a title row, and it hooks into the code VS C
 
 Each has a recommendation. The plan is written to the recommendations; a different answer changes the named requirement.
 
+**Answered by Jarmo on 2026-10-19, with his approval of this plan: "Approved, all five as recommended".** Each of D1–D5 below stands as recommended.
+
 - **D1: Which VS Code release, and when it is frozen.** Recommended: the newest stable release on the day the sprint starts. Until the merge, only a recovery release of the same minor may replace it, after the stack is dry-applied on it. A new minor never replaces it. The alternative, waiting for a release that has been out a week or more, buys little: VS Code's recovery releases come within days and are taken anyway. (R1)
 - **D2: No second update before 2.0 ships.** Recommended: 2.0 ships on the frozen release. VS Code will be a few releases further on by then, and catching up would mean another rebase and another round of checks right before the release. Until the release candidate is cut, only recovery releases of the frozen minor are taken. A security advisory for Electron or Chromium in between comes to Jarmo as its own decision. (Non-requirement)
 - **D3: If the newest release breaks the frame's mechanism.** Recommended: step back to the newest release where the frame's mechanism still holds (named by the frame audit), and 2.0 waits for that. 2.0 does not ship on 1.117.0, whose Electron 39 is out of security support. Redesigning the frame to fit upstream's new code would be its own sprint and its own drawings. (R1, R7)
@@ -100,6 +102,7 @@ Each has a recommendation. The plan is written to the recommendations; a differe
 
 - **2026-10-17 (engineering, Sprint 132's plan):** the pin stays at 1.117.0 for Steps 1–3, and one VS Code update sprint follows Step 3.
 - **2026-10-17 (engineering, on Jarmo's "You decide"):** each Windows round is built from main, with no separate unsigned branch builds.
+- **2026-10-19 (Jarmo, at this plan's approval):** D1–D5 as recommended ("Approved, all five as recommended"). By D1 the target is 1.142.0, the newest stable release that day.
 - **2026-10-18 (engineering, this plan):**
   - No patch is renamed, split or merged in this sprint. 007 keeps its file name, and its header and `CLAUDE.md`'s line say what it does now.
   - The rebase runs `git apply --3way` against the pin's blobs, one commit per patch. Patches are regenerated from consecutive commits, so stacked pairs stay correct by construction.
@@ -139,3 +142,8 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 ## Pre-Implementation Gate
 
 - This plan's PR gets the usual automated review. Jarmo's approval gates Phase 0, which also waits for Steps 1–3 to be merged.
+
+## Approval
+
+- [x] Jarmo approved this sprint plan: "Approved, all five as recommended" (2026-10-19). His answers to the five *Decisions for Jarmo*, the same day: D1, the newest stable release on the sprint's first day, frozen then, with only recovery releases of the same minor after it; D2, no second update before 2.0 ships; D3, if the frame's mechanism cannot be carried, step back to the newest release where it holds, never 1.117.0; D4, the production build and Windows CI from main right after the merge, with main closed to other shell-tier merges until they are green; D5, engineering pins back what a setting brings back, the Experience lead reviews the rest, and only Jarmo replaces the baseline.
+- [x] Steps 1–3 merged: `origin/main` `3c8a7c30` (Sprint 134, #467).

@@ -4,8 +4,8 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Steps 
 
 ## Phase 0: Branch, freeze and starting tree
 
-- [ ] Steps 1–3 merged; confirm on `origin/main` and note the commit
-- [ ] `git checkout -b sprint-135-vscode-update` from `origin/main`; `git branch --show-current` shows it
+- [x] Steps 1–3 merged; confirm on `origin/main` and note the commit: `3c8a7c30` (Sprint 134, #467)
+- [x] `git checkout -b sprint-135-vscode-update` from `origin/main`; `git branch --show-current` shows it (2026-10-19, after Jarmo's approval)
 - [ ] Freeze the target by R1's rule; write `notes/freeze.md` (tag, commit, date, Node, Electron, server Node); put the target in the sprint plan's status line (W1, S1)
 - [ ] Record the rollback point: main's last 1.117.0 commit and its clean-room build check, in the release plan's tracker (R10, W11)
 - [ ] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1)
