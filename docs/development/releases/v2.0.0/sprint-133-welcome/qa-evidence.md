@@ -103,6 +103,10 @@ To settle:
 - The palette's "Developer: Reset Welcome Page Walkthrough Progress" goes with Sprint 134's palette filter.
 - #401 on a fresh profile: extension host at +14.6 s, Ritemark activated +16.8 s, eager done +33.3 s, unresponsive 4.9 s and 0.7 s, MsMpEng 6.3% average (peak 19.2%): round 2's Defender pattern again.
 
+## E7: the drift check (19 October)
+
+`./scripts/check-vscode-drift.sh 1.142.0` at `eae1dedd`: 13 of 18 patches fail in 56 file patches. 006, 011, 012, 014 and 016 apply; the most are 018's (14 file patches), 002's (12) and 003's (8). Sprint 132's closeout measured 15 of 19 in 60; this sprint retired 017 and 001's and 016's Getting Started hunks. Recorded in the release plan's risk register.
+
 ## E5: the production build at the merge (19 October)
 
 A clean-room release worktree from `./scripts/create-release-worktree.sh` at `origin/main` `eae1dedd`: HEAD exactly `origin/main`, detached, tracked sources clean, a physical pristine VS Code checkout at the gitlink `10c8e557`, physical dependency roots, empty build output. `release-preflight.sh` passed with one warning, the extension symlink, which the build creates. Then `build-prod.sh` (arm64 Node 22.22.1 from `vscode/.nvmrc`), unsigned: all 9 steps, VALIDATION PASSED, BUILD PROVENANCE VERIFIED, finished 09:25. The built app carries the sprint's last changes: the first-window size (`main.js`), Help's Getting started, `sendFeedback`, the compact rhythm in `webview.js`, and the trusted sign-in hosts in `product.json`, which, as expected, still has no `commit` (#463). The worktree is kept, unsigned, at `.worktrees/release-eae1dedd7114` (10 GB, the app 2.0 GB).
