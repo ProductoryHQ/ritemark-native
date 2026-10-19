@@ -99,14 +99,14 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [x] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [x] Docs: `architecture.md` (Projects; the browser's share question), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist lines (E6)
 - [x] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
-- [ ] Windows overlay round before the merge: S41 on the extension side
+- [x] Windows overlay round before the merge: S41 on the extension side (its S55 loop on an older shell fixed by #468)
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467), done); `qa-validator` review (done, two findings fixed); screenshots to the Experience lead (done, approved); the Development manager's smoke test; Jarmo's "admin merge"
-- [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
-- [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
+- [x] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467)); `qa-validator` review (two findings fixed); screenshots to the Experience lead (approved); Jarmo's "admin merge 467": merged 2026-10-19 as `3c8a7c30`
+- [x] After the merge: a production build from a clean-room worktree at the merged commit (E5): built to step 5 of 9 and stopped at the provenance gate because #468 merged meanwhile; the app's checks pass ([qa-evidence.md](qa-evidence.md), E5)
+- [x] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md` Round 4 on the signed build of `3c8a7c30`: all pass; #472 fixed the labels' mojibake; the splash in Light and Share with About this project are left open for a Windows re-check (`qa-evidence.md`)
 - [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
-- [ ] After the merge: the drift check into the release plan (E7)
+- [x] After the merge: the drift check into the release plan (E7): 13 of 18 patches fail on 1.142.0 in 59 file patches
 - [x] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [x] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated
 - [x] The [v1.14 parity list](../parity-v1.14.md): every Sprint 134 row checked on the branch and marked done
-- [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)
+- [x] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call): nothing to clean; this worktree is held back (8.0 GiB), E5's release worktree removed with Jarmo's OK
