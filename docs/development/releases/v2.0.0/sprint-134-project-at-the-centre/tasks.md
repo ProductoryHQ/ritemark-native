@@ -101,7 +101,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [x] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"
+- [ ] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467), done); `qa-validator` review (done, two findings fixed); screenshots to the Experience lead (done, approved); the Development manager's smoke test; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
 - [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
