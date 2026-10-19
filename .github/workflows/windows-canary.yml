@@ -74,40 +74,30 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Patch bundled node-gyp + verify Visual Studio detection
-        # Mirrors build-windows.yml's node-gyp patch step (kept in sync with it):
-        # swap npm's bundled node-gyp for 12.4.0 (which maps VC++ major 18 ->
-        # VS2026) and then run findVisualStudio() to confirm the runner's actual
-        # VS toolchain is detectable. This is the exact check that went red when
-        # the runner image moved to Visual Studio 2026; if a future image bump
-        # ships an even newer VS major, THIS STEP FAILS FAST and prints the
-        # detected version, giving us a week of lead time before a release build.
+      - name: Check npm's node-gyp + verify Visual Studio detection
+        # Mirrors build-windows.yml's "Check npm's node-gyp finds Visual Studio"
+        # step (kept in sync with it): npm's bundled node-gyp must be 12.1.0 or
+        # newer (the first that maps VC++ major 18 -> VS2026; Node 24.18.0's npm
+        # bundles 12.3.0), and findVisualStudio() must find the runner's actual
+        # VS toolchain. This is the check that went red when the runner image
+        # moved to Visual Studio 2026; if a future image bump ships an even
+        # newer VS major, THIS STEP FAILS FAST and prints the detected version,
+        # giving us a week of lead time before a release build.
         id: node-gyp-check
         shell: bash
         run: |
           set -e
           NODE_DIR="$(dirname "$(command -v node)")"
-          NPM_DIR="$NODE_DIR/node_modules/npm"
-          NODE_GYP_DIR="$NPM_DIR/node_modules/node-gyp"
+          NODE_GYP_DIR="$NODE_DIR/node_modules/npm/node_modules/node-gyp"
           NODE_GYP_JS="$NODE_GYP_DIR/bin/node-gyp.js"
 
           if [ ! -f "$NODE_GYP_JS" ]; then
             echo "::error::Bundled node-gyp not found at $NODE_GYP_JS -- npm/Node layout on the runner image changed. Investigate before the next release build."
             exit 1
           fi
-          echo "Runner-bundled node-gyp before patch: $(node "$NODE_GYP_JS" --version)"
-
-          STAGING="$RUNNER_TEMP/node-gyp-staging"
-          mkdir -p "$STAGING"
-          ( cd "$STAGING" && npm init -y --silent >/dev/null && npm install node-gyp@12.4.0 --install-strategy=nested --save-exact --no-audit --no-fund --loglevel=error )
-          rm -rf "$NODE_GYP_DIR"
-          cp -R "$STAGING/node_modules/node-gyp" "$NODE_GYP_DIR"
-
-          PATCHED_VERSION="$(node "$NODE_GYP_JS" --version)"
-          if [ "$PATCHED_VERSION" != "v12.4.0" ]; then
-            echo "::error::node-gyp patch did not take effect (got '$PATCHED_VERSION')"
-            exit 1
-          fi
+          GYP_VERSION="$(node "$NODE_GYP_JS" --version)"
+          echo "Runner-bundled node-gyp: $GYP_VERSION"
+          node -e "const [a,b]=process.argv[1].replace(/^v/,'').split('.').map(Number); if (a < 12 || (a === 12 && b < 1)) { console.error('::error::node-gyp ' + process.argv[1] + ' is older than 12.1.0, the first that finds Visual Studio 2026'); process.exit(1); }" "$GYP_VERSION"
 
           cat > "$RUNNER_TEMP/check-vs.js" <<'EOF'
           const path = require('path')
@@ -118,7 +108,7 @@ jobs:
             console.log('Visual Studio detection OK:', JSON.stringify(info, null, 2))
           }).catch((err) => {
             console.error('Visual Studio detection FAILED:', err.message)
-            console.error('::error::The Windows runner image VS toolchain is no longer detected by node-gyp 12.4.0 -- the runner image likely shipped a newer Visual Studio. Update the node-gyp pin / VS override in build-windows.yml before the next release.')
+            console.error('::error::The Windows runner image VS toolchain is no longer detected by npm\'s bundled node-gyp -- the runner image likely shipped a newer Visual Studio. Update the Node pin (hence npm and node-gyp) in build-windows.yml before the next release.')
             process.exit(1)
           })
           EOF
@@ -127,7 +117,7 @@ jobs:
       - name: Compile a native module (toolchain smoke test)
         # Detection passing isn't the same as the MSVC toolchain actually
         # compiling. Force a from-source build of one small, reliably-compiling
-        # native addon using the patched node-gyp. If the C++ toolchain on the
+        # native addon using npm's bundled node-gyp. If the C++ toolchain on the
         # runner image regresses (missing MSVC, broken SDK, Python mismatch),
         # this fails even when VS detection "passes".
         shell: bash

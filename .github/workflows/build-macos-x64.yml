@@ -65,12 +65,11 @@ jobs:
       # =========================================================================
       - name: Install VS Code dependencies
         working-directory: r/vscode
+        # vscode/.npmrc names the Electron target (43.7.7 at VS Code 1.142) and
+        # its headers, as in build-prod.sh. Environment overrides here would win
+        # over it: until Sprint 135 they built native modules against Electron
+        # 30.5.1's headers (research/toolchain-audit.md section 5).
         env:
-          npm_config_disturl: https://electronjs.org/headers
-          npm_config_target: 30.5.1
-          npm_config_runtime: electron
-          npm_config_build_from_source: true
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           success=0

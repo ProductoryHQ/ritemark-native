@@ -128,144 +128,48 @@ jobs:
             --destination vscode/extensions/ritemark \
             --target win32-x64
 
-      - name: Patch bundled node-gyp for VS2026 detection
-        # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs a copy of
-        # this node-gyp patch + VS-detection logic weekly on the free
-        # windows-latest runner as an early-warning. If you change the node-gyp
-        # pin or VS-detection logic here, update windows-canary.yml too.
+      - name: Check npm's node-gyp finds Visual Studio
+        # DRIFT-PREVENTION: .github/workflows/windows-canary.yml runs this same
+        # check weekly on the free windows-latest runner as an early warning. If
+        # you change the node-gyp floor or the Visual Studio check here, change
+        # windows-canary.yml in the same commit.
         #
-        # windows-8core now ships Visual Studio 2026 (internal major version
-        # 18) instead of/alongside VS 2022. node-gyp 11.2.0 (bundled with this
-        # runner's Node 22.22.1) only recognises major versions 15/16/17 ->
-        # 2017/2019/2022 and silently drops anything newer, so every native
-        # module build fails with "Could not find any Visual Studio
-        # installation to use" (@parcel/watcher hits it first). node-gyp
-        # 12.0.0 (2026-01-27) added the 18 -> 2026 mapping (still present in
-        # 13.x). Using 12.4.0, NOT 13.x: node-gyp 13.0.1 requires Node
-        # `^22.22.2 || ^24.15.0 || >=26.0.0`, and this runner is pinned to
-        # 22.22.1 -- one patch below that floor. 12.4.0 only requires
-        # `^20.17.0 || >=22.9.0` (satisfied) and already has the same VS2026
-        # fix, confirmed by diffing its find-visualstudio.js.
-        #
-        # Setting npm_config_node_gyp as a plain env var does NOT work here:
-        # during `npm ci`'s automatic native-module rebuild, @npmcli/arborist's
-        # rebuild.js builds its own narrow env object for lifecycle scripts
-        # (just npm_package_* keys) instead of forwarding process.env, so
-        # @npmcli/run-script's make-spawn-args.js never sees the override and
-        # falls back to `require.resolve('node-gyp/bin/node-gyp.js')` — i.e.
-        # whichever node-gyp is physically bundled inside npm's own install
-        # tree. So patch that file in place instead, at the exact path
-        # confirmed from the failing runs' own logs (node.exe's sibling
-        # node_modules/npm on the official Windows Node distribution layout).
-        #
-        # A plain `npm install node-gyp@12.4.0` run *inside* npm's own
-        # directory 404s (confirmed locally): npm's package.json is a
-        # workspace-style manifest with internal-only devDependencies
-        # (@npmcli/docs) that aren't independently installable. So build a
-        # fully self-contained node-gyp@12.4.0 in an isolated staging project
-        # instead (--install-strategy=nested nests every dependency inside
-        # node-gyp's own node_modules rather than hoisting into the staging
-        # root), then drop that whole folder into place -- npm's other hoisted
-        # sibling packages are never touched. Verified locally (staged install
-        # + version check + a require() smoke test of find-visualstudio.js)
-        # before ever running this on CI. The VS-detection check below then
-        # confirms the real code path so a wrong layout assumption fails in
-        # seconds, not after a full ~9-minute npm ci cycle.
-        #
-        # VS Code's OWN build/npm/preinstall.ts does a SEPARATE, independent
-        # compiler-toolchain check (unrelated to node-gyp): it hardcodes
-        # `Microsoft Visual Studio\2022` / `\2019` folder-name lookups and
-        # throws "Invalid C/C++ Compiler Toolchain" if neither exists. VS2026
-        # lives at `...\Visual Studio\18\...`, so that check also needs a
-        # nudge -- preinstall.ts itself documents the fix: a `vs2022_install`
-        # env var that bypasses the hardcoded path via fs.existsSync. Emit the
-        # path node-gyp just found as a step output so the next step can wire
-        # it up without re-deriving it.
-        id: node-gyp-patch
+        # windows-8core ships Visual Studio 2026 (internal major version 18).
+        # node-gyp maps 18 -> 2026 from 12.1.0 on. Node 24.18.0's npm 11.16.0
+        # bundles node-gyp 12.3.0, so npm's own copy finds it, and the swap to
+        # 12.4.0 that Node 22.22.1's node-gyp 11.2.0 needed is gone (Sprint 135,
+        # research/toolchain-audit.md section 2). This step only checks: a Node
+        # or npm whose node-gyp is older than 12.1.0, or a runner image whose
+        # Visual Studio it cannot find, fails here in seconds, not after a full
+        # npm ci. VS Code's own build/npm/preinstall.ts knows VS 2026's "18"
+        # folder at 1.142, so it needs no vs2022_install override either.
         shell: bash
         run: |
           set -e
           NODE_DIR="$(dirname "$(command -v node)")"
-          NPM_DIR="$NODE_DIR/node_modules/npm"
-          NODE_GYP_DIR="$NPM_DIR/node_modules/node-gyp"
+          NODE_GYP_DIR="$NODE_DIR/node_modules/npm/node_modules/node-gyp"
           NODE_GYP_JS="$NODE_GYP_DIR/bin/node-gyp.js"
-          echo "Node dir: $NODE_DIR"
-          echo "npm install dir: $NPM_DIR"
-
           if [ ! -f "$NODE_GYP_JS" ]; then
-            echo "::error::Expected bundled node-gyp not found at $NODE_GYP_JS -- runner layout assumption is wrong, aborting before an npm ci cycle."
+            echo "::error::npm's bundled node-gyp not found at $NODE_GYP_JS -- runner layout assumption is wrong, aborting before an npm ci cycle."
             exit 1
           fi
-          echo "Before patch: $(node "$NODE_GYP_JS" --version)"
-
-          STAGING="$RUNNER_TEMP/node-gyp-staging"
-          mkdir -p "$STAGING"
-          ( cd "$STAGING" && npm init -y --silent >/dev/null && npm install node-gyp@12.4.0 --install-strategy=nested --save-exact --no-audit --no-fund --loglevel=error )
-
-          rm -rf "$NODE_GYP_DIR"
-          cp -R "$STAGING/node_modules/node-gyp" "$NODE_GYP_DIR"
-
-          PATCHED_VERSION="$(node "$NODE_GYP_JS" --version)"
-          echo "After patch: $PATCHED_VERSION"
-          if [ "$PATCHED_VERSION" != "v12.4.0" ]; then
-            echo "::error::node-gyp patch did not take effect (got '$PATCHED_VERSION', expected v12.4.0)"
-            exit 1
-          fi
+          GYP_VERSION="$(node "$NODE_GYP_JS" --version)"
+          echo "npm's node-gyp: $GYP_VERSION"
+          node -e "const [a,b]=process.argv[1].replace(/^v/,'').split('.').map(Number); if (a < 12 || (a === 12 && b < 1)) { console.error('::error::node-gyp ' + process.argv[1] + ' is older than 12.1.0, the first that finds Visual Studio 2026'); process.exit(1); }" "$GYP_VERSION"
 
           cat > "$RUNNER_TEMP/check-vs.js" <<'EOF'
           const path = require('path')
-          const fs = require('fs')
           const gypDir = process.argv[2]
           const { findVisualStudio } = require(path.join(gypDir, 'lib', 'find-visualstudio.js'))
           const nodeSemver = { major: parseInt(process.versions.node.split('.')[0], 10) }
           findVisualStudio(nodeSemver, undefined).then((info) => {
-            console.log('VS2026 detection OK:', JSON.stringify(info, null, 2))
-            if (process.env.GITHUB_OUTPUT) {
-              fs.appendFileSync(process.env.GITHUB_OUTPUT, `vs_path=${info.path}\n`)
-            }
+            console.log('Visual Studio detection OK:', JSON.stringify(info, null, 2))
           }).catch((err) => {
-            console.error('VS2026 detection FAILED:', err.message)
+            console.error('Visual Studio detection FAILED:', err.message)
             process.exit(1)
           })
           EOF
           node "$RUNNER_TEMP/check-vs.js" "$NODE_GYP_DIR"
-
-      - name: Skip native builds for bundled copilot extension
-        # extensions/copilot (GitHub Copilot Chat, built into VS Code 1.117) is
-        # STRIPPED entirely from the final Ritemark app -- see the later
-        # "Strip bundled copilot extension from output" step. We never ship its
-        # native modules.
-        #
-        # Its transitive deps `keytar` and `@keyv/sqlite`->`sqlite3` are native
-        # addons. copilot's OWN lockfile pins `node-gyp@10.3.1` locally
-        # (extensions/copilot/node_modules/node-gyp), so their install scripts
-        # (`prebuild-install || node-gyp rebuild`) PATH-resolve node-gyp to that
-        # local copy -- which shadows the VS2026-aware node-gyp@12.4.0 we patch
-        # into npm globally and, like 11.2.0, cannot map VC++ major 18 -> VS2026.
-        # Result: "Could not find any Visual Studio installation to use", the
-        # ONLY fatal failure once Layers 1+2 are in place (build/remote already
-        # compile fine under VS2026 via npm's global patched node-gyp; ssh2's
-        # optional openssl-dependent crypto binding fails non-fatally and is
-        # unrelated).
-        #
-        # We can't drop the copilot extension (gulp's
-        # prepareBuiltInCopilotExtensionShims hard-requires the dir), and env-var
-        # node-gyp overrides don't reach this arborist-driven `npm ci` lifecycle
-        # path (proven in the node-gyp patch step's own comment). Since copilot's
-        # native modules are never shipped, skip its install scripts entirely.
-        # This is safe for the build: keytar/sqlite3 are esbuild EXTERNALS in
-        # copilot's .esbuild.ts (never bundled at compile time), and copilot's
-        # compile re-runs its own script/postinstall.ts (which only COPIES
-        # prebuilt @vscode/tree-sitter-wasm .wasm / tiktoken / @github/copilot CLI
-        # assets -- no node-gyp, no build-wasm). @github/copilot (needed by the
-        # gulp shim) has no install script, so its sdk/ tarball contents are
-        # unaffected.
-        shell: bash
-        working-directory: r/vscode
-        run: |
-          echo "ignore-scripts=true" >> extensions/copilot/.npmrc
-          echo "extensions/copilot/.npmrc is now:"
-          cat extensions/copilot/.npmrc
 
       - name: Install VS Code dependencies
         shell: bash
@@ -277,15 +181,9 @@ jobs:
           # Force node-gyp to use the setup-python 3.11 interpreter instead of
           # whatever is first on PATH. The runner image now ships Python 3.14.5,
           # which node-gyp auto-selects and which breaks native module builds.
-          # NODE_GYP_FORCE_PYTHON is the authoritative node-gyp 11 override
-          # (npm_config_python is no longer honoured as of npm 9).
+          # NODE_GYP_FORCE_PYTHON is the authoritative node-gyp override (npm 9
+          # stopped honouring npm_config_python; node-gyp 12.3.0 still reads it).
           NODE_GYP_FORCE_PYTHON: ${{ steps.setup-python.outputs.python-path }}
-          # See the "Patch bundled node-gyp" step: VS Code's own
-          # build/npm/preinstall.ts only recognises Visual Studio 2022/2019 by
-          # folder name and throws "Invalid C/C++ Compiler Toolchain"
-          # otherwise. Point its documented override at the VS2026 install
-          # node-gyp just found.
-          vs2022_install: ${{ steps.node-gyp-patch.outputs.vs_path }}
         run: |
           success=0
           for i in 1 2 3; do
@@ -314,8 +212,8 @@ jobs:
         working-directory: r/vscode/extensions/ritemark
         env:
           # Forward defense: keep node-gyp on Python 3.11 if a future extension
-          # dependency adds a native module (none today). The patched node-gyp
-          # 12.4.0 from the earlier step is already in place for the whole job.
+          # dependency adds a native module (none today). npm's own node-gyp
+          # (checked in the earlier step) serves the whole job.
           NODE_GYP_FORCE_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         run: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
 
