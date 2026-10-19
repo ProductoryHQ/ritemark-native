@@ -43,10 +43,20 @@
 #      ChatAIDisabledSettingId (same setting, chat.disableAIFeatures); this
 #      patch's one use follows it.
 #
+#   5. Sprint 135: 1.142 lets a custom editor reveal a selection it is opened
+#      with (CustomEditorInput.applyOptions), and webviewEditor.ts called it
+#      even when the editor was opened with no options, so `options.selection`
+#      threw and the document showed "The editor could not be opened". Open
+#      Editor at Index (which Ritemark runs for the welcome's landing, the
+#      permanent tabs, Home, Settings and the Task board) and Open Next Editor
+#      open with none. Upstream's later fix is taken as it is: options may be
+#      undefined, and navigation applies only when there are some.
+#
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
 #          src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts,
 #          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts,
-#          src/vs/workbench/browser/parts/paneCompositeBar.ts
+#          src/vs/workbench/browser/parts/paneCompositeBar.ts,
+#          src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
 # Created: 2026-05-02
 # Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
@@ -529,6 +539,38 @@ index dafd354c00d..b3a6e0b477f 100644
  
  export const ChatSetupFromAccountsWhen = ContextKeyExpr.and(
  	ChatContextKeys.Setup.hidden.negate(),
+diff --git a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
+index ece5b5c75f2..1c767f00455 100644
+--- a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
++++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
+@@ -137,7 +137,7 @@ export class WebviewEditor extends EditorPane {
+ 		super.clearInput();
+ 	}
+ 
+-	public override async setInput(input: EditorInput, options: IEditorOptions, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
++	public override async setInput(input: EditorInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
+ 		if (this.input && input.matches(this.input)) {
+ 			await this.applyNavigationOptions(options, token);
+ 			return;
+@@ -165,13 +165,15 @@ export class WebviewEditor extends EditorPane {
+ 		await this.applyNavigationOptions(options, token);
+ 	}
+ 
+-	public override setOptions(options: IEditorOptions): void {
++	public override setOptions(options: IEditorOptions | undefined): void {
+ 		super.setOptions(options);
+ 		void this.applyNavigationOptions(options, CancellationToken.None);
+ 	}
+ 
+-	private async applyNavigationOptions(options: IEditorOptions, token: CancellationToken): Promise<void> {
+-		if (this.input instanceof WebviewInput) {
++	// Ritemark (Sprint 135): upstream's later fix, taken early. An editor opened with no options (Open Editor at Index,
++	// Open Next Editor, the welcome's landing) made a custom editor read `options.selection` of undefined and fail to open
++	private async applyNavigationOptions(options: IEditorOptions | undefined, token: CancellationToken): Promise<void> {
++		if (options && this.input instanceof WebviewInput) {
+ 			await this.input.applyOptions(options, token);
+ 		}
+ 	}
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 index ff993368801..f274838de2b 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts

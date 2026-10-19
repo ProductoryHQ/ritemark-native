@@ -57,11 +57,12 @@ Conflicts in 8 files; the other 15 merged cleanly with identical `+`/`-` lines (
 ### 006 dev launch: 4 → 4 files, 4 → 4 hunks
 - **carried**: applies as is.
 
-### 007 Copilot Chat compatibility: 4 → 4 files, 13 → 14 hunks
+### 007 Copilot Chat compatibility: 4 → 5 files, 13 → 16 hunks
 - `chat.contribution.ts` → `chat.shared.contribution.ts` (2 hunks): **moved**. Upstream moved the chat registrations (2,204 lines) into the new `chat.shared.contribution.ts`. 007's two changes go there unchanged: `ChatSetupActionsContribution` registered instead of `ChatSetupContribution`, `ChatTeardownContribution` not registered. In the shared file the two registrations are no longer next to each other, so the second is its own hunk (14 hunks). `chat.contribution.ts` leaves 007's file list, `chat.shared.contribution.ts` joins it.
 - `chatSetupContributions.ts`: **re-based**, one line **re-cut**. 007's own `ChatSetupActionsContribution` (the narrow sign-in actions, the Copilot Chat launcher and `ritemark.copilotChat.openAsTab`) carries over. Upstream renamed `ChatConfiguration.AIDisabled` to `ChatAIDisabledSettingId` (same value, `chat.disableAIFeatures`), so 007's one use changes with it (found by the type-check). Upstream now imports `ChatEntitlementContextKeys` itself, so 007 no longer adds it.
 - `onboardingVariationA.ts`: **re-based**. Upstream still asserts `defaultChatAgent` at module load, so the soft fallback is still needed; upstream's new `EnterpriseSignInUiState` type sits above it.
 - `paneCompositeBar.ts`: **carried**.
+- `webviewPanel/browser/webviewEditor.ts` (2 hunks): **new in this sprint**, found in Phase 7 (S23 of this sprint). 1.142 lets a custom editor reveal the selection it is opened with (`CustomEditorInput.applyOptions` reads `options.selection`), and `WebviewEditor.setInput` called it even when the editor was opened with no options, so the document showed "The editor could not be opened". `workbench.action.openEditorAtIndex` opens with none, and Ritemark runs it for the welcome's landing ("Open when you left"), the permanent tabs, Home, Settings and the Task board; core's Open Next Editor does too. Caught with the debugger on a v1.14.0 profile landing on 1.142 (the same profile on 1.117 opens). Upstream main has since fixed it in this file (`options: IEditorOptions | undefined`, navigation only `if (options && …)`); 007 takes that fix as it is, so the next update drops the hunks.
 - Behavioural differences against main's patch: none beyond the above. Runtime check: Copilot Chat's launcher in More, the View menu and Ctrl+Alt+I open it as a tab (Phase 7).
 
 ### 008 Windows binary strip: 1 → 1 file, 1 → 1 hunk
@@ -124,7 +125,7 @@ At 1.142.0, by `grep '^diff --git'`. Every difference from the lists above is ex
 | `004-ritemark-build-system.patch` | 4 | 4 | 7 | 7 | — |
 | `005-ritemark-windows-and-oss-fixes.patch` | 3 | 3 | 5 | 5 | — |
 | `006-ritemark-dev-launch-fallback.patch` | 4 | 4 | 4 | 4 | — |
-| `007-ritemark-vscode-1117-compat.patch` | 4 | 4 | 13 | 14 | out: `src/vs/workbench/contrib/chat/browser/chat.contribution.ts`; in: `src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts` |
+| `007-ritemark-vscode-1117-compat.patch` | 4 | 5 | 13 | 16 | out: `src/vs/workbench/contrib/chat/browser/chat.contribution.ts`; in: `src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts`; in: `src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts` |
 | `008-ritemark-windows-binary-strip.patch` | 1 | 1 | 1 | 1 | — |
 | `009-ritemark-browser-context-bridge.patch` | 4 | 4 | 9 | 12 | — |
 | `010-ritemark-browser-action-bridge.patch` | 4 | 4 | 12 | 13 | — |
