@@ -126,7 +126,12 @@ if [ "$RUN_TS" = true ]; then
       nvm use "$(cat "$PROJECT_ROOT/.nvmrc")" >/dev/null
     fi
     cd "$VSCODE_DIR"
-    npm run compile-check-ts-native
+    # VS Code 1.142 renamed the client type-check (Sprint 135): typecheck-client; 1.117 had compile-check-ts-native
+    if node -e "process.exit(require('./package.json').scripts['typecheck-client'] ? 0 : 1)"; then
+      npm run typecheck-client
+    else
+      npm run compile-check-ts-native
+    fi
   )
 else
   echo "No chrome-sensitive TS changes detected; skipping VS Code TypeScript check."
