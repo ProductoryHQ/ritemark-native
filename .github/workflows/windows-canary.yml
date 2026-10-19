@@ -46,7 +46,7 @@ on:
 env:
   # Keep in lockstep with build-windows.yml so the canary exercises the same
   # Node (hence the same bundled npm/node-gyp) the real build relies on.
-  NODE_VERSION: '22.22.1'
+  NODE_VERSION: '24.18.0'
 
 jobs:
   canary:

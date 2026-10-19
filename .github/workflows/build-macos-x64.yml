@@ -29,10 +29,10 @@ jobs:
       # =========================================================================
       # Step 2: Setup toolchain
       # =========================================================================
-      - name: Setup Node.js 22.22.1
+      - name: Setup Node.js 24.18.0
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.1'
+          node-version: '24.18.0'
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5

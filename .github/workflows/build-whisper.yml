@@ -38,7 +38,7 @@ concurrency:
 env:
   # whisper.cpp v1.8.3. The build scripts refuse any other commit.
   WHISPER_CPP_COMMIT: 2eeeba56e9edd762b4b38467bab96c2517163158
-  NODE_VERSION: '22.22.1'
+  NODE_VERSION: '24.18.0'
   TSX: tsx@4.21.0
   # Test model for the contract test (ggml-tiny.bin, checksum pinned in the script).
   MODEL_CACHE_KEY: whisper-contract-model-ggml-tiny-be07e048

@@ -40,10 +40,10 @@ jobs:
       - name: Checkout Ritemark
         uses: actions/checkout@v5
 
-      - name: Setup Node.js 22.22.1
+      - name: Setup Node.js 24.18.0
         uses: actions/setup-node@v5
         with:
-          node-version: '22.22.1'
+          node-version: '24.18.0'
 
       - name: Validate exact manifest and SDK snapshot
         shell: bash
