@@ -241,7 +241,7 @@ export function presentCard(card: BoardCardView, context: { now: Date; titleOf: 
 export function finishedLine(card: BoardCardView): string | null {
   if (!card.result) return null
   const by = card.result.by
-  const agent = by === 'claude' ? 'Claude' : by === 'codex' ? 'Codex' : by === 'opencode' ? 'OpenCode' : 'The agent'
+  const agent = by === 'claude' ? 'Claude' : by === 'codex' ? 'ChatGPT' : by === 'opencode' ? 'OpenCode' : 'The agent'
   return card.result.seconds !== undefined ? `${agent} finished in ${duration(card.result.seconds)}` : `${agent} finished`
 }
 

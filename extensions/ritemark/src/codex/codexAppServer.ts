@@ -156,7 +156,7 @@ export class CodexAppServer extends EventEmitter {
       ...params,
     }, 120_000, {
       progressAfterMs: 10_000,
-      progressMessage: 'Starting Codex session, this may take a moment…',
+      progressMessage: 'Starting ChatGPT. This may take a moment…',
       progressConversationId: conversationId,
       diagnosticsOnTimeout: () => this.buildThreadStartDiagnostics(),
     });
@@ -419,7 +419,7 @@ export class CodexAppServer extends EventEmitter {
   private handleExit(code: number | null): void {
     this.trace?.('app-server', 'exit', { code });
     for (const [, { reject }] of this.pendingRequests.entries()) {
-      reject(new Error('Codex app-server exited unexpectedly'));
+      reject(new Error('ChatGPT stopped unexpectedly.'));
     }
     this.pendingRequests.clear();
     this.lastStderrMessage = null;

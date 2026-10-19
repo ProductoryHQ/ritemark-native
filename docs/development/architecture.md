@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-18 (Sprint 133: the welcome, one consent gate for usage data, the landing, Getting Started retired)
+**Last updated:** 2026-10-19 (Sprint 134: the project at the centre — the projects, Home, switching, the share question on the AI's sheet)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -148,8 +148,9 @@ extensions/ritemark/src/
 ├── googleDocs/      Publish to Google Docs — OAuth, account, link store, Docs API mapper, publisher, controller
 ├── editorSync/      Markdown/CSV disk-model-view coordinator, typed protocol, retry and three-way state
 ├── ai/              Shared AI utilities — modelConfig.ts (model IDs), modelCatalog/ (model lists), connectivity
-├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider, TasksViewProvider
-├── settings/        Settings page bridge
+├── projects/        The project at the centre (Sprint 134) — the project list, the project file, what waits, switching, About this project
+├── views/           View providers — UnifiedViewProvider (AI sidebar), AgentLibraryViewProvider, TasksViewProvider; HomePanel, ProjectsViewProvider, permanentTabs (Sprint 134)
+├── settings/        Settings page bridge; Advanced settings opens VS Code's settings (Sprint 134)
 ├── utils/           Binary resolution, platform utils, bundledAgentRuntime, runProcess (child processes without blocking the host)
 ├── voiceDictation/  On-device dictation (Whisper): engine resolver + readiness, model download, controller (macOS and Windows)
 ├── speech/          Transcription subsystem (Sprint 108) — engines, jobs, sessions; recording/ (Sprint 118)
@@ -364,6 +365,36 @@ extension  browser/browserNavigationRecorder.ts (no vscode import; every rule un
 - **One entry per page.** `historyKey` = normalized address without its `#fragment`; entries saved by earlier versions merge on the next visit. `openInIntegratedBrowser()` no longer writes to the store; the page is recorded when it loads, at the address it ends on.
 - **Pages loading in hidden tabs** are recorded when the tab is first shown, not while hidden. Deleted `file:` entries are pruned when Recent is shown (only `FileNotFound` removes one).
 
+### The share question (Sprint 134, #455)
+
+Whether to share a web page with the AI is asked on the AI's sheet, above the message box, not in a dialog. Upstream's "Share with Agent?" dialog was modal: it blocked the tab row until it was answered (#455). When and whether Ritemark asks did not change. Only where it asks did.
+
+```text
+UnifiedViewProvider  polls the browser tab in front every 1.5 s, only while the sheet is shown
+  → BrowserContextStore.ensureSharedForActiveTab() → ShareQuestionChange
+      calls 009's workbench.action.browser.ensureActiveBrowserShared with no argument
+        shared already, or the person shares pages without asking → shared, nothing asked
+        otherwise → needsAnswer: true, no dialog
+      → show {pageId, title}  → posts browser:share-question to the sheet
+      → clear                 → posts browser:share-question-clear (another page in front, or none)
+      → unchanged
+sheet  ShareQuestionCard.tsx: Share this page / Not now, and the box "Share pages I open in Ritemark without asking"
+  → browser:share-answer {pageId, answer: 'share' | 'notNow', withoutAsking}
+host  BrowserContextStore.answerShareQuestion(pageId, answer, withoutAsking)
+  → ensureActiveBrowserShared({ pageId, answer, withoutAsking })
+      share   → the model's shareWithAgentAnswered(withoutAsking): what upstream's Allow does
+      notNow  → nothing shared
+      a pageId no longer in front → stale: true, nothing shared
+```
+
+- **The three messages are typed** in `views/agentSidebarProtocol.ts` (`BrowserShareQuestionMessage`, `BrowserShareQuestionClearMessage`, `BrowserShareAnswerMessage`), and `decodeBrowserShareAnswer` checks every answer field.
+- **Only an answer marks a page as asked** for the session. A page left unanswered when another comes in front stays unshared and is asked about again when it comes back. Share and Not now both mark it; Not now is today's Deny.
+- **Patch 009 takes the answer.** `shareWithAgentAnswered` sits beside upstream's `setSharedWithAgent` in `contrib/browserView/common/browserView.ts`. It mirrors Allow's path: the network policy's check and notice first, the stored choice (`browserView.shareWithAgent.dontAskAgain`) only with the box, then sharing. The model's `ritemarkSharesWithoutAsking` reads that stored choice.
+- **The consent boundary stays** (Sprint 67 D5). `buildTurnContext` sends nothing about a page that is not shared, so a message sent while the question waits goes without the page.
+- **Three paths keep upstream's dialog:** annotation mode on an unshared page, the control question (010's `ensureControlConsent`, then the share it needs) and upstream's own "Share with Agent" toggle. Each answers a click of the person's own, so it blocks nothing they did not start. Known limit: on a page not yet shared, Allow Control is followed by upstream's share dialog, so the person is asked twice. That was so before this sprint, and it stays.
+- **A hidden sheet asks nothing.** The poll runs only while the sheet is shown, so the question never waits where nobody sees it; nothing is shared meanwhile.
+- **A reloaded sheet** (`sheetReloaded()`) gets a waiting question again on the next poll.
+
 ### Task board (Sprint 130, #119)
 
 Each project folder has one task board. Its cards are Markdown files in the folder, `.ritemark/tasks/<slug>.md`, so the board travels with the folder (git, sync tools, a copy on another computer). What happens on this computer (which conversation a card runs in, the state of its turn) is a separate, machine-local ledger. Two surfaces show the board: the Tasks side bar (`views/TasksViewProvider.ts`) and the Task board tab (`taskBoard/TaskBoardPanel.ts`). A third, the card page, is the Ritemark editor in card mode.
@@ -410,6 +441,8 @@ board/give ───────────────────→     shar
 - **A named file's presence is live.** The board re-checks the files cards name when a project file is created or deleted.
 - **Archived cards are off the board** (`archived: <time>` in the file): out of the columns, Your calls, Doing and Next up, refused for moves and agent work until restored. Done shows the last 28 days.
 - **The `task-board` flag** is default on. Off, the surfaces say so, no board tools are injected and no file is written.
+- **Calls have one rule** (Sprint 134). `callsOf(cards, handoffs)` in `BoardController.ts` turns cards into Your calls, for the board's snapshot and for `projects/waiting.ts`. Another project's hand-off records are read with the decoder alone (`decodeCardHandoffRecord`), never through `CardTaskStore.load()`, which renames a record it can't read.
+- **The board's tab is second and pinned** (Sprint 134): `views/permanentTabs.ts` opens it after Home, and patch 019 draws the Tasks place's badge on it, so the tab and the place show one count. The Tasks side bar lists the tasks in the order work moves (`webview …/tasks/taskList.ts`): Ideas, To do, Doing, then Done with Archived inside. A task that waits for the person is first in its stage, wherever it is.
 
 #### TO BE — known limits carried out of Sprint 130
 
@@ -449,6 +482,7 @@ supplies defaults, words and colours.
   - **#450:** a debounced watcher on `.claude/{agents,commands,skills}` in `UnifiedViewProvider` sends @ and / their list again.
   - **#451:** new Text and Table go in the project, in the folder chosen in the tree. 018's hidden `_ritemark.files.chosenFolder` (`fileCommands.ts`) gives the folder, and `src/newDocumentLocation.ts` names the file.
   - **The closeout:** 007's Copilot Chat entries (More, the View menu, Ctrl+Alt+I) count only a Copilot Chat that is installed and not disabled. Ctrl+Alt+I is always Ritemark's, so VS Code's own Chat never opens in its place.
+- **Sprint 134** (see *The project at the centre*): the head on Tasks, Browser and Transcribe, each place's rows from extension commands; on Home, no head and no title row; Switch project's flyout; File ▸ New tab, Switch project and Share from `ritemark/fileMenu`; ⌘T and Ctrl+T run 019's `ritemark.newTab`; the Task board tab's count.
 
 ### The welcome and usage data (Sprint 133)
 
@@ -473,6 +507,85 @@ A window with no folder opens on the welcome, an extension page in the shared bu
 - **A sign-in says only what happened.** ChatGPT's card shows Checking… until `vscode.env.openExternal` reports the page open (the sign-in hosts are trusted link domains in `product.json`); Cancel stops Codex's login listener (`CodexRuntime.stopLoginServer`: the bundled Codex has no login cancel, so an app-server no conversation uses is stopped). A ChatGPT check that says ready is tried once as a turn would use it (`CodexRuntime.verifySignIn`), without forcing a token refresh.
 - **Feedback is the person's own send.** `ConsentGate.sendFeedback` sends Send Feedback's reaction and text even with usage data off, from a client made for that one send: a one-off id never stored, no location, no shared properties, no session start, none of the held welcome events. The answer is unchanged; the kill switch still stops it.
 - **The first window is Ritemark's size.** Patch 018's `windowsStateHandler.ts` (`ritemarkFirstWindowSize`) opens a fresh profile's first window at 1440 × 900, or 90% of a smaller work area, centred; a saved window state wins. The welcome's page takes a compact rhythm below 822 tall (`welcome.css`).
+
+### The project at the centre (Sprint 134)
+
+A project is a folder. Every project window has Home, the project's own page, as its first tab and the Task board as its second, both pinned. On the Home place the left column lists the person's projects, with what waits in each. A click on one switches to it in the same window. The welcome's lists (Sprint 133) read the same list.
+
+| Module | Owns |
+|---|---|
+| `projects/ProjectList.ts` | Ritemark's own list of projects on this computer, `<globalStorage>/projects/v1/list.json`. Each entry (`ProjectEntryV1`) holds the folder URI, when it was added and last opened, how it was found (`opened`, `recent`, `chats`) and `missingSince`. A folder joins when a window opens it (`opened`); `remove` and `relocate` (Find it…) change the list only. A folder that is not found is marked and kept, never dropped. Every change re-reads the file and writes it by temporary file and rename, so one window never writes back another's older copy. No `vscode` import |
+| `projects/firstFill.ts` | The list's first fill, once per profile (`ritemark.projects.filledV1`, written after the list). Sources: VS Code's recent folders (`_workbench.getRecentlyOpened`, its only use), then the folders of the chat store's scopes, read raw from `index.json` (never through `ConversationStore`, whose methods rewrite the index). Only single local or network folders that exist now are added (2 s per check); no workspace files, remote folders or the sample inside the app. VS Code's spelling of a folder wins; on Windows a folder known only from chats is spelled by `realpathSync.native`. Last-open times come from `workspaceStorage`, for the order only. Boards add no folder: their records name none |
+| `projects/projectWindows.ts` | Which project each running window holds: `<globalStorage>/projects/v1/windows/<pid>.json`, written at activation and removed at dispose, in the shape of `conversations/turnOwners.ts`. A file whose process is gone holds nothing |
+| `projects/projectFile.ts` | `.ritemark/project.json` in the folder (`ritemark: "project/1"`): the line (200 characters) and a cover copied into `.ritemark/cover.<ext>`. Written only when the person changes something. A file it can't read is never written over, unknown keys are kept, and `mkdir` is never recursive. The name and the mark are the folder's in this sprint: a `name` or `mark` in the file is kept, not drawn. No `vscode` import |
+| `projects/waiting.ts` | `WaitingReader`: what waits in a project, read without opening it. A card's call goes through `callsOf` over the card files and this computer's hand-off records; a hand-off still in flight in a project no live window holds reads as interrupted, as that project's next start would record it. A chat's question or approval comes from `index.json` while a live window holds the chat (`TurnOwners`). A chat's unread reply comes from the index's `readAt` and `lastReplyAt`. A card's chat counts only through its card. An unreadable tasks folder or chat index gives no count, never 0. Other projects are read when Home or the switcher shows, cached 30 s. No `vscode` import |
+| `projects/homeState.ts` | Home's state from what the host read, pure: Last changed (the five newest files of the kinds Ritemark opens, About this project by that name, the pointer `CLAUDE.md` left out), the waiting items with the AI's name, the other projects' line |
+| `projects/protocol.ts` | The exact-field `home/*` and `projects/*` unions and their decoders. Names, titles and paths travel as text. The page never sees or sends a path: rows and items carry opaque ids |
+| `projects/switchProject.ts` | `ProjectSwitcher`: the one path for every Ritemark switch (below), the "Switched to…" note (`ritemark.projects.switchedFrom`, shown once and only within 2 minutes), and `beforeReload`, the answer to patch 018's veto |
+| `projects/aboutFile.ts` | About this project: the root's `AGENTS.md`, matched without regard to case, and a `CLAUDE.md` holding only `@AGENTS.md`. Create writes each by exclusive create, never over a file that is there. `addPointerLine` (the note's Add the line) puts `@AGENTS.md` first and keeps every other byte. `isPointerOnly` ignores surrounding whitespace, CRLF and a byte-order mark. No `vscode` import |
+| `projects/projectFolderGuard.ts` | `ensureProjectSubfolder`: every folder Ritemark makes under a project (a saved flow, the board's first card, the editor's images and diagrams, recordings, the flow nodes that save files) is made only after the project's folder itself is `stat`ed. A folder that has gone stays gone (R13). `FlowStorage.listFlows()` creates nothing |
+| `projects/projectsHost.ts` | Composition, one per window: the list and its first fill, this window's claim, the `WaitingReader`, the switcher, Home, the projects list, the permanent tabs, the place clicks, and the commands `ritemark.openHome`, `ritemark.projects.switch`, `.switchTo`, `.switcherItems`, `.openInNewWindow`, `ritemark.aboutProject` and `_ritemark.projects.beforeReload` |
+| `views/HomePanel.ts` | Home's tab: a webview panel of view type `ritemark.home` (the type 019 keeps permanent), in the shared bundle (`data-editor-type="home"`, `webview/src/components/home/`), restored by its serializer. It redraws on the board's changes, on the chat index's changes, on file changes in the project (1.5 s debounce, at most 5,000 files scanned) and when shown. The default cover is the welcome's picture, served as a file |
+| `views/ProjectsViewProvider.ts` | The projects list, in 1.x's launcher's slot (`ritemark.homeView` in `ritemark-home`), in the shared bundle (`data-editor-type="projects"`): Search all projects, a row per project with its mark, name and count, and Add a project…. ⌥ click (Alt click on Windows) opens a new window. Folders are checked when the list shows and when the window gains focus |
+| `views/permanentTabs.ts` | Home first and the board second, pinned in the first group: after the window restores its tabs (800 ms), and again when one is closed or unpinned (400 ms). The person is returned to their tab; a fresh project window opens on Home. The order is the pure `planPermanentTabs`. It also answers `ritemark.placeClickedAgain`: the Home place brings Home's tab forward, as the Tasks place brings the board |
+
+**Where things live.** The folder holds what the person owns: `.ritemark/project.json` and its cover, `AGENTS.md` and the pointer `CLAUDE.md`. This computer holds the rest under global storage: the list, the window markers and the chats' read marker. Nothing in the list leaves the computer.
+
+**What waits** is one number for one thing everywhere: the projects list, the switcher, Home's Waiting for you, the Tasks tab and the Tasks place. The board's part is `snapshot.attention.count`, which the Tasks place's badge already shows; 019 draws that badge on the Task board tab.
+
+**The read marker** (R3). A chat's record gains `readAt`. Its index summary carries `readAt` and `lastReplyAt`, the newest completed or failed reply. A reply is unread when both are there and the reply is newer. A reply that finishes while its chat is in front on a shown sheet is read at once. Selecting a chat, or showing the sheet with it in front, marks it read (`ConversationStore.markRead`, which writes only when there is an unread reply). A record without `readAt` counts as read, so chats from before this build show no backlog. The AI sheet's rail marks an unread chat with the amber dot.
+
+**Switching** (R9). A switch reloads the window: VS Code's API has no other way to change the folder.
+
+```text
+Ritemark's routes: Home's list, the head's Switch project ▸ and Open a folder…, File ▸ Switch project, Go back, Find it…
+  → ProjectSwitcher.switchTo(folder)
+      a chat in this window works (UnifiedViewProvider.workingChats(): a running turn, or one waiting on the person)
+        → "Claude is still working in <project>": Cancel / Switch and stop / Open in a new window (the default)
+      Switch and stop → stopWorkingChats() (as Stop does; up to 3 s) → switch
+      → ritemark.projects.switchedFrom written → vscode.openFolder(folder, { forceReuseWindow: true })
+VS Code's routes: Open Recent, Open Folder…, a folder dropped on the Dock icon, Close Folder
+  → 018's ritemarkSwitchGuard.ts vetoes the ShutdownReason.LOAD unload with the answer of
+    _ritemark.projects.beforeReload(target?); the host service's doOpenWindow notes the target (Open Recent only)
+  → the same question; with no target only Cancel and Switch and stop, Cancel the default
+```
+
+- **The guard never traps the window.** It answers at once when nothing works, and lets Ritemark's own reload through for 10 s after Ritemark asked. With no command, an error, or no answer within 10 s while no question shows, the reload goes on. Reload Window (`RELOAD`) and quitting never ask.
+- **The splash shows the ground.** 018's hunk in `partsSplash.ts` saves `ritemark.ground` as the splash's background, so a reloading window shows the ground's colour, not the desk's. 001's auto-detect defaults are the two grounds, `#16132F` and `#F1F5F9`. The page can't read the extension's colour before the workbench loads, so a change to `ritemark.ground` changes them too.
+
+**About this project** (R8). The root's `AGENTS.md` is shown as "About this project" wherever a person names the file:
+- the tab, the folded list, Quick Open and the window title: the `configurationDefaults` value `workbench.editor.customLabels.patterns: { "*/AGENTS.md": "About this project" }`;
+- Documents' row, its tooltip ("AGENTS.md, read by Claude and ChatGPT") and its accessible name: 018's `labels.ts` and `explorerViewer.ts`;
+- the icon: `agents.md` in the file icon theme (README's book), `book` in the product icon theme;
+- Home's Last changed and the AI sheet's chips: the extension and the webview name it themselves.
+
+018's `FilesFilter` hides the root's `CLAUDE.md` while its whole text is `@AGENTS.md` and the root has an `AGENTS.md`; it reads at most 1 KB, as it reads `.gitignore`. Search, Quick Open and Source Control show the file as it is. When the folder has its own `CLAUDE.md` without the line, the Ritemark editor shows a note at the top of About this project (`webview …/AboutProjectNote.tsx`) with Add the line and Not now.
+
+**Home replaces the 1.x launcher.** `HomeViewProvider.ts` and its test were deleted after every row of spec R14's table was checked: New document and New table are Home's Start something and the +; New AI conversation is the AI sheet's New chat; Recent work is Last changed; the board is the Tasks tab; recent folders are the projects list. The `home-launcher` flag gates nothing and stays as a tombstone (`status: 'disabled'`). The view id `ritemark.homeView` and the container `ritemark-home` stay, so a profile's saved places still find them.
+
+**Invariants.**
+
+- **The rules have no `vscode` import.** The list, the first fill, the project file, what waits, About this project and Home's state are tested with injected file systems. `projectsHost.ts`, `HomePanel.ts` and `ProjectsViewProvider.ts` only compose them.
+- **Nothing opens another project to read it.** Its counts come from its card files, this computer's hand-off records and the chat index, read raw; nothing is written on the way.
+- **The list never drops a project by itself.** A folder that is not found shows as Not found, with Find it… and Remove from the list. Remove leaves its folder, chats and board alone.
+- **Every Ritemark switch goes through `ProjectSwitcher`.** ⌥ click and Open in a new window never touch this window.
+
+#### TO BE — known limits carried out of Sprint 134
+
+| Limit | Where it bites |
+|---|---|
+| VS Code's Open Folder…, a folder dropped on the Dock icon, the CLI and Close Folder have no known target | The question has no Open in a new window there, only Cancel and Switch and stop |
+| The reload guard waits at most 10 s while no question shows | A slow or stuck extension host lets the reload go on, and a working chat ends as interrupted, as it did before |
+| A switch reloads the window | Switching without a reload would mean rebuilding how VS Code runs extensions (spec, Non-Requirements) |
+| The first fill finds no board by itself | A board in a folder that neither the recent list nor the chats know joins the list when it is next opened |
+| A project's name and mark are the folder's | Nothing lets a person change them yet; a `name` or `mark` in `project.json` is kept, not drawn |
+| Other projects' counts are read on show and cached 30 s | Home and the switcher can show another project's count up to 30 s old; the open project's count is live |
+| An older Ritemark rewrites a chat record without `readAt` | A downgrade loses read state, nothing else |
+| A fresh profile's very first window | Its splash stays white for a moment; the ground shows from the first saved splash on |
+
+### Settings' foot: Advanced settings (Sprint 134)
+
+⌘, (Ctrl+, on Windows) opens Ritemark Settings (`ritemark.aiSettings`) since Sprint 132. Some settings live only on VS Code's own settings page: the feature switches, the update mode and channel, the excluded folders and the transcription export folder. So the foot of Ritemark Settings has one link, Advanced settings (`webview …/settings/AdvancedSettingsLink.tsx`). It posts `settings:openAdvanced`, and `RitemarkSettingsProvider` runs `workbench.action.openSettings`. Nothing else on the page moved. The palette's "Preferences: Open Settings" stays (R21 keeps it).
 
 ## Agent Runtime Architecture
 
@@ -816,7 +929,7 @@ Sent as `approvalMode` + `planFirst` on `agent-execute`; the webview derives bot
 | **Manual (ask)** | SDK `default` + mutating tools gated via `canUseTool` | `approvalPolicy: untrusted` + `sandbox: read-only` | native `request_permission` prompt |
 | **Plan on** | SDK native `permissionMode: 'plan'` (enforced read-only) + `planModeInstructions`; `ExitPlanMode` → plan card; approve → `updatedPermissions setMode` to the autonomy mode, same turn continues | `collaborationMode: plan` on a **read-only sandbox** thread; approval sends the continuation turn on a write-sandbox thread | **not offered** — no enforceable plan contract (capability-gated) |
 
-Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`, `thinkingEffortSource`, `browserContext`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks. `browserContext` gates both the host's per-turn browser-context injection and the Composer's browser chip; the chip also requires the tab's "Share with Agent?" consent, so it shows exactly what the host sends.
+Capability gating: `src/runtime/capabilities.ts` is the single registry of per-runtime capabilities (`planFirst`, `liveModeSwitch`, `structuredPlanSteps`, `thinkingEffortSource`, `browserContext`), delivered to the webview on `agent:bootstrap`; no component hardcodes runtime ids for capability checks. `browserContext` gates both the host's per-turn browser-context injection and the Composer's browser chip; the chip also requires the page to be shared (since Sprint 134 the share question is asked on the AI's sheet, see *The share question*), so it shows exactly what the host sends.
 
 Mechanics & constraints:
 - `allowedTools` in the Claude SDK means *auto-allowed without prompting* and auto-allowed tools NEVER reach `canUseTool` — mutating tools **and `ExitPlanMode`** must be excluded from it (audit F7; only `AskUserQuestion` is documented as always prompting).
@@ -1354,6 +1467,12 @@ Flow editor's image pickers read the image arrays here. Sprint 89 deleted `CLAUD
 | File attachments broken for Codex (partial) and ACP (missing) | Done — `UnifiedAttachment` type; ACP fenced-block fallback with notice |
 | `UnifiedViewProvider` at 2480 LOC | Done in Sprint 79 — 2480 → 1097 LOC (target ≤ 1100). **Reopened as tracked debt by Sprint 89**: catalog wiring pushed it to 1223 LOC, back over target — see Version History 2026-07-01 entry; no dedicated extraction sprint yet |
 
+**Resolved in Sprint 134:**
+
+| Item | Resolution |
+|---|---|
+| `home-launcher` zombie flag (1.x Home launcher replaced by 2.0's Home) | Done — `HomeViewProvider.ts` and its test deleted after spec R14's table was checked; flag status set to `'disabled'` with a tombstone description, as `document-search` was in Sprint 79 |
+
 Post-Sprint 79 items tracked as GitHub Issues:
 
 | Issue | Item | Prerequisite |
@@ -1404,6 +1523,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-19 | Sprint 134 | **The project at the centre (2.0, step 3).** New `src/projects/` (see *The project at the centre*): `ProjectList.ts` (`<globalStorage>/projects/v1/list.json`), `firstFill.ts` (once per profile, from VS Code's recent folders and the chat store read raw), `projectWindows.ts` (window markers in `projects/v1/windows/`), `projectFile.ts` (`.ritemark/project.json`, `project/1`), `waiting.ts` (`WaitingReader` over card files, hand-off records and the chat index), `switchProject.ts` (`ProjectSwitcher` and the reload guard `_ritemark.projects.beforeReload`), `aboutFile.ts` (`AGENTS.md` as About this project, the pointer `CLAUDE.md`), `projectFolderGuard.ts` (`ensureProjectSubfolder`; listing flows creates nothing), `homeState.ts`, `protocol.ts` and `projectsHost.ts`. Views: `HomePanel.ts` (`ritemark.home`, pinned first) and `ProjectsViewProvider.ts` (`ritemark.homeView`) replace the 1.x `HomeViewProvider.ts`, which is deleted; the `home-launcher` flag is a tombstone. `permanentTabs.ts` keeps Home and Tasks first. The chat store gains `readAt`, and its index `lastReplyAt`, for unread replies (R3); `BoardController.callsOf` is the one rule for calls. The browser's share question moves to the AI's sheet (R20, #455): `ensureSharedForActiveTab` returns a show, clear or unchanged change, `answerShareQuestion` takes the answer, and `browser:share-question`, `browser:share-question-clear` and `browser:share-answer` are typed in `agentSidebarProtocol.ts`. Settings gains Advanced settings (`settings:openAdvanced` → `workbench.action.openSettings`, R23). The heads (R16–R18): Tasks' New task and Search, its list in the order work moves; Transcribe's Record and Transcribe a file…, with "Recordings" and its gear; Browser's Recent label with + and Clear history, and "No pages yet". The document's bar says Saved and Export becomes Share (R12). On the PDF and Word bars, Save as Markdown becomes Make an editable copy and Share is added (R19); `utils/openExternal.ts` opens files with `execFile` and an argument list, not a shell string. A project folder that has gone stays gone (R13). ChatGPT, never Codex, in every visible string (R22); setting keys, command IDs and the `@codex` comment handle stay. An agent's chosen colour on its row, through eight `ritemark.agentColor.*` theme colours at 3:1 (R24). Patches: 001 (the splash's defaults are the grounds); 003 (All commands drops 62 debugging and 88 developer command IDs, R21, #456); 009 (`ensureActiveBrowserShared` takes the answer, `shareWithAgentAnswered`); 018 (the heads' rows, Switch project's flyout, `ritemark/fileMenu`, About this project in `labels.ts` and `explorerViewer.ts`, `ritemarkSwitchGuard.ts` with `nativeHostService.ts`, `partsSplash.ts` saves `ritemark.ground`); 019 (the Task board tab's count, `ritemark.newTab` for ⌘T and Ctrl+T). `media/webview.js` 8,540,208 → 8,603,102 bytes. |
 | 2026-10-19 | Sprint 133 | **The welcome merged (#453, `eae1dedd`).** After review: the consent gate's `sendFeedback` (the v1.14 parity list's G3); ChatGPT's sign-in waits for the page to open, Cancel stops Codex's listener (`CodexRuntime.stopLoginServer`), and its check tries the sign-in (`verifySignIn`); `product.json` trusts the ChatGPT and Claude sign-in hosts; patch 015 adds Help's Getting started (G1); Settings shows Git whichever Claude runs (G2); patch 018 opens a fresh profile's first window at 1440 × 900 (`windowsStateHandler.ts`); the welcome's compact rhythm for short windows; main's #452 merged in, with 018's CSS rebuilt by a three-way merge. |
 | 2026-10-18 | Sprint 133 | **The welcome (2.0, step 2).** New `src/welcome/` (see *The welcome and usage data*) and `analytics/consent.ts` (one gate, off until yes, held welcome events, `build_channel`, the 1.x answer carried over); four events (`welcome_shown`, `ai_signed_in`, `project_opened`, `first_message_sent`). `UnifiedViewProvider` gains `openLandingChat`, `startCodexSignIn`/`stopCodexSignIn` and the first-message event. Settings gains Usage data and the Git and Node.js rows. The sticky-tab healer replaces the text tab (#429). Patches: 001 loses the Getting Started rewrite and reroutes Help: Welcome and walkthroughs to `ritemark.welcome.open`; 016 keeps only Source Control; 017 retired; 018 gains `ritemarkWelcomeAlone.ts` and the muted extension (`iconLabel.ts` `splitExtension`); 019 gains `ritemarkEmptyDesk.ts`. `product.json`: `workbench.startupEditor: none`. `copy-welcome-assets.sh` and its build steps retired. |
 | 2026-10-18 | Sprint 132 | **The 2.0 frame, merge 2 and closeout (#447, #450, #451, the closeout PR).** 018:

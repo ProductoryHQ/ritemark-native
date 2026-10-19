@@ -68,6 +68,8 @@ export interface WelcomeState {
     placePrefix: string;
     /** The name was refused: why, in words. */
     error: string | null;
+    /** Sprint 134 (S25): the sheet opens with the form open: Add a project… ▸ Start a new project. */
+    open?: boolean;
   };
   /** Which OpenCode keys are already set (never the keys themselves). */
   keysSet: Record<WelcomeKeyName, boolean>;

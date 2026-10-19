@@ -7,11 +7,53 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import * as XLSX from 'xlsx';
-import { getCurrentPlatform } from './platform';
+import { getCurrentPlatform, type Platform } from './platform';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+/**
+ * What opening a file in another app needs from the system. Sprint 134 (W13,
+ * confirmations §8): a file's name only ever travels as one item of an argument
+ * list, or as a URI handed to the system, never inside a command string a shell
+ * reads, so a name with `"`, `$(…)`, `;` or `%…%` stays a name. Injected in tests.
+ */
+export interface ExternalOpenDeps {
+  platform: Platform;
+  /** Runs a program with an argument list, without a shell (`child_process.execFile`). */
+  execFile: (file: string, args: readonly string[]) => Promise<unknown>;
+  /** Hands a file to the system's default app for its type, with no command line (Windows). */
+  openWithSystem: (filePath: string) => Promise<void>;
+}
+
+/**
+ * Windows: the default app for the file, through VS Code's opener (Electron's
+ * `shell.openExternal`), which hands the file to the system without a command line.
+ */
+export async function openFileWithSystem(filePath: string): Promise<void> {
+  const opened = await vscode.env.openExternal(vscode.Uri.file(filePath));
+  if (!opened) {
+    throw new Error('The system did not open the file');
+  }
+}
+
+function systemDeps(): ExternalOpenDeps {
+  return {
+    platform: getCurrentPlatform(),
+    execFile: (file, args) => execFileAsync(file, [...args]),
+    openWithSystem: openFileWithSystem,
+  };
+}
+
+/** Only an absolute path is passed on, so a file name can never be read as an option. */
+function assertAbsolute(filePath: string, platform: Platform): void {
+  const isAbsolute = platform === 'win32' ? path.win32.isAbsolute(filePath) : path.posix.isAbsolute(filePath);
+  if (!isAbsolute) {
+    throw new Error(`Not an absolute path: ${filePath}`);
+  }
+}
 
 /**
  * Check if an application is installed
@@ -24,7 +66,7 @@ export async function isAppInstalled(appName: string): Promise<boolean> {
   try {
     if (platform === 'darwin') {
       // macOS: open -Ra checks if app exists without launching it
-      await execAsync(`open -Ra "${appName}"`);
+      await execFileAsync('open', ['-Ra', appName]);
       return true;
     } else if (platform === 'win32') {
       // Windows: check registry for Office installations
@@ -51,20 +93,27 @@ export async function isAppInstalled(appName: string): Promise<boolean> {
 /**
  * Open a file in an external application
  * @param filePath - Absolute path to the file
- * @param appName - Application name (e.g., 'Microsoft Excel', 'Numbers')
+ * @param appName - Application name (e.g., 'Microsoft Excel', 'Numbers', 'Preview');
+ *   used on macOS only. Windows and Linux open the default app for the file's type.
+ * @param deps - The system calls; tests inject their own.
  */
-export async function openInExternalApp(filePath: string, appName: string): Promise<void> {
-  const platform = getCurrentPlatform();
+export async function openInExternalApp(
+  filePath: string,
+  appName: string,
+  deps: ExternalOpenDeps = systemDeps(),
+): Promise<void> {
+  assertAbsolute(filePath, deps.platform);
 
-  if (platform === 'darwin') {
-    await execAsync(`open -a "${appName}" "${filePath}"`);
-  } else if (platform === 'win32') {
-    // Windows: use start command to open with default app for this file type
-    // Double-quoting: first "" is the window title, second is the file path
-    await execAsync(`start "" "${filePath}"`);
+  if (deps.platform === 'darwin') {
+    // `open -a <App> <file>`: each an item of the argument list, no shell.
+    await deps.execFile('open', ['-a', appName, filePath]);
+  } else if (deps.platform === 'win32') {
+    // Windows: the default app for this file type, without `cmd /c start`
+    // (cmd reads `%name%` and `&` in a file name).
+    await deps.openWithSystem(filePath);
   } else {
-    // Linux: xdg-open
-    await execAsync(`xdg-open "${filePath}"`);
+    // Linux: xdg-open, with the file as its one argument.
+    await deps.execFile('xdg-open', [filePath]);
   }
 }
 
@@ -72,12 +121,16 @@ export async function openInExternalApp(filePath: string, appName: string): Prom
  * Open a file with the system's default app for its type (Sprint 124: the
  * Word preview's fallback when neither Word nor Pages is installed).
  */
-export async function openWithDefaultApp(filePath: string): Promise<void> {
-  if (getCurrentPlatform() === 'darwin') {
-    await execFileAsync('open', [filePath]);
+export async function openWithDefaultApp(
+  filePath: string,
+  deps: ExternalOpenDeps = systemDeps(),
+): Promise<void> {
+  if (deps.platform === 'darwin') {
+    assertAbsolute(filePath, deps.platform);
+    await deps.execFile('open', [filePath]);
   } else {
-    // Windows `start` and Linux `xdg-open` already open the default app.
-    await openInExternalApp(filePath, '');
+    // Windows and Linux already open the default app.
+    await openInExternalApp(filePath, '', deps);
   }
 }
 

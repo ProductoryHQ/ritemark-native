@@ -7,7 +7,7 @@ set -euo pipefail
 # build-windows.yml builds only the exact main commit, so a sprint branch cannot
 # produce a Windows installer. This zip holds what differs on the branch:
 # compiled out/, the webview bundles, the media icons, the welcome's media and the
-# sample project (Sprint 133), package.json with a test version (higher than any
+# sample project (Sprint 133), Home's tab icons and the icon themes (Sprint 134), package.json with a test version (higher than any
 # release, so it wins over the built-in copy), and the Windows whisper engine. scripts/qa/windows-branch-test.ps1 lays it over a copy of the installed
 # extension and starts the installed Ritemark with that copy and a fresh profile.
 #
@@ -41,6 +41,12 @@ cp "$EXT"/media/*.svg "$STAGE/media/"
 # (with its .ritemark/tasks). An extension release would not ship either, and
 # without them the welcome's header and Try the sample project fail.
 cp -R "$EXT/media/welcome" "$STAGE/media/welcome"
+# Sprint 134: Home's tab icons, and the two icon themes (About this project's
+# book on AGENTS.md; the heads' Record, Transcribe a file…, About this project
+# and Open in a new window glyphs). Without them those tabs and rows show no icon.
+cp -R "$EXT/media/home" "$STAGE/media/home"
+cp -R "$EXT/fileicons" "$STAGE/fileicons"
+cp -R "$EXT/producticons" "$STAGE/producticons"
 cp -R "$EXT/sample-project" "$STAGE/sample-project"
 cp -R "$EXT/binaries/win32-x64" "$STAGE/binaries/win32-x64"
 cp "$EXT/binaries/whisper-manifest.json" "$STAGE/binaries/"

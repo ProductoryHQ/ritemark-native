@@ -165,6 +165,12 @@ export interface ConversationRecordV1 {
   composerPreferences: ConversationComposerPreferencesV1;
   continuations?: ContinuationDescriptorsV1;
   migration?: MigrationProvenanceV1;
+  /**
+   * Sprint 134 (R3): when the person last had the chat in front on a shown
+   * AI sheet. A reply that finished later is unread. Absent on chats from
+   * before Sprint 134, which count as read.
+   */
+  readAt?: string;
 }
 
 export interface TombstoneV1 {
@@ -188,6 +194,12 @@ export interface ConversationSummaryV1 {
   runtimeSummary: RuntimeId[];
   integrity: 'verified' | 'corrupt';
   lastVerifiedAt: string;
+  /** Sprint 134 (R3): the record's `readAt`, so other windows count unread replies from the index. */
+  readAt?: string;
+  /** Sprint 134 (R3): when the newest reply finished (see {@link lastReplyAtOf}). */
+  lastReplyAt?: string;
+  /** Sprint 134 (R3): the title is still the chat's first message (no AI title, no rename), so Home quotes it. */
+  titleIsFirstMessage?: true;
 }
 
 export interface ConversationIndexV1 {
@@ -230,6 +242,8 @@ export interface ConversationCheckpointV1 {
   appendEvents?: ConversationEventV1[];
   composerPreferences?: ConversationComposerPreferencesV1;
   continuationUpdate?: { runtimeId: AgentId; descriptor: RuntimeContinuationDescriptorV1 | null };
+  /** Sprint 134 (R3): the chat was read up to this time. */
+  readAt?: string;
 }
 
 export interface ConversationDeleteResultV1 {
@@ -646,6 +660,8 @@ export function decodeConversationRecordV1(value: unknown): ConversationRecordV1
     record.continuations = decodeLegacyContinuation(input.continuation, record.scopeId);
   }
   if (input.migration !== undefined) record.migration = decodeMigration(input.migration, 'migration');
+  // Sprint 134 (R3): a marker that doesn't read as a time is dropped, never a reason to quarantine the chat.
+  if (typeof input.readAt === 'string' && !Number.isNaN(Date.parse(input.readAt))) record.readAt = input.readAt;
 
   const repairedOAuthEvents = record.events.filter(
     (event): event is AssistantMessageEventV1 => event.kind === 'assistant-message'
@@ -704,7 +720,29 @@ export function decodeTombstoneV1(value: unknown): TombstoneV1 {
   return result;
 }
 
+/**
+ * Sprint 134 (R3): when the chat's newest reply finished: an assistant message
+ * that completed or failed, or a failed turn. A reply the person stopped and a
+ * turn a restart ended are not replies.
+ */
+export function lastReplyAtOf(events: readonly ConversationEventV1[]): string | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.kind === 'assistant-message' && (event.terminalStatus === 'completed' || event.terminalStatus === 'failed')) return event.occurredAt;
+    if (event.kind === 'boundary' && event.boundaryKind === 'failed') return event.occurredAt;
+  }
+  return undefined;
+}
+
+/** Sprint 134 (R3): the newest reply came after the person last read the chat. No marker: read. */
+export function hasUnreadReply(summary: { readAt?: string; lastReplyAt?: string }): boolean {
+  return typeof summary.readAt === 'string' && typeof summary.lastReplyAt === 'string' && summary.lastReplyAt > summary.readAt;
+}
+
 export function summarizeConversationRecord(record: ConversationRecordV1, verifiedAt: string): ConversationSummaryV1 {
+  const lastReplyAt = lastReplyAtOf(record.events);
+  const firstMessage = record.events.find((event): event is UserMessageEventV1 => event.kind === 'user-message')?.text;
+  const titleIsFirstMessage = Boolean(firstMessage?.trim()) && record.title === fallbackTitleFromPrompt(firstMessage!);
   return {
     conversationId: record.conversationId,
     scopeId: record.scopeId,
@@ -718,5 +756,8 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
     runtimeSummary: [...record.runtimeSummary],
     integrity: 'verified',
     lastVerifiedAt: verifiedAt,
+    ...(record.readAt ? { readAt: record.readAt } : {}),
+    ...(lastReplyAt ? { lastReplyAt } : {}),
+    ...(titleIsFirstMessage ? { titleIsFirstMessage: true as const } : {}),
   };
 }

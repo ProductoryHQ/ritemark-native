@@ -30,6 +30,7 @@ import {
   nodeConversationStoreFileSystem,
   type ConversationStoreFileSystem,
 } from '../conversations/ConversationStore';
+import { ensureProjectSubfolder, isProjectFolderError } from '../projects/projectFolderGuard';
 import {
   CARD_FOLDER,
   CARD_STAGES,
@@ -248,7 +249,16 @@ export class BoardStore {
         { at, by: input.by, what: input.what ?? 'Created' },
       );
       const text = serializeCard(card);
-      await this.fs.mkdir(this.tasksDir);
+      // The project's folder must still be there: a recursive mkdir would
+      // bring back one that was deleted while it was open (Sprint 134, R13).
+      try {
+        await ensureProjectSubfolder(this.folderPath, this.tasksDir, { mkdir: (dir) => this.fs.mkdir(dir) });
+      } catch (error) {
+        if (isProjectFolderError(error)) {
+          throw new BoardStoreError('write-failed', `Couldn't save ${fileName}: ${messageOf(error)}`, error);
+        }
+        throw error;
+      }
       await this.write(fileName, text);
       this.entries.set(fileName, { fileName, hash: hashOf(text), parsed: { kind: 'card', card } });
       this.resolveIds();

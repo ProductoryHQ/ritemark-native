@@ -17,6 +17,8 @@ import {
   decodeConversationRecordV1,
   decodeTombstoneV1,
   summarizeConversationRecord,
+  lastReplyAtOf,
+  hasUnreadReply,
   type ConversationCheckpointV1,
   type ConversationCreateInputV1,
   type ConversationDeleteResultV1,
@@ -159,6 +161,9 @@ function decodeIndex(value: unknown): ConversationIndexV1 {
       runtimeSummary: [...runtimeSummary],
       integrity: entry.integrity,
       lastVerifiedAt: entry.lastVerifiedAt as string,
+      ...(typeof entry.readAt === 'string' ? { readAt: entry.readAt } : {}),
+      ...(typeof entry.lastReplyAt === 'string' ? { lastReplyAt: entry.lastReplyAt } : {}),
+      ...(entry.titleIsFirstMessage === true ? { titleIsFirstMessage: true as const } : {}),
     };
   });
   return {
@@ -301,6 +306,7 @@ export class ConversationStore {
         title: update.title ?? current.title,
         lifecycle: update.lifecycle ?? current.lifecycle,
         composerPreferences: update.composerPreferences ?? current.composerPreferences,
+        ...(update.readAt ? { readAt: update.readAt } : {}),
         events,
         runtimeSummary: runtimeSummaryFor({ events }),
         revision: current.revision + 1,
@@ -356,6 +362,32 @@ export class ConversationStore {
         lastActivityAt: current.lastActivityAt,
       });
 
+      await this.writeRecord(next);
+      await this.updateIndexBestEffort();
+      return next;
+    });
+  }
+
+  /**
+   * Sprint 134 (R3): the person had the chat in front on a shown sheet, so its
+   * replies so far are read. Reading is not activity: the chat keeps its place
+   * in the recent-chat rail. Writes nothing when nothing was unread.
+   */
+  markRead(conversationId: string, readAt: string): Promise<ConversationRecordV1 | null> {
+    return this.serialized(async () => {
+      await this.ensureInitialized();
+      assertConversationId(conversationId);
+      if (await this.readTombstone(conversationId)) return null;
+      const current = await this.readRecord(conversationId);
+      if (!current) return null;
+      const lastReplyAt = lastReplyAtOf(current.events);
+      if (!hasUnreadReply({ readAt: current.readAt, lastReplyAt })) return null;
+      const next = decodeConversationRecordV1({
+        ...current,
+        readAt,
+        revision: current.revision + 1,
+        lastActivityAt: current.lastActivityAt,
+      });
       await this.writeRecord(next);
       await this.updateIndexBestEffort();
       return next;

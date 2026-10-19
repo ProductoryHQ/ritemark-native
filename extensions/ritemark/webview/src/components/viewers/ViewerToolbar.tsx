@@ -4,9 +4,12 @@
  * Built from what a reader does. Reading and scrolling is nearly everything, so
  * the bar stays quiet: where you are (Page 3 of 28), how big it is (− Fit width ▾ +),
  * and, on the right, the one thing you leave the preview for (Open in Word ▾, with
- * Save as Markdown as its second action). Search is not a field on the bar: the
+ * Make an editable copy as its second action). Search is not a field on the bar: the
  * magnifier and Cmd/Ctrl+F open the same floating find bar as the Markdown editor.
  * The file name is not repeated: the tab and the breadcrumbs show it.
+ *
+ * Sprint 134 (R19): the PDF and Word bars end in Share, as the document's bar
+ * does (`comparison/after-pdf.png`, `after-word.png`); its items are `viewerShare.ts`'s.
  *
  * Every button is a shadcn Button with a tooltip; labels stay on one line. Under
  * 560 px the labels shorten to icons (with their tooltips) instead of wrapping.
@@ -17,6 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Icon, type PhosphorIconName as IconName } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { ZOOM_PRESETS, zoomLabel, type FitMode } from './viewerLayout'
+import { SHARE_LABEL, shareTooltip, type ShareMenuItem } from './viewerShare'
 
 const COMPACT_BELOW_PX = 560
 const CompactContext = createContext(false)
@@ -265,5 +269,47 @@ export function SplitButton({
         </>
       )}
     </div>
+  )
+}
+
+/** A short upright hairline between the bar's last action and Share, as drawn (the kit's docbar .sep). */
+export function ToolbarDivider() {
+  return <span className="mx-1 h-4 w-px shrink-0 bg-hairline" aria-hidden="true" data-toolbar-divider />
+}
+
+/**
+ * Share at the end of a PDF's or a Word file's bar (Sprint 134, R19): an outlined
+ * "Share" that opens its two items, each with what it is for. Share stays a word
+ * on a narrow bar: it is short, and the bar's other labels shorten first.
+ */
+export function ShareMenu({ items, onSelect }: { items: readonly ShareMenuItem[]; onSelect: (item: ShareMenuItem) => void }) {
+  return (
+    <DropdownMenu modal={false}>
+      <Tooltip label={shareTooltip(items)}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            // The document bar's Share (DocumentHeader): outlined, the accent's soft fill while open.
+            className="h-7 shrink-0 whitespace-nowrap rounded-md bg-surface px-2.5 font-ui text-[13px] font-medium text-ink-strong shadow-none data-[state=open]:border-transparent data-[state=open]:bg-accent-soft"
+            data-viewer-share
+          >
+            {SHARE_LABEL}
+          </Button>
+        </DropdownMenuTrigger>
+      </Tooltip>
+      <DropdownMenuContent align="end" className="min-w-[14rem]">
+        {items.map((item) => (
+          <DropdownMenuItem key={item.id} onSelect={() => onSelect(item)} className="items-start">
+            <Icon name={item.icon} size={14} tone="inherit" className="mt-0.5" />
+            <span className="flex min-w-0 flex-col">
+              <span className="whitespace-nowrap">{item.label}</span>
+              <span className="text-[12px] text-ink-muted">{item.description}</span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

@@ -22,8 +22,14 @@ Don't ask again; terminalEditorInput.ts), also from the bar's Close, which close
 Sprint 133: an empty desk offers the +'s first three as tiles, Text, Table and Web page, which run the +'s own
 commands in that desk (ritemarkEmptyDesk.ts, in the group's watermark; drawn by 018's stylesheet; R6). The tabs ask
 the resource label for the file's extension apart from its name, so 018's stylesheet mutes it (R13).
-Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9) and
-contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8); run with ./scripts/test.sh --grep Ritemark.
+Sprint 134: the Task board tab carries the Tasks place's count, read from the Tasks container's badge (the extension
+sets it), so the tab and the place never differ; its tooltip and accessible name say it in words, "Task board, 1 waits for
+you" (ritemarkFoldedTabs.ts, multiEditorTabsControl.ts; drawn by 018's stylesheet; R6).
+Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9),
+contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8) and test/browser/parts/editor/ritemarkTabCount.test.ts
+(Sprint 134, R6); run with ./scripts/test.sh --grep Ritemark.
+Sprint 134 also: the Task board tab's count (R6), and ritemark.newTab (File ▸ New tab, ⌘T / Ctrl+T) clicks the +
+of the desk in front (ritemarkNewTab.ts; R21).
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
@@ -345,7 +351,7 @@ index b0a44e2c23a..040e7ede5e1 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index b56047d66e1..50d712ae9ce 100644
+index b56047d66e1..9184503e6a5 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 @@ -44,7 +44,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
@@ -357,16 +363,17 @@ index b56047d66e1..50d712ae9ce 100644
  import { equals } from '../../../../base/common/objects.js';
  import { EditorActivation, IEditorOptions } from '../../../../platform/editor/common/editor.js';
  import { UNLOCK_GROUP_COMMAND_ID } from './editorCommands.js';
-@@ -58,6 +58,8 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
+@@ -58,6 +58,9 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
  import { IHostService } from '../../../services/host/browser/host.js';
  import { BugIndicatingError } from '../../../../base/common/errors.js';
  import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
 +import { createRitemarkNewTabButton } from './ritemarkNewTab.js';
-+import { RitemarkFoldedTabs } from './ritemarkFoldedTabs.js';
++import { RitemarkFoldedTabs, RITEMARK_TASKS_CONTAINER, ritemarkIsTaskBoard, ritemarkShowTabCount, ritemarkTabCountWords, ritemarkTasksCount } from './ritemarkFoldedTabs.js';
++import { IActivityService } from '../../../services/activity/common/activity.js';
  
  interface IEditorInputLabel {
  	readonly editor: EditorInput;
-@@ -87,6 +89,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
+@@ -87,6 +90,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
  	options?: IMultiEditorTabsControlLayoutOptions;
  }
  
@@ -379,26 +386,59 @@ index b56047d66e1..50d712ae9ce 100644
  export class MultiEditorTabsControl extends EditorTabsControl {
  
  	private static readonly SCROLLBAR_SIZES = {
-@@ -107,6 +115,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -107,6 +116,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  
  	private titleContainer: HTMLElement | undefined;
  	private tabsAndActionsContainer: HTMLElement | undefined;
 +	private ritemarkFoldedTabs: RitemarkFoldedTabs | undefined;
++	private ritemarkActivityService: IActivityService | undefined;
  	private tabsContainer: HTMLElement | undefined;
  	private tabsScrollbar: ScrollableElement | undefined;
  	private tabSizingFixedDisposables: DisposableStore | undefined;
-@@ -190,6 +199,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -190,6 +201,19 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		// Tabs Container listeners
  		this.registerTabsContainerListeners(this.tabsContainer, this.tabsScrollbar);
  
 +		// Ritemark 2.0: tabs that do not fit fold into "N ⌄" before the +, which asks what kind of new tab
 +		this.ritemarkFoldedTabs = this._register(this.instantiationService.createInstance(RitemarkFoldedTabs, this.tabsAndActionsContainer, this.groupView));
++		// Ritemark 2.0 (Sprint 134, R6): the Tasks tab carries the Tasks place's count, redrawn when it changes
++		this.ritemarkActivityService = this.instantiationService.invokeFunction(accessor => accessor.get(IActivityService)) as IActivityService | undefined;
++		if (this.ritemarkActivityService) { // absent in some test workbenches
++			this._register(this.ritemarkActivityService.onDidChangeActivity(changed => {
++				if ((typeof changed === 'string' ? changed : changed.id) === RITEMARK_TASKS_CONTAINER && this.tabsModel.getEditors(EditorsOrder.SEQUENTIAL).some(ritemarkIsTaskBoard)) {
++					this.redraw();
++				}
++			}));
++		}
 +		this._register(this.instantiationService.invokeFunction(accessor => createRitemarkNewTabButton(accessor, this.tabsAndActionsContainer!, () => this.groupsView.activateGroup(this.groupView))));
 +
  		// Create Editor Toolbar
  		this.createEditorActionsToolBar(this.tabsAndActionsContainer, ['editor-actions']);
  
-@@ -1654,6 +1667,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1632,8 +1656,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 			description = tabLabel.description || '';
+ 		}
+ 
++		// Ritemark 2.0 (Sprint 134, R6): the Task board tab shows what waits on you, in its tooltip and name too
++		const ritemarkCount = this.ritemarkActivityService && ritemarkIsTaskBoard(editor) ? ritemarkTasksCount(this.ritemarkActivityService) : 0;
++		ritemarkShowTabCount(tabContainer, ritemarkCount);
++
+ 		if (tabLabel.ariaLabel) {
+-			tabContainer.setAttribute('aria-label', tabLabel.ariaLabel);
++			tabContainer.setAttribute('aria-label', ritemarkCount > 0 ? ritemarkTabCountWords(tabLabel.ariaLabel, ritemarkCount) : tabLabel.ariaLabel);
+ 			// Set aria-description to empty string so that screen readers would not read the title as well
+ 			// More details https://github.com/microsoft/vscode/issues/95378
+ 			tabContainer.setAttribute('aria-description', '');
+@@ -1643,7 +1671,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 		tabLabelWidget.setResource(
+ 			{ name, description, resource: EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.BOTH }) },
+ 			{
+-				title: this.getHoverTitle(editor),
++				title: ritemarkCount > 0 ? ritemarkTabCountWords(tabLabel.name ?? editor.getName(), ritemarkCount) : this.getHoverTitle(editor),
+ 				extraClasses: coalesce(['tab-label', fileDecorationBadges ? 'tab-label-has-badge' : undefined].concat(editor.getLabelExtraClasses())),
+ 				italic: !this.tabsModel.isPinned(editor),
+ 				forceLabel,
+@@ -1654,6 +1682,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  				icon: editor.getIcon(),
  				hideIcon: options.showIcons === false,
  				namePrefix,
@@ -406,7 +446,7 @@ index b56047d66e1..50d712ae9ce 100644
  			}
  		);
  
-@@ -1798,12 +1812,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1798,12 +1827,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  			// the real height of the title area with wrapping.
  			height = this.tabsAndActionsContainer.offsetHeight;
  		} else {
@@ -486,7 +526,7 @@ index b56047d66e1..50d712ae9ce 100644
  	layout(dimensions: IEditorTitleControlDimensions, options?: IMultiEditorTabsControlLayoutOptions): Dimension {
  
  		// Remember dimensions that we get
-@@ -2014,6 +2094,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2014,6 +2109,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private doLayoutTabsNonWrapping(options?: IMultiEditorTabsControlLayoutOptions): void {
  		const [tabsContainer, tabsScrollbar] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar);
  
@@ -495,7 +535,7 @@ index b56047d66e1..50d712ae9ce 100644
  		//
  		// Synopsis
  		// - allTabsWidth:   			sum of all tab widths
-@@ -2049,7 +2131,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2049,7 +2146,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  					break;
  			}
  
@@ -504,7 +544,7 @@ index b56047d66e1..50d712ae9ce 100644
  		}
  
  		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
-@@ -2166,7 +2248,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2166,7 +2263,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	}
  
  	private get visible(): boolean {
@@ -571,10 +611,10 @@ index 00000000000..50de262ef4d
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts b/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts
 new file mode 100644
-index 00000000000..7ac893b5de7
+index 00000000000..ec6ccab036c
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkFoldedTabs.ts
-@@ -0,0 +1,214 @@
+@@ -0,0 +1,254 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -602,10 +642,50 @@ index 00000000000..7ac893b5de7
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { IActivityService, NumberBadge } from '../../../services/activity/common/activity.js';
 +import { EditorResourceAccessor, SideBySideEditor, Verbosity } from '../../../common/editor.js';
 +import { EditorInput } from '../../../common/editor/editorInput.js';
 +import { IEditorGroupView } from './editor.js';
 +import { ritemarkMenuButton, ritemarkShowMenuUnder } from './ritemarkNewTab.js';
++
++/** The Tasks place's view container: its badge is what waits on you, set by the extension (Sprint 134, R6). */
++export const RITEMARK_TASKS_CONTAINER = 'workbench.view.extension.ritemark-tasks';
++
++/** The extension's Task board tab. */
++export function ritemarkIsTaskBoard(editor: EditorInput): boolean {
++	const viewType = (editor as { viewType?: unknown }).viewType;
++	return typeof viewType === 'string' && viewType.endsWith('ritemark.taskBoard');
++}
++
++/** The Tasks place's count: the same number on the place and on the tab, so the two never differ. */
++export function ritemarkTasksCount(activityService: IActivityService): number {
++	for (const activity of activityService.getViewContainerActivities(RITEMARK_TASKS_CONTAINER)) {
++		if (activity.badge instanceof NumberBadge) {
++			return activity.badge.number;
++		}
++	}
++	return 0;
++}
++
++/** "Task board, 1 waits for you": the tab's tooltip and accessible name with the count in words. */
++export function ritemarkTabCountWords(base: string, count: number): string {
++	return count === 1
++		? localize('ritemark.tabCount.one', "{0}, 1 waits for you", base)
++		: localize('ritemark.tabCount.many', "{0}, {1} wait for you", base, count);
++}
++
++/** The count at the tab icon's lower right, as the places row draws it; up to "99+", nothing when nothing waits. */
++export function ritemarkShowTabCount(tab: HTMLElement, count: number): void {
++	let badge = tab.querySelector<HTMLElement>(':scope > .ritemark-tab-count');
++	if (count <= 0) {
++		badge?.remove();
++		return;
++	}
++	if (!badge) {
++		badge = append(tab, $('span.ritemark-tab-count', { 'aria-hidden': 'true' }));
++	}
++	badge.textContent = count > 99 ? '99+' : String(count);
++}
 +
 +function iconOf(editor: EditorInput): ThemeIcon {
 +	const resource = EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.PRIMARY });
@@ -791,10 +871,10 @@ index 00000000000..7ac893b5de7
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
 new file mode 100644
-index 00000000000..a0197538ea4
+index 00000000000..1a8c5074d84
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,186 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -807,7 +887,7 @@ index 00000000000..a0197538ea4
 + * Terminal. It sits outside the tabs container, whose children the tabs control maps to tab indexes.
 + */
 +
-+import { $, addDisposableListener, append, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, append, EventType, getActiveWindow, getWindow } from '../../../../base/browser/dom.js';
 +import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
 +import { AnchorAlignment } from '../../../../base/browser/ui/contextview/contextview.js';
 +import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -816,7 +896,7 @@ index 00000000000..a0197538ea4
 +import { DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
@@ -970,6 +1050,17 @@ index 00000000000..a0197538ea4
 +	getWindow(menu).setTimeout(() => items[0].focus(), 0);
 +	return disposables;
 +}
++
++/**
++ * Sprint 134 (R8): New tab, from the File menu and ⌘T (Ctrl+T), opens the front desk's + menu, as a click on its +
++ * does. The extension names it in the File menu and binds the keys.
++ */
++CommandsRegistry.registerCommand('ritemark.newTab', () => {
++	const document = getActiveWindow().document;
++	const plus = document.querySelector<HTMLElement>('.part.editor .editor-group-container.active .ritemark-new-tab')
++		?? document.querySelector<HTMLElement>('.part.editor .ritemark-new-tab');
++	plus?.click();
++});
 diff --git a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
 index 0ef439569e1..8909ed3d0cf 100644
 --- a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
@@ -1710,4 +1801,80 @@ index 00000000000..949c7891831
 +	});
 +
 +	ensureNoDisposablesAreLeakedInTestSuite();
++});
+diff --git a/src/vs/workbench/test/browser/parts/editor/ritemarkTabCount.test.ts b/src/vs/workbench/test/browser/parts/editor/ritemarkTabCount.test.ts
+new file mode 100644
+index 00000000000..79d6463bf76
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/editor/ritemarkTabCount.test.ts
+@@ -0,0 +1,70 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { $ } from '../../../../../base/browser/dom.js';
++import { Event } from '../../../../../base/common/event.js';
++import { Disposable } from '../../../../../base/common/lifecycle.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { RITEMARK_TASKS_CONTAINER, ritemarkIsTaskBoard, ritemarkShowTabCount, ritemarkTabCountWords, ritemarkTasksCount } from '../../../../browser/parts/editor/ritemarkFoldedTabs.js';
++import { IActivity, IActivityService, IconBadge, NumberBadge } from '../../../../services/activity/common/activity.js';
++import { Codicon } from '../../../../../base/common/codicons.js';
++import { EditorInput } from '../../../../common/editor/editorInput.js';
++
++/** Only what the count reads: the Tasks place's activities. */
++function activityService(activities: Record<string, IActivity[]>): IActivityService {
++	return {
++		_serviceBrand: undefined,
++		onDidChangeActivity: Event.None,
++		getViewContainerActivities: (id: string) => activities[id] ?? [],
++		showViewContainerActivity: () => Disposable.None,
++		showViewActivity: () => Disposable.None,
++		showAccountsActivity: () => Disposable.None,
++		showGlobalActivity: () => Disposable.None,
++		getActivity: () => [],
++	} as IActivityService;
++}
++
++/**
++ * Ritemark 2.0 (Sprint 134, R6): the Task board tab carries the Tasks place's count, drawn as the places row
++ * draws it, up to "99+", and says it in words in its tooltip and accessible name.
++ */
++suite('Ritemark Tasks tab count', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('the count is the Tasks place\'s number badge, nothing else', () => {
++		assert.strictEqual(ritemarkTasksCount(activityService({})), 0);
++		assert.strictEqual(ritemarkTasksCount(activityService({ [RITEMARK_TASKS_CONTAINER]: [{ badge: new NumberBadge(3, () => '3') }] })), 3);
++		assert.strictEqual(ritemarkTasksCount(activityService({ [RITEMARK_TASKS_CONTAINER]: [{ badge: new IconBadge(Codicon.sync, () => 'Syncing') }] })), 0);
++		assert.strictEqual(ritemarkTasksCount(activityService({ 'workbench.view.extension.other': [{ badge: new NumberBadge(5, () => '5') }] })), 0);
++	});
++
++	test('the badge shows the count up to 99+, and goes when nothing waits', () => {
++		const tab = $('div.tab');
++		ritemarkShowTabCount(tab, 0);
++		assert.strictEqual(tab.querySelector('.ritemark-tab-count'), null);
++		ritemarkShowTabCount(tab, 2);
++		assert.strictEqual(tab.querySelector('.ritemark-tab-count')?.textContent, '2');
++		assert.strictEqual(tab.querySelector('.ritemark-tab-count')?.getAttribute('aria-hidden'), 'true');
++		ritemarkShowTabCount(tab, 140);
++		assert.strictEqual(tab.querySelectorAll('.ritemark-tab-count').length, 1);
++		assert.strictEqual(tab.querySelector('.ritemark-tab-count')?.textContent, '99+');
++		ritemarkShowTabCount(tab, 0);
++		assert.strictEqual(tab.querySelector('.ritemark-tab-count'), null);
++	});
++
++	test('the words', () => {
++		assert.strictEqual(ritemarkTabCountWords('Task board', 1), 'Task board, 1 waits for you');
++		assert.strictEqual(ritemarkTabCountWords('Task board', 2), 'Task board, 2 wait for you');
++		assert.strictEqual(ritemarkTabCountWords('Task board', 140), 'Task board, 140 wait for you');
++	});
++
++	test('only the Task board tab', () => {
++		assert.strictEqual(ritemarkIsTaskBoard({ viewType: 'mainThreadWebview-ritemark.taskBoard' } as unknown as EditorInput), true);
++		assert.strictEqual(ritemarkIsTaskBoard({ viewType: 'mainThreadWebview-ritemark.home' } as unknown as EditorInput), false);
++		assert.strictEqual(ritemarkIsTaskBoard({} as EditorInput), false);
++	});
 +});

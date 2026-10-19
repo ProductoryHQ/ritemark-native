@@ -15,6 +15,8 @@ import { dictationModeFor } from './voiceDictation/whisperCpp';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
+import { ensureProjectSubfolder } from './projects/projectFolderGuard';
+import { addPointerLine, isAboutFile, needsNote, nodeAboutFileFs, readAboutState } from './projects/aboutFile';
 import { trackEvent } from './analytics/posthog';
 import { resolveInternalLinkTarget, isMarkdownFile } from './internalLinkResolver';
 import {
@@ -125,6 +127,17 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   /** Last word count reported by each Markdown panel (GH #378). */
   private static readonly _wordCounts = new Map<vscode.WebviewPanel, number>();
   private static _activeMarkdownPanel: vscode.WebviewPanel | null = null;
+
+  /**
+   * Sprint 134 (R8): File ▸ Share opens the Share menu of the document in front. False when no Ritemark document is
+   * in front (the menu item is greyed out then, by its enablement).
+   */
+  public static openShareMenu(): boolean {
+    const panel = RitemarkEditorProvider._activeMarkdownPanel;
+    if (!panel) return false;
+    void panel.webview.postMessage({ type: 'share:open' });
+    return true;
+  }
 
   /**
    * One status bar item serves the whole window, so it follows the active
@@ -434,6 +447,34 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     }
 
     return imageMappings;
+  }
+
+  /** The project folder whose About this project this document is, or undefined (Sprint 134, R8). */
+  private aboutFolderOf(document: vscode.TextDocument): string | undefined {
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder || document.uri.scheme !== 'file') return undefined;
+    return isAboutFile(folder.uri.fsPath, document.uri.fsPath) ? folder.uri.fsPath : undefined;
+  }
+
+  /** About this project shows its note while the project's own CLAUDE.md lacks `@AGENTS.md` (S44). */
+  private async postAboutNote(document: vscode.TextDocument, webview: vscode.Webview): Promise<void> {
+    const folder = this.aboutFolderOf(document);
+    if (!folder) return;
+    try {
+      const state = await readAboutState(nodeAboutFileFs(), folder);
+      if (needsNote(state)) void webview.postMessage({ type: 'about:note', show: true });
+    } catch (error) {
+      console.warn('[About this project] Could not read the project folder:', error);
+    }
+  }
+
+  private async addAboutLine(document: vscode.TextDocument, webview: vscode.Webview): Promise<void> {
+    const folder = this.aboutFolderOf(document);
+    if (!folder) return;
+    const result = await addPointerLine(nodeAboutFileFs(), folder);
+    // A CLAUDE.md that has gone needs no line; one that can't be written keeps the note to try again.
+    void webview.postMessage({ type: 'about:note', show: !result.ok && result.reason === 'not-writable' });
+    if (!result.ok) void vscode.window.showWarningMessage(result.message);
   }
 
   private async handleSearchWorkspaceFiles(
@@ -767,6 +808,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
         if (this.documentSync.handles(message)) {
           this.documentSync.handle(document, webview, message);
+          // Sprint 134 (R8): a synced document says it is ready here, not with 'ready'
+          if (message.type === 'document:ready') void this.postAboutNote(document, webview);
           return;
         }
 
@@ -812,6 +855,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // Comment status is reconstructed from the host ledger, not from
             // webview memory that a reload just threw away (audit F15).
             void RitemarkEditorProvider.publishCommentTasksFor(document);
+            void this.postAboutNote(document, webview);
+            return;
+
+          // Sprint 134 (R8): Add the line, on About this project's note
+          case 'about:addLine':
+            void this.addAboutLine(document, webview);
             return;
 
           case 'searchWorkspaceFiles':
@@ -1056,7 +1105,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               if (!workspaceRoot || !message.name) return;
               const flowsDir = path.join(workspaceRoot, '.ritemark', 'flows');
               try {
-                await fsp.mkdir(flowsDir, { recursive: true });
+                // Only while the project's folder is there (Sprint 134, R13).
+                await ensureProjectSubfolder(workspaceRoot, flowsDir);
                 const stem = String(message.name).replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
                 const flowPath = path.join(flowsDir, `${stem}.flow.json`);
                 if (!fs.existsSync(flowPath)) {
@@ -1294,6 +1344,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       const imagesDir = path.join(docDir, 'images');
       const rawBaseName = path.basename(filename, path.extname(filename));
 
+      // Only while the document's folder is there: a gone project folder is
+      // not brought back by a pasted image (Sprint 134, R13).
+      await ensureProjectSubfolder(docDir, imagesDir);
       const finalFilename = writeImageRelativeTo(
         imagesDir,
         `${rawBaseName}.${extension}`,
@@ -1366,8 +1419,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     webview: vscode.Webview
   ): Promise<void> {
     try {
-      const imagesDir = path.join(path.dirname(document.uri.fsPath), 'images');
-      await fsp.mkdir(imagesDir, { recursive: true });
+      const docDir = path.dirname(document.uri.fsPath);
+      const imagesDir = path.join(docDir, 'images');
+      // Only while the document's folder is there (Sprint 134, R13).
+      await ensureProjectSubfolder(docDir, imagesDir);
 
       const diagramPath = getUniqueDrawioPath(imagesDir);
       await fsp.writeFile(diagramPath, EMPTY_DRAWIO_SVG_TEMPLATE, 'utf-8');

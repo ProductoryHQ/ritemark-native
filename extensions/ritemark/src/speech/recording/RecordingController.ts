@@ -20,12 +20,14 @@
  */
 
 import * as path from 'path';
+import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { RecordingEvent, RecordingRequest } from './protocol';
 import {
   decideDestination,
   displayLocation,
   durationFromDataBytes,
   finalPathFor,
+  isInside,
   projectRecordingsDir,
   recordingBaseName,
   reserveRecordingPath,
@@ -199,7 +201,7 @@ export class RecordingController {
       let sink: WavRecordingSink;
       let finalPath: string;
       try {
-        await this.deps.fs.mkdirp(target.dir);
+        await this.makeDestination(target.dir);
         const reserved = await reserveRecordingPath(target.dir, recordingBaseName(this.deps.now()), (p) => this.deps.fs.exists(p));
         sink = await WavRecordingSink.create(this.deps.fs, reserved.partPath);
         finalPath = reserved.finalPath;
@@ -224,6 +226,20 @@ export class RecordingController {
     } finally {
       this.starting = false;
     }
+  }
+
+  /**
+   * A project's `recordings/` only while the project's folder is there: a
+   * recursive mkdir would bring back one that was deleted while it was open
+   * (Sprint 134, R13). A folder outside the projects is made as before.
+   */
+  private async makeDestination(dir: string): Promise<void> {
+    const project = this.deps.workspaceFolders().find((folder) => isInside(dir, folder.path));
+    if (project) {
+      await ensureProjectSubfolder(project.path, dir, { mkdir: (target) => this.deps.fs.mkdirp(target) });
+      return;
+    }
+    await this.deps.fs.mkdirp(dir);
   }
 
   private async resolveDestination(): Promise<{ dir: string; label: string } | null> {

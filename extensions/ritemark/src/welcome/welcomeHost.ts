@@ -90,6 +90,16 @@ export interface WelcomeAiSheet {
   openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void>;
 }
 
+/**
+ * Sprint 134: the project list the welcome's sheets read (R2, S54), once its
+ * first fill has run, and Home, where the landing arrives (R10).
+ */
+export interface WelcomeProjects {
+  ready: Promise<void>;
+  entries(): Promise<{ folderUri: string; lastOpenedAt: string; missingSince?: string }[]>;
+  revealHome(): Promise<void>;
+}
+
 // ── Before anything else in activate() ──────────────────────────────────────
 
 /**
@@ -134,11 +144,13 @@ export interface WelcomeHost {
   isOpen(): boolean;
 }
 
-export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet): WelcomeHost {
-  const controller = new WelcomeController(context, profileKind, aiSheet);
+export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet, projects?: WelcomeProjects): WelcomeHost {
+  const controller = new WelcomeController(context, profileKind, aiSheet, projects);
   context.subscriptions.push(
     controller,
     vscode.commands.registerCommand('ritemark.welcome.open', () => controller.open({ reason: 'command' })),
+    // Sprint 134 (S25): the projects list's Start a new project runs the welcome's own flow, with its place and Change…
+    vscode.commands.registerCommand('ritemark.welcome.newProject', () => controller.openNewProject()),
     vscode.window.registerWebviewPanelSerializer(WELCOME_VIEW_TYPE, {
       deserializeWebviewPanel: async (panel) => controller.adopt(panel),
     }),
@@ -151,6 +163,8 @@ type OpenReason = 'start' | 'command' | 'folder-gone';
 
 class WelcomeController implements vscode.Disposable {
   private panel: vscode.WebviewPanel | null = null;
+  private newProjectRequested = false;
+  private tabBefore: { label: string; viewColumn: vscode.ViewColumn } | null = null;
   private readonly disposables: vscode.Disposable[] = [];
   private panelDisposables: vscode.Disposable[] = [];
   private kind: WelcomeKind;
@@ -187,6 +201,7 @@ class WelcomeController implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly profileKind: ProfileKind,
     private readonly aiSheet: WelcomeAiSheet,
+    private readonly projectSource?: WelcomeProjects,
   ) {
     this.kind = welcomeKind(profileKind, context.globalState.get(WELCOME_FINISHED_KEY));
     const dispose = (fn: () => void) => ({ dispose: fn });
@@ -256,7 +271,13 @@ class WelcomeController implements vscode.Disposable {
   }
 
   private async land(record: LandingRecord): Promise<void> {
-    await vscode.commands.executeCommand('workbench.view.explorer');
+    // Sprint 134 (R10): the project's Home first, its projects list in the left column.
+    if (this.projectSource) {
+      await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+      await this.projectSource.revealHome();
+    } else {
+      await vscode.commands.executeCommand('workbench.view.explorer');
+    }
     const placeholder = landingPlaceholder(record.provider);
     if (record.provider && placeholder) {
       await this.aiSheet.openLandingChat(runtimeOfProvider(record.provider), placeholder);
@@ -268,11 +289,32 @@ class WelcomeController implements vscode.Disposable {
 
   // ── The panel ─────────────────────────────────────────────────────────────
 
+  /** Sprint 134 (S25): the sheet with Start a new project's form open. */
+  async openNewProject(): Promise<void> {
+    const wasOpen = this.panel !== null && this.panel !== undefined;
+    this.newProjectRequested = true;
+    // A fresh welcome the person never finished opens on its project step, where the form is, as Skip for now
+    // would take it: they asked to start a project, not to pick an AI (S25)
+    if (this.kind === 'fresh' && this.step === 1) {
+      this.step = afterSkip({ kind: this.kind, step: this.step, readyProvider: this.readyProvider }).step;
+      void this.refreshMissingTool();
+    }
+    await this.open({ reason: 'command' });
+    // A sheet already showing takes it now; a new one when its page says it is ready ('welcome/ready')
+    if (wasOpen) {
+      this.push();
+      this.newProjectRequested = false;
+    }
+  }
+
   async open(options: { reason: OpenReason }): Promise<void> {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.One, false);
       return;
     }
+    // Sprint 134 (R10): the tab the window had in front, for "Open when you left"
+    const before = vscode.window.tabGroups.activeTabGroup.activeTab;
+    this.tabBefore = before ? { label: before.label, viewColumn: before.group.viewColumn } : null;
     const panel = vscode.window.createWebviewPanel(
       WELCOME_VIEW_TYPE,
       'Welcome',
@@ -339,6 +381,26 @@ class WelcomeController implements vscode.Disposable {
     }
   }
 
+  /**
+   * Sprint 134 (R10): "Open when you left" restores the window's own tabs, with Home and Tasks added first: the
+   * tab that was in front comes back in front, not the Task board the permanent tabs opened last. Home when there
+   * was none.
+   */
+  private async revealTabBefore(): Promise<void> {
+    const before = this.tabBefore;
+    this.tabBefore = null;
+    const tab = before && vscode.window.tabGroups.all
+      .filter((group) => group.viewColumn === before.viewColumn)
+      .flatMap((group) => group.tabs)
+      .find((candidate) => candidate.label === before.label);
+    if (!tab) {
+      await this.projectSource?.revealHome();
+      return;
+    }
+    if (tab.group.viewColumn === vscode.ViewColumn.One) await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', tab.group.tabs.indexOf(tab));
+  }
+
   private closePanel(): void {
     if (!this.panel) return;
     this.closingQuietly = true;
@@ -379,7 +441,7 @@ class WelcomeController implements vscode.Disposable {
       projects: this.projects.map(({ uri: _uri, ...row }) => row),
       usageData: { on: usage.on, fromRitemark1: usage.fromRitemark1 },
       missingTool: this.missingTool,
-      newProject: { placePrefix: this.placePrefix(), error: this.newProjectError },
+      newProject: { placePrefix: this.placePrefix(), error: this.newProjectError, ...(this.newProjectRequested ? { open: true } : {}) },
       keysSet: this.keysSet,
       notice: this.notice,
       opening: this.opening,
@@ -487,6 +549,7 @@ class WelcomeController implements vscode.Disposable {
     switch (request.type) {
       case 'welcome/ready':
         this.push();
+        this.newProjectRequested = false;
         return;
       case 'welcome/sign-in':
         return request.provider === 'claude' ? this.signInClaude() : this.signInChatGpt();
@@ -815,6 +878,7 @@ class WelcomeController implements vscode.Disposable {
         void trackEvent('project_opened', { source: 'recent', has_ai: this.landingProvider() !== null });
       }
       this.closePanel();
+      await this.revealTabBefore();
       await vscode.commands.executeCommand('workbench.view.explorer');
       await vscode.commands.executeCommand('ritemark.unifiedView.focus');
       return;
@@ -870,12 +934,23 @@ class WelcomeController implements vscode.Disposable {
   private async refreshProjects(): Promise<void> {
     if (this.kind === 'fresh') return;
     try {
-      const recents = await vscode.commands.executeCommand<{ workspaces?: Array<{ folderUri?: vscode.Uri }> }>('_workbench.getRecentlyOpened');
-      const folders = (recents?.workspaces ?? [])
-        .map((workspace) => workspace.folderUri)
-        .filter((uri): uri is vscode.Uri => !!uri && uri.scheme === 'file')
-        .map((uri) => ({ fsPath: uri.fsPath, uri: uri.toString() }));
-      const lastOpen = await lastOpenTimes(this.context.globalStorageUri.fsPath);
+      // Sprint 134 (R2, S54): Ritemark's own project list, once its first fill has run; a project that is
+      // not found is left off. Without it (tests), VS Code's recent folders as in Sprint 133.
+      let folders: { fsPath: string; uri: string }[];
+      let lastOpen: Map<string, number>;
+      if (this.projectSource) {
+        await this.projectSource.ready;
+        const entries = (await this.projectSource.entries()).filter((entry) => !entry.missingSince);
+        folders = entries.map((entry) => ({ fsPath: vscode.Uri.parse(entry.folderUri).fsPath, uri: entry.folderUri }));
+        lastOpen = new Map(entries.map((entry) => [entry.folderUri, Date.parse(entry.lastOpenedAt)]));
+      } else {
+        const recents = await vscode.commands.executeCommand<{ workspaces?: Array<{ folderUri?: vscode.Uri }> }>('_workbench.getRecentlyOpened');
+        folders = (recents?.workspaces ?? [])
+          .map((workspace) => workspace.folderUri)
+          .filter((uri): uri is vscode.Uri => !!uri && uri.scheme === 'file')
+          .map((uri) => ({ fsPath: uri.fsPath, uri: uri.toString() }));
+        lastOpen = await lastOpenTimes(this.context.globalStorageUri.fsPath);
+      }
       this.projects = projectRows({
         recents: folders,
         currentFolder: vscode.workspace.workspaceFolders?.[0]?.uri.toString(),

@@ -17,7 +17,7 @@ import { createHash, randomUUID } from 'crypto';
 import { nodeConversationStoreFileSystem, type ConversationStoreFileSystem } from '../conversations/ConversationStore';
 import type { AgentId } from '../agent/types';
 import type { CardTurnKind } from './boardPrompt';
-import type { HandoffState, NeedsKind, WaitReason } from './protocol';
+import type { CardHandoffView, HandoffState, NeedsKind, WaitReason } from './protocol';
 
 export interface CardHandoffRecordV1 {
   schemaVersion: 1;
@@ -59,7 +59,8 @@ export function cardTaskStoreDir(globalStoragePath: string, folderPath: string):
   return path.join(globalStoragePath, 'task-board', 'v1', projectKey(folderPath));
 }
 
-function decode(value: unknown): CardHandoffRecordV1 | null {
+/** One hand-off record, or null when it doesn't decode. Reads only. */
+export function decodeCardHandoffRecord(value: unknown): CardHandoffRecordV1 | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Partial<CardHandoffRecordV1>;
   if (record.schemaVersion !== 1) return null;
@@ -69,6 +70,20 @@ function decode(value: unknown): CardHandoffRecordV1 | null {
   if (typeof record.state !== 'string' || !STATES.has(record.state)) return null;
   if (typeof record.since !== 'string') return null;
   return record as CardHandoffRecordV1;
+}
+
+/** What the board sees of a hand-off record (also read for other projects, Sprint 134). */
+export function handoffViewOf(record: CardHandoffRecordV1): CardHandoffView {
+  return {
+    state: record.state,
+    runtimeId: record.runtimeId,
+    since: record.since,
+    ...(record.needs ? { needs: record.needs } : {}),
+    ...(record.waitFor ? { waitFor: record.waitFor } : {}),
+    ...(record.failure ? { failure: record.failure } : {}),
+    canOpen: Boolean(record.conversationId) && record.state !== 'conversation-gone',
+    ...(record.conversationTitle ? { conversationTitle: record.conversationTitle } : {}),
+  };
 }
 
 export class CardTaskStore {
@@ -97,7 +112,7 @@ export class CardTaskStore {
           if (!name.endsWith('.json') || name.includes('.tmp-')) continue;
           const file = path.join(this.baseDir, name);
           try {
-            const record = decode(JSON.parse(await this.fs.readFile(file)));
+            const record = decodeCardHandoffRecord(JSON.parse(await this.fs.readFile(file)));
             if (record) this.records.set(record.cardId, record);
             else await this.fs.rename(file, `${file}.unreadable`);
           } catch {

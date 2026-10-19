@@ -32,7 +32,7 @@ export const ALIAS_TO_AGENT_ID: Record<CommentAgentAlias, string> = {
  */
 export const ALIAS_LABEL: Record<CommentAgentAlias, string> = {
   claude: 'Claude',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   opencode: 'OpenCode',
 }
 

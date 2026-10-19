@@ -40,6 +40,8 @@ export interface ConversationControllerDependencies {
   emit?: (event: ConversationHostEvent) => void;
   /** A turn in this conversation is active in this host (see `TurnOwners`). */
   onTurnActive?: (conversationId: string) => void;
+  /** Sprint 134 (R3): the chat is in front on a shown AI sheet in this window, so a reply is read at once. */
+  isInFront?: (conversationId: string) => boolean;
   rolloutMode?: () => Promise<ConversationRolloutMode>;
   markHostAuthority?: () => Promise<void>;
   migrator?: LegacyConversationMigrator;
@@ -528,12 +530,22 @@ export class ConversationController {
           : input.status !== 'completed' && currentDescriptor
             ? { runtimeId: input.runtimeId, descriptor: null }
             : undefined;
+        // Sprint 134 (R3): a reply in front on a shown sheet is read at once. Otherwise it is
+        // unread: a chat with no marker yet gets one from just before this turn began.
+        let readAt: string | undefined;
+        if (this.dependencies.isInFront?.(input.conversationId)) {
+          readAt = occurredAt;
+        } else if (input.status !== 'cancelled' && !current.readAt) {
+          const began = activeUser?.occurredAt ?? occurredAt;
+          readAt = began < occurredAt ? began : new Date(Date.parse(occurredAt) - 1).toISOString();
+        }
         return {
           lifecycle: input.status === 'completed'
             ? { state: 'idle' as const }
             : { state: 'interrupted' as const, turnId, reason: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const },
           appendEvents,
           ...(continuationUpdate ? { continuationUpdate } : {}),
+          ...(readAt ? { readAt } : {}),
         };
       },
     );
@@ -648,6 +660,16 @@ export class ConversationController {
    * (this window runs them), never one with a live runtime session here, and
    * never a turn that started after the list was read.
    */
+  /**
+   * Sprint 134 (R3): the person has the chat in front on a shown sheet. Its
+   * replies so far are read; nothing is written when none was unread.
+   */
+  async markRead(conversationId: string): Promise<void> {
+    if (this.disposed) return;
+    const record = await this.dependencies.store.markRead(conversationId, this.now().toISOString());
+    if (record) this.emitChanged(record);
+  }
+
   async interruptTurnsLeftByRestart(isLive: (conversationId: string) => boolean): Promise<string[]> {
     if (this.disposed) return [];
     const interrupted: string[] = [];

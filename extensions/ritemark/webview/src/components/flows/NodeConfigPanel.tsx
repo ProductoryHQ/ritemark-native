@@ -960,7 +960,7 @@ function CodexNodeConfig({ nodeId, data, onUpdate }: CodexNodeConfigProps) {
 
       <Field
         label="Model"
-        description="Select the Codex model to use."
+        description="Select the ChatGPT model to use."
       >
         <Select
           value={getCodexModelSelectValue(data.model)}

@@ -155,16 +155,24 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
         case 'ready': {
-          const app = await this.resolveExternalApp();
-          webviewPanel.webview.postMessage({ type: 'openStatus', openLabel: app.label });
+          await this.postOpenStatus(webviewPanel.webview);
           await this.sendDocument(document, webviewPanel.webview);
           break;
         }
+        // Sprint 134 (R19): the viewer asks once it is drawn. The answer to
+        // `ready` comes before `load`, when only the waiting page is listening.
+        case 'getOpenStatus':
+          await this.postOpenStatus(webviewPanel.webview);
+          break;
         case 'refresh':
           await this.handleRefresh(document, webviewPanel.webview);
           break;
         case 'openInExternalApp':
           await this.openExternally(document.uri.fsPath);
+          break;
+        // Sprint 134 (R19): Share's Show in Finder (Show in File Explorer on Windows).
+        case 'revealInOS':
+          await vscode.commands.executeCommand('revealFileInOS', document.uri);
           break;
         case 'openLink':
           // Sprint 125 R7: a link on a slide. Only web links leave the preview, and
@@ -196,6 +204,12 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
         this.fileChangeDebounceTimers.delete(filePath);
       }
     });
+  }
+
+  /** Which app Open sends the file to, and the system, which names Finder or File Explorer. */
+  private async postOpenStatus(webview: vscode.Webview): Promise<void> {
+    const app = await this.resolveExternalApp();
+    webview.postMessage({ type: 'openStatus', openLabel: app.label, platform: getCurrentPlatform() });
   }
 
   private async sendDocument(document: OfficeDocument, webview: vscode.Webview): Promise<void> {

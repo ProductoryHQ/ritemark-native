@@ -74,6 +74,7 @@ const MEASURE = `(() => {
 		projectHead: box(document.querySelector('.part.sidebar .ritemark-project-head')),
 		projectRows: all('.part.sidebar > .ritemark-project-rows .ritemark-project-row').map(box),
 		documentsLabel: box(document.querySelector('.part.sidebar > .ritemark-project-rows .ritemark-project-group')),
+		activePlace: document.querySelector('.part.sidebar > .header-or-footer .composite-bar .action-item.checked .action-label')?.getAttribute('aria-label') ?? null,
 		treeRows: all('.part.sidebar .explorer-folders-view .monaco-list-row').map(box).filter(Boolean),
 	};
 })()`;
@@ -197,7 +198,23 @@ if (m.projectRows.length === 2 && m.documentsLabel) {
 	check('R10 Documents at 214', near(m.documentsLabel.y, 214), round(m.documentsLabel.y), 214);
 	check('R10 the tree from 236', m.treeRows[0] ? near(m.treeRows[0].y, 236) : null, round(m.treeRows[0]?.y), 236);
 	check('R10 the project\'s name centred at 110 (92 + 36 / 2)', m.projectHead ? near(m.projectHead.cy, 110) : null, round(m.projectHead?.cy), 110);
+	// Sprint 134 (Jarmo, 19 October): the head's box is as wide as the rows under it, 8 to 248
+	check('R10 the head\'s box spans the column, 8 to 248', m.projectHead ? near(m.projectHead.x, 8) && near(m.projectHead.right, 248) : null, m.projectHead ? `${round(m.projectHead.x)} to ${round(m.projectHead.right)}` : null, '8 to 248');
 }
+// Sprint 134 R16: the head on Tasks, Browser and Transcribe has Documents' numbers: the name centred at 110, its rows
+// at 136 and 168 (Tasks: New task, Search; Browser: New page; Transcribe: Record, Transcribe a file…).
+if (!m.documentsLabel && m.projectHead && /^(Tasks|Browser|Transcribe)\b/.test(m.activePlace ?? '')) {
+	const place = m.activePlace.split(/[ (]/)[0];
+	check(`R16 ${place}: the project's name centred at 110`, near(m.projectHead.cy, 110), round(m.projectHead.cy), 110);
+	check(`R16 ${place}: the first row at 136`, m.projectRows[0] ? near(m.projectRows[0].y, 136) : null, round(m.projectRows[0]?.y), 136);
+	if (place !== 'Browser') {
+		check(`R16 ${place}: the second row at 168`, m.projectRows[1] ? near(m.projectRows[1].y, 168) : null, round(m.projectRows[1]?.y), 168);
+	}
+	for (const [index, row] of m.projectRows.entries()) {
+		check(`R16 ${place}: row ${index + 1} is 32 high`, near(row.h, 32), round(row.h), 32);
+	}
+}
+
 for (const [index, row] of m.treeRows.slice(0, 3).entries()) {
 	check(`R1 tree row ${index + 1} is 32 high`, near(row.h, 32), round(row.h), 32);
 }

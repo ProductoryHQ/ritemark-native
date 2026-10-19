@@ -37,7 +37,7 @@ export function EnvironmentStatusNotice({
           )}
           {environmentStatus.recommendedAction === 'install-node' && (
             <div className="mt-2 text-xs opacity-80">
-              Claude or Codex installed with npm runs on Node.js. Install Node.js and reload Ritemark, or switch Runtime preference to Bundled in Settings.
+              Claude or ChatGPT installed with npm needs Node.js. Install Node.js and reload Ritemark. Or switch Runtime preference to Bundled in Settings.
             </div>
           )}
           {environmentStatus.recommendedAction === 'reload' && (

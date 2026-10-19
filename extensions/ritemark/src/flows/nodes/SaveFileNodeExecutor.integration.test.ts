@@ -276,6 +276,27 @@ async function runTests() {
     assertTrue(result.path.includes('test.md'), 'Path should include filename');
   });
 
+  // Sprint 134 (R13): a run never brings back a project folder that has gone.
+  await test('should refuse, and make nothing, when the project folder is gone', async () => {
+    const project = path.join(tempDir, 'Notes');
+    const node = createTestNode({
+      filename: 'digest.md',
+      folder: 'reports/weekly',
+    });
+    const context = createTestContext(project, 'Content');
+
+    let refused = '';
+    try {
+      await executeSaveFileNode(node, context);
+    } catch (error) {
+      refused = error instanceof Error ? error.message : String(error);
+    }
+
+    assertTrue(/is not where it was/.test(refused), `Should refuse in words, got "${refused}"`);
+    assertEqual(fs.existsSync(project), false, 'The gone project folder should not come back');
+    assertEqual(fs.readdirSync(tempDir).length, 0, 'Nothing should be made');
+  });
+
   // Summary
   console.log('\n' + '─'.repeat(40));
   console.log(`\nResults: ${passed} passed, ${failed} failed`);

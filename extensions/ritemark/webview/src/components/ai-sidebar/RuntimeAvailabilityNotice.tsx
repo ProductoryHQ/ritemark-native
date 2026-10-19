@@ -126,7 +126,7 @@ export function RuntimeAvailabilityNotice({
         onAction: startCodexLogin,
       };
     } else if (availability.state === 'broken') {
-      recoveryAction = { label: 'Repair Codex', icon: 'wrench', onAction: repairCodex };
+      recoveryAction = { label: 'Repair ChatGPT', icon: 'wrench', onAction: repairCodex };
     } else if (availability.state === 'disabled' || availability.state === 'needs-configuration') {
       recoveryAction = { label: 'Open AI Settings', icon: 'gear', onAction: openAgentSettings };
     }

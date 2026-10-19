@@ -3,11 +3,20 @@
  *
  * CRUD operations for .flow.json files in the workspace.
  * Flows are stored in .ritemark/flows/ directory at workspace root.
+ *
+ * Listing creates nothing (Sprint 134, R13): the scheduler lists flows at
+ * start and every 30 s, so a listing that made `.ritemark/flows` gave every
+ * project an empty one and brought back a project folder that was deleted
+ * while it was open. Only a save makes the folder, and only while the
+ * project's folder is there (`ensureProjectSubfolder`).
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import type { Flow } from './types';
+
+const FLOWS_FOLDER = '.ritemark/flows';
 
 /**
  * Sanitize a string for use in a filename
@@ -28,31 +37,35 @@ function shortId(): string {
 }
 
 export class FlowStorage {
+  private readonly projectRoot: string;
   private flowsDir: string;
 
   constructor(workspacePath: string) {
-    this.flowsDir = path.join(workspacePath, '.ritemark', 'flows');
+    this.projectRoot = workspacePath;
+    this.flowsDir = path.join(workspacePath, ...FLOWS_FOLDER.split('/'));
   }
 
   /**
-   * Ensure .ritemark/flows directory exists
+   * Make .ritemark/flows for a save. Refuses, and makes nothing, when the
+   * project's folder itself is not there (R13).
    */
   async ensureFlowsDirectory(): Promise<void> {
-    try {
-      await fs.access(this.flowsDir);
-    } catch {
-      await fs.mkdir(this.flowsDir, { recursive: true });
-    }
+    await ensureProjectSubfolder(this.projectRoot, FLOWS_FOLDER);
   }
 
   /**
-   * List all flows
+   * List all flows. Creates nothing: no .ritemark/flows means no flows.
    */
   async listFlows(): Promise<Flow[]> {
-    await this.ensureFlowsDirectory();
-
     try {
-      const files = await fs.readdir(this.flowsDir);
+      let files: string[];
+      try {
+        files = await fs.readdir(this.flowsDir);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return [];
+        throw err;
+      }
       const flowFiles = files.filter((f) => f.endsWith('.flow.json'));
 
       const flows: Flow[] = [];

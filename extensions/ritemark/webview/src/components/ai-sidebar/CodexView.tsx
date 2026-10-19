@@ -164,7 +164,7 @@ export function CodexTurn({
     && rawPlanText.trim() === turn.streamingText.trim();
 
   // OpenCode reuses this Codex turn shape/rendering — label by provenance.
-  const runtimeLabel = turn.runtime === 'opencode' ? 'OpenCode' : 'Codex';
+  const runtimeLabel = turn.runtime === 'opencode' ? 'OpenCode' : 'ChatGPT';
 
   return (
     <div className="space-y-2">
@@ -218,7 +218,7 @@ export function CodexTurn({
 
       {needsPlanReview && (
         <PlanReviewCard
-          title="Codex is waiting for plan review"
+          title="ChatGPT is waiting for you to review its plan"
           planText={rawPlanText}
           approveLabel="Approve & continue"
           rejectLabel="Keep planning"
@@ -274,7 +274,7 @@ function PlanCard({
 }) {
   return (
     <div className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
-      <div className="mb-2 text-[11px] font-medium text-[var(--r-ink-muted)]">Codex plan</div>
+      <div className="mb-2 text-[11px] font-medium text-[var(--r-ink-muted)]">ChatGPT's plan</div>
       {explanation && (
         <p className="text-[12px] opacity-85 mb-2 whitespace-pre-wrap">{explanation}</p>
       )}
@@ -488,7 +488,7 @@ export function CompatibilityNotice({
         <button
           onClick={onDismiss}
           className="rounded-md p-1 text-[var(--r-ink-muted)] opacity-70 transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] hover:opacity-100"
-          aria-label="Dismiss Codex compatibility notice"
+          aria-label="Dismiss this notice about ChatGPT"
           title="Dismiss"
         >
           <Icon name="x" size={12} />

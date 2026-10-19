@@ -6,7 +6,7 @@ Ritemark 2.0's third step makes the project the place a person works in. Each pr
 
 Refreshed on 18 October 2026 with what Sprint 132 handed to step 3 (R16–R19, and changes to R2, R8 and R13), and with the gaps the [v1.14 parity list](../parity-v1.14.md) gives this step.
 
-Updated on 19 October 2026 with Jarmo's decisions of that day (R20–R24) and the Experience lead's answers to the refresh's design questions (R16, R19).
+Updated on 19 October 2026 with Jarmo's decisions of that day (R20–R24) and the Experience lead's answers to the refresh's design questions (R16, R19), and at the plan's approval the same day with Jarmo's answers to its open questions (R3: unread replies count).
 
 ## Principles
 
@@ -38,7 +38,10 @@ As a writer with several projects, I want them all listed, from the first day of
 
 Acceptance criteria:
 - Ritemark keeps its own list of projects on this computer. A folder is added whenever a window opens it.
-- On the first start of this build, the list is filled once from what is already on the computer: VS Code's recent folders, every project that has chats in Ritemark's chat store, and every project that has a task board record (decided by engineering, 17 October).
+- On the first start of this build, the list is filled once from what is already on the computer: VS Code's recent folders, every project that has chats in Ritemark's chat store, and every task board in those folders (decided by engineering, 17 October; the [first-fill audit](research/first-fill-audit.md)):
+  - a board's records on this computer name no folder, so a board in a folder neither source knows joins the list when it is next opened;
+  - only folders that are there at the time are added. A recent folder that has since gone is not known to be a project, and adding it would open 2.0 with rows marked Not found;
+  - single folders only, on this computer or a network share. Workspace files (`.code-workspace`) and remote folders are left out.
 - A project whose folder is not found (moved, renamed, deleted, or on a drive that is not connected) stays in the list, shown as Not found (R13), with Find it… and Remove from the list. It is never dropped silently. Folders are checked when Home shows and when the window gains focus.
 - Remove from the list removes it from the list only; its folder, chats and board are untouched.
 - The list is ordered by when each project was last open, the open project first.
@@ -52,8 +55,15 @@ As a writer, I want to see what needs me, here and in my other projects.
 
 Acceptance criteria:
 - For each project, what waits is the sum of:
-  - chats that need the person: a question or an approval waiting in a chat of that project (from the chat store);
+  - chats that need the person (from the chat store; Jarmo, 19 October):
+    - a question or an approval the AI is waiting on in a chat of that project;
+    - a reply the person has not read: the AI finished it after the person last had that chat in front on the AI's sheet;
   - tasks that wait on the person: the board's Your calls (from that project's board).
+- A reply is read once its chat is in front on the AI's sheet while the sheet is shown. A reply that finishes while its chat is in front and shown is read at once.
+- A chat that a card runs in is counted through the card's call only, never twice.
+- A question or an approval counts only while a window holds its chat, so a crash leaves no count behind. An unread reply counts until it is read, after a restart too.
+- Chats from before this build count as read, so the first 2.0 start shows no backlog.
+- The chat store has no read marker today. It gains one, kept in the record and in its index, so another project's unread replies are counted without opening that project.
 - The project's total shows in the projects list, in the switcher and in Home's Waiting for you. The board's part of it is the number the Tasks place shows today, and the Tasks tab shows the same (R6).
 - A task counts exactly as the board counts it today (its four kinds of call: needs you, a decision, a review, failed), from the same rules, including what only this computer's hand-off records know.
 - Other projects' counts are read without opening them: from their card files, this computer's hand-off records and the chat store.
@@ -70,7 +80,7 @@ Acceptance criteria:
   - the project's mark and name, not the word Home;
   - the folder it works in, as one muted line, which opens Documents when clicked;
   - the project's line, which the person can edit in place;
-  - **Waiting for you**, with its count, listing what waits (a card's call or a chat's question), each opening where it waits;
+  - **Waiting for you**, with its count, listing what waits (a card's call, a chat's question or approval, or a chat's reply not yet read), each opening where it waits;
   - one line for what waits in the other projects, which are counted in the list;
   - **Start something in <project>**: Text, Table and Web page, as the + offers, on every Home, under Waiting for you and above Last changed (experience 2, frame 4; experience 29, frame 1; the Experience lead, 18 October);
   - **Last changed in <project>**: the documents changed last, each with its folder and when, each opening the document.
@@ -98,7 +108,7 @@ As a writer, I want the Tasks tab to tell me something waits (Jarmo, 16 October)
 Acceptance criteria:
 - The Tasks tab shows the same count as the Tasks place (the board's calls), drawn the same way at the icon's lower right, up to "99+".
 - No count shows when nothing waits.
-- The tab's tooltip and accessible name say the count in words ("Tasks, 1 waits for you").
+- The tab's tooltip and accessible name say the count in words, after the tab's own name ("Task board, 1 waits for you"; QA, 19 October: the tab is named Task board everywhere).
 
 ### R7: On Home, the left column holds the projects
 
@@ -130,13 +140,16 @@ Acceptance criteria:
 - When the folder has its own `CLAUDE.md` without `@AGENTS.md`, About this project shows one line at the top of the page, in body ink with an info icon: "Claude reads this project's CLAUDE.md. Add one line to it so Claude reads this page too." The buttons are Add the line (primary) and Not now (Experience lead, 18 October):
   - Add the line writes `@AGENTS.md` as `CLAUDE.md`'s first line and changes nothing else, then the note goes;
   - Not now leaves the note on this page only, and Ritemark doesn't ask anywhere else.
-- Ritemark shows the file as "About this project" everywhere, never as `AGENTS.md`: the menu, its tab, Documents and Home's Last changed (Jarmo, 18 October). The tab and the Documents row read "About this project" with the book-open icon, and the tooltip reads "AGENTS.md, read by Claude and ChatGPT". It is the one file shown by its plain name (Experience lead, 18 October). How each place draws the name is audited first (technical plan, Phase 1).
-- Documents hides only a `CLAUDE.md` that Ritemark wrote and that holds nothing but the pointer. A `CLAUDE.md` with the person's own words stays visible as it is, extension and all (Experience lead, 18 October).
+- Ritemark shows the file as "About this project" everywhere, never as `AGENTS.md`: the menu, its tab, Documents and Home's Last changed (Jarmo, 18 October). The tab and the Documents row read "About this project" with the book-open icon, and the tooltip reads "AGENTS.md, read by Claude and ChatGPT". It is the one file shown by its plain name (Experience lead, 18 October). Per the [about-file audit](research/about-file-audit.md):
+  - only the project root's `AGENTS.md` is About this project. An `AGENTS.md` in a subfolder keeps its name, though it shares the book-open icon, as README files do. Matching ignores case, as the Mac's and Windows' file systems do;
+  - "everywhere" is the menu, the tab (with the folded tabs' list, Quick Open and the window's title), Documents, Home's Last changed, and the AI sheet's Active chip and Context line. Search, Source Control, the AI's activity and changed-file lists, and the file names Share suggests keep `AGENTS.md`;
+  - in a folder under Git, the tooltip carries Git's status after it ("… • Untracked").
+- Documents hides only the root's `CLAUDE.md` whose whole content is `@AGENTS.md` (surrounding whitespace, line endings and a byte-order mark ignored), and only while the root has an `AGENTS.md`. Home's Last changed leaves it out too. Search, Quick Open and Source Control show it as it is. A `CLAUDE.md` with the person's own words stays visible as it is, extension and all (Experience lead, 18 October; the about-file audit).
 - New and Search keep Sprint 132's behaviour.
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
 - The File menu gains three items, where experiences/windows frame 2 draws them:
   - New tab (⌘T, Ctrl+T on Windows), which opens the +'s menu;
-  - Switch project, which opens the switcher;
+  - Switch project, which shows Home with the projects list, its search ready for typing. A native menu can't hold the switcher's list, which changes as projects come and go ([confirmations](research/confirmations.md) §1);
   - Share, which opens the Share menu of the document in front (R12), and is greyed out when none is.
   This holds for Windows' menu button and for the Mac's menu bar. Sprint 132 left New tab and Switch project for this step (its technical plan, W3).
 
@@ -149,10 +162,12 @@ Acceptance criteria:
 - While it reloads, the window shows the ground's colour, in Light and in Dark, not a dark block.
 - The next project opens on its Home, and keeps its own tabs: coming back to a project brings its tabs back as they were.
 - Any switch that reloads the window (Home's list, the project's menu, Open a folder…) while a chat in this window is working (a card's turn runs in a chat too) asks first, in experience 31's dialog, 440 wide (experience 33, frame 3):
-  - title: "Claude is still working in <project>" (the AI's name as it is);
+  - title: "Claude is still working in <project>" (the AI's name as it is; with chats of two AIs working, both names: "Claude and ChatGPT are still working in <project>");
   - detail: "Switching projects stops it. Open <other> in a new window to let Claude finish.";
   - buttons: Cancel, Switch and stop, and Open in a new window as the default.
   Open in a new window opens the other project in a new window and leaves this one as it is; Switch and stop stops the chat as Stop would, then switches; Cancel does nothing. With nothing working, switching never asks.
+- "Working" means a turn is running in a chat of this window, or waits on the person's answer, a card's turn included. A card waiting for room and a prompt queued behind a finished turn are not working ([switch audit](research/switch-audit.md)).
+- VS Code's own ways of opening a folder ask too: File ▸ Open Recent, File ▸ Open Folder…, a folder dropped on the Dock icon, and File ▸ Close Folder. Where Ritemark can't know the folder about to open (all but Open Recent), the dialog has Cancel and Switch and stop, with Cancel as the default (switch audit, 19 October). If Ritemark doesn't answer within 10 seconds, the switch goes on as today, so the window is never stuck.
 - After a switch, Home's note says "Switched to <project>. <other> is kept as you left it." with Go back, which switches back (experience 3, frame 3; experience 33).
 - Open in a new window, and ⌥ click, open the project in a new window instead and leave this one as it is.
 
@@ -200,6 +215,8 @@ Acceptance criteria:
 - A project with no task board yet: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and its tab has no count; no board file is written until the person adds a card.
 - With the `task-board` flag off: no Tasks tab, no task counts; chats still count.
 - Nothing in Ritemark brings back a project folder that has gone. Today Flows' storage does: it creates `.ritemark/flows` with every missing parent, so a deleted project folder comes back empty (`FlowStorage.ts:44`; Sprint 133's QA, open findings). A folder that is not found stays not found until the person finds it or removes it from the list.
+  - Flows' storage creates nothing when it only lists flows. Today the flow scheduler lists them at start and every 30 seconds, so every project gains an empty `.ritemark/flows/` the moment it opens, and a deleted one comes back within 30 seconds ([confirmations](research/confirmations.md) §7).
+  - Everything that creates a folder under a project (a new card's `.ritemark/tasks/`, a saved flow, an export, a transcript) first checks that the project's folder is still there.
 
 ### R14: Nothing v1.14.0 does is lost
 
@@ -240,9 +257,9 @@ Acceptance criteria:
 - Each place's own content stays under the head. Only the rows its drawing gives are added:
   - Tasks: New task and Search (experience 6, frame 1; R17);
   - Transcribe: Record and Transcribe a file… (experience 20, frames 2 and 3). They are today's Record and Add recording, with the same actions. The library follows under the column's group labels, with "Recordings" in place of "Library";
-  - Browser: no rows; the Recent label and its actions (R18).
+  - Browser: New page (R18; the Experience lead, 19 October).
 - An action that the place's title row carries today keeps a home:
-  - Browser's New browser tab and Clear history go to the Recent label (R18);
+  - Browser's New browser tab becomes the head's New page row, and Clear history goes to the right of the Recent label (R18);
   - Transcribe's settings button, which opens Settings at the transcription card, becomes a small icon button at the right of the "Recordings" group label, under the project's head (the Experience lead, 19 October). It is the gear, with the tooltip "Transcribe settings", in the column's icon-button style beside the 11-caps label. It is the same pattern as Browser's + and Clear at the right of "Recent".
 - The head's row words and their commands come from the extension, as Documents' and Agents' do, so an extension release can change them.
 - With no folder open, each place keeps its plain name, as Sprint 132 left it.
@@ -262,16 +279,18 @@ Acceptance criteria:
   - Done, folded, with today's Archived inside it.
 - A task that waits for the person (the board's calls: needs you, a decision, a review, failed) is marked and first in its stage, wherever it is. No call is hidden by the order, and the count is unchanged (R6).
 - Every task the list shows today is still listed, and every action on a row stays: open, the … menu, and Restore and Delete… for an archived task.
-- Your calls is no longer a panel of its own, and Archived is no longer a section of its own. This changes a 1.x behaviour, so it needs Jarmo's yes (Open Question 3).
+- Your calls is no longer a panel of its own, and Archived is no longer a section of its own. This changes a 1.x behaviour; Jarmo said yes on 19 October ("Yes, as drawn").
 
 ### R18: Browser under the head
 
 As a writer, I want the Browser place to say plainly what it holds.
 
 Acceptance criteria:
-- Under the head, a group label, "Recent", heads the recent pages in the column's 11-caps style, as Documents' label heads the tree.
-- New browser tab (+) and Clear history sit at the right of the Recent label, in the column's icon-button style, each with a tooltip that says what it does. They do what the title row's two buttons do today, and stay in the palette.
-- With no pages, the list says "No pages yet" in place of "No recent URLs" (the Experience lead, 18 October: plain words). The line under it stays as today.
+- Under the head, one row, **New page** with the + icon, opens a web page as a tab, as the +'s Web page does. It follows Documents' New and Transcribe's Record (the Experience lead, 19 October).
+- Then a group label, "Recent", heads the recent pages in the column's 11-caps style, as Documents' label heads the tree. Clear history (the broom) sits at its right in the column's icon-button style, with a tooltip that says what it does.
+- The recent pages are 32-high rows: the site's icon, the page's title, and the domain in muted ink at the right (the Experience lead, 19 October).
+- New browser tab and Clear history do what the title row's two buttons do today, and stay in the palette.
+- With no pages, the list says "No pages yet" in muted ink, in place of "No recent URLs" (the Experience lead, 18 October: plain words). The line under it stays as today.
 - The recent pages, their remove button and opening a page work as today (Sprint 131).
 
 ### R19: The PDF and Word bars
@@ -283,7 +302,7 @@ Acceptance criteria:
 - Each bar ends in **Share**, as the document's bar does (R12; the comparison's `after-pdf.png`). On a PDF or a Word file, Share holds two items (the Experience lead, 19 October):
   - **Show in Finder** (Show in File Explorer on Windows), so the file can be attached to an email or a message;
   - **Open in Preview** for a PDF, or **Open in Word** for a Word file, where the system's own Share is. Open in Word takes the name the bar's button already shows.
-- On Windows, where there is no Preview, a PDF's second item opens the file in its default app. Its words go to the Experience lead with the screenshots.
+- On Windows, where there is no Preview, a PDF's second item opens the file in its default app, as "Open in default app", the words the Word bar already uses ([confirmations](research/confirmations.md) §8). They go to the Experience lead with the screenshots.
 - Share has no Export and no Google Docs on a PDF or a Word file.
 - Make an editable copy stays on the bar, as drawn. On the PDF's bar it sits beside Share (`after-pdf.png`). On the Word bar it stays in Open in Word's menu, as today (`after-word.png`).
 - Nothing on today's bar is removed.
@@ -307,7 +326,7 @@ Acceptance criteria:
 - Share this page shares the page, as Allow does today. With the box ticked, later pages are shared without asking, as "Don't ask again" does today.
 - Not now shares nothing, as Deny does today. The question is not asked again for that page in this session.
 - The tabs stay usable while the question waits. Switching tabs, closing a tab, the + and the page itself all work (#455: today they do nothing until the dialog is answered).
-- The question is about the page in front. If the person moves to another page before answering, it asks about that page instead, and the page left unanswered is not shared.
+- The question is about the page in front. If the person moves to another page before answering, it asks about that page instead, and the page left unanswered is not shared. It is asked about again when it comes back in front: only an answer marks a page as asked for the session ([share-question audit](research/share-question-audit.md)).
 - Nothing about a page (its address, title or content) reaches the AI before Share (Sprint 67's consent boundary). A message sent while the question waits goes without the page.
 - The question is reached by keyboard and read by VoiceOver, and draws in Light and Dark.
 - A page the network policy blocks still gets today's notice.
@@ -320,12 +339,14 @@ As a writer, I want All commands to list what I can use in Ritemark (#456).
 Acceptance criteria:
 - All commands (⇧⌘P, Ctrl+Shift+P on Windows) no longer lists VS Code's developer and debugging commands, such as "Add Data Breakpoint at Address" and "Add Function Breakpoint" (Jarmo, 19 October).
 - It is a filter of command IDs, in patch 003, beside its menu cleanup. The commands stay registered, so a menu, a shortcut or another command that runs one still works.
-- The list of IDs to drop is written first, by an audit (technical plan, Phase 1).
+- The list of IDs to drop is written first, by an audit (technical plan, Phase 1). The [palette audit](research/palette-audit.md) drops 62 debugging IDs (five prefixes and three IDs) and 88 developer IDs, and keeps four developer commands: Reload Window, Toggle Developer Tools, Open Webview Developer Tools and Open Process Explorer, each named by a Ritemark menu, doc, skill or QA step.
+- With no debugger installed (Ritemark ships none), most debugging entries are already hidden. About nine always show today, both of #456's examples among them.
 - A command stays in the palette when:
   - it is Ritemark's own;
   - a Ritemark menu, doc, skill or QA step names it (for example Developer: Reload Window);
   - the parity list reaches a v1.14.0 function through All commands only, such as refreshing the file list and maximising the AI's column (G7).
 - Search and the recently used list never offer a dropped command.
+- The walkthrough pickers go too, "Welcome: Open Walkthrough…" and "Chat: Open Walkthrough": Getting Started is Ritemark's welcome (Sprint 133), which Help: Welcome opens and which stays (the Development manager, 19 October, from Windows round 3).
 - The commands keep VS Code's names. Plain-word names (experience 22) come after 2.0.
 
 ### R22: ChatGPT, never Codex
@@ -344,6 +365,11 @@ Acceptance criteria:
 - The list comes first: an audit lists every user-visible "Codex" string, with where it is, what it says and what it will say (technical plan, Phase 1).
 - This is a copy pass only. Internal names, setting keys, command IDs, file names, log lines and code identifiers stay as they are, so nothing a person set is lost.
 - A model's own name stays as OpenAI writes it, such as "GPT-5.3 Codex Spark". The audit lists these apart.
+- Per the [Codex strings audit](research/codex-strings-audit.md) (104 strings):
+  - **The comment handle `@codex` stays** for 2.0. It is syntax saved inside people's documents, and changing it would break every comment already assigned with it. Wherever Ritemark shows it (suggestion lists, chips, tooltips, docs), the name beside it reads ChatGPT, for example "@codex — ChatGPT". An `@chatgpt` alias comes after 2.0 (decided by the Development manager, 19 October);
+  - **VS Code's settings page names a setting from its key**, so "Codex: Approval Policy", "Codex: Sandbox Mode" and "Codex-integration" stay where Advanced settings leads (R23). The AI choice shows "ChatGPT" through `enumItemLabels`, and the settings section is titled "ChatGPT and OpenCode", since it holds OpenCode's setting too;
+  - **words already saved stay**: a flow step's saved label, a card's history line and a chat's history keep "Codex" where it was written before;
+  - **the user documents** (`docs/user/`) are rewritten with Sprint 136's notes (parity list, G9), not in this pass.
 - Text that the bundled runtime itself writes, such as its own error, is shown as it came. Ritemark's words around it say ChatGPT.
 - Settings keeps its layout. The Settings redesign (experience 15) comes after 2.0.
 
@@ -445,6 +471,13 @@ After 2.0 (Jarmo, 19 October):
 
 ## Resolved Questions
 
+- **The Experience lead, 19 October (after the approval):**
+  - **An unread reply in Home's Waiting for you** is listed like a chat's question, as one sentence: the chat's own coloured bubble as its icon (the rail's duotone bubble in that chat's colour), then "<AI> replied in <chat title>" with the chat's own AI, the time at the right in muted ink. Questions and approvals come first, since they hold work up, then unread replies, newest first. Clicking it opens the chat on the AI's sheet, which reads it and takes it off the list (R3, R4).
+  - **The chat rail marks an unread chat** with the amber dot it already uses for "waits for you", in the same place and size; it clears once the chat has been in front on a shown AI sheet. One meaning: amber means something waits there, a question or a reply (R3).
+  - **Browser under the head:** one row, New page, then the Recent label with Clear history at its right, then the pages as 32-high rows with the site's icon, the title and the domain in muted ink (R16, R18).
+  - **A chat titled by its first message** (no name from the AI, no rename) is quoted on Home and the sentence says "to": Claude replied to “In one sentence, what is a module plan?”, with curly quotes, on one line, a long message cut at a word with the ellipsis inside the quotes. A named chat keeps "Claude replied in Plan Module 5". Questions and approvals in such a chat quote it too (R4).
+  - **Documents hides the `.claude` folder**, as it hides `.ritemark`: what is in it is what the Agents place shows. Search and Quick Open leave it out too, as for `.ritemark`; the Agents place reads it as before (R8).
+
 - **2026-10-15 (Jarmo):** Home states the project's name, with a header image the person can change; the first window after the welcome is Home; chats are kept privately on this computer, never in the project's folder.
 - **2026-10-16 (Jarmo):** Home and Tasks pinned permanently as the first two tabs, icons only; "yes, yes, yes" to the projects list on Home, the count on the Tasks tab, and sending it to the Development manager.
 - **2026-10-17 (Jarmo):** "when I click Tasks, the board ALWAYS opens too"; the Home tab comes in step 3 ("ok").
@@ -472,17 +505,13 @@ After 2.0 (Jarmo, 19 October):
 - **2026-10-19 (the Experience lead's answers to the refresh's design questions):**
   - **Transcribe's settings button** is a small icon button, the gear with the tooltip "Transcribe settings", at the right of the "Recordings" group label, under the project's head. It is the same pattern as Browser's + and Clear at the right of "Recent" (R16).
   - **Share on a PDF or a Word file** holds Show in Finder (Show in File Explorer on Windows), so the file can be attached to an email or a message, and Open in Preview for a PDF or Open in Word, where the system's own Share is. Make an editable copy stays on the bar beside Share, as drawn (`comparison/after-pdf.png`). Share has no Export or Google Docs on these files (R19).
+- **2026-10-19 (Jarmo, at this plan's approval):**
+  - **What counts as "waits" in a chat:** "Also unread answers". A chat waits while the AI waits on a question or an approval, and also while it has a finished reply the person has not read (R3). The recommendation had been questions and approvals only.
+  - **Removing 1.x's Home view:** yes, as recommended. The projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone (R14).
+  - **Tasks' list as experience 6 draws it:** "Yes, as drawn" (R17).
 
 ## Open Questions
 
-Each has a recommendation; Jarmo answers at this plan's approval.
+None. The Experience lead answered the last two on 19 October (*Resolved Questions*).
 
-1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
-2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
-
-3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own: the tasks that wait lead their stage, marked. Archived moves inside Done. **Recommendation:** yes, as drawn. Nothing is lost: every task and every action stays, and the count is unchanged. Because it changes how a 1.x list looks, `CLAUDE.md`'s first hard rule asks for Jarmo's yes, as Sprint 132 asked for Agents' sections.
-
-Still open for the Experience lead, from the refresh:
-- Whether Browser has rows under the head. The handover names only the Recent label and its two actions, so the plan draws none.
-
-The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*).
+The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*). Jarmo answered this plan's three open questions at its approval on 19 October (*Resolved Questions*).

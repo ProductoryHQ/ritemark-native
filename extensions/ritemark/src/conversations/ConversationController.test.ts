@@ -214,7 +214,7 @@ async function run(): Promise<void> {
     );
     assert.equal(
       restoredBoundary?.kind === 'boundary' ? restoredBoundary.message : null,
-      'Continuing with Codex. Previous messages were included as context.',
+      'Continuing with ChatGPT. Previous messages were included as context.',
       'fallback disclosure is one compact durable line associated with the next turn',
     );
     await controller.activateRuntimeContinuation({

@@ -110,7 +110,7 @@ test('the head\'s words are Ritemark\'s', () => {
   assert.equal(title('ritemark.projectHead.openFolder'), 'Open a folder…');
   assert.equal(title('ritemark.projectHead.revealInFinder'), 'Reveal in Finder');
   assert.equal(title('ritemark.projectHead.revealInFileExplorer'), 'Reveal in File Explorer');
-  assert.equal(title('ritemark.projectHead.switchProject'), 'Switch project…');
+  assert.equal(title('ritemark.projectHead.switchProject'), 'Switch project');
   assert.equal(title('ritemark.projectHead.newText'), 'Text');
   assert.equal(title('ritemark.projectHead.newTable'), 'Table (CSV data)');
 });
@@ -131,10 +131,21 @@ test('the 2.0 defaults', () => {
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMinWidth'], 38); // no floor: tabs are as wide as their names (the stylesheet)
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMaxWidth'], 200);
   assert.equal(configurationDefaults['workbench.editor.pinnedTabSizing'], 'compact');
-  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true });
+  // Documents hides .ritemark, and .claude, whose contents the Agents place shows (the Experience lead, 19 October)
+  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true, '**/.claude': true });
   assert.equal(configurationDefaults['terminal.integrated.defaultLocation'], 'editor');
   assert.equal(configurationDefaults['terminal.integrated.hideOnStartup'], 'always');
-  assert.deepEqual(configurationDefaults['terminal.integrated.commandsToSkipShell'], ['workbench.action.createTerminalEditor']);
+  // ⌘T reaches the tab row from a terminal tab too (Sprint 134, R21)
+  assert.deepEqual(configurationDefaults['terminal.integrated.commandsToSkipShell'], ['workbench.action.createTerminalEditor', 'ritemark.newTab']);
+  // The project's AGENTS.md is About this project wherever VS Code draws a file's name (Sprint 134, R8)
+  assert.deepEqual(configurationDefaults['workbench.editor.customLabels.patterns'], { '*/AGENTS.md': 'About this project' });
+});
+
+test('⌘T (Ctrl+T on Windows) is a new tab: the + of the desk you are on (Sprint 134, R21)', () => {
+  const binding = keybindings.find(candidate => candidate.command === 'ritemark.newTab');
+  assert.ok(binding, 'no binding for a new tab');
+  assert.equal(binding.key, 'ctrl+t');
+  assert.equal(binding.mac, 'cmd+t');
 });
 
 test('Ctrl+` (⌃` on the Mac) opens a new terminal tab', () => {
@@ -154,7 +165,8 @@ test('⌘, (Ctrl+, on Windows) opens Ritemark\'s settings, not VS Code\'s (Jarmo
 });
 
 test('the seven surface colours, each with light, dark and high-contrast values', () => {
-  const ids = colors.map(color => color.id);
+  // An agent's chosen colours (Sprint 134, R24) are checked by themeContrast.test.ts.
+  const ids = colors.map(color => color.id).filter(id => !id.startsWith('ritemark.agentColor.'));
   assert.deepEqual(ids, ['ritemark.ground', 'ritemark.aiSheet', 'ritemark.desk', 'ritemark.sheetBorder', 'ritemark.sheetShadow', 'ritemark.placeActiveBackground', 'ritemark.placeActiveForeground']);
   for (const color of colors) {
     for (const key of ['light', 'dark', 'highContrast', 'highContrastLight']) {

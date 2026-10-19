@@ -130,7 +130,7 @@ const SECTIONS: CapabilitySection[] = [
       [
         'USER-ONLY FEATURES (you cannot trigger these — they are editor-UI actions the USER performs):',
         '- The `/` slash menu, image insertion (`/image`), and draw.io diagrams (`/diagram`).',
-        '- Exporting to PDF or DOCX (an export-menu action) and voice dictation.',
+        '- Sending a copy as PDF or Word, or publishing to Google Docs (the Share menu on the document\'s bar), and voice dictation.',
         'If the user asks you to do one of these directly, say plainly that it is done by the user via the editor UI — do not claim you performed it and do not invent a tool or command for it.',
         'Existing draw.io diagrams appear as image references like `![](./images/diagram.drawio.svg)`; treat those files as user-authored assets — reference them if relevant, but do not attempt to author or rewrite `.drawio.svg` content.',
       ].join('\n'),

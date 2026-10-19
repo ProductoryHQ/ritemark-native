@@ -97,7 +97,7 @@ function main(): void {
   );
   assert.throws(
     () => buildAgentSidebarBootstrap({ ...input(), codexModels: [] }),
-    /Codex model catalog is empty/,
+    /ChatGPT's model list is empty/,
   );
   assert.doesNotThrow(
     () => buildAgentSidebarBootstrap({ ...input(), codexEnabled: false, codexModels: [] }),

@@ -156,7 +156,7 @@ assert.equal(recoveryForRuntimeAvailability('ready'), 'none');
 assert.equal(RUNTIME_LABELS['claude-code'], 'Claude');
 assert.ok(
   messageForRuntimeAvailability('codex', { state: 'needs-auth', usable: false, detail: null })
-    .startsWith('Codex is signed out'),
+    .startsWith('ChatGPT is signed out'),
 );
 assert.equal(
   messageForRuntimeAvailability('claude-code', { state: 'broken', usable: false, detail: 'bad binary' }),

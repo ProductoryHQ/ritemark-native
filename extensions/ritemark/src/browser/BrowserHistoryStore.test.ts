@@ -1,5 +1,6 @@
 /**
- * Tests for the Browser Recent store and row text (Sprint 131, #195).
+ * Tests for the Browser Recent store and row text (Sprint 131, #195), and the page's Recent label, its two
+ * actions and its list (Sprint 134 R18).
  *
  * `vscode` is stubbed before the units load: an EventEmitter, an in-memory
  * Memento, and a `workspace.fs.stat` / `FileSystemError` pair for the
@@ -31,8 +32,14 @@ class StubFileSystemError extends Error {
 }
 
 const statResults = new Map<string, 'ok' | 'FileNotFound' | 'NoPermissions'>();
+const executedCommands: string[] = [];
 
 const vscodeStub = {
+  commands: {
+    executeCommand: async (command: string) => {
+      executedCommands.push(command);
+    },
+  },
   EventEmitter: StubEventEmitter,
   FileSystemError: StubFileSystemError,
   Uri: { parse: (value: string) => ({ toString: () => value }) },
@@ -59,7 +66,13 @@ moduleAny._load = (request: string, parent: unknown, isMain?: boolean): unknown 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { BrowserHistoryStore } = require('./BrowserHistoryStore') as typeof import('./BrowserHistoryStore');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { describe, fileIsMissing } = require('./BrowserPanelProvider') as typeof import('./BrowserPanelProvider');
+const { describe, fileIsMissing, recentHeaderHtml, BrowserPanelProvider, RECENT_ACTIONS, RECENT_LIST_SCRIPT } =
+  require('./BrowserPanelProvider') as typeof import('./BrowserPanelProvider');
+
+/** The page script's list, evaluated from the same text the page runs. */
+const page = new Function(`${RECENT_LIST_SCRIPT}\nreturn { renderList };`)() as {
+  renderList(items: Array<{ url: string; name: string; domain: string; favicon?: string; visitedAt: number }>): string;
+};
 
 type Entry = { url: string; visitedAt: number; title?: string };
 
@@ -171,17 +184,132 @@ async function runTests(): Promise<void> {
     assert.equal(store.getAll().length, 3, 'a failing check keeps every entry');
   }
 
-  // R5: row text — title over address when there is one, today's text otherwise.
-  assert.deepEqual(describe('https://github.com/ProductoryHQ/ritemark-native', 'ritemark-native'), {
-    name: 'ritemark-native',
-    description: 'github.com/ProductoryHQ/ritemark-native',
-  });
-  assert.deepEqual(describe('http://localhost:5173/', 'Dev app'), { name: 'Dev app', description: 'localhost:5173' });
-  assert.deepEqual(describe('https://ritemark.app/'), { name: 'ritemark.app', description: '' });
-  assert.deepEqual(describe('https://ritemark.app/docs'), { name: 'ritemark.app', description: '/docs' });
-  assert.deepEqual(describe('http://localhost:8765/untitled.html'), { name: 'localhost:8765', description: '/untitled.html' });
-  assert.deepEqual(describe('file:///tmp/ws/report.html', 'Q3 report'), { name: 'Q3 report', description: '/tmp/ws/report.html' });
-  assert.deepEqual(describe('file:///tmp/ws/my%20notes.html'), { name: 'my notes.html', description: '/tmp/ws/my notes.html' });
+  // Sprint 134 R18 (the Experience lead): a row's title, and its domain in muted ink at the right.
+  assert.deepEqual(
+    [
+      describe('https://github.com/ProductoryHQ/ritemark-native', 'ritemark-native'),
+      describe('http://localhost:5173/', 'Dev app'),
+      describe('https://ritemark.app/'),
+      describe('https://ritemark.app/docs'),
+      describe('file:///tmp/ws/report.html', 'Q3 report'),
+      describe('file:///tmp/ws/my%20notes.html'),
+    ],
+    [
+      { name: 'ritemark-native', domain: 'github.com' },
+      { name: 'Dev app', domain: 'localhost:5173' },
+      { name: 'ritemark.app', domain: 'ritemark.app' },
+      { name: 'ritemark.app/docs', domain: 'ritemark.app' },
+      { name: 'Q3 report', domain: 'ws' },
+      { name: 'my notes.html', domain: 'ws' },
+    ]
+  );
+
+  // Sprint 134 R18: the Recent label in the column's 11-caps style, with Clear history at its right, an icon button
+  // with an accessible name and a tooltip that says what it does. New browser tab is the head's New page row.
+  {
+    const header = recentHeaderHtml();
+    assert.ok(header.includes('<span class="group-label" role="heading" aria-level="2">Recent</span>'), header);
+    const buttons = header.match(/<button [^>]*>/g) ?? [];
+    assert.deepEqual(buttons, [
+      '<button type="button" class="group-btn" data-message="clearAll" aria-label="Clear history" data-tooltip="Clear the list of recent pages">',
+    ]);
+    assert.ok(header.indexOf('group-label') < header.indexOf('group-actions'), 'the button sits at the label\'s right');
+    assert.equal((header.match(/<svg /g) ?? []).length, 1, 'an icon');
+    assert.deepEqual(RECENT_ACTIONS.map((action) => action.command), ['ritemark.browser.history.clearAll']);
+  }
+
+  // R18: with no pages, plain words; the line under them stays.
+  {
+    const empty = page.renderList([]);
+    assert.equal(
+      empty,
+      '<div class="empty"><div class="empty-title">No pages yet</div>Pages you visit in Ritemark Browser appear here.</div>'
+    );
+    assert.ok(!empty.includes('No recent URLs'));
+  }
+
+  // R18 / Sprint 131: a page's title, address and description are shown as text, never as markup.
+  {
+    const rows = page.renderList([
+      {
+        url: 'https://evil.example/?q="><img src=x onerror=alert(1)>',
+        name: '<img src=x onerror=alert(1)><b>Quarterly</b> & \'notes\'',
+        domain: 'evil.example/<script>alert(1)</script>',
+        favicon: 'javascript:alert(1)',
+        visitedAt: 1,
+      },
+    ]);
+    assert.ok(!/<img|<b>|<script/.test(rows), rows);
+    assert.ok(
+      rows.includes('<span class="item-name">&lt;img src=x onerror=alert(1)&gt;&lt;b&gt;Quarterly&lt;/b&gt; &amp; &#39;notes&#39;</span>'),
+      rows
+    );
+    assert.ok(rows.includes('data-url="https://evil.example/?q=&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"'), rows);
+    assert.ok(rows.includes('<span class="item-domain">evil.example/&lt;script&gt;alert(1)&lt;/script&gt;</span>'), rows);
+    assert.ok(!rows.includes('javascript:'), 'an icon that is not an image data URL is not drawn');
+    assert.ok(rows.includes('aria-label="Remove from history"'), 'each page keeps its remove button');
+  }
+
+  // R18: the site's icon when the browser reported one, the globe otherwise.
+  {
+    const icon = 'data:image/png;base64,iVBORw0KGgo=';
+    const rows = page.renderList([
+      { url: 'https://ritemark.app/', name: 'Ritemark', domain: 'ritemark.app', favicon: icon, visitedAt: 2 },
+      { url: 'https://example.com/', name: 'Example', domain: 'example.com', visitedAt: 1 },
+    ]);
+    assert.ok(rows.includes(`<span class="item-icon"><img class="item-favicon" src="${icon}" alt=""></span><span class="item-name">Ritemark</span><span class="item-domain">ritemark.app</span>`), rows);
+    assert.equal((rows.match(/<svg /g) ?? []).length, 3, 'the second row\'s globe, and each row\'s remove icon');
+  }
+
+  // R18: the page draws the label over the list, and its two buttons run their commands; opening and
+  // removing a page work as before.
+  {
+    const store = new BrowserHistoryStore(memento([{ url: 'https://ritemark.app/', visitedAt: 1, title: 'Ritemark' }]) as never);
+    const provider = new BrowserPanelProvider(store, { toString: () => 'ext' } as never);
+    let receive: (msg: unknown) => void = () => undefined;
+    const posted: unknown[] = [];
+    const view = {
+      visible: true,
+      onDidChangeVisibility: () => ({ dispose: () => undefined }),
+      webview: {
+        options: {},
+        html: '',
+        cspSource: 'vscode-resource:',
+        onDidReceiveMessage: (handler: (msg: unknown) => void) => {
+          receive = handler;
+          return { dispose: () => undefined };
+        },
+        postMessage: async (msg: unknown) => {
+          posted.push(msg);
+          return true;
+        },
+      },
+    };
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+    const html = view.webview.html;
+    assert.ok(html.indexOf(recentHeaderHtml()) > 0 && html.indexOf(recentHeaderHtml()) < html.indexOf('<div id="content">'));
+    assert.ok(html.includes(RECENT_LIST_SCRIPT), 'the page runs the tested list');
+    assert.ok(!html.includes('No recent URLs'));
+
+    executedCommands.length = 0;
+    receive({ type: 'clearAll' });
+    receive({ type: 'somethingElse' });
+    assert.deepEqual(executedCommands, ['ritemark.browser.history.clearAll']);
+    assert.ok(html.includes("img-src data:"), 'the page may draw a site\'s icon, and nothing else from outside');
+
+    executedCommands.length = 0;
+    receive({ type: 'open', url: 'https://ritemark.app/' });
+    assert.deepEqual(executedCommands, ['ritemark.browser.history.open']);
+    receive({ type: 'ready' });
+    assert.deepEqual(posted[0], {
+      type: 'items',
+      items: [{ url: 'https://ritemark.app/', name: 'Ritemark', domain: 'ritemark.app', visitedAt: 1 }],
+    });
+    receive({ type: 'remove', url: 'https://ritemark.app/' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(store.getAll(), []);
+    provider.dispose();
+  }
 
   console.log('All browser history store tests passed.');
 }

@@ -367,9 +367,9 @@ async function testProbesRunAsynchronously() {
       const status = await managerResolving({ binaryPath: fake.binaryPath, runtimeSource: 'system', launchMode: 'codex-cli' }).getBinaryStatus();
       assert.deepStrictEqual(status.compatibility, {
         state: 'limited',
-        summary: 'Codex is runnable, but one or more lifecycle capabilities Ritemark expects were not detected.',
+        summary: 'ChatGPT runs, but some features Ritemark expects are missing.',
         capabilities: { approvals: true, requestUserInput: false, planUpdates: true },
-        limitations: ['Interactive question prompts were not detected in the current Codex app-server protocol.'],
+        limitations: ['This version of ChatGPT does not ask you questions.'],
       });
     } finally {
       fake.remove();
@@ -412,7 +412,7 @@ async function testProbesRunAsynchronously() {
     try {
       const status = await managerResolving({ binaryPath: fake.binaryPath, runtimeSource: 'bundled', launchMode: 'codex-app-server' }).getBinaryStatus();
       assert.strictEqual(status.runnable, false);
-      assert.strictEqual(status.error, 'The bundled Codex runtime could not start (app-server --help exited 1). Reinstall Ritemark to restore it.');
+      assert.strictEqual(status.error, 'The bundled ChatGPT could not start (app-server --help exited 1). Reinstall Ritemark to restore it.');
       assert.strictEqual(status.compatibility, null);
       assert.deepStrictEqual(fake.calls(), ['--version', '--help']);
     } finally {

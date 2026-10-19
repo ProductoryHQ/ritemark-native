@@ -51,6 +51,14 @@ const WelcomePage = lazy(() =>
   import('./components/welcome/WelcomePage').then((m) => ({ default: m.WelcomePage }))
 )
 
+// Home and the projects list (Sprint 134): the project's own page, and the left column on Home.
+const HomePage = lazy(() =>
+  import('./components/home/HomePage').then((m) => ({ default: m.HomePage }))
+)
+const ProjectsList = lazy(() =>
+  import('./components/home/ProjectsList').then((m) => ({ default: m.ProjectsList }))
+)
+
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
@@ -124,6 +132,14 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'welcome' ? (
       <Suspense fallback={null}>
         <WelcomePage />
+      </Suspense>
+    ) : editorType === 'home' ? (
+      <Suspense fallback={null}>
+        <HomePage />
+      </Suspense>
+    ) : editorType === 'projects' ? (
+      <Suspense fallback={null}>
+        <ProjectsList />
       </Suspense>
     ) : (
       <App />

@@ -60,7 +60,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Phase 1 audits
 
-1. **`research/waiting-audit.md`** (R3, R6): computing another project's calls from its card files and its hand-off records (`projectKey(folder)`), mapped as `CardHandoffLedger.list()` maps them, through `deriveWho`; chats that need the person from `index.json` read as it is (never `list()` with no scope, which rewrites it), mapped to folders through the records' scopes, and kept only when a live owner holds them (a `needs-user` left by a crash is not a call); the cost with 20 projects of 50 cards each.
+1. **`research/waiting-audit.md`** (R3, R6): computing another project's calls from its card files and its hand-off records (`projectKey(folder)`), mapped as `CardHandoffLedger.list()` maps them, through `deriveWho`; chats that need the person from `index.json` read as it is (never `list()` with no scope, which rewrites it), mapped to folders through the records' scopes, and kept only when a live owner holds them (a `needs-user` left by a crash is not a call); the cost with 20 projects of 50 cards each. After Jarmo's answer of 19 October ("Also unread answers"), it also settles the read marker: which field records when a chat's newest reply finished (a reply, a failure, or neither for a turn interrupted by a restart), where the marker lives in the record and in `index.json` so another project's unread replies are counted from the raw index, when the sheet marks a chat read (in front on a shown sheet, in the window that has focus or not), how records from before this build count as read, and how a card's chat (`sourceKind: card`) is left to its card.
 2. **`research/first-fill-audit.md`** (R2): the three sources and how each gives a folder path:
    - VS Code's recent folders, read once through `_workbench.getRecentlyOpened`;
    - the chat store's records, whose scopes carry their folder URIs;
@@ -99,6 +99,38 @@ From 19 October it also records:
 - how the PDF's provider (`pdfEditorProvider.ts`) opens a file in Preview on the Mac and in its default app on Windows, and what that item says on Windows, checked with the Experience lead (R19);
 - that `workbench.action.openSettings` opens VS Code's settings page, not Ritemark Settings, with ⌘, bound to `ritemark.aiSettings` (R23).
 
+## What the audits changed (19 October)
+
+Each workstream below follows these, which override its own text where they differ.
+
+- **W1:** the project's name and mark are the folder's in this sprint: nothing lets a person change them, and 018's head draws the folder's name. A `name` or `mark` in the file is kept, not drawn (`projectFile.ts`).
+- **W2** ([first-fill audit](research/first-fill-audit.md)):
+  - sources, in order: VS Code's recent folders (their URIs keep VS Code's spelling), then the chat store read raw (`index.json`, then one record per scope for its folder URIs; `records/` only when the index can't be read). Never through `ConversationStore`, whose every method rewrites the index;
+  - no board source: a board's records name no folder;
+  - VS Code's `workspaceStorage/*/workspace.json` and its `state.vscdb` modified times give each folder's last-open time, for the order only;
+  - only single folders that exist at the time (a timeout per check, for network shares); no `.code-workspace`, remote or virtual folders, and not the sample inside the app;
+  - on Windows the chat store lower-cases whole paths, so a folder known only from chats is spelled by `fs.realpathSync.native` before it is listed (hand-off records and VS Code's saved tabs are keyed by the exact `fsPath`);
+  - the fill is a merge (the union, the later time), so two windows running it together give the same list; `ritemark.projects.filledV1` is written after the list.
+- **W3** ([waiting audit](research/waiting-audit.md)): as W3 says above.
+- **W4** ([confirmations](research/confirmations.md) §3):
+  - `ritemark.newChat` neither reveals nor focuses the AI's sheet, and a chat opens by id only through the private `_revealConversation`. The provider gains public, held openers, as `openLandingChat` is: `openNewChat()` and `openConversation(id)`, which reveal the sheet and wait for it to be ready;
+  - a waiting card opens its card page, as `ritemark.openTaskBoard <cardId>` and the Tasks place's rows do.
+- **W5** (confirmations §10): `ritemark.placeClickedAgain` can be registered once, so Tasks and Home share one handler, keyed by the container id (`workbench.view.extension.ritemark-home`, `…-tasks`). A first click on a place is seen as its view becoming visible.
+- **W7** (confirmations §1, §2, §6):
+  - **the switcher** is a flyout inside Ritemark's menu, as experience 3 frame 2 draws it: VS Code shows one context view at a time, and `ritemarkMenu.ts` has no submenu. 018 gains optional `mark`, `checked`, `sub` and `submenu` fields on a menu item, and a table that maps the `package.json` submenu `ritemark/projectHead/switch` to the command `ritemark.projects.switcherItems`. If the command is missing, the flyout shows only its fixed rows;
+  - **File ▸ Switch project** shows Home with the projects list and focuses its search (spec R8);
+  - **New tab** needs a command: 019 has none, the + is a button. 019 gains `ritemark.newTab`, which opens the +'s menu at the front desk's +; the extension binds ⌘T and Ctrl+T to it with a `when` that outranks Go to Symbol in Workspace and the browser's own new tab. On Windows, the command joins the terminal's commands that skip the shell;
+  - Reveal's words follow VS Code's: Reveal in Finder (Mac), Reveal in File Explorer (Windows), as the head already does.
+- **W8** ([splash audit](research/splash-audit.md)): 018's hunk in `partsSplash.ts` `_savePartsSplash()` saves `ritemark.ground` (falling back to `sideBar.background`) as the splash's `background` and `editorBackground`, which the main process and `workbench.ts` already use. 001's two defaults in `workbench.ts` become the grounds: `#16132F` (Dark) and `#F1F5F9` (Light). A fresh profile's very first window stays as today (out of R9's scope).
+- **W10** (confirmations §4, §7): `FlowStorage.listFlows()` creates nothing; `saveFlow` and the other sites that make a folder under a project (a card's `.ritemark/tasks/`, exports, transcripts: 13 listed in the note) go through one guard, `ensureProjectSubfolder(project, …)`, which refuses when the project's folder itself is gone.
+- **W12** (confirmations §5):
+  - `HEAD_PLACES` is a fixed map, and its "New" and "Search" words are the shell's. It becomes one extension menu, `ritemark/projectHead/rows`, whose items carry `when: activeViewlet == …`; the head draws up to two of them with their own titles and icons. Documents and Agents keep their rows through it;
+  - a place with the head hides its title-row actions by CSS (`ritemarkSurfaces.css`), so Browser's and Transcribe's buttons move into their pages in the same change;
+  - `ritemark.transcribe.openSettings` is not in the palette today, so its gear lives in the page only, as in v1.14.0.
+- **W13** (confirmations §8): `openInExternalApp(file, 'Preview')` opens Preview on the Mac and the default app on Windows, but builds a shell string, so a crafted file name could run a command. It moves to `execFile` with an argument list in this sprint (the same code path R19 uses). The Windows item says "Open in default app".
+- **W17** (confirmations §9): the message is `settings:openAdvanced`, as that file names its messages.
+- **W18** (confirmations §2): the Agents place's row menu says "Reveal in Finder" on Windows too; it says "Reveal in File Explorer" there, fixed with R24's change to the same rows.
+
 ## Workstream 1: The project file (R1)
 
 - `src/projects/projectFile.ts` (new, no `vscode` import; an injected file system):
@@ -124,12 +156,19 @@ From 19 October it also records:
 ## Workstream 3: What waits (R3, R6)
 
 - `src/projects/waiting.ts` (new), per `research/waiting-audit.md`:
-  - **the open project**: the board's own snapshot (`snapshot.attention.count` and its `calls`) and the chat store's live conversations of this window's scope with `lifecycle.state: 'needs-user'`;
-  - **another project**: its card files (`parseCardFile`) and its hand-off records (by `projectKey`), through `deriveWho`; and its chats from `index.json` with a live owner, as the audit settles;
+  - **the open project**: the board's own snapshot (`snapshot.attention.count` and its `calls`) and the chat store's live conversations of this window's scope with `lifecycle.state: 'needs-user'`, plus its chats with an unread reply;
+  - **another project**: its card files (`parseCardFile`) and its hand-off records (by `projectKey`), through `deriveWho`; and its chats from `index.json`: a `needs-user` with a live owner, or an unread reply, as the audit settles;
+  - a chat that a card runs in counts only through the card's call.
+- **The read marker** (Jarmo, 19 October: "Also unread answers"). The chat store has none today. Each conversation record and its `index.json` entry gain when the chat was last read (proposed `readAt`), beside when its newest reply finished. The AI's sheet marks a chat read when it is in front on a shown sheet, and at once when a reply finishes while it is so. A record without the marker counts as read, so the first start of this build shows no backlog. The field names and the rules are the waiting audit's; the store's decoder keeps both optional, so an older build reading the store is unaffected.
   - a project whose board cannot be read gives no count (`undefined`), never zero.
-- Other projects are read when Home or the switcher is shown, with a short cache (30 s), never on a timer in the background.
+- Per [`research/waiting-audit.md`](research/waiting-audit.md):
+  - the loop that turns cards into calls moves out of `BoardController.snapshot()` into one exported function, `callsOf(cards, handoffs)`, which the snapshot and `waiting.ts` both call;
+  - another project's hand-off records are read by a decode-only reader, never `CardTaskStore.load()`, which renames a record it can't read;
+  - **a window marker**, as `TurnOwners` does for chats: each window writes `<globalStorage>/projects/v1/windows/<pid>.json` with its folder at activation and removes it at dispose. A hand-off in an active state in a project no live window holds is read as `interrupted` (a failed call), as `recover()` would make it when that project opens;
+  - an unreadable `index.json` gives no count anywhere, rather than counts without chats.
+- Other projects are read when Home or the switcher is shown, with a short cache (30 s), never on a timer in the background. The audit measured 46 ms for 20 projects of 50 cards (30 ms warm).
 - **The Tasks tab's count** (019, from the PoC): `multiEditorTabsControl.ts` reads the badge of `workbench.view.extension.ritemark-tasks` from `IActivityService` and draws it on the tab whose view type is `mainThreadWebview-ritemark.taskBoard`, up to "99+", with the tab's accessible name including it. The badge is the board's calls, so the tab and the place cannot disagree.
-- Tests: `waiting.test.ts` with fixture boards (each call kind, archived, done, a hand-off that needs the person) and fixture chat indexes (live and stale `needs-user`).
+- Tests: `waiting.test.ts` with fixture boards (each call kind, archived, done, a hand-off that needs the person) and fixture chat indexes (live and stale `needs-user`; an unread reply, a read one, one from before this build, a card's chat). The store's tests cover the marker's round trip and an older record without it.
 
 ## Workstream 4: Home's tab (R4, R10, R11, R13)
 
@@ -171,7 +210,12 @@ From 19 October it also records:
   - An `AGENTS.md` or `CLAUDE.md` already in the folder is never written over. A folder that cannot be written says so, as R1 does.
   - **The note.** When the folder's own `CLAUDE.md` has no line `@AGENTS.md`, the Ritemark editor shows the note at the top of About this project, with Add the line and Not now (spec R8). Add the line rereads `CLAUDE.md`, writes `@AGENTS.md` and a newline in front of its bytes (a temporary file, then rename), and drops the note; if the file changed since the note was drawn, it rereads before writing. Not now writes nothing and shows nothing elsewhere.
   - **Pointer-only.** A `CLAUDE.md` whose whole content is `@AGENTS.md`, compared with surrounding whitespace and line endings ignored, is Ritemark's pointer and is hidden in Documents; Create and the sample project both write exactly that. A `CLAUDE.md` with anything more, even one more line, stays visible as the person's own file (Experience lead, 18 October).
-  - The name About this project is drawn where `research/about-file-audit.md` says; if Documents needs a hunk, it goes into 018's resource-label hunk from Sprint 133.
+  - **How each place draws the name** ([`research/about-file-audit.md`](research/about-file-audit.md)):
+    - the tab, the folded list, Quick Open and the window title: a `configurationDefaults` value, `workbench.editor.customLabels.patterns: { "*/AGENTS.md": "About this project" }` (VS Code's own custom labels match from the root folder's parent, so only the root's file). If a fresh profile's first start shows `AGENTS.md` first (live check L2), the default moves to `branding/product.json` (013);
+    - Documents' row and both tooltips: one fixed-rule case in 018's `labels.ts`, on Sprint 133's `splitExtension` opt-in, so the row is right on the first frame without waiting for the extension;
+    - the pointer: a case in 018's `FilesFilter` (`explorerViewer.ts`) that reads the root `CLAUDE.md` itself (at most 1 KB), as it reads `.gitignore`, and hides it while its trimmed text is `@AGENTS.md` and the root has an `AGENTS.md`;
+    - the icon: `"agents.md"` in the file icon theme's `fileNames` (the book-open icon README uses), and `book` (Phosphor `\e0e6`) in the product icon theme for the menu;
+    - Home's Last changed and the AI sheet's Active chip and Context line name it themselves.
   - Tests: `aboutFile.test.ts`: open, create both files, an existing `CLAUDE.md` left byte for byte, the note's condition, Add the line (first line, every other byte kept), Not now writing nothing, pointer-only recognised (with surrounding whitespace and CRLF) and a `CLAUDE.md` with one more line not, an existing `AGENTS.md` opened, a read-only folder.
 - **The File menu** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`. The extension contributes three items there, in the drawing's order:
   - New tab, which runs the +'s menu (019's new-tab command), bound to ⌘T and Ctrl+T in `package.json`, above VS Code's own binding;
@@ -186,7 +230,9 @@ From 19 October it also records:
   - It then opens the next folder in the same window (`vscode.openFolder(uri, { forceNewWindow: false })`).
   - VS Code keeps each folder's tabs in its own workspace state, so coming back restores them; the permanent tabs (W5) add Home and Tasks where missing and the window opens on Home.
 - **The "Switched to…" note** (experience 3, frame 3; kept in experience 33): the switch writes `ritemark.projects.switchedFrom` with the folder and the time; the next window's Home shows "Switched to <project>. <other> is kept as you left it." with Go back, once, and the key is deleted. Go back goes through the same switch.
-- **VS Code's own routes** (File ▸ Open Folder…, Open Recent): per the audit, either a small 018 veto asks the extension before a LOAD shutdown, or they are left as today and the audit records it.
+- **What is working** ([`research/switch-audit.md`](research/switch-audit.md)): `UnifiedViewProvider.workingChats()`, the chats with an entry in `_activeConversationTurnIds` whose record is `working` or `needs-user`, with each one's runtime for the dialog's title. **Switch and stop** cancels each as `agent-cancel` does (the cancel intent, then the session), waits up to 3 s for the turns to end, then switches.
+- **The head's Open a folder…** picks the folder itself (`showOpenDialog`, folders only) and then goes through the switch, since `vscode.openFolder` with no URI opens in the main process.
+- **VS Code's own routes** (decided in the audit): a small 018 contribution vetoes a `LOAD` shutdown with the answer of the hidden command `_ritemark.projects.beforeReload`, passing the target folder when the window knows it (a stash in the host service's `openWindow`: Open Recent). The guard answers at once when nothing works or when Ritemark started the reload after asking. Without a target (Open Folder…, a drop, the CLI, Close Folder) its dialog has Cancel and Switch and stop, Cancel the default. No answer in 10 s, or no such command: the reload goes on. `RELOAD` and `QUIT` never ask.
 - **The splash** (per `research/splash-audit.md`): the window shows the ground's colour while it reloads, in Light and Dark. Expected: 018's hunk in `partsSplash.ts` saves the theme's `ritemark.ground` as the splash background when the theme defines it, and 001's dark default becomes the dark ground (`#16132F`) instead of `#1E1B4B`.
 - **⌥ click and Open in a new window** never switch this window.
 
@@ -230,11 +276,11 @@ From 19 October it also records:
 ## Workstream 14: The browser's share question, on the AI's sheet (R20)
 
 - **When it asks stays.** `ensureSharedForActiveTab` keeps its rule: the first time a page becomes the AI's context in a session, once per page, never once "share without asking" is stored. Only the dialog goes.
-- **009's bridge takes the answer** (per `research/share-question-audit.md`). `workbench.action.browser.ensureActiveBrowserShared` gains an optional argument, `{ answer?: 'share' | 'notNow', withoutAsking?: boolean }`:
+- **009's bridge takes the answer** (per [`research/share-question-audit.md`](research/share-question-audit.md)). `workbench.action.browser.ensureActiveBrowserShared` gains an optional argument, `{ pageId, answer?: 'share' | 'notNow', withoutAsking?: boolean }`; an answer for a tab no longer in front shares nothing and returns `stale: true`:
   - with no answer, it shares at once when `browserView.shareWithAgent.dontAskAgain` is stored, as today; otherwise it returns `needsAnswer: true` and opens nothing;
   - with `share`, it shares the page as Allow does, and stores the key when `withoutAsking` is set, as the dialog's box does;
   - with `notNow`, it shares nothing.
-  The model gains a Ritemark method that shares without the dialog, beside upstream's `setSharedWithAgent`. The network policy's check and its notice stay as upstream has them.
+  The model gains a Ritemark method, `shareWithAgentAnswered(withoutAsking)`, beside upstream's `setSharedWithAgent`: what Allow does, without the dialog. The network policy's check and its notice stay as upstream has them. The tab is marked as asked for the session only once answered, so a question withdrawn unanswered is asked again when its tab comes back in front. Annotation mode, control and upstream's own toggle keep upstream's dialog: each answers a click of the person's own.
 - **The host** (`BrowserContextStore`, `UnifiedViewProvider`): on `needsAnswer`, it posts `browser:share-question` to the sheet with the page's id and title and the AI's name. The sheet answers with `browser:share-answer`, and the host calls the bridge with it. A question about a page that is no longer in front is withdrawn (`browser:share-question-clear`), and the page stays unshared. The messages are typed in `agentSidebarProtocol.ts`.
 - **The sheet** (`webview/src/components/ai-sidebar/ShareQuestionCard.tsx`, new): the card above the message box, as experience 28's frame 1 draws it, from the UI components (`Button`, the checkbox, a tooltip on each button). The page's chip shows beside it as today.
 - **The consent boundary stays:** `buildTurnContext` sends nothing about a page that is not shared, so a message sent while the question waits goes without it.
@@ -251,7 +297,9 @@ From 19 October it also records:
   |---|---|---|
   | `workbench.debug.viewlet.action.addDataBreakpointOnAddress` | Add Data Breakpoint at Address | Debugging (#456) |
   | `workbench.debug.viewlet.action.addFunctionBreakpointAction` | Add Function Breakpoint | Debugging (#456) |
-  | *(the audit fills the rest)* | | |
+  | *the rest: [`research/palette-audit.md`](research/palette-audit.md) §7, the authoritative list (5 prefixes, 86 IDs)* | | |
+
+  The hunk is one filter on the array `getCommandPicks` returns (`commandsQuickAccess.ts:128–131`), which search, similar commands, recently used and the AI's related picks all read, after patch 015's tested pure-function pattern. Sprint 135's VS Code update runs the audit's search again, since new versions add developer commands.
 
 - Kept by rule (spec R21): Ritemark's commands, the commands a Ritemark menu, doc, skill or QA step names, and those the parity list reaches only through All commands.
 - Tests: a VS Code unit test that a listed ID and a prefixed ID are not offered and a kept one is; S58 by hand.
@@ -274,7 +322,7 @@ From 19 October it also records:
 ## Workstream 18: An agent's colour on its row (R24)
 
 - `agent/discovery.ts`: each agent carries the colour from its file (`color:`) only when the file sets one, apart from the colour `resolveIconAndColor` guesses from the name. The decision names the chosen colour, so a guessed one is not drawn.
-- `AgentLibraryViewProvider.ts`: the row's icon (`.row-icon`) takes the agent's colour when it has one, through eight theme colours, one per name (indigo, blue, green, amber, red, purple, pink, slate). An agent with none keeps the muted icon.
+- `AgentLibraryViewProvider.ts`: the row's icon (`.row-icon`) takes the agent's colour when it has one, through eight theme colours, one per name the Color field offers (`agentSchema.ts` `COLOR_OPTIONS`: red, blue, green, yellow, purple, orange, pink, cyan; the plan first named another list, corrected at implementation). A file with a name outside the list keeps the muted icon. An agent with none keeps the muted icon.
 - The eight colours are `ritemark.*` colours in `package.json`, with a Light and a Dark value, each at 3:1 or more against the column. `themeContrast.test.ts`, which reads those colours, checks them.
 - A change in the agent's settings already rewrites its file, and the place already redraws on file changes, so the row follows without a reload.
 - Nothing else on the place changes: the count line, the empty state, Sort and the tooltips stay as Sprint 132 left them (Jarmo, 19 October).
@@ -294,7 +342,7 @@ From 19 October it also records:
 
 ## Delivery plan: one merge
 
-1. Before the merge: Mac QA (S1–S40, S43–S61), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages, Settings' foot, the copy pass).
+1. Before the merge: Mac QA (S1–S40, S43–S62), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages, Settings' foot, the copy pass).
 2. The merge.
 3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe, the share question and the palette), and the drift check. Fixes from the Windows round go in a small follow-up PR.
 

@@ -111,7 +111,7 @@ function nextId(): string {
 
 const RUNTIME_LABELS: Record<'claude-code' | 'codex' | 'opencode', string> = {
   'claude-code': 'Claude',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   opencode: 'OpenCode',
 };
 
@@ -279,6 +279,9 @@ interface AISidebarState {
   selection: EditorSelection;
   activeFilePath: string | null;
   currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; screenshotPreview?: { dataUrl: string } | null; error?: string } | null;
+  /** Sprint 134 (R20): the share question about the page in front, waiting above the message box. */
+  browserShareQuestion: { pageId: string; title: string } | null;
+  answerBrowserShareQuestion: (answer: 'share' | 'notNow', withoutAsking: boolean) => void;
 
   // ── Conversations (Sprint 99 R5 — the source of truth) ──
   /** Every OPEN conversation, keyed by id. */
@@ -986,6 +989,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     selection: { text: '', isEmpty: true, from: 0, to: 0 },
     activeFilePath: null,
     currentBrowserContext: null,
+    browserShareQuestion: null,
+    answerBrowserShareQuestion: (answer, withoutAsking) => {
+      const question = get().browserShareQuestion;
+      if (!question) return;
+      set({ browserShareQuestion: null });
+      vscode.postMessage({ type: 'browser:share-answer', pageId: question.pageId, answer, withoutAsking });
+    },
 
     conversations: { [initialConversation.id]: initialConversation },
     activeConversationId: initialConversation.id,
@@ -2811,7 +2821,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 isRunning: false,
                 result: {
                   status: 'blocked',
-                  error: message.status.error || 'Codex is not ready.',
+                  error: message.status.error || 'ChatGPT is not ready.',
                 },
               }));
             }
@@ -2835,6 +2845,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'active-browser-changed':
           set({ currentBrowserContext: message.context ?? null });
+          break;
+
+        case 'browser:share-question':
+          set({ browserShareQuestion: { pageId: message.pageId, title: message.title } });
+          break;
+
+        case 'browser:share-question-clear':
+          set({ browserShareQuestion: null });
           break;
 
         case 'ai-streaming':

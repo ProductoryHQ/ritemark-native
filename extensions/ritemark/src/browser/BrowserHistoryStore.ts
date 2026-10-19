@@ -9,6 +9,8 @@ export interface BrowserHistoryEntry {
   visitedAt: number;
   /** Page title when the page had one (Sprint 131); absent on entries saved by earlier versions. */
   title?: string;
+  /** Sprint 134 (R18): the site's icon, a small image data URL; absent until the tab reported one. */
+  favicon?: string;
 }
 
 export class BrowserHistoryStore implements HistorySink {
@@ -28,9 +30,11 @@ export class BrowserHistoryStore implements HistorySink {
     if (!trimmed) return;
     const key = historyKey(trimmed);
     const existing = this.getAll();
-    const keptTitle = title ?? existing.find((e) => historyKey(e.url) === key)?.title;
+    const previous = existing.find((e) => historyKey(e.url) === key);
+    const keptTitle = title ?? previous?.title;
     const entry: BrowserHistoryEntry = { url: trimmed, visitedAt: Date.now() };
     if (keptTitle) entry.title = keptTitle;
+    if (previous?.favicon) entry.favicon = previous.favicon;
     const next = [entry, ...existing.filter((e) => historyKey(e.url) !== key)].slice(0, MAX_ENTRIES);
     await this.globalState.update(STORAGE_KEY, next);
     this.emitter.fire();
@@ -44,6 +48,18 @@ export class BrowserHistoryStore implements HistorySink {
     if (index === -1 || existing[index].title === title) return;
     const next = [...existing];
     next[index] = { ...existing[index], title };
+    await this.globalState.update(STORAGE_KEY, next);
+    this.emitter.fire();
+  }
+
+  /** Sprint 134 (R18): sets the page's icon in place: no reorder, no write when unchanged. */
+  async setFavicon(url: string, favicon: string): Promise<void> {
+    const key = historyKey(url);
+    const existing = this.getAll();
+    const index = existing.findIndex((e) => historyKey(e.url) === key);
+    if (index === -1 || existing[index].favicon === favicon) return;
+    const next = [...existing];
+    next[index] = { ...existing[index], favicon };
     await this.globalState.update(STORAGE_KEY, next);
     this.emitter.fire();
   }

@@ -1,0 +1,196 @@
+/**
+ * Sprint 134 (R9, W8): switching projects in the same window.
+ *
+ * Every Ritemark way of switching comes here: Home's projects list, the head's
+ * Switch project ▸ and Open a folder…, File ▸ Switch project's list, Go back
+ * and Find it…. VS Code's own ways (Open Recent, Open Folder…, a drop on the
+ * Dock icon, Close Folder) reach the same question through patch 018's veto
+ * on a reload, which runs `_ritemark.projects.beforeReload`.
+ *
+ * Switching reloads the window. While a chat in this window works, it asks
+ * first (experience 33, frame 3): Cancel, Switch and stop, and Open in a new
+ * window as the default. With nothing working it never asks.
+ *
+ * Research: docs/development/releases/v2.0.0/sprint-134-project-at-the-centre/
+ *   research/switch-audit.md
+ */
+
+import * as vscode from 'vscode';
+import { aiNameOf } from './homeState';
+
+export const SWITCHED_FROM_KEY = 'ritemark.projects.switchedFrom';
+/** The note shows only on the window the switch opened, not on a later start. */
+export const SWITCHED_NOTE_MS = 2 * 60 * 1000;
+/**
+ * R9: "The next project opens on its Home". Every switch in place leaves this for the next window, Go back and
+ * VS Code's own routes included (the note's `SWITCHED_FROM_KEY` is not left by Go back); the window's tab check
+ * takes it once and brings Home forward.
+ */
+export const LANDING_KEY = 'ritemark.projects.landOnHome';
+
+interface Landing {
+  /** The folder the switch left. */
+  from: string | null;
+  /** The folder it opens, when the window knows it (not for Open Folder…, a drop or Close Folder). */
+  target: string | null;
+  at: number;
+}
+
+const sameFolder = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
+
+export interface SwitchedFrom {
+  folderUri: string;
+  name: string;
+  at: number;
+}
+
+export type SwitchChoice = 'cancel' | 'switch-and-stop' | 'new-window';
+
+/** The question's words (pure, tested): "Claude is still working in Leadership programme". */
+export function switchQuestion(workingRuntimes: readonly (string | null)[], here: string, there: string | null): {
+  title: string;
+  detail: string;
+  buttons: { choice: SwitchChoice; label: string }[];
+} {
+  const names = [...new Set(workingRuntimes.map((id) => aiNameOf(id) ?? 'The AI'))];
+  const who = names.length <= 1 ? (names[0] ?? 'The AI') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const verb = names.length > 1 ? 'are' : 'is';
+  const pronoun = names.length > 1 ? 'them' : 'it';
+  const subject = names.length > 1 ? 'them' : names[0] ?? 'the AI';
+  const title = `${who} ${verb} still working in ${here}`;
+  if (there) {
+    return {
+      title,
+      detail: `Switching projects stops ${pronoun}. Open ${there} in a new window to let ${subject} finish.`,
+      // The first is the dialog's default (experience 33: Open in a new window).
+      buttons: [
+        { choice: 'new-window', label: 'Open in a new window' },
+        { choice: 'switch-and-stop', label: 'Switch and stop' },
+      ],
+    };
+  }
+  // VS Code's own ways where the folder isn't known: no new window to offer, and Cancel is the default, since the
+  // other button stops the AI (S33). It goes first, as the dialog's close button too.
+  return {
+    title,
+    detail: `Switching projects stops ${pronoun}.`,
+    buttons: [
+      { choice: 'cancel', label: 'Cancel' },
+      { choice: 'switch-and-stop', label: 'Switch and stop' },
+    ],
+  };
+}
+
+export interface SwitchDependencies {
+  context: vscode.ExtensionContext;
+  /** The open project's name, as Home and the head draw it. */
+  hereName: () => string;
+  hereUri: () => string | null;
+  nameOf: (folderUri: string) => string;
+  workingChats: () => { conversationId: string; runtimeId: string | null }[];
+  stopWorkingChats: () => Promise<void>;
+}
+
+export class ProjectSwitcher {
+  /** Ritemark asked already: the reload it starts next is let through by the veto. */
+  private askedUntil = 0;
+
+  constructor(private readonly deps: SwitchDependencies) {}
+
+  /** Ask while a chat works; undefined when nothing does. */
+  private async ask(there: string | null): Promise<SwitchChoice | undefined> {
+    const working = this.deps.workingChats();
+    if (working.length === 0) return undefined;
+    const question = switchQuestion(working.map((chat) => chat.runtimeId), this.deps.hereName(), there);
+    // A Cancel of the question's own is the dialog's close button (and, first, its default); otherwise VS Code adds one.
+    const picked = await vscode.window.showWarningMessage(
+      question.title,
+      { modal: true, detail: question.detail },
+      ...question.buttons.map((button) => ({ title: button.label, isCloseAffordance: button.choice === 'cancel' })),
+    );
+    return question.buttons.find((button) => button.label === picked?.title)?.choice ?? 'cancel';
+  }
+
+  private async rememberLanding(target: string | undefined): Promise<void> {
+    const landing: Landing = { from: this.deps.hereUri(), target: target ?? null, at: Date.now() };
+    await this.deps.context.globalState.update(LANDING_KEY, landing);
+  }
+
+  private async rememberHere(): Promise<void> {
+    const here = this.deps.hereUri();
+    if (!here) return;
+    const from: SwitchedFrom = { folderUri: here, name: this.deps.hereName(), at: Date.now() };
+    await this.deps.context.globalState.update(SWITCHED_FROM_KEY, from);
+  }
+
+  /**
+   * Switch this window to the folder, asking first when a chat works. Going back
+   * (the note's Go back) leaves no note of its own on the project it returns to (S32).
+   */
+  async switchTo(target: vscode.Uri, options: { newWindow?: boolean; goingBack?: boolean } = {}): Promise<SwitchChoice | 'switched'> {
+    if (options.newWindow) {
+      await vscode.commands.executeCommand('vscode.openFolder', target, { forceNewWindow: true });
+      return 'new-window';
+    }
+    const choice = await this.ask(this.deps.nameOf(target.toString()));
+    if (choice === 'cancel') return 'cancel';
+    if (choice === 'new-window') {
+      await vscode.commands.executeCommand('vscode.openFolder', target, { forceNewWindow: true });
+      return 'new-window';
+    }
+    if (choice === 'switch-and-stop') await this.deps.stopWorkingChats();
+    if (options.goingBack) await this.deps.context.globalState.update(SWITCHED_FROM_KEY, undefined);
+    else await this.rememberHere();
+    await this.rememberLanding(target.toString());
+    this.askedUntil = Date.now() + 10_000;
+    await vscode.commands.executeCommand('vscode.openFolder', target, { forceReuseWindow: true });
+    return 'switched';
+  }
+
+  /**
+   * The veto's question (patch 018): VS Code is about to reload this window
+   * for another folder. True stops the reload. `target` is the folder when the
+   * window knows it (Open Recent), undefined when only the main process does.
+   */
+  async beforeReload(target: unknown): Promise<boolean> {
+    if (Date.now() < this.askedUntil) return false;
+    const targetUri = typeof target === 'string' ? vscode.Uri.parse(target) : target instanceof vscode.Uri ? target : undefined;
+    const choice = await this.ask(targetUri ? this.deps.nameOf(targetUri.toString()) : null);
+    if (choice === undefined) {
+      if (targetUri) await this.rememberHere();
+      await this.rememberLanding(targetUri?.toString());
+      return false;
+    }
+    if (choice === 'cancel') return true;
+    if (choice === 'new-window' && targetUri) {
+      await vscode.commands.executeCommand('vscode.openFolder', targetUri, { forceNewWindow: true });
+      return true;
+    }
+    await this.deps.stopWorkingChats();
+    if (targetUri) await this.rememberHere();
+    await this.rememberLanding(targetUri?.toString());
+    return false;
+  }
+
+  /**
+   * Whether this window came from a switch in place, so it lands on Home (R9, S30): once, only right after the
+   * switch, and only in the folder it opened (or, when the window did not know it, in any other folder).
+   */
+  static takeLanding(context: vscode.ExtensionContext, hereUri: string | null): boolean {
+    const landing = context.globalState.get<Landing>(LANDING_KEY);
+    if (!landing) return false;
+    void context.globalState.update(LANDING_KEY, undefined);
+    if (!hereUri || typeof landing.at !== 'number' || Date.now() - landing.at > SWITCHED_NOTE_MS) return false;
+    if (landing.target) return sameFolder(landing.target, hereUri);
+    return !landing.from || !sameFolder(landing.from, hereUri);
+  }
+
+  /** The note on the next window's Home: once, and only right after a switch. */
+  static takeSwitchedFrom(context: vscode.ExtensionContext, hereUri: string | null): SwitchedFrom | null {
+    const from = context.globalState.get<SwitchedFrom>(SWITCHED_FROM_KEY);
+    if (!from) return null;
+    void context.globalState.update(SWITCHED_FROM_KEY, undefined);
+    if (Date.now() - from.at > SWITCHED_NOTE_MS || !from.folderUri || from.folderUri === hereUri) return null;
+    return from;
+  }
+}

@@ -188,6 +188,22 @@ export function deriveWho(card: Card, handoff: CardHandoffView | null): { move: 
   return { move: null, call: null, since: null };
 }
 
+/**
+ * The calls on a board: every card that waits on the person, most urgent kind
+ * first, then the longest waiting. Archived cards wait on nobody (D15). The
+ * Tasks place, its tab and every project's count (Sprint 134, R3) come from
+ * this one function.
+ */
+export function callsOf(cards: readonly Card[], handoffs: ReadonlyMap<string, CardHandoffView>): BoardCall[] {
+  const calls: BoardCall[] = [];
+  for (const card of cards) {
+    if (card.archived !== undefined) continue;
+    const who = deriveWho(card, handoffs.get(card.id) ?? null);
+    if (who.call && who.since) calls.push({ cardId: card.id, kind: who.call, since: who.since });
+  }
+  return calls.sort((a, b) => CALL_ORDER[a.kind] - CALL_ORDER[b.kind] || (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
+}
+
 export class BoardController {
   private readonly store: BoardStore;
   private readonly ledger: HandoffLedger;
@@ -263,14 +279,13 @@ export class BoardController {
     );
     const views: BoardCardView[] = [];
     const archived: BoardCardView[] = [];
-    const calls: BoardCall[] = [];
+    const calls = callsOf(cards.map((entry) => entry.card), handoffs);
     for (const entry of cards) {
       const { card } = entry;
       const handoff = handoffs.get(card.id) ?? null;
       // An archived card is off the board: it waits on nobody (D15).
       const isArchived = card.archived !== undefined;
       const who = isArchived ? { move: null, call: null, since: null } : deriveWho(card, handoff);
-      if (who.call && who.since) calls.push({ cardId: card.id, kind: who.call, since: who.since });
       (isArchived ? archived : views).push({
         id: card.id,
         title: card.title,
@@ -298,7 +313,6 @@ export class BoardController {
         checkboxes: countCheckboxes(card.description),
       });
     }
-    calls.sort((a, b) => CALL_ORDER[a.kind] - CALL_ORDER[b.kind] || (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
     const oldest = calls.reduce<string | null>((min, call) => (min === null || call.since < min ? call.since : min), null);
     const runtimes = this.deps.runtimes();
     return {

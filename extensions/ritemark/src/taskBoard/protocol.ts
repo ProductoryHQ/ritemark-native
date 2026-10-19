@@ -182,7 +182,12 @@ export type BoardHostMessage =
   /** The board tab should show this view (opened from the side bar). */
   | { type: 'board/focus'; tab?: BoardTab }
   /** The card whose page is the active editor tab, for the side bar's highlight; null when none. */
-  | { type: 'board/active-page'; cardId: string | null };
+  | { type: 'board/active-page'; cardId: string | null }
+  /** One of the project head's rows on Tasks ran (Sprint 134, R17): show the add field or the search field, with the keyboard in it. */
+  | { type: 'board/head'; row: BoardHeadRow };
+
+/** The rows of the project's head on Tasks: New task (`ritemark.tasks.newTask`) and Search (`ritemark.tasks.search`). */
+export type BoardHeadRow = 'new-task' | 'search';
 
 // ── Requests (webview → host) ───────────────────────────────────────────────
 

@@ -24,6 +24,34 @@ export interface BrowserContextSnapshot {
   summaryTruncated?: boolean;
   screenshot?: { mimeType: 'image/jpeg'; base64: string };
   error?: string;
+  /** Sprint 134 (R20): the page waits for the share question's answer on the AI's sheet. */
+  needsAnswer?: boolean;
+  /** Sprint 134 (R20): an answer about a page no longer in front; nothing was shared. */
+  stale?: boolean;
+}
+
+/** Sprint 134 (R20): the share question on the AI's sheet, about the page in front. */
+export interface ShareQuestion {
+  pageId: string;
+  /** The page's title, or its address's host when it has none. */
+  title: string;
+}
+
+/** What the AI's sheet does with the share question after a poll. */
+export type ShareQuestionChange =
+  | { kind: 'show'; question: ShareQuestion }
+  | { kind: 'clear' }
+  | { kind: 'unchanged' };
+
+export type ShareAnswer = 'share' | 'notNow';
+
+function pageTitleOf(snapshot: BrowserContextSnapshot): string {
+  if (snapshot.title?.trim()) return snapshot.title.trim();
+  try {
+    return new URL(snapshot.url ?? '').host || (snapshot.url ?? '');
+  } catch {
+    return snapshot.url ?? '';
+  }
 }
 
 export interface BrowserTurnContext {
@@ -73,7 +101,10 @@ export class BrowserContextStore {
   public static readonly instance = new BrowserContextStore();
 
   private lastSnapshot: BrowserContextSnapshot | null = null;
+  /** Pages answered this session (Share, Not now, or shared without asking): never asked again. */
   private autoSharedPageIds = new Set<string>();
+  /** The share question the AI's sheet shows now (Sprint 134, R20). */
+  private shownQuestion: ShareQuestion | null = null;
   private autoControlSharedPageIds = new Set<string>();
 
   public getLastSnapshot(): BrowserContextSnapshot | null {
@@ -105,27 +136,67 @@ export class BrowserContextStore {
   }
 
   /**
-   * Trigger the workbench "Share with Agent?" consent for the active browser tab
-   * the first time it becomes the active context in this session. Subsequent
-   * activations for the same pageId are ignored. The workbench-level
-   * `setSharedWithAgent` honors the "Don't ask again" preference, so once the
-   * user consents once, future tabs auto-share silently.
+   * The share question for the page in front, after `refreshMetadata`
+   * (Sprint 134, R20; was upstream's modal "Share with Agent?" dialog, #455).
+   *
+   * A page becomes the AI's context the first time it is in front in this
+   * session. Once the person chose to share pages without asking, the
+   * workbench shares it at once and nothing is asked. Otherwise the AI's sheet
+   * asks, and only an answer marks the page as asked for the session: a page
+   * left unanswered is asked about again when it comes back in front. Another
+   * page in front, or none, withdraws the question.
    */
-  public async ensureSharedForActiveTab(): Promise<void> {
+  public async ensureSharedForActiveTab(): Promise<ShareQuestionChange> {
     const snapshot = this.lastSnapshot;
-    if (!snapshot?.pageId || !snapshot.url || snapshot.sharedWithAgent) return;
-    if (this.autoSharedPageIds.has(snapshot.pageId)) return;
+    const shown = this.shownQuestion;
+    const withdraw = (): ShareQuestionChange => {
+      this.shownQuestion = null;
+      return shown ? { kind: 'clear' } : { kind: 'unchanged' };
+    };
+    if (!snapshot?.pageId || !snapshot.url || snapshot.sharedWithAgent || this.autoSharedPageIds.has(snapshot.pageId)) return withdraw();
+    if (shown?.pageId === snapshot.pageId) return { kind: 'unchanged' };
 
-    this.autoSharedPageIds.add(snapshot.pageId);
+    let result: unknown;
     try {
-      const result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND);
-      if (isUsableSnapshot(result)) {
-        this.lastSnapshot = { ...snapshot, ...result };
-      }
+      result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND);
     } catch {
-      // Workbench may have rejected (consent declined). Keep the pageId
-      // marked so we don't re-prompt for this tab in this session.
+      return withdraw(); // the workbench failed: nothing shared, asked again on a later poll
     }
+    if (!isUsableSnapshot(result) || result.error || result.pageId !== snapshot.pageId) return withdraw();
+    this.lastSnapshot = { ...snapshot, ...result };
+    if (!result.needsAnswer) {
+      // The workbench decided without asking: shared (the person's choice), or not, with the network policy's notice.
+      // Either way the page is settled for this session, so the notice shows once.
+      this.autoSharedPageIds.add(snapshot.pageId);
+      return withdraw();
+    }
+    this.shownQuestion = { pageId: snapshot.pageId, title: pageTitleOf(this.lastSnapshot) };
+    return { kind: 'show', question: this.shownQuestion };
+  }
+
+  /** The AI's sheet loaded again: a waiting question is posted again on the next poll. */
+  public sheetReloaded(): void {
+    this.shownQuestion = null;
+  }
+
+  /**
+   * The person's answer on the AI's sheet. Share shares the page (the box:
+   * later pages without asking); Not now shares nothing. Either marks the page
+   * as asked for the session. An answer about a page no longer in front
+   * changes nothing and returns false.
+   */
+  public async answerShareQuestion(pageId: string, answer: ShareAnswer, withoutAsking: boolean): Promise<boolean> {
+    if (this.shownQuestion?.pageId === pageId) this.shownQuestion = null;
+    let result: unknown;
+    try {
+      result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND, { pageId, answer, withoutAsking: answer === 'share' && withoutAsking });
+    } catch {
+      return false;
+    }
+    if (!isUsableSnapshot(result) || result.error || result.stale) return false;
+    this.autoSharedPageIds.add(pageId);
+    if (this.lastSnapshot?.pageId === pageId) this.lastSnapshot = { ...this.lastSnapshot, ...result };
+    return true;
   }
 
   /**

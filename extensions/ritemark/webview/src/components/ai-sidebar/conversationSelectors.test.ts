@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { selectRailConversationIds } from './conversationSelectors';
+import { railMarkOf, selectRailConversationIds } from './conversationSelectors';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
 
 const summary = (id: string, minute: number, state: 'idle' | 'working' | 'needs-user' = 'idle'): ConversationSummaryV1 => ({
@@ -23,5 +23,19 @@ assert.deepEqual(
   selectRailConversationIds(rows, ['a'], 'old'),
   ['a', 'f', 'e', 'd', 'c', 'b', 'old'],
   'an older current conversation is appended without disturbing recent order',
+);
+// Sprint 134 (R3): the rail's dot. Amber for a question or approval and for a reply not yet read;
+// the accent while working; a chat without a read marker counts as read.
+const at = (state: string, readAt?: string, lastReplyAt?: string) => ({ lifecycle: { state }, readAt, lastReplyAt }) as Parameters<typeof railMarkOf>[0];
+assert.deepEqual(
+  [
+    railMarkOf(at('needs-user')),
+    railMarkOf(at('working', '2026-10-19T08:00:00.000Z', '2026-10-19T09:00:00.000Z')),
+    railMarkOf(at('idle', '2026-10-19T08:00:00.000Z', '2026-10-19T09:00:00.000Z')),
+    railMarkOf(at('idle', '2026-10-19T09:00:00.000Z', '2026-10-19T08:00:00.000Z')),
+    railMarkOf(at('idle', undefined, '2026-10-19T09:00:00.000Z')),
+    railMarkOf(at('interrupted')),
+  ],
+  ['needs-you', 'working', 'unread', null, null, null],
 );
 console.log('conversationSelectors tests passed');

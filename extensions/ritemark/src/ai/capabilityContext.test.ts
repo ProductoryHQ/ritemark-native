@@ -100,7 +100,7 @@ test('labels the user-only features and existing diagrams', () => {
   for (const text of [claude, codex, acp]) {
     assert.ok(/USER-ONLY FEATURES/i.test(text), 'user-only section present');
     assert.ok(text.includes('/diagram') && text.includes('/image'), 'diagram + image');
-    assert.ok(/Exporting to PDF or DOCX/i.test(text), 'export labelled user-only');
+    assert.ok(/Sending a copy as PDF or Word/i.test(text), 'Share (once export) labelled user-only');
     assert.ok(text.includes('.drawio.svg'), 'existing diagram assets referenced');
   }
 });

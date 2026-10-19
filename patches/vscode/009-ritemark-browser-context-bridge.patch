@@ -51,8 +51,24 @@
 #   src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 #   src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 #
+#   The share question (Sprint 134, R20, #455): upstream's modal "Share with
+#   Agent?" dialog blocked the window. ensureActiveBrowserShared now opens no
+#   dialog: with no argument it shares only when the person chose to share
+#   pages without asking (the model's ritemarkSharesWithoutAsking), else it
+#   returns needsAnswer and the extension asks on the AI's sheet. With the
+#   sheet's answer { pageId, answer: 'share' | 'notNow', withoutAsking } it
+#   shares through the model's shareWithAgentAnswered (what Allow does: the
+#   network policy's notice first, the stored choice only with the box), and
+#   an answer about a page no longer in front is stale and shares nothing.
+#   Annotation mode, control consent and upstream's toggle keep the dialog.
+#
+#   The site's icon (Sprint 134, R18): the navigation push also reports the
+#   tab's favicon changes (kind 'favicon', the model's data URL), so Recent's
+#   rows show the site's icon.
+#
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
+# Updated: 2026-10-19 (Sprint 134: the share question on the AI's sheet)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index ecb40a9e856..832846bd4a5 100644
@@ -74,7 +90,7 @@ index ecb40a9e856..832846bd4a5 100644
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
  	ClearWorkspaceStorage = `${commandPrefix}.clearWorkspaceStorage`,
 diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
-index 849efe3775c..c23e9405486 100644
+index 849efe3775c..1f88ea4d0e5 100644
 --- a/src/vs/workbench/contrib/browserView/common/browserView.ts
 +++ b/src/vs/workbench/contrib/browserView/common/browserView.ts
 @@ -173,11 +173,13 @@ export interface IBrowserViewModel extends IDisposable {
@@ -99,7 +115,18 @@ index 849efe3775c..c23e9405486 100644
  	trustCertificate(host: string, fingerprint: string): Promise<void>;
  	untrustCertificate(host: string, fingerprint: string): Promise<void>;
  	zoomIn(): Promise<void>;
-@@ -236,11 +239,15 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+@@ -217,6 +220,10 @@ export interface IBrowserViewModel extends IDisposable {
+ 	getConsoleLogs(): Promise<string>;
+ 	getElementData(token: CancellationToken): Promise<IElementData | undefined>;
+ 	getFocusedElementData(): Promise<IElementData | undefined>;
++	/** Ritemark (Sprint 134, R20): whether the person chose to share pages without asking (upstream's "Don't ask again"). */
++	readonly ritemarkSharesWithoutAsking: boolean;
++	/** Ritemark (Sprint 134, R20): the answer to the question on the AI's sheet: what Allow does, without the dialog. */
++	shareWithAgentAnswered(withoutAsking: boolean): Promise<void>;
+ }
+ 
+ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+@@ -236,11 +243,15 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
  	private _isEphemeral: boolean = false;
  	private _zoomHost: string | undefined = undefined;
  	private _sharedWithAgent: boolean = false;
@@ -115,7 +142,7 @@ index 849efe3775c..c23e9405486 100644
  	private readonly _onDidChangeZoom = this._register(new Emitter<void>());
  	readonly onDidChangeZoom: Event<void> = this._onDidChangeZoom.event;
  
-@@ -277,6 +284,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+@@ -277,6 +288,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
  	get certificateError(): IBrowserViewCertificateError | undefined { return this._certificateError; }
  	get storageScope(): BrowserViewStorageScope { return this._storageScope; }
  	get sharedWithAgent(): boolean { return this._sharedWithAgent; }
@@ -123,7 +150,41 @@ index 849efe3775c..c23e9405486 100644
  	get zoomFactor(): number { return browserZoomFactors[this._browserZoomIndex]; }
  	get canZoomIn(): boolean { return this._browserZoomIndex < browserZoomFactors.length - 1; }
  	get canZoomOut(): boolean { return this._browserZoomIndex > 0; }
-@@ -649,6 +657,26 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+@@ -644,11 +656,60 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 		}
+ 	}
+ 
++	get ritemarkSharesWithoutAsking(): boolean {
++		return this.storageService.getBoolean(BrowserViewModel.SHARE_DONT_ASK_KEY, StorageScope.PROFILE) === true;
++	}
++
++	async shareWithAgentAnswered(withoutAsking: boolean): Promise<void> {
++		// The network policy's notice comes first, as in setSharedWithAgent.
++		if (this._url) {
++			try {
++				const uri = URI.parse(this._url);
++				if (!this.agentNetworkFilterService.isUriAllowed(uri)) {
++					await this.dialogService.info(
++						localize('browserView.shareBlocked.title', "Cannot Share with Agent"),
++						this.agentNetworkFilterService.formatError(uri),
++					);
++					return;
++				}
++			} catch { }
++		}
++		if (withoutAsking) {
++			this.storageService.store(BrowserViewModel.SHARE_DONT_ASK_KEY, true, StorageScope.PROFILE, StorageTarget.USER);
++		}
++		this.telemetryService.publicLog2<IntegratedBrowserShareWithAgentEvent, IntegratedBrowserShareWithAgentClassification>(
++			'integratedBrowser.shareWithAgent',
++			{ shared: true, dontAskAgain: withoutAsking }
++		);
++		await this.playwrightService.startTrackingPage(this.id);
++		this._setSharedWithAgent(true);
++	}
++
+ 	private _setSharedWithAgent(isShared: boolean): void {
+ 		if (isShared !== this._sharedWithAgent) {
  			this._sharedWithAgent = isShared;
  			this._onDidChangeSharedWithAgent.fire(isShared);
  		}
@@ -164,10 +225,10 @@ index be1e6c7d1cb..3bd599e42e5 100644
  	EditorPaneDescriptor.create(
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..11792629ed9
+index 00000000000..affd3e32475
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,301 @@
+@@ -0,0 +1,334 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -209,6 +270,17 @@ index 00000000000..11792629ed9
 +	readonly summaryTruncated?: boolean;
 +	readonly screenshot?: { readonly mimeType: 'image/jpeg'; readonly base64: string };
 +	readonly error?: string;
++	/** Ritemark (Sprint 134, R20): the page waits for the share question's answer on the AI's sheet. */
++	readonly needsAnswer?: boolean;
++	/** Ritemark (Sprint 134, R20): the answer was about a page no longer in front; nothing was shared. */
++	readonly stale?: boolean;
++}
++
++/** Ritemark (Sprint 134, R20): the AI sheet's answer to the share question. */
++interface IRitemarkShareAnswer {
++	readonly pageId?: string;
++	readonly answer?: 'share' | 'notNow';
++	readonly withoutAsking?: boolean;
 +}
 +
 +function activeBrowserModel(accessor: ServicesAccessor): IBrowserViewModel | undefined {
@@ -269,7 +341,7 @@ index 00000000000..11792629ed9
 +const RITEMARK_BROWSER_DID_NAVIGATE_COMMAND = 'ritemark.browser.didNavigate';
 +
 +interface IRitemarkBrowserNavigationDto {
-+	readonly kind: 'navigate' | 'title';
++	readonly kind: 'navigate' | 'title' | 'favicon';
 +	readonly pageId: string;
 +	readonly url: string;
 +	readonly title: string;
@@ -277,6 +349,8 @@ index 00000000000..11792629ed9
 +	readonly failed: boolean;
 +	/** The tab browses in an ephemeral (private) storage session. */
 +	readonly ephemeral: boolean;
++	/** Sprint 134 (R18): the site's icon as a data URL, when the tab has one (Recent's rows show it). */
++	readonly favicon?: string;
 +}
 +
 +/**
@@ -299,9 +373,10 @@ index 00000000000..11792629ed9
 +		this.send(model, 'navigate', model.url, model.title);
 +		store.add(model.onDidNavigate(e => this.send(model, 'navigate', e.url, e.title)));
 +		store.add(model.onDidChangeTitle(e => this.send(model, 'title', model.url, e.title)));
++		store.add(model.onDidChangeFavicon(() => this.send(model, 'favicon', model.url, model.title)));
 +	}
 +
-+	private send(model: IBrowserViewModel, kind: 'navigate' | 'title', url: string, title: string): void {
++	private send(model: IBrowserViewModel, kind: 'navigate' | 'title' | 'favicon', url: string, title: string): void {
 +		if (!url) {
 +			return;
 +		}
@@ -312,6 +387,7 @@ index 00000000000..11792629ed9
 +			title,
 +			failed: model.error !== undefined,
 +			ephemeral: model.storageScope === BrowserViewStorageScope.Ephemeral,
++			favicon: model.favicon,
 +		};
 +		this.commandService.executeCommand(RITEMARK_BROWSER_DID_NAVIGATE_COMMAND, dto).catch(err => {
 +			this.logService.trace('[Ritemark] Browser Recent: navigation not delivered', err);
@@ -432,12 +508,30 @@ index 00000000000..11792629ed9
 +		});
 +	}
 +
-+	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserContextDto> {
++	/**
++	 * Ritemark (Sprint 134, R20): the share question waits on the AI's sheet, not in a dialog (#455). With no answer, a
++	 * page not yet shared is shared only when the person chose to share pages without asking; otherwise the result says
++	 * `needsAnswer` and nothing opens. With the sheet's answer for `pageId`: Share shares it (the box stores the choice),
++	 * Not now shares nothing, and an answer about a page no longer in front is `stale` and shares nothing.
++	 */
++	async run(accessor: ServicesAccessor, answer?: IRitemarkShareAnswer): Promise<IRitemarkBrowserContextDto> {
 +		const model = activeBrowserModel(accessor);
 +		if (!model) {
 +			return { error: 'No active integrated browser tab.' };
 +		}
++		if (answer?.answer) {
++			if (answer.pageId !== model.id) {
++				return { ...dtoFromModel(model), stale: true };
++			}
++			if (answer.answer === 'share' && !model.sharedWithAgent) {
++				await model.shareWithAgentAnswered(answer.withoutAsking === true);
++			}
++			return dtoFromModel(model);
++		}
 +		if (!model.sharedWithAgent) {
++			if (!model.ritemarkSharesWithoutAsking) {
++				return { ...dtoFromModel(model), needsAnswer: true };
++			}
 +			await model.setSharedWithAgent(true);
 +		}
 +		return dtoFromModel(model);

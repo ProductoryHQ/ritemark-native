@@ -327,7 +327,7 @@ export class CodexSession implements RuntimeSession {
       });
     }
 
-    config.onProgress({ type: 'init', message: 'Starting Codex…', timestamp: Date.now() });
+    config.onProgress({ type: 'init', message: 'Starting ChatGPT…', timestamp: Date.now() });
 
     // Convert image attachments to data URLs (Codex image input format)
     const imageDataUrls = turn.attachments
@@ -684,7 +684,7 @@ export class CodexRuntime implements AgentRuntime {
     const codexManager = new CodexManager();
     const binaryStatus = await codexManager.getBinaryStatus();
     if (!binaryStatus.available || !binaryStatus.runnable) {
-      return { enabled: true, state: 'broken-install', version: binaryStatus.version ?? null, authMethod: null, email: null, plan: null, error: binaryStatus.error ?? 'Codex CLI is not available.', diagnostics: binaryStatus.diagnostics, repairCommand: binaryStatus.repairCommand ?? null, binaryPath: binaryStatus.binaryPath ?? null, compatibility: binaryStatus.compatibility ?? null };
+      return { enabled: true, state: 'broken-install', version: binaryStatus.version ?? null, authMethod: null, email: null, plan: null, error: binaryStatus.error ?? 'ChatGPT is not available.', diagnostics: binaryStatus.diagnostics, repairCommand: binaryStatus.repairCommand ?? null, binaryPath: binaryStatus.binaryPath ?? null, compatibility: binaryStatus.compatibility ?? null };
     }
     try {
       this._ensureAppServer();

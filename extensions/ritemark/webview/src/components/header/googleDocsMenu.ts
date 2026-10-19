@@ -1,11 +1,19 @@
 /**
- * Google Docs publishing in the editor's Export menu (Sprint 119, W6).
+ * Google Docs publishing in the document's Share menu (Sprint 119, W6; 2.0's
+ * words in Sprint 134, R12).
  *
  * The host owns every fact; this file only turns the host's redacted
- * projection into menu items. It mirrors `GoogleDocsDocumentProjection` from
- * `src/googleDocs/types.ts` — the webview has no import path to host code.
- * Labels are single-line by rule: no hint text inside a button.
+ * projection into the Share menu's Google Docs group. It mirrors
+ * `GoogleDocsDocumentProjection` from `src/googleDocs/types.ts` — the webview
+ * has no import path to host code.
+ *
+ * Each state keeps 1.x's actions and messages: Connect… and Reconnect… open
+ * Settings, Create and Sync publish, Open opens the Google Doc, Remove link…
+ * asks the host to forget it. Only the words changed (experience 26: Publish
+ * to Google Docs, Update the Google Doc, Open in Google Docs). What 1.x showed
+ * as a native tooltip is now the item's second line. Each line stays single.
  */
+import type { PhosphorIconName } from '../ui/Icon'
 
 export type GoogleDocsDocumentState =
   | 'hidden'
@@ -32,10 +40,10 @@ export type GoogleDocsAction = 'publish' | 'open' | 'unlink' | 'settings'
 export interface GoogleDocsMenuItem {
   action: GoogleDocsAction | null
   label: string
-  icon: 'cloud-arrow-up' | 'arrows-clockwise' | 'arrow-square-out' | 'link-break' | 'sign-in' | 'circle-notch'
+  /** The second line, under the label. */
+  detail: string | null
+  icon: Extract<PhosphorIconName, 'google-logo' | 'arrows-clockwise' | 'arrow-square-out' | 'link-break' | 'sign-in' | 'circle-notch'>
   disabled?: boolean
-  /** Accessible description; also shown as the native tooltip. */
-  description?: string
 }
 
 const STAGE_TEXT: Record<GoogleDocsStage, string> = {
@@ -45,16 +53,17 @@ const STAGE_TEXT: Record<GoogleDocsStage, string> = {
   verifying: 'Checking…',
 }
 
-export function formatSyncedAt(iso: string | null, now: Date = new Date()): string | null {
+/** "Last updated 5 min ago", from the binding's last publish; null when unknown. */
+export function formatLastUpdate(iso: string | null, now: Date = new Date()): string | null {
   if (!iso) return null
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return null
   const minutes = Math.round((now.getTime() - then.getTime()) / 60_000)
-  if (minutes < 1) return 'synced just now'
-  if (minutes < 60) return `synced ${minutes} min ago`
+  if (minutes < 1) return 'Last updated just now'
+  if (minutes < 60) return `Last updated ${minutes} min ago`
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `synced ${hours} h ago`
-  return `synced ${then.toLocaleDateString()}`
+  if (hours < 24) return `Last updated ${hours} h ago`
+  return `Last updated ${then.toLocaleDateString()}`
 }
 
 export function googleDocsMenuItems(projection: GoogleDocsProjection | null, now: Date = new Date()): GoogleDocsMenuItem[] {
@@ -64,32 +73,27 @@ export function googleDocsMenuItems(projection: GoogleDocsProjection | null, now
     case 'unavailable':
       return []
     case 'not-connected':
-      return [{ action: 'settings', label: 'Connect Google Docs…', icon: 'sign-in', description: 'Connect a Google account in Settings to publish this document to Google Docs' }]
+      // Today's connect step: Settings, where the account is connected. Then
+      // the same item publishes.
+      return [{ action: 'settings', label: 'Publish to Google Docs', detail: 'Connect your Google account first', icon: 'google-logo' }]
     case 'unbound':
-      return [{ action: 'publish', label: 'Create Google Doc', icon: 'cloud-arrow-up', description: 'Publish this document as a new Google Doc and remember it for later Sync' }]
+      return [{ action: 'publish', label: 'Publish to Google Docs', detail: 'One Google Doc you update from here', icon: 'google-logo' }]
     case 'account-mismatch':
       return [{
         action: 'settings',
-        label: 'Reconnect Google account…',
+        label: 'Reconnect your Google account',
+        detail: projection.boundAccountEmail
+          ? `Published with ${projection.boundAccountEmail}`
+          : 'Published with another Google account',
         icon: 'sign-in',
-        description: projection.boundAccountEmail
-          ? `This document was published with ${projection.boundAccountEmail}. Connect that account to sync it.`
-          : 'This document was published with a different Google account.',
       }]
     case 'busy':
-      return [{ action: null, label: projection.stage ? STAGE_TEXT[projection.stage] : 'Publishing…', icon: 'circle-notch', disabled: true }]
-    case 'bound': {
-      const synced = formatSyncedAt(projection.lastSyncedAt, now)
+      return [{ action: null, label: projection.stage ? STAGE_TEXT[projection.stage] : 'Publishing…', detail: null, icon: 'circle-notch', disabled: true }]
+    case 'bound':
       return [
-        {
-          action: 'publish',
-          label: 'Sync Google Doc',
-          icon: 'arrows-clockwise',
-          description: [`Replace "${projection.title ?? 'the Google Doc'}" with this version`, synced].filter(Boolean).join(' · '),
-        },
-        { action: 'open', label: 'Open Google Doc', icon: 'arrow-square-out', description: projection.title ?? undefined },
-        { action: 'unlink', label: 'Remove Google Docs link…', icon: 'link-break', description: 'Forget which Google Doc this file is published to. The Google Doc is not deleted.' },
+        { action: 'publish', label: 'Update the Google Doc', detail: formatLastUpdate(projection.lastSyncedAt, now) ?? 'Sends this version', icon: 'arrows-clockwise' },
+        { action: 'open', label: 'Open in Google Docs', detail: projection.title, icon: 'arrow-square-out' },
+        { action: 'unlink', label: 'Remove the link…', detail: 'The Google Doc is not deleted', icon: 'link-break' },
       ]
-    }
   }
 }

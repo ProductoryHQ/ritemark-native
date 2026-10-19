@@ -15,7 +15,7 @@
  *     and says why (D4/#133), rather than the feature quietly shrinking.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type PhosphorIconName as IconName } from '../ui/Icon';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../ui/context-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu';
@@ -28,11 +28,13 @@ import {
   NoFolderLocation,
   PermissionCard,
   RecordDot,
+  RecordPromptCard,
   RecordingProblem,
   SavingCard,
   useRecordingAnnouncement,
 } from './recording/RecordingCards';
 import { useTranscribeRecording } from './recording/useTranscribeRecording';
+import { RECORD_REQUEST, canStartRecording, panelChrome, requestedRecordingStart } from './panelChrome';
 import {
   formatDuration,
   formatRecordingDate,
@@ -49,6 +51,11 @@ export function TranscribePanel() {
   const [rejected, setRejected] = useState<{ fileName: string; reason: string } | null>(null);
   const [selectedEngine, setSelectedEngine] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Sprint 134 R16: each time the head's Record asks the panel to record (RECORD_REQUEST).
+  const [recordRequests, setRecordRequests] = useState(0);
+  const handledRecordRequests = useRef(0);
+  // ...and it arrived with no click in the panel, so the panel asks for one (RecordPromptCard).
+  const [recordPrompt, setRecordPrompt] = useState(false);
   const recording = useTranscribeRecording(state?.recording ?? null);
   const announcement = useRecordingAnnouncement(recording.view, state?.recording ?? null);
 
@@ -60,6 +67,8 @@ export function TranscribePanel() {
         if (message.data.pending) setRejected(null);
       } else if (message?.type === 'transcribe:importRejected') {
         setRejected({ fileName: message.fileName, reason: message.reason });
+      } else if (message?.type === RECORD_REQUEST) {
+        setRecordRequests((count) => count + 1);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -74,6 +83,24 @@ export function TranscribePanel() {
     () => (state?.engines ?? []).filter((engine) => engine.supportedOnPlatform && engine.readiness.ready),
     [state],
   );
+
+  // The head's Record starts a recording exactly when the panel's own Record button would (an effect, so the
+  // state the host posted just before the request is the one it reads).
+  useEffect(() => {
+    if (!state || recordRequests === handledRecordRequests.current) return;
+    handledRecordRequests.current = recordRequests;
+    const host = state.recording ?? null;
+    const busy = recording.view.phase !== 'idle' || (host !== null && host.phase !== 'idle');
+    if (!canStartRecording({ enabled: host?.enabled === true, nothingReady: usableEngines.length === 0, recordingBusy: busy })) return;
+    const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+    if (requestedRecordingStart(activation) === 'start') recording.start();
+    else setRecordPrompt(true);
+  }, [recordRequests, state, usableEngines, recording]);
+
+  // A recording started any other way answers the prompt.
+  useEffect(() => {
+    if (recording.view.phase !== 'idle') setRecordPrompt(false);
+  }, [recording.view.phase]);
 
   if (!state) {
     return <div className="p-4 text-xs text-ink-muted">Loading…</div>;
@@ -92,6 +119,17 @@ export function TranscribePanel() {
   const recordingBusy = capture.phase !== 'idle' || (host !== null && host.phase !== 'idle');
   const showSaving = capture.phase === 'stopping' || (capture.phase === 'idle' && host?.phase === 'finalizing');
   const partials = host?.partials ?? [];
+  const canRecord = canStartRecording({ enabled: host?.enabled === true, nothingReady, recordingBusy });
+
+  // Sprint 134 R16: with a folder open, the project's head draws Record and Transcribe a file…, so the
+  // panel's own row goes; with none, the panel keeps it.
+  const chrome = panelChrome({
+    hasProject: state.hasProject,
+    recordingEnabled: host?.enabled === true,
+    showAllProjects: state.showAllProjects,
+  });
+  const showNoFolderLocation = Boolean(host?.enabled && !host.hasProject && host.noFolderLocation && capture.phase === 'idle');
+  const showTopBlock = chrome.actions.length > 0 || showNoFolderLocation || dragging;
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -116,7 +154,7 @@ export function TranscribePanel() {
 
     setRejected({
       fileName: dropped?.name ?? 'That file',
-      reason: 'Files dragged from Finder cannot be read directly. Use Add recording to pick it instead.',
+      reason: `Files dragged from Finder cannot be read directly. Use ${chrome.pickFileName} to pick it instead.`,
     });
   };
 
@@ -130,67 +168,85 @@ export function TranscribePanel() {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
     >
-      {/* Settings lives in the view's TITLE BAR (package.json view/title), not
-          here — a second gear inside the panel body puts it on its own row
-          below the title, which reads as a stray control. */}
-      <div className="p-3 pb-2">
-        {/* One row at every width: Add recording, with Record as an icon
-            button beside it (Jarmo, 2026-09-22 RunDev review). */}
-        <div className="flex gap-2">
-          <Tooltip
-            className="min-w-0 flex-1"
-            label={nothingReady && !state.pending ? 'Set up a transcription engine first' : 'Choose an audio file to transcribe'}
-          >
-            {/* At 200% zoom the sidebar is narrow: the label ellipsizes rather
-                than overflowing the button; the tooltip keeps the full name. */}
-            <Button
-              className="h-8 w-full min-w-0 rounded-[8px] text-[13px]" /* the kit's button: 32 high, radius 8, 13 */
-              onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
-              disabled={nothingReady && !state.pending}
-            >
-              <Icon name="plus" size={14} />
-              <span className="truncate">Add recording</span>
-            </Button>
-          </Tooltip>
-          {host?.enabled && (
-            <Tooltip
-              className="shrink-0"
-              label={
-                recordingBusy
-                  ? 'A recording is in progress'
-                  : nothingReady
-                    ? 'Set up a transcription engine first'
-                    : 'Record from the microphone'
-              }
-            >
-              <Button
-                className="size-8 rounded-[8px]"
-                size="icon"
-                aria-label="Record"
-                onClick={() => recording.start()}
-                disabled={nothingReady || recordingBusy}
+      {/* Settings is the gear at the right of the Recordings label (Sprint 134 R16): the project's head
+          takes the view's title row, and its actions with it. */}
+      {showTopBlock && (
+        <div className="p-3 pb-2">
+          {/* One row at every width: Add recording, with Record as an icon
+              button beside it (Jarmo, 2026-09-22 RunDev review). Not drawn
+              when the project's head carries both (R16). */}
+          {chrome.actions.length > 0 && (
+            <div className="flex gap-2">
+              <Tooltip
+                className="min-w-0 flex-1"
+                label={nothingReady && !state.pending ? 'Set up a transcription engine first' : 'Choose an audio file to transcribe'}
               >
-                <RecordDot size="lg" />
-              </Button>
-            </Tooltip>
+                {/* At 200% zoom the sidebar is narrow: the label ellipsizes rather
+                    than overflowing the button; the tooltip keeps the full name. */}
+                <Button
+                  className="h-8 w-full min-w-0 rounded-[8px] text-[13px]" /* the kit's button: 32 high, radius 8, 13 */
+                  onClick={() => vscode.postMessage({ type: 'transcribe:pickFile' })}
+                  disabled={nothingReady && !state.pending}
+                >
+                  <Icon name="plus" size={14} />
+                  <span className="truncate">Add recording</span>
+                </Button>
+              </Tooltip>
+              {chrome.actions.includes('record') && (
+                <Tooltip
+                  className="shrink-0"
+                  label={
+                    recordingBusy
+                      ? 'A recording is in progress'
+                      : nothingReady
+                        ? 'Set up a transcription engine first'
+                        : 'Record from the microphone'
+                  }
+                >
+                  <Button
+                    className="size-8 rounded-[8px]"
+                    size="icon"
+                    aria-label="Record"
+                    onClick={() => recording.start()}
+                    disabled={!canRecord}
+                  >
+                    <RecordDot size="lg" />
+                  </Button>
+                </Tooltip>
+              )}
+            </div>
+          )}
+          {showNoFolderLocation && host?.noFolderLocation && <NoFolderLocation location={host.noFolderLocation} />}
+          {dragging && (
+            <div
+              className={[
+                chrome.actions.length > 0 || showNoFolderLocation ? 'mt-2' : '',
+                'rounded-lg border border-dashed border-accent bg-accent-soft/40 px-3 py-4 text-center text-xs text-accent-deep',
+              ].join(' ')}
+            >
+              Drop the recording here
+            </div>
           )}
         </div>
-        {host?.enabled && !host.hasProject && host.noFolderLocation && capture.phase === 'idle' && (
-          <NoFolderLocation location={host.noFolderLocation} />
-        )}
-        {dragging && (
-          <div className="mt-2 rounded-lg border border-dashed border-accent bg-accent-soft/40 px-3 py-4 text-center text-xs text-accent-deep">
-            Drop the recording here
-          </div>
-        )}
-      </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto pb-4">
-        <div className="sr-only" role="status" aria-live="polite">
-          {announcement}
-        </div>
-
+      {/* Under the head's rows (no top block), the first group label sits 14 below them, as Documents' does. */}
+      <div
+        className={[
+          'flex-1 overflow-y-auto pb-4',
+          showTopBlock ? '' : '[&>[data-section]:first-child>:first-child]:pt-1.5',
+        ].join(' ')}
+      >
         {host && capture.phase === 'idle' && !showSaving && <RecordingProblem host={host} platform={state.platform} />}
+        {recordPrompt && canRecord && (
+          <RecordPromptCard
+            onStart={() => {
+              setRecordPrompt(false);
+              recording.start();
+            }}
+            onCancel={() => setRecordPrompt(false)}
+          />
+        )}
         {capture.phase === 'permission' && <PermissionCard onCancel={() => recording.cancel()} />}
         {capture.phase === 'recording' && host && (
           <LiveRecordingCard
@@ -241,13 +297,28 @@ export function TranscribePanel() {
           </Section>
         )}
 
-        {state.recordings.length > 0 && (
-          <Section title={state.showAllProjects ? 'All projects' : 'Library'} count={state.recordings.length}>
-            {state.recordings.map((recording) => (
-              <RecordingRow key={recording.sessionId} recording={recording} />
-            ))}
-          </Section>
-        )}
+        {/* The Recordings label is always drawn, empty library or not: its gear is Transcribe's settings (R16). */}
+        <Section
+          title={chrome.libraryLabel}
+          count={state.recordings.length > 0 ? state.recordings.length : undefined}
+          action={
+            <Tooltip className="ml-auto shrink-0" label={chrome.settings.label}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="-my-1 -mr-1 size-[22px] rounded-[4px] text-ink-muted"
+                aria-label={chrome.settings.label}
+                onClick={() => vscode.postMessage(chrome.settings.message)}
+              >
+                <Icon name={chrome.settings.icon} size={14} className="size-3.5" />
+              </Button>
+            </Tooltip>
+          }
+        >
+          {state.recordings.map((recording) => (
+            <RecordingRow key={recording.sessionId} recording={recording} />
+          ))}
+        </Section>
 
         {!state.pending && !nothingReady && !recordingBusy && state.recordings.length === 0 && activeJobs.length === 0 && (
           <p className="px-4 py-6 text-center text-[13px] leading-5 text-ink-muted [text-wrap:balance]">
@@ -264,7 +335,10 @@ export function TranscribePanel() {
               </>
             ) : (
               <>
-                {host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.'}
+                {/* Sprint 134 (R16): with a project open, the head's rows are Record and Transcribe a file… */}
+                {state.hasProject
+                  ? (host?.enabled ? 'Record, or transcribe a file.' : 'Transcribe a file to start.')
+                  : (host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.')}
                 <br />
                 {state.acceptedExtensions.join(', ')}
               </>
@@ -290,6 +364,11 @@ export function TranscribePanel() {
             </Button>
           </div>
         )}
+
+        {/* Last, so the first group label can be the container's first child (the 14 under the head's rows). */}
+        <div className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </div>
       </div>
     </div>
   );
@@ -298,18 +377,22 @@ export function TranscribePanel() {
 function Section({
   title,
   count,
+  action,
   children,
 }: {
   title: string;
   count?: number;
+  /** An icon button at the label's right (R16: the Recordings label's gear). */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-1">
+    <div className="mb-1" data-section>
       {/* the column's group head (kit: .group): 11 semibold uppercase in ink, the count in muted ink */}
       <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-ink-strong">
-        <span>{title}</span>
+        <span role="heading" aria-level={2}>{title}</span>
         {count !== undefined && <span className="font-normal normal-case tracking-normal text-ink-muted">{count}</span>}
+        {action}
       </div>
       {children}
     </div>

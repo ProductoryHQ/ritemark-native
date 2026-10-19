@@ -57,6 +57,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore } from '../browser/BrowserContextStore';
+import { decodeBrowserShareAnswer, type BrowserShareQuestionClearMessage, type BrowserShareQuestionMessage } from './agentSidebarProtocol';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
@@ -201,6 +202,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * window is.
    */
   private _pendingLandingChat: { runtimeId: AgentId; placeholder: string } | null = null;
+  /** Sprint 134 (R4): a chat Home asked to open before the sidebar's page was ready. */
+  private _pendingSelectConversation: string | null = null;
   /**
    * Set once the CURRENT webview instance has signalled `sidebar/ready`.
    * `_view` existing only means a view object was created — its page may
@@ -338,6 +341,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._conversationController = new ConversationController({
       store: conversationStore,
       onTurnActive: (conversationId) => this._turnOwners.claim(conversationId),
+      // Sprint 134 (R3): a reply that finishes in front on a shown sheet is read at once.
+      isInFront: (conversationId) => this._isConversationInFront(conversationId),
       currentScope: () => resolveProjectScope({
         workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,
         folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),
@@ -431,6 +436,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (!delivered || !this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._sendChatFontSize();
           this._sendActiveFile();
+          BrowserContextStore.instance.sheetReloaded(); // a waiting share question is shown again
           void this._sendActiveBrowserContext();
           this._sendConnectivityStatus();
 
@@ -556,6 +562,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._selectedConversationId = message.conversationId;
             this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
             this._noteActiveConversation(message.conversationId);
+            this._markInFrontRead();
           }
           break;
 
@@ -564,7 +571,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // from this, so a bounded wait on it replaces the old blind 400 ms
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
-          if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          if (typeof message.conversationId === 'string') {
+            this._noteActiveConversation(message.conversationId);
+            this._markInFrontRead();
+          }
           // A replaced webview's late ready signal says nothing about the current
           // one: it must neither mark it ready nor use up a held report request.
           if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
@@ -577,6 +587,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             const landing = this._pendingLandingChat;
             this._pendingLandingChat = null;
             void webviewView.webview.postMessage({ type: 'landing:new-chat', ...landing });
+          }
+          if (this._pendingSelectConversation) {
+            const conversationId = this._pendingSelectConversation;
+            this._pendingSelectConversation = null;
+            void webviewView.webview.postMessage({ type: 'conversation/select', conversationId });
           }
           break;
 
@@ -652,6 +667,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'pin-agent-request':
           this.pinAgent(message.agentId, message.filePath);
           break;
+
+        // Sprint 134 (R20): the share question's answer, then the chip and any next question at once
+        case 'browser:share-answer': {
+          const answer = decodeBrowserShareAnswer(message);
+          if (!answer) break;
+          await BrowserContextStore.instance.answerShareQuestion(answer.pageId, answer.answer, answer.withoutAsking);
+          void this._sendActiveBrowserContext();
+          break;
+        }
 
         case 'agent-execute': {
           const { agentId, model, attachments } = message;
@@ -1221,7 +1245,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 type: 'codex-result', conversationId,
                 agentId,
                 status: 'error',
-                error: 'Codex exited unexpectedly. Please try again.',
+                error: 'ChatGPT stopped unexpectedly. Please try again.',
               });
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
@@ -1559,6 +1583,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // requiring a tab switch. Polling stops when the sidebar hides or disposes.
     webviewView.onDidChangeVisibility(() => {
       this._refreshBrowserContextPolling();
+      this._markInFrontRead();
       // Sprint 127 R5 (S27): a long-idle sidebar checks the model feed on show.
       if (webviewView.visible) modelCatalog.pollFeedIfStale();
     });
@@ -1637,6 +1662,49 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._pendingLandingChat = { runtimeId, placeholder };
+  }
+
+  /**
+   * Home's Waiting for you (Sprint 134, R4): open a chat on the AI's sheet,
+   * which reads it. Held until the sidebar's page is ready, like the landing.
+   */
+  public async openConversation(conversationId: string): Promise<void> {
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    if (this._view && this._sidebarReady) {
+      void this._view.webview.postMessage({ type: 'conversation/select', conversationId });
+      return;
+    }
+    this._pendingSelectConversation = conversationId;
+  }
+
+  /**
+   * Switching projects (Sprint 134, R9): the chats with a turn running in this
+   * window, a turn that waits on the person included, with their AI.
+   */
+  public workingChats(): { conversationId: string; runtimeId: AgentId | null }[] {
+    return [...this._activeConversationTurnIds.keys()].map((conversationId) => ({
+      conversationId,
+      runtimeId: [...(this._runtimeSessions.get(conversationId)?.keys() ?? [])][0] ?? null,
+    }));
+  }
+
+  /**
+   * Switch and stop (Sprint 134, R9): stop every working chat as Stop does, so
+   * each turn is recorded as stopped by the person, then wait for the turns to
+   * end, up to `timeoutMs`. A turn still running then is left to the reload.
+   */
+  public async stopWorkingChats(timeoutMs = 3000): Promise<void> {
+    const working = [...this._activeConversationTurnIds.keys()];
+    for (const conversationId of working) {
+      this._noteCancelIntent(conversationId);
+      for (const session of this._runtimeSessions.get(conversationId)?.values() ?? []) {
+        await session.cancel().catch((error: unknown) => console.warn('[Projects] Could not stop a chat before switching:', error));
+      }
+    }
+    const deadline = Date.now() + timeoutMs;
+    while (working.some((id) => this._activeConversationTurnIds.has(id)) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   }
 
   /**
@@ -1895,6 +1963,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (delivered === false) settle('no-conversation');
         }, () => settle('no-conversation'));
       }, () => settle('no-conversation'));
+    });
+  }
+
+  /** Sprint 134 (R3): the chat is in front on the AI's sheet, and the sheet is shown. */
+  private _isConversationInFront(conversationId: string): boolean {
+    return this._activeConversationId === conversationId && this._view?.visible === true;
+  }
+
+  /** Sprint 134 (R3): the chat in front on a shown sheet has its replies read. */
+  private _markInFrontRead(): void {
+    const conversationId = this._activeConversationId;
+    if (!conversationId || this._view?.visible !== true) return;
+    void this._conversationController.markRead(conversationId).catch((error) => {
+      console.warn('[Conversations] Could not mark a chat read:', error);
     });
   }
 
@@ -2701,7 +2783,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       await this._postCurrentSidebarMessage(target, {
         type: 'agent:runtime-status-error',
         runtimeId: 'codex',
-        error: `Codex could not be checked. ${detail}`,
+        error: `Ritemark could not check ChatGPT. ${detail}`,
         generation: target.generation,
         revision,
       }, 'Codex status');
@@ -2735,7 +2817,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       await rt.logout();
       emitCodexStatusInvalidated('logout');
     } catch (error) {
-      vscode.window.showErrorMessage(`Codex sign-out failed: ${error instanceof Error ? error.message : String(error)}`);
+      vscode.window.showErrorMessage(`ChatGPT sign-out failed: ${error instanceof Error ? error.message : String(error)}`);
       this._postCodexSidebarStatus(await rt.getCodexSidebarStatus());
     }
   }
@@ -2749,7 +2831,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     }
 
     const terminal = vscode.window.createTerminal({
-      name: 'Codex Repair',
+      name: 'Repair ChatGPT',
       shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
     });
 
@@ -2757,7 +2839,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     terminal.sendText(status.repairCommand);
 
     vscode.window.showInformationMessage(
-      'Opened Codex repair in terminal. After it finishes, reload the window.'
+      "Opened ChatGPT's repair in a terminal. When it finishes, reload the window."
     );
   }
 
@@ -3056,10 +3138,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private async _sendActiveBrowserContext() {
     const snapshot = await BrowserContextStore.instance.refreshMetadata();
-    if (snapshot?.url && snapshot.pageId && !snapshot.sharedWithAgent) {
-      // Fire-and-forget: triggers consent dialog the first time per pageId per session.
-      // Subsequent polls see sharedWithAgent === true and skip.
-      void BrowserContextStore.instance.ensureSharedForActiveTab();
+    // Sprint 134 (R20): the share question waits on this sheet, about the page in front; no dialog (#455).
+    const question = await BrowserContextStore.instance.ensureSharedForActiveTab();
+    if (question.kind === 'show') {
+      this._view?.webview.postMessage({ type: 'browser:share-question', pageId: question.question.pageId, title: question.question.title } satisfies BrowserShareQuestionMessage);
+    } else if (question.kind === 'clear') {
+      this._view?.webview.postMessage({ type: 'browser:share-question-clear' } satisfies BrowserShareQuestionClearMessage);
     }
     const post = BrowserContextStore.instance.getLastSnapshot() ?? snapshot;
 

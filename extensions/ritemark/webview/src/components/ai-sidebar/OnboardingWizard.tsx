@@ -134,7 +134,7 @@ function ChecklistStep({
         />
         {/* This install runs npm. Without Node.js, the bundled Codex is restored by reinstalling Ritemark. */}
         <DependencyRow
-          label="Codex"
+          label="ChatGPT"
           installed={status.codexCliInstalled}
           installState={installStates['codex-cli']}
           onInstall={() => onInstall('codex-cli')}
@@ -206,7 +206,7 @@ function AuthenticateStep({
           suffix={status.claudeCliInstalled ? 'Installed' : undefined}
         />
         <CompactRow
-          label="Codex"
+          label="ChatGPT"
           installed={status.codexCliInstalled}
           suffix={status.codexCliInstalled ? 'Installed' : 'Optional'}
           optional={!status.codexCliInstalled}
@@ -237,7 +237,7 @@ function AuthenticateStep({
 
       {status.codexCliInstalled && !status.codexCliAuthenticated && (
         <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
-          <div className="text-sm font-semibold mb-1">Sign in to Codex</div>
+          <div className="text-sm font-semibold mb-1">Sign in to ChatGPT</div>
           <p className="text-xs leading-5 opacity-75 mb-3">
             Connect your ChatGPT account to get started.
           </p>
@@ -275,7 +275,7 @@ function ReadyStep({
   const agentName = status.claudeCliAuthenticated
     ? 'Claude'
     : status.codexCliAuthenticated
-      ? 'Codex'
+      ? 'ChatGPT'
       : 'Your AI assistant';
 
   return (

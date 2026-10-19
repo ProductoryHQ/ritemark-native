@@ -27,3 +27,18 @@ export function selectRailConversationIds(
     ...(currentId && valid.has(currentId) ? [currentId] : []),
   ])];
 }
+
+/**
+ * Sprint 134 (R3): what the rail's dot says about a chat. Amber when it waits for
+ * the person: a question or an approval, or a reply not yet read (Jarmo, 19
+ * October: "Also unread answers"); the accent dot while it works. A chat with no
+ * read marker (one from before Sprint 134) counts as read, as on Home.
+ */
+export type RailMark = 'needs-you' | 'unread' | 'working' | null;
+
+export function railMarkOf(summary: Pick<ConversationSummaryV1, 'lifecycle' | 'readAt' | 'lastReplyAt'>): RailMark {
+  if (summary.lifecycle.state === 'needs-user') return 'needs-you';
+  if (summary.lifecycle.state === 'working') return 'working';
+  if (summary.readAt && summary.lastReplyAt && summary.lastReplyAt > summary.readAt) return 'unread';
+  return null;
+}

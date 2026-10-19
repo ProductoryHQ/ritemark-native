@@ -77,6 +77,30 @@ export const COLORS: Record<ColorName, { bg: string; fg: string }> = {
   slate:  { bg: 'rgba(100, 116, 139, 0.18)', fg: '#64748b' },
 };
 
+/**
+ * The colours an agent's settings offer: the Color field (`webview/src/components/agent/agentSchema.ts`'s
+ * `COLOR_OPTIONS`, Claude Code's own agent colours), which writes `color:` into the agent's file. The Agents place draws
+ * a chosen one on its row's icon through the theme colour `ritemark.agentColor.<name>` (package.json); a colour guessed
+ * from the name (`resolveIconAndColor`'s fallback, `COLORS`) is never drawn there (Sprint 134, R24).
+ */
+export const AGENT_COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan'] as const;
+export type AgentColor = (typeof AGENT_COLORS)[number];
+
+/** The colour an agent's own file chose (`color:`), or undefined when it sets none of the Color field's colours. */
+export function chosenAgentColor(frontmatter: Record<string, unknown>): AgentColor | undefined {
+  const raw = typeof frontmatter.color === 'string' ? frontmatter.color.trim().toLowerCase() : '';
+  return (AGENT_COLORS as readonly string[]).includes(raw) ? (raw as AgentColor) : undefined;
+}
+
+/**
+ * The theme colour that draws a chosen agent colour, as a webview reads it. VS Code names a webview's colour
+ * variables by replacing only the id's first dot (`themeing.ts`), so `ritemark.agentColor.green` is
+ * `--vscode-ritemark-agentColor.green`, and the second dot is escaped in CSS (S61).
+ */
+export function agentColorCssVar(color: AgentColor): string {
+  return `var(--vscode-ritemark-agentColor\\.${color})`;
+}
+
 interface HeuristicRule {
   keywords: string[];
   icon: IconName;

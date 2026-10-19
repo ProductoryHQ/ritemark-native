@@ -35,7 +35,6 @@ import { CARD_FOLDER } from './cardTypes';
 import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
 
 /** The Tasks place's container id, as the shell reports a click on it. */
-const TASKS_PLACE_ID = 'workbench.view.extension.ritemark-tasks';
 
 export interface TaskBoardHostDependencies {
   context: vscode.ExtensionContext;
@@ -53,6 +52,8 @@ export interface TaskBoardHost {
   store: BoardStore | null;
   /** Cards opened as pages in the Ritemark editor; null without a board. */
   cardPages: CardPages | null;
+  /** Bring the Task board's tab forward, or open it (Sprint 134: the permanent tabs and the place's click). */
+  showBoard: (() => Promise<void>) | null;
 }
 
 const RECOVER_COMMANDS: Record<string, string> = {
@@ -285,23 +286,29 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     context.subscriptions.push(cardPages);
   }
 
+  const tasksView = new TasksViewProvider(
+    extensionUri,
+    surfaceContext,
+    store ? () => TaskBoardPanel.show(extensionUri, surfaceContext) : undefined,
+  );
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(TasksViewProvider.viewType, new TasksViewProvider(
-      extensionUri,
-      surfaceContext,
-      store ? () => TaskBoardPanel.show(extensionUri, surfaceContext) : undefined,
-    ), {
+    vscode.window.registerWebviewViewProvider(TasksViewProvider.viewType, tasksView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
+    // The project's head on Tasks (Sprint 134, R16–R17): New task and Search run in the Tasks view.
+    // With no board (no folder, or the flag off) they show the view, which says why, as it does today.
+    vscode.commands.registerCommand('ritemark.tasks.newTask', () => tasksView.runHeadRow(controller ? 'new-task' : null)),
+    vscode.commands.registerCommand('ritemark.tasks.search', () => tasksView.runHeadRow(controller ? 'search' : null)),
     vscode.window.registerWebviewPanelSerializer(TaskBoardPanel.viewType, {
       async deserializeWebviewPanel(panel) {
+        // Sprint 134 (R5, S22): with the board turned off, Home stands first alone: a board tab the window restored
+        // goes (the extension may dispose a permanent tab; patch 019 stops only people and commands)
+        if (!controller) {
+          panel.dispose();
+          return;
+        }
         TaskBoardPanel.revive(panel, extensionUri, surfaceContext);
       },
-    }),
-    // Ritemark 2.0: the places row sits on top of the left column, where a click on the open place changes
-    // nothing; the shell tells us (patch 018), so a click on Tasks brings the board forward every time (R5, S18).
-    vscode.commands.registerCommand('ritemark.placeClickedAgain', async (placeId?: unknown) => {
-      if (placeId === TASKS_PLACE_ID && store) await TaskBoardPanel.show(extensionUri, surfaceContext);
     }),
     // With a card id, the card's page opens instead of the board.
     vscode.commands.registerCommand('ritemark.openTaskBoard', async (cardId?: unknown) => {
@@ -327,5 +334,5 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     }),
   );
 
-  return { controller, store, cardPages };
+  return { controller, store, cardPages, showBoard: store ? () => TaskBoardPanel.show(extensionUri, surfaceContext) : null };
 }

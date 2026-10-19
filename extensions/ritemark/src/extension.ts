@@ -20,6 +20,7 @@ import { registerReportStatusBar } from './reporting/reportStatusBar';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
+import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
@@ -93,6 +94,7 @@ let settingsProvider: RitemarkSettingsProvider | null = null;
 
 // The welcome (Sprint 133)
 let welcomeHost: WelcomeHost | null = null;
+let projectsHost: ProjectsHost | null = null;
 
 // Sprint 118: Transcribe panel, so shutdown can close an in-progress recording cleanly
 let transcribeView: { prepareForShutdown(): Promise<void> } | null = null;
@@ -507,19 +509,17 @@ export function activate(context: vscode.ExtensionContext) {
   // discovery so seeded items appear immediately in the sidebar.
   seedStarterPackOnFirstRun(context.extensionPath);
 
-  // Sprint 106 (#74): Home / first-task launcher — persistent re-entry point.
-  // Flag-gated (home-launcher, experimental kill-switch); reuses existing
-  // commands only, no duplicate creation logic.
-  // Sprint 106 (#74): the Home view is contributed unconditionally (a
-  // when-gated sole view left the container hidden via hideIfEmpty before the
-  // context key could be set). The provider itself honors the kill-switch: with
-  // the flag off it renders a one-line disabled notice instead of the launcher.
-  {
-    const { HomeViewProvider } = require('./views/HomeViewProvider') as typeof import('./views/HomeViewProvider');
-    context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(HomeViewProvider.viewType, new HomeViewProvider(context.extensionUri, isEnabled('home-launcher'), isEnabled('task-board'))),
-    );
-  }
+  // Sprint 134 (Ritemark 2.0, step 3): the project at the centre. Home's place holds the projects list
+  // (in 1.x's Home launcher's slot, `ritemark.homeView`), Home is the project's own first tab, Home and
+  // Tasks are the first two tabs, and switching projects asks first while a chat works.
+  projectsHost = registerProjects({
+    context,
+    taskBoard,
+    boardEnabled: () => isEnabled('task-board'),
+    openConversation: (conversationId) => unifiedViewProvider.openConversation(conversationId),
+    workingChats: () => unifiedViewProvider.workingChats(),
+    stopWorkingChats: () => unifiedViewProvider.stopWorkingChats(),
+  });
 
   // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the
   // on-device engine can't run, the registry says so rather than the whole view
@@ -707,7 +707,11 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.newDocument', async () => {
       await createDraftAndOpen('md', RitemarkEditorProvider.viewType);
-    })
+    }),
+    // Sprint 134 (R8): File ▸ Share, the Share menu of the document in front.
+    vscode.commands.registerCommand('ritemark.document.share', () => {
+      RitemarkEditorProvider.openShareMenu();
+    }),
   );
 
   context.subscriptions.push(
@@ -734,7 +738,11 @@ export function activate(context: vscode.ExtensionContext) {
     stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
     verifyCodexSignIn: () => unifiedViewProvider.verifyCodexSignIn(),
     openLandingChat: (runtimeId, placeholder) => unifiedViewProvider.openLandingChat(runtimeId, placeholder),
-  });
+  }, projectsHost ? {
+    ready: projectsHost.ready,
+    entries: () => projectsHost!.projectList.entries(vscode.workspace.workspaceFolders?.[0]?.uri.toString()),
+    revealHome: () => projectsHost!.revealHome(),
+  } : undefined);
 
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(
@@ -994,6 +1002,11 @@ export function activate(context: vscode.ExtensionContext) {
   // Command: open empty browser tab (Activity Bar "New Tab" button).
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.browser.newTab', async () => {
+      await openEmptyBrowserTab();
+    }),
+    // Sprint 134 (R18): the Browser place's head row, New page (the Experience lead, 19 October); hidden in the
+    // palette, where New browser tab stays
+    vscode.commands.registerCommand('ritemark.browser.newPage', async () => {
       await openEmptyBrowserTab();
     })
   );
