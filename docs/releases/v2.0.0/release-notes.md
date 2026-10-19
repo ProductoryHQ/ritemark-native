@@ -14,6 +14,7 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **A sample project to try.** "Leadership programme" is a small leadership programme with documents to work on: a brief, modules, kickoff notes, and tasks on its task board. A second copy goes to "Leadership programme 2". Ritemark never writes over a folder you already have.
 - **Ready to ask.** The window opens on your project with Documents open. The AI's sheet starts a new chat that reads "Ask Claude about this project" (or the AI you signed in to), and the empty desk offers Text, Table and Web page.
 - **A later window.** A new window with no folder asks "Where do you want to start?", with your recent projects, **Open another folder…** and **Start a new project**.
+- **A first window that fits.** The first window opens at 1440 × 900, or at 90% of a smaller screen. In a shorter window the welcome tightens up, so it always fits without scrolling. A window size you have used before is kept.
 - **Help's Welcome is Ritemark's.** Help's **Welcome** and the walkthrough commands open Ritemark's welcome. VS Code's Getting Started page is gone.
 
 ## The window
@@ -23,7 +24,8 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **Ritemark Light and Ritemark Dark, redrawn.** Ritemark Dark uses deep indigo surfaces instead of slate, and its buttons are light indigo with dark text.
 - **Easier to read.** Muted text in Ritemark Light is darker.
 - **You.** **You**, at the top right, holds **Settings** and **Help**. ⌘, (Ctrl+, on Windows) opens Ritemark Settings.
-- **Git and Node.js in Settings.** When you use this computer's own Claude or Codex, Ritemark Settings shows Git and Node.js under the runtime choice.
+- **Git and Node.js in Settings.** Ritemark Settings shows whether Git is on your computer, since File changes needs it, and, when you use this computer's own Claude or Codex, Node.js too.
+- **Getting started in Help.** Help has **Getting started** beside **Support**.
 
 ## Places and the left column
 
@@ -32,7 +34,7 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **The project at the top.** The left column starts with your project's mark and name, with a menu. Below them, **New** makes a document, folder, agent, skill, command or flow, and **Search** searches the project's files.
 - **A calmer file tree.** The tree has no carets, and its rows are taller.
 - **File icons you can tell apart.** PDF, Word, Excel, CSV, PowerPoint, image and audio files each have their own icon.
-- **Extensions in a lighter ink.** In the file tree and on tabs, a file's extension is in a lighter ink. The chosen row and tab stay in full ink, and high contrast themes keep full ink.
+- **Extensions in a lighter ink.** In the file tree and on tabs, a file's extension is in a lighter ink. On the chosen tab and row it is a step quieter than the name, and high contrast themes keep full ink.
 
 ## Tabs
 

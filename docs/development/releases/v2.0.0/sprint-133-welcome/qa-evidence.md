@@ -52,12 +52,12 @@ Windows (S45–S47 and R15's Windows half) is not in this file yet: it runs thro
 | S39 #429's reproduction | Pass | With the folder really open (see the harness note): 5 of 5 fresh launches with `"*.md": "default"` and 25 of 25 without it ended with one tab, in the Ritemark editor. |
 | S40 Every way in | Pass | Help: Welcome, Welcome: Open Walkthrough…, Chat: Open Walkthrough, Get Started with Accessibility Features and the default `startupEditor` all open Ritemark's welcome or nothing; Getting Started never showed (`s40-help-welcome.png`). |
 | S41 The launch check's rows | Pass | With this computer's Claude: "This computer's tools: Git found … Node.js found …" under the runtime choice; with Ritemark's own, no rows. Sign-in states with Sign Out; Usage data with the welcome's words and both links (`s41-settings-this-computers-tools.png`). |
-| S42 The tree and the tabs | Pass | Name in body ink, extension muted (`.md` only for `report.final.md`; none for `README`; `.gitignore` whole); both parts body ink when chosen. In Dark and Light High Contrast the extension takes the body ink (21:1 and about 14.7:1) (`s42-*.png`). |
+| S42 The tree and the tabs | Pass | Name in body ink, extension muted (`.md` only for `report.final.md`; none for `README`; `.gitignore` whole); on the chosen tab and the open row the name is in ink and the extension in body (#1E1B4B and #475569 in Light; #F8FAFC and #C7D2FE in Dark), as revised after Windows round 3. In Dark and Light High Contrast the extension takes the name's ink (21:1 and about 14.7:1) (`s42-*.png`). |
 | S48 A finished profile's window with no folder | Pass | "Where do you want to start?" with the recent projects, Open another folder… and Start a new project, no AI or switch (`*-welcome-start.png`). |
 | S49 Every empty desk | Pass | In a project window with every tab closed: Text opened a new document, Table a new table, Web page a browser tab (`s49-empty-desk-tiles.png`). The new files went into the project (#451 unchanged). |
 | S43 The inventory | Partly | The launch check's rows live in Settings (S41) and the welcome (S20); "You are interacting with AI" shows on the AI's sheet. The sign-in, setup, repair and recovery cards need signed-out or broken runtimes: not run here. |
 | S44 Skipped, then signing in later | Not run | Both AIs are signed in on this Mac, so the AI's sheet shows no sign-in cards. |
-| S45–S47 Windows | S45, S46 on the overlay: see *The Windows overlay round* | Four findings fixed; S47 and the shell parts wait for the round from main. |
+| S45–S47 Windows | Pass on the overlay and from main | S45, S46 on the overlay (four findings fixed in #453); S47 and the shell parts from main `eae1dedd`: see *The Windows round from main*. |
 
 ## Fixed during this QA
 
@@ -85,6 +85,31 @@ The Experience lead approved all three, and asked for three more, done and check
 - The feedback box says under its field "What you write here is sent with your feedback." (the usage-data switch promises never your documents, chats or names). VS Code's input box draws that line in its own ink, not muted, and appends its "(Press 'Enter' to confirm…)" hint; muting it would restyle every input box. The Experience lead accepted it as VS Code draws it.
 
 The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
+
+## The Windows round from main (19 October)
+
+Round 3, run by the Development manager's Windows session on the signed build of main `eae1dedd` (run 39208269223). 7 of 9 checks passed:
+- The first window opened at 1440 × 900, centred in a 1920 × 1032 work area; a copied profile kept its maximised size.
+- The welcome alone: no tab row, no Getting Started.
+- ChatGPT's sign-in: no question; Edge opened OpenAI's sign-in page; the card's Cancel ended it and freed 1455; `auth.json` was unchanged.
+- S47 on a copy of Jarmo's profile: the update welcome once, with "On, as you chose in Ritemark 1"; Claude Signed in and ChatGPT's sign-in ended; "Open when you left" reopened the project with its tabs.
+- Help: Getting started, Support, View License, Advanced, About; "Help: Welcome" in the palette opens the welcome.
+- The empty desk's tiles, and Sprint 132's toast wrapping and Ctrl+Alt+I.
+- `product.json` trusts the sign-in hosts; `commit` is still `""` (#463).
+
+To settle:
+- **The compact welcome below a 620 window: passes to spec.** Windows' frame takes 108 of the window (its 32 caption) and the Mac's 76, so a 620-tall window leaves a page of 512 on Windows and 544 on the Mac, and steps 1 and 2 scroll inside the sheet there. The Experience lead confirmed their 620 is the page's height: step 1 fits down to a page of 551, step 2 to 585 (607 on Windows), which covers a maximised 1366 × 768 Windows laptop (page about 620). No further tier.
+- **The chosen tab's extension** was drawn in the name's ink. The Experience lead's call: a step quieter, in body (the kit's `.tb.on .ext`), on the chosen tab and the open row. Fixed in the closeout (patch 018's `ritemarkSurfaces.css`), checked in Light, Dark and Dark High Contrast (`s42-chosen-tab-body-extension.png`), and S42 reworded.
+- The palette's "Developer: Reset Welcome Page Walkthrough Progress" goes with Sprint 134's palette filter.
+- #401 on a fresh profile: extension host at +14.6 s, Ritemark activated +16.8 s, eager done +33.3 s, unresponsive 4.9 s and 0.7 s, MsMpEng 6.3% average (peak 19.2%): round 2's Defender pattern again.
+
+## E7: the drift check (19 October)
+
+`./scripts/check-vscode-drift.sh 1.142.0` at `eae1dedd`: 13 of 18 patches fail in 56 file patches. 006, 011, 012, 014 and 016 apply; the most are 018's (14 file patches), 002's (12) and 003's (8). Sprint 132's closeout measured 15 of 19 in 60; this sprint retired 017 and 001's and 016's Getting Started hunks. Recorded in the release plan's risk register.
+
+## E5: the production build at the merge (19 October)
+
+A clean-room release worktree from `./scripts/create-release-worktree.sh` at `origin/main` `eae1dedd`: HEAD exactly `origin/main`, detached, tracked sources clean, a physical pristine VS Code checkout at the gitlink `10c8e557`, physical dependency roots, empty build output. `release-preflight.sh` passed with one warning, the extension symlink, which the build creates. Then `build-prod.sh` (arm64 Node 22.22.1 from `vscode/.nvmrc`), unsigned: all 9 steps, VALIDATION PASSED, BUILD PROVENANCE VERIFIED, finished 09:25. The built app carries the sprint's last changes: the first-window size (`main.js`), Help's Getting started, `sendFeedback`, the compact rhythm in `webview.js`, and the trusted sign-in hosts in `product.json`, which, as expected, still has no `commit` (#463). The worktree is kept, unsigned, at `.worktrees/release-eae1dedd7114` (10 GB, the app 2.0 GB).
 
 ## The Windows overlay round (18 October)
 
@@ -139,13 +164,25 @@ The Development manager's parity check found three gaps in the welcome's scope; 
 
 ## Open findings
 
-Outside this sprint's files, for follow-up issues:
-- Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open.
-- Ritemark Settings doesn't redraw when the runtime choice changes outside the page (in `settings.json`); its own select does.
+Outside this sprint's files, as issues:
+- Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open: in Sprint 134 (R13).
+- [#460](https://github.com/ProductoryHQ/ritemark-native/issues/460): Ritemark Settings doesn't redraw when the runtime choice changes outside the page (in `settings.json`); its own select does.
+- [#461](https://github.com/ProductoryHQ/ritemark-native/issues/461): the first-run theme setup overwrites a theme set in `settings.json` before the first start (`window.autoDetectColorScheme`, seen in the Windows round).
+- [#463](https://github.com/ProductoryHQ/ritemark-native/issues/463): `product.json` has no commit, so windows never keep a V8 code cache (the #401 audit's second lead).
+- [#464](https://github.com/ProductoryHQ/ritemark-native/issues/464): the welcome's ChatGPT check reads Codex's error text (`isCodexSignInFailure`); a structured status from Codex would replace it.
+
+## Privacy, for the website (E6)
+
+For ritemark.app's privacy page, through the release's launch plan (Sprint 136's D5):
+- Usage data is off until the person turns it on, with a switch on the welcome and in Ritemark Settings; nothing is sent before that yes. Ritemark 1's OK (or a notice closed without Opt Out) carries over as a yes; Opt Out or no answer is off.
+- Every event carries `build_channel` (`dev` or `prod`), and no event carries a path, a name, a file, a message or an account.
+- New in 2.0 with usage data on: four counts (the welcome shown, an AI signed in, a project opened, the first message sent), beside the app starts and features used.
+- Send Feedback is the person's own choice and is sent even with usage data off: only the reaction and what they typed, under a one-off id that isn't kept, with no location. The box says "What you write here is sent with your feedback."
+- With usage data on, PostHog derives country and city from the request's IP (`disableGeoip: false`).
 
 ## The frame baseline
 
-`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The same after main's #452 was merged in. The baseline is unchanged; the welcome's own scenes are in `qa-evidence/` for Jarmo to approve into the baseline (`docs/development/frame-baseline/README.md`: a new baseline only with his approval).
+`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The same after main's #452 was merged in. The frame's 18 scenes are unchanged. The welcome's own ten scenes joined the baseline with Jarmo's approval on 19 October (`docs/development/frame-baseline/README.md`).
 
 ## Checks
 

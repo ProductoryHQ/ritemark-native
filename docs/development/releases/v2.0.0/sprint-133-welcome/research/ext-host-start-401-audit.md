@@ -35,6 +35,7 @@ Main `f492948b`, installed over round 1 on Jarmo's own profile (the real update 
 - Defender (`MsMpEng`) averaged 6.6% of the machine (peak 18.7%) on the reinstall's first start, 2.5% on the second, 0.5% idle.
 - The same build's second start reads the same files in 202 ms. What differs is files the installer has just written, which Defender scans on their first read. No security setting was changed.
 - The CPU profiles and samples stay on the Windows PC (they hold Windows user paths).
+- Round 3, the signed build of main `eae1dedd` on a fresh profile: extension host at +14.6 s, Ritemark activated +16.8 s, eager done +33.3 s, unresponsive 4.9 s and 0.7 s, MsMpEng 6.3% average (peak 19.2%). The same pattern.
 
 ## A second lead: the V8 code cache
 

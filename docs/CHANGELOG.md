@@ -27,9 +27,11 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **Tiles on an empty desk (Sprint 133).** Every empty desk offers Text, Table and Web page as tiles.
 - **Welcome to Ritemark 2.0 (Sprint 133).** Updating from Ritemark 1 shows it once. It lists your AIs and whether each is signed in, with **Add another** for more, and up to three recent projects with the one you left first. **Open when you left** brings the window back as it was. **Open another folder…**, **Start a new project** and the usage-data switch are there too.
 - **Where do you want to start? (Sprint 133).** A later window with no folder asks this, with your recent projects, **Open another folder…** and **Start a new project**.
+- **A first window made for the new frame (Sprint 133).** On a fresh start the first window opens at 1440 × 900, or at 90% of the screen when that is smaller. A window size you have used before is kept. In a shorter window the welcome takes a more compact layout, so it always fits without scrolling.
 - **A usage-data switch (Sprint 133).** On the welcome and in Ritemark Settings: "Share anonymous usage data to improve Ritemark. Never your documents, chats or names.", with links to the Privacy Policy and Terms of Use. Usage data is off until you turn it on, and nothing is sent before you say yes. Turning it off stops sending at once.
 - **Four new anonymous counts (Sprint 133).** With usage data on, Ritemark also counts four steps, beside the app starts and features used it already counted: the welcome shown, an AI signed in, a project opened and the first message sent. Never a path, a name, a file, a message or an account.
-- **Git and Node.js in Ritemark Settings (Sprint 133).** When you use this computer's own Claude or Codex, Settings shows Git and Node.js under the runtime choice, the rows from the old launch check.
+- **Git and Node.js in Ritemark Settings (Sprint 133).** Settings shows whether Git is on this computer, since File changes needs it, and, when you use this computer's own Claude or Codex, Node.js too: the rows from the old launch check.
+- **Getting started in Help (Sprint 133).** Help has **Getting started** beside **Support**, opening the guide the old first page linked to.
 
 ### Changed
 - **No title row (Sprint 132).** On the Mac and on Windows, each column starts with a strip that holds its controls on one line: the traffic lights or Windows' buttons, a toggle for each side column, the tabs and **You**.
@@ -50,7 +52,7 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **Ritemark 1's usage-data notice is gone (Sprint 133).** If you pressed **OK** on it, or closed it without **Opt Out**, usage data stays on after the update. If you chose **Opt Out** or never answered, it is off.
 - **Send Feedback says what it sends (Sprint 133).** Under the text box: "What you write here is sent with your feedback." Pressing Send sends your feedback even with usage data off. Then it sends only your reaction and what you typed, under a one-off id that isn't kept, and usage data stays off. Escape sends nothing.
 - **Help's Welcome opens Ritemark's welcome (Sprint 133).** VS Code's Getting Started page is gone. Help's **Welcome** and the walkthrough commands open Ritemark's welcome instead.
-- **File extensions in a lighter ink (Sprint 133).** In the file tree and on tabs, a file's extension is in a lighter ink. The chosen tab and row stay in full ink, and high contrast themes keep full ink.
+- **File extensions in a lighter ink (Sprint 133).** In the file tree and on tabs, a file's extension is in a lighter ink. On the chosen tab and row it is a step quieter than the name, and high contrast themes keep full ink.
 
 ### Fixed
 - **Updating keeps the theme you chose (Sprint 132).** Ritemark re-applied its theme set-up whenever the version changed, so every update reset a theme picked by hand. The set-up now runs once per profile.

@@ -193,7 +193,7 @@ Acceptance criteria:
 As a writer, I want names to read first and extensions to step back.
 
 Acceptance criteria:
-- In the document tree and on tabs, a file's extension is drawn in the theme's muted ink, and its name in the body ink. On the chosen tab and the open row both are the body ink (the Experience lead's review of Sprint 132, 17 October).
+- In the document tree and on tabs, a file's extension is drawn in the theme's muted ink, and its name in the body ink. On the chosen tab and the open row the name is in ink and the extension a step quieter, in body (the kit's `.tb.on .ext`; the Experience lead, 19 October, after Windows round 3).
 - Names with no extension, names starting with a dot, and names with several dots (`report.final.md`: only `.md` is muted) are drawn correctly.
 - Search results, quick picks and the tab's tooltip are unchanged.
 - It holds in Light, Dark and high contrast; in high contrast the extension keeps 4.5:1.

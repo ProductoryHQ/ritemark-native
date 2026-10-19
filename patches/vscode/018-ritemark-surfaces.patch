@@ -605,10 +605,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..01610913be4
+index 00000000000..f51529716ee
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1701 @@
+@@ -0,0 +1,1707 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2293,8 +2293,9 @@ index 00000000000..01610913be4
 +
 +/*
 + * A file's extension in muted ink, in the documents tree and on tabs (R13; iconLabel.ts `splitExtension`). The name is
-+ * the body ink; on the chosen tab, the open row, a pointed-at row or tab, in high contrast, and where a file decoration
-+ * colours the name, the extension takes the name's own colour.
++ * the body ink. On the chosen tab and the open row the name is in ink and the extension a step quieter, in body (the
++ * kit's `.tb.on .ext`, the Experience lead, 19 October). On a pointed-at row or tab, in high contrast, and where a file
++ * decoration colours the name, the extension takes the name's own colour.
 + */
 +
 +.monaco-workbench .label-extension {
@@ -2309,6 +2310,11 @@ index 00000000000..01610913be4
 +.monaco-workbench.hc-black .label-extension,
 +.monaco-workbench.hc-light .label-extension {
 +	color: inherit;
++}
++
++.monaco-workbench:not(.hc-black):not(.hc-light) .tabs-container > .tab.active .monaco-icon-label:not([class*="monaco-decoration-itemColor-"]) .label-extension,
++.monaco-workbench:not(.hc-black):not(.hc-light) .monaco-list .monaco-list-row.selected .monaco-icon-label:not([class*="monaco-decoration-itemColor-"]) .label-extension {
++	color: var(--rm-body);
 +}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 index 4aaccf3c849..31f3520c15a 100644
