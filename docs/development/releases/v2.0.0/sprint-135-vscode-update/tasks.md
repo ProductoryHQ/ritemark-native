@@ -8,7 +8,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Steps 
 - [x] `git checkout -b sprint-135-vscode-update` from `origin/main`; `git branch --show-current` shows it (2026-10-19, after Jarmo's approval)
 - [x] Freeze the target by R1's rule; write `notes/freeze.md` (tag, commit, date, Node, Electron, server Node); put the target in the sprint plan's status line (W1, S1): 1.142.0, `d956e8a6`, 2026-10-19
 - [x] Record the rollback point: main's last 1.117.0 commit and its clean-room build check, in the release plan's tracker (R10, W11): `3c8a7c30` for now, with Sprint 134's E5 build check; confirmed or moved to the PR's base before the PR
-- [x] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1): 13 of 18 patches fail in 59 file patches; 104 of 400 hunks
+- [x] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1): 13 of 18 patches fail in 59 file patches; 105 of 400 hunks
 - [x] The upstream diff inventory for every patched file (W1): `notes/upstream-diff.md`
 - [x] List Steps 2 and 3's patches and their shell scenarios by number below, under Phase 7 (R7)
 - [x] Record every patch's file list and count before the rebase, in `notes/rebase.md` (`PATCH-RULES.md` §8)

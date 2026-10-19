@@ -219,7 +219,7 @@ VS Code 1.142.0: 13 of 18 patches fail in 59 file patches
 
 ### By hunk
 
-As at planning time: each patch applied in order with `git apply --reject --whitespace=nowarn` to the drift script's sparse checkout of 1.142.0; hunks that apply stay applied. The 2 hunks for `build/lib/optimize.ts`, which is gone upstream, count as rejected.
+As at planning time: each patch applied in order with `git apply --reject --whitespace=nowarn` to the drift script's sparse checkout of 1.142.0; hunks that apply stay applied. The 2 hunks for `build/lib/optimize.ts`, which is gone upstream, count as rejected, and so does 015's hunk that creates `src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts`: upstream added a test file of the same name. The updated `check-vscode-drift.sh` gives the same table.
 
 | Patch | Files | Hunks | Rejected hunks | Failing files |
 |---|---|---|---|---|
@@ -237,11 +237,11 @@ As at planning time: each patch applied in order with `git apply --reject --whit
 | 012 | 1 | 5 | 0 | 0 |
 | 013 | 2 | 3 | 1 | 1 |
 | 014 | 7 | 16 | 0 | 0 |
-| 015 | 6 | 16 | 2 | 2 |
+| 015 | 6 | 16 | 3 | 2 |
 | 016 | 1 | 1 | 0 | 0 |
 | 018 | 52 | 106 | 24 | 17 |
 | 019 | 19 | 53 | 10 | 4 |
-| **Total** | | **400** | **104** | **59** |
+| **Total** | | **400** | **105** | **59** |
 
 ### What changed since planning
 
