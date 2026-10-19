@@ -21,6 +21,22 @@ import { aiNameOf } from './homeState';
 export const SWITCHED_FROM_KEY = 'ritemark.projects.switchedFrom';
 /** The note shows only on the window the switch opened, not on a later start. */
 export const SWITCHED_NOTE_MS = 2 * 60 * 1000;
+/**
+ * R9: "The next project opens on its Home". Every switch in place leaves this for the next window, Go back and
+ * VS Code's own routes included (the note's `SWITCHED_FROM_KEY` is not left by Go back); the window's tab check
+ * takes it once and brings Home forward.
+ */
+export const LANDING_KEY = 'ritemark.projects.landOnHome';
+
+interface Landing {
+  /** The folder the switch left. */
+  from: string | null;
+  /** The folder it opens, when the window knows it (not for Open Folder…, a drop or Close Folder). */
+  target: string | null;
+  at: number;
+}
+
+const sameFolder = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 
 export interface SwitchedFrom {
   folderUri: string;
@@ -95,6 +111,11 @@ export class ProjectSwitcher {
     return question.buttons.find((button) => button.label === picked?.title)?.choice ?? 'cancel';
   }
 
+  private async rememberLanding(target: string | undefined): Promise<void> {
+    const landing: Landing = { from: this.deps.hereUri(), target: target ?? null, at: Date.now() };
+    await this.deps.context.globalState.update(LANDING_KEY, landing);
+  }
+
   private async rememberHere(): Promise<void> {
     const here = this.deps.hereUri();
     if (!here) return;
@@ -120,6 +141,7 @@ export class ProjectSwitcher {
     if (choice === 'switch-and-stop') await this.deps.stopWorkingChats();
     if (options.goingBack) await this.deps.context.globalState.update(SWITCHED_FROM_KEY, undefined);
     else await this.rememberHere();
+    await this.rememberLanding(target.toString());
     this.askedUntil = Date.now() + 10_000;
     await vscode.commands.executeCommand('vscode.openFolder', target, { forceReuseWindow: true });
     return 'switched';
@@ -136,6 +158,7 @@ export class ProjectSwitcher {
     const choice = await this.ask(targetUri ? this.deps.nameOf(targetUri.toString()) : null);
     if (choice === undefined) {
       if (targetUri) await this.rememberHere();
+      await this.rememberLanding(targetUri?.toString());
       return false;
     }
     if (choice === 'cancel') return true;
@@ -145,7 +168,21 @@ export class ProjectSwitcher {
     }
     await this.deps.stopWorkingChats();
     if (targetUri) await this.rememberHere();
+    await this.rememberLanding(targetUri?.toString());
     return false;
+  }
+
+  /**
+   * Whether this window came from a switch in place, so it lands on Home (R9, S30): once, only right after the
+   * switch, and only in the folder it opened (or, when the window did not know it, in any other folder).
+   */
+  static takeLanding(context: vscode.ExtensionContext, hereUri: string | null): boolean {
+    const landing = context.globalState.get<Landing>(LANDING_KEY);
+    if (!landing) return false;
+    void context.globalState.update(LANDING_KEY, undefined);
+    if (!hereUri || typeof landing.at !== 'number' || Date.now() - landing.at > SWITCHED_NOTE_MS) return false;
+    if (landing.target) return sameFolder(landing.target, hereUri);
+    return !landing.from || !sameFolder(landing.from, hereUri);
   }
 
   /** The note on the next window's Home: once, and only right after a switch. */

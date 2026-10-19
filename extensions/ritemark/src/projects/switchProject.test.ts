@@ -28,7 +28,7 @@ const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]
 (Module as unknown as { _load: unknown })._load = (request: string, ...rest: unknown[]) => (request === 'vscode' ? vscodeStub : load(request, ...rest));
 
 async function main(): Promise<void> {
-  const { switchQuestion, ProjectSwitcher, SWITCHED_FROM_KEY } = await import('./switchProject');
+  const { switchQuestion, ProjectSwitcher, SWITCHED_FROM_KEY, LANDING_KEY } = await import('./switchProject');
 
   // S31: one AI, the other project known: three buttons, Open in a new window the default.
   const one = switchQuestion(['claude-code'], 'Leadership programme', 'Sales proposal Q4');
@@ -120,6 +120,23 @@ async function main(): Promise<void> {
   assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/sales'), null, 'once');
   state.set(SWITCHED_FROM_KEY, { folderUri: 'file:///p/sales', name: 'Sales', at: Date.now() });
   assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/sales'), null, 'not about itself');
+
+  // R9, S30: every switch in place lands on Home in the next window, Go back and Open Recent included; once, only in
+  // the folder it opened (any other folder when the window did not know it), only right after the switch.
+  reset(); working = [];
+  await fresh().switchTo(sales, { goingBack: true });
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales/'), true, 'Go back lands on Home too');
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), false, 'once');
+  await fresh().switchTo(sales);
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/other'), false, 'not in another folder');
+  await fresh().beforeReload('file:///p/sales');
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), true, 'Open Recent');
+  await fresh().beforeReload(undefined);
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/lead'), false, 'Open Folder… back into the same folder is no switch');
+  await fresh().beforeReload(undefined);
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/elsewhere'), true, 'Open Folder… into another folder');
+  state.set(LANDING_KEY, { from: 'file:///p/lead', target: 'file:///p/sales', at: Date.now() - 3 * 60 * 1000 });
+  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), false, 'too late');
 
   console.log('projects/switchProject: all assertions passed');
 }

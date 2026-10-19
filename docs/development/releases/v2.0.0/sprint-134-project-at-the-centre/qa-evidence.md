@@ -45,10 +45,10 @@ Each scenario's result after the fixes, with the run that holds its evidence (ru
 | S24 Searching | Pass | A |
 | S25 Add a project | Pass after two fixes (no place to choose; an unfinished welcome opened on step 1) | A, C, round three |
 | S26 A new window | Pass | A |
-| S27 Switch project | Pass after a fix (accessible names) | run 1 |
+| S27 Switch project | Pass after two fixes (accessible names; two flyouts at once) | run 1; E3 |
 | S28 About this project | Pass; ChatGPT's answer at Gate 2 | run 1 |
 | S29 File ▸ Switch project | Pass on the Mac; Windows after the merge | run 1 |
-| S30 Switching and coming back | Pass; the frames between the pages at Gate 2 | run 1 |
+| S30 Switching and coming back | Pass after a fix (Open Recent and Go back did not land on Home); the frames between the pages at Gate 2 | run 1; E3 |
 | S31 The AI is working | Pass after a fix (buttons past the sheet's edge); Open in a new window by unit test | run 1 |
 | S32 Go back | Pass after two fixes (a second note; Dark) | run 1, C |
 | S33 VS Code's own Open Folder and Open Recent | Pass after a fix (Enter stopped the AI); Open Folder…'s native picker not run | run 1 |
@@ -121,6 +121,19 @@ Fixed after run C on the build of `d35e3e57`, and checked live on run 1's instan
 
 - **S22:** with the board turned off, a restored Task board tab stayed until it was clicked, because VS Code revives a restored webview, and so calls the board's serializer, only when the tab is shown. The permanent-tabs check now plans a `remove` for a board tab while the board is off: it brings the tab forward, the serializer disposes it, and the person's own tab comes back (`permanentTabs.ts`; `permanentTabs.test.ts`). Live: Kickoff notes.md in front, the flag off, Reload Window: Home pinned and alone, Kickoff notes.md still in front (`s22-board-off-tab-gone-after-reload-dark.png`); the flag on again and a reload: Home and Task board pinned.
 - **S25:** on a profile whose welcome was never finished, Start a new project opened the welcome on step 1 ("Which AI do you use?"), with no form. It now opens on the project step with the form open, as Skip for now would (`welcomeHost.ts`). Live, a short-lived second instance on a fresh profile launched straight onto a folder: Add a project ▸ Start a new project → "2 · Set up project" with Start a new project's name field and Change… (`s25-unfinished-welcome-opens-on-the-form-light.png`); that instance quit with ⌘Q and its profile deleted.
+
+### Found while writing E3's checks, and fixed
+
+- **R9, S30: a switch did not land on Home.** "The next project opens on its Home" held only by chance: a switch from Home's list leaves Home in front, so coming back finds it there, but File ▸ Open Recent, the project's menu or Go back from a document reopened the project on the tab it was left with, and the "Switched to …" note sat unseen on Home. Every switch in place now leaves a landing record for the next window (Go back and VS Code's own routes included; `LANDING_KEY`), which the permanent-tabs check takes once and brings Home forward (`switchProject.ts`, `permanentTabs.ts`; `switchProject.test.ts`). Live: Leadership programme left on Kickoff notes.md, switched to Sales proposal Q4 and back through Open Recent: it came back with Home in front, its tabs in their order (`project-check.mjs`, below).
+- **R8: Switch project ▸ opened two flyouts, one over the other.** A pointer coming to rest on the row and the click on it both started an opening while the rows were still being asked for. They now share one opening (patch 018, `ritemarkMenu.ts`; `ritemarkMenu.test.ts`, which failed with 2 flyouts before the fix). Live: one flyout, the keyboard on its first row; Escape closes it, a second Escape the menu, and the keyboard goes back to the head.
+
+## E3: the scripted checks
+
+- **`scripts/qa/project-check.mjs`** (new): Home and Tasks first and pinned (R5); the Tasks tab's count equal to the place's (R6); with `--user-data-dir`, the splash's saved colours equal to the ground (R9); with `--close-all`, only Home and Tasks after Close all (S20); with `--switch-to`, File ▸ Open Recent there and back, landing on Home with the tabs restored in their order (R9, S30); with `--share-question`, a page it serves itself asks on the AI's sheet while Home comes forward and the + opens its menu (R20, #455). It types and presses Enter only into a focused quick pick or the browser's address, never into a webview (see the incident below). On run 1's instance: all pass (Home and Tasks first; count 1 = 1; splash `#16132f` = the ground; switched to Leadership programme and back to Sales proposal Q4 with its 3 tabs in order); the share question skipped there, as that profile shares without asking.
+- **`scripts/qa/frame-screenshots.mjs`**: a project window now opens on Home, so the run chooses Documents first; 8 new scenes (home, switcher, tasks, browser, transcribe, agents, settings-foot, share-question), light and dark. The baseline's sample project gains `.claude/agents/proofreader.md` (green) and `summariser.md` (no colour); `.claude` is hidden from Documents, so the other scenes do not change for it.
+- **Against the 18 October baseline**, on a fresh profile with the sample at `/private/tmp/ritemark-frame/`: the 9 scenes in each theme changed by 0.52–1.01%, all by Home and the Task board at the start of the tab row and Saved and Share on the document's bar; the model's name in the composer reads Sonnet 5.5 where the baseline has Opus 5 with 1M context (the model list's default today, not this sprint). The 16 new scenes are not in the baseline. The set, old beside new, went to Jarmo for approval as the new baseline.
+
+**One more harness incident** (run 1, `project-check.mjs`'s first version): after a switch, the AI's sheet restored its last chat and took the keyboard from File ▸ Open Recent's picker a moment later, so the folder name the script typed, and its Enter, went to Claude as a follow-up in a chat of the test project Sales proposal Q4 (`/tmp/r134`). Claude read a card and asked how to apply the words; the turn was stopped at once, nothing in `/tmp/r134` changed (no file newer than the run's start). The script now types only into a focused quick pick or the browser's address, and stops otherwise.
 
 ## Left open
 

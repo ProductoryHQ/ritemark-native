@@ -86,14 +86,21 @@ export interface PermanentTabsDependencies {
   /** Open the Task board's tab in the first group, in front. */
   openBoard: () => Promise<void>;
   boardEnabled: () => boolean;
+  /** True once, in a window a switch in place opened: it lands on Home, not on the tab it was left with (R9). */
+  landOnHome?: () => boolean;
 }
 
 /** Make sure Home (first) and Tasks (second) are pinned in the first group. */
 export async function ensurePermanentTabs(deps: PermanentTabsDependencies): Promise<void> {
+  const land = deps.landOnHome?.() ?? false;
   const before = vscode.window.tabGroups.activeTabGroup.activeTab;
   const facts = () => (firstGroup()?.tabs ?? []).map((tab) => ({ tab, kind: kindOf(tab), pinned: tab.isPinned }));
   const plan = planPermanentTabs(facts(), deps.boardEnabled());
-  if (plan.length === 0) return;
+  if (plan.length === 0) {
+    const home = land ? facts().find((fact) => fact.kind === 'home')?.tab : undefined;
+    if (home && !home.isActive) await revealTab(home);
+    return;
+  }
   for (const step of plan) {
     const existing = facts().find((fact) => fact.kind === step.kind)?.tab;
     if (step.action === 'remove') {
@@ -112,7 +119,7 @@ export async function ensurePermanentTabs(deps: PermanentTabsDependencies): Prom
   }
   // The person goes back to the tab they were on; a window with nothing else opens on Home.
   const beforeKind = before ? kindOf(before) : 'other';
-  if (before && beforeKind === 'other') {
+  if (before && beforeKind === 'other' && !land) {
     const again = vscode.window.tabGroups.all.flatMap((group) => group.tabs)
       .find((tab) => tab.label === before.label && tab.group.viewColumn === before.group.viewColumn && kindOf(tab) === 'other');
     if (again) await revealTab(again);

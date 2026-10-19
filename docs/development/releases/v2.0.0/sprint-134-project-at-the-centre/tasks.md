@@ -93,12 +93,12 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 ## Phase 6: QA, merge and closeout
 
-- [ ] CDP checks in `scripts/qa/`: the permanent tabs, the Tasks tab's count, switching, the splash, the tab row while the share question waits (E3)
+- [x] CDP checks in `scripts/qa/`: the permanent tabs, the Tasks tab's count, switching, the splash, the tab row while the share question waits (E3) — `project-check.mjs`; the heads in `frame-geometry.mjs`
 - [x] `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe (E3)
-- [ ] The screenshot baseline gains Home, the list, the switcher, What moved, the three places with their heads, the share question, Settings' foot and a coloured agent, light and dark (E3)
+- [x] The screenshot baseline gains Home, the list, the switcher, What moved, the three places with their heads, the share question, Settings' foot and a coloured agent, light and dark (E3) — What moved is not a scene (it needs a Ritemark 1 profile; S35's screenshot is in `qa-evidence/`); Jarmo approved the set of 34 on 19 October
 - [x] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [x] Docs: `architecture.md` (Projects; the browser's share question), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist lines (E6)
-- [ ] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
+- [x] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"
@@ -106,7 +106,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
 - [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
 - [ ] After the merge: the drift check into the release plan (E7)
-- [ ] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
-- [ ] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated
-- [ ] The [v1.14 parity list](../parity-v1.14.md): every Sprint 134 row checked on the branch and marked done
+- [x] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
+- [x] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated
+- [x] The [v1.14 parity list](../parity-v1.14.md): every Sprint 134 row checked on the branch and marked done
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)

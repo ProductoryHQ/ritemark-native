@@ -20,9 +20,15 @@
  * more than 0.5% or are missing from the baseline.
  *
  * The set approved at merge 2 is the baseline for the later steps of 2.0 and for update-vscode.sh's checklist.
+ *
+ * Sprint 134 (E3) adds the project at the centre: Home with the projects list, the head's Switch project flyout, the
+ * Tasks, Browser, Transcribe and Agents places with their heads, the foot of Ritemark Settings, and the share question
+ * on the AI's sheet for a page this script serves itself. What moved needs a Ritemark 1 profile and is not a scene. A
+ * project window now opens on Home, so the run first chooses Documents, where the base scene's document is opened.
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -82,7 +88,7 @@ const isMac = await evaluate(`document.querySelector('.monaco-workbench').classL
 const MOD = isMac ? 4 : 2; // CDP modifiers: 2 Ctrl, 4 Meta, 8 Shift
 
 async function key(code, modifiers = 0, keyName = code.replace(/^Key/, '').toLowerCase()) {
-	const virtualKey = { Escape: 27, Enter: 13, Backquote: 192 }[code] ?? keyName.toUpperCase().charCodeAt(0);
+	const virtualKey = { Escape: 27, Enter: 13, Backquote: 192, Comma: 188, End: 35 }[code] ?? keyName.toUpperCase().charCodeAt(0);
 	await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', modifiers, code, key: keyName, windowsVirtualKeyCode: virtualKey });
 	await send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, code, key: keyName, windowsVirtualKeyCode: virtualKey });
 }
@@ -139,6 +145,15 @@ async function capture(name) {
 	console.log(`captured ${name} (${w}x${h})`);
 }
 
+const placeLabel = name => byLabel('.part.sidebar .composite-bar .action-item .action-label', name);
+async function place(name) {
+	await click(`the ${name} place`, placeLabel(name));
+	await sleep(1800);
+}
+
+// Sprint 134: a project window opens on Home; the base scene is Documents with a document in front
+await place('Documents');
+
 const DOCUMENTS = `[...document.querySelectorAll('.part.sidebar .explorer-folders-view .monaco-list-row')].map(row => row.getAttribute('aria-label') || '').filter(label => /\\.md\\b/.test(label)).map(label => label.split(',')[0])`;
 const documents = await evaluate(DOCUMENTS);
 if (!documents.length) {
@@ -150,6 +165,24 @@ async function openDocument(label) {
 	await click(`the document ${label}`, byLabel('.part.sidebar .explorer-folders-view .monaco-list-row', label));
 	await sleep(1500);
 }
+
+/** Back to the base: Documents chosen, the first document in front. */
+async function backToBase() {
+	await place('Documents');
+	await openDocument(documents[0]);
+}
+
+/** A page for the share question, served by this run on this computer (no network, the same every time). */
+const pageServer = createServer((request, response) => {
+	response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+	response.end('<!doctype html><title>Harbour Logistics</title><body style="font:16px/1.5 -apple-system,sans-serif;margin:48px"><h1>Harbour Logistics</h1><p>Six one-day modules for twelve new shift leaders.</p></body>');
+});
+// A fixed port, so the address bar reads the same in every run (any free one if it is taken)
+await new Promise(resolve => {
+	pageServer.once('error', () => pageServer.listen(0, '127.0.0.1', resolve));
+	pageServer.listen(47134, '127.0.0.1', resolve);
+});
+const pageUrl = `http://127.0.0.1:${pageServer.address().port}/`;
 
 const LEFT_TOGGLE = byLabel('a.ritemark-frame-button', 'Show or Hide the Left Column');
 const AI_TOGGLE = byLabel('a.ritemark-frame-button', 'Show or Hide the AI');
@@ -192,13 +225,67 @@ const SCENES = [
 	['terminal', async () => {
 		await key('Backquote', 2, '`'); // Ctrl+` on every platform (⌃` on the Mac)
 		await sleep(2500);
+		// The new terminal's tab is in front. Once (Sprint 134's second baseline run) the Task board was in front
+		// instead, and could not be reproduced: say so loudly, and bring the terminal forward so the scene stays true.
+		const TERMINAL_TAB = `[...document.querySelectorAll('.part.editor .tabs-container > .tab')].find(tab => /^(Terminal|zsh|bash|fish|pwsh|powershell)\\b/i.test(tab.getAttribute('aria-label') || ''))`;
+		if (!await evaluate(`${TERMINAL_TAB}?.classList.contains('active') ?? false`)) {
+			console.log(`NOTE     the terminal's tab was not in front after Ctrl+\` (in front: ${await evaluate(`document.querySelector('.part.editor .tabs-container > .tab.active')?.getAttribute('aria-label') ?? 'none'`)}); bringing it forward`);
+			await click('the terminal\'s tab', TERMINAL_TAB);
+			await sleep(1000);
+		}
 		// The scene is the terminal's tab and bar. Its text (the shell's prompt, with the computer's and the account's
 		// names, and the first-run hint) differs from machine to machine, so it is blanked while the scene is taken.
 		await evaluate(`(() => { const style = document.createElement('style'); style.id = 'frame-screenshots-terminal'; style.textContent = '.part.editor .xterm-screen { visibility: hidden !important; }'; document.head.append(style); })()`);
 		return async () => {
 			await evaluate(`document.getElementById('frame-screenshots-terminal')?.remove()`);
-			await key('KeyW', MOD, 'w');
+			// Close the terminal by its own tab: ⌘W would close whatever is in front
+			await click('the terminal tab\'s close button', `${TERMINAL_TAB}?.querySelector('.tab-actions .action-label')`);
 		};
+	}],
+	// Sprint 134: the project at the centre
+	['home', async () => {
+		await place('Home');
+		return backToBase;
+	}],
+	['switcher', async () => {
+		await click('the project\'s head', `document.querySelector('.part.sidebar .ritemark-project-head')`);
+		await sleep(800);
+		await click('Switch project', `[...document.querySelectorAll('.ritemark-menu-item')].find(row => row.getAttribute('aria-label') === 'Switch project')`);
+		await sleep(1200);
+		return async () => {
+			await key('Escape', 0, 'Escape');
+			await sleep(300);
+			await key('Escape', 0, 'Escape');
+		};
+	}],
+	...['Tasks', 'Browser', 'Transcribe', 'Agents'].map(name => [name.toLowerCase(), async () => {
+		await place(name);
+		return backToBase;
+	}]),
+	['settings-foot', async () => {
+		await key('Comma', MOD, ',');
+		await sleep(2500);
+		// Scroll Ritemark Settings to its foot, where Advanced settings is (R23)
+		const centre = await evaluate(`(() => { const r = document.querySelector('.part.editor .editor-container').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+		for (let i = 0; i < 12; i++) {
+			await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: centre[0], y: centre[1], deltaX: 0, deltaY: 2000 });
+			await sleep(100);
+		}
+		return async () => key('KeyW', MOD, 'w');
+	}],
+	['share-question', async () => {
+		await command('Ritemark Browser: New Browser Tab');
+		await sleep(1500);
+		await click('the address', `[...document.querySelectorAll('.part.editor .editor-group-container.active .browser-url-display, .part.editor .editor-group-container.active .browser-url-input')].find(element => element.getBoundingClientRect().width)`);
+		await sleep(500);
+		const focused = await evaluate(`document.activeElement?.classList.contains('browser-url-input') ?? false`);
+		if (!focused) {
+			throw new Error('the browser\'s address did not take the keyboard');
+		}
+		await type(pageUrl);
+		await key('Enter', 0, 'Enter');
+		await sleep(4000);
+		return async () => key('KeyW', MOD, 'w');
 	}],
 	['many-tabs', async () => {
 		// Open the folders, so there are enough documents to fold the row
@@ -236,6 +323,7 @@ for (const themeName of ['Ritemark Light', 'Ritemark Dark']) {
 }
 await theme('Ritemark Light');
 await send('Emulation.clearDeviceMetricsOverride');
+pageServer.close();
 
 let differing = 0;
 if (baseline) {

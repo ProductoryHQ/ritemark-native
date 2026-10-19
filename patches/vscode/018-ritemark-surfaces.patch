@@ -88,7 +88,8 @@ electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titleb
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
 R13), workbench/test/browser/parts/ritemarkSwitchGuard.test.ts and base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts
-(Sprint 134, R9); run with ./scripts/test.sh --grep Ritemark.
+(Sprint 134, R9), workbench/test/browser/parts/ritemarkMenu.test.ts (Sprint 134, R8: one flyout); run with
+./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 3169c8326c3..f7d28372c7f 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
@@ -3241,10 +3242,10 @@ index 00000000000..16a18d72338
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..540edb06444
+index 00000000000..c515a8eb74f
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,236 @@
+@@ -0,0 +1,239 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3402,13 +3403,7 @@ index 00000000000..540edb06444
 +			row.setAttribute('aria-haspopup', 'menu');
 +			append(row, $('span.ritemark-menu-trailing.codicon.codicon-chevron-right'));
 +			// The flyout opens on a pointer resting on the row, a click, Enter or the Right arrow; a pointer on another row closes it.
-+			const open = async (focusFirst: boolean) => {
-+				if (row.getAttribute('aria-expanded') === 'true') {
-+					if (focusFirst) {
-+						container.querySelector<HTMLElement>('.ritemark-menu-flyout [role="menuitem"]')?.focus();
-+					}
-+					return;
-+				}
++			const show = async () => {
 +				openFlyout.clear();
 +				const entries = await submenu();
 +				if (!row.isConnected || !entries.length) {
@@ -3423,6 +3418,15 @@ index 00000000000..540edb06444
 +					row.setAttribute('aria-expanded', 'false');
 +					container.querySelector('.ritemark-menu-flyout')?.remove();
 +				}));
++			};
++			// A pointer coming to rest on the row and a click on it arrive together, while the rows are still being
++			// asked for: they share one opening, so one flyout opens
++			let opening: Promise<void> | undefined;
++			const open = async (focusFirst: boolean) => {
++				if (row.getAttribute('aria-expanded') !== 'true') {
++					opening ??= show().finally(() => opening = undefined);
++					await opening;
++				}
 +				if (focusFirst) {
 +					container.querySelector<HTMLElement>('.ritemark-menu-flyout [role="menuitem"]')?.focus();
 +				}
@@ -4942,4 +4946,76 @@ index 00000000000..50a653619fa
 +	});
 +
 +	ensureNoDisposablesAreLeakedInTestSuite();
++});
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
+new file mode 100644
+index 00000000000..7924086e116
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
+@@ -0,0 +1,66 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../base/common/async.js';
++import { IDisposable } from '../../../../base/common/lifecycle.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { IContextViewDelegate, IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
++import { showRitemarkMenu } from '../../../browser/parts/ritemarkMenu.js';
++
++/**
++ * Ritemark 2.0 (Sprint 134, R8): the head's Switch project ▸ opens one flyout. A pointer coming to rest on the row and
++ * a click on it arrive while the flyout's rows are still being asked for; before the fix each drew a flyout of its own.
++ */
++suite('Ritemark menu', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('a pointer resting on a flyout row and a click on it open one flyout', async () => {
++		const container = document.createElement('div');
++		const anchor = document.createElement('div');
++		document.body.append(container, anchor);
++		let rendered: IDisposable | undefined;
++		let onHide: (() => void) | undefined;
++		const contextViewService = {
++			showContextView: (delegate: IContextViewDelegate) => {
++				rendered = delegate.render(container) ?? undefined;
++				onHide = delegate.onHide;
++			},
++			hideContextView: () => {
++				rendered?.dispose();
++				rendered = undefined;
++				container.textContent = '';
++				onHide?.();
++			},
++		} as unknown as IContextViewService;
++		let asked = 0;
++		showRitemarkMenu(contextViewService, anchor, { className: 'ritemark-project-menu', ariaLabel: 'Project', align: 'left' }, [{
++			label: 'Switch project',
++			iconClassNames: [],
++			run: () => { },
++			submenu: async () => {
++				asked++;
++				await timeout(5);
++				return [{ label: 'Sales proposal Q4', iconClassNames: [], run: () => { } }];
++			},
++		}], () => { });
++
++		const row = container.querySelector<HTMLElement>('.ritemark-menu-item')!;
++		row.dispatchEvent(new MouseEvent('mouseenter'));
++		row.click();
++		await timeout(30);
++
++		assert.deepStrictEqual({
++			flyouts: container.querySelectorAll('.ritemark-menu-flyout').length,
++			asked,
++			expanded: row.getAttribute('aria-expanded'),
++		}, { flyouts: 1, asked: 1, expanded: 'true' });
++
++		contextViewService.hideContextView();
++		container.remove();
++		anchor.remove();
++	});
 +});

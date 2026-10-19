@@ -278,7 +278,14 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
 
   // Home and Tasks, the first two tabs, in a project window (R5).
   if (folder && home) {
+    // R9: a window a switch in place opened lands on Home, once
+    let land = ProjectSwitcher.takeLanding(context, folder ? folder.uri.toString() : null);
     context.subscriptions.push(registerPermanentTabs({
+      landOnHome: () => {
+        const value = land;
+        land = false;
+        return value;
+      },
       openHome: async () => {
         await home.reveal({ viewColumn: vscode.ViewColumn.One });
       },
