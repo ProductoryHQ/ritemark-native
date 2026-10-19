@@ -86,6 +86,10 @@ The Experience lead approved all three, and asked for three more, done and check
 
 The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
 
+## E5: the production build at the merge (19 October)
+
+A clean-room release worktree from `./scripts/create-release-worktree.sh` at `origin/main` `eae1dedd`: HEAD exactly `origin/main`, detached, tracked sources clean, a physical pristine VS Code checkout at the gitlink `10c8e557`, physical dependency roots, empty build output. `release-preflight.sh` passed with one warning, the extension symlink, which the build creates. Then `build-prod.sh` (arm64 Node 22.22.1 from `vscode/.nvmrc`), unsigned: all 9 steps, VALIDATION PASSED, BUILD PROVENANCE VERIFIED, finished 09:25. The built app carries the sprint's last changes: the first-window size (`main.js`), Help's Getting started, `sendFeedback`, the compact rhythm in `webview.js`, and the trusted sign-in hosts in `product.json`, which, as expected, still has no `commit` (#463). The worktree is kept, unsigned, at `.worktrees/release-eae1dedd7114` (10 GB, the app 2.0 GB).
+
 ## The Windows overlay round (18 October)
 
 Run by the Development manager's Windows session with overlay run 39159831343 (head 2149ecc8) on the installed round 2 build of main `f492948b`, fresh profiles, the installed app untouched.
