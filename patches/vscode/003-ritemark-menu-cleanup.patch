@@ -11,6 +11,13 @@ Sprint 132 (Ritemark 2.0, after Windows round 1, 2026-10-18):
   - No Run entry in the View menu (a fresh profile showed one)
   - No Chat entry for the panel's chat view; the View menu's Copilot Chat
     opens it as a tab instead (patch 007)
+Sprint 134 (Ritemark 2.0, step 3; R21, #456):
+  - All commands no longer offers VS Code's developer and debugging commands:
+    one filter of command IDs and ID prefixes where getCommandPicks returns
+    (commandsQuickAccess.ts, isHiddenFromRitemarkPalette), so search, similar
+    commands and recently used never show them. They stay registered, so their
+    menus and shortcuts still run them. The list is research/palette-audit.md §7.
+    Test: contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts.
 ---
 diff --git a/src/vs/editor/contrib/comment/browser/comment.ts b/src/vs/editor/contrib/comment/browser/comment.ts
 index 4b2a1461b9a..213d0674001 100644
@@ -733,3 +740,414 @@ index acf3e73a07c..895e0953a02 100644
  
  	focusCommand = { id: 'timeline.focus' };
  }
+diff --git a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
+index e05b71bd72c..5a16d2d4985 100644
+--- a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
++++ b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
+@@ -41,6 +41,138 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
+ import { IChatAgentService } from '../../chat/common/participants/chatAgents.js';
+ import { ChatAgentLocation } from '../../chat/common/constants.js';
+ 
++/**
++ * Ritemark 2.0 (Sprint 134, R21): the command families All commands does not offer in Ritemark, by ID prefix.
++ * Each keeps its trailing dot, so `workbench.action.debugRenderer` or `debugpy.…` is not caught by `debug.`.
++ */
++const RITEMARK_PALETTE_HIDDEN_PREFIXES: readonly string[] = [
++	'workbench.debug.',
++	'workbench.action.debug.',
++	'debug.',
++	'editor.debug.',
++	'merge.dev.',
++];
++
++/**
++ * Ritemark 2.0 (Sprint 134, R21): the single commands All commands does not offer in Ritemark, from the sprint's
++ * palette audit (§7): three debugging IDs a prefix would be too wide for, then the Developer commands.
++ *
++ * Kept on purpose, because a Ritemark menu, doc, skill or QA step names them:
++ * `workbench.action.reloadWindow` (Developer: Reload Window), `workbench.action.toggleDevTools` (Developer: Toggle
++ * Developer Tools), `workbench.action.webview.openDeveloperTools` (Developer: Open Webview Developer Tools) and
++ * `workbench.action.openProcessExplorer` (Developer: Open Process Explorer).
++ */
++const RITEMARK_PALETTE_HIDDEN_IDS: ReadonlySet<string> = new Set([
++	// Debugging
++	'workbench.view.debug',
++	'workbench.panel.repl.view.focus',
++	'extension.node-debug.toggleAutoAttach',
++	// Developer: the workbench
++	'workbench.action.inspectContextKeys',
++	'workbench.action.toggleScreencastMode',
++	'workbench.action.logStorage',
++	'workbench.action.logWorkingCopies',
++	'workbench.action.removeLargeStorageDatabaseEntries',
++	'workbench.action.showPolicyDiagnostics',
++	'workbench.action.syncAccountPolicy',
++	'workbench.action.startTrackDisposables',
++	'workbench.action.snapshotTrackedDisposables',
++	'workbench.action.stopTrackDisposables',
++	'workbench.action.reloadWindowWithExtensionsDisabled',
++	'workbench.action.revealUserDataFolder',
++	'workbench.action.showGPUInfo',
++	'workbench.action.showContentTracing',
++	'workbench.action.startTracing',
++	'workbench.action.stopTracing',
++	// Developer: the editor
++	'editor.action.forceRetokenize',
++	'editor.action.debugEditorGpuRenderer',
++	'editor.action.inlineSuggest.dev.extractRepro',
++	'editor.action.inspectTMScopes',
++	'workbench.action.inspectKeyMappings',
++	'workbench.action.inspectKeyMappingsJSON',
++	'editor.action.startDebugTextMate',
++	// Developer: chat
++	'workbench.action.chat.logInputHistory',
++	'workbench.action.chat.logChatIndex',
++	'workbench.action.chat.inspectChatModel',
++	'workbench.action.chat.inspectChatModelReferences',
++	'workbench.action.chat.clearRecentlyUsedLanguageModels',
++	'workbench.action.chat.openAgentDebugPanel',
++	'workbench.action.chat.exportAgentDebugLog',
++	'workbench.action.chat.importAgentDebugLog',
++	'aiCustomization.generateDebugReport',
++	'workbench.action.chat.openStorageFolder',
++	'workbench.action.chat.resetGrowthSession',
++	// Developer: extensions and the extension host
++	'workbench.action.showRuntimeExtensions',
++	'workbench.extensions.action.installExtensionFromLocation',
++	'workbench.extensions.action.devtoolsExtensionHost',
++	'workbench.extensions.action.debugExtensionHost',
++	'workbench.action.debugRenderer',
++	'workbench.action.debugExtensionHostAndRenderer',
++	'workbench.extensions.action.openExtensionsFolder',
++	'_workbench.extensions.action.cleanUpExtensionsFolder',
++	'workbench.action.restartExtensionHost',
++	'editor.action.measureExtHostLatency',
++	// Developer: shortcuts and logs
++	'workbench.action.toggleKeybindingsLog',
++	'workbench.action.setLogLevel',
++	'workbench.action.showWindowLog',
++	'workbench.action.openLogsFolder',
++	'workbench.action.openExtensionLogsFolder',
++	'workbench.action.showLogs',
++	'workbench.action.openLogFile',
++	'workbench.action.exportLogs',
++	'workbench.action.importLog',
++	// Developer: notebooks
++	'workbench.action.toggleNotebookClipboardLog',
++	'notebook.toggleLayoutTroubleshoot',
++	'notebook.inspectLayout',
++	'notebook.clearNotebookEdtitorTypeCache',
++	'notebook.clearNotebookKernelsMRUCache',
++	'workbench.notebook.layout.gettingStarted',
++	'notebook.developer.addViewZones',
++	// Developer: performance, connection, telemetry, themes, update, URLs and profiles
++	'perfview.show',
++	'perf.insta.printAsyncCycles',
++	'perf.insta.printTraces',
++	'perf.event.profiling',
++	'workbench.action.triggerReconnect',
++	'workbench.action.pauseSocketWriting',
++	'workbench.action.showTelemetry',
++	'workbench.action.generateColorTheme',
++	'developer.showCurrentFileAsReleaseNotes',
++	'update.showUpdateInfo',
++	'_update.applyupdate',
++	'workbench.action.url.openUrl',
++	'workbench.profiles.actions.cleanupProfiles',
++	'workbench.profiles.actions.resetWorkspaces',
++	// Developer: webviews, welcome, sync and terminals
++	'workbench.action.webview.reloadWebviewAction',
++	'resetGettingStartedProgress',
++	'workbench.action.welcomeOnboarding2026',
++	'workbench.editSessions.actions.resumeFromSerializedPayload',
++	'workbench.userDataSync.actions.downloadSyncActivity',
++	'workbench.action.terminal.showTextureAtlas',
++	'workbench.action.terminal.writeDataToTerminal',
++	'workbench.action.terminal.recordSession',
++	'workbench.action.terminal.restartPtyHost',
++]);
++
++/**
++ * Ritemark 2.0 (Sprint 134, R21): whether All commands leaves a command out in Ritemark. Only the palette's offer
++ * changes: the command stays registered, so its menus, shortcuts and callers still run it. Other products are
++ * unchanged.
++ */
++export function isHiddenFromRitemarkPalette(applicationName: string | undefined, commandId: string): boolean {
++	if (applicationName !== 'ritemark') {
++		return false;
++	}
++
++	return RITEMARK_PALETTE_HIDDEN_IDS.has(commandId) || RITEMARK_PALETTE_HIDDEN_PREFIXES.some(prefix => commandId.startsWith(prefix));
++}
++
+ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAccessProvider {
+ 
+ 	private static AI_RELATED_INFORMATION_MAX_PICKS = 5;
+@@ -125,10 +257,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
+ 			return [];
+ 		}
+ 
++		// Ritemark 2.0 (Sprint 134, R21): no VS Code developer or debugging command is offered. Search, similar
++		// commands, recently used and the AI's related picks all read this array, so one filter covers them all.
+ 		return [
+ 			...this.getCodeEditorCommandPicks(),
+ 			...this.getGlobalCommandPicks()
+-		].map(picks => ({
++		].filter(pick => !isHiddenFromRitemarkPalette(this.productService.applicationName, pick.commandId)).map(picks => ({
+ 			...picks,
+ 			buttons: [{
+ 				iconClass: ThemeIcon.asClassName(Codicon.gear),
+diff --git a/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
+new file mode 100644
+index 00000000000..d6b5c585bd4
+--- /dev/null
++++ b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
+@@ -0,0 +1,248 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { CancellationToken } from '../../../../../base/common/cancellation.js';
++import { DisposableStore } from '../../../../../base/common/lifecycle.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { IEditor, IEditorAction } from '../../../../../editor/common/editorCommon.js';
++import { ICommandAction } from '../../../../../platform/action/common/action.js';
++import { IMenuService, MenuItemAction } from '../../../../../platform/actions/common/actions.js';
++import { ICommandService } from '../../../../../platform/commands/common/commands.js';
++import { NullCommandService } from '../../../../../platform/commands/test/common/nullCommandService.js';
++import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
++import { TestConfigurationService } from '../../../../../platform/configuration/test/common/testConfigurationService.js';
++import { IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
++import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
++import { TestDialogService } from '../../../../../platform/dialogs/test/common/testDialogService.js';
++import { TestInstantiationService } from '../../../../../platform/instantiation/test/common/instantiationServiceMock.js';
++import { IKeybindingService } from '../../../../../platform/keybinding/common/keybinding.js';
++import { MockContextKeyService, MockKeybindingService } from '../../../../../platform/keybinding/test/common/mockKeybindingService.js';
++import { ILogService, NullLogService } from '../../../../../platform/log/common/log.js';
++import { IProductService } from '../../../../../platform/product/common/productService.js';
++import { ICommandQuickPick } from '../../../../../platform/quickinput/browser/commandsQuickAccess.js';
++import { IQuickPickSeparator } from '../../../../../platform/quickinput/common/quickInput.js';
++import { InMemoryStorageService, IStorageService, StorageScope, StorageTarget } from '../../../../../platform/storage/common/storage.js';
++import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
++import { NullTelemetryService } from '../../../../../platform/telemetry/common/telemetryUtils.js';
++import { IAiRelatedInformationService } from '../../../../services/aiRelatedInformation/common/aiRelatedInformation.js';
++import { IEditorGroup, IEditorGroupsService } from '../../../../services/editor/common/editorGroupsService.js';
++import { IEditorService } from '../../../../services/editor/common/editorService.js';
++import { IExtensionService } from '../../../../services/extensions/common/extensions.js';
++import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
++import { IChatAgentService } from '../../../chat/common/participants/chatAgents.js';
++import { CommandsQuickAccessProvider, isHiddenFromRitemarkPalette } from '../../browser/commandsQuickAccess.js';
++
++/** The provider's own lists, reached from outside. */
++class TestCommandsQuickAccessProvider extends CommandsQuickAccessProvider {
++
++	async allPicks(): Promise<string[]> {
++		return (await this.getCommandPicks(CancellationToken.None)).map(pick => pick.commandId);
++	}
++
++	/** What All commands shows for a filter: separators as `-- label`, commands by ID. */
++	async shown(filter: string, disposables: DisposableStore): Promise<string[]> {
++		const result = await this._getPicks(filter, disposables, CancellationToken.None);
++		// With no AI picks configured, the provider answers with a plain list
++		if (!Array.isArray(result)) {
++			throw new Error('All commands answered with more than a plain list');
++		}
++		return (result as readonly (ICommandQuickPick | IQuickPickSeparator)[]).map(pick => pick.type === 'separator' ? `-- ${pick.label}` : pick.commandId);
++	}
++}
++
++function editorAction(id: string, label: string): IEditorAction {
++	return { id, label, alias: label, metadata: undefined, isSupported: () => true, run: async () => { } };
++}
++
++/** A text editor in front: two developer and debugging actions among its own. */
++const EDITOR_ACTIONS: IEditorAction[] = [
++	editorAction('editor.debug.action.toggleBreakpoint', 'Debug: Toggle Breakpoint'),
++	editorAction('editor.action.formatDocument', 'Format Document'),
++	editorAction('editor.action.forceRetokenize', 'Developer: Force Retokenize'),
++];
++
++/** The palette's global items, dropped and kept ones mixed. */
++const GLOBAL_COMMANDS: ICommandAction[] = [
++	{ id: 'workbench.debug.viewlet.action.addFunctionBreakpointAction', title: 'Add Function Breakpoint' },
++	{ id: 'workbench.action.openSettings2', title: 'Open Settings (UI)', category: 'Preferences' },
++	{ id: 'workbench.action.inspectContextKeys', title: 'Inspect Context Keys', category: 'Developer' },
++	{ id: 'workbench.action.reloadWindow', title: 'Reload Window', category: 'Developer' },
++	{ id: 'workbench.action.debug.start', title: 'Start Debugging', category: 'Debug' },
++	{ id: 'workbench.files.action.refreshFilesExplorer', title: 'Refresh Explorer' },
++	{ id: 'debug.addConfiguration', title: 'Add Configuration...', category: 'Debug' },
++	{ id: 'workbench.action.toggleDevTools', title: 'Toggle Developer Tools', category: 'Developer' },
++	{ id: 'workbench.view.debug', title: 'Show Run and Debug', category: 'View' },
++	{ id: 'workbench.action.webview.openDeveloperTools', title: 'Open Webview Developer Tools', category: 'Developer' },
++	{ id: 'merge.dev.openContentsJson', title: 'Open Merge Editor State from JSON', category: 'Merge Editor (Dev)' },
++	{ id: 'workbench.action.openProcessExplorer', title: 'Open Process Explorer', category: 'Developer' },
++	{ id: 'extension.node-debug.toggleAutoAttach', title: 'Toggle Auto Attach', category: 'Debug' },
++	{ id: 'workbench.action.toggleMaximizedAuxiliaryBar', title: 'Toggle Maximized Secondary Side Bar', category: 'View' },
++	{ id: 'workbench.panel.repl.view.focus', title: 'Focus on Debug Console View', category: 'Debug Console' },
++	{ id: 'ritemark.reactions', title: 'Send Feedback' },
++];
++
++/**
++ * Ritemark 2.0 (Sprint 134, R21): All commands offers none of VS Code's developer and debugging commands. The
++ * commands stay registered; only the palette's offer changes, in search and in recently used alike.
++ */
++suite('Ritemark palette policy', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	function createProvider(applicationName: string, recentlyUsed: string[] = []): TestCommandsQuickAccessProvider {
++		const instantiationService = store.add(new TestInstantiationService());
++		const contextKeyService: IContextKeyService = new MockContextKeyService();
++
++		const storageService = store.add(new InMemoryStorageService());
++		if (recentlyUsed.length) {
++			// The history as an older session left it: oldest first, the last the most recently used
++			storageService.store('commandPalette.mru.cache', JSON.stringify({ usesLRU: true, entries: recentlyUsed.map((key, index) => ({ key, value: index + 1 })) }), StorageScope.PROFILE, StorageTarget.USER);
++			storageService.store('commandPalette.mru.counter', recentlyUsed.length + 1, StorageScope.PROFILE, StorageTarget.USER);
++		}
++
++		const editor = { getSupportedActions: () => EDITOR_ACTIONS } as IEditor;
++		const menuActions = GLOBAL_COMMANDS.map(command => new MenuItemAction(command, undefined, undefined, undefined, undefined, contextKeyService, NullCommandService));
++
++		instantiationService.stub(IEditorService, { activeTextEditorControl: editor, activeEditorPane: undefined });
++		instantiationService.stub(IEditorGroupsService, { activeGroup: { scopedContextKeyService: contextKeyService } as IEditorGroup });
++		instantiationService.stub(IMenuService, { getMenuActions: () => [['navigation', menuActions]] });
++		instantiationService.stub(IExtensionService, { whenInstalledExtensionsRegistered: async () => true });
++		instantiationService.stub(IKeybindingService, new MockKeybindingService());
++		instantiationService.stub(ICommandService, NullCommandService);
++		instantiationService.stub(ITelemetryService, NullTelemetryService);
++		instantiationService.stub(IDialogService, new TestDialogService());
++		instantiationService.stub(IConfigurationService, new TestConfigurationService({
++			workbench: {
++				commandPalette: {
++					history: 50,
++					preserveInput: false,
++					showAskInChat: false,
++					experimental: { suggestCommands: false, enableNaturalLanguageSearch: false, askChatLocation: 'chatView' }
++				}
++			}
++		}));
++		instantiationService.stub(IPreferencesService, {});
++		instantiationService.stub(IProductService, { applicationName });
++		instantiationService.stub(IAiRelatedInformationService, { isEnabled: () => false });
++		instantiationService.stub(IChatAgentService, {});
++		instantiationService.stub(IStorageService, storageService);
++		instantiationService.stub(ILogService, new NullLogService());
++
++		return store.add(instantiationService.createInstance(TestCommandsQuickAccessProvider));
++	}
++
++	test('drops the listed IDs and every ID under a listed prefix, and keeps the rest', () => {
++		const ids = [
++			// Dropped by exact ID
++			'workbench.view.debug',
++			'workbench.panel.repl.view.focus',
++			'extension.node-debug.toggleAutoAttach',
++			'workbench.action.inspectContextKeys',
++			'workbench.action.debugRenderer',
++			'_update.applyupdate',
++			// Dropped by prefix, one for each
++			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
++			'workbench.action.debug.start',
++			'debug.addConfiguration',
++			'editor.debug.action.toggleBreakpoint',
++			'merge.dev.openContentsJson',
++			// Kept: the four developer commands Ritemark names
++			'workbench.action.reloadWindow',
++			'workbench.action.toggleDevTools',
++			'workbench.action.webview.openDeveloperTools',
++			'workbench.action.openProcessExplorer',
++			// Kept: the parity list's palette-only commands, and Ritemark's own
++			'workbench.action.openSettings2',
++			'workbench.files.action.refreshFilesExplorer',
++			'workbench.action.toggleMaximizedAuxiliaryBar',
++			'workbench.action.maximizeAuxiliaryBar',
++			'ritemark.reactions',
++			'_ritemark.files.chosenFolder',
++			// Kept: a prefix needs its dot, so look-alikes outside the family stay
++			'workbench.action.debugger.other',
++			'debugpy.debugInTerminal',
++			'editor.debugger.other',
++		];
++
++		assert.deepStrictEqual(ids.filter(id => isHiddenFromRitemarkPalette('ritemark', id)), [
++			'workbench.view.debug',
++			'workbench.panel.repl.view.focus',
++			'extension.node-debug.toggleAutoAttach',
++			'workbench.action.inspectContextKeys',
++			'workbench.action.debugRenderer',
++			'_update.applyupdate',
++			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
++			'workbench.action.debug.start',
++			'debug.addConfiguration',
++			'editor.debug.action.toggleBreakpoint',
++			'merge.dev.openContentsJson',
++		]);
++	});
++
++	test('other products are unchanged', () => {
++		const ids = ['workbench.view.debug', 'workbench.action.inspectContextKeys', 'workbench.debug.viewlet.action.addFunctionBreakpointAction', 'merge.dev.openContentsJson'];
++
++		assert.deepStrictEqual(ids.filter(id => isHiddenFromRitemarkPalette('code-oss', id)), []);
++		assert.deepStrictEqual(ids.filter(id => isHiddenFromRitemarkPalette(undefined, id)), []);
++	});
++
++	test('All commands offers no dropped command, from the editor or the palette\'s items, in the order it had', async () => {
++		assert.deepStrictEqual(await createProvider('ritemark').allPicks(), [
++			'editor.action.formatDocument',
++			'workbench.action.openSettings2',
++			'workbench.action.reloadWindow',
++			'workbench.files.action.refreshFilesExplorer',
++			'workbench.action.toggleDevTools',
++			'workbench.action.webview.openDeveloperTools',
++			'workbench.action.openProcessExplorer',
++			'workbench.action.toggleMaximizedAuxiliaryBar',
++			'ritemark.reactions',
++		]);
++
++		assert.deepStrictEqual(await createProvider('code-oss').allPicks(), [
++			...EDITOR_ACTIONS.map(action => action.id),
++			...GLOBAL_COMMANDS.map(command => command.id),
++		]);
++	});
++
++	test('search, by words or by exact ID, finds no dropped command', async () => {
++		const disposables = store.add(new DisposableStore());
++
++		assert.deepStrictEqual(await createProvider('ritemark').shown('Breakpoint', disposables), []);
++		assert.deepStrictEqual(await createProvider('ritemark').shown('workbench.action.inspectContextKeys', disposables), []);
++
++		// The same searches find them in other products
++		assert.deepStrictEqual(await createProvider('code-oss').shown('Breakpoint', disposables), [
++			'workbench.debug.viewlet.action.addFunctionBreakpointAction',
++			'editor.debug.action.toggleBreakpoint',
++		]);
++		assert.deepStrictEqual(await createProvider('code-oss').shown('workbench.action.inspectContextKeys', disposables), [
++			'workbench.action.inspectContextKeys',
++		]);
++	});
++
++	test('recently used never offers a dropped command, even one used last', async () => {
++		const disposables = store.add(new DisposableStore());
++		const recentlyUsed = ['workbench.action.reloadWindow', 'workbench.action.inspectContextKeys', 'editor.debug.action.toggleBreakpoint'];
++		const shown = await createProvider('ritemark', recentlyUsed).shown('', disposables);
++
++		assert.deepStrictEqual(shown.slice(0, 3), [
++			'-- recently used',
++			'workbench.action.reloadWindow',
++			'-- other commands',
++		]);
++		assert.deepStrictEqual(shown.filter(id => isHiddenFromRitemarkPalette('ritemark', id)), []);
++
++		// The same history leads with them in other products
++		assert.deepStrictEqual((await createProvider('code-oss', recentlyUsed).shown('', disposables)).slice(0, 5), [
++			'-- recently used',
++			'editor.debug.action.toggleBreakpoint',
++			'workbench.action.inspectContextKeys',
++			'workbench.action.reloadWindow',
++			'-- other commands',
++		]);
++	});
++});
