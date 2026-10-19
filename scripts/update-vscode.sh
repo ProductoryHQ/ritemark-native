@@ -116,6 +116,9 @@ echo ""
 echo -e "${CYAN}Step 2: Checking out $TARGET_TAG...${NC}"
 git checkout -q --detach "$TARGET_COMMIT"
 git clean -fd -e extensions/ritemark
+# Stage the new gitlink now. .gitmodules sets ignore = all, so git status and git diff do not show that the pin moved,
+# and git add vscode stages nothing: a branch can carry rebased patches over the old pin unnoticed (Sprint 135)
+git -C "$ROOT_DIR" update-index --cacheinfo "160000,$TARGET_COMMIT,vscode"
 
 TARGET_NODE=$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || echo "unknown")
 ROOT_NODE=$(tr -d '[:space:]' < "$ROOT_DIR/.nvmrc" 2>/dev/null || echo "unknown")
@@ -202,7 +205,8 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "         shareWithAgentAnswered to match its Allow path (the network policy's notice, the stored choice, sharing)."
     echo "       - The internal command _workbench.getRecentlyOpened still exists (the project list's first fill, extensions/ritemark/src/projects/projectsHost.ts)."
     echo "     Then, in vscode/: ./scripts/test.sh --grep Ritemark (ritemarkSwitchGuard, ritemarkPalettePolicy, ritemarkTabCount)."
-    echo "  7. Update submodule reference: git add vscode && git commit"
+    echo "  7. Commit the new pin: the script staged the gitlink (git update-index). git status and git add vscode ignore the"
+    echo "     submodule (.gitmodules sets ignore = all); after committing, git ls-tree HEAD vscode must print $TARGET_COMMIT"
 else
     echo ""
     echo -e "${RED}========================================"
