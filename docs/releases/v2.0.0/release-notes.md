@@ -133,6 +133,7 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **VS Code's settings.** ⌘, opens Ritemark Settings, and **Advanced settings** at its foot opens all the other settings.
 - **Your usage-data answer carries over.** Ritemark 1's usage-data notice is gone. If you pressed **OK** on it, or closed it without **Opt Out**, usage data stays on after the update. If you chose **Opt Out** or never answered, it is off.
 - **Your choices are kept.** A theme you picked yourself stays after the update. Before, every update reset it.
+- **A newer VS Code underneath.** Ritemark 2.0 is built on VS Code 1.142 (Ritemark 1.14 was on 1.117), with Electron 43 and Chromium 150. In the browser, Developer tools is now in the bar's ⋯ menu.
 - **The places row gets Ritemark's order once.** On the first start of 2.0, the places row takes Ritemark's order. After that, a place you drag stays where you put it.
 
 ## Fixes

@@ -17,6 +17,8 @@ export function startPdfWorker(source: string): void {
   const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))
   try {
     port = new Worker(url, { type: 'module' })
+  } catch {
+    return // pdf.js then loads its worker by URL (the viewer sets workerSrc as well)
   } finally {
     URL.revokeObjectURL(url)
   }

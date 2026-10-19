@@ -94,7 +94,7 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
 ## Phase 8: Docs (E3)
 
 - [x] `CLAUDE.md`: the patch table (007's line), anything naming 1.117
-- [x] `PATCH-RULES.md`: the table; 003's inventory (21 files)
+- [x] `PATCH-RULES.md`: the table; 003's inventory (25 files); §3–§7 and §10's checklists for 2.0
 - [x] `SKILL.md`: the Node table; "VS Code 1.142 upgrade pitfalls" (or the target's number); the rollback recipe
 - [x] `references/layout-invariants.md`: enforcing files and symbols that moved
 - [x] `architecture.md`: history line; anything naming the pin

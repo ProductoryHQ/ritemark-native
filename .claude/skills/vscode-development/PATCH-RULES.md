@@ -212,47 +212,50 @@ Compiled JS in `out/` uses numeric constants instead of enum names:
 
 Before declaring ANY patch change complete, verify ALL of the following. Do not skip items.
 
-### Menu Bar Checklist
+### Menu Bar Checklist (§3)
 
-- [ ] File menu visible
+- [ ] File menu visible, with New tab first, Switch project after Open Folder…, Share after Save
 - [ ] Edit menu visible, NO Toggle Comment, NO Block Comment, NO Emmet
-- [ ] Selection menu visible
-- [ ] View menu visible, NO Appearance submenu, NO Editor Layout submenu, NO Extensions
+- [ ] Selection menu NOT visible
+- [ ] View menu visible, NO Appearance submenu, NO Editor Layout submenu, NO Extensions, NO Run
 - [ ] Go menu NOT visible
 - [ ] Run menu NOT visible
 - [ ] Terminal menu NOT visible
 - [ ] Window menu visible
-- [ ] Help menu visible
+- [ ] Help menu: Getting started, Support, View License, Advanced ▸ Toggle Developer Tools
 
-### Title Bar Checklist
+On the Mac the menus can be read from the profile's `storage.json` (`lastKnownMenubarData`) without opening them.
 
-- [ ] Left sidebar toggle visible
-- [ ] Right sidebar toggle visible
-- [ ] Settings gear visible
-- [ ] Accounts icon NOT visible
-- [ ] Panel toggle NOT visible
+### Strips Checklist (§4)
 
-### Sidebar Checklist
+- [ ] No title row on the Mac or on Windows
+- [ ] Left column toggle on the left column's strip; the tab row and the + on the desk's strip; the AI toggle and You on the AI's strip
+- [ ] NO Accounts, chat sparkle or layout controls
 
-- [ ] Explorer visible
-- [ ] Search visible
-- [ ] Run and Debug NOT visible (no icon in activity bar)
-- [ ] Extensions visible
+### Places Row Checklist (§5)
 
-### Status Bar Checklist
+- [ ] Home, Documents, Tasks, Browser, Agents, Transcribe, then More
+- [ ] More: Copilot Chat (only while installed and not disabled), Search, File changes, Extensions
+- [ ] Run and Debug NOT visible
+- [ ] VS Code's Agents window cannot open
+
+### Status Bar Checklist (§6)
 
 - [ ] Copilot icon NOT visible
+- [ ] No remote indicator or problem counts
 
-### Keybinding Checklist
+### Keybinding Checklist (§7)
 
-- [ ] Cmd+B does NOT toggle sidebar
-- [ ] Cmd+B triggers Bold in editor
+- [ ] Cmd+B does NOT toggle the left column; it bolds in the editor
+- [ ] Cmd+T opens the desk's + menu
+- [ ] Ctrl+` opens a terminal tab, never the panel
 
 ### Build Checklist
 
-- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 14
-- [ ] `./scripts/apply-patches.sh --dry-run` shows all patches "Already applied"
-- [ ] TypeScript compiles without "declared but never read" errors
+- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 25 (§2)
+- [ ] `./scripts/apply-patches.sh --dry-run` reports every patch can apply and none conflicts (it checks against `vscode/`'s HEAD, so keep HEAD at the pin)
+- [ ] `node scripts/check-patch-stacking.mjs` passes
+- [ ] TypeScript compiles without "declared but never read" errors (`npm run typecheck-client` in `vscode/`)
 
 ---
 

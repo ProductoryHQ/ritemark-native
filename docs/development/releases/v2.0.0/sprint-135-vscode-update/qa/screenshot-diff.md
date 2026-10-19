@@ -4,6 +4,8 @@ The frame baseline is `docs/development/frame-baseline/`, approved by Jarmo at S
 
 ## Result: 32 of 34 scenes match
 
+The first run, before main was merged in and before the bar changed (below):
+
 | Scenes | Pixels changed | Note |
 |---|---|---|
 | base, two-desks, left-hidden, ai-hidden, both-hidden, new-tab-menu, more-menu, terminal, switcher, tasks, browser, transcribe, agents (both themes) | 0% | |
@@ -11,6 +13,16 @@ The frame baseline is `docs/development/frame-baseline/`, approved by Jarmo at S
 | settings-foot (both themes) | 0.02% | Below the threshold; not looked into further. |
 | many-tabs | 0% light, 0.01% dark | Below the threshold. |
 | **share-question** | **0.7% light, 0.94% dark** | See below. |
+
+The re-run on the branch's head (main merged in, the bar as the Experience lead decided), on a fresh profile: still 32 of 34.
+
+| Scenes | Pixels changed | Note |
+|---|---|---|
+| The thirteen above | 0% | |
+| home (both themes) | 0.13% | Below the threshold: two "today" rows of Last changed in another order (the fresh sample copy's file times). |
+| settings-foot (both themes) | 0.02% | Below the threshold. |
+| many-tabs | 0.01% | Below the threshold. |
+| **share-question** | **1.62% light, 1.88% dark** | The decided bar: one button fewer than 1.117's, so the address field is longer. Waits for Jarmo. |
 
 ## The share question: what differs and why
 
