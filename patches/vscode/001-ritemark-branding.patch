@@ -15,44 +15,12 @@ Sprint 134: the splash's defaults with auto-detect on are the two grounds, #1613
 extension's ritemark.ground, which workbench.ts can't read before the workbench loads; change both together).
 Note: Binary fonts/icons (woff2, svg) handled by apply-patches.sh, not in this diff.
 ---
-diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
-index 31188a4ce9e..b2adc95b839 100644
---- a/build/gulpfile.vscode.ts
-+++ b/build/gulpfile.vscode.ts
-@@ -95,6 +95,10 @@ const vscodeResourceIncludes = [
- 	// Accessibility Signals
- 	'out-build/vs/platform/accessibilitySignal/browser/media/*.mp3',
- 
-+	// RiteMark: Custom fonts
-+	'out-build/media/*.woff2',
-+	'out-build/vs/workbench/browser/media/fonts/*.woff2',
-+
- 	// Welcome
- 	'out-build/vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.{svg,png}',
- 	'out-build/vs/workbench/contrib/welcomeOnboarding/browser/media/*.svg',
-diff --git a/build/lib/optimize.ts b/build/lib/optimize.ts
-index f5e812e2890..35621379bbd 100644
---- a/build/lib/optimize.ts
-+++ b/build/lib/optimize.ts
-@@ -147,6 +147,7 @@ function bundleESMTask(opts: IBundleESMTaskOpts): NodeJS.ReadWriteStream {
- 				target: [target],
- 				loader: {
- 					'.ttf': 'file',
-+					'.woff2': 'file',
- 					'.svg': 'file',
- 					'.png': 'file',
- 					'.sh': 'file',
-@@ -284,4 +285,3 @@ function getBuildTarget() {
- 	const tsconfigPath = path.join(REPO_ROOT_PATH, 'src', 'tsconfig.base.json');
- 	return getTargetStringFromTsConfig(tsconfigPath);
- }
--
 diff --git a/build/next/index.ts b/build/next/index.ts
-index 1993dbf6d6f..782c0b0db67 100644
+index c439d777fd5..a94f901d2e0 100644
 --- a/build/next/index.ts
 +++ b/build/next/index.ts
-@@ -863,6 +863,7 @@ ${tslib}`,
- 			banner,
+@@ -517,6 +517,7 @@ async function bundle(outDir: string, doMinify: boolean, doNls: boolean, doMangl
+ 				: { outfile: outPath }),
  			loader: {
  				'.ttf': 'file',
 +				'.woff2': 'file',
@@ -60,7 +28,7 @@ index 1993dbf6d6f..782c0b0db67 100644
  				'.png': 'file',
  				'.sh': 'file',
 diff --git a/src/vs/base/browser/ui/codicons/codicon/codicon.css b/src/vs/base/browser/ui/codicons/codicon/codicon.css
-index d7f257db934..6079140d7c8 100644
+index d7f257db934..45b37ad4f9b 100644
 --- a/src/vs/base/browser/ui/codicons/codicon/codicon.css
 +++ b/src/vs/base/browser/ui/codicons/codicon/codicon.css
 @@ -9,6 +9,14 @@
@@ -79,10 +47,10 @@ index d7f257db934..6079140d7c8 100644
  	font: normal normal normal 16px/1 codicon;
  	display: inline-block;
 diff --git a/src/vs/code/electron-browser/workbench/workbench.ts b/src/vs/code/electron-browser/workbench/workbench.ts
-index 767fbe08db3..e24fe48451f 100644
+index 5b8c2499f3b..d28b6dea71b 100644
 --- a/src/vs/code/electron-browser/workbench/workbench.ts
 +++ b/src/vs/code/electron-browser/workbench/workbench.ts
-@@ -66,15 +66,20 @@
+@@ -70,15 +70,20 @@ import { getPartsSplashColors, getPartsSplashLayoutMetrics } from './partsSplash
  				shellForeground = '#000000';
  			}
  		} else if (configuration.autoDetectColorScheme) {
@@ -106,7 +74,7 @@ index 767fbe08db3..e24fe48451f 100644
  		}
  
  		const style = document.createElement('style');
-@@ -93,7 +98,7 @@
+@@ -101,7 +106,7 @@ import { getPartsSplashColors, getPartsSplashLayoutMetrics } from './partsSplash
  
  			const splash = document.createElement('div');
  			splash.id = 'monaco-parts-splash';
@@ -116,10 +84,10 @@ index 767fbe08db3..e24fe48451f 100644
  			if (layoutInfo.windowBorder && colorInfo.windowBorder) {
  				const borderElement = document.createElement('div');
 diff --git a/src/vs/platform/dialogs/electron-browser/dialog.ts b/src/vs/platform/dialogs/electron-browser/dialog.ts
-index ec26804c300..ce5bad99ad8 100644
+index 71d2a8a906a..ce5bad99ad8 100644
 --- a/src/vs/platform/dialogs/electron-browser/dialog.ts
 +++ b/src/vs/platform/dialogs/electron-browser/dialog.ts
-@@ -5,13 +5,13 @@
+@@ -5,48 +5,42 @@
  
  import { fromNow } from '../../../base/common/date.js';
  import { isLinuxSnap } from '../../../base/common/platform.js';
@@ -128,6 +96,10 @@ index ec26804c300..ce5bad99ad8 100644
  import { IProductService } from '../../product/common/productService.js';
  import { process } from '../../../base/parts/sandbox/electron-browser/globals.js';
  
+-function formatCopilotVersion(version: string | undefined): string {
+-	return version?.replace(/^(?<core>\d+\.\d+\.\d+)-(?:canary|unstable)(?=[.+-]|$)/, '$<core>').replace(/\.unsigned$/, '') || 'Unknown';
+-}
+-
  export function createNativeAboutDialogDetails(productService: IProductService, osProps: IOSProperties): { title: string; details: string; detailsToCopy: string } {
 -	let version = productService.version;
 +	const ritemarkVersion = (productService as IProductService & { ritemarkVersion?: string }).ritemarkVersion;
@@ -135,12 +107,15 @@ index ec26804c300..ce5bad99ad8 100644
  	if (productService.target) {
  		version = `${version} (${productService.target} setup)`;
  	} else if (productService.darwinUniversalAssetId) {
-@@ -19,25 +19,28 @@ export function createNativeAboutDialogDetails(productService: IProductService,
+ 		version = `${version} (Universal)`;
  	}
  
+-	const copilotRuntimeVersion = formatCopilotVersion(productService.copilotVersions?.runtime);
+-	const copilotSdkVersion = formatCopilotVersion(productService.copilotVersions?.sdk);
+-
  	const getDetails = (useAgo: boolean): string => {
--		return localize({ key: 'aboutDetail', comment: ['Electron, Chromium, Node.js and V8 are product names that need no translation'] },
--			"Version: {0}\nCommit: {1}\nDate: {2}\nElectron: {3}\nElectronBuildId: {4}\nChromium: {5}\nNode.js: {6}\nV8: {7}\nOS: {8}",
+-		return localize({ key: 'aboutDetail', comment: ['Electron, Chromium, Node.js, V8 and Copilot are product names that need no translation'] },
+-			"Version: {0}\nCommit: {1}\nDate: {2}\nElectron: {3}\nElectronBuildId: {4}\nChromium: {5}\nNode.js: {6}\nV8: {7}\n@github/copilot: {8}\n@github/copilot-sdk: {9}\nOS: {10}",
 -			version,
 -			productService.commit || 'Unknown',
 -			productService.date ? `${productService.date}${useAgo ? ' (' + fromNow(new Date(productService.date), true) + ')' : ''}` : 'Unknown',
@@ -149,6 +124,8 @@ index ec26804c300..ce5bad99ad8 100644
 -			process.versions['chrome'],
 -			process.versions['node'],
 -			process.versions['v8'],
+-			copilotRuntimeVersion,
+-			copilotSdkVersion,
 -			`${osProps.type} ${osProps.arch} ${osProps.release}${isLinuxSnap ? ' snap' : ''}`
 -		);
 +		const details = [
@@ -178,7 +155,7 @@ index ec26804c300..ce5bad99ad8 100644
  		detailsToCopy: detailsToCopy
  	};
 diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
-index 9feac0c4ca4..52d2738d73a 100644
+index 9feac0c4ca4..08e22351a02 100644
 --- a/src/vs/platform/theme/common/iconRegistry.ts
 +++ b/src/vs/platform/theme/common/iconRegistry.ts
 @@ -319,6 +319,45 @@ function initialize() {
@@ -228,7 +205,7 @@ index 9feac0c4ca4..52d2738d73a 100644
  
  const schemaRegistry = platform.Registry.as<IJSONContributionRegistry>(JSONExtensions.JSONContribution);
 diff --git a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-index 9e9258c04e8..41a30a37016 100644
+index 0009eb39c87..056d82e0dc5 100644
 --- a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
 +++ b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
 @@ -210,12 +210,12 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
@@ -247,7 +224,7 @@ index 9e9258c04e8..41a30a37016 100644
  	}
  
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 1f6e583f5e0..20be7b0b06e 100644
+index c6bd172ac07..9ac63c8a9cf 100644
 --- a/src/vs/workbench/browser/media/style.css
 +++ b/src/vs/workbench/browser/media/style.css
 @@ -7,26 +7,50 @@
@@ -317,10 +294,10 @@ index 1f6e583f5e0..20be7b0b06e 100644
  .monaco-workbench.mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
  .monaco-workbench.windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
 diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
-index ba678499fec..3a490837e9b 100644
+index c2ea17be8ea..0eeeb7ea935 100644
 --- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
-@@ -217,7 +217,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
+@@ -234,7 +234,7 @@ const separatorIcon = registerIcon('breadcrumb-separator', Codicon.chevronRight,
  
  export class BreadcrumbsControl {
  
@@ -386,7 +363,7 @@ index a24f76131a8..10bb8f074c5 100644
 +	opacity: 0.6;
 +}
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
-index 5a5f9180bfa..ec682b423f9 100644
+index 067580a4b11..cbefa2f2357 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
 +++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
 @@ -4,9 +4,9 @@
