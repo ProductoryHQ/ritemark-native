@@ -81,42 +81,46 @@ grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
 
 ## 3. Menu Bar Expected State
 
+Ritemark 2.0 on VS Code 1.142 (Sprint 135's QA read the menus from the data the workbench sends to the Mac's menu bar, `lastKnownMenubarData` in the profile's `storage.json`). On Windows the same menus open from the menu button on the left column's strip (018).
+
 | Menu | Visible? | Notes |
 |------|----------|-------|
 | Ritemark (app menu) | YES | macOS app menu |
-| File | YES | Standard file operations |
-| Edit | YES | Cleaned: no Toggle Comment, no Block Comment, no Emmet Expand Abbreviation |
-| Selection | YES | Standard selection operations |
-| View | YES | Cleaned: no Appearance submenu, no Editor Layout submenu, no Extensions entry |
-| Go | NO | Entire menu removed (menubarControl.ts) |
-| Run | NO | Entire menu removed (debug.contribution.ts) |
-| Terminal | NO | Entire menu removed (menubarControl.ts) |
-| Window | YES | Standard window operations |
-| Help | YES | Cleaned of VS Code specific items |
+| File | YES | Includes File ▸ New tab, Switch project and Share (`ritemark/fileMenu`, 018) |
+| Edit | YES | Cleaned: no Toggle Comment, no Block Comment, no Emmet Expand Abbreviation (003) |
+| Selection | NO | Removed in `menubar.contribution.ts` (003) |
+| View | YES | Cleaned: no Appearance submenu, no Editor Layout, no Extensions, no Run; Copilot Chat only while it is installed and not disabled (003, 007) |
+| Go | NO | Removed in `menubar.contribution.ts` (003) |
+| Run | NO | Removed (`debug.contribution.ts`, 003) |
+| Terminal | NO | Removed in `menubar.contribution.ts` (003) |
+| Window | YES | macOS's own |
+| Help | YES | Getting started, Support, View License, Advanced ▸ Toggle Developer Tools; anything else upstream adds stays hidden (015) |
 
 ---
 
-## 4. Title Bar Expected State
+## 4. The Strips (no title row)
 
-| Element | Visible? | Notes |
-|---------|----------|-------|
-| Left sidebar toggle | YES | File explorer toggle |
-| Right sidebar toggle | YES | AI panel / terminal toggle |
-| Settings gear | YES | Opens settings |
-| Chat sparkle icon | NO (goal) | Currently still visible -- known issue. Patch 003 sets `isDefault=false` and unregisters view, but icon may persist from cache. |
-| Accounts icon | NO | Hidden by patch 002 |
-| Panel toggle | NO | Hidden by patch 002 |
+2.0 has no title row on the Mac or on Windows (018). The top line is three 44-high strips, every control centred on the line at 26.
+
+| Element | Where | Notes |
+|---------|-------|-------|
+| macOS traffic lights | Left column's strip | Placed by 018 (`windowImpl.ts`, `window.ts`) |
+| Left column toggle | Left column's strip; the desk's strip when the column is hidden | 018 |
+| Home and Task board tabs, the document tabs, "N ⌄", the + | The desk's strip | 019 |
+| AI toggle, You | The AI's strip | You is a menu: Settings ⌘, and Help (018) |
+| Windows minimize, maximize, close | Right end of the AI's strip | 018 |
+| Chat sparkle, Accounts, layout controls, Copilot entries in the command center | NO | 002, 003 |
 
 ---
 
-## 5. Sidebar Expected State
+## 5. Places Row Expected State
 
 | Item | Visible? | Notes |
 |------|----------|-------|
-| Explorer / Project | YES | Primary navigation |
-| Search | YES | Full-text search |
-| Run and Debug | NO | `hideIfEmpty: true` + welcome view condition set to `'never-show'` (patch 003) |
-| Extensions | YES | Marketplace works, but removed from View menu |
+| Home, Documents, Tasks, Browser, Agents, Transcribe | YES, in this order | The row on top of the left column (002) |
+| More | YES | Copilot Chat (while installed and not disabled, opens as a tab, 007), Search, File changes, Extensions, then other extensions' places (002) |
+| Run and Debug | NO | `hideIfEmpty: true` + welcome view condition `'never-show'` (003) |
+| VS Code's Agents window | NO | Its precondition is false (003) |
 
 ---
 
@@ -124,7 +128,9 @@ grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
 
 | Element | Visible? | Notes |
 |---------|----------|-------|
-| Copilot icon | NO | `chatStatusEntry.ts` disposes entry immediately (patch 003) |
+| Word count, AI Ready, Report AI issue, notifications | YES | The extension's items and the bell |
+| Copilot icon | NO | `chatStatusEntry.ts` disposes the entry (003) |
+| Remote indicator, problem counts | NO | Hidden by 018's stylesheet (`ritemarkSurfaces.css`); Problems stays in the View menu |
 
 ---
 
@@ -133,6 +139,9 @@ grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
 | Keybinding | Default VS Code Behavior | Ritemark Behavior | Enforced By |
 |------------|--------------------------|-------------------|-------------|
 | Cmd+B | Toggle sidebar | Bold text (TipTap) | Patch 002 removes the keybinding |
+| Ctrl+Alt+I (⌃⌘I) | Open Chat | Copilot Chat as a tab, and nothing without a usable Copilot Chat | 007 |
+| Cmd+T / Ctrl+T | Go to Symbol in Workspace | The + of the desk in front (`ritemark.newTab`) | 019 |
+| Ctrl+` | Toggle the terminal panel | A new terminal tab (`workbench.action.createTerminalEditor`) | 002 removes the toggle; the extension's `package.json` binds the new tab |
 
 ---
 
