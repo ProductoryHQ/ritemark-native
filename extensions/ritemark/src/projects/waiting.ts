@@ -35,7 +35,7 @@ export type ChatWaitKind = 'approval' | 'question' | 'plan-review' | 'reply';
 
 export type WaitingItem =
   | { source: 'card'; kind: CallKind; cardId: string; title: string; since: string }
-  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string; runtimeId: string | null; colorSlot: number | null };
+  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string; runtimeId: string | null; colorSlot: number | null; quoted?: boolean };
 
 export interface ProjectWaiting {
   /** The board's calls; undefined when the board can't be read, 0 with no board. */
@@ -61,6 +61,8 @@ export interface ChatIndexEntry {
   runtimeSummary?: string[];
   /** The chat's colour on the rail (its duotone bubble), 0–7. */
   identityColorSlot?: number;
+  /** The title is still the chat's first message. */
+  titleIsFirstMessage?: boolean;
 }
 
 const ATTENTION_KINDS: ReadonlySet<string> = new Set(['approval', 'question', 'plan-review']);
@@ -70,6 +72,11 @@ export { hasUnreadReply };
 function lastRuntime(entry: ChatIndexEntry): string | null {
   const runtimes = Array.isArray(entry.runtimeSummary) ? entry.runtimeSummary.filter((id) => typeof id === 'string') : [];
   return runtimes[runtimes.length - 1] ?? null;
+}
+
+/** A chat titled by its first message is quoted on Home: Claude replied to “…” (the Experience lead, 19 October). */
+function quotedOf(entry: ChatIndexEntry): { quoted?: boolean } {
+  return entry.titleIsFirstMessage === true ? { quoted: true } : {};
 }
 
 function colorSlotOf(entry: ChatIndexEntry): number | null {
@@ -89,12 +96,12 @@ export function chatsWaiting(
     const { lifecycle } = entry;
     if (lifecycle.state === 'needs-user' && lifecycle.attentionKind && ATTENTION_KINDS.has(lifecycle.attentionKind)) {
       if (heldByLiveWindow.has(entry.conversationId)) {
-        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry) });
+        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry), ...quotedOf(entry) });
         continue;
       }
     }
     if (hasUnreadReply(entry)) {
-      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt!, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry) });
+      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt!, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry), ...quotedOf(entry) });
     }
   }
   // Questions and approvals first, longest waiting first, since they hold work up; then unread replies, newest first

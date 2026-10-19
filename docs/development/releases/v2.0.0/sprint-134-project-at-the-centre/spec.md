@@ -346,6 +346,7 @@ Acceptance criteria:
   - a Ritemark menu, doc, skill or QA step names it (for example Developer: Reload Window);
   - the parity list reaches a v1.14.0 function through All commands only, such as refreshing the file list and maximising the AI's column (G7).
 - Search and the recently used list never offer a dropped command.
+- The walkthrough pickers go too, "Welcome: Open Walkthrough…" and "Chat: Open Walkthrough": Getting Started is Ritemark's welcome (Sprint 133), which Help: Welcome opens and which stays (the Development manager, 19 October, from Windows round 3).
 - The commands keep VS Code's names. Plain-word names (experience 22) come after 2.0.
 
 ### R22: ChatGPT, never Codex
@@ -474,6 +475,8 @@ After 2.0 (Jarmo, 19 October):
   - **An unread reply in Home's Waiting for you** is listed like a chat's question, as one sentence: the chat's own coloured bubble as its icon (the rail's duotone bubble in that chat's colour), then "<AI> replied in <chat title>" with the chat's own AI, the time at the right in muted ink. Questions and approvals come first, since they hold work up, then unread replies, newest first. Clicking it opens the chat on the AI's sheet, which reads it and takes it off the list (R3, R4).
   - **The chat rail marks an unread chat** with the amber dot it already uses for "waits for you", in the same place and size; it clears once the chat has been in front on a shown AI sheet. One meaning: amber means something waits there, a question or a reply (R3).
   - **Browser under the head:** one row, New page, then the Recent label with Clear history at its right, then the pages as 32-high rows with the site's icon, the title and the domain in muted ink (R16, R18).
+  - **A chat titled by its first message** (no name from the AI, no rename) is quoted on Home and the sentence says "to": Claude replied to “In one sentence, what is a module plan?”, with curly quotes, on one line, a long message cut at a word with the ellipsis inside the quotes. A named chat keeps "Claude replied in Plan Module 5". Questions and approvals in such a chat quote it too (R4).
+  - **Documents hides the `.claude` folder**, as it hides `.ritemark`: what is in it is what the Agents place shows. Search and Quick Open leave it out too, as for `.ritemark`; the Agents place reads it as before (R8).
 
 - **2026-10-15 (Jarmo):** Home states the project's name, with a header image the person can change; the first window after the welcome is Home; chats are kept privately on this computer, never in the project's folder.
 - **2026-10-16 (Jarmo):** Home and Tasks pinned permanently as the first two tabs, icons only; "yes, yes, yes" to the projects list on Home, the count on the Tasks tab, and sending it to the Development manager.

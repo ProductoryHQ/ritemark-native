@@ -75,6 +75,7 @@ When Home is shown in "Leadership programme"
 Then the list counts it beside "Sales proposal Q4", and Home says what waits in the other projects
 When the person opens that chat in the other window and Home is shown again
 Then it is no longer counted
+And Home words it "Claude replied in <chat's name>", or, for a chat still titled by its first message, Claude replied to “<the message>”, cut at a word inside the quotes when it runs long (the Experience lead, 19 October)
 And a reply that finishes while its chat is in front on the AI's sheet is never counted
 And a card's finished turn counts once, as the card's review, not as its chat too
 And on a v1.14.0 profile's first start of this build, no old chat counts as unread.
@@ -392,9 +393,9 @@ Then the question is about the page now in front, and ritemark.app is not shared
 ## Feature: The command palette (R21)
 
 ### S58: No developer commands
-When the person opens All commands (⇧⌘P) and types "breakpoint", then "debug", then "developer"
-Then "Add Data Breakpoint at Address", "Add Function Breakpoint" and the other IDs on the audit's list do not show, and nothing on the list shows under recently used
-And Ritemark's commands, Preferences: Open Settings (UI), the four kept developer commands (Reload Window, Toggle Developer Tools, Open Webview Developer Tools, Open Process Explorer), Refresh Explorer and the AI column's Maximize all show
+When the person opens All commands (⇧⌘P) and types "breakpoint", then "debug", then "developer", then "walkthrough"
+Then "Add Data Breakpoint at Address", "Add Function Breakpoint", the walkthrough pickers and the other IDs on the audit's list do not show, and nothing on the list shows under recently used
+And Ritemark's commands, Preferences: Open Settings (UI), the four kept developer commands (Reload Window, Toggle Developer Tools, Open Webview Developer Tools, Open Process Explorer), Refresh Explorer, the AI column's Maximize and Help: Welcome all show
 When the person runs Help ▸ Toggle Developer Tools from its menu, and a dropped command from a key binding made for the test
 Then each runs as before: a menu or a key still runs a command the palette dropped.
 

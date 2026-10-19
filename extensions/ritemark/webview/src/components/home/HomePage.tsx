@@ -126,7 +126,9 @@ function Waiting({ state, now }: { state: HomeState; now: number }) {
             {item.source === 'chat' && item.kind === 'reply' && item.colorSlot !== null
               ? <span className="rh-ic rh-ic-bubble"><ConversationBubbleIcon identityColorSlot={item.colorSlot} size={14} /></span>
               : <span className="rh-ic"><Icon name={waitingIcon(item)} size={14} tone="inherit" /></span>}
-            <span className="rh-text">{words.text}</span>
+            {words.quote === undefined
+              ? <span className="rh-text">{words.text}</span>
+              : <span className="rh-text rh-quoted"><span className="rh-lead">{`${words.text} “`}</span><span className="rh-quote">{words.quote}</span><span className="rh-lead">”</span></span>}
             {words.tag && <span className="rh-tag">{words.tag}</span>}
             <span className="rh-when">{whenWords(item.since, now, 'minutes')}</span>
           </button>

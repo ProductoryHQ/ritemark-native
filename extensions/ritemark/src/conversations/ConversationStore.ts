@@ -163,6 +163,7 @@ function decodeIndex(value: unknown): ConversationIndexV1 {
       lastVerifiedAt: entry.lastVerifiedAt as string,
       ...(typeof entry.readAt === 'string' ? { readAt: entry.readAt } : {}),
       ...(typeof entry.lastReplyAt === 'string' ? { lastReplyAt: entry.lastReplyAt } : {}),
+      ...(entry.titleIsFirstMessage === true ? { titleIsFirstMessage: true as const } : {}),
     };
   });
   return {

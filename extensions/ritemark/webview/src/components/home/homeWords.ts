@@ -30,19 +30,38 @@ export function whenWords(iso: string, now: number, precision: 'minutes' | 'days
   return new Date(then).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-/** The row's sentence, and the muted tag after it. */
-export function waitingWords(item: HomeWaitingItem): { text: string; tag: string | null } {
+/** Home's row fits about this much of a quoted message beside its lead and time at the page's width. */
+export const QUOTE_LIMIT = 56
+
+/** A quoted first message, cut at a word with the ellipsis inside the quote marks. */
+export function quoteWords(message: string, limit = QUOTE_LIMIT): string {
+  const text = message.replace(/\s+/g, ' ').trim()
+  if (text.length <= limit) return text
+  const cut = text.slice(0, limit - 1)
+  const space = cut.lastIndexOf(' ')
+  return `${(space >= limit * 0.55 ? cut.slice(0, space) : cut).replace(/[\s.,;:!?…–—-]+$/, '')}…`
+}
+
+/**
+ * The row's sentence, and the muted tag after it. A chat titled by its first
+ * message is quoted, the quote cut inside its marks (`quote`): Claude replied
+ * to “In one sentence…” (the Experience lead, 19 October).
+ */
+export function waitingWords(item: HomeWaitingItem): { text: string; quote?: string; tag: string | null } {
   const ai = item.ai ?? 'The AI'
   if (item.source === 'chat') {
+    const named = (lead: string) => (item.quoted ? { text: lead, quote: quoteWords(item.title) } : { text: `${lead} ${item.title}` })
     switch (item.kind) {
       case 'question':
-        return item.detail ? { text: `${ai} asks: ${item.detail}`, tag: item.title } : { text: `${ai} asks you something in ${item.title}`, tag: null }
+        return item.detail
+          ? { text: `${ai} asks: ${item.detail}`, tag: item.quoted ? `“${quoteWords(item.title)}”` : item.title }
+          : { ...named(`${ai} asks you something in`), tag: null }
       case 'approval':
-        return { text: `${ai} waits for your OK in ${item.title}`, tag: null }
+        return { ...named(`${ai} waits for your OK in`), tag: null }
       case 'plan-review':
-        return { text: `${ai}’s plan waits for you in ${item.title}`, tag: null }
+        return { ...named(`${ai}’s plan waits for you in`), tag: null }
       default:
-        return { text: `${ai} replied in ${item.title}`, tag: null }
+        return item.quoted ? { text: `${ai} replied to`, quote: quoteWords(item.title), tag: null } : { text: `${ai} replied in ${item.title}`, tag: null }
     }
   }
   switch (item.kind) {

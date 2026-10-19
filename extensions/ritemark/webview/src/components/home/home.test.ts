@@ -29,6 +29,7 @@ const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { HomeView } = await import('./HomePage')
 const { ProjectsListView, filterProjects } = await import('./ProjectsList')
+const { quoteWords, QUOTE_LIMIT } = await import('./homeWords')
 
 const now = new Date(2026, 9, 19, 12, 0).getTime()
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString()
@@ -228,6 +229,19 @@ assert.notEqual(filterProjects(rows, ''), rows, 'a copy, never the list itself')
 const replied = render(home({ waiting: { count: 1, items: [{ id: 'chat:c-9', source: 'chat', kind: 'reply', title: 'Plan Module 5', detail: null, ai: 'Claude', since: ago(3), colorSlot: 4 }] }, others: [] }))
 assert.match(replied, /class="rh-ic rh-ic-bubble"><span class="inline-flex shrink-0 [^"]*" style="color:[^"]+">/)
 assert.match(replied, />Claude replied in Plan Module 5</)
+
+// A chat titled by its first message is quoted, "to" not "in", the quote cut inside its marks (the Experience lead, 19 October)
+const quoted = render(home({ waiting: { count: 1, items: [{ id: 'chat:c-10', source: 'chat', kind: 'reply', title: 'In one sentence, what is a module plan?', detail: null, ai: 'Claude', since: ago(2), colorSlot: 1, quoted: true }] }, others: [] }))
+assert.match(quoted, /<span class="rh-text rh-quoted"><span class="rh-lead">Claude replied to “<\/span><span class="rh-quote">In one sentence, what is a module plan\?<\/span><span class="rh-lead">”<\/span><\/span>/)
+assert.doesNotMatch(quoted, /replied in/)
+// A long first message is cut at a word, the ellipsis inside the marks; a short one is whole
+assert.equal(quoteWords('Read the three briefs in Research and tell me which parts of the module plan we should rewrite'), 'Read the three briefs in Research and tell me which…')
+assert.equal(quoteWords('In one sentence, what is a module plan?'), 'In one sentence, what is a module plan?')
+assert.equal(quoteWords('Plan the kickoff, the venue, the agenda, the invitations, the budget and more'), 'Plan the kickoff, the venue, the agenda, the…')
+assert.ok(quoteWords('x'.repeat(200)).length <= QUOTE_LIMIT)
+// The same rule for a question without its words: the quote, cut inside its marks
+const asked = render(home({ waiting: { count: 1, items: [{ id: 'chat:c-11', source: 'chat', kind: 'question', title: 'Can you draft the venue email?', detail: null, ai: 'ChatGPT', since: ago(2), colorSlot: null, quoted: true }] }, others: [] }))
+assert.match(asked, /ChatGPT asks you something in “<\/span><span class="rh-quote">Can you draft the venue email\?<\/span>/)
 
 assert.deepEqual(posted, [], 'drawing sends nothing to the host')
 console.log('home: all assertions passed')

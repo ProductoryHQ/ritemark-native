@@ -87,7 +87,7 @@ export function recentItems(
 export function waitingItems(waiting: ProjectWaiting): HomeWaitingItem[] {
   return waiting.items.map((item) => item.source === 'card'
     ? { id: `card:${item.cardId}`, source: 'card', kind: item.kind, title: item.title, detail: null, ai: null, since: item.since, colorSlot: null }
-    : { id: `chat:${item.conversationId}`, source: 'chat', kind: item.kind, title: item.title, detail: null, ai: aiNameOf(item.runtimeId), since: item.since, colorSlot: item.colorSlot });
+    : { id: `chat:${item.conversationId}`, source: 'chat', kind: item.kind, title: item.title, detail: null, ai: aiNameOf(item.runtimeId), since: item.since, colorSlot: item.colorSlot, ...(item.quoted ? { quoted: true } : {}) });
 }
 
 /** The other projects with something waiting, in the list's order; null when none can be counted. */

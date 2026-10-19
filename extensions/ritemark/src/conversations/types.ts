@@ -198,6 +198,8 @@ export interface ConversationSummaryV1 {
   readAt?: string;
   /** Sprint 134 (R3): when the newest reply finished (see {@link lastReplyAtOf}). */
   lastReplyAt?: string;
+  /** Sprint 134 (R3): the title is still the chat's first message (no AI title, no rename), so Home quotes it. */
+  titleIsFirstMessage?: true;
 }
 
 export interface ConversationIndexV1 {
@@ -739,6 +741,8 @@ export function hasUnreadReply(summary: { readAt?: string; lastReplyAt?: string 
 
 export function summarizeConversationRecord(record: ConversationRecordV1, verifiedAt: string): ConversationSummaryV1 {
   const lastReplyAt = lastReplyAtOf(record.events);
+  const firstMessage = record.events.find((event): event is UserMessageEventV1 => event.kind === 'user-message')?.text;
+  const titleIsFirstMessage = Boolean(firstMessage?.trim()) && record.title === fallbackTitleFromPrompt(firstMessage!);
   return {
     conversationId: record.conversationId,
     scopeId: record.scopeId,
@@ -754,5 +758,6 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
     lastVerifiedAt: verifiedAt,
     ...(record.readAt ? { readAt: record.readAt } : {}),
     ...(lastReplyAt ? { lastReplyAt } : {}),
+    ...(titleIsFirstMessage ? { titleIsFirstMessage: true as const } : {}),
   };
 }

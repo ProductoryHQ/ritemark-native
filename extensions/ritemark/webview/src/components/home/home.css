@@ -177,6 +177,10 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   color: var(--r-ink-body);
 }
 .rh-row .rh-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A quoted first message is cut inside its marks: Claude replied to “In one sentence…” */
+.rh-row .rh-quoted { display: flex; }
+.rh-quoted .rh-lead { flex: none; white-space: pre; }
+.rh-quoted .rh-quote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rh-row .rh-tag { flex: none; color: var(--r-ink-muted); font-size: 13px; }
 .rh-row .rh-when { margin-left: auto; flex: none; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; }
 

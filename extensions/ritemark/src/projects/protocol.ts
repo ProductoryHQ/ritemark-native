@@ -29,6 +29,8 @@ export interface HomeWaitingItem {
   since: string;
   /** A chat's colour on the rail, for its bubble on Home (the Experience lead, 19 October); null for a card. */
   colorSlot: number | null;
+  /** The chat's title is its first message, so Home quotes it: Claude replied to “…”. */
+  quoted?: boolean;
 }
 
 export type RecentKind = 'markdown' | 'pdf' | 'word' | 'sheet' | 'slides' | 'drawing' | 'flow' | 'other';

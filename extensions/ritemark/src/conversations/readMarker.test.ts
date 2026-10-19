@@ -70,6 +70,16 @@ async function run(): Promise<void> {
     const rawEntry = raw.entries.find((entry) => entry.conversationId === away)!;
     assert.equal(hasUnreadReply(rawEntry), true, 'other windows count it from index.json');
 
+    // ── Titled by its first message: the index says so, for Home's quote; a renamed chat is named ──
+    assert.equal(unread.titleIsFirstMessage, true);
+    assert.equal((rawEntry as { titleIsFirstMessage?: boolean }).titleIsFirstMessage, true);
+    const named = await chatWithReply('Draft the venue email. Keep it short.');
+    assert.equal((await summary(named)).title, 'Draft the venue email.');
+    assert.equal((await summary(named)).titleIsFirstMessage, true, 'the title is the first sentence of the first message');
+    const record = (await store.get(named))!;
+    await store.checkpoint({ conversationId: named, bindingGeneration: record.bindingGeneration, expectedRevision: record.revision, title: 'Venue email' });
+    assert.equal((await summary(named)).titleIsFirstMessage, undefined);
+
     // ── Shown in front: read; the chat keeps its place in the rail ──
     const before = await store.get(away);
     tick(60);

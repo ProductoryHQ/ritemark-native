@@ -131,7 +131,8 @@ test('the 2.0 defaults', () => {
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMinWidth'], 38); // no floor: tabs are as wide as their names (the stylesheet)
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMaxWidth'], 200);
   assert.equal(configurationDefaults['workbench.editor.pinnedTabSizing'], 'compact');
-  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true });
+  // Documents hides .ritemark, and .claude, whose contents the Agents place shows (the Experience lead, 19 October)
+  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true, '**/.claude': true });
   assert.equal(configurationDefaults['terminal.integrated.defaultLocation'], 'editor');
   assert.equal(configurationDefaults['terminal.integrated.hideOnStartup'], 'always');
   // ⌘T reaches the tab row from a terminal tab too (Sprint 134, R21)

@@ -741,10 +741,10 @@ index acf3e73a07c..895e0953a02 100644
  	focusCommand = { id: 'timeline.focus' };
  }
 diff --git a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-index e05b71bd72c..5a16d2d4985 100644
+index e05b71bd72c..f7f25a9d934 100644
 --- a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
 +++ b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-@@ -41,6 +41,138 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
+@@ -41,6 +41,141 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
  import { IChatAgentService } from '../../chat/common/participants/chatAgents.js';
  import { ChatAgentLocation } from '../../chat/common/constants.js';
  
@@ -865,6 +865,9 @@ index e05b71bd72c..5a16d2d4985 100644
 +	'workbench.action.terminal.writeDataToTerminal',
 +	'workbench.action.terminal.recordSession',
 +	'workbench.action.terminal.restartPtyHost',
++	// The walkthrough pickers: Getting Started is Ritemark's welcome (Sprint 133), which Help: Welcome opens (Windows round 3)
++	'welcome.showAllWalkthroughs',
++	'github.copilot.open.walkthrough',
 +]);
 +
 +/**
@@ -883,7 +886,7 @@ index e05b71bd72c..5a16d2d4985 100644
  export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAccessProvider {
  
  	private static AI_RELATED_INFORMATION_MAX_PICKS = 5;
-@@ -125,10 +257,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
+@@ -125,10 +260,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
  			return [];
  		}
  
@@ -899,10 +902,10 @@ index e05b71bd72c..5a16d2d4985 100644
  				iconClass: ThemeIcon.asClassName(Codicon.gear),
 diff --git a/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
 new file mode 100644
-index 00000000000..d6b5c585bd4
+index 00000000000..de2ac0a670f
 --- /dev/null
 +++ b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,256 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1048,6 +1051,9 @@ index 00000000000..d6b5c585bd4
 +			'workbench.action.inspectContextKeys',
 +			'workbench.action.debugRenderer',
 +			'_update.applyupdate',
++			'resetGettingStartedProgress',
++			'welcome.showAllWalkthroughs',
++			'github.copilot.open.walkthrough',
 +			// Dropped by prefix, one for each
 +			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
 +			'workbench.action.debug.start',
@@ -1066,6 +1072,8 @@ index 00000000000..d6b5c585bd4
 +			'workbench.action.maximizeAuxiliaryBar',
 +			'ritemark.reactions',
 +			'_ritemark.files.chosenFolder',
++			// Kept: Help: Welcome, which opens Ritemark's welcome
++			'workbench.action.openWalkthrough',
 +			// Kept: a prefix needs its dot, so look-alikes outside the family stay
 +			'workbench.action.debugger.other',
 +			'debugpy.debugInTerminal',
@@ -1079,6 +1087,9 @@ index 00000000000..d6b5c585bd4
 +			'workbench.action.inspectContextKeys',
 +			'workbench.action.debugRenderer',
 +			'_update.applyupdate',
++			'resetGettingStartedProgress',
++			'welcome.showAllWalkthroughs',
++			'github.copilot.open.walkthrough',
 +			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
 +			'workbench.action.debug.start',
 +			'debug.addConfiguration',

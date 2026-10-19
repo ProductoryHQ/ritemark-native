@@ -207,6 +207,15 @@ async function main(): Promise<void> {
     ]);
   }
 
+  // A chat titled by its first message is quoted on Home (the Experience lead, 19 October); a named one is not.
+  {
+    const items = chatsWaiting([
+      chat('first-message', { readAt: '2026-10-19T08:00:00.000Z', lastReplyAt: '2026-10-19T08:50:00.000Z', titleIsFirstMessage: true }),
+      chat('named', { readAt: '2026-10-19T08:00:00.000Z', lastReplyAt: '2026-10-19T08:40:00.000Z' }),
+    ], scopeId, new Set(), new Set());
+    assert.deepEqual(items.map((item) => [item.conversationId, item.quoted === true]), [['first-message', true], ['named', false]]);
+  }
+
   fs.rmSync(root, { recursive: true, force: true });
   console.log('projects/waiting: all assertions passed');
 }
