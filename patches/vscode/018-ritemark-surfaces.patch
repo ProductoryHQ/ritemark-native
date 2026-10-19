@@ -73,6 +73,12 @@ right ("1 waits", "Not found", a key); a long name ends in … before it; a proj
 its old place under its name and a warning at its right (S38). The project's mark is two letters, as the welcome draws it
 ("Notes" → "NO"). The project menu's New folder and Collapse folders show on Documents only.
 
+Sprint 135: rebased onto VS Code 1.142.0 (the sprint's research/frame-audit.md). Modern UI
+(workbench.experimental.modernUI) is pinned off in product.json; the frame's lines sit beside its branches.
+sidebarPart.ts and auxiliaryBarPart.ts answer upstream's getRelayoutDimension() with the full size, so a strip is
+not taken off twice; windowImpl.ts places the window controls inside upstream's hasWindowControlOverlay gate;
+overlayWebview.ts sets ritemark-desk-webview in setAnchorElement (webviews now follow their anchor by CSS anchor
+positioning); ritemarkSurfaces.css styles the empty desk through .editor-group-watermark-wrapper.
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 

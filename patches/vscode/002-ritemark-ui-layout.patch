@@ -19,6 +19,10 @@ Sprint 132 (Ritemark 2.0 step 1, 2026-10-17): this patch keeps placement; 018 an
   In the places row only Ritemark's six take a spot: every other place lives in More, even while open, and More
   takes the chosen fill then; a place new to a saved row never goes in among the six (compositeBar.ts). Documents
   stays a place while its tree is not registered yet, and is called Documents (explorerViewlet.ts).
+Sprint 135: rebased onto VS Code 1.142.0. The places row and the 40-high header, title and activity bar as before;
+  compositeSize is upstream's (actionHeight + actionGap, 40 with Modern UI off, which product.json pins); the
+  Appearance submenu stays out of View; layoutActions.ts also drops its KeyMod/KeyCode import, used at 1.142 only
+  by the Cmd+B binding this patch removes.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts

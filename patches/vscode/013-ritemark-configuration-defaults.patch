@@ -9,6 +9,7 @@ first-run bug. This patch:
   - adds `configurationDefaults` to IProductConfiguration
   - registers `product.configurationDefaults` in DefaultConfiguration
     (additive; user/workspace settings still override)
+Sprint 135: rebased onto VS Code 1.142.0 (product.ts beside upstream's new product configuration interfaces).
 
 diff --git a/src/vs/base/common/product.ts b/src/vs/base/common/product.ts
 index 0767bb78c5a..7006cccdd3d 100644

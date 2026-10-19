@@ -8,10 +8,12 @@
 #      renderer at module load time when defaultChatAgent is not configured.
 #      Ritemark does not ship Microsoft Copilot onboarding, so the assertion
 #      fires every prod boot. Fix: replace the assertion with a soft fallback
-#      (`?? {}`) so the module loads. The wizard itself remains unreachable
-#      because no UI links to it.
+#      (`?? {}`) so the module loads. The wizard itself stays closed: at 1.117
+#      no UI linked to it; from 1.142 upstream shows it on a first launch
+#      while workbench.welcomePage.experimentalOnboarding is on (startupPage.ts),
+#      which branding/product.json pins off, with onboarding.enabled (Sprint 135).
 #
-#   2. chat.contribution.ts (NEW in 1.117) registers
+#   2. chat.contribution.ts (NEW in 1.117; chat.shared.contribution.ts from 1.142) registers
 #      ChatSetupContribution + ChatTeardownContribution which add a
 #      "Chat Debug" item with a setup badge to the activity bar — even
 #      though Ritemark already gates the chat view via patch 003. Disable
@@ -35,11 +37,18 @@
 #      view bindings, and does nothing without a usable Copilot Chat: VS Code's
 #      own Chat never opens in its place (S21, Windows round 2, 2026-10-18).
 #
+#   4. Sprint 135 (VS Code 1.142.0): upstream moved the chat registrations into
+#      chat.shared.contribution.ts; the two changes go there unchanged, now two
+#      hunks. Upstream renamed ChatConfiguration.AIDisabled to
+#      ChatAIDisabledSettingId (same setting, chat.disableAIFeatures); this
+#      patch's one use follows it.
+#
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
-#          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
+#          src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts,
 #          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts,
 #          src/vs/workbench/browser/parts/paneCompositeBar.ts
 # Created: 2026-05-02
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 index ee76b0ef3b4..29725b7f835 100644

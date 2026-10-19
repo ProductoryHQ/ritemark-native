@@ -19,6 +19,7 @@ any download or install link.
 Note: Visual Studio Code ships in the Microsoft Store with the same button,
 so this is not evidence that mentioning Git acquisition is categorically
 forbidden. The resubmission describes what changed, not a policy reading.
+Sprint 135: carried onto VS Code 1.142.0 unchanged.
 ---
 diff --git a/extensions/git/package.nls.json b/extensions/git/package.nls.json
 index e8acff6826e..0fd98375e6a 100644

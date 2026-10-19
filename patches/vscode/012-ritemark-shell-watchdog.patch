@@ -6,6 +6,7 @@
 #
 # File(s): src/vs/workbench/api/browser/mainThreadExtensionService.ts
 # Created: 2026-07-21
+# Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadExtensionService.ts b/src/vs/workbench/api/browser/mainThreadExtensionService.ts
 index 4cfaf6a58cb..df0ba063e04 100644

@@ -8,11 +8,18 @@
 #          directly in BrowserEditor with zero text-tab flicker.
 #          Sprint 78: adds agentSnapshot (read-only ARIA outline, no consent).
 #
+# Sprint 135 (VS Code 1.142.0): revoking control when the share goes moves into
+#   009's audience listener; the .html/.htm resolver uses getOrCreateLazy and
+#   its own label key (ritemark.browser.htmlEditorLabel), beside upstream's new
+#   .html entry, which stays (Ritemark's has default priority and wins); the
+#   actions take RITEMARK_PLAYWRIGHT_SESSION.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 # Created: 2026-05-13
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644

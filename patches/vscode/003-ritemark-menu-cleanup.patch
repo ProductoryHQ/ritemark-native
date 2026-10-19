@@ -18,6 +18,15 @@ Sprint 134 (Ritemark 2.0, step 3; R21, #456):
     commands and recently used never show them. They stay registered, so their
     menus and shortcuts still run them. The list is research/palette-audit.md §7.
     Test: contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts.
+Sprint 135 (rebased onto VS Code 1.142.0; the sprint's research/surfaces-audit.md):
+  - The main menu's registrations moved upstream to menubar.contribution.ts; Selection, Go and Terminal stay out
+    there (menubarControl.ts leaves this patch).
+  - chatStatusEntry.ts and extensionEnablementService.ts re-cut onto upstream's new structure: the Copilot entry is
+    still disposed; ensureChatExtensionInitialDisabledState is emptied, so Copilot Chat installed from the
+    Marketplace is never disabled behind the person's back.
+  - The Agents window never opens: OPEN_AGENTS_WINDOW_PRECONDITION is false (chat/common/constants.ts), and
+    windowsMainService.ts opens a normal window when --agents, an agent link or a tryout hand-off asks for it.
+  - All commands also leaves out the Agents window's two commands and 23 Developer commands new since 1.117.
 ---
 diff --git a/extensions/git/package.json b/extensions/git/package.json
 index 8c8e8ce632a..0195e79ad08 100644

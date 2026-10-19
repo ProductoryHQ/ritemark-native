@@ -6,6 +6,7 @@
 #
 # File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 # Created: 2026-08-31
+# Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
 index 9827a1a573f..5affedfb204 100644

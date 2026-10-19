@@ -22,8 +22,17 @@
 #   vscode/build/lib/copilot.ts: mkdirSync(nodePtyDest, { recursive: true })
 #   followed by cpSync). So stripping the entire prebuilds/** tree is safe.
 #
+#   Sprint 135 (VS Code 1.142.0): upstream now strips @github/copilot/** whole
+#   and adds back only the target's Copilot SDK platform package when it
+#   packages (build/lib/copilot.ts), so the two @github/copilot/sdk lines are
+#   upstream's and leave this patch. The three claude-agent-sdk vendor/ lines
+#   stay: the SDK installed now ships its binary in per-platform packages and
+#   has no vendor/ folder, so they guard the older layout. Windows CI's
+#   packaging (rcedit) is the proof.
+#
 # File(s): build/.moduleignore
 # Created: 2026-05-03
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/build/.moduleignore b/build/.moduleignore
 index 202d76b197e..248e9e5f511 100644

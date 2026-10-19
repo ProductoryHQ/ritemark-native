@@ -6,6 +6,9 @@ v1.10.0 RC bug fix:
   - Keeps commands available through the Command Menu
   - Covers the policy and separator normalization with unit tests
 Sprint 133: Getting started joins Support in Help, where 1.x's first page linked to it
+Sprint 135: rebased onto VS Code 1.142.0. The main menu's registrations moved upstream to
+menubar.contribution.ts; the Help allowlist stays in menubarControl.ts, which now imports MenuRegistry itself.
+Upstream added its own menubarControl.test.ts (Open Recent's labels); this patch's suite is appended to it.
 ---
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
 index 0df05b689ce..3400905b234 100644

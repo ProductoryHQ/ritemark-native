@@ -66,9 +66,19 @@
 #   tab's favicon changes (kind 'favicon', the model's data URL), so Recent's
 #   rows show the site's icon.
 #
+# Sprint 135 (VS Code 1.142.0; the sprint's research/browser-bridge-audit.md):
+#   re-cut onto upstream's agent audiences. A share is an agent audience on the
+#   view (setAudience); ritemarkSharedWithAgent reads the audiences, so the AI's
+#   page context does not depend on VS Code's chat (whose sharingState reads
+#   Unavailable while chat is off). shareWithAgentAnswered follows upstream's
+#   Allow path. Playwright calls take one fixed session,
+#   RITEMARK_PLAYWRIGHT_SESSION ('ritemark'). Browser Recent's ephemeral flag
+#   covers every in-memory tab (private tabs and upstream's Agent storage).
+#
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
 # Updated: 2026-10-19 (Sprint 134: the share question on the AI's sheet)
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 78cee5deca2..31466d78914 100644

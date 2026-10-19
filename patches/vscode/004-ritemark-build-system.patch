@@ -2,6 +2,8 @@ Ritemark Build System: making the VS Code fork build and run correctly
 Consolidates old patches: 008 (jschardet), 009 (microphone), 013 (integrity check)
 Also delegates the microphone Permissions-Policy feature to webview iframes
 (required since Electron 39 enforces iframe media policy; fixes voice dictation, GH #116)
+Sprint 135: rebased onto VS Code 1.142.0 (app.ts: upstream's permission handler now takes webContents and
+lists 'media' for the core window; this patch still adds it to the webview list)
 ---
 diff --git a/build/.moduleignore b/build/.moduleignore
 index 51149993424..202d76b197e 100644

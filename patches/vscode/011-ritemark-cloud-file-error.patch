@@ -1,6 +1,7 @@
 Ritemark: actionable error message for OneDrive/SharePoint cloud-file read failures
 Sprint 91: #134 — when a cloud-only (dehydrated) file fails to read, show a user-friendly
 message instead of the generic "Unknown (FileSystemError)".
+Sprint 135: carried onto VS Code 1.142.0 unchanged.
 diff --git a/src/vs/platform/files/node/diskFileSystemProvider.ts b/src/vs/platform/files/node/diskFileSystemProvider.ts
 index 3d3ee074e9e..befdda04859 100644
 --- a/src/vs/platform/files/node/diskFileSystemProvider.ts

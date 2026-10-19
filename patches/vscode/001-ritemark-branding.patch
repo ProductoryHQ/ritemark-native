@@ -14,6 +14,11 @@ ritemark.welcome.open instead, and a Getting Started tab saved in an earlier ses
 Sprint 134: the splash's defaults with auto-detect on are the two grounds, #16132F dark and #F1F5F9 light (the
 extension's ritemark.ground, which workbench.ts can't read before the workbench loads; change both together).
 Note: Binary fonts/icons (woff2, svg) handled by apply-patches.sh, not in this diff.
+Sprint 135: rebased onto VS Code 1.142.0
+  - build/gulpfile.vscode.ts and build/lib/optimize.ts leave the patch (12 → 10 files): esbuild bundles the core
+    (build/next/index.ts, which keeps the .woff2 loader) and writes the fonts the CSS references to media/, and the
+    packaging takes the whole bundle output, so the font includes are upstream's now and optimize.ts is gone
+  - The About box keeps its 1.117 lines: upstream's new Copilot SDK version lines stay out (dialog.ts)
 ---
 diff --git a/build/next/index.ts b/build/next/index.ts
 index c439d777fd5..a94f901d2e0 100644

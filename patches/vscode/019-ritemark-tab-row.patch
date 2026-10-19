@@ -30,6 +30,9 @@ contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8) and test/browser
 (Sprint 134, R6); run with ./scripts/test.sh --grep Ritemark.
 Sprint 134 also: the Task board tab's count (R6), and ritemark.newTab (File ▸ New tab, ⌘T / Ctrl+T) clicks the +
 of the desk in front (ritemarkNewTab.ts; R21).
+Sprint 135: rebased onto VS Code 1.142.0. The pinned tabs' width is summed in upstream's loop and
+RITEMARK_TABS_INSET is added after it; Close all chains its filter after upstream's CannotClose filter; the empty
+desk's tiles render into the watermark's wrapper.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
