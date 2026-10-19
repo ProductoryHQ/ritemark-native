@@ -14,7 +14,7 @@ The first run, before main was merged in and before the bar changed (below):
 | many-tabs | 0% light, 0.01% dark | Below the threshold. |
 | **share-question** | **0.7% light, 0.94% dark** | See below. |
 
-The re-run on the branch's head (main merged in, the bar as the Experience lead decided), on a fresh profile: still 32 of 34.
+The re-run on the branch's head (main merged in, the bar as the Experience lead decided), on a fresh profile with the shared recent folders cleared (below): still 32 of 34.
 
 | Scenes | Pixels changed | Note |
 |---|---|---|
@@ -22,7 +22,11 @@ The re-run on the branch's head (main merged in, the bar as the Experience lead 
 | home (both themes) | 0.13% | Below the threshold: two "today" rows of Last changed in another order (the fresh sample copy's file times). |
 | settings-foot (both themes) | 0.02% | Below the threshold. |
 | many-tabs | 0.01% | Below the threshold. |
-| **share-question** | **1.62% light, 1.88% dark** | The decided bar: one button fewer than 1.117's, so the address field is longer. Waits for Jarmo. |
+| **share-question** | **0.7% light, 0.94% dark** | The decided bar alone: one button fewer than 1.117's, so the address field is longer, and Chromium 150's text in the test page. The tab row matches the baseline. Waits for Jarmo. |
+
+Two earlier attempts at this re-run were not clean, and neither came from the update:
+- 1.62% and 1.88% on share-question: the frame script's ⌘W after the settings-foot scene had not reached the window, so a Ritemark Settings tab stayed in the row. The script now checks each close and falls back to View: Close Editor (`frame-screenshots.mjs`, `closeFrontTab`).
+- 0.53% and 0.49% on switcher: the fresh profile's projects list took a folder from VS Code 1.142's shared recent folders (`~/.ritemark-shared`, see qa-evidence). For a run against the baseline, clear `history.recentlyOpenedPathsList` there first.
 
 ## The share question: what differs and why
 
@@ -32,7 +36,7 @@ The browser bar as 1.142 drew it before the Experience lead's decision: 1.117 (t
 
 ![The browser bar in Dark: 1.117 above, 1.142 below](share-question-bar-dark.png)
 
-Full windows, before the decision: [Light](share-question-light-1142.png), [Dark](share-question-dark-1142.png). The final bar, captured by the frame script at the branch's head: [Light](share-question-light-1142-final.png), [Dark](share-question-dark-1142-final.png): the camera and ⋯ only.
+Full windows, before the decision: [Light](share-question-light-1142.png), [Dark](share-question-dark-1142.png). The final bar, captured by the frame script at the branch's head on a clean profile: [Light](share-question-light-1142-final.png), [Dark](share-question-dark-1142-final.png): the camera and ⋯ only; the tab row as the baseline's.
 
 1. **"Add Element to Chat" and its "Add to Chat" menu are new on the bar.** They are VS Code's own chat features for the integrated browser (`browserEditorChatFeatures.ts`). They show only while VS Code's chat is on (`when: ChatContextKeys.enabled`), and the dev build turns it on with its built-in Copilot. The production build strips the built-in Copilot (`build-prod.sh` step 4.5), so a person sees them only after installing Copilot Chat. They send a page element to Copilot Chat, not to Ritemark's AI. **For the Experience lead (D5):** keep them for people who install Copilot Chat, or hide them in Ritemark (patch 010, beside the bar's other Ritemark changes).
 2. **The Developer Tools button has a new icon** (a wrench where 1.117 had a terminal glyph). Upstream's icon; no setting brings the old one back. **For the Experience lead.**

@@ -202,6 +202,23 @@ async function capture(name) {
 	console.log(`captured ${name} (${w}x${h})`);
 }
 
+/**
+ * Closes the tab in front, by ⌘W (Ctrl+W) and, when the key did not reach the window (a webview in front can keep it
+ * in a background window), by View: Close Editor. A tab left open would show in every scene after it.
+ */
+async function closeFrontTab() {
+	const front = `document.querySelector('.part.editor .editor-group-container.active .tabs-container > .tab.active')?.getAttribute('aria-label') ?? ''`;
+	const before = await evaluate(front);
+	await key('KeyW', MOD, 'w');
+	await sleep(800);
+	if (before && (await evaluate(front)) === before) {
+		await command('View: Close Editor');
+	}
+	if (before && (await evaluate(front)) === before) {
+		throw new Error(`could not close the tab "${before}"`);
+	}
+}
+
 const placeLabel = name => byLabel('.part.sidebar .composite-bar .action-item .action-label', name);
 async function place(name) {
 	await click(`the ${name} place`, placeLabel(name));
@@ -341,7 +358,7 @@ const SCENES = [
 		if (!inView) {
 			throw new Error('Advanced settings is not in view after scrolling Ritemark Settings to its foot');
 		}
-		return async () => key('KeyW', MOD, 'w');
+		return closeFrontTab;
 	}],
 	['share-question', async () => {
 		await command('Ritemark Browser: New Browser Tab');
@@ -357,7 +374,7 @@ const SCENES = [
 		await type(pageUrl);
 		await key('Enter', 0, 'Enter');
 		await sleep(4000);
-		return async () => key('KeyW', MOD, 'w');
+		return closeFrontTab;
 	}],
 	['many-tabs', async () => {
 		// Open the folders, so there are enough documents to fold the row
