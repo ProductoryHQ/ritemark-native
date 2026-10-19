@@ -156,10 +156,12 @@ Acceptance criteria:
 - While it reloads, the window shows the ground's colour, in Light and in Dark, not a dark block.
 - The next project opens on its Home, and keeps its own tabs: coming back to a project brings its tabs back as they were.
 - Any switch that reloads the window (Home's list, the project's menu, Open a folder…) while a chat in this window is working (a card's turn runs in a chat too) asks first, in experience 31's dialog, 440 wide (experience 33, frame 3):
-  - title: "Claude is still working in <project>" (the AI's name as it is);
+  - title: "Claude is still working in <project>" (the AI's name as it is; with chats of two AIs working, both names: "Claude and ChatGPT are still working in <project>");
   - detail: "Switching projects stops it. Open <other> in a new window to let Claude finish.";
   - buttons: Cancel, Switch and stop, and Open in a new window as the default.
   Open in a new window opens the other project in a new window and leaves this one as it is; Switch and stop stops the chat as Stop would, then switches; Cancel does nothing. With nothing working, switching never asks.
+- "Working" means a turn is running in a chat of this window, or waits on the person's answer, a card's turn included. A card waiting for room and a prompt queued behind a finished turn are not working ([switch audit](research/switch-audit.md)).
+- VS Code's own ways of opening a folder ask too: File ▸ Open Recent, File ▸ Open Folder…, a folder dropped on the Dock icon, and File ▸ Close Folder. Where Ritemark can't know the folder about to open (all but Open Recent), the dialog has Cancel and Switch and stop, with Cancel as the default (switch audit, 19 October). If Ritemark doesn't answer within 10 seconds, the switch goes on as today, so the window is never stuck.
 - After a switch, Home's note says "Switched to <project>. <other> is kept as you left it." with Go back, which switches back (experience 3, frame 3; experience 33).
 - Open in a new window, and ⌥ click, open the project in a new window instead and leave this one as it is.
 
@@ -314,7 +316,7 @@ Acceptance criteria:
 - Share this page shares the page, as Allow does today. With the box ticked, later pages are shared without asking, as "Don't ask again" does today.
 - Not now shares nothing, as Deny does today. The question is not asked again for that page in this session.
 - The tabs stay usable while the question waits. Switching tabs, closing a tab, the + and the page itself all work (#455: today they do nothing until the dialog is answered).
-- The question is about the page in front. If the person moves to another page before answering, it asks about that page instead, and the page left unanswered is not shared.
+- The question is about the page in front. If the person moves to another page before answering, it asks about that page instead, and the page left unanswered is not shared. It is asked about again when it comes back in front: only an answer marks a page as asked for the session ([share-question audit](research/share-question-audit.md)).
 - Nothing about a page (its address, title or content) reaches the AI before Share (Sprint 67's consent boundary). A message sent while the question waits goes without the page.
 - The question is reached by keyboard and read by VoiceOver, and draws in Light and Dark.
 - A page the network policy blocks still gets today's notice.

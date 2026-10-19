@@ -218,9 +218,13 @@ Then its Home says "Switched to Sales proposal Q4. Leadership programme is kept 
 When the person clicks Go back
 Then the window switches back, and the note does not show again.
 
-### S33: VS Code's own Open Folder
-When the person uses File ▸ Open Folder… while a turn runs
-Then Ritemark behaves as `research/switch-audit.md` decided (asks first, or switches as today), and the evidence says which.
+### S33: VS Code's own Open Folder and Open Recent
+Given a chat turn running in "Leadership programme"
+When the person uses File ▸ Open Recent and picks "Sales proposal Q4"
+Then the same dialog asks first, with Cancel, Switch and stop, and Open in a new window as the default
+When the person uses File ▸ Open Folder… instead and picks a folder
+Then the dialog asks first with Cancel and Switch and stop, Cancel the default, and no Open in a new window
+And with nothing working, neither asks, and Developer: Reload Window never asks.
 
 ## Feature: The landing and What moved (R10, R11)
 
