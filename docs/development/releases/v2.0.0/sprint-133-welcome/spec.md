@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Ritemark 2.0's second step changes how Ritemark starts. A new window with no folder opens on one calm sheet that asks one question, "Which AI do you use?", then where the person's work is, and lands them on a project with their AI ready beside it. Someone updating from Ritemark 1 sees a shorter sheet once, already signed in, and goes straight back to their work. The usage-data choice is part of the sheet, and nothing is counted until the person says yes; for someone updating, an OK on Ritemark 1's notice is that yes. Four anonymous events tell whether people reach a project.
+Ritemark 2.0's second step changes how Ritemark starts. A new window with no folder opens on one calm sheet that asks one question, "Which AI do you use?", then where the person's work is, and lands them on a project with their AI ready beside it. Someone updating from Ritemark 1 sees a shorter sheet once, already signed in, and goes straight back to their work. The usage-data choice is part of the sheet: on by default since 19 October, and nothing is counted until the person leaves the welcome for a project with it on; for someone updating, an OK on Ritemark 1's notice is that yes and an Opt Out stays a no. Four anonymous events tell whether people reach a project.
 
 ## Principles
 
@@ -100,18 +100,23 @@ Acceptance criteria:
 
 ### R7: Usage data on the welcome
 
-As someone starting Ritemark, I want to choose about usage data myself, and know nothing is counted before I say yes.
+As someone starting Ritemark, I want to see that usage data is on, what it never contains, and turn it off before anything is sent.
+
+**Changed on 19 October 2026: usage data is on by default.** Jarmo: "usage data on by default, as you suggested" (relayed by the Development manager). This reverses the 17 October rule, off until the person turns it on, which this requirement first carried. What stays: nothing leaves the computer before the welcome is finished, and turning it off there sends nothing at all.
 
 Acceptance criteria:
-- Step 2 ends with a switch: "Share anonymous usage data to improve Ritemark" / "Off until you turn it on. Never your documents, chats or names." It is off when the welcome opens (experience 2, frame 3). The update welcome's switch shows the person's 1.x answer instead (the last criterion here; R10).
-- **Nothing is sent to PostHog until the switch is turned on**, from any part of Ritemark: not the welcome's events, not the existing events, not on a dev run. Turning it off stops sending at once.
+- Step 2 ends with a switch: "Share anonymous usage data to improve Ritemark" / "On. Anonymous: never your documents, chats or names. You can turn it off here or in Settings." It is on when the welcome opens. Turned off, it reads "Off. Turn it on to share anonymous usage data. Never your documents, chats or names." (Words drafted for the Experience lead, who finalises them.) The update welcome's switch shows the person's 1.x answer instead (the last criterion here; R10).
+- **Nothing is sent to PostHog before the welcome is finished.** The switch's on is not yet a yes: leaving step 2 for a project with the switch on is the yes, and only then does anything go, starting with the welcome's held events (R8). Turning it off on step 2 is a no at once: the held events are dropped and nothing is sent. Turning it off later, here or in Settings, stops sending at once.
+- **A profile that never finishes the welcome sends nothing**, from any part of Ritemark: not the existing events, not on a dev run, not when its first window opened with a folder or a file (R11). Usage data is on by default only through the welcome's switch; with no answer, the gate stays shut.
+- **No location, from any event:** PostHog's GeoIP is off for every event (`disableGeoip` on the client and `$geoip_disable` on each event, feedback included), so no country or city is derived from the address the request comes from.
 - **One exception: feedback the person sends** (the v1.14 parity list's G3; Jarmo, 19 October, "all recommendations ok"). Pressing Send in Send Feedback is the person's own choice, so it goes even with usage data off. It carries only the reaction and what they typed. It goes from a client made for that one send, with a one-off id that is never stored and no location derived. It sends no session start and none of the welcome's held events, and it doesn't turn usage data on. Dismissing the text box with Escape sends nothing while usage data is off. The feedback box says under its field: "What you write here is sent with your feedback." The `analytics` kill switch still stops it.
-- Leaving the welcome without turning it on is a no. The welcome never asks again; the choice stays in Settings.
+- Quitting without finishing the welcome sends nothing. The welcome shows again, its switch on unless the person turned it off. Once finished, the welcome never asks again; the choice stays in Settings.
 - The 1.x usage-data notice (the toast with OK, Opt Out, Privacy Policy and Terms of Use) no longer shows. Its Privacy Policy and Terms of Use links stay reachable: beside the switch on the welcome, and in Settings.
 - Ritemark Settings gains the same choice with the same words (it has none today; the only switch is VS Code's `ritemark.analytics.enabled`), and changing it there takes effect at once.
 - Someone updating from 1.x keeps the answer they gave to 1.x's notice (Jarmo, 18 October, refining the 17 October rule; experience 32, frame 1, redrawn to match):
   - an OK carries over as a yes. The update welcome's switch is on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and they can turn it off there;
-  - Opt Out, or no answer, is off, with "Off until you turn it on. Never your documents, chats or names."
+  - Opt Out stays off, with "Off. Turn it on to share anonymous usage data. Never your documents, chats or names.";
+  - no answer (the notice never closed) is treated as a fresh profile since 19 October: the switch is on, and nothing goes until the update welcome is left for a project with it on.
   1.x's OK wrote no yes, only that the notice was closed, and it wrote the same when the notice was closed in other ways. So any notice closed without Opt Out counts as the OK (Jarmo, 18 October; technical plan, W1).
 
 ### R8: Four events
@@ -130,7 +135,7 @@ Acceptance criteria:
 
 - No event carries a path, a folder or project name, a file name, a message, or an account or e-mail.
 - Every event carries the build channel (R9) and the existing shared properties.
-- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer (Jarmo, 18 October; *Open Questions* 1). On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
+- **The welcome's events are held in memory until the person answers.** Leaving step 2 for a project with the switch on sends them (R7, since 19 October); turning the switch off, or quitting first, drops them. Nothing is written to disk before the answer (Jarmo, 18 October; *Open Questions* 1). On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
 - `first_message_sent` is sent once per profile, and only if the switch is on when the message is sent.
 - Each event reaches PostHog once, verified in PostHog's live events, and none appears before an answer or after a no.
 
@@ -140,7 +145,7 @@ As the people reading the numbers, we want dev and automated runs out of them.
 
 Acceptance criteria:
 - Every event carries `build_channel`: `prod` for an installed app, `dev` for a run from source (an unfloored version, or the extension running in development mode).
-- The automation skills' throwaway profiles never send anything: they never turn the switch on, and the 2.0 default is off.
+- The automation skills' throwaway profiles never send anything. Since usage data became on by default (19 October), a run from source sends only to a PostHog key given in `RITEMARK_POSTHOG_PROJECT_KEY`, never to the key in `product.json`, so a dev profile that finishes the welcome reaches nothing. An automation run of an installed build opens its profile with a folder (R11), or turns the welcome's switch off before leaving it.
 - PostHog's internal-user filter can be one rule (`build_channel = dev`); the release plan's analytics row records it.
 
 ### R10: Updating from 1.x: the welcome once
@@ -153,7 +158,7 @@ Acceptance criteria:
   - Your AI: one row for each AI the profile was signed in to, with its state (R4), and Add another, which offers step 1's choices;
   - Where do you want to start?: up to three recent folders, the one open when the person last quit first with "Open when you left", the others with when they were last open, each a 56 row with the project's mark;
   - Open another folder… and Start a new project under the list;
-  - the usage-data switch at the foot: on, with "On, as you chose in Ritemark 1.", for someone who pressed OK on 1.x's notice; off, with "Off until you turn it on.", for anyone else (R7).
+  - the usage-data switch at the foot: on, with "On, as you chose in Ritemark 1.", for someone who pressed OK on 1.x's notice; off for someone who chose Opt Out; on by default, as on a fresh profile's step 2, for someone who never answered (R7, since 19 October).
 - A project row opens its project. The project open when they left closes the sheet and restores the window as it was, without a reload; any other reloads into it (R6).
 - After a project is picked the update welcome never shows again on this profile; a later window with no folder shows the short "Where do you want to start?" sheet, as for any finished profile (R1).
 - A fresh profile never sees the update welcome.
@@ -276,7 +281,8 @@ Acceptance criteria:
   - **About this project** is one file, `AGENTS.md`, which both Claude and Codex read, with a `CLAUDE.md` that only points to it, shown everywhere as "About this project". The project's menu item that opens it or offers to create it is built in Sprint 134; a new project here still starts empty (R5).
   - **The sample project:** yes. Ritemark ships one, and step 2 offers "Try the sample project" (R5). Its content is written before step 2 is built; the Experience lead offered to draft it.
 - **2026-10-18 (the sample project's content):** written by the Experience lead and approved by Jarmo the same day ("files look good!"). It is `ritemark-dev` 70701c1, `product/design/experience/sample-project/Leadership programme`, copied as it is into `extensions/ritemark/sample-project/`. Its README lists what each file sets up. The four cards' `created` and `updated` are placeholders (2026-01-01), which the copy sets to the time of copying (R5).
-  - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes. They see the switch on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and can turn it off there. Anyone who opted out or never answered sees it off, with "Off until you turn it on." This refines the 17 October rule (R7, R10). Experience 32's frame 1 was redrawn to match (`ritemark-dev` a82c852).
+  - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes. They see the switch on, with "On, as you chose in Ritemark 1. Never your documents, chats or names.", and can turn it off there. Anyone who opted out or never answered sees it off, with "Off until you turn it on." This refines the 17 October rule (R7, R10). Experience 32's frame 1 was redrawn to match (`ritemark-dev` a82c852). *Changed on 19 October for anyone who never answered, below.*
+- **2026-10-19 (Jarmo, relayed by the Development manager):** "usage data on by default, as you suggested". It reverses the 17 October off until yes (R7): the welcome's switch is on by default; nothing leaves before the welcome is left for a project with it on; turning it off there sends nothing; no event carries a location (GeoIP off); a 1.x Opt Out stays off and an OK carries over on; a profile that never finishes the welcome sends nothing (R7, R9, R10). ritemark.app's privacy policy says so before 2.0 ships (Sprint 136, D5).
 - **No ChatGPT API key in 2.0.** Recommended in the release plan ("leave it out of 2.0 and add it if people ask") and listed as decided in the Development manager's brief of 18 October; the release plan still lists it as open, so this plan's approval confirms it. It means ChatGPT is reached only through its sign-in. The OpenAI key that Settings already holds (`openai-api-key`, used by OpenCode and other services) is not a ChatGPT key and stays (HARD RULE #1).
 
 ## Open Questions

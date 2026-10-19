@@ -2,7 +2,7 @@
 
 **Status:** draft. These notes grow with each step of Ritemark 2.0; this draft covers steps 1, 2 and 3: Surfaces and frame, The welcome, and The project at the centre.
 
-Ritemark is a free writing app where the AI you choose works directly in your files, and you stay the author. Ritemark 2.0 starts with a welcome. On the first start, one sheet asks which AI you use and where your work is, then opens your project with the AI ready. Usage data is off until you turn it on. Each project now has its own Home, which says what waits for you and what changed, and you switch between projects in the same window, each with its own tabs. The window has a new frame too. The title row is gone. Your places sit in one row at the top of the left column, your documents lie on a raised desk, and the AI has a sheet of its own. A terminal is now a tab like any other. Ritemark Light and Ritemark Dark are redrawn, and Ritemark draws its own menus and dialogs on the Mac and on Windows. The flow editor and the Agent Library are redrawn too, and a narrow window makes room for your document by itself.
+Ritemark is a free writing app where the AI you choose works directly in your files, and you stay the author. Ritemark 2.0 starts with a welcome. On the first start, one sheet asks which AI you use and where your work is, then opens your project with the AI ready. Usage data is on by default, and you can turn it off on that sheet, before anything is sent. Each project now has its own Home, which says what waits for you and what changed, and you switch between projects in the same window, each with its own tabs. The window has a new frame too. The title row is gone. Your places sit in one row at the top of the left column, your documents lie on a raised desk, and the AI has a sheet of its own. A terminal is now a tab like any other. Ritemark Light and Ritemark Dark are redrawn, and Ritemark draws its own menus and dialogs on the Mac and on Windows. The flow editor and the Agent Library are redrawn too, and a narrow window makes room for your document by itself.
 
 ## The welcome
 
@@ -116,7 +116,8 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 
 ## Usage data
 
-- **Off until you turn it on.** A switch on the welcome and in Ritemark Settings reads "Share anonymous usage data to improve Ritemark. Never your documents, chats or names.", with links to the Privacy Policy and Terms of Use. Nothing is sent before you say yes.
+- **On by default, and yours to turn off.** A switch on the welcome and in Ritemark Settings reads "Share anonymous usage data to improve Ritemark", and says it never carries your documents, chats or names, with links to the Privacy Policy and Terms of Use. Nothing is sent until you leave the welcome for a project with the switch on; turn it off there and nothing is sent at all. If you chose Opt Out in Ritemark 1, it stays off.
+- **No location.** No event carries where you are.
 - **Four new steps, counted anonymously.** With usage data on, Ritemark also counts the welcome shown, an AI signed in, a project opened and the first message sent, beside the app starts and features used it already counted. Never a path, a name, a file, a message or an account.
 - **Off means off.** Turning it off stops sending at once.
 - **Feedback is your own choice.** Send Feedback says under its text box that what you write is sent with your feedback. Pressing Send sends it even with usage data off: only your reaction and what you typed, under a one-off id that isn't kept. Usage data stays off, and Escape sends nothing.

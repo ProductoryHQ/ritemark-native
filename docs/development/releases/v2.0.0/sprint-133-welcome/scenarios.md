@@ -153,6 +153,8 @@ Then the window says the folder is not there and shows the welcome's step 2.
 
 ## Feature: Usage data (R7)
 
+*Superseded in part on 19 October 2026: usage data is on by default (Jarmo, "usage data on by default, as you suggested"; spec R7). S24 now reads: going through the welcome to a project without touching the switch sends the held events once, on leaving step 2, and nothing before. Turning the switch off on step 2 sends nothing at all (the old S24). S53's update welcome shows the switch on by default. The checks for the new rule are in `consent.test.ts` and `welcomeState.test.ts`, and the live check is in the usage-data PR.*
+
 ### S24: Off until yes
 Given a fresh profile, with PostHog's live events open and a network capture of the app
 When the person goes through the welcome to a project without touching the switch, then writes and chats for a while

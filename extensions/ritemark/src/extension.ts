@@ -385,7 +385,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize connectivity monitoring (status bar + online detection)
   initConnectivity(context);
 
-  // Initialize analytics: off until the person's yes (Sprint 133, R7)
+  // Initialize analytics: nothing is sent before the person's yes, on by default from the welcome (Sprint 133, R7)
   initAnalytics(context);
   registerReactionCommand(context);
 

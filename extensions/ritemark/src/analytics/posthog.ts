@@ -1,15 +1,20 @@
 /**
  * PostHog analytics client for Ritemark.
  *
- * - Off until the person says yes (Sprint 133, R7): `ritemark.analytics.enabled`
+ * - Nothing is sent before a yes (Sprint 133, R7): `ritemark.analytics.enabled`
  *   defaults to false, and every send passes the one gate in `consent.ts`.
  *   Before a yes no client exists, no anonymous id is written and nothing
  *   leaves the computer.
- * - The answer is given on the welcome or in Ritemark Settings; Ritemark 1's
- *   notice is retired. An OK on that notice carries over as a yes (`consent.ts`).
+ * - On by default from the welcome (Jarmo, 19 October): its switch shows on,
+ *   and leaving the welcome for a project with it on is the yes. Settings
+ *   changes it at once. Ritemark 1's notice is retired; an OK on it carries over
+ *   as a yes (`consent.ts`).
+ * - No location: GeoIP is off for every event.
  * - Feature-flag kill-switch via `ritemark.features.analytics` (off only)
  * - Every event carries `build_channel` (#338)
- * - Project API key loaded from env or product.json (never hardcoded in source)
+ * - Project API key loaded from env or product.json (never hardcoded in source); a run
+ *   from source uses only the env key
+
  */
 
 import * as vscode from 'vscode';
@@ -80,7 +85,7 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
     readSetting,
     analyticsAllowed,
     createClient: (options) => {
-      const config = getAnalyticsConfig();
+      const config = getAnalyticsConfig(channel === 'prod');
       if (!config) {
         console.log(
           '[Ritemark Analytics] Disabled: no PostHog project key configured. ' +
@@ -93,11 +98,10 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
         host: config.host,
         flushAt: 1,
         flushInterval: 0,
-        // posthog-node defaults disableGeoip=true (server-SDK assumption). Ritemark
-        // runs on the user's machine, so the request IP is the user's real IP and
-        // GeoIP should be enabled for country/city analytics. Feedback sent without
-        // usage data derives no location (Sprint 133, G3).
-        disableGeoip: options?.oneOff === true,
+        // No location from any event (Jarmo, 19 October, with usage data on by default): the request
+        // comes from the person's own computer, so PostHog's GeoIP would place them; every event also
+        // carries `$geoip_disable` (consent.ts).
+        disableGeoip: true,
       });
       client.on('error', (error) => {
         console.warn('[Ritemark Analytics] PostHog error:', error);
@@ -223,7 +227,7 @@ export async function shutdownAnalytics(): Promise<void> {
 
 // ── Internals ────────────────────────────────────────────────
 
-function getAnalyticsConfig(): { apiKey: string; host: string } | null {
+function getAnalyticsConfig(productKeyAllowed: boolean): { apiKey: string; host: string } | null {
   const envApiKey = process.env.RITEMARK_POSTHOG_PROJECT_KEY?.trim();
   const envHost = process.env.RITEMARK_POSTHOG_HOST?.trim();
 
@@ -232,6 +236,12 @@ function getAnalyticsConfig(): { apiKey: string; host: string } | null {
       apiKey: envApiKey,
       host: envHost || DEFAULT_POSTHOG_HOST,
     };
+  }
+
+  // A run from source sends only to a key given for it (Sprint 133, R9): with usage data on by
+  // default, a dev or automation profile that finishes the welcome must not reach Ritemark's project.
+  if (!productKeyAllowed) {
+    return null;
   }
 
   try {

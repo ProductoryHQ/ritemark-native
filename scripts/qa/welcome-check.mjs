@@ -3,7 +3,7 @@
  * welcome-check.mjs - check the welcome in a running window (Sprint 133, E3).
  *
  * Usage: node scripts/qa/welcome-check.mjs --port <cdp-port> --expect <alone|landing|update>
- *          [--usage on|off] [--placeholder "<text>"] [--out <file.json>]
+ *          [--usage on|off|default] [--placeholder "<text>"] [--out <file.json>]
  *
  * Connects over the Chrome DevTools Protocol to a Ritemark dev instance started with
  * --remote-debugging-port (`open -n -g`, an isolated --user-data-dir; never Jarmo's own profile) and
@@ -11,6 +11,7 @@
  *   alone    the welcome alone on the ground (R1, S1, S48): no columns, tabs or status bar; the sheet
  *            640 wide and centred; no Getting Started page (R12)
  *   update   the update welcome (R10, S33): alone, "Welcome to Ritemark 2.0", the switch as --usage says
+ *            (on: 1.x's OK carried over; off: 1.x's Opt Out; default: no answer, on by default since 19 October)
  *   landing  after the landing (R6, S21): Documents and the AI's sheet open, the welcome gone, the empty
  *            desk's three tiles; with --placeholder, the AI's message box says it
  * Every check prints PASS, FAIL or SKIP; the exit code is the number of failures.
@@ -30,7 +31,7 @@ const usage = option('usage');
 const placeholder = option('placeholder');
 const out = option('out');
 if (!port || !['alone', 'landing', 'update'].includes(expect)) {
-	console.error('usage: node scripts/qa/welcome-check.mjs --port <cdp-port> --expect <alone|landing|update> [--usage on|off] [--placeholder "<text>"] [--out <file.json>]');
+	console.error('usage: node scripts/qa/welcome-check.mjs --port <cdp-port> --expect <alone|landing|update> [--usage on|off|default] [--placeholder "<text>"] [--out <file.json>]');
 	process.exit(2);
 }
 
@@ -126,8 +127,11 @@ if (expect === 'alone' || expect === 'update') {
 if (expect === 'update') {
 	check('R10 "Welcome to Ritemark 2.0"', welcome?.title === 'Welcome to Ritemark 2.0', welcome?.title, 'Welcome to Ritemark 2.0');
 	if (usage) {
-		check(`R7 the switch is ${usage}`, welcome?.usage === (usage === 'on' ? 'true' : 'false'), welcome?.usage, usage === 'on' ? 'true' : 'false');
-		const words = usage === 'on' ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.' : 'Off until you turn it on. Never your documents, chats or names.';
+		const checked = usage === 'off' ? 'false' : 'true';
+		check(`R7 the switch is ${usage}`, welcome?.usage === checked, welcome?.usage, checked);
+		const words = usage === 'on' ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
+			: usage === 'default' ? 'On. Anonymous: never your documents, chats or names. You can turn it off here or in Settings.'
+			: 'Off. Turn it on to share anonymous usage data. Never your documents, chats or names.';
 		check('R7 the switch\'s words', welcome?.usageWords === words, welcome?.usageWords, words);
 	}
 }
