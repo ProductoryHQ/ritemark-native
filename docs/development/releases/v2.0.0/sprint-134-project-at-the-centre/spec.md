@@ -38,7 +38,10 @@ As a writer with several projects, I want them all listed, from the first day of
 
 Acceptance criteria:
 - Ritemark keeps its own list of projects on this computer. A folder is added whenever a window opens it.
-- On the first start of this build, the list is filled once from what is already on the computer: VS Code's recent folders, every project that has chats in Ritemark's chat store, and every project that has a task board record (decided by engineering, 17 October).
+- On the first start of this build, the list is filled once from what is already on the computer: VS Code's recent folders, every project that has chats in Ritemark's chat store, and every task board in those folders (decided by engineering, 17 October; the [first-fill audit](research/first-fill-audit.md)):
+  - a board's records on this computer name no folder, so a board in a folder neither source knows joins the list when it is next opened;
+  - only folders that are there at the time are added. A recent folder that has since gone is not known to be a project, and adding it would open 2.0 with rows marked Not found;
+  - single folders only, on this computer or a network share. Workspace files (`.code-workspace`) and remote folders are left out.
 - A project whose folder is not found (moved, renamed, deleted, or on a drive that is not connected) stays in the list, shown as Not found (R13), with Find it… and Remove from the list. It is never dropped silently. Folders are checked when Home shows and when the window gains focus.
 - Remove from the list removes it from the list only; its folder, chats and board are untouched.
 - The list is ordered by when each project was last open, the open project first.
@@ -146,7 +149,7 @@ Acceptance criteria:
 - The menu's words and entries come from the extension (Sprint 132's `ritemark/projectHead` menus).
 - The File menu gains three items, where experiences/windows frame 2 draws them:
   - New tab (⌘T, Ctrl+T on Windows), which opens the +'s menu;
-  - Switch project, which opens the switcher;
+  - Switch project, which shows Home with the projects list, its search ready for typing. A native menu can't hold the switcher's list, which changes as projects come and go ([confirmations](research/confirmations.md) §1);
   - Share, which opens the Share menu of the document in front (R12), and is greyed out when none is.
   This holds for Windows' menu button and for the Mac's menu bar. Sprint 132 left New tab and Switch project for this step (its technical plan, W3).
 
@@ -212,6 +215,8 @@ Acceptance criteria:
 - A project with no task board yet: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and its tab has no count; no board file is written until the person adds a card.
 - With the `task-board` flag off: no Tasks tab, no task counts; chats still count.
 - Nothing in Ritemark brings back a project folder that has gone. Today Flows' storage does: it creates `.ritemark/flows` with every missing parent, so a deleted project folder comes back empty (`FlowStorage.ts:44`; Sprint 133's QA, open findings). A folder that is not found stays not found until the person finds it or removes it from the list.
+  - Flows' storage creates nothing when it only lists flows. Today the flow scheduler lists them at start and every 30 seconds, so every project gains an empty `.ritemark/flows/` the moment it opens, and a deleted one comes back within 30 seconds ([confirmations](research/confirmations.md) §7).
+  - Everything that creates a folder under a project (a new card's `.ritemark/tasks/`, a saved flow, an export, a transcript) first checks that the project's folder is still there.
 
 ### R14: Nothing v1.14.0 does is lost
 
@@ -295,7 +300,7 @@ Acceptance criteria:
 - Each bar ends in **Share**, as the document's bar does (R12; the comparison's `after-pdf.png`). On a PDF or a Word file, Share holds two items (the Experience lead, 19 October):
   - **Show in Finder** (Show in File Explorer on Windows), so the file can be attached to an email or a message;
   - **Open in Preview** for a PDF, or **Open in Word** for a Word file, where the system's own Share is. Open in Word takes the name the bar's button already shows.
-- On Windows, where there is no Preview, a PDF's second item opens the file in its default app. Its words go to the Experience lead with the screenshots.
+- On Windows, where there is no Preview, a PDF's second item opens the file in its default app, as "Open in default app", the words the Word bar already uses ([confirmations](research/confirmations.md) §8). They go to the Experience lead with the screenshots.
 - Share has no Export and no Google Docs on a PDF or a Word file.
 - Make an editable copy stays on the bar, as drawn. On the PDF's bar it sits beside Share (`after-pdf.png`). On the Word bar it stays in Open in Word's menu, as today (`after-word.png`).
 - Nothing on today's bar is removed.

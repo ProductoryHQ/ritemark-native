@@ -99,6 +99,38 @@ From 19 October it also records:
 - how the PDF's provider (`pdfEditorProvider.ts`) opens a file in Preview on the Mac and in its default app on Windows, and what that item says on Windows, checked with the Experience lead (R19);
 - that `workbench.action.openSettings` opens VS Code's settings page, not Ritemark Settings, with ⌘, bound to `ritemark.aiSettings` (R23).
 
+## What the audits changed (19 October)
+
+Each workstream below follows these, which override its own text where they differ.
+
+- **W1:** the project's name and mark are the folder's in this sprint: nothing lets a person change them, and 018's head draws the folder's name. A `name` or `mark` in the file is kept, not drawn (`projectFile.ts`).
+- **W2** ([first-fill audit](research/first-fill-audit.md)):
+  - sources, in order: VS Code's recent folders (their URIs keep VS Code's spelling), then the chat store read raw (`index.json`, then one record per scope for its folder URIs; `records/` only when the index can't be read). Never through `ConversationStore`, whose every method rewrites the index;
+  - no board source: a board's records name no folder;
+  - VS Code's `workspaceStorage/*/workspace.json` and its `state.vscdb` modified times give each folder's last-open time, for the order only;
+  - only single folders that exist at the time (a timeout per check, for network shares); no `.code-workspace`, remote or virtual folders, and not the sample inside the app;
+  - on Windows the chat store lower-cases whole paths, so a folder known only from chats is spelled by `fs.realpathSync.native` before it is listed (hand-off records and VS Code's saved tabs are keyed by the exact `fsPath`);
+  - the fill is a merge (the union, the later time), so two windows running it together give the same list; `ritemark.projects.filledV1` is written after the list.
+- **W3** ([waiting audit](research/waiting-audit.md)): as W3 says above.
+- **W4** ([confirmations](research/confirmations.md) §3):
+  - `ritemark.newChat` neither reveals nor focuses the AI's sheet, and a chat opens by id only through the private `_revealConversation`. The provider gains public, held openers, as `openLandingChat` is: `openNewChat()` and `openConversation(id)`, which reveal the sheet and wait for it to be ready;
+  - a waiting card opens its card page, as `ritemark.openTaskBoard <cardId>` and the Tasks place's rows do.
+- **W5** (confirmations §10): `ritemark.placeClickedAgain` can be registered once, so Tasks and Home share one handler, keyed by the container id (`workbench.view.extension.ritemark-home`, `…-tasks`). A first click on a place is seen as its view becoming visible.
+- **W7** (confirmations §1, §2, §6):
+  - **the switcher** is a flyout inside Ritemark's menu, as experience 3 frame 2 draws it: VS Code shows one context view at a time, and `ritemarkMenu.ts` has no submenu. 018 gains optional `mark`, `checked`, `sub` and `submenu` fields on a menu item, and a table that maps the `package.json` submenu `ritemark/projectHead/switch` to the command `ritemark.projects.switcherItems`. If the command is missing, the flyout shows only its fixed rows;
+  - **File ▸ Switch project** shows Home with the projects list and focuses its search (spec R8);
+  - **New tab** needs a command: 019 has none, the + is a button. 019 gains `ritemark.newTab`, which opens the +'s menu at the front desk's +; the extension binds ⌘T and Ctrl+T to it with a `when` that outranks Go to Symbol in Workspace and the browser's own new tab. On Windows, the command joins the terminal's commands that skip the shell;
+  - Reveal's words follow VS Code's: Reveal in Finder (Mac), Reveal in File Explorer (Windows), as the head already does.
+- **W8** ([splash audit](research/splash-audit.md)): 018's hunk in `partsSplash.ts` `_savePartsSplash()` saves `ritemark.ground` (falling back to `sideBar.background`) as the splash's `background` and `editorBackground`, which the main process and `workbench.ts` already use. 001's two defaults in `workbench.ts` become the grounds: `#16132F` (Dark) and `#F1F5F9` (Light). A fresh profile's very first window stays as today (out of R9's scope).
+- **W10** (confirmations §4, §7): `FlowStorage.listFlows()` creates nothing; `saveFlow` and the other sites that make a folder under a project (a card's `.ritemark/tasks/`, exports, transcripts: 13 listed in the note) go through one guard, `ensureProjectSubfolder(project, …)`, which refuses when the project's folder itself is gone.
+- **W12** (confirmations §5):
+  - `HEAD_PLACES` is a fixed map, and its "New" and "Search" words are the shell's. It becomes one extension menu, `ritemark/projectHead/rows`, whose items carry `when: activeViewlet == …`; the head draws up to two of them with their own titles and icons. Documents and Agents keep their rows through it;
+  - a place with the head hides its title-row actions by CSS (`ritemarkSurfaces.css`), so Browser's and Transcribe's buttons move into their pages in the same change;
+  - `ritemark.transcribe.openSettings` is not in the palette today, so its gear lives in the page only, as in v1.14.0.
+- **W13** (confirmations §8): `openInExternalApp(file, 'Preview')` opens Preview on the Mac and the default app on Windows, but builds a shell string, so a crafted file name could run a command. It moves to `execFile` with an argument list in this sprint (the same code path R19 uses). The Windows item says "Open in default app".
+- **W17** (confirmations §9): the message is `settings:openAdvanced`, as that file names its messages.
+- **W18** (confirmations §2): the Agents place's row menu says "Reveal in Finder" on Windows too; it says "Reveal in File Explorer" there, fixed with R24's change to the same rows.
+
 ## Workstream 1: The project file (R1)
 
 - `src/projects/projectFile.ts` (new, no `vscode` import; an injected file system):
