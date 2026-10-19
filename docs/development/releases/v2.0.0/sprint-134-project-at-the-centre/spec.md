@@ -108,7 +108,7 @@ As a writer, I want the Tasks tab to tell me something waits (Jarmo, 16 October)
 Acceptance criteria:
 - The Tasks tab shows the same count as the Tasks place (the board's calls), drawn the same way at the icon's lower right, up to "99+".
 - No count shows when nothing waits.
-- The tab's tooltip and accessible name say the count in words ("Tasks, 1 waits for you").
+- The tab's tooltip and accessible name say the count in words, after the tab's own name ("Task board, 1 waits for you"; QA, 19 October: the tab is named Task board everywhere).
 
 ### R7: On Home, the left column holds the projects
 
@@ -257,9 +257,9 @@ Acceptance criteria:
 - Each place's own content stays under the head. Only the rows its drawing gives are added:
   - Tasks: New task and Search (experience 6, frame 1; R17);
   - Transcribe: Record and Transcribe a file… (experience 20, frames 2 and 3). They are today's Record and Add recording, with the same actions. The library follows under the column's group labels, with "Recordings" in place of "Library";
-  - Browser: no rows; the Recent label and its actions (R18).
+  - Browser: New page (R18; the Experience lead, 19 October).
 - An action that the place's title row carries today keeps a home:
-  - Browser's New browser tab and Clear history go to the Recent label (R18);
+  - Browser's New browser tab becomes the head's New page row, and Clear history goes to the right of the Recent label (R18);
   - Transcribe's settings button, which opens Settings at the transcription card, becomes a small icon button at the right of the "Recordings" group label, under the project's head (the Experience lead, 19 October). It is the gear, with the tooltip "Transcribe settings", in the column's icon-button style beside the 11-caps label. It is the same pattern as Browser's + and Clear at the right of "Recent".
 - The head's row words and their commands come from the extension, as Documents' and Agents' do, so an extension release can change them.
 - With no folder open, each place keeps its plain name, as Sprint 132 left it.
@@ -286,9 +286,11 @@ Acceptance criteria:
 As a writer, I want the Browser place to say plainly what it holds.
 
 Acceptance criteria:
-- Under the head, a group label, "Recent", heads the recent pages in the column's 11-caps style, as Documents' label heads the tree.
-- New browser tab (+) and Clear history sit at the right of the Recent label, in the column's icon-button style, each with a tooltip that says what it does. They do what the title row's two buttons do today, and stay in the palette.
-- With no pages, the list says "No pages yet" in place of "No recent URLs" (the Experience lead, 18 October: plain words). The line under it stays as today.
+- Under the head, one row, **New page** with the + icon, opens a web page as a tab, as the +'s Web page does. It follows Documents' New and Transcribe's Record (the Experience lead, 19 October).
+- Then a group label, "Recent", heads the recent pages in the column's 11-caps style, as Documents' label heads the tree. Clear history (the broom) sits at its right in the column's icon-button style, with a tooltip that says what it does.
+- The recent pages are 32-high rows: the site's icon, the page's title, and the domain in muted ink at the right (the Experience lead, 19 October).
+- New browser tab and Clear history do what the title row's two buttons do today, and stay in the palette.
+- With no pages, the list says "No pages yet" in muted ink, in place of "No recent URLs" (the Experience lead, 18 October: plain words). The line under it stays as today.
 - The recent pages, their remove button and opening a page work as today (Sprint 131).
 
 ### R19: The PDF and Word bars
@@ -363,7 +365,7 @@ Acceptance criteria:
 - This is a copy pass only. Internal names, setting keys, command IDs, file names, log lines and code identifiers stay as they are, so nothing a person set is lost.
 - A model's own name stays as OpenAI writes it, such as "GPT-5.3 Codex Spark". The audit lists these apart.
 - Per the [Codex strings audit](research/codex-strings-audit.md) (104 strings):
-  - **The comment handle `@codex` stays** for 2.0. It is syntax saved inside people's documents, and changing it would break every comment already assigned with it. The name shown beside it says ChatGPT. A `@chatgpt` handle is a code change for later (to be confirmed by the Development manager);
+  - **The comment handle `@codex` stays** for 2.0. It is syntax saved inside people's documents, and changing it would break every comment already assigned with it. Wherever Ritemark shows it (suggestion lists, chips, tooltips, docs), the name beside it reads ChatGPT, for example "@codex — ChatGPT". An `@chatgpt` alias comes after 2.0 (decided by the Development manager, 19 October);
   - **VS Code's settings page names a setting from its key**, so "Codex: Approval Policy", "Codex: Sandbox Mode" and "Codex-integration" stay where Advanced settings leads (R23). The AI choice shows "ChatGPT" through `enumItemLabels`, and the settings section is titled "ChatGPT and OpenCode", since it holds OpenCode's setting too;
   - **words already saved stay**: a flow step's saved label, a card's history line and a chat's history keep "Codex" where it was written before;
   - **the user documents** (`docs/user/`) are rewritten with Sprint 136's notes (parity list, G9), not in this pass.
@@ -468,6 +470,11 @@ After 2.0 (Jarmo, 19 October):
 
 ## Resolved Questions
 
+- **The Experience lead, 19 October (after the approval):**
+  - **An unread reply in Home's Waiting for you** is listed like a chat's question, as one sentence: the chat's own coloured bubble as its icon (the rail's duotone bubble in that chat's colour), then "<AI> replied in <chat title>" with the chat's own AI, the time at the right in muted ink. Questions and approvals come first, since they hold work up, then unread replies, newest first. Clicking it opens the chat on the AI's sheet, which reads it and takes it off the list (R3, R4).
+  - **The chat rail marks an unread chat** with the amber dot it already uses for "waits for you", in the same place and size; it clears once the chat has been in front on a shown AI sheet. One meaning: amber means something waits there, a question or a reply (R3).
+  - **Browser under the head:** one row, New page, then the Recent label with Clear history at its right, then the pages as 32-high rows with the site's icon, the title and the domain in muted ink (R16, R18).
+
 - **2026-10-15 (Jarmo):** Home states the project's name, with a header image the person can change; the first window after the welcome is Home; chats are kept privately on this computer, never in the project's folder.
 - **2026-10-16 (Jarmo):** Home and Tasks pinned permanently as the first two tabs, icons only; "yes, yes, yes" to the projects list on Home, the count on the Tasks tab, and sending it to the Development manager.
 - **2026-10-17 (Jarmo):** "when I click Tasks, the board ALWAYS opens too"; the Home tab comes in step 3 ("ok").
@@ -502,8 +509,6 @@ After 2.0 (Jarmo, 19 October):
 
 ## Open Questions
 
-Still open for the Experience lead:
-- Whether Browser has rows under the head (from the refresh). The handover names only the Recent label and its two actions, so the plan draws none.
-- How a chat's unread reply is drawn in Home's Waiting for you, and whether the AI sheet's chat rail marks an unread chat (from Jarmo's answer of 19 October, R3). Until they answer, the reply is listed as a chat's question is, with its own words, and the rail is unchanged.
+None. The Experience lead answered the last two on 19 October (*Resolved Questions*).
 
 The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*). Jarmo answered this plan's three open questions at its approval on 19 October (*Resolved Questions*).

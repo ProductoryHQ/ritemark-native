@@ -211,7 +211,9 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
           label: row.name,
           mark: row.mark,
           sub: row.missing ? 'Not found' : row.count ? (row.count === 1 ? '1 waits' : `${row.count} wait`) : undefined,
-          checked: row.open,
+          // A project whose folder is not found: muted, with its old place under its name (R13, S38)
+          ...(row.missing ? { muted: true, detail: row.place, trailingIcon: 'warning' } : {}),
+          checked: row.open && !row.missing,
           command: 'ritemark.projects.switchTo',
           args: [folderUri],
         })),
@@ -261,6 +263,18 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
   // Counts follow the board at once (R3).
   const board = deps.taskBoard.controller;
   if (board) context.subscriptions.push({ dispose: board.subscribe(() => projectsView?.refresh()) });
+  // ... and follow the chats too: a question, an answer or a reply read, in this window or another (R3, S9, S62)
+  const chatIndex = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(
+    vscode.Uri.file(path.join(context.globalStorageUri.fsPath, 'conversations', 'v1')), 'index.json'));
+  let chatRefresh: ReturnType<typeof setTimeout> | undefined;
+  const onChatIndex = () => {
+    if (chatRefresh) clearTimeout(chatRefresh);
+    chatRefresh = setTimeout(() => {
+      waiting.invalidate();
+      projectsView?.refresh();
+    }, 300);
+  };
+  context.subscriptions.push(chatIndex, chatIndex.onDidChange(onChatIndex), chatIndex.onDidCreate(onChatIndex), { dispose: () => chatRefresh && clearTimeout(chatRefresh) });
 
   // Home and Tasks, the first two tabs, in a project window (R5).
   if (folder && home) {

@@ -256,7 +256,7 @@ async function main(): Promise<void> {
     assert.match(html, /\.row-icon \{[^}]*color: var\(--r-ink-muted\);/);
     for (const name of AGENT_COLORS) {
       assert.ok(
-        html.includes(`.item .row-icon.agent-color-${name} { color: var(--vscode-ritemark-agentColor-${name}); }`),
+        html.includes(`.item .row-icon.agent-color-${name} { color: var(--vscode-ritemark-agentColor\\.${name}); }`),
         `no rule for ${name}`,
       );
     }

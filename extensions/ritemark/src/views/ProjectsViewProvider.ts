@@ -19,8 +19,6 @@ import { projectInitials } from '../projects/projectFile';
 import { decodeProjectsRequest, type ProjectRow, type ProjectsRequest, type ProjectsState } from '../projects/protocol';
 import type { ProjectSwitcher } from '../projects/switchProject';
 import type { WaitingReader } from '../projects/waiting';
-import { runProcess } from '../utils/runProcess';
-import { checkProjectName, createProjectFolder, defaultProjectsParent, documentsFolder, parseRegQueryPersonal, placeLine } from '../welcome/newProject';
 import { displayPlace } from '../welcome/recentProjects';
 
 const FOUND_TIMEOUT_MS = 2000;
@@ -195,42 +193,20 @@ export class ProjectsViewProvider implements vscode.WebviewViewProvider, vscode.
           mark: projectInitials(name),
           count: open ? hereCount : counts.get(entry.folderUri)?.total ?? null,
           open,
-          missing: Boolean(entry.missingSince) && !open,
+          // The open project too: its folder can go while its window is open (S53)
+          missing: Boolean(entry.missingSince),
           place: displayPlace(vscode.Uri.parse(entry.folderUri).fsPath, os.homedir(), process.platform),
         },
       };
     });
   }
 
-  /** Start a new project: an empty folder where the welcome makes them (Sprint 133, R5), then switch to it. */
+  /**
+   * Start a new project: the welcome's own flow (Sprint 133 R5, S25), with its name field, its place and Change…;
+   * it switches to the new project when made.
+   */
   private async newProject(): Promise<void> {
-    const documents = await documentsFolder({
-      platform: process.platform,
-      home: os.homedir(),
-      env: process.env,
-      readRegistryDocuments: async () => {
-        const result = await runProcess('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders', '/v', 'Personal'], { timeout: 3000 });
-        return result.status === 0 ? parseRegQueryPersonal(result.stdout) : null;
-      },
-    });
-    const parent = defaultProjectsParent(documents);
-    const name = await vscode.window.showInputBox({
-      title: 'Start a new project',
-      prompt: placeLine({ parent, name: '', home: os.homedir(), documentsFolder: documents, platform: process.platform }),
-      placeHolder: 'The project’s name',
-      validateInput: (value) => {
-        if (!value.trim()) return undefined;
-        const checked = checkProjectName(value, process.platform);
-        return checked.ok ? undefined : checked.message;
-      },
-    });
-    if (!name?.trim()) return;
-    const created = await createProjectFolder(fsp, parent, name, process.platform);
-    if (!created.ok) {
-      void vscode.window.showWarningMessage(created.message);
-      return;
-    }
-    await this.deps.switcher.switchTo(vscode.Uri.file(created.value));
+    await vscode.commands.executeCommand('ritemark.welcome.newProject');
   }
 
   private async push(): Promise<void> {

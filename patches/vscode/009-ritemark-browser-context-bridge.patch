@@ -62,6 +62,10 @@
 #   an answer about a page no longer in front is stale and shares nothing.
 #   Annotation mode, control consent and upstream's toggle keep the dialog.
 #
+#   The site's icon (Sprint 134, R18): the navigation push also reports the
+#   tab's favicon changes (kind 'favicon', the model's data URL), so Recent's
+#   rows show the site's icon.
+#
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
 # Updated: 2026-10-19 (Sprint 134: the share question on the AI's sheet)
@@ -221,10 +225,10 @@ index be1e6c7d1cb..3bd599e42e5 100644
  	EditorPaneDescriptor.create(
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..66e6e76600c
+index 00000000000..affd3e32475
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,334 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -337,7 +341,7 @@ index 00000000000..66e6e76600c
 +const RITEMARK_BROWSER_DID_NAVIGATE_COMMAND = 'ritemark.browser.didNavigate';
 +
 +interface IRitemarkBrowserNavigationDto {
-+	readonly kind: 'navigate' | 'title';
++	readonly kind: 'navigate' | 'title' | 'favicon';
 +	readonly pageId: string;
 +	readonly url: string;
 +	readonly title: string;
@@ -345,6 +349,8 @@ index 00000000000..66e6e76600c
 +	readonly failed: boolean;
 +	/** The tab browses in an ephemeral (private) storage session. */
 +	readonly ephemeral: boolean;
++	/** Sprint 134 (R18): the site's icon as a data URL, when the tab has one (Recent's rows show it). */
++	readonly favicon?: string;
 +}
 +
 +/**
@@ -367,9 +373,10 @@ index 00000000000..66e6e76600c
 +		this.send(model, 'navigate', model.url, model.title);
 +		store.add(model.onDidNavigate(e => this.send(model, 'navigate', e.url, e.title)));
 +		store.add(model.onDidChangeTitle(e => this.send(model, 'title', model.url, e.title)));
++		store.add(model.onDidChangeFavicon(() => this.send(model, 'favicon', model.url, model.title)));
 +	}
 +
-+	private send(model: IBrowserViewModel, kind: 'navigate' | 'title', url: string, title: string): void {
++	private send(model: IBrowserViewModel, kind: 'navigate' | 'title' | 'favicon', url: string, title: string): void {
 +		if (!url) {
 +			return;
 +		}
@@ -380,6 +387,7 @@ index 00000000000..66e6e76600c
 +			title,
 +			failed: model.error !== undefined,
 +			ephemeral: model.storageScope === BrowserViewStorageScope.Ephemeral,
++			favicon: model.favicon,
 +		};
 +		this.commandService.executeCommand(RITEMARK_BROWSER_DID_NAVIGATE_COMMAND, dto).catch(err => {
 +			this.logService.trace('[Ritemark] Browser Recent: navigation not delivered', err);

@@ -53,11 +53,15 @@ export function switchQuestion(workingRuntimes: readonly (string | null)[], here
       ],
     };
   }
-  // VS Code's own ways where the folder isn't known: no new window to offer; Cancel is the default.
+  // VS Code's own ways where the folder isn't known: no new window to offer, and Cancel is the default, since the
+  // other button stops the AI (S33). It goes first, as the dialog's close button too.
   return {
     title,
     detail: `Switching projects stops ${pronoun}.`,
-    buttons: [{ choice: 'switch-and-stop', label: 'Switch and stop' }],
+    buttons: [
+      { choice: 'cancel', label: 'Cancel' },
+      { choice: 'switch-and-stop', label: 'Switch and stop' },
+    ],
   };
 }
 
@@ -82,12 +86,13 @@ export class ProjectSwitcher {
     const working = this.deps.workingChats();
     if (working.length === 0) return undefined;
     const question = switchQuestion(working.map((chat) => chat.runtimeId), this.deps.hereName(), there);
+    // A Cancel of the question's own is the dialog's close button (and, first, its default); otherwise VS Code adds one.
     const picked = await vscode.window.showWarningMessage(
       question.title,
       { modal: true, detail: question.detail },
-      ...question.buttons.map((button) => button.label),
+      ...question.buttons.map((button) => ({ title: button.label, isCloseAffordance: button.choice === 'cancel' })),
     );
-    return question.buttons.find((button) => button.label === picked)?.choice ?? 'cancel';
+    return question.buttons.find((button) => button.label === picked?.title)?.choice ?? 'cancel';
   }
 
   private async rememberHere(): Promise<void> {
@@ -97,8 +102,11 @@ export class ProjectSwitcher {
     await this.deps.context.globalState.update(SWITCHED_FROM_KEY, from);
   }
 
-  /** Switch this window to the folder, asking first when a chat works. */
-  async switchTo(target: vscode.Uri, options: { newWindow?: boolean } = {}): Promise<SwitchChoice | 'switched'> {
+  /**
+   * Switch this window to the folder, asking first when a chat works. Going back
+   * (the note's Go back) leaves no note of its own on the project it returns to (S32).
+   */
+  async switchTo(target: vscode.Uri, options: { newWindow?: boolean; goingBack?: boolean } = {}): Promise<SwitchChoice | 'switched'> {
     if (options.newWindow) {
       await vscode.commands.executeCommand('vscode.openFolder', target, { forceNewWindow: true });
       return 'new-window';
@@ -110,7 +118,8 @@ export class ProjectSwitcher {
       return 'new-window';
     }
     if (choice === 'switch-and-stop') await this.deps.stopWorkingChats();
-    await this.rememberHere();
+    if (options.goingBack) await this.deps.context.globalState.update(SWITCHED_FROM_KEY, undefined);
+    else await this.rememberHere();
     this.askedUntil = Date.now() + 10_000;
     await vscode.commands.executeCommand('vscode.openFolder', target, { forceReuseWindow: true });
     return 'switched';

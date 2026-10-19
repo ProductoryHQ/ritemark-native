@@ -81,7 +81,7 @@ And on a v1.14.0 profile's first start of this build, no old chat counts as unre
 
 ### S12: The Tasks tab's count
 Given two cards waiting on the person
-Then the Tasks tab shows 2 at its icon's lower right, its tooltip says "Tasks, 2 wait for you", and VoiceOver reads it
+Then the Tasks tab shows 2 at its icon's lower right, its tooltip says "Task board, 2 wait for you", and VoiceOver reads it
 When both are answered
 Then no count shows.
 
@@ -245,7 +245,7 @@ And a fresh profile never shows it.
 
 ### S36: Saved
 When the person types in a document and stops
-Then the bar shows Saved once the document is written; with a save failing (the file made read-only), Review changes and Retry show in its place as today.
+Then the bar shows Saved once the document is written; with a save failing (the file made read-only), the bar does not say Saved and VS Code's own message says why, as today; Review changes and Retry show in Saved's place for a sync problem, as today (QA, 19 October: today's bar has them only for a sync conflict or a failed apply).
 
 ### S37: Share
 When the person opens Share
@@ -305,14 +305,14 @@ Then the first two are listed and open; the third shows as Not found.
 Given "Leadership programme" open
 When the person chooses Tasks, then Browser, then Transcribe in the places row
 Then each shows the project's head: the mark "LP", "Leadership programme" and the chevron, at the numbers Documents has; no "Tasks", "Browser" or "Transcribe" title row
-And under it Tasks shows New task and Search, Transcribe shows Record and Transcribe a file…, and Browser shows the Recent label
+And under it Tasks shows New task and Search, Transcribe shows Record and Transcribe a file…, and Browser shows New page and then the Recent label
 And each place's content follows as before
 When the person clicks the chevron on each
 Then the project's menu opens, as on Documents.
 
 ### S46: Nothing on a title row is lost
 Given Browser and Transcribe chosen in turn
-Then Browser's New browser tab and Clear history are at the right of the Recent label, each with its tooltip, and each works as the title row's button did
+Then Browser's New browser tab is the head's New page row and Clear history is at the right of the Recent label with its tooltip, and each works as the title row's button did
 And Transcribe's settings button is a gear at the right of the Recordings label, with the tooltip "Transcribe settings", and opens Settings at the transcription card
 And Record and Transcribe a file… do what Record and Add recording did.
 
@@ -341,9 +341,9 @@ And the Tasks place and the Tasks tab both count 2.
 ### S50: Recent, and plain words
 Given a fresh profile
 When the person chooses Browser
-Then the Recent label heads the column in 11-caps, and the list says "No pages yet" with today's line under it
-When the person opens ritemark.app from the + at the right of the label
-Then the page shows under Recent with its title
+Then New page is under the head, the Recent label heads the list in 11-caps, and the list says "No pages yet" in muted ink with today's line under it
+When the person opens ritemark.app from New page
+Then the page shows under Recent as one 32-high row: the site's icon, its title, and "ritemark.app" in muted ink at the right
 When the person picks Clear history
 Then the list is empty again and says "No pages yet".
 

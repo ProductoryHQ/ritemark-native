@@ -92,9 +92,13 @@ export function chosenAgentColor(frontmatter: Record<string, unknown>): AgentCol
   return (AGENT_COLORS as readonly string[]).includes(raw) ? (raw as AgentColor) : undefined;
 }
 
-/** The theme colour that draws a chosen agent colour, as a webview reads it. */
+/**
+ * The theme colour that draws a chosen agent colour, as a webview reads it. VS Code names a webview's colour
+ * variables by replacing only the id's first dot (`themeing.ts`), so `ritemark.agentColor.green` is
+ * `--vscode-ritemark-agentColor.green`, and the second dot is escaped in CSS (S61).
+ */
 export function agentColorCssVar(color: AgentColor): string {
-  return `var(--vscode-ritemark-agentColor-${color})`;
+  return `var(--vscode-ritemark-agentColor\\.${color})`;
 }
 
 interface HeuristicRule {

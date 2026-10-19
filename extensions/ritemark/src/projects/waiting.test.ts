@@ -96,8 +96,8 @@ async function main(): Promise<void> {
       'card:review:aaaaa1',
       'card:failed:aaaaa4',
       'card:failed:aaaaa6',
+      'chat:approval:c-approval', // questions and approvals before unread replies (the Experience lead, 19 October)
       'chat:reply:c-unread',
-      'chat:approval:c-approval',
     ]);
     assert.equal(waiting.tasks, 4);
     assert.equal(waiting.chats, 2, 'a stale question, a read chat, an old chat and a card’s chat are not counted');
@@ -190,6 +190,21 @@ async function main(): Promise<void> {
   {
     const items = chatsWaiting([chat('x', { scopeId: 'ps1-other', readAt: 'a', lastReplyAt: 'b' })], scopeId, new Set(), new Set());
     assert.deepEqual(items, []);
+  }
+
+  // The order (the Experience lead, 19 October): questions and approvals first, longest waiting first; then unread
+  // replies, newest first. Each chat carries its colour on the rail.
+  {
+    const items = chatsWaiting([
+      chat('old-reply', { readAt: '2026-10-19T08:00:00.000Z', lastReplyAt: '2026-10-19T08:10:00.000Z', identityColorSlot: 2 }),
+      chat('new-reply', { readAt: '2026-10-19T08:00:00.000Z', lastReplyAt: '2026-10-19T08:50:00.000Z', identityColorSlot: 5 }),
+      chat('question', { lifecycle: { state: 'needs-user', attentionKind: 'question' }, lastActivityAt: '2026-10-19T08:30:00.000Z' }),
+    ], scopeId, new Set(['question']), new Set());
+    assert.deepEqual(items.map((item) => [item.conversationId, item.kind, item.colorSlot]), [
+      ['question', 'question', null],
+      ['new-reply', 'reply', 5],
+      ['old-reply', 'reply', 2],
+    ]);
   }
 
   fs.rmSync(root, { recursive: true, force: true });

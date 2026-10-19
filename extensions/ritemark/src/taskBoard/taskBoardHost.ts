@@ -301,6 +301,12 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
     vscode.commands.registerCommand('ritemark.tasks.search', () => tasksView.runHeadRow(controller ? 'search' : null)),
     vscode.window.registerWebviewPanelSerializer(TaskBoardPanel.viewType, {
       async deserializeWebviewPanel(panel) {
+        // Sprint 134 (R5, S22): with the board turned off, Home stands first alone: a board tab the window restored
+        // goes (the extension may dispose a permanent tab; patch 019 stops only people and commands)
+        if (!controller) {
+          panel.dispose();
+          return;
+        }
         TaskBoardPanel.revive(panel, extensionUri, surfaceContext);
       },
     }),

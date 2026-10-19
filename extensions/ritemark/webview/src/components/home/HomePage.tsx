@@ -18,6 +18,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { othersWords, recentIcon, waitingIcon, waitingWords, whenWords } from './homeWords'
+import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
 import './home.css'
 
@@ -66,7 +67,7 @@ function ProjectLine({ line }: { line: string }) {
     )
   }
   return (
-    <button type="button" className={`rh-line${line ? '' : ' empty'}`} onClick={() => setEditing(true)} aria-label={line ? `${line}. Edit the line about this project` : 'Add a line about this project'}>
+    <button type="button" className={`rh-line${line ? '' : ' empty'}`} onClick={() => setEditing(true)} aria-label={line ? `${line.replace(/[.!?…]+$/, '')}. Edit the line about this project` : 'Add a line about this project'}>
       {line || 'Add a line about this project'}
     </button>
   )
@@ -121,7 +122,10 @@ function Waiting({ state, now }: { state: HomeState; now: number }) {
         const words = waitingWords(item)
         return (
           <button key={item.id} type="button" className="rh-row" onClick={() => send({ type: 'home/open-waiting', id: item.id })}>
-            <span className="rh-ic"><Icon name={waitingIcon(item)} size={14} tone="inherit" /></span>
+            {/* An unread reply wears its chat's own bubble, as on the rail (the Experience lead, 19 October) */}
+            {item.source === 'chat' && item.kind === 'reply' && item.colorSlot !== null
+              ? <span className="rh-ic rh-ic-bubble"><ConversationBubbleIcon identityColorSlot={item.colorSlot} size={14} /></span>
+              : <span className="rh-ic"><Icon name={waitingIcon(item)} size={14} tone="inherit" /></span>}
             <span className="rh-text">{words.text}</span>
             {words.tag && <span className="rh-tag">{words.tag}</span>}
             <span className="rh-when">{whenWords(item.since, now, 'minutes')}</span>
@@ -217,6 +221,8 @@ function Missing({ state }: { state: HomeState }) {
         <span className="rh-mark muted" aria-hidden="true">{missing.mark}</span>
         <h1 className="rh-name">{missing.name}</h1>
         <section className="rh-missing" aria-label="This project's folder is not where it was">
+          {/* What Find it… or Remove said, here in the box where the person is (S43) */}
+          {state.notice && <p className="rh-missing-notice" role="status"><Icon name="info" size={14} tone="inherit" />{state.notice}</p>}
           <h3>This project’s folder is not where it was</h3>
           <p>It may have been moved or renamed, or it is on a drive that is not connected now.</p>
           <span className="rh-path"><Icon name="folder-simple" size={14} tone="inherit" />{missing.place}</span>
@@ -228,13 +234,18 @@ function Missing({ state }: { state: HomeState }) {
               <Button variant="outline" size="sm" onClick={() => send({ type: 'home/remove-missing', id: missing.id })}>Remove from the list</Button>
             </Tooltip>
           </div>
-          <p className="rh-foot">Removing it from the list leaves the folder alone, wherever it is. You stay in {state.project.name} meanwhile.</p>
+          {missing.here
+            ? <p className="rh-foot">Removing it from the list closes it in this window and leaves the folder alone, wherever it is.</p>
+            : <p className="rh-foot">Removing it from the list leaves the folder alone, wherever it is. You stay in {state.project.name} meanwhile.</p>}
         </section>
-        <div style={{ marginTop: 16 }}>
-          <Tooltip label={`Back to ${state.project.name}’s Home`}>
-            <Button variant="ghost" size="sm" onClick={() => send({ type: 'home/dismiss-missing' })}><Icon name="caret-left" size={12} tone="inherit" />{state.project.name}</Button>
-          </Tooltip>
-        </div>
+        {/* The open project's own folder gone (S53): there is no Home of its own to go back to */}
+        {!missing.here && (
+          <div style={{ marginTop: 16 }}>
+            <Tooltip label={`Back to ${state.project.name}’s Home`}>
+              <Button variant="ghost" size="sm" onClick={() => send({ type: 'home/dismiss-missing' })}><Icon name="caret-left" size={12} tone="inherit" />{state.project.name}</Button>
+            </Tooltip>
+          </div>
+        )}
       </div>
     </div>
   )

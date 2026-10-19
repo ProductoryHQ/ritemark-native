@@ -64,7 +64,14 @@ explorerViewer.ts), and Documents hides the root CLAUDE.md while it is only Rite
 Open Folder…, a drop, Close Folder) waits for the extension's _ritemark.projects.beforeReload, passed the folder the
 host service noted (ritemarkSwitchGuard.ts, nativeHostService.ts); with no command, or no answer and no question shown
 in 10 s, the reload goes on; Reload Window and quitting never ask (R9). The splash saves ritemark.ground as the
-window's background, so a switch shows the ground, not the desk (partsSplash.ts; the switch audit).
+window's background, so a switch shows the ground, not the desk (partsSplash.ts; the switch audit). A modal message
+whose extension lists its close affordance first gets Cancel as its default, focused and drawn primary
+(mainThreadMessageService.ts, dialogHandler.ts, dialogs.ts' ICustomDialogOptions.ritemarkFocusCancel, dialog.ts): the
+switch question with no known folder, where the other button stops the AI (S33). The dialog's button row starts at the
+sheet's edge and wraps rather than running past it (three buttons, S31). A menu row is read with what it shows at its
+right ("1 waits", "Not found", a key); a long name ends in … before it; a project whose folder is not found is muted, with
+its old place under its name and a warning at its right (S38). The project's mark is two letters, as the welcome draws it
+("Notes" → "NO"). The project menu's New folder and Collapse folders show on Documents only.
 
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
@@ -80,7 +87,41 @@ parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; c
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
-R13) and workbench/test/browser/parts/ritemarkSwitchGuard.test.ts (Sprint 134, R9); run with ./scripts/test.sh --grep Ritemark.
+R13), workbench/test/browser/parts/ritemarkSwitchGuard.test.ts and base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts
+(Sprint 134, R9); run with ./scripts/test.sh --grep Ritemark.
+diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
+index 3169c8326c3..f7d28372c7f 100644
+--- a/src/vs/base/browser/ui/dialog/dialog.ts
++++ b/src/vs/base/browser/ui/dialog/dialog.ts
+@@ -42,6 +42,8 @@ export enum DialogContentsAlignment {
+ 
+ export interface IDialogOptions {
+ 	readonly cancelId?: number;
++	/** Ritemark (Sprint 134, R9): the cancel button is the default: focused first and drawn as the primary. */
++	readonly ritemarkFocusCancel?: boolean;
+ 	readonly detail?: string;
+ 	readonly alignment?: DialogContentsAlignment;
+ 	readonly checkboxLabel?: string;
+@@ -282,7 +284,7 @@ export class Dialog extends Disposable {
+ 
+ 			// Buttons
+ 			buttonMap.forEach((_, index) => {
+-				const primary = buttonMap[index].index === 0;
++				const primary = this.options.ritemarkFocusCancel && typeof this.options.cancelId === 'number' ? buttonMap[index].index === this.options.cancelId : buttonMap[index].index === 0;
+ 
+ 				let button: IButton;
+ 				const buttonOptions = this.options.buttonOptions?.[buttonMap[index]?.index];
+@@ -551,8 +553,9 @@ export class Dialog extends Disposable {
+ 				this.inputs[0].focus();
+ 				this.inputs[0].select();
+ 			} else {
++				const focusIndex = this.options.ritemarkFocusCancel && typeof this.options.cancelId === 'number' ? this.options.cancelId : 0;
+ 				buttonMap.forEach((value, index) => {
+-					if (value.index === 0) {
++					if (value.index === focusIndex) {
+ 						buttonBar.buttons[index].focus();
+ 					}
+ 				});
 diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
 index 034c650442a..3b2312d89cd 100644
 --- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
@@ -309,6 +350,75 @@ index 00000000000..b5391e7c619
 +		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'Modules');
 +	});
 +});
+diff --git a/src/vs/base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts b/src/vs/base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts
+new file mode 100644
+index 00000000000..59285830fe4
+--- /dev/null
++++ b/src/vs/base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts
+@@ -0,0 +1,50 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { mainWindow } from '../../../../browser/window.js';
++import { unthemedButtonStyles } from '../../../../browser/ui/button/button.js';
++import { Dialog, IDialogOptions } from '../../../../browser/ui/dialog/dialog.js';
++import { unthemedInboxStyles } from '../../../../browser/ui/inputbox/inputBox.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../common/utils.js';
++
++/**
++ * Ritemark (Sprint 134, R9): a question whose action stops work (the switch question with no known folder) makes
++ * Cancel the default: it is focused when the dialog opens, so Enter cancels, and it is the button drawn as primary.
++ */
++suite('Ritemark dialog focus', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	const styles: Pick<IDialogOptions, 'buttonStyles' | 'checkboxStyles' | 'inputBoxStyles' | 'dialogStyles'> = {
++		buttonStyles: unthemedButtonStyles,
++		checkboxStyles: { checkboxBackground: undefined, checkboxBorder: undefined, checkboxForeground: undefined, checkboxDisabledBackground: undefined, checkboxDisabledForeground: undefined },
++		inputBoxStyles: unthemedInboxStyles,
++		dialogStyles: { dialogForeground: undefined, dialogBackground: undefined, dialogShadow: undefined, dialogBorder: undefined, errorIconForeground: undefined, warningIconForeground: undefined, infoIconForeground: undefined, textLinkForeground: undefined },
++	};
++
++	async function open(focusCancel: boolean) {
++		const container = mainWindow.document.createElement('div');
++		mainWindow.document.body.appendChild(container);
++		const dialog = store.add(new Dialog(container, 'Claude is still working in A', ['Switch and stop', 'Cancel'], { ...styles, cancelId: 1, ritemarkFocusCancel: focusCancel }));
++		const result = dialog.show();
++		await new Promise(resolve => setTimeout(resolve, 0));
++		const buttons = Array.from(container.querySelectorAll<HTMLElement>('.monaco-button'));
++		const focused = buttons.find(button => button === mainWindow.document.activeElement)?.textContent;
++		const primary = buttons.filter(button => !button.classList.contains('secondary')).map(button => button.textContent);
++		dialog.dispose();
++		await result.catch(() => undefined);
++		container.remove();
++		return { focused, primary };
++	}
++
++	test('upstream: the first action is the default', async () => {
++		assert.deepStrictEqual(await open(false), { focused: 'Switch and stop', primary: ['Switch and stop'] });
++	});
++
++	test('with ritemarkFocusCancel, Cancel is the default', async () => {
++		assert.deepStrictEqual(await open(true), { focused: 'Cancel', primary: ['Cancel'] });
++	});
++});
+diff --git a/src/vs/platform/dialogs/common/dialogs.ts b/src/vs/platform/dialogs/common/dialogs.ts
+index fc73e57f824..1c2e93c5bce 100644
+--- a/src/vs/platform/dialogs/common/dialogs.ts
++++ b/src/vs/platform/dialogs/common/dialogs.ts
+@@ -285,6 +285,8 @@ export interface IOpenDialogOptions {
+ export const IDialogService = createDecorator<IDialogService>('dialogService');
+ 
+ export interface ICustomDialogOptions {
++	/** Ritemark (Sprint 134, R9): Cancel is the default (focused and drawn primary), for a question whose action stops work. */
++	readonly ritemarkFocusCancel?: boolean;
+ 	readonly buttonDetails?: string[];
+ 	readonly markdownDetails?: ICustomDialogMarkdown[];
+ 	readonly classes?: string[];
 diff --git a/src/vs/platform/quickinput/browser/quickInputList.ts b/src/vs/platform/quickinput/browser/quickInputList.ts
 index f71937903f3..22cce6eb73b 100644
 --- a/src/vs/platform/quickinput/browser/quickInputList.ts
@@ -547,6 +657,29 @@ index 68bcfe4e00f..8b28e2f239f 100644
 +
  	ensureNoDisposablesAreLeakedInTestSuite();
  });
+diff --git a/src/vs/workbench/api/browser/mainThreadMessageService.ts b/src/vs/workbench/api/browser/mainThreadMessageService.ts
+index 288f11659fc..6ff42a5f781 100644
+--- a/src/vs/workbench/api/browser/mainThreadMessageService.ts
++++ b/src/vs/workbench/api/browser/mainThreadMessageService.ts
+@@ -138,13 +138,17 @@ export class MainThreadMessageService implements MainThreadMessageServiceShape {
+ 			}
+ 		}
+ 
++		// Ritemark (Sprint 134, R9): an extension that lists its close affordance first makes Cancel the default,
++		// where the other choice stops work (the switch question with no known folder)
++		const focusCancel = commands.length > 1 && commands[0].isCloseAffordance;
++
+ 		const { result } = await this._dialogService.prompt({
+ 			type: severity,
+ 			message,
+ 			detail,
+ 			buttons,
+ 			cancelButton,
+-			custom: useCustom
++			custom: focusCancel ? { ritemarkFocusCancel: true } : useCustom
+ 		});
+ 
+ 		return result;
 diff --git a/src/vs/workbench/browser/labels.ts b/src/vs/workbench/browser/labels.ts
 index a414a3d0fcf..a4a30096d9c 100644
 --- a/src/vs/workbench/browser/labels.ts
@@ -649,10 +782,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..bff65c1f2ce
+index 00000000000..a839d3a3f55
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1760 @@
+@@ -0,0 +1,1784 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1668,6 +1801,26 @@ index 00000000000..bff65c1f2ce
 +.monaco-workbench .ritemark-menu-text {
 +	display: grid;
 +	min-width: 0;
++	overflow: hidden;
++	text-overflow: ellipsis; /* a long project name ends in … before its count, never under it (Sprint 134, S16) */
++}
++
++.monaco-workbench .ritemark-menu-item:not(.tall) .ritemark-menu-text {
++	display: block;
++}
++
++.monaco-workbench .ritemark-menu-text > span {
++	overflow: hidden;
++	text-overflow: ellipsis;
++}
++
++/* A project whose folder is not found (Sprint 134, R13, S38): its row in muted ink, its old place under it */
++.monaco-workbench .ritemark-menu-item.muted {
++	color: var(--vscode-descriptionForeground);
++}
++
++.monaco-workbench .ritemark-menu-item.muted .ritemark-menu-mark {
++	opacity: 0.5;
 +}
 +
 +.monaco-workbench .ritemark-menu-item.tall .ritemark-menu-text {
@@ -1681,6 +1834,7 @@ index 00000000000..bff65c1f2ce
 +
 +.monaco-workbench .ritemark-menu-sub,
 +.monaco-workbench .ritemark-menu-trailing {
++	flex: none;
 +	margin-left: auto;
 +	padding-left: 16px;
 +	font-size: 12px;
@@ -2117,6 +2271,9 @@ index 00000000000..bff65c1f2ce
 +.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons {
 +	gap: 8px;
 +	overflow: visible;
++	margin-left: 0; /* upstream keeps 67 under its icon, which this sheet has none of: three buttons fit (Sprint 134, S31) */
++	flex-wrap: wrap; /* and a row that still does not fit takes a second line inside the sheet, never past its edge */
++	row-gap: 8px;
 +}
 +
 +.monaco-workbench .monaco-dialog-box > .dialog-buttons-row > .dialog-buttons > .monaco-button {
@@ -2695,6 +2852,18 @@ index fe7bce2f083..71fd1bb112b 100644
  	}
  }
  
+diff --git a/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts b/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
+index 5af4f540bac..4917bfa22d8 100644
+--- a/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
++++ b/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
+@@ -114,6 +114,7 @@ export class BrowserDialogHandler extends AbstractDialogHandler {
+ 			createWorkbenchDialogOptions({
+ 				detail,
+ 				cancelId,
++				ritemarkFocusCancel: customOptions?.ritemarkFocusCancel,
+ 				type: this.getDialogType(type),
+ 				renderBody,
+ 				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
 index 9bb098c68f8..9c7898b39be 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
@@ -3072,10 +3241,10 @@ index 00000000000..16a18d72338
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..6935d6682a4
+index 00000000000..540edb06444
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,236 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3112,6 +3281,8 @@ index 00000000000..6935d6682a4
 +	readonly mark?: string;
 +	/** The chosen one of a list (the open project), ticked at the row's right. */
 +	readonly checked?: boolean;
++	/** Drawn in muted ink: a project whose folder is not found (Sprint 134, S38). */
++	readonly muted?: boolean;
 +	/** Its rows, asked for when it opens: the row opens a flyout beside the menu instead of running. */
 +	readonly submenu?: () => Promise<readonly RitemarkMenuEntry[]>;
 +	/** `altKey`: the row was chosen with ⌥ (Alt on Windows) held, as a project opened in a new window. */
@@ -3202,7 +3373,9 @@ index 00000000000..6935d6682a4
 +			append(menu, $('.ritemark-menu-sep', { role: 'separator' }));
 +			continue;
 +		}
-+		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': item.checked ? `${item.label}, open` : item.label }));
++		// The row is read with what it shows at its right too: "1 waits", "Not found", a key
++		const ariaLabel = [item.label, item.checked ? 'open' : undefined, item.sub, item.muted ? item.detail : undefined].filter(Boolean).join(', ');
++		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}${item.muted ? '.muted' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': ariaLabel }));
 +		if (item.mark !== undefined) {
 +			append(row, $('span.ritemark-menu-mark', { 'aria-hidden': 'true' }, item.mark));
 +		} else {
@@ -3682,10 +3855,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..67bf90ea053
+index 00000000000..5f751447e51
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,316 @@
+@@ -0,0 +1,328 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3745,7 +3918,7 @@ index 00000000000..67bf90ea053
 +	['workbench.view.extension.ritemark-agent-library', { rows: [{ command: NEW_ROW, menu: MenuId.for('ritemark/projectHead/agents/new') }, { command: 'ritemark.agentLibrary.search' }] }],
 +	// Sprint 134 (R16–R18): the project's head on every place but Home
 +	['workbench.view.extension.ritemark-tasks', { rows: [{ command: 'ritemark.tasks.newTask' }, { command: 'ritemark.tasks.search' }] }],
-+	['workbench.view.extension.ritemark-browser', { rows: [] }],
++	['workbench.view.extension.ritemark-browser', { rows: [{ command: 'ritemark.browser.newPage' }] }],
 +	['workbench.view.extension.ritemark-transcribe', { rows: [{ command: 'ritemark.transcribe.record' }, { command: 'ritemark.transcribe.addFile' }] }],
 +]);
 +
@@ -3763,6 +3936,11 @@ index 00000000000..67bf90ea053
 +	readonly sub?: string;
 +	readonly checked?: boolean;
 +	readonly icon?: string;
++	/** A second line: a not-found project's old place. */
++	readonly detail?: string;
++	/** Muted, with an icon at its right: a project whose folder is not found. */
++	readonly muted?: boolean;
++	readonly trailingIcon?: string;
 +	readonly command: string;
 +	readonly args?: readonly unknown[];
 +	readonly separatorBefore?: boolean;
@@ -3778,8 +3956,12 @@ index 00000000000..67bf90ea053
 +
 +/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
 +export function ritemarkProjectInitials(name: string): string {
++	// Two letters, as the welcome draws them (Sprint 134: one rule everywhere): two words' first letters, or one
++	// word's first two ("Notes" → "NO")
 +	const words = name.split(/[\s:_-]+/).filter(word => /[\p{L}\p{N}]/u.test(word));
-+	return words.slice(0, 2).map(word => [...word.replace(/[^\p{L}\p{N}]/gu, '')][0] ?? '').join('').toUpperCase() || '·';
++	const letters = (word: string) => [...word.replace(/[^\p{L}\p{N}]/gu, '')];
++	const mark = words.length >= 2 ? (letters(words[0])[0] ?? '') + (letters(words[1])[0] ?? '') : letters(words[0] ?? '').slice(0, 2).join('');
++	return mark.toUpperCase() || '·';
 +}
 +
 +export class RitemarkProjectHead extends Disposable {
@@ -3969,6 +4151,9 @@ index 00000000000..67bf90ea053
 +				mark: row.mark,
 +				sub: row.sub,
 +				checked: row.checked,
++				detail: typeof row.detail === 'string' ? row.detail : undefined,
++				muted: row.muted === true,
++				trailingIconClassNames: typeof row.trailingIcon === 'string' ? ThemeIcon.asClassNameArray(ThemeIcon.fromId(row.trailingIcon)) : undefined,
 +				iconClassNames: row.icon ? ThemeIcon.asClassNameArray(ThemeIcon.fromId(row.icon)) : [],
 +				run: event => this.commandService.executeCommand(row.command, ...(row.args ?? []), { newWindow: event?.altKey === true }),
 +			});

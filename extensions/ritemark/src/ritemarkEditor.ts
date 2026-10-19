@@ -808,6 +808,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
         if (this.documentSync.handles(message)) {
           this.documentSync.handle(document, webview, message);
+          // Sprint 134 (R8): a synced document says it is ready here, not with 'ready'
+          if (message.type === 'document:ready') void this.postAboutNote(document, webview);
           return;
         }
 

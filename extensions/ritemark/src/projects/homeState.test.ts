@@ -11,7 +11,7 @@ import * as path from 'path';
 import { callsOf } from '../taskBoard/BoardController';
 import type { Card } from '../taskBoard/cardFile';
 import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
-import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile } from './homeState';
+import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile, showWhatMoved } from './homeState';
 import { decodeHomeRequest } from './protocol';
 import { cardItems, chatsWaiting, handoffViewsFor, summarize, type ChatIndexEntry, type ProjectWaiting } from './waiting';
 
@@ -46,14 +46,19 @@ const files: ChangedFile[] = [
 ];
 const pointers = new Set([at('CLAUDE.md'), at('Modules', 'CLAUDE.md')]);
 const full = recentItems(folder, files, pointers, 10);
-assert.deepEqual(full.map(({ item }) => [item.id, item.name, item.extension, item.folder, item.kind, item.about]), [
-  ['file:0', 'About this project', '', null, 'markdown', true],
-  ['file:1', 'Outline', '.md', null, 'markdown', false],
-  ['file:2', 'Session notes', '.md', 'Modules/Week 1', 'markdown', false],
-  ['file:3', 'AGENTS', '.md', 'Modules', 'markdown', false],
-  ['file:4', 'Budget', '.xlsx', null, 'sheet', false],
-  ['file:5', 'README', '', null, 'other', false],
+assert.deepEqual(full.map(({ item }) => [item.name, item.extension, item.folder, item.kind, item.about]), [
+  ['About this project', '', null, 'markdown', true],
+  ['Outline', '.md', null, 'markdown', false],
+  ['Session notes', '.md', 'Modules/Week 1', 'markdown', false],
+  ['AGENTS', '.md', 'Modules', 'markdown', false],
+  ['Budget', '.xlsx', null, 'sheet', false],
+  ['README', '', null, 'other', false],
 ], 'newest first; About this project for the root AGENTS.md; the pointer CLAUDE.md left out');
+// S15: an id is the file's, not its place in the list: opaque, and the same after the list reorders.
+assert.ok(full.every(({ item }) => /^file:[0-9a-f]{16}$/.test(item.id)));
+const reordered = recentItems(folder, files.map((file) => (file.path === at('Budget.xlsx') ? { ...file, changedAt: minutes(-5) } : file)), pointers, 10);
+assert.equal(reordered[0].path, at('Budget.xlsx'));
+assert.equal(reordered[0].item.id, full.find(({ path: filePath }) => filePath === at('Budget.xlsx'))!.item.id);
 assert.deepEqual(full.map(({ path: filePath }) => filePath), [at('AGENTS.md'), at('Outline.md'), at('Modules', 'Week 1', 'Session notes.md'), at('Modules', 'AGENTS.md'), at('Budget.xlsx'), at('README')],
   'the host keeps each id’s path');
 assert.equal(full[0].item.changedAt, '2026-10-19T08:59:00.000Z');
@@ -147,5 +152,11 @@ assert.deepEqual(othersOf([
 ]), [{ name: 'Sales proposal Q4', count: 2 }, { name: 'Research: hybrid work', count: 1 }], 'in the list’s order; nothing waiting and unknown left out');
 assert.deepEqual(othersOf([{ name: 'Quiet', waiting: waits(0) }]), []);
 assert.equal(othersOf([{ name: 'A', waiting: undefined }, { name: 'B', waiting: waits(undefined) }]), null, 'none can be counted: unknown, not zero');
+
+// R11/S35: What moved, for a profile from Ritemark 1 (the welcome records { at }), until Got it.
+assert.equal(showWhatMoved({ at: '2026-10-19T08:00:00.000Z' }, undefined), true);
+assert.equal(showWhatMoved(true, undefined), true);
+assert.equal(showWhatMoved({ at: '2026-10-19T08:00:00.000Z' }, true), false, 'Got it');
+assert.equal(showWhatMoved(undefined, undefined), false, 'a fresh profile never sees it');
 
 console.log('projects/homeState: all assertions passed');

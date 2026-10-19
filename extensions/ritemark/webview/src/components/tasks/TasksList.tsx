@@ -131,7 +131,7 @@ export function TasksList({ snapshot }: { snapshot: BoardSnapshot }) {
                   variant="ghost"
                   size="icon-sm"
                   aria-label="Clear the search"
-                  className="size-6 rounded-[4px] text-ink-muted"
+                  className="size-6 rounded-[4px] text-[var(--r-ink-body)] hover:text-[var(--r-ink-strong)]"
                   // Keep the field from losing the keyboard before the click lands.
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => searchTo({ type: 'escape' })}
@@ -381,9 +381,10 @@ function SideRow({
   const p = present(card)
   const active = activePage === card.id
   const progress = card.checkboxes.total ? `${card.checkboxes.done}/${card.checkboxes.total}` : ''
-  const words = <span className={cn('min-w-0 truncate', toneClass(p.tone === 'faint' ? 'muted' : p.tone))}>{p.row}</span>
+  // The state's words wrap rather than cut ("Ready to revie…", QA 19 October): they say what to do
+  const words = <span className={cn('min-w-0 [overflow-wrap:anywhere]', toneClass(p.tone === 'faint' ? 'muted' : p.tone))}>{p.row}</span>
   const sub = waiting ? (
-    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px]">
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
       <span className="tb-wfy">Waiting for you</span>
       {p.row ? words : null}
     </div>

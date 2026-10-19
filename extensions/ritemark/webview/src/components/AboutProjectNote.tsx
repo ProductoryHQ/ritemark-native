@@ -13,7 +13,7 @@ import { Tooltip } from './ui/tooltip'
 
 export function AboutProjectNote({ onAddLine, onNotNow, busy }: { onAddLine: () => void; onNotNow: () => void; busy: boolean }) {
   return (
-    <div className="mx-auto max-w-[900px] pl-16 pr-8 pt-6 font-ui">
+    <div className="rm-about-note mx-auto max-w-[900px] pl-16 pr-8 pt-6 font-ui">
       <div role="note" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3.5 py-2.5 text-[13px] leading-[1.4] text-[var(--r-ink-body)]">
         <Icon name="info" size={16} className="shrink-0" />
         <span className="min-w-[200px] flex-1">Claude reads this project's CLAUDE.md. Add one line to it so Claude reads this page too.</span>

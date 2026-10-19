@@ -259,6 +259,18 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     // A new page asks for its data with 'ready'; the section follows that.
     this.pendingSection = section;
 
+    // A Settings tab the window restored is revived only when shown: bring that tab forward rather than open a
+    // second one (Sprint 134 QA, the same as Home's S21)
+    const restored = vscode.window.tabGroups.all.flatMap((group) => group.tabs)
+      .find((tab) => tab.input instanceof vscode.TabInputWebview && tab.input.viewType.endsWith(RitemarkSettingsProvider.viewType));
+    if (restored) {
+      const index = restored.group.tabs.indexOf(restored);
+      if (restored.group.viewColumn === vscode.ViewColumn.One) await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+      await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', index);
+      for (let waited = 0; !RitemarkSettingsProvider.panel && waited < 3000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+      if (RitemarkSettingsProvider.panel) return;
+    }
+
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
       'Ritemark Settings',

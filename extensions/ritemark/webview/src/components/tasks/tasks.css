@@ -153,7 +153,7 @@
 .tb-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
 .tb-search input::placeholder { color: var(--r-ink-muted); opacity: 1; }
 .tb-search input::-webkit-search-cancel-button { display: none; }
-.tb-toast { position: fixed; left: 50%; bottom: 16px; z-index: 95; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
+.tb-toast { position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; bottom: 16px; z-index: 95; max-width: min(420px, calc(100% - 32px)); /* centred by margins, not left 50%: a fixed box from the middle got half the column's width (QA, 19 October) */ border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
 /* The card page (design.md §5): a card open in the Ritemark editor. The strip
    takes DocumentHeader's place; the head sits in the editor's column, which
    follows .wysiwyg-editor .ProseMirror (max-width 900px, 2rem 2rem 0 4rem). */

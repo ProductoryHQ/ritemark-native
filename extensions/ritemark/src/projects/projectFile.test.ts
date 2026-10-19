@@ -105,6 +105,7 @@ async function main(): Promise<void> {
   assert.equal(projectInitials('board-report_2026'), 'BR');
   assert.equal(projectInitials('Ärm öö'), 'ÄÖ');
   assert.equal(projectInitials('   '), '·');
+  assert.equal(projectInitials('Empty'), 'EM', 'one word: its first two letters, as the welcome draws them');
   assert.equal(projectInitials('2026 plans'), '2P');
 
   // ── The line: one line, cut at a word ──

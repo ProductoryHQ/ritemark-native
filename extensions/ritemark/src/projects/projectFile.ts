@@ -57,10 +57,15 @@ const WORDS = {
   tooLarge: 'That picture is larger than 10 MB. Choose a smaller one.',
 };
 
-/** "Harbour leadership programme" → "HL", as patch 018's head draws it (`ritemarkProjectInitials`). */
+/**
+ * "Harbour leadership programme" → "HL", "Notes" → "NO": two letters, as patch 018's head (`ritemarkProjectInitials`)
+ * and the welcome (`projectMark`) draw them, one rule everywhere.
+ */
 export function projectInitials(name: string): string {
   const words = name.split(/[\s:_-]+/).filter((word) => /[\p{L}\p{N}]/u.test(word));
-  return words.slice(0, 2).map((word) => [...word.replace(/[^\p{L}\p{N}]/gu, '')][0] ?? '').join('').toUpperCase() || '·';
+  const letters = (word: string) => [...word.replace(/[^\p{L}\p{N}]/gu, '')];
+  const mark = words.length >= 2 ? (letters(words[0])[0] ?? '') + (letters(words[1])[0] ?? '') : letters(words[0] ?? '').slice(0, 2).join('');
+  return mark.toUpperCase() || '·';
 }
 
 /** One line, at most {@link PROJECT_LINE_LIMIT} characters, cut at a word where it can be. */

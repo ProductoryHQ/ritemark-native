@@ -282,4 +282,37 @@ assert.ok(long?.endsWith('…'));
   );
 }
 
-console.log('All browser navigation recorder tests passed.');
+// --- Sprint 134 R18: the site's icon ------------------------------------------
+void (async () => {
+  const icon = 'data:image/png;base64,iVBORw0KGgo=';
+  const other = 'data:image/png;base64,AAAA';
+  const writes: unknown[][] = [];
+  const clock = new FakeClock();
+  const recorder = new BrowserNavigationRecorder({
+    record: async (url, title) => { writes.push(['record', url, title]); },
+    setTitle: async (url, title) => { writes.push(['setTitle', url, title]); },
+    setFavicon: async (url, favicon) => { writes.push(['setFavicon', url, favicon]); },
+  }, clock);
+  const favicon = (url: string, value: unknown, pageId = 'p1') => ({ kind: 'favicon', pageId, url, title: '', failed: false, ephemeral: false, favicon: value });
+
+  // A navigation carrying the previous page's icon is not taken; the tab's own icon change is, once settled.
+  recorder.handle({ ...nav(T, 'Titled'), favicon: other });
+  recorder.handle(favicon(T, icon));
+  clock.advance(SETTLE_MS);
+  await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(writes, [['record', T, 'Titled'], ['setFavicon', T, icon]]);
+  // A later change is written in place; the same icon again is not.
+  recorder.handle(favicon(T, other));
+  recorder.handle(favicon(T, other));
+  await Promise.resolve();
+  assert.deepEqual(writes.slice(2), [['setFavicon', T, other]]);
+  // An icon for a page the tab is not on, or one that is not a small image data URL, is dropped.
+  recorder.handle(favicon('https://elsewhere.example/', icon));
+  assert.equal(parseNavigationEvent(favicon(T, 'javascript:alert(1)'))?.favicon, undefined);
+  assert.equal(parseNavigationEvent(favicon(T, 'data:image/png;base64,' + 'A'.repeat(20_000)))?.favicon, undefined);
+  assert.equal(writes.length, 3);
+  console.log('All browser navigation recorder tests passed.');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

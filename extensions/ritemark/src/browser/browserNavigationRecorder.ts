@@ -19,10 +19,12 @@ export const SETTLE_MS = 1_000;
 /** Title changes are taken only this long after the navigation (R5). */
 export const TITLE_SETTLE_MS = 10_000;
 const MAX_TRACKED_TABS = 200;
+/** Sprint 134 (R18): a site's icon is kept only as a small image data URL (25 of them live in global state). */
+export const MAX_FAVICON_LENGTH = 12_288;
 const RECORDED_PROTOCOLS = new Set(['http:', 'https:', 'file:']);
 
 export interface BrowserNavigationEvent {
-  kind: 'navigate' | 'title';
+  kind: 'navigate' | 'title' | 'favicon';
   pageId: string;
   url: string;
   title: string;
@@ -30,17 +32,25 @@ export interface BrowserNavigationEvent {
   failed: boolean;
   /** The tab browses in an ephemeral (private) storage session. */
   ephemeral: boolean;
+  /** Sprint 134 (R18): the site's icon, a small image data URL, when the tab has one. */
+  favicon?: string;
+}
+
+/** A site's icon Recent keeps: an image data URL of at most MAX_FAVICON_LENGTH characters (R18). */
+export function cleanFavicon(raw: unknown): string | undefined {
+  return typeof raw === 'string' && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= MAX_FAVICON_LENGTH ? raw : undefined;
 }
 
 /** Validates the command argument; undefined for anything malformed (R8). */
 export function parseNavigationEvent(raw: unknown): BrowserNavigationEvent | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const e = raw as Record<string, unknown>;
-  if (e.kind !== 'navigate' && e.kind !== 'title') return undefined;
+  if (e.kind !== 'navigate' && e.kind !== 'title' && e.kind !== 'favicon') return undefined;
   if (typeof e.pageId !== 'string' || !e.pageId) return undefined;
   if (typeof e.url !== 'string' || typeof e.title !== 'string') return undefined;
   if (typeof e.failed !== 'boolean' || typeof e.ephemeral !== 'boolean') return undefined;
-  return { kind: e.kind, pageId: e.pageId, url: e.url, title: e.title, failed: e.failed, ephemeral: e.ephemeral };
+  const favicon = cleanFavicon(e.favicon);
+  return { kind: e.kind, pageId: e.pageId, url: e.url, title: e.title, failed: e.failed, ephemeral: e.ephemeral, ...(favicon ? { favicon } : {}) };
 }
 
 /**
@@ -108,6 +118,8 @@ function fallbackTitles(url: string): Set<string> {
 export interface HistorySink {
   record(url: string, title?: string): Promise<void>;
   setTitle(url: string, title: string): Promise<void>;
+  /** Sprint 134 (R18): the site's icon, set in place. */
+  setFavicon?(url: string, favicon: string): Promise<void>;
 }
 
 export interface RecorderClock {
@@ -133,6 +145,10 @@ interface TabState {
   title?: string;
   /** Title last written to the sink. */
   writtenTitle?: string;
+  /** The site's icon, from the tab's favicon changes on this document (R18). */
+  favicon?: string;
+  /** Icon last written to the sink. */
+  writtenFavicon?: string;
   /** Set while the navigation waits SETTLE_MS before it counts. */
   cancel?: () => void;
 }
@@ -156,9 +172,11 @@ export class BrowserNavigationRecorder {
     if (tab && sameDocument(url, tab.url)) {
       // A title change, a reload, a tab switch or an #anchor jump: not a new visit.
       this.applyTitle(tab, event.title);
+      // The icon is taken only from the tab's own icon changes: at a navigation the tab may still hold the last page's.
+      if (event.kind === 'favicon' && event.favicon) this.applyFavicon(tab, event.favicon);
       return;
     }
-    if (event.kind === 'title' || event.failed) return;
+    if (event.kind !== 'navigate' || event.failed) return;
     this.startNavigation(event.pageId, url, event.title, tab);
   }
 
@@ -186,8 +204,23 @@ export class BrowserNavigationRecorder {
   private settle(tab: TabState): void {
     tab.cancel = undefined;
     tab.writtenTitle = tab.title;
-    this.sink.record(tab.url, tab.title).catch(() => {
+    const favicon = tab.favicon;
+    this.sink.record(tab.url, tab.title).then(() => {
+      if (favicon && this.sink.setFavicon) {
+        tab.writtenFavicon = favicon;
+        return this.sink.setFavicon(tab.url, favicon);
+      }
+    }).catch(() => {
       // Storage failure: Recent misses this one visit.
+    });
+  }
+
+  private applyFavicon(tab: TabState, favicon: string): void {
+    tab.favicon = favicon;
+    if (tab.cancel || favicon === tab.writtenFavicon || !this.sink.setFavicon) return;
+    tab.writtenFavicon = favicon;
+    this.sink.setFavicon(tab.url, favicon).catch(() => {
+      // Storage failure: the row keeps the globe.
     });
   }
 

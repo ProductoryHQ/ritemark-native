@@ -59,7 +59,11 @@ export function WelcomePage() {
   useEffect(() => {
     const listener = (event: MessageEvent<WelcomeMessage>) => {
       const message = event.data
-      if (message?.type === 'welcome/state') setState(message.state)
+      if (message?.type === 'welcome/state') {
+        setState(message.state)
+        // Sprint 134 (S25): opened from the projects list's Start a new project
+        if (message.state.newProject.open) setNewProjectOpen(true)
+      }
       if (message?.type === 'welcome/keys-saved') setKeysResult({ ok: message.ok, message: message.message })
     }
     window.addEventListener('message', listener)

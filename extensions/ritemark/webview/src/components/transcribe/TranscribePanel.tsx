@@ -335,7 +335,10 @@ export function TranscribePanel() {
               </>
             ) : (
               <>
-                {host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.'}
+                {/* Sprint 134 (R16): with a project open, the head's rows are Record and Transcribe a file… */}
+                {state.hasProject
+                  ? (host?.enabled ? 'Record, or transcribe a file.' : 'Transcribe a file to start.')
+                  : (host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.')}
                 <br />
                 {state.acceptedExtensions.join(', ')}
               </>

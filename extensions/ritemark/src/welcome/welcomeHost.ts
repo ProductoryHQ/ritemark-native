@@ -149,6 +149,8 @@ export function registerWelcome(context: vscode.ExtensionContext, profileKind: P
   context.subscriptions.push(
     controller,
     vscode.commands.registerCommand('ritemark.welcome.open', () => controller.open({ reason: 'command' })),
+    // Sprint 134 (S25): the projects list's Start a new project runs the welcome's own flow, with its place and Change…
+    vscode.commands.registerCommand('ritemark.welcome.newProject', () => controller.openNewProject()),
     vscode.window.registerWebviewPanelSerializer(WELCOME_VIEW_TYPE, {
       deserializeWebviewPanel: async (panel) => controller.adopt(panel),
     }),
@@ -161,6 +163,8 @@ type OpenReason = 'start' | 'command' | 'folder-gone';
 
 class WelcomeController implements vscode.Disposable {
   private panel: vscode.WebviewPanel | null = null;
+  private newProjectRequested = false;
+  private tabBefore: { label: string; viewColumn: vscode.ViewColumn } | null = null;
   private readonly disposables: vscode.Disposable[] = [];
   private panelDisposables: vscode.Disposable[] = [];
   private kind: WelcomeKind;
@@ -285,11 +289,26 @@ class WelcomeController implements vscode.Disposable {
 
   // ── The panel ─────────────────────────────────────────────────────────────
 
+  /** Sprint 134 (S25): the sheet with Start a new project's form open. */
+  async openNewProject(): Promise<void> {
+    const wasOpen = this.panel !== null && this.panel !== undefined;
+    this.newProjectRequested = true;
+    await this.open({ reason: 'command' });
+    // A sheet already showing takes it now; a new one when its page says it is ready ('welcome/ready')
+    if (wasOpen) {
+      this.push();
+      this.newProjectRequested = false;
+    }
+  }
+
   async open(options: { reason: OpenReason }): Promise<void> {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.One, false);
       return;
     }
+    // Sprint 134 (R10): the tab the window had in front, for "Open when you left"
+    const before = vscode.window.tabGroups.activeTabGroup.activeTab;
+    this.tabBefore = before ? { label: before.label, viewColumn: before.group.viewColumn } : null;
     const panel = vscode.window.createWebviewPanel(
       WELCOME_VIEW_TYPE,
       'Welcome',
@@ -356,6 +375,26 @@ class WelcomeController implements vscode.Disposable {
     }
   }
 
+  /**
+   * Sprint 134 (R10): "Open when you left" restores the window's own tabs, with Home and Tasks added first: the
+   * tab that was in front comes back in front, not the Task board the permanent tabs opened last. Home when there
+   * was none.
+   */
+  private async revealTabBefore(): Promise<void> {
+    const before = this.tabBefore;
+    this.tabBefore = null;
+    const tab = before && vscode.window.tabGroups.all
+      .filter((group) => group.viewColumn === before.viewColumn)
+      .flatMap((group) => group.tabs)
+      .find((candidate) => candidate.label === before.label);
+    if (!tab) {
+      await this.projectSource?.revealHome();
+      return;
+    }
+    if (tab.group.viewColumn === vscode.ViewColumn.One) await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', tab.group.tabs.indexOf(tab));
+  }
+
   private closePanel(): void {
     if (!this.panel) return;
     this.closingQuietly = true;
@@ -396,7 +435,7 @@ class WelcomeController implements vscode.Disposable {
       projects: this.projects.map(({ uri: _uri, ...row }) => row),
       usageData: { on: usage.on, fromRitemark1: usage.fromRitemark1 },
       missingTool: this.missingTool,
-      newProject: { placePrefix: this.placePrefix(), error: this.newProjectError },
+      newProject: { placePrefix: this.placePrefix(), error: this.newProjectError, ...(this.newProjectRequested ? { open: true } : {}) },
       keysSet: this.keysSet,
       notice: this.notice,
       opening: this.opening,
@@ -504,6 +543,7 @@ class WelcomeController implements vscode.Disposable {
     switch (request.type) {
       case 'welcome/ready':
         this.push();
+        this.newProjectRequested = false;
         return;
       case 'welcome/sign-in':
         return request.provider === 'claude' ? this.signInClaude() : this.signInChatGpt();
@@ -832,6 +872,7 @@ class WelcomeController implements vscode.Disposable {
         void trackEvent('project_opened', { source: 'recent', has_ai: this.landingProvider() !== null });
       }
       this.closePanel();
+      await this.revealTabBefore();
       await vscode.commands.executeCommand('workbench.view.explorer');
       await vscode.commands.executeCommand('ritemark.unifiedView.focus');
       return;

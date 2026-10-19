@@ -1003,6 +1003,11 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ritemark.browser.newTab', async () => {
       await openEmptyBrowserTab();
+    }),
+    // Sprint 134 (R18): the Browser place's head row, New page (the Experience lead, 19 October); hidden in the
+    // palette, where New browser tab stays
+    vscode.commands.registerCommand('ritemark.browser.newPage', async () => {
+      await openEmptyBrowserTab();
     })
   );
 

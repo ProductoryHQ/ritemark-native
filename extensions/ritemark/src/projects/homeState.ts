@@ -4,6 +4,7 @@
  * what name, what waits and with which AI, and the other projects' line.
  */
 
+import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
 import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
@@ -69,7 +70,8 @@ export function recentItems(
       return {
         path: file.path,
         item: {
-          id: `file:${index}`,
+          // Stable across redraws, so focus stays on the same file when the list reorders (S15); opaque to the page.
+          id: `file:${createHash('sha256').update(path.relative(folder, file.path)).digest('hex').slice(0, 16)}`,
           name: about ? ABOUT_TITLE : dot > 0 ? base.slice(0, dot) : base,
           extension: about || dot <= 0 ? '' : base.slice(dot),
           folder: relativeDir && relativeDir !== '.' ? relativeDir.split(path.sep).join('/') : null,
@@ -84,8 +86,8 @@ export function recentItems(
 /** What waits here, as Home lists it: cards first (most urgent first), then chats. */
 export function waitingItems(waiting: ProjectWaiting): HomeWaitingItem[] {
   return waiting.items.map((item) => item.source === 'card'
-    ? { id: `card:${item.cardId}`, source: 'card', kind: item.kind, title: item.title, detail: null, ai: null, since: item.since }
-    : { id: `chat:${item.conversationId}`, source: 'chat', kind: item.kind, title: item.title, detail: null, ai: aiNameOf(item.runtimeId), since: item.since });
+    ? { id: `card:${item.cardId}`, source: 'card', kind: item.kind, title: item.title, detail: null, ai: null, since: item.since, colorSlot: null }
+    : { id: `chat:${item.conversationId}`, source: 'chat', kind: item.kind, title: item.title, detail: null, ai: aiNameOf(item.runtimeId), since: item.since, colorSlot: item.colorSlot });
 }
 
 /** The other projects with something waiting, in the list's order; null when none can be counted. */
@@ -93,4 +95,14 @@ export function othersOf(projects: readonly { name: string; waiting: ProjectWait
   const counted = projects.filter((project) => project.waiting?.total !== undefined);
   if (projects.length > 0 && counted.length === 0) return null;
   return counted.filter((project) => (project.waiting!.total ?? 0) > 0).map((project) => ({ name: project.name, count: project.waiting!.total! }));
+}
+
+/**
+ * What moved shows on Home once for a profile that came from Ritemark 1 (R11):
+ * the welcome records `ritemark.updatedFrom1x` as `{ at }` when an update
+ * welcome finishes, and Got it records it seen.
+ */
+export function showWhatMoved(updatedFrom1x: unknown, seen: unknown): boolean {
+  const updated = updatedFrom1x === true || (typeof updatedFrom1x === 'object' && updatedFrom1x !== null);
+  return updated && seen !== true;
 }

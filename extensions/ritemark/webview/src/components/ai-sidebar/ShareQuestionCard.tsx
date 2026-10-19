@@ -53,7 +53,7 @@ export function ShareQuestionCard({ aiName, pageTitle, onAnswer }: {
           type="checkbox"
           checked={withoutAsking}
           onChange={(event) => setWithoutAsking(event.target.checked)}
-          className="m-0 size-3.5 cursor-pointer accent-[var(--r-accent)]"
+          className="rm-check"
         />
         {words.withoutAsking}
       </label>

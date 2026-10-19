@@ -300,6 +300,12 @@
         "icon": "$(add)"
       },
       {
+        "command": "ritemark.browser.newPage",
+        "title": "New page",
+        "category": "Browser",
+        "icon": "$(add)"
+      },
+      {
         "command": "ritemark.tasks.search",
         "title": "Search",
         "category": "Tasks",
@@ -753,6 +759,14 @@
           "when": "false"
         },
         {
+          "command": "ritemark.browser.newPage",
+          "when": "false"
+        },
+        {
+          "command": "ritemark.explorer.refresh",
+          "when": "false"
+        },
+        {
           "command": "ritemark.tasks.search",
           "when": "false"
         },
@@ -784,8 +798,8 @@
         { "command": "ritemark.projectHead.revealInFinder", "group": "1_project@2", "when": "isMac" },
         { "command": "ritemark.projectHead.revealInFileExplorer", "group": "1_project@2", "when": "isWindows" },
         { "command": "ritemark.projectHead.aboutProject", "group": "1_project@3" },
-        { "command": "ritemark.projectHead.newFolder", "group": "3_folder@1" },
-        { "command": "ritemark.projectHead.collapseFolders", "group": "3_folder@2" }
+        { "command": "ritemark.projectHead.newFolder", "group": "3_folder@1", "when": "activeViewlet == 'workbench.view.explorer'" },
+        { "command": "ritemark.projectHead.collapseFolders", "group": "3_folder@2", "when": "activeViewlet == 'workbench.view.explorer'" }
       ],
       "ritemark/projectHead/new": [
         { "command": "ritemark.projectHead.newText", "group": "1_documents@1" },

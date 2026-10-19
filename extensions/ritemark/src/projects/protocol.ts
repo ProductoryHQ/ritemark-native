@@ -27,6 +27,8 @@ export interface HomeWaitingItem {
   ai: AiName | null;
   /** When it started waiting (ISO). */
   since: string;
+  /** A chat's colour on the rail, for its bubble on Home (the Experience lead, 19 October); null for a card. */
+  colorSlot: number | null;
 }
 
 export type RecentKind = 'markdown' | 'pdf' | 'word' | 'sheet' | 'slides' | 'drawing' | 'flow' | 'other';
@@ -72,7 +74,8 @@ export interface HomeState {
   /** "Switched to … Go back": the project this window came from. */
   switchedFrom: { name: string } | null;
   /** A project of the list whose folder is not found, chosen from the list (experience 33). */
-  missing: { id: string; name: string; mark: string; place: string } | null;
+  /** A project whose folder is not found: one of the list, or (`here`) this window's own (R13, S53). */
+  missing: { id: string; name: string; mark: string; place: string; here: boolean } | null;
   /** One line at the top: a file that can't be read, a change that couldn't be saved. */
   notice: string | null;
 }

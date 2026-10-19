@@ -48,7 +48,8 @@ function Row({ project, platform }: { project: ProjectRow; platform: ProjectsSta
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div>
-          <Tooltip label={tip} side="right" className="block">
+          {/* Below the row, not to its right: the column is the webview's whole width (S38) */}
+          <Tooltip label={tip} side="bottom" className="block">
             <button
               type="button"
               className={`rp-row${project.open ? ' open' : ''}${project.missing ? ' missing' : ''}`}
@@ -115,7 +116,7 @@ export function ProjectsListView({ state }: { state: ProjectsState }) {
       {shown.length === 0 && query && <p className="rp-empty">No project’s name has “{query}”.</p>}
       <div className="rp-add">
         <DropdownMenu>
-          <Tooltip label="Open a folder as a project, or start a new one" side="right" className="block">
+          <Tooltip label="Open a folder as a project, or start a new one" side="bottom" className="block">
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="rp-row justify-start">
                 <Icon name="plus" size={14} tone="inherit" />Add a project…

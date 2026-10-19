@@ -40,8 +40,8 @@ function home(overrides: Partial<HomeState> = {}): HomeState {
     waiting: {
       count: 2,
       items: [
-        { id: 'card:aaaaa1', source: 'card', kind: 'needs-you', title: 'Draft the agenda', detail: null, ai: null, since: ago(40) },
-        { id: 'chat:c-1', source: 'chat', kind: 'approval', title: 'Budget check', detail: null, ai: 'ChatGPT', since: ago(5) },
+        { id: 'card:aaaaa1', source: 'card', kind: 'needs-you', title: 'Draft the agenda', detail: null, ai: null, since: ago(40), colorSlot: null },
+        { id: 'chat:c-1', source: 'chat', kind: 'approval', title: 'Budget check', detail: null, ai: 'ChatGPT', since: ago(5), colorSlot: null },
       ],
     },
     others: [{ name: 'Sales proposal Q4', count: 2 }],
@@ -114,8 +114,15 @@ assert.deepEqual(outline(render(home({ recent: [] }))).sections.slice(2), [])
 
 // ── Not found (R13, S38): the head, muted, and one box ──
 
-const missing = home({ missing: { id: 'project:moved1', name: 'Moved', mark: 'MO', place: '~/Documents/Moved' } })
+const missing = home({ missing: { id: 'project:moved1', name: 'Moved', mark: 'MO', place: '~/Documents/Moved', here: false } })
 const missingMarkup = render(missing)
+// S43: what Find it… said shows in the box itself.
+assert.match(render(home({ notice: 'That folder is already Board report 2026, another project in the list. The list is as it was.', missing: { id: 'project:moved1', name: 'Moved', mark: 'MO', place: '~/Documents/Moved', here: false } })),
+  /class="rh-missing-notice" role="status">.*That folder is already Board report 2026/)
+// S53: this window's own folder gone: no way back to a Home of its own, and Remove says it closes the folder.
+const hereMissing = render(home({ missing: { id: 'here:abc', name: 'Moved', mark: 'MO', place: '~/Documents/Moved', here: true } }))
+assert.doesNotMatch(hereMissing, /Back to /)
+assert.match(hereMissing, /closes it in this window/)
 assert.deepEqual(outline(missingMarkup), {
   headings: ['Moved', 'This project’s folder is not where it was'],
   sections: ['This project\'s folder is not where it was'],
@@ -135,7 +142,7 @@ assert.ok(!missingMarkup.includes('rh-cover'), 'no cover, no Change image')
 
 const chatOnly = home({
   boardEnabled: false,
-  waiting: { count: 1, items: [{ id: 'chat:c-2', source: 'chat', kind: 'question', title: 'Venue ideas', detail: null, ai: 'Claude', since: ago(90) }] },
+  waiting: { count: 1, items: [{ id: 'chat:c-2', source: 'chat', kind: 'question', title: 'Venue ideas', detail: null, ai: 'Claude', since: ago(90), colorSlot: null }] },
   others: null,
 })
 assert.deepEqual(outline(render(chatOnly)).waiting, [['Claude asks you something in Venue ideas', '2 hours ago']])
@@ -156,8 +163,8 @@ const evilState = home({
   waiting: {
     count: 2,
     items: [
-      { id: 'card:aaaaa1', source: 'card', kind: 'decision', title: '<b>Bold</b>', detail: null, ai: null, since: ago(1) },
-      { id: 'chat:c-1', source: 'chat', kind: 'question', title: evil, detail: `Is ${evil} right?`, ai: 'OpenCode', since: ago(1) },
+      { id: 'card:aaaaa1', source: 'card', kind: 'decision', title: '<b>Bold</b>', detail: null, ai: null, since: ago(1), colorSlot: null },
+      { id: 'chat:c-1', source: 'chat', kind: 'question', title: evil, detail: `Is ${evil} right?`, ai: 'OpenCode', since: ago(1), colorSlot: null },
     ],
   },
   others: [{ name: evil, count: 1 }],
@@ -171,7 +178,7 @@ const projectsWithMarkup: ProjectsState = {
 }
 for (const [label, markup] of [
   ['Home', render(evilState)],
-  ['Home, not found', render(home({ project: evilState.project, missing: { id: 'project:evil01', name: evil, mark: '<b>', place: `~/${evil}` } }))],
+  ['Home, not found', render(home({ project: evilState.project, missing: { id: 'project:evil01', name: evil, mark: '<b>', place: `~/${evil}`, here: false } }))],
   ['the projects list', renderToStaticMarkup(createElement(ProjectsListView, { state: projectsWithMarkup }))],
 ] as const) {
   assert.doesNotMatch(markup, /<script|<img|<b>&lt;|<b>Bold|<i[ >]/, `${label}: no name becomes a tag`)
@@ -216,6 +223,11 @@ assert.deepEqual(names('documents'), [], 'by name only, not by place')
 assert.deepEqual(names('zzz'), [])
 assert.deepEqual(names('  '), rows.map((row) => row.name), 'a cleared field shows all')
 assert.notEqual(filterProjects(rows, ''), rows, 'a copy, never the list itself')
+
+// An unread reply (the Experience lead, 19 October): one sentence, the chat's own coloured bubble as its icon.
+const replied = render(home({ waiting: { count: 1, items: [{ id: 'chat:c-9', source: 'chat', kind: 'reply', title: 'Plan Module 5', detail: null, ai: 'Claude', since: ago(3), colorSlot: 4 }] }, others: [] }))
+assert.match(replied, /class="rh-ic rh-ic-bubble"><span class="inline-flex shrink-0 [^"]*" style="color:[^"]+">/)
+assert.match(replied, />Claude replied in Plan Module 5</)
 
 assert.deepEqual(posted, [], 'drawing sends nothing to the host')
 console.log('home: all assertions passed')

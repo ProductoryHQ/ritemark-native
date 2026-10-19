@@ -35,7 +35,7 @@ export type ChatWaitKind = 'approval' | 'question' | 'plan-review' | 'reply';
 
 export type WaitingItem =
   | { source: 'card'; kind: CallKind; cardId: string; title: string; since: string }
-  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string; runtimeId: string | null };
+  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string; runtimeId: string | null; colorSlot: number | null };
 
 export interface ProjectWaiting {
   /** The board's calls; undefined when the board can't be read, 0 with no board. */
@@ -59,6 +59,8 @@ export interface ChatIndexEntry {
   lastReplyAt?: string;
   /** The runtimes the chat used, oldest first: the last one is its AI now. */
   runtimeSummary?: string[];
+  /** The chat's colour on the rail (its duotone bubble), 0–7. */
+  identityColorSlot?: number;
 }
 
 const ATTENTION_KINDS: ReadonlySet<string> = new Set(['approval', 'question', 'plan-review']);
@@ -70,7 +72,11 @@ function lastRuntime(entry: ChatIndexEntry): string | null {
   return runtimes[runtimes.length - 1] ?? null;
 }
 
-/** A project's chats that need the person, longest waiting first. */
+function colorSlotOf(entry: ChatIndexEntry): number | null {
+  return typeof entry.identityColorSlot === 'number' && Number.isInteger(entry.identityColorSlot) && entry.identityColorSlot >= 0 ? entry.identityColorSlot : null;
+}
+
+/** A project's chats that need the person: questions and approvals, then unread replies. */
 export function chatsWaiting(
   entries: readonly ChatIndexEntry[],
   scopeId: string,
@@ -83,15 +89,19 @@ export function chatsWaiting(
     const { lifecycle } = entry;
     if (lifecycle.state === 'needs-user' && lifecycle.attentionKind && ATTENTION_KINDS.has(lifecycle.attentionKind)) {
       if (heldByLiveWindow.has(entry.conversationId)) {
-        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt, runtimeId: lastRuntime(entry) });
+        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry) });
         continue;
       }
     }
     if (hasUnreadReply(entry)) {
-      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt!, runtimeId: lastRuntime(entry) });
+      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt!, runtimeId: lastRuntime(entry), colorSlot: colorSlotOf(entry) });
     }
   }
-  return items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
+  // Questions and approvals first, longest waiting first, since they hold work up; then unread replies, newest first
+  // (the Experience lead, 19 October).
+  const asks = items.filter((item) => item.kind !== 'reply').sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
+  const replies = items.filter((item) => item.kind === 'reply').sort((a, b) => (a.since > b.since ? -1 : a.since < b.since ? 1 : 0));
+  return [...asks, ...replies];
 }
 
 /**

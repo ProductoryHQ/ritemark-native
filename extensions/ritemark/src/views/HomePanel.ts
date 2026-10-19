@@ -6,6 +6,7 @@
  * person does; every request is decoded field by field (`projects/protocol.ts`).
  */
 
+import { createHash } from 'crypto';
 import { promises as fsp } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -13,8 +14,8 @@ import * as vscode from 'vscode';
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardSnapshot } from '../taskBoard/protocol';
 import { isPointerOnly } from '../projects/aboutFile';
-import { recentItems, RECENT_EXTENSIONS, othersOf, waitingItems } from '../projects/homeState';
-import { readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
+import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, waitingItems } from '../projects/homeState';
+import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
 import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
 import { ProjectSwitcher, type SwitchedFrom } from '../projects/switchProject';
@@ -52,6 +53,8 @@ export class HomeHost implements vscode.Disposable {
   private waitingIds = new Map<string, { source: 'card' | 'chat'; id: string }>();
   private snapshot: BoardSnapshot | null = null;
   private notice: string | null = null;
+  /** OK on the unreadable project file's note: it stays hidden until the window reloads (S3). */
+  private unreadableSeen = false;
   private switchedFrom: SwitchedFrom | null;
   private missing: { id: string; folderUri: string; name: string; mark: string; place: string } | null = null;
 
@@ -69,7 +72,11 @@ export class HomeHost implements vscode.Disposable {
     // The chats: their index changes whenever a chat's state does, in this window or another.
     const chats = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(
       vscode.Uri.file(path.join(deps.context.globalStorageUri.fsPath, 'conversations', 'v1')), 'index.json'));
-    this.disposables.push(chats, chats.onDidChange(() => this.scheduleRedraw()), chats.onDidCreate(() => this.scheduleRedraw()));
+    const onChats = () => {
+      this.deps.waiting.invalidate();
+      this.scheduleRedraw();
+    };
+    this.disposables.push(chats, chats.onDidChange(onChats), chats.onDidCreate(onChats));
     this.disposables.push(deps.projectList.onDidChange(() => this.scheduleRedraw()) as unknown as vscode.Disposable);
   }
 
@@ -86,11 +93,33 @@ export class HomeHost implements vscode.Disposable {
     });
   }
 
-  /** Show Home: bring its tab forward, or make it. */
-  async reveal(options: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn } = {}): Promise<vscode.WebviewPanel> {
+  /** Show Home: bring its tab forward, or make it. Calls that overlap share one attempt, so two never make two Homes. */
+  reveal(options: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn } = {}): Promise<vscode.WebviewPanel> {
+    if (!this.revealing) {
+      this.revealing = this.revealOnce(options).finally(() => {
+        this.revealing = undefined;
+      });
+    }
+    return this.revealing;
+  }
+
+  private revealing: Promise<vscode.WebviewPanel> | undefined;
+
+  private async revealOnce(options: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn }): Promise<vscode.WebviewPanel> {
     if (this.panel) {
       this.panel.reveal(this.panel.viewColumn ?? options.viewColumn, options.preserveFocus);
       return this.panel;
+    }
+    // A Home tab the window restored is revived only when shown: bring that tab forward and wait for it, rather
+    // than make a second Home (S21).
+    const restored = vscode.window.tabGroups.all.flatMap((group) => group.tabs)
+      .find((tab) => tab.input instanceof vscode.TabInputWebview && tab.input.viewType.endsWith(HOME_VIEW_TYPE));
+    if (restored) {
+      const index = restored.group.tabs.indexOf(restored);
+      if (restored.group.viewColumn === vscode.ViewColumn.One) await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+      await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', index);
+      for (let waited = 0; !this.panel && waited < 3000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+      if (this.panel) return this.panel;
     }
     const panel = vscode.window.createWebviewPanel(
       HOME_VIEW_TYPE,
@@ -151,6 +180,8 @@ export class HomeHost implements vscode.Disposable {
         if (panel.visible) {
           this.deps.waiting.invalidate();
           this.scheduleRedraw(0);
+          // The list beside Home counts from the same fresh read (R3, S9)
+          this.deps.onProjectsChanged();
         }
       }),
     ];
@@ -223,7 +254,7 @@ export class HomeHost implements vscode.Disposable {
         const from = this.switchedFrom;
         this.switchedFrom = null;
         await this.push();
-        if (from) await this.deps.switcher.switchTo(vscode.Uri.parse(from.folderUri));
+        if (from) await this.deps.switcher.switchTo(vscode.Uri.parse(from.folderUri), { goingBack: true });
         return;
       }
       case 'home/dismiss-switched':
@@ -235,10 +266,13 @@ export class HomeHost implements vscode.Disposable {
         return;
       case 'home/remove-missing':
         if (this.missing && this.missing.id === request.id) {
+          const here = this.missing.folderUri === folder.uri.toString();
           await this.deps.projectList.remove(this.missing.folderUri);
           this.missing = null;
           this.deps.onProjectsChanged();
-          await this.push();
+          // This window's own project: nothing is left to show in it, so it closes the folder (S53)
+          if (here) await vscode.commands.executeCommand('workbench.action.closeFolder');
+          else await this.push();
         }
         return;
       case 'home/dismiss-missing':
@@ -254,6 +288,7 @@ export class HomeHost implements vscode.Disposable {
         await this.copyIn(request.uris.map((uri) => vscode.Uri.parse(uri)).filter((uri) => uri.scheme === 'file'));
         return;
       case 'home/dismiss-notice':
+        if (!this.notice) this.unreadableSeen = true;
         this.notice = null;
         await this.push();
         return;
@@ -294,6 +329,12 @@ export class HomeHost implements vscode.Disposable {
   /** Copy files into the project's top folder; the originals stay where they are (R13). */
   private async copyIn(sources: vscode.Uri[]): Promise<void> {
     const root = this.deps.folder.uri;
+    // Nothing brings back a project folder that has gone (R13, S53): a copy into it would make it again.
+    if (!(await folderIsThere(root.fsPath))) {
+      this.notice = 'This project’s folder is not where it was, so nothing was copied.';
+      await this.push();
+      return;
+    }
     const failed: string[] = [];
     for (const source of sources) {
       const base = path.basename(source.fsPath);
@@ -315,6 +356,14 @@ export class HomeHost implements vscode.Disposable {
   /** Home's state, read now. */
   private async state(): Promise<HomeState> {
     const { folder, context } = this.deps;
+    // The open project's folder can go while its window is open: its Home shows the not-found box, as a project of
+    // the list does, and the list marks it (R13, S53).
+    if (!this.missing && !(await folderIsThere(folder.uri.fsPath))) {
+      await this.deps.projectList.markFound(async (uri) => (uri === folder.uri.toString() ? false : undefined));
+      this.deps.onProjectsChanged();
+      const name = folder.name;
+      this.missing = { id: `here:${createHash('sha256').update(folder.uri.toString()).digest('hex').slice(0, 16)}`, folderUri: folder.uri.toString(), name, mark: projectInitials(name), place: displayPlace(folder.uri.fsPath, os.homedir(), process.platform) };
+    }
     const details = await readProject(nodeProjectFileFs(), folder.uri.fsPath, folder.name);
     const platform = process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux';
     const coverUrl = details.cover && this.panel
@@ -341,7 +390,6 @@ export class HomeHost implements vscode.Disposable {
     })));
     // Last changed, and whether the project holds anything at all.
     const recent = await this.recentFiles();
-    const updatedFrom1x = context.globalState.get<boolean>(UPDATED_FROM_1X_KEY) === true;
     return {
       platform,
       project: {
@@ -356,16 +404,17 @@ export class HomeHost implements vscode.Disposable {
       recent: recent.items,
       empty: recent.empty,
       boardEnabled: this.deps.boardEnabled(),
-      whatMoved: updatedFrom1x && context.globalState.get<boolean>(WHAT_MOVED_SEEN_KEY) !== true,
+      whatMoved: showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY)),
       switchedFrom: this.switchedFrom ? { name: this.switchedFrom.name } : null,
-      missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place } : null,
-      notice: this.notice ?? (details.unreadable ? 'Ritemark can’t read this project’s settings file (.ritemark/project.json), so it shows the defaults and leaves the file as it is.' : null),
+      missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place, here: this.missing.folderUri === folder.uri.toString() } : null,
+      notice: this.notice ?? (details.unreadable && !this.unreadableSeen ? 'Ritemark can’t read this project’s settings file (.ritemark/project.json), so it shows the defaults and leaves the file as it is.' : null),
     };
   }
 
   private async recentFiles(): Promise<{ items: HomeState['recent']; empty: boolean }> {
     const folder = this.deps.folder;
-    const exclude = '{**/node_modules/**,**/.git/**,**/.ritemark/**,**/.DS_Store}';
+    // Hidden folders too (.claude's agents, .github, …): Last changed is the person's documents (QA, 19 October)
+    const exclude = '{**/node_modules/**,**/.*/**,**/.DS_Store}';
     const any = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, '**/*'), exclude, 1);
     if (any.length === 0) return { items: [], empty: true };
     const pattern = `**/*{${[...RECENT_EXTENSIONS, '.flow.json'].join(',')}}`;
@@ -401,6 +450,10 @@ export class HomeHost implements vscode.Disposable {
     this.disposables.forEach((disposable) => disposable.dispose());
     this.panel?.dispose();
   }
+}
+
+async function folderIsThere(fsPath: string): Promise<boolean> {
+  return fsp.stat(fsPath).then((stat) => stat.isDirectory(), () => false);
 }
 
 async function exists(uri: vscode.Uri): Promise<boolean> {

@@ -283,6 +283,36 @@ body {
   font-family: var(--ritemark-editor-font-family);
 }
 
+/* Sprint 134 (R8): under About this project's note the page starts closer, as under a task card's head. */
+.wysiwyg-editor .rm-about-note ~ div .ProseMirror {
+  padding-top: 1.5rem !important;
+}
+
+/* Sprint 134 (R20): a quiet box, as the kit draws the share question's (experience 28: .ask1 .chk i) */
+.rm-check {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--r-hairline-strong);
+  cursor: pointer;
+}
+.rm-check:checked { background: var(--r-accent); box-shadow: none; }
+.rm-check:checked::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border: solid var(--r-on-accent);
+  border-width: 0 0 1.5px 1.5px;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.rm-check:focus-visible { outline: 2px solid var(--r-ring-color); outline-offset: 2px; }
+
 /* TipTap ProseMirror styles - will be expanded in Task 2 */
 .ProseMirror {
   outline: none;

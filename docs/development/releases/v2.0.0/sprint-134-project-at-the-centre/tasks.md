@@ -70,7 +70,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] 018: `HEAD_PLACES` takes Tasks, Browser and Transcribe, with each place's rows from the extension (R16)
 - [ ] Tasks: New task and Search rows; the list in the order work moves, a call first and marked in its stage, Archived inside Done; test (R17)
 - [ ] Transcribe: Record and Transcribe a file… as rows; "Recordings" in place of "Library"; the settings gear at the right of the Recordings label, with the tooltip "Transcribe settings" (R16)
-- [ ] Browser: the Recent label with + and Clear history; "No pages yet"; `view/title`'s two entries removed once the page has them (R18)
+- [ ] Browser: New page under the head; the Recent label with Clear history; 32-high rows with the site's icon, title and domain; "No pages yet"; `view/title`'s two entries removed once the page has them (R18, the Experience lead's answer of 19 October)
 - [ ] `FlowStorage` and any other recursive `mkdir` under a project: a gone folder stays gone; test (R13, S53)
 
 ## Phase 5: The document's bar, and removing the launcher (W9, W6)
