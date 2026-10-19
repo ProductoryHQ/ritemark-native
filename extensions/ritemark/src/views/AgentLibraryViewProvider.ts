@@ -5,8 +5,10 @@ import * as path from 'path';
 import * as fsp from 'fs/promises';
 import { discoverAgents, discoverCommands, validateAgentFrontmatter } from '../agent/discovery';
 import type { DiscoveredAgent, DiscoveredCommand, ItemScope } from '../agent/discovery';
+import { AGENT_COLORS, agentColorCssVar } from '../agent/iconPack';
 import type { DaemonResultStore } from '../daemon/DaemonResultStore';
 import type { DaemonController } from '../daemon/index';
+import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 
 type HelperType = 'skill' | 'agent' | 'command';
 
@@ -102,6 +104,18 @@ function getClaudeRoot(scope: ItemScope, workspacePath: string | undefined): str
   return path.join(os.homedir(), '.claude');
 }
 
+/**
+ * Make a folder under `.claude`. In project scope only while the project's
+ * folder is there, so a gone project is not brought back (Sprint 134, R13).
+ */
+async function makeHelperFolder(dir: string, scope: ItemScope, workspacePath: string | undefined): Promise<void> {
+  if (scope === 'project' && workspacePath) {
+    await ensureProjectSubfolder(workspacePath, dir);
+    return;
+  }
+  fs.mkdirSync(dir, { recursive: true });
+}
+
 /** Determine the scope of a file path by checking which root it lives under. */
 function detectScope(filePath: string, workspacePath: string | undefined): ItemScope {
   if (workspacePath && filePath.startsWith(path.join(workspacePath, '.claude'))) return 'project';
@@ -118,6 +132,16 @@ function isSkillItem(filePath: string): boolean {
 /** For skill items, the "real" item the user thinks of is the directory; for agents, the file. */
 function getItemRoot(filePath: string): string {
   return isSkillItem(filePath) ? path.dirname(filePath) : filePath;
+}
+
+/**
+ * The row menu's words for showing a file in its folder, as VS Code's own `revealFileInOS` says them: Reveal in Finder
+ * on the Mac, Reveal in File Explorer on Windows, Open Containing Folder elsewhere (Sprint 134, W18).
+ */
+export function revealInOsLabel(platform: NodeJS.Platform = process.platform): string {
+  if (platform === 'darwin') return 'Reveal in Finder';
+  if (platform === 'win32') return 'Reveal in File Explorer';
+  return 'Open Containing Folder';
 }
 
 export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
@@ -342,7 +366,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
     const subdir = type === 'skill' ? 'skills' : type === 'command' ? 'commands' : 'agents';
     const parentDir = path.join(claudeRoot, subdir);
-    fs.mkdirSync(parentDir, { recursive: true });
+    await makeHelperFolder(parentDir, scope, this._workspacePath);
 
     const baseSlug = slugify(trimmed);
     const isDirItem = type === 'skill';
@@ -351,7 +375,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     let filePath: string;
     if (type === 'skill') {
       const skillDir = path.join(parentDir, slug);
-      fs.mkdirSync(skillDir, { recursive: true });
+      await makeHelperFolder(skillDir, scope, this._workspacePath);
       filePath = path.join(skillDir, 'SKILL.md');
       fs.writeFileSync(filePath, skillSkeleton(trimmed), 'utf8');
     } else {
@@ -465,7 +489,14 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     const _ = subdir; // silence unused
     void _;
     const targetParent = path.join(targetClaudeRoot, realSubdir);
-    fs.mkdirSync(targetParent, { recursive: true });
+    try {
+      await makeHelperFolder(targetParent, targetScope, this._workspacePath);
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        `Failed to move: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return;
+    }
 
     const itemBaseName = path.basename(itemRoot);
     const targetPath = path.join(targetParent, itemBaseName);
@@ -656,6 +687,8 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
     .item.open .row-label { color: var(--r-ink-strong); font-weight: 500; }
     .item.open .row-icon { color: var(--r-accent); }
     .row-icon { flex: none; width: 14px; font-size: 14px; color: var(--r-ink-muted); }
+    /* An agent's chosen colour (its settings' Color field) on its row's icon, open or not; the theme's colours (R24) */
+    ${AGENT_COLORS.map((name) => `.item .row-icon.agent-color-${name} { color: ${agentColorCssVar(name)}; }`).join('\n    ')}
     .row-label {
       flex: 1 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -888,6 +921,10 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+    // An agent's chosen colour, from its file; a colour guessed from its name is never sent (R24)
+    const AGENT_COLORS = ${JSON.stringify(AGENT_COLORS)};
+    // The system's words for showing a file in its folder (W18)
+    const REVEAL_LABEL = ${JSON.stringify(revealInOsLabel())};
 
     let agents = [];
     let skills = [];
@@ -1048,7 +1085,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       if (!isMainAgent) {
         items.push({ label: 'Duplicate', action: () => vscode.postMessage({ type: 'duplicateHelper', filePath: item.filePath }) });
       }
-      items.push({ label: 'Reveal in Finder', action: () => vscode.postMessage({ type: 'revealInFinder', filePath: item.filePath }) });
+      items.push({ label: REVEAL_LABEL, action: () => vscode.postMessage({ type: 'revealInFinder', filePath: item.filePath }) });
       items.push({ label: moveLabel, action: () => vscode.postMessage({ type: 'moveScope', filePath: item.filePath }) });
       if (!isMainAgent) {
         items.push({ separator: true });
@@ -1264,10 +1301,12 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
       return '<div class="group" data-group="' + escapeHtml(title) + '" role="heading" aria-level="2">' + escapeHtml(title) + '<span class="count">' + count + '</span></div>';
     }
 
-    // A row (kit: ritemark.css .row): the kind's icon, the name, then what it needs to say at the right
+    // A row (kit: ritemark.css .row): the kind's icon (in the agent's chosen colour, else muted), the name, then what
+    // it needs to say at the right
     function rowHtml(row) {
       let html = '<div class="item' + (row.open ? ' open' : '') + (row.warn ? ' has-warn' : '') + (row.extraClass ? ' ' + row.extraClass : '') + '"' + (row.attrs || '') + ' title="' + escapeHtml(row.title) + '">';
-      html += '<i class="ph row-icon" aria-hidden="true">' + row.icon + '</i>';
+      const colorClass = row.color && AGENT_COLORS.indexOf(row.color) !== -1 ? ' agent-color-' + row.color : '';
+      html += '<i class="ph row-icon' + colorClass + '" aria-hidden="true">' + row.icon + '</i>';
       html += '<span class="row-label">' + labelHtml(row.label) + '</span>';
       if (row.warn) html += '<i class="ph row-warn" role="img" aria-label="' + escapeHtml(row.warn) + '">' + ICON.warning + '</i>';
       if (row.meta || row.metaHtml) html += '<span class="row-meta' + (row.metaClass ? ' ' + row.metaClass : '') + '"' + (row.metaAttrs || '') + '>' + (row.metaHtml || escapeHtml(row.meta)) + '</span>';
@@ -1404,6 +1443,7 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
         const warn = errors[0] || (isAgent && !main && !item.hasFrontmatter ? 'Add a description in its frontmatter' : '');
         html += rowHtml({
           icon: ICON[kind], label: fileLabel(item.filePath), open: item.filePath === selectedPath, more: true,
+          color: item.chosenColor,
           attrs: ' data-filepath="' + escapeHtml(item.filePath) + '"',
           title: itemTooltip(item, main ? 'Instructions loaded into every session' : warn), warn,
         });

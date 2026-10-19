@@ -154,7 +154,8 @@ test('⌘, (Ctrl+, on Windows) opens Ritemark\'s settings, not VS Code\'s (Jarmo
 });
 
 test('the seven surface colours, each with light, dark and high-contrast values', () => {
-  const ids = colors.map(color => color.id);
+  // An agent's chosen colours (Sprint 134, R24) are checked by themeContrast.test.ts.
+  const ids = colors.map(color => color.id).filter(id => !id.startsWith('ritemark.agentColor.'));
   assert.deepEqual(ids, ['ritemark.ground', 'ritemark.aiSheet', 'ritemark.desk', 'ritemark.sheetBorder', 'ritemark.sheetShadow', 'ritemark.placeActiveBackground', 'ritemark.placeActiveForeground']);
   for (const color of colors) {
     for (const key of ['light', 'dark', 'highContrast', 'highContrastLight']) {

@@ -8,7 +8,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ColorName, IconName, resolveIconAndColor } from './iconPack';
+import { AgentColor, ColorName, IconName, chosenAgentColor, resolveIconAndColor } from './iconPack';
 
 export type ItemScope = 'project' | 'user';
 
@@ -22,7 +22,14 @@ export interface DiscoveredAgent {
   isMainAgent: boolean;
   modifiedAt: number;
   icon: IconName;
+  /** The file's colour when it sets a valid one, otherwise one guessed from the name. */
   color: ColorName;
+  /**
+   * The colour the agent's own file chose (`color:`, set by the Color field in its settings), apart from `color`,
+   * which may be guessed. Only a chosen colour is drawn on the Agents place's row (Sprint 134, R24). Never set for
+   * CLAUDE.md or AGENTS.md, which are instructions rather than agents.
+   */
+  chosenColor?: AgentColor;
   // Extended frontmatter fields (Phase 1, R4)
   runtime?: string;
   runtimeModel?: string;
@@ -257,6 +264,7 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
         const description = fmStr(fm, 'description') || '';
         const isMain = isClaudeMd(filePath);
         const { icon, color } = resolveIconAndColor(fm, name, description, isMain);
+        const chosenColor = isMain ? undefined : chosenAgentColor(fm);
 
         agents.push({
           id,
@@ -269,6 +277,7 @@ function discoverAgentsInRoot(claudeRoot: string, scope: ItemScope): DiscoveredA
           modifiedAt: safeMtime(filePath),
           icon,
           color,
+          ...(chosenColor ? { chosenColor } : {}),
           runtime: fmStr(fm, 'runtime'),
           runtimeModel: fmStr(fm, 'model'),
           routine: fmStr(fm, 'routine'),

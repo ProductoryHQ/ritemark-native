@@ -4,12 +4,16 @@
  * (WCAG 1.4.3 and 1.4.11). The levels are the themes' own colours, which must match the `ritemark.*` surface colours
  * in package.json.
  *
+ * Sprint 134 (R24): the eight agent colours (`ritemark.agentColor.*`, one per colour the agent's Color field offers)
+ * reach 3:1 on the column's ground, and on the desk an open row lies on, in Light, Dark and high contrast.
+ *
  * Run: npx tsx src/themeContrast.test.ts
  */
 
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { AGENT_COLORS } from './agent/iconPack';
 
 const root = path.join(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
@@ -106,6 +110,51 @@ for (const { file, kind } of themes) {
     const chosen = contrast(surface('placeActiveForeground'), `#${fill.map(c => Math.round(c).toString(16).padStart(2, '0')).join('')}`);
     assert.deepEqual({ low, chosenAtLeast3: chosen >= 3 }, { low: [], chosenAtLeast3: true }, `chosen place ${chosen}`);
   });
+
+  test('the eight agent colours reach 3:1 on the ground, and on an open row\'s desk', () => {
+    assert.deepEqual(agentColourLows(kind, { ground: levels.ground, desk: levels.desk }), []);
+  });
+}
+
+console.log('the agent colours');
+
+test('one agent colour per colour the Color field offers, each with light, dark and high-contrast values', () => {
+  const ids = pkg.contributes.colors.map(colour => colour.id).filter(id => id.startsWith('ritemark.agentColor.'));
+  assert.deepEqual([...ids].sort(), AGENT_COLORS.map(name => `ritemark.agentColor.${name}`).sort());
+  for (const name of AGENT_COLORS) {
+    for (const kind of ['light', 'dark', 'highContrast', 'highContrastLight']) {
+      assert.match(colourDefault(`agentColor.${name}`, kind) ?? '', /^#[0-9A-Fa-f]{6}$/, `agentColor.${name} has no opaque ${kind} value`);
+    }
+  }
+});
+
+test('in high contrast, the eight agent colours reach 3:1 on the ground', () => {
+  const low = ['highContrast', 'highContrastLight'].flatMap(kind => agentColourLows(kind, { ground: colourDefault('ground', kind)! }));
+  assert.deepEqual(low, []);
+});
+
+/** A `ritemark.*` colour's default for a theme kind. */
+function colourDefault(id: string, kind: string): string | undefined {
+  return pkg.contributes.colors.find(colour => colour.id === `ritemark.${id}`)?.defaults[kind];
+}
+
+/** Each agent colour under 3:1 on one of the given levels, or missing, as a line. */
+function agentColourLows(kind: string, on: Record<string, string>): string[] {
+  const low: string[] = [];
+  for (const name of AGENT_COLORS) {
+    const value = colourDefault(`agentColor.${name}`, kind);
+    if (!value) {
+      low.push(`agentColor.${name} has no ${kind} value`);
+      continue;
+    }
+    for (const [level, surface] of Object.entries(on)) {
+      const ratio = contrast(value, surface);
+      if (ratio < 3) {
+        low.push(`agentColor.${name} ${value} on the ${kind} ${level} ${surface}: ${ratio}`);
+      }
+    }
+  }
+  return low;
 }
 
 if (failures) {

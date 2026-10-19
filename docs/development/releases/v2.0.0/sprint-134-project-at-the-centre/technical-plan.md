@@ -322,7 +322,7 @@ Each workstream below follows these, which override its own text where they diff
 ## Workstream 18: An agent's colour on its row (R24)
 
 - `agent/discovery.ts`: each agent carries the colour from its file (`color:`) only when the file sets one, apart from the colour `resolveIconAndColor` guesses from the name. The decision names the chosen colour, so a guessed one is not drawn.
-- `AgentLibraryViewProvider.ts`: the row's icon (`.row-icon`) takes the agent's colour when it has one, through eight theme colours, one per name (indigo, blue, green, amber, red, purple, pink, slate). An agent with none keeps the muted icon.
+- `AgentLibraryViewProvider.ts`: the row's icon (`.row-icon`) takes the agent's colour when it has one, through eight theme colours, one per name the Color field offers (`agentSchema.ts` `COLOR_OPTIONS`: red, blue, green, yellow, purple, orange, pink, cyan; the plan first named another list, corrected at implementation). A file with a name outside the list keeps the muted icon. An agent with none keeps the muted icon.
 - The eight colours are `ritemark.*` colours in `package.json`, with a Light and a Dark value, each at 3:1 or more against the column. `themeContrast.test.ts`, which reads those colours, checks them.
 - A change in the agent's settings already rewrites its file, and the place already redraws on file changes, so the row follows without a reload.
 - Nothing else on the place changes: the count line, the empty state, Sort and the tooltips stay as Sprint 132 left them (Jarmo, 19 October).
