@@ -338,6 +338,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._conversationController = new ConversationController({
       store: conversationStore,
       onTurnActive: (conversationId) => this._turnOwners.claim(conversationId),
+      // Sprint 134 (R3): a reply that finishes in front on a shown sheet is read at once.
+      isInFront: (conversationId) => this._isConversationInFront(conversationId),
       currentScope: () => resolveProjectScope({
         workspaceFileUri: vscode.workspace.workspaceFile?.toString() ?? null,
         folderUris: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()),
@@ -556,6 +558,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._selectedConversationId = message.conversationId;
             this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
             this._noteActiveConversation(message.conversationId);
+            this._markInFrontRead();
           }
           break;
 
@@ -564,7 +567,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // from this, so a bounded wait on it replaces the old blind 400 ms
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
-          if (typeof message.conversationId === 'string') this._noteActiveConversation(message.conversationId);
+          if (typeof message.conversationId === 'string') {
+            this._noteActiveConversation(message.conversationId);
+            this._markInFrontRead();
+          }
           // A replaced webview's late ready signal says nothing about the current
           // one: it must neither mark it ready nor use up a held report request.
           if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
@@ -1559,6 +1565,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // requiring a tab switch. Polling stops when the sidebar hides or disposes.
     webviewView.onDidChangeVisibility(() => {
       this._refreshBrowserContextPolling();
+      this._markInFrontRead();
       // Sprint 127 R5 (S27): a long-idle sidebar checks the model feed on show.
       if (webviewView.visible) modelCatalog.pollFeedIfStale();
     });
@@ -1895,6 +1902,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (delivered === false) settle('no-conversation');
         }, () => settle('no-conversation'));
       }, () => settle('no-conversation'));
+    });
+  }
+
+  /** Sprint 134 (R3): the chat is in front on the AI's sheet, and the sheet is shown. */
+  private _isConversationInFront(conversationId: string): boolean {
+    return this._activeConversationId === conversationId && this._view?.visible === true;
+  }
+
+  /** Sprint 134 (R3): the chat in front on a shown sheet has its replies read. */
+  private _markInFrontRead(): void {
+    const conversationId = this._activeConversationId;
+    if (!conversationId || this._view?.visible !== true) return;
+    void this._conversationController.markRead(conversationId).catch((error) => {
+      console.warn('[Conversations] Could not mark a chat read:', error);
     });
   }
 

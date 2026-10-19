@@ -22,6 +22,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
+import { hasUnreadReply } from '../conversations/types';
 import { liveTurnOwnerIds, turnOwnersDir } from '../conversations/turnOwners';
 import { callsOf } from '../taskBoard/BoardController';
 import { BoardStore } from '../taskBoard/BoardStore';
@@ -60,10 +61,7 @@ export interface ChatIndexEntry {
 
 const ATTENTION_KINDS: ReadonlySet<string> = new Set(['approval', 'question', 'plan-review']);
 
-/** True when the chat's newest reply came after the person last read it. No marker: read. */
-export function hasUnreadReply(entry: Pick<ChatIndexEntry, 'readAt' | 'lastReplyAt'>): boolean {
-  return typeof entry.readAt === 'string' && typeof entry.lastReplyAt === 'string' && entry.lastReplyAt > entry.readAt;
-}
+export { hasUnreadReply };
 
 /** A project's chats that need the person, longest waiting first. */
 export function chatsWaiting(
