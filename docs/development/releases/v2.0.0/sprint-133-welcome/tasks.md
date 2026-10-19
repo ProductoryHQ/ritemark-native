@@ -87,7 +87,7 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [x] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge" — #453; the qa-validator's one blocker (a conflict with main) resolved; merged as `eae1dedd` on Jarmo's "all looks good now! Proceed" (19 October)
 - [x] After the merge: a production build from a clean-room worktree at the merged commit (E5) — `eae1dedd`, unsigned, validation and provenance passed (`qa-evidence.md`, *E5*); kept at `.worktrees/release-eae1dedd7114`
-- [ ] After the merge: Windows round from main: S45–S47 and the shell parts (Getting Started gone, the welcome alone, the muted extension); findings in `qa-evidence.md`
+- [x] After the merge: Windows round from main: S45–S47 and the shell parts (Getting Started gone, the welcome alone, the muted extension); findings in `qa-evidence.md` — round 3 at `eae1dedd`: 7 of 9 pass; the compact welcome's short-window question with the Experience lead
 - [ ] After the merge: the drift check into the release plan's risk register (E7)
 - [ ] PostHog: the four events seen live after a yes on a production build; none before an answer or after a no; a 1.x OK sending from the first start (S24–S30, S52, S53)
 - [ ] Linked issues closed with evidence: [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429), [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338); [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401) closed or updated with the audit

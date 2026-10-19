@@ -57,7 +57,7 @@ Windows (S45–S47 and R15's Windows half) is not in this file yet: it runs thro
 | S49 Every empty desk | Pass | In a project window with every tab closed: Text opened a new document, Table a new table, Web page a browser tab (`s49-empty-desk-tiles.png`). The new files went into the project (#451 unchanged). |
 | S43 The inventory | Partly | The launch check's rows live in Settings (S41) and the welcome (S20); "You are interacting with AI" shows on the AI's sheet. The sign-in, setup, repair and recovery cards need signed-out or broken runtimes: not run here. |
 | S44 Skipped, then signing in later | Not run | Both AIs are signed in on this Mac, so the AI's sheet shows no sign-in cards. |
-| S45–S47 Windows | S45, S46 on the overlay: see *The Windows overlay round* | Four findings fixed; S47 and the shell parts wait for the round from main. |
+| S45–S47 Windows | Pass on the overlay and from main | S45, S46 on the overlay (four findings fixed in #453); S47 and the shell parts from main `eae1dedd`: see *The Windows round from main*. |
 
 ## Fixed during this QA
 
@@ -85,6 +85,23 @@ The Experience lead approved all three, and asked for three more, done and check
 - The feedback box says under its field "What you write here is sent with your feedback." (the usage-data switch promises never your documents, chats or names). VS Code's input box draws that line in its own ink, not muted, and appends its "(Press 'Enter' to confirm…)" hint; muting it would restyle every input box. The Experience lead accepted it as VS Code draws it.
 
 The Experience lead's sign-off (18 October): the welcome, the keys sheet, the ring and focus ring on Done, "Ask ChatGPT…" and the feedback line are right; from the design side #453 is ready for Jarmo's merge word.
+
+## The Windows round from main (19 October)
+
+Round 3, run by the Development manager's Windows session on the signed build of main `eae1dedd` (run 39208269223). 7 of 9 checks passed:
+- The first window opened at 1440 × 900, centred in a 1920 × 1032 work area; a copied profile kept its maximised size.
+- The welcome alone: no tab row, no Getting Started.
+- ChatGPT's sign-in: no question; Edge opened OpenAI's sign-in page; the card's Cancel ended it and freed 1455; `auth.json` was unchanged.
+- S47 on a copy of Jarmo's profile: the update welcome once, with "On, as you chose in Ritemark 1"; Claude Signed in and ChatGPT's sign-in ended; "Open when you left" reopened the project with its tabs.
+- Help: Getting started, Support, View License, Advanced, About; "Help: Welcome" in the palette opens the welcome.
+- The empty desk's tiles, and Sprint 132's toast wrapping and Ctrl+Alt+I.
+- `product.json` trusts the sign-in hosts; `commit` is still `""` (#463).
+
+To settle:
+- **The compact welcome scrolls earlier than the manager's reading of the spec.** Windows' frame takes 108 of the window (its 32 caption), so a 620-tall window leaves a page of 512: step 1 (519) and step 2 (575) scroll inside the sheet. On the Mac a 620 window leaves 544: step 1 is 7 over, step 2 41. The Experience lead's line was "only below about 620 does it scroll"; whether that is the page or the window is with them, with a tighter tier proposed for the second reading.
+- **The chosen tab's extension in the name's ink** is as specified (S42: "on the chosen tab and the open row both parts are the body ink").
+- The palette's "Developer: Reset Welcome Page Walkthrough Progress" goes with Sprint 134's palette filter.
+- #401 on a fresh profile: extension host at +14.6 s, Ritemark activated +16.8 s, eager done +33.3 s, unresponsive 4.9 s and 0.7 s, MsMpEng 6.3% average (peak 19.2%): round 2's Defender pattern again.
 
 ## E5: the production build at the merge (19 October)
 
