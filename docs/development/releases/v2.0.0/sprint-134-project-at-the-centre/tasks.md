@@ -17,8 +17,12 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `research/switch-audit.md` (W8, R9): what "the AI is working" means and where it is known; Ritemark's switch paths; VS Code's own Open Folder and Open Recent
 - [ ] `research/splash-audit.md` (W8, R9): `partsSplash.ts`'s colours; the ground in Light and Dark; a v1.14.0 profile's stored splash
 - [ ] `research/about-file-audit.md` (W7, R8): where a file's name is drawn (menu, tab, Documents, Home, the AI sheet) and how each says About this project; how Documents hides only the pointer-only `CLAUDE.md`; the book-open icon and the tooltip on the tab and the Documents row
-- [ ] `research/confirmations.md`: `ritemarkMenu.ts` and a submenu; `revealFileInOS` on Windows; opening the AI's new chat from Home; `BoardStore` writing nothing until the first card; how 018's head takes a place's rows and what happens to a view's title-row actions under it; what ⌘T and Ctrl+T run today; every recursive `mkdir` under a project besides Flows' storage
-- [ ] The refresh's design questions answered by the Experience lead: Transcribe's settings button, Share on a PDF and a Word file, rows on Browser (spec, Open Questions)
+- [ ] `research/share-question-audit.md` (W14, R20): every path that opens upstream's share dialog and which go through the sheet; 009's bridge and the stored "Don't ask again"; when the host polls, so the question is never asked unseen
+- [ ] `research/palette-audit.md` (W15, R21): every All commands entry by category; the list of command IDs to drop, written into the technical plan's W15 table; the kept ones by spec R21's rule
+- [ ] `research/codex-strings-audit.md` (W16, R22), after Sprint 133 merges: every user-visible "Codex" string, with its file and line, where it is read, its words now and after; what stays listed apart (keys, IDs, identifiers, log lines, model names, the runtime's own text); its search kept for QA
+- [ ] `research/confirmations.md`: `ritemarkMenu.ts` and a submenu; `revealFileInOS` on Windows; opening the AI's new chat from Home; `BoardStore` writing nothing until the first card; how 018's head takes a place's rows and what happens to a view's title-row actions under it; what ⌘T and Ctrl+T run today; every recursive `mkdir` under a project besides Flows' storage; opening a PDF in Preview on the Mac and in its default app on Windows, and that item's words on Windows, checked with the Experience lead; `workbench.action.openSettings` opening VS Code's settings
+- [x] The refresh's design questions on Transcribe's settings button and on Share on a PDF and a Word file, answered by the Experience lead on 19 October (spec, Resolved Questions)
+- [ ] The refresh's design question on rows under Browser's head answered by the Experience lead (spec, Open Questions)
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: The projects subsystem (W1, W2, W3)
@@ -64,7 +68,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 - [ ] 018: `HEAD_PLACES` takes Tasks, Browser and Transcribe, with each place's rows from the extension (R16)
 - [ ] Tasks: New task and Search rows; the list in the order work moves, a call first and marked in its stage, Archived inside Done; test (R17)
-- [ ] Transcribe: Record and Transcribe a file… as rows; "Recordings" in place of "Library"; the settings button where the Experience lead draws it (R16)
+- [ ] Transcribe: Record and Transcribe a file… as rows; "Recordings" in place of "Library"; the settings gear at the right of the Recordings label, with the tooltip "Transcribe settings" (R16)
 - [ ] Browser: the Recent label with + and Clear history; "No pages yet"; `view/title`'s two entries removed once the page has them (R18)
 - [ ] `FlowStorage` and any other recursive `mkdir` under a project: a gone folder stays gone; test (R13, S53)
 
@@ -72,23 +76,34 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 - [ ] `DocumentHeader.tsx`: Saved from `document:sync-state`; test (R12)
 - [ ] `ExportMenu.tsx` → Share as experience 26's frame 1, with today's handlers and every Google Docs state; test (R12)
-- [ ] The PDF and Word bars: Make an editable copy; Share as the Experience lead draws it; test (R19, W13)
+- [ ] The PDF and Word bars: Make an editable copy; Share with Show in Finder (Show in File Explorer on Windows), and Open in Preview or Open in Word; no Export or Google Docs; test (R19, W13)
 - [ ] R14's table checked row by row on the branch (S40)
 - [ ] `HomeViewProvider.ts` and its test deleted; `home-launcher` set to `disabled` with a tombstone in `flags.ts`; its `package.json` entries tidied (R14)
 
+## Phase 5b: Jarmo's 19 October additions (W14–W18)
+
+- [ ] 009: the share bridge takes the person's answer and opens no dialog; the stored "Don't ask again" honoured (R20)
+- [ ] `BrowserContextStore` and `UnifiedViewProvider`: the question posted to the sheet, the answer to the bridge, a question withdrawn when its page leaves the front; the messages in `agentSidebarProtocol.ts`; `BrowserContextStore.test.ts` (R20)
+- [ ] `ShareQuestionCard.tsx` above the message box, as experience 28's frame 1; its webview test (R20)
+- [ ] 003: the palette skips the audit's IDs and prefixes; its VS Code unit test (R21)
+- [ ] The copy pass, file by file from the Codex audit: words only; tests' expected words updated; the audit's search run again (R22)
+- [ ] Ritemark Settings: Advanced settings at the foot, with its tooltip, running `workbench.action.openSettings`; its test; the Settings page check green (R23)
+- [ ] Agents: the chosen colour on the row's icon, a guessed one not drawn; the eight colours in `package.json` for Light and Dark; the contrast test; the row data's test (R24)
+
 ## Phase 6: QA, merge and closeout
 
-- [ ] CDP checks in `scripts/qa/`: the permanent tabs, the Tasks tab's count, switching, the splash (E3)
+- [ ] CDP checks in `scripts/qa/`: the permanent tabs, the Tasks tab's count, switching, the splash, the tab row while the share question waits (E3)
 - [ ] `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe (E3)
-- [ ] The screenshot baseline gains Home, the list, the switcher, What moved and the three places with their heads, light and dark (E3)
+- [ ] The screenshot baseline gains Home, the list, the switcher, What moved, the three places with their heads, the share question, Settings' foot and a coloured agent, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
-- [ ] Docs: `architecture.md` (Projects), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions, `update-vscode.sh`'s checklist line (E6)
-- [ ] Manual QA on the Mac: S1–S40, S43–S54; evidence in `qa-evidence.md`
+- [ ] Docs: `architecture.md` (Projects; the browser's share question), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist lines (E6)
+- [ ] Manual QA on the Mac: S1–S40, S43–S61; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
-- [ ] After the merge: Windows round from main: S41, S42, S29, S52, the splash and the Tasks tab's count; findings in `qa-evidence.md`
+- [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
+- [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
 - [ ] After the merge: the drift check into the release plan (E7)
 - [ ] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [ ] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated

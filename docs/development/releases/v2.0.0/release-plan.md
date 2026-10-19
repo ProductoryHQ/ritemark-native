@@ -289,6 +289,8 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 - **The sample project:** yes. Ritemark ships one, and the welcome offers "Try the sample project" (step 2).
 - **Usage data for people updating from 1.x:** an OK on 1.x's notice carries over as a yes, shown on and changeable on the update sheet; anyone who opted out or never answered starts off (step 2). This refines the 17 October rule.
 
+**Jarmo, 19 October ("all recommendations ok"):** step 3 ([Sprint 134](sprint-134-project-at-the-centre/sprint-plan.md)) adds the browser's share question on the AI's sheet (#455), the palette without VS Code's developer commands (#456), "ChatGPT, never Codex" in every visible string, Advanced settings (G4) and an agent's colour on its row (G5). The Task board and Transcribe redraws, the AI step, the indigo icon on the open row and tab, and the Flows {date} chip come after 2.0.
+
 **Engineering, on Jarmo's "You decide":**
 
 - **Patch ownership:** the new patch owns sizes and drawing, and patch 002 keeps what sits where.
