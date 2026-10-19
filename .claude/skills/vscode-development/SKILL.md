@@ -524,8 +524,9 @@ The update lands as one squash commit (the gitlink, the patches, `branding/produ
 ```bash
 git revert <update squash commit>        # in a PR, after Jarmo's yes
 nvm use                                  # back to the root .nvmrc of the reverted tree
-git submodule update vscode              # the old gitlink
-git -C vscode reset --hard HEAD && git -C vscode clean -fd -e extensions/ritemark
+git -C vscode reset --hard HEAD && git -C vscode clean -fd -e extensions/ritemark   # the update's patches off first
+git submodule update vscode              # the old gitlink (refuses while patches are applied)
+git -C vscode clean -fd -e extensions/ritemark
 arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use && cd vscode && npm ci'
 ./scripts/apply-patches.sh
 ./scripts/check-native-modules.sh
