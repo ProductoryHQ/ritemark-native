@@ -1,0 +1,754 @@
+{
+	"label": "two-desks",
+	"measured": {
+		"window": {
+			"w": 1440,
+			"h": 900,
+			"zoom": "1"
+		},
+		"classes": {
+			"nosidebar": false,
+			"noauxiliarybar": false,
+			"mac": true,
+			"windows": false
+		},
+		"titlebarShown": false,
+		"sidebar": {
+			"x": 0,
+			"y": 0,
+			"w": 256,
+			"h": 876,
+			"right": 256,
+			"bottom": 876,
+			"cx": 128,
+			"cy": 438
+		},
+		"auxiliarybar": {
+			"x": 1040,
+			"y": 0,
+			"w": 400,
+			"h": 868,
+			"right": 1440,
+			"bottom": 868,
+			"cx": 1240,
+			"cy": 434
+		},
+		"aiContent": {
+			"x": 1048,
+			"y": 44,
+			"w": 392,
+			"h": 824,
+			"right": 1440,
+			"bottom": 868,
+			"cx": 1244,
+			"cy": 456
+		},
+		"editor": {
+			"x": 256,
+			"y": 0,
+			"w": 784,
+			"h": 868,
+			"right": 1040,
+			"bottom": 868,
+			"cx": 648,
+			"cy": 434
+		},
+		"statusbar": {
+			"x": 0,
+			"y": 876,
+			"w": 1440,
+			"h": 24,
+			"right": 1440,
+			"bottom": 900,
+			"cx": 720,
+			"cy": 888
+		},
+		"leftStrip": {
+			"x": 0,
+			"y": 0,
+			"w": 256,
+			"h": 44,
+			"right": 256,
+			"bottom": 44,
+			"cx": 128,
+			"cy": 22
+		},
+		"leftToggle": {
+			"x": 84,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 112,
+			"bottom": 40,
+			"cx": 98,
+			"cy": 26
+		},
+		"aiToggle": {
+			"x": 1368,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 1396,
+			"bottom": 40,
+			"cx": 1382,
+			"cy": 26
+		},
+		"you": {
+			"x": 1404,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 1432,
+			"bottom": 40,
+			"cx": 1418,
+			"cy": 26
+		},
+		"deskLeftStrip": null,
+		"deskLeftToggle": null,
+		"deskAiToggle": null,
+		"deskYou": null,
+		"deskRightStrip": null,
+		"desks": [
+			{
+				"group": {
+					"x": 256,
+					"y": 0,
+					"w": 392,
+					"h": 868,
+					"right": 648,
+					"bottom": 868,
+					"cx": 452,
+					"cy": 434
+				},
+				"sheet": {
+					"x": 256,
+					"y": 44,
+					"w": 392,
+					"h": 824,
+					"right": 648,
+					"bottom": 868,
+					"cx": 452,
+					"cy": 456
+				},
+				"title": {
+					"x": 256,
+					"y": 0,
+					"w": 392,
+					"h": 44,
+					"right": 648,
+					"bottom": 44,
+					"cx": 452,
+					"cy": 22
+				}
+			},
+			{
+				"group": {
+					"x": 648,
+					"y": 0,
+					"w": 392,
+					"h": 868,
+					"right": 1040,
+					"bottom": 868,
+					"cx": 844,
+					"cy": 434
+				},
+				"sheet": {
+					"x": 656,
+					"y": 44,
+					"w": 384,
+					"h": 824,
+					"right": 1040,
+					"bottom": 868,
+					"cx": 848,
+					"cy": 456
+				},
+				"title": {
+					"x": 656,
+					"y": 0,
+					"w": 384,
+					"h": 44,
+					"right": 1040,
+					"bottom": 44,
+					"cx": 848,
+					"cy": 22
+				}
+			}
+		],
+		"deskSeparators": 0,
+		"tabs": [
+			{
+				"x": 272,
+				"y": 8,
+				"w": 38,
+				"h": 36,
+				"right": 310,
+				"bottom": 44,
+				"cx": 291,
+				"cy": 26,
+				"active": false,
+				"sticky": true,
+				"label": null
+			},
+			{
+				"x": 310,
+				"y": 8,
+				"w": 38,
+				"h": 36,
+				"right": 348,
+				"bottom": 44,
+				"cx": 329,
+				"cy": 26,
+				"active": false,
+				"sticky": true,
+				"label": null
+			},
+			{
+				"x": 348,
+				"y": 8,
+				"w": 112.9375,
+				"h": 36,
+				"right": 460.9375,
+				"bottom": 44,
+				"cx": 404.46875,
+				"cy": 26,
+				"active": true,
+				"sticky": false,
+				"label": {
+					"x": 382,
+					"y": 18,
+					"w": 46.9375,
+					"h": 15.5,
+					"right": 428.9375,
+					"bottom": 33.5,
+					"cx": 405.46875,
+					"cy": 25.75
+				}
+			},
+			{
+				"x": 672,
+				"y": 8,
+				"w": 112.9375,
+				"h": 36,
+				"right": 784.9375,
+				"bottom": 44,
+				"cx": 728.46875,
+				"cy": 26,
+				"active": true,
+				"sticky": false,
+				"label": {
+					"x": 706,
+					"y": 18,
+					"w": 46.9375,
+					"h": 15.5,
+					"right": 752.9375,
+					"bottom": 33.5,
+					"cx": 729.46875,
+					"cy": 25.75
+				}
+			}
+		],
+		"newTab": {
+			"x": 602,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 630,
+			"bottom": 40,
+			"cx": 616,
+			"cy": 26
+		},
+		"folded": null,
+		"places": [
+			{
+				"x": 7,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 41,
+				"bottom": 80,
+				"cx": 24,
+				"cy": 64,
+				"fill": {
+					"x": 7,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 41,
+					"bottom": 80,
+					"cx": 24,
+					"cy": 64
+				},
+				"label": "Home"
+			},
+			{
+				"x": 41,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 75,
+				"bottom": 80,
+				"cx": 58,
+				"cy": 64,
+				"fill": {
+					"x": 41,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 75,
+					"bottom": 80,
+					"cx": 58,
+					"cy": 64
+				},
+				"label": "Documents (⇧⌘E)"
+			},
+			{
+				"x": 75,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 109,
+				"bottom": 80,
+				"cx": 92,
+				"cy": 64,
+				"fill": {
+					"x": 75,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 109,
+					"bottom": 80,
+					"cx": 92,
+					"cy": 64
+				},
+				"label": "Tasks"
+			},
+			{
+				"x": 109,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 143,
+				"bottom": 80,
+				"cx": 126,
+				"cy": 64,
+				"fill": {
+					"x": 109,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 143,
+					"bottom": 80,
+					"cx": 126,
+					"cy": 64
+				},
+				"label": "Browser"
+			},
+			{
+				"x": 143,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 177,
+				"bottom": 80,
+				"cx": 160,
+				"cy": 64,
+				"fill": {
+					"x": 143,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 177,
+					"bottom": 80,
+					"cx": 160,
+					"cy": 64
+				},
+				"label": "Agents"
+			},
+			{
+				"x": 177,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 211,
+				"bottom": 80,
+				"cx": 194,
+				"cy": 64,
+				"fill": {
+					"x": 177,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 211,
+					"bottom": 80,
+					"cx": 194,
+					"cy": 64
+				},
+				"label": "Transcribe"
+			},
+			{
+				"x": 211,
+				"y": 48,
+				"w": 34,
+				"h": 32,
+				"right": 245,
+				"bottom": 80,
+				"cx": 228,
+				"cy": 64,
+				"fill": {
+					"x": 211,
+					"y": 48,
+					"w": 34,
+					"h": 32,
+					"right": 245,
+					"bottom": 80,
+					"cx": 228,
+					"cy": 64
+				},
+				"label": "More"
+			}
+		],
+		"projectHead": {
+			"x": 8,
+			"y": 92,
+			"w": 240,
+			"h": 36,
+			"right": 248,
+			"bottom": 128,
+			"cx": 128,
+			"cy": 110
+		},
+		"projectRows": [
+			{
+				"x": 8,
+				"y": 136,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 168,
+				"cx": 128,
+				"cy": 152
+			},
+			{
+				"x": 8,
+				"y": 168,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 200,
+				"cx": 128,
+				"cy": 184
+			}
+		],
+		"documentsLabel": {
+			"x": 8,
+			"y": 214,
+			"w": 240,
+			"h": 14,
+			"right": 248,
+			"bottom": 228,
+			"cx": 128,
+			"cy": 221
+		},
+		"activePlace": "Documents (⇧⌘E)",
+		"treeRows": [
+			{
+				"x": 8,
+				"y": 236,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 268,
+				"cx": 128,
+				"cy": 252
+			},
+			{
+				"x": 8,
+				"y": 268,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 300,
+				"cx": 128,
+				"cy": 284
+			},
+			{
+				"x": 8,
+				"y": 300,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 332,
+				"cx": 128,
+				"cy": 316
+			},
+			{
+				"x": 8,
+				"y": 332,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 364,
+				"cx": 128,
+				"cy": 348
+			},
+			{
+				"x": 8,
+				"y": 364,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 396,
+				"cx": 128,
+				"cy": 380
+			},
+			{
+				"x": 8,
+				"y": 396,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 428,
+				"cx": 128,
+				"cy": 412
+			},
+			{
+				"x": 8,
+				"y": 428,
+				"w": 240,
+				"h": 32,
+				"right": 248,
+				"bottom": 460,
+				"cx": 128,
+				"cy": 444
+			}
+		]
+	},
+	"results": [
+		{
+			"name": "R1 the main window has no title row",
+			"result": "PASS",
+			"actual": false,
+			"expected": false
+		},
+		{
+			"name": "R1 the left strip is 44 high",
+			"result": "PASS",
+			"actual": 44,
+			"expected": 44
+		},
+		{
+			"name": "R1 the left toggle sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the AI toggle sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R11 You sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R11 You is a 28 circle",
+			"result": "PASS",
+			"actual": "28x28",
+			"expected": "28x28"
+		},
+		{
+			"name": "R11 You ends 8 from the window's right edge (the Mac)",
+			"result": "PASS",
+			"actual": 1432,
+			"expected": 1432
+		},
+		{
+			"name": "R7 tab 1 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 1's label sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 2 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 2's label sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 3 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 3's label sits on the line (26)",
+			"result": "PASS",
+			"actual": 25.8,
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 3 is at most 200 wide (as wide as its name)",
+			"result": "PASS",
+			"actual": 112.9,
+			"expected": "<=200"
+		},
+		{
+			"name": "R7 tab 4 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 4's label sits on the line (26)",
+			"result": "PASS",
+			"actual": 25.8,
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 4 is at most 200 wide (as wide as its name)",
+			"result": "PASS",
+			"actual": 112.9,
+			"expected": "<=200"
+		},
+		{
+			"name": "R7 the + sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the desk starts at 44",
+			"result": "PASS",
+			"actual": 44,
+			"expected": 44
+		},
+		{
+			"name": "R1 the desk ends 8 above the status bar",
+			"result": "PASS",
+			"actual": 868,
+			"expected": 868
+		},
+		{
+			"name": "R1 the status bar is 24",
+			"result": "PASS",
+			"actual": 24,
+			"expected": 24
+		},
+		{
+			"name": "R1 two desks lie 8 apart",
+			"result": "PASS",
+			"actual": 8,
+			"expected": 8
+		},
+		{
+			"name": "R1 no separator line in the gap between desks",
+			"result": "PASS",
+			"actual": 0,
+			"expected": 0
+		},
+		{
+			"name": "R5 the places are 32 high",
+			"result": "PASS",
+			"actual": 32,
+			"expected": 32
+		},
+		{
+			"name": "R5 the places row sits at 48 (centre 64)",
+			"result": "PASS",
+			"actual": 64,
+			"expected": 64
+		},
+		{
+			"name": "R5 the first place's fill starts 8 into the column (its icon on the text edge, 16)",
+			"result": "PASS",
+			"actual": 8,
+			"expected": 8
+		},
+		{
+			"name": "R5 places sit 34 apart (kit: ritemark.js, Ritemark.more)",
+			"result": "PASS",
+			"actual": 34,
+			"expected": 34
+		},
+		{
+			"name": "R7 the tabs start 16 into the desk (kit: .tabs at 272)",
+			"result": "PASS",
+			"actual": 16,
+			"expected": 16
+		},
+		{
+			"name": "R11 You sits 8 after the AI toggle (kit: 1368 and 1404)",
+			"result": "PASS",
+			"actual": 8,
+			"expected": 8
+		},
+		{
+			"name": "R10 New at 136",
+			"result": "PASS",
+			"actual": 136,
+			"expected": 136
+		},
+		{
+			"name": "R10 Search at 168",
+			"result": "PASS",
+			"actual": 168,
+			"expected": 168
+		},
+		{
+			"name": "R10 Documents at 214",
+			"result": "PASS",
+			"actual": 214,
+			"expected": 214
+		},
+		{
+			"name": "R10 the tree from 236",
+			"result": "PASS",
+			"actual": 236,
+			"expected": 236
+		},
+		{
+			"name": "R10 the project's name centred at 110 (92 + 36 / 2)",
+			"result": "PASS",
+			"actual": 110,
+			"expected": 110
+		},
+		{
+			"name": "R10 the head's box spans the column, 8 to 248",
+			"result": "PASS",
+			"actual": "8 to 248",
+			"expected": "8 to 248"
+		},
+		{
+			"name": "R1 tree row 1 is 32 high",
+			"result": "PASS",
+			"actual": 32,
+			"expected": 32
+		},
+		{
+			"name": "R1 tree row 2 is 32 high",
+			"result": "PASS",
+			"actual": 32,
+			"expected": 32
+		},
+		{
+			"name": "R1 tree row 3 is 32 high",
+			"result": "PASS",
+			"actual": 32,
+			"expected": 32
+		}
+	]
+}
