@@ -21,6 +21,8 @@ export interface HomeWaitingItem {
   kind: HomeWaitingKind;
   /** The card's or the chat's title, drawn as text. */
   title: string;
+  /** What the AI asks, when it is known (a chat's question), drawn as text. */
+  detail: string | null;
   /** The AI a chat runs with, for "Claude asks…". */
   ai: AiName | null;
   /** When it started waiting (ISO). */

@@ -1,7 +1,7 @@
 /**
  * AgentSplitButton — every board action that starts agent work (Give to,
  * Review with, Retry with, Send to): the label names the agent, the caret
- * picks Claude Code, Codex or OpenCode, and a choice becomes the board's
+ * picks Claude Code, ChatGPT or OpenCode, and a choice becomes the board's
  * default (Jarmo, 2026-10-12; design.md D10).
  */
 
@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 
-const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', opencode: 'OpenCode' }
+const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'ChatGPT', opencode: 'OpenCode' }
 
 /** The short reason an agent cannot take work, for its menu row. */
 function unavailableWords(runtime: BoardRuntimeView): string {
@@ -61,7 +61,7 @@ export function AgentSplitButton({
   const mainTip = disabledReason
     ? disabledReason
     : !anyUsable
-    ? 'Set up Claude, Codex or OpenCode in the AI sidebar first'
+    ? 'Set up Claude, ChatGPT or OpenCode in the AI sidebar first'
     : usable
       ? tip(name)
       : (current?.message ?? `${name} is not ready.`)

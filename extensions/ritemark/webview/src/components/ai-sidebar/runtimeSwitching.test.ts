@@ -250,7 +250,7 @@ function testTranscriptRestorationUsesDurableBoundaryInsteadOfBanner() {
       [{
         turnId: 'turn-2',
         runtimeId: 'codex',
-        message: 'Continuing with Codex. Previous messages were included as context. The previous agent did not return a saved answer. Some older messages were left out.',
+        message: 'Continuing with ChatGPT. Previous messages were included as context. The previous agent did not return a saved answer. Some older messages were left out.',
       }],
       'same-runtime fallback renders its compact boundary immediately without waiting for a reload',
     );

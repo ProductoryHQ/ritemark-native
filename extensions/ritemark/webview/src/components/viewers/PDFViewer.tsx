@@ -11,8 +11,18 @@ import { matchCountLabel, normalizeQuery, stepMatch } from '../../utils/textSear
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import { buildMatchRange, isPageTextLayerRendered, scrollPageIntoView } from './pdfSearchDom'
 import { buildPdfSearchIndex, findDocumentMatches, resolvePdfMatch, type PdfSearchIndex } from './pdfSearchIndex'
-import { PageIndicator, ToolbarIconButton, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
+import { PageIndicator, ShareMenu, ToolbarDivider, ToolbarIconButton, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
+import {
+  EDITABLE_COPY_ICON,
+  editableCopyLabel,
+  editableCopyTooltip,
+  guessPlatform,
+  parsePlatform,
+  postShareItem,
+  shareMenuItems,
+  type HostPlatform,
+} from './viewerShare'
 
 interface PDFViewerProps {
   content: string  // base64-encoded PDF
@@ -158,6 +168,12 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     message: string
     warnings: string[]
   } | null>(null)
+  // Sprint 134 (R19): the system names Share's items (Finder or File Explorer,
+  // Preview or the default app). The host answers `getOpenStatus` with it.
+  const [platform, setPlatform] = useState<HostPlatform>(() =>
+    guessPlatform(typeof navigator !== 'undefined' ? navigator.platform : undefined)
+  )
+  const shareItems = useMemo(() => shareMenuItems('pdf', platform), [platform])
 
   // Issue #344: search. The doc proxy (for eager per-page getTextContent())
   // comes from Document's onLoadSuccess — the same parse react-pdf already
@@ -206,11 +222,14 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     }
   }, [workerSrc])
 
-  // Listen for Save-as-Markdown result from extension host.
+  // Listen for the Make-an-editable-copy result and the system from the extension host.
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message = event.data
-      if (message.type === 'saveAsMarkdownResult') {
+      if (message.type === 'openStatus') {
+        const reported = parsePlatform(message.platform)
+        if (reported) setPlatform(reported)
+      } else if (message.type === 'saveAsMarkdownResult') {
         setIsSavingMd(false)
         if (message.success) {
           setSaveToast({
@@ -228,6 +247,8 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
       }
     }
     window.addEventListener('message', handler)
+    // Asked once listening: the page mounts after the host's `load`.
+    sendToExtension('getOpenStatus')
     return () => window.removeEventListener('message', handler)
   }, [])
 
@@ -500,14 +521,18 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
           onClick={searchOpen ? closeSearch : openSearch}
         />
         {canSaveAsMarkdown && (
-          <ToolbarTextButton
-            icon="file-text"
-            label={isSavingMd ? 'Converting…' : 'Save as Markdown'}
-            tooltip={isSavingMd ? 'Converting the PDF to Markdown' : 'Save the PDF as a Markdown file (a best-effort conversion)'}
-            disabled={isSavingMd || !pdfData}
-            onClick={handleSaveAsMarkdown}
-          />
+          <>
+            <ToolbarTextButton
+              icon={EDITABLE_COPY_ICON}
+              label={editableCopyLabel(isSavingMd)}
+              tooltip={editableCopyTooltip('pdf', isSavingMd)}
+              disabled={isSavingMd || !pdfData}
+              onClick={handleSaveAsMarkdown}
+            />
+            <ToolbarDivider />
+          </>
         )}
+        <ShareMenu items={shareItems} onSelect={(item) => postShareItem(item, sendToExtension)} />
       </ViewerToolbar>
 
       {/* PDF Content; the find bar floats over its top. */}

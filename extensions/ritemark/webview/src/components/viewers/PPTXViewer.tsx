@@ -117,6 +117,9 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
       }
     }
     window.addEventListener('message', handler)
+    // Asked once listening (Sprint 134, as the Word viewer does): the host's answer to `ready` arrives
+    // before this viewer mounts, so the label would stay "Open in PowerPoint".
+    sendToExtension('getOpenStatus')
     return () => window.removeEventListener('message', handler)
   }, [])
 

@@ -20,7 +20,7 @@ export type ThreadRuntime = 'claude' | 'codex' | 'opencode';
 
 export const RUNTIME_LABEL: Record<ThreadRuntime, string> = {
   claude: 'Claude',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   opencode: 'OpenCode',
 };
 

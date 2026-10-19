@@ -13,6 +13,7 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from './components/header'
 import { VoiceDictationButton } from './components/VoiceDictationButton'
 import { CardHead, CardStrip } from './components/tasks/CardPage'
+import { AboutProjectNote } from './components/AboutProjectNote'
 import { startBoard, useBoardSnapshot } from './components/tasks/boardClient'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
 import type { GoogleDocsAction, GoogleDocsProjection } from './components/header/googleDocsMenu'
@@ -91,6 +92,8 @@ function App() {
   // UI state
   const [showPropertiesModal, setShowPropertiesModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  // Sprint 134 (R8): the note on About this project while the project's own CLAUDE.md lacks the line
+  const [aboutNote, setAboutNote] = useState<'hidden' | 'shown' | 'adding'>('hidden')
   const exportButtonRef = useRef<HTMLElement | null>(null)
   // Google Docs publishing (Sprint 119): the host owns the link; this view
   // only renders its projection and sends intent.
@@ -255,6 +258,14 @@ function App() {
       }
 
       switch (message.type) {
+        // Sprint 134 (R8): File ▸ Share
+        case 'share:open':
+          setShowExportMenu(true)
+          return
+        // Sprint 134 (R8): the host says whether About this project shows its note
+        case 'about:note':
+          setAboutNote(message.show === true ? 'shown' : 'hidden')
+          return
         case 'load':
           setContent(message.content as string)
           setFileType((message.fileType as FileType) || 'markdown')
@@ -808,6 +819,8 @@ function App() {
           onAgentClick={isAgentMode ? handleAgentPanelClick : undefined}
           commentsSlot={commentsSlot}
           syncAction={syncAction}
+          syncState={documentViewSync.state}
+          shareOpen={showExportMenu}
           features={features}
         />
       )}
@@ -863,7 +876,16 @@ function App() {
             commentCallouts={features.commentCallouts}
             syncTarget={syncTarget}
             onExternalApplied={handleDocumentApplied}
-            header={pageCard && boardSnapshot ? <CardHead card={pageCard} snapshot={boardSnapshot} /> : undefined}
+            header={pageCard && boardSnapshot ? <CardHead card={pageCard} snapshot={boardSnapshot} /> : aboutNote !== 'hidden' ? (
+              <AboutProjectNote
+                busy={aboutNote === 'adding'}
+                onAddLine={() => {
+                  setAboutNote('adding')
+                  sendToExtension('about:addLine', {})
+                }}
+                onNotNow={() => setAboutNote('hidden')}
+              />
+            ) : undefined}
           />
         </div>
       </div>

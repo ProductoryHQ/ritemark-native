@@ -24,10 +24,12 @@ export interface ProjectHeadCommand {
 
 /** The project's menu, behind the chevron: project things only (Switch project, Open a folder, Reveal) and the folder tools. */
 export const PROJECT_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
-  { id: 'ritemark.projectHead.switchProject', runs: 'workbench.action.openRecent' },
+  // Sprint 134 (R8): the shell opens the projects flyout for it; run on its own, it shows Home's projects list.
+  { id: 'ritemark.projectHead.switchProject', runs: 'ritemark.projects.switch' },
   { id: 'ritemark.projectHead.openFolder', runs: 'workbench.action.files.openFolder' },
   { id: 'ritemark.projectHead.revealInFinder', runs: 'revealFileInOS', onFolder: true },
   { id: 'ritemark.projectHead.revealInFileExplorer', runs: 'revealFileInOS', onFolder: true },
+  { id: 'ritemark.projectHead.aboutProject', runs: 'ritemark.aboutProject' },
   { id: 'ritemark.projectHead.newFolder', runs: 'explorer.newFolder' },
   { id: 'ritemark.projectHead.collapseFolders', runs: 'workbench.files.action.collapseExplorerFolders' },
 ];
@@ -49,9 +51,18 @@ export const AGENTS_NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
   { id: 'ritemark.projectHead.newFlow', runs: 'ritemark.flows.new' },
 ];
 
+/**
+ * The rows under the head (Sprint 134, R16): the shell draws each row with its command's title and icon from
+ * package.json. New opens the place's New menu under the row; run on its own (a key), it makes a document.
+ */
+export const HEAD_ROW_COMMANDS: readonly ProjectHeadCommand[] = [
+  { id: 'ritemark.projectHead.newRow', runs: 'ritemark.newDocument' },
+  { id: 'ritemark.projectHead.search', runs: 'workbench.view.search' },
+];
+
 /** Every head command once (a command can sit in two menus). */
 export const PROJECT_HEAD_COMMANDS: readonly ProjectHeadCommand[] = [...new Map(
-  [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS, ...AGENTS_NEW_MENU_COMMANDS].map(command => [command.id, command]),
+  [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS, ...AGENTS_NEW_MENU_COMMANDS, ...HEAD_ROW_COMMANDS].map(command => [command.id, command]),
 ).values()];
 
 export function registerProjectHeadCommands(context: vscode.ExtensionContext): void {

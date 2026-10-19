@@ -3,12 +3,13 @@ import { Icon } from '../ui/Icon';
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { ConversationTooltip } from './ConversationTooltip';
 import { conversationPinState } from './conversationActionsModel';
-import { selectRailConversationIds } from './conversationSelectors';
+import { railMarkOf, selectRailConversationIds } from './conversationSelectors';
 import { useAISidebarStore } from './store';
 
-function statusLabel(state: string): string {
+function statusLabel(state: string, unread: boolean): string {
   if (state === 'needs-user') return 'Needs you';
   if (state === 'working') return 'Working';
+  if (unread) return 'New reply';
   if (state === 'interrupted') return 'Interrupted';
   return 'Recent';
 }
@@ -30,7 +31,8 @@ export function ThreadRail() {
   const byId = useMemo(() => new Map(summaries.map((summary) => [summary.conversationId, summary])), [summaries]);
   const pinnedRailIds = ids.filter((id) => pinnedIds.includes(id));
   const automaticRailIds = ids.filter((id) => !pinnedIds.includes(id));
-  const needsYouCount = summaries.filter((summary) => summary.lifecycle.state === 'needs-user').length;
+  // Sprint 134 (R3): a reply not yet read waits for the person too
+  const needsYouCount = summaries.filter((summary) => { const mark = railMarkOf(summary); return mark === 'needs-you' || mark === 'unread'; }).length;
   const workingCount = summaries.filter((summary) => summary.lifecycle.state === 'working').length;
   const allConversationsLabel = needsYouCount > 0
     ? `All conversations — ${needsYouCount} need${needsYouCount === 1 ? 's' : ''} you`
@@ -43,14 +45,15 @@ export function ThreadRail() {
     if (!summary) return null;
     const { pinned: isPinned, atCapacity: pinAtCapacity, label: pinLabel, icon: pinIcon } = conversationPinState(id, summary.title, pinnedIds);
     const isActive = activeId === id;
-    const label = `${summary.title} — ${isPinned ? 'Pinned' : statusLabel(summary.lifecycle.state)}`;
+    const mark = railMarkOf(summary);
+    const label = `${summary.title} — ${isPinned ? (mark === 'unread' ? 'Pinned, new reply' : 'Pinned') : statusLabel(summary.lifecycle.state, mark === 'unread')}`;
     return (
       <div key={id} className="group relative h-10 w-10 shrink-0">
         <ConversationTooltip label={label}>
           <button type="button" aria-label={label} aria-current={isActive ? 'true' : undefined} onClick={() => openConversations[id] ? switchConversation(id) : loadSavedConversation(id)} className={`flex h-10 w-10 items-center justify-center rounded-[11px] outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${isActive ? 'bg-[var(--r-accent-soft)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
             <ConversationBubbleIcon identityColorSlot={summary.identityColorSlot} />
-            {summary.lifecycle.state === 'needs-user' && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 rounded-full bg-[var(--r-warning)] ring-2 ring-[var(--r-surface-muted)]" aria-hidden="true" />}
-            {summary.lifecycle.state === 'working' && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 animate-pulse rounded-full bg-[var(--r-accent)] ring-2 ring-[var(--r-surface-muted)] motion-reduce:animate-none" aria-hidden="true" />}
+            {(mark === 'needs-you' || mark === 'unread') && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 rounded-full bg-[var(--r-warning)] ring-2 ring-[var(--r-surface-muted)]" aria-hidden="true" />}
+            {mark === 'working' && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 animate-pulse rounded-full bg-[var(--r-accent)] ring-2 ring-[var(--r-surface-muted)] motion-reduce:animate-none" aria-hidden="true" />}
           </button>
         </ConversationTooltip>
         {isPinned && (

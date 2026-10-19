@@ -35,6 +35,8 @@ import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { RuntimeNotice } from './RuntimeNotice';
 import { RuntimeAvailabilityNotice } from './RuntimeAvailabilityNotice';
+import { ShareQuestionCard } from './ShareQuestionCard';
+import { RUNTIME_LABEL } from './threadStatus';
 import { deriveRuntimeAvailabilities, listReadyAlternatives } from './runtimeAvailability';
 
 export function AISidebar() {
@@ -148,6 +150,8 @@ export function AISidebar() {
   const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const browserShareQuestion = useAISidebarStore((s) => s.browserShareQuestion);
+  const answerBrowserShareQuestion = useAISidebarStore((s) => s.answerBrowserShareQuestion);
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
   const isOpenCode = selectedAgent === 'opencode';
@@ -164,7 +168,7 @@ export function AISidebar() {
   const readyAlternatives = listReadyAlternatives(runtimeAvailabilities, selectedAgent);
   const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
   const [runtimeTimedOut, setRuntimeTimedOut] = useState(false);
-  const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'Codex' : 'OpenCode';
+  const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'ChatGPT' : 'OpenCode';
   const bootstrapDisplayError = bootstrapError
     ?? (bootstrapTimedOut ? 'Agent Chat is taking longer than expected to load its local configuration.' : null);
 
@@ -376,6 +380,14 @@ export function AISidebar() {
                   runtimeId={selectedAgent}
                   availability={selectedRuntimeAvailability}
                   alternativeRuntime={readyAlternatives[0] ?? null}
+                />
+              )}
+              {browserShareQuestion && (
+                <ShareQuestionCard
+                  key={browserShareQuestion.pageId}
+                  aiName={RUNTIME_LABEL[selectedAgent === 'claude-code' ? 'claude' : selectedAgent]}
+                  pageTitle={browserShareQuestion.title}
+                  onAnswer={answerBrowserShareQuestion}
                 />
               )}
               <ChatInput onReport={reportDialog.request} menuBoundary={conversationColumn} />

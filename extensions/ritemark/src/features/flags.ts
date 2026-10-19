@@ -111,14 +111,15 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
-  // Sprint 106 (#74): persistent Home re-entry surface (Activity Bar view with
-  // New document / New AI conversation / recent work). Experimental = real runtime
-  // kill-switch during rollout; ON by default per HARD RULE #2.
+  // Sprint 106 (#74): the 1.x Home launcher. Replaced in Sprint 134 by 2.0's
+  // Home (src/views/HomePanel.ts, ProjectsViewProvider.ts) once every row of
+  // spec R14's table was checked (Jarmo, 19 October: "Yes, delete after the
+  // check"). The flag gates nothing; it stays as a tombstone (ARCH-3).
   'home-launcher': {
     id: 'home-launcher',
     label: 'Home Launcher',
-    description: 'Persistent Home view in the Activity Bar: create a Markdown document, start an AI task, or reopen recent work after the Welcome page is gone.',
-    status: 'experimental',
+    description: 'Removed in Sprint 134: replaced by Home. Flag retained as a tombstone.',
+    status: 'disabled',
     platforms: ['darwin', 'win32', 'linux'],
   },
   // Sprint 130 (#119): a task board per project folder (cards in
@@ -128,7 +129,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'task-board': {
     id: 'task-board',
     label: 'Task Board',
-    description: 'A task board for each project folder: cards as Markdown files in .ritemark/tasks, Your calls, and Give to agent with Claude Code, Codex or OpenCode.',
+    description: 'A task board for each project folder: cards as Markdown files in .ritemark/tasks, Your calls, and Give to agent with Claude Code, ChatGPT or OpenCode.',
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
@@ -198,7 +199,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   },
   'save-as-markdown-from-preview': {
     id: 'save-as-markdown-from-preview',
-    label: 'Save as Markdown from Preview',
+    label: 'Make an editable copy',
     description: 'Convert .docx / .pdf previews to editable markdown',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
@@ -226,8 +227,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   },
   'codex-integration': {
     id: 'codex-integration',
-    label: 'Codex CLI Integration',
-    description: 'ChatGPT-authenticated coding agent using OpenAI Codex CLI',
+    label: 'ChatGPT',
+    description: "OpenAI's agent, signed in with a ChatGPT account",
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

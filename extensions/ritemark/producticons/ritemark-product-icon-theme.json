@@ -105,6 +105,10 @@
       "fontId": "phosphor-400",
       "fontCharacter": "\\e3d4"
     },
+    "window": { "fontId": "phosphor-400", "fontCharacter": "\\e5da" },
+    "book": { "fontId": "phosphor-400", "fontCharacter": "\\e0e6" },
+    "cloud-upload": { "fontId": "phosphor-400", "fontCharacter": "\\e4c0" },
+    "record": { "fontId": "phosphor-400", "fontCharacter": "\\e3ee" },
     "remove": {
       "fontId": "phosphor-400",
       "fontCharacter": "\\e32a"

@@ -1071,7 +1071,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     : pendingRuntime.runtimeId === 'codex'
       ? modelDisplayName(currentCodexModel) || codexSelectedModel || 'Model'
       : modelDisplayName(currentClaudeModel, true) || selectedModel || 'Model';
-  const runtimeFooterLabel = `${isOpenCode ? 'OpenCode' : pendingRuntime.runtimeId === 'codex' ? 'Codex' : 'Claude'} · ${runtimeModelLabel}`;
+  const runtimeFooterLabel = `${isOpenCode ? 'OpenCode' : pendingRuntime.runtimeId === 'codex' ? 'ChatGPT' : 'Claude'} · ${runtimeModelLabel}`;
   // 2026-08-05 Jarmo: no "N context" here — the context chips above the
   // composer already show exactly what's included; counting them again is noise.
   const contextSummary = [
@@ -1494,7 +1494,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               {canUseClaude && models.length > 0 && canUseCodex && codexModels.length > 0 && <SelectSeparator />}
               {canUseCodex && codexModels.length > 0 && (
                 <SelectGroup>
-                  <SelectLabel className="text-[10px]">Codex</SelectLabel>
+                  <SelectLabel className="text-[10px]">ChatGPT</SelectLabel>
                   {codexModels.map((model) => {
                     const { versionLine, tagline } = parseModelDescription(model.description);
                     const primary = versionLine || model.label;
@@ -1634,7 +1634,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
 
           {composerThinkingEffortEnabled ? (
             <ThinkingEffortControl
-              runtimeLabel={pendingRuntime.runtimeId === 'codex' ? 'Codex' : pendingRuntime.runtimeId === 'opencode' ? 'OpenCode' : 'Claude'}
+              runtimeLabel={pendingRuntime.runtimeId === 'codex' ? 'ChatGPT' : pendingRuntime.runtimeId === 'opencode' ? 'OpenCode' : 'Claude'}
               modelLabel={pendingRuntime.runtimeId === 'codex'
                 ? currentCodexModel?.label ?? 'Model'
                 : pendingRuntime.runtimeId === 'opencode'

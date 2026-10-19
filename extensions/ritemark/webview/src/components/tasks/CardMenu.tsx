@@ -15,7 +15,7 @@ import { Icon, type PhosphorIconName } from '../ui/Icon'
 import { act, giveCard, moveCard, useBoardUi } from './boardUi'
 import { STAGE_NAMES, agentName, type CardPresentation } from './taskCopy'
 
-const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', opencode: 'OpenCode' }
+const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'ChatGPT', opencode: 'OpenCode' }
 type Sub = 'give' | 'retry' | 'review' | 'move'
 
 interface Item {

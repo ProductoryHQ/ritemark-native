@@ -32,7 +32,7 @@ import { runProcess, type ProcessResult } from '../utils/runProcess';
  * no install of its own to repair; reinstalling Ritemark restores it.
  */
 export const BUNDLED_CODEX_REPAIR_MESSAGE =
-  'Codex ships with Ritemark and cannot be repaired on its own. If it does not work, reinstall Ritemark to restore it.';
+  'ChatGPT ships with Ritemark and cannot be repaired on its own. If it does not work, reinstall Ritemark to restore it.';
 
 export interface CodexManagerConfig {
   onStdout?: (data: string) => void;
@@ -272,8 +272,8 @@ export class CodexManager {
         runnable: false,
         version: null,
         error: preferSystem
-          ? 'Codex runtime not found. Check your own Codex install (npm install -g @openai/codex), or reinstall Ritemark to restore the bundled agent.'
-          : 'Codex runtime not found. Reinstall Ritemark to restore the bundled agent.',
+          ? 'ChatGPT was not found. Check your own install (npm install -g @openai/codex). Or reinstall Ritemark to restore the one that ships with it.'
+          : 'ChatGPT was not found. Reinstall Ritemark to restore it.',
         binaryPath: null,
         installNodeVersion: null,
         runtimeNodeVersion,
@@ -385,7 +385,7 @@ export class CodexManager {
     // reports what the CLI printed.
     const error = versionProbe.error
       ? versionProbe.error.message
-      : this.summarizeFailure(versionProbe.stderr || versionProbe.stdout || `Codex CLI exited with code ${versionProbe.status}`);
+      : this.summarizeFailure(versionProbe.stderr || versionProbe.stdout || `ChatGPT exited with code ${versionProbe.status}`);
     return {
       available: true,
       runnable: false,
@@ -426,7 +426,7 @@ export class CodexManager {
   async ensureRunning(): Promise<void> {
     // Check feature flag first
     if (!isEnabled('codex-integration')) {
-      throw new Error('Codex integration is not enabled. Enable it in Settings > Features.');
+      throw new Error('ChatGPT is turned off. Turn it on in Advanced settings.');
     }
 
     if (this.isRunning()) {
@@ -441,16 +441,16 @@ export class CodexManager {
    */
   private async spawn(): Promise<void> {
     if (this.process) {
-      throw new Error('Codex app-server is already running');
+      throw new Error('ChatGPT is already running.');
     }
 
     // Check if binary is installed
     const status = await this.getBinaryStatus();
     if (!status.available) {
-      throw new Error(status.error ?? 'Codex runtime not found.');
+      throw new Error(status.error ?? 'ChatGPT was not found.');
     }
     if (!status.runnable) {
-      throw new Error(status.error || 'Codex CLI is installed but could not be started.');
+      throw new Error(status.error || 'ChatGPT is installed but could not start.');
     }
 
     return new Promise((resolve, reject) => {
@@ -503,7 +503,7 @@ export class CodexManager {
    */
   send(message: string): void {
     if (!this.process || !this.process.stdin) {
-      throw new Error('Codex app-server is not running');
+      throw new Error('ChatGPT is not running.');
     }
 
     this.process.stdin.write(message + '\n');
@@ -574,7 +574,7 @@ export class CodexManager {
     }
 
     if (!bundled && machineArch === 'arm64' && installNodeArch === 'x86_64') {
-      diagnostics.push('Rosetta/x64 Node install detected. This can install the wrong Codex binary on Apple Silicon.');
+      diagnostics.push('Rosetta/x64 Node install detected. This can install the wrong ChatGPT binary on Apple silicon.');
     }
 
     return diagnostics;
@@ -699,13 +699,13 @@ export class CodexManager {
     }
 
     const firstLine = trimmed.split(/\r?\n/).map(line => line.trim()).find(Boolean);
-    return firstLine ?? 'Codex CLI failed to start.';
+    return firstLine ?? 'ChatGPT failed to start.';
   }
 
   /** A system install is repaired with its npm command; the bundled runtime by reinstalling Ritemark. */
   private describeLaunchFailure(runtimeSource: CodexRuntimeSource, failure: string): string {
     return runtimeSource === 'bundled'
-      ? `The bundled Codex runtime could not start (${failure}). Reinstall Ritemark to restore it.`
+      ? `The bundled ChatGPT could not start (${failure}). Reinstall Ritemark to restore it.`
       : failure;
   }
 
@@ -759,13 +759,13 @@ export class CodexManager {
 
       const limitations: string[] = [];
       if (!capabilities.approvals) {
-        limitations.push('Approval requests were not detected in the current Codex app-server protocol.');
+        limitations.push('This version of ChatGPT does not ask for approvals.');
       }
       if (!capabilities.requestUserInput) {
-        limitations.push('Interactive question prompts were not detected in the current Codex app-server protocol.');
+        limitations.push('This version of ChatGPT does not ask you questions.');
       }
       if (!capabilities.planUpdates) {
-        limitations.push('Structured plan update notifications were not detected in the current Codex app-server protocol.');
+        limitations.push('This version of ChatGPT does not send plan updates.');
       }
 
       return this.buildCompatibilityStatus(capabilities, limitations);
@@ -811,7 +811,7 @@ export class CodexManager {
     if (limitations.length > 0) {
       return {
         state: 'limited',
-        summary: 'Codex is runnable, but one or more lifecycle capabilities Ritemark expects were not detected.',
+        summary: 'ChatGPT runs, but some features Ritemark expects are missing.',
         capabilities,
         limitations,
       };

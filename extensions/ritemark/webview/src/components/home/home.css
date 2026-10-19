@@ -1,0 +1,363 @@
+/*
+ * Home (Sprint 134, R4): the project's own page on the desk, and the projects
+ * list in the left column on Home (R7). To the kit's numbers (ritemark-dev:
+ * product/design/experience/kit/ritemark.css: .cover, .homehead, .homeloc,
+ * .homepage, .wrow, .recent, .tiles, .dropzone; experiences home, empty,
+ * missing and update frame 5). Colours come from the theme tokens, so Ritemark
+ * Light and Ritemark Dark both follow. Scoped to rh- classes: this sheet is in
+ * the bundle every Ritemark webview loads.
+ */
+
+.rh-desk {
+  min-height: 100vh;
+  background: var(--r-surface);
+  font-family: var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  padding: 16px 16px 48px;
+}
+
+.rh-cover {
+  position: relative;
+  height: 136px;
+  border-radius: 8px;
+  background-color: var(--r-surface-soft);
+  background-position: 62% 42%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.rh-cover .rh-change {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+
+.rh-chip-button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1e1b4b;
+  font: 500 12px/26px var(--ritemark-ui-font-family);
+  gap: 6px;
+}
+.rh-chip-button:hover { background: #ffffff; }
+
+.rh-page {
+  position: relative;
+  width: 640px;
+  max-width: 100%;
+  margin-left: clamp(0px, calc(72px - 16px), 8vw);
+  margin-top: -28px;
+}
+.rh-page.no-cover { margin-top: 40px; }
+
+.rh-mark {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--r-ink-strong);
+  color: var(--r-surface);
+  font: 700 17px/56px var(--ritemark-ui-font-family);
+  letter-spacing: 0.3px;
+  text-align: center;
+  box-shadow: 0 0 0 4px var(--r-surface);
+}
+.rh-mark.muted { background: var(--r-hairline-strong); color: var(--r-ink-body); }
+
+.rh-name {
+  margin: 14px 0 4px;
+  font: 600 30px/36px var(--ritemark-ui-font-family);
+  letter-spacing: -0.2px;
+  color: var(--r-ink-strong);
+  overflow-wrap: anywhere;
+}
+
+.rh-place {
+  height: 24px;
+  margin: 0 0 6px -6px;
+  padding: 0 8px 0 6px;
+  border-radius: 6px;
+  font: 500 13px/24px var(--ritemark-ui-font-family);
+  color: var(--r-ink-body);
+  gap: 6px;
+  max-width: 100%;
+}
+.rh-place .rh-place-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rh-line {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: 400 14px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-muted);
+  cursor: text;
+}
+.rh-line.empty { font-style: italic; }
+.rh-line:hover { color: var(--r-ink-body); }
+.rh-line-input {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--r-hairline-strong);
+  background: var(--r-surface);
+  font: 400 14px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  outline: none;
+}
+.rh-line-input:focus { border-color: var(--r-accent); box-shadow: 0 0 0 3px var(--r-ring-color); }
+
+.rh-h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 6px;
+  font: 600 11px/14px var(--ritemark-ui-font-family);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--r-ink-strong);
+}
+
+.rh-badge {
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--r-accent);
+  color: var(--r-on-accent);
+  font: 700 10px/16px var(--ritemark-ui-font-family);
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.rh-sub {
+  margin: 0 0 8px;
+  font: 400 14px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-muted);
+}
+.rh-empty-line { margin-top: 4px; }
+
+
+.rh-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--r-hairline);
+  background: transparent;
+  text-align: left;
+  font: 400 14px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  border-radius: 0;
+}
+.rh-row:hover { background: var(--r-surface-soft); }
+.rh-row .rh-ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--vscode-ritemark-ground, var(--r-surface-soft));
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--r-ink-body);
+}
+.rh-row .rh-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-row .rh-tag { flex: none; color: var(--r-ink-muted); font-size: 13px; }
+.rh-row .rh-when { margin-left: auto; flex: none; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; }
+
+.rh-file {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--r-hairline);
+  background: transparent;
+  text-align: left;
+  font: 400 14px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  border-radius: 0;
+}
+.rh-file:hover { background: var(--r-surface-soft); }
+.rh-file .rh-ext { color: var(--r-ink-muted); }
+.rh-file .rh-where { color: var(--r-ink-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-file .rh-when { margin-left: auto; flex: none; font-size: 12px; color: var(--r-ink-muted); }
+
+.rh-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.rh-tile {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 14px;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+  text-align: left;
+  height: auto;
+  white-space: normal;
+}
+.rh-tile:hover { background: var(--r-surface-soft); }
+.rh-tile .rh-ic { width: 32px; height: 32px; border-radius: 8px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; color: var(--r-ink-body); }
+.rh-tile b { display: block; font: 600 14px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rh-tile small { display: block; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+
+.rh-drop {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--r-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
+  font: 400 13px/19px var(--ritemark-ui-font-family);
+  color: var(--r-ink-body);
+}
+.rh-drop.over { box-shadow: inset 0 0 0 2px var(--r-accent); }
+.rh-drop .rh-ic { width: 32px; height: 32px; border-radius: 8px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
+.rh-drop b { display: block; font: 600 14px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rh-drop .rh-drop-action { margin-left: auto; flex: none; }
+
+/* What moved (experience 32, frame 5) */
+.rh-card {
+  margin: 16px 0 8px;
+  padding: 12px 16px 14px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+}
+.rh-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font: 500 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rh-card-head .rh-version { height: 18px; padding: 0 6px; border-radius: 5px; background: var(--r-accent-soft); color: var(--r-accent); font: 600 11px/18px var(--ritemark-ui-font-family); }
+.rh-card-head .rh-card-action { margin-left: auto; }
+.rh-moved { display: flex; align-items: center; gap: 10px; min-height: 32px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rh-moved .rh-ic { width: 22px; height: 22px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
+.rh-moved b { font-weight: 600; color: var(--r-ink-strong); }
+
+/* A project whose folder is not found (experience 33, frame 2) */
+.rh-missing {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+}
+.rh-missing h3 { margin: 0 0 6px; font: 600 16px/22px var(--ritemark-ui-font-family); color: var(--r-ink-strong); text-transform: none; letter-spacing: 0; }
+.rh-missing p { margin: 0 0 8px; font: 400 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rh-missing .rh-path { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); font: 500 13px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-missing .rh-actions { display: flex; gap: 8px; margin: 16px 0 12px; }
+.rh-missing .rh-foot { margin: 0; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+
+/* A notice: a file that can't be read, a change that couldn't be saved */
+.rh-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--r-warning-soft);
+  font: 400 13px/18px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+}
+.rh-notice .rh-notice-action { margin-left: auto; flex: none; }
+
+/* "Switched to …" with Go back (experience 3, frame 3) */
+.rh-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 14px;
+  border-radius: 8px;
+  background: var(--r-ink-strong);
+  color: var(--r-surface);
+  font: 400 13px/20px var(--ritemark-ui-font-family);
+  box-shadow: 0 4px 6px -1px rgba(30, 27, 75, 0.18), 0 2px 4px -2px rgba(30, 27, 75, 0.12);
+  z-index: 20;
+}
+.rh-toast .rh-toast-action { height: 24px; padding: 0 8px; color: var(--r-accent-soft); background: transparent; }
+
+/* The projects list in the left column on Home (R7) */
+.rp-column {
+  min-height: 100vh;
+  background: var(--vscode-sideBar-background, var(--vscode-ritemark-ground, var(--r-surface-soft)));
+  font-family: var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  padding: 4px 8px 16px;
+}
+.rp-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+.rp-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 400 13px/18px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+}
+.rp-search input::placeholder { color: var(--r-ink-body); opacity: 1; }
+.rp-search:focus-within { background: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); }
+.rp-label {
+  margin: 24px 8px 6px;
+  font: 600 11px/14px var(--ritemark-ui-font-family);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--r-ink-strong);
+}
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font: 400 13px/18px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+}
+.rp-row:hover { background: var(--r-surface-soft); }
+.rp-row.open { background: var(--r-surface); }
+.rp-row .rp-mini {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--r-ink-strong);
+  color: var(--r-surface);
+  font: 700 7px/18px var(--ritemark-ui-font-family);
+  text-align: center;
+  flex: none;
+  letter-spacing: 0.2px;
+}
+.rp-row .rp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-row .rp-count { margin-left: auto; flex: none; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.rp-row.missing .rp-mini { background: var(--r-hairline-strong); color: var(--r-ink-body); }
+.rp-row.missing .rp-name { color: var(--r-ink-muted); }
+.rp-row .rp-missing { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 4px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rp-add { margin-top: 8px; color: var(--r-ink-strong); }
+.rp-empty { margin: 8px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }

@@ -50,7 +50,7 @@ function main(): void {
   assert.deepEqual(words(card()), ['circle', 'faint', '', ''])
   assert.equal(presentCard(card(), context).plain, true)
   assert.deepEqual(words(card({ handoff: handoff('accepting') })), ['circle-notch', 'accent', 'Sending to Claude…', 'Sending to Claude…'])
-  assert.deepEqual(words(card({ handoff: handoff('queued', { runtimeId: 'codex' }) })), ['clock', 'muted', 'Queued for Codex', 'Queued for Codex'])
+  assert.deepEqual(words(card({ handoff: handoff('queued', { runtimeId: 'codex' }) })), ['clock', 'muted', 'Queued for ChatGPT', 'Queued for ChatGPT'])
   assert.deepEqual(words(card({ handoff: handoff('running', { runtimeId: 'opencode' }) })), ['circle-notch', 'accent', 'Working · OpenCode', 'Working · OpenCode'])
   assert.equal(presentCard(card({ handoff: handoff('running') }), context).spin, true)
   assert.deepEqual(
@@ -96,8 +96,8 @@ function main(): void {
   assert.deepEqual(words(card({ stage: 'idea', review: reviewed, reviewing: { runtimeId: 'codex', since: ago(0) } })), [
     'circle-notch',
     'accent',
-    'Reviewing · Codex',
-    'Reviewing · Codex',
+    'Reviewing · ChatGPT',
+    'Reviewing · ChatGPT',
   ])
   assert.equal(presentCard(card({ stage: 'idea', reviewing: { runtimeId: 'claude-code', since: ago(0) } }), context).spin, true)
   assert.deepEqual(words(card({ stage: 'idea', review: reviewed, reviewFailure: 'The review didn’t come back. Try again.' })).slice(0, 3), [
@@ -134,7 +134,7 @@ function main(): void {
   assert.equal(modifiedLine(['docs/plan.md']), 'Modified 1 file: plan.md')
   assert.equal(
     finishedLine(card({ result: { by: 'codex', at: ago(1), seconds: 61, summary: '', files: [], check: [] } })),
-    'Codex finished in 1m 01s',
+    'ChatGPT finished in 1m 01s',
   )
 
   // ── D15: archived cards, and the Done column's four weeks ───────────────────

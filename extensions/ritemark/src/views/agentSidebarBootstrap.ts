@@ -66,7 +66,7 @@ export function buildAgentSidebarBootstrap(input: AgentSidebarBootstrapInput): A
     throw new AgentSidebarBootstrapError('Claude model catalog is empty.');
   }
   if (input.codexEnabled && input.codexModels.length === 0) {
-    throw new AgentSidebarBootstrapError('Codex model catalog is empty.');
+    throw new AgentSidebarBootstrapError("ChatGPT's model list is empty.");
   }
   if (input.agents.length === 0) {
     throw new AgentSidebarBootstrapError('No Agent Chat runtimes are available.');

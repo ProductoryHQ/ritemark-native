@@ -35,7 +35,7 @@ export type ChatWaitKind = 'approval' | 'question' | 'plan-review' | 'reply';
 
 export type WaitingItem =
   | { source: 'card'; kind: CallKind; cardId: string; title: string; since: string }
-  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string };
+  | { source: 'chat'; kind: ChatWaitKind; conversationId: string; title: string; since: string; runtimeId: string | null };
 
 export interface ProjectWaiting {
   /** The board's calls; undefined when the board can't be read, 0 with no board. */
@@ -57,11 +57,18 @@ export interface ChatIndexEntry {
   lifecycle: { state: string; attentionKind?: string };
   readAt?: string;
   lastReplyAt?: string;
+  /** The runtimes the chat used, oldest first: the last one is its AI now. */
+  runtimeSummary?: string[];
 }
 
 const ATTENTION_KINDS: ReadonlySet<string> = new Set(['approval', 'question', 'plan-review']);
 
 export { hasUnreadReply };
+
+function lastRuntime(entry: ChatIndexEntry): string | null {
+  const runtimes = Array.isArray(entry.runtimeSummary) ? entry.runtimeSummary.filter((id) => typeof id === 'string') : [];
+  return runtimes[runtimes.length - 1] ?? null;
+}
 
 /** A project's chats that need the person, longest waiting first. */
 export function chatsWaiting(
@@ -76,12 +83,12 @@ export function chatsWaiting(
     const { lifecycle } = entry;
     if (lifecycle.state === 'needs-user' && lifecycle.attentionKind && ATTENTION_KINDS.has(lifecycle.attentionKind)) {
       if (heldByLiveWindow.has(entry.conversationId)) {
-        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt });
+        items.push({ source: 'chat', kind: lifecycle.attentionKind as ChatWaitKind, conversationId: entry.conversationId, title: entry.title, since: entry.lastActivityAt, runtimeId: lastRuntime(entry) });
         continue;
       }
     }
     if (hasUnreadReply(entry)) {
-      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt! });
+      items.push({ source: 'chat', kind: 'reply', conversationId: entry.conversationId, title: entry.title, since: entry.lastReplyAt!, runtimeId: lastRuntime(entry) });
     }
   }
   return items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));

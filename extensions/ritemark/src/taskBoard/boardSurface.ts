@@ -16,6 +16,7 @@ import {
   decodeBoardRequest,
   isBoardRequest,
   type BoardAnswer,
+  type BoardHeadRow,
   type BoardHostMessage,
   type BoardRecoverAction,
   type BoardRequest,
@@ -52,6 +53,8 @@ export interface BoardSurfaceContext {
 export interface BoardSurfaceConnection extends vscode.Disposable {
   /** Show a view on this surface (the board tab, opened from the side bar). */
   focus(target: { tab?: BoardTab }): void;
+  /** Run one of the project head's rows on this surface (the Tasks side bar, Sprint 134, R17). */
+  headRow(row: BoardHeadRow): void;
 }
 
 export function connectBoardSurface(
@@ -62,6 +65,7 @@ export function connectBoardSurface(
 ): BoardSurfaceConnection {
   let ready = false;
   let pendingFocus: { tab?: BoardTab } | null = null;
+  let pendingHeadRow: BoardHeadRow | null = null;
   const post = (message: BoardHostMessage) => {
     void webview.postMessage(message);
   };
@@ -94,6 +98,10 @@ export function connectBoardSurface(
         post({ type: 'board/focus', ...pendingFocus });
         pendingFocus = null;
       }
+      if (pendingHeadRow) {
+        post({ type: 'board/head', row: pendingHeadRow });
+        pendingHeadRow = null;
+      }
       return;
     }
     options.onRequest?.(request);
@@ -105,6 +113,10 @@ export function connectBoardSurface(
     focus(target) {
       if (ready) post({ type: 'board/focus', ...target });
       else pendingFocus = target;
+    },
+    headRow(row) {
+      if (ready) post({ type: 'board/head', row });
+      else pendingHeadRow = row;
     },
     dispose() {
       unsubscribe?.();

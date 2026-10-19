@@ -302,7 +302,7 @@ function getDefaultNodeData(type: string): FlowNodeData {
       };
     case 'codexNode':
       return {
-        label: 'Codex',
+        label: 'ChatGPT',
         prompt: '',
         model: '',
         timeout: 5,

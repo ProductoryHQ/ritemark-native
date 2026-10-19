@@ -43,7 +43,7 @@ export async function executeCodexNode(
   // Check feature flag
   if (!isEnabled('codex-integration')) {
     throw new Error(
-      'Codex integration is disabled. Enable it in Settings > Features > Codex Integration.'
+      'ChatGPT is turned off. Turn it on in Advanced settings.'
     );
   }
 
@@ -52,7 +52,7 @@ export async function executeCodexNode(
   // Validate configuration
   if (!data.prompt || data.prompt.trim() === '') {
     console.error('[Codex] Missing prompt');
-    throw new Error('Codex node missing prompt');
+    throw new Error('This ChatGPT step has no prompt.');
   }
 
   // Interpolate variables in prompt
@@ -64,14 +64,14 @@ export async function executeCodexNode(
 
   try {
     // Initialize app-server (starts binary + handshake)
-    onProgress?.({ type: 'init', message: 'Starting Codex...' });
+    onProgress?.({ type: 'init', message: 'Starting ChatGPT...' });
     await appServer.ensureInitialized();
 
     // Check authentication
     const accountResponse = await appServer.getAccount();
     if (!accountResponse || !accountResponse.account) {
       throw new Error(
-        'Codex is not signed in. Open Settings and sign in with ChatGPT under Agent Runtime, then run the flow again.'
+        'ChatGPT is signed out. Sign in with ChatGPT in Ritemark Settings. Then run the flow again.'
       );
     }
 
@@ -82,7 +82,7 @@ export async function executeCodexNode(
     const threadId = threadResult.thread.id;
 
     // Start a turn with the prompt
-    onProgress?.({ type: 'thinking', message: 'Codex is working...' });
+    onProgress?.({ type: 'thinking', message: 'ChatGPT is working...' });
     const turnResult = await appServer.turnStart(
       threadId,
       interpolatedPrompt,
@@ -102,7 +102,7 @@ export async function executeCodexNode(
         resolve({
           text: textChunks.join(''),
           files,
-          error: `Codex timed out after ${data.timeout || 5} minutes`,
+          error: `ChatGPT timed out after ${data.timeout || 5} minutes`,
         });
       }, timeoutMs);
 
@@ -157,9 +157,9 @@ export async function executeCodexNode(
           ? String((params.turn.error as Record<string, unknown>).message || params.turn.error)
           : undefined;
 
-        onProgress?.({ type: 'done', message: 'Codex completed' });
+        onProgress?.({ type: 'done', message: 'ChatGPT finished' });
         resolve({
-          text: text || 'Codex completed the task.',
+          text: text || 'ChatGPT finished the task.',
           files,
           error: turnError,
         });
@@ -170,7 +170,7 @@ export async function executeCodexNode(
         resolve({
           text: textChunks.join(''),
           files,
-          error: `Codex app-server exited unexpectedly (code: ${code})`,
+          error: `ChatGPT stopped unexpectedly (code: ${code})`,
         });
       };
 

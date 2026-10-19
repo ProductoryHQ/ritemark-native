@@ -5,6 +5,8 @@ import { PdfDocument } from './pdfDocument';
 import { trackEvent } from './analytics/posthog';
 import { isEnabled } from './features';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
+import { openInExternalApp, openWithDefaultApp } from './utils/openExternal';
+import { getCurrentPlatform } from './utils/platform';
 
 /**
  * Custom editor provider for PDF files
@@ -86,6 +88,17 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
             webviewPanel.webview
           );
           break;
+        // Sprint 134 (R19): the bar's Share. The page asks for the system once it
+        // is drawn, to name Finder or File Explorer, Preview or the default app.
+        case 'getOpenStatus':
+          webviewPanel.webview.postMessage({ type: 'openStatus', platform: getCurrentPlatform() });
+          break;
+        case 'revealInOS':
+          await vscode.commands.executeCommand('revealFileInOS', document.uri);
+          break;
+        case 'openInExternalApp':
+          await this.openExternally(document.uri.fsPath);
+          break;
       }
     });
 
@@ -103,6 +116,20 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
         this.fileChangeDebounceTimers.delete(filePath);
       }
     });
+  }
+
+  /** Share's Open in Preview: Preview on the Mac, the default app for PDFs elsewhere. */
+  private async openExternally(filePath: string): Promise<void> {
+    const mac = getCurrentPlatform() === 'darwin';
+    const name = mac ? 'Preview' : 'the default app';
+    try {
+      if (mac) await openInExternalApp(filePath, 'Preview');
+      else await openWithDefaultApp(filePath);
+      vscode.window.showInformationMessage(`Opening in ${name}...`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to open in ${name}: ${errorMessage}`);
+    }
   }
 
   private async sendPdfData(

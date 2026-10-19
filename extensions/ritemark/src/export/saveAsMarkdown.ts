@@ -50,7 +50,7 @@ export async function saveAsMarkdownHandler(
     const saveUri = await vscode.window.showSaveDialog({
       defaultUri,
       filters: { Markdown: ['md'] },
-      saveLabel: 'Save as Markdown',
+      saveLabel: 'Make an editable copy', // Sprint 134 (R19): the bars' words
     });
 
     if (!saveUri) {

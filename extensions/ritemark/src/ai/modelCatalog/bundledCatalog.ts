@@ -34,7 +34,7 @@ import {
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-10-13T00:00:00Z',
+  updatedAt: '2026-10-19T00:00:00Z',
   providers: {
     anthropic: {
       defaults: { 'claude-code': CLAUDE_MODEL_IDS.SONNET_5_5 },
@@ -80,7 +80,7 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       defaults: { codex: CODEX_MODEL_IDS.SOL_6_1 },
       models: [
         { id: CODEX_MODEL_IDS.SOL_6_1, label: 'GPT-6.1 Sol', description: 'Latest agentic workhorse (recommended)', tier: 'high', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
-        { id: CODEX_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: 'Most capable Codex model', tier: 'high', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
+        { id: CODEX_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: 'Most capable model', tier: 'high', deprecated: false, order: 1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
         { id: CODEX_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Previous agentic workhorse', tier: 'high', deprecated: false, order: 2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
         { id: CODEX_MODEL_IDS.TERRA, label: 'GPT-5.6 Terra', description: 'Balanced', tier: 'medium', deprecated: false, order: 3, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
         { id: CODEX_MODEL_IDS.LUNA, label: 'GPT-5.6 Luna', description: 'Fast & light', tier: 'low', deprecated: false, order: 4, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultLevel: 'medium' } },

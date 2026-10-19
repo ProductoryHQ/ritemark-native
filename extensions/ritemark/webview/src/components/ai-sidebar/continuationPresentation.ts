@@ -2,7 +2,7 @@ import type { ConversationContinuationNotice } from './conversationState';
 
 const runtimeLabels: Record<ConversationContinuationNotice['runtimeId'], string> = {
   'claude-code': 'Claude',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   opencode: 'OpenCode',
 };
 

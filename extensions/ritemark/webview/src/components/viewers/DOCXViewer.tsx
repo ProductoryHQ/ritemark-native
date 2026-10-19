@@ -14,7 +14,7 @@
  * page, symbol-font bullets, missing page setup and bordered list paragraphs
  * are drawn as Word draws them.
  */
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
 import mammoth from 'mammoth'
 import { sendToExtension } from '../../bridge'
@@ -48,13 +48,24 @@ import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import {
   Notice,
   PageIndicator,
+  ShareMenu,
   SplitButton,
+  ToolbarDivider,
   ToolbarIconButton,
   ToolbarSpacer,
   ViewerToolbar,
   ZoomControls,
 } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, pageAtScroll, stepZoom, type FitMode } from './viewerLayout'
+import {
+  EDITABLE_COPY_ICON,
+  editableCopyLabel,
+  guessPlatform,
+  parsePlatform,
+  postShareItem,
+  shareMenuItems,
+  type HostPlatform,
+} from './viewerShare'
 import './documentSearch.css'
 import './docx/docxPreview.css'
 
@@ -161,6 +172,11 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const [hyphenate, setHyphenate] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [openLabel, setOpenLabel] = useState('Open in Word')
+  // Sprint 134 (R19): the system names Share's Show in Finder / Show in File Explorer.
+  const [platform, setPlatform] = useState<HostPlatform>(() =>
+    guessPlatform(typeof navigator !== 'undefined' ? navigator.platform : undefined)
+  )
+  const shareItems = useMemo(() => shareMenuItems('docx', platform, openLabel), [platform, openLabel])
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const [matches, setMatches] = useState<Range[]>([])
@@ -185,12 +201,15 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const currentPageRef = useRef(0)
   currentPageRef.current = currentPage
 
-  // Host messages: which app opens the file, Save-as-Markdown results, file changes.
+  // Host messages: which app opens the file (and the system), Make-an-editable-copy
+  // results, file changes.
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message = event.data
       if (message.type === 'openStatus') {
         if (typeof message.openLabel === 'string') setOpenLabel(message.openLabel)
+        const reported = parsePlatform(message.platform)
+        if (reported) setPlatform(reported)
       } else if (message.type === 'saveAsMarkdownResult') {
         setIsSavingMd(false)
         if (message.success) {
@@ -216,6 +235,9 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       }
     }
     window.addEventListener('message', handler)
+    // Asked once listening: the host's answer to `ready` arrives before this
+    // viewer mounts (it mounts on `load`), so the label would stay "Open in Word".
+    sendToExtension('getOpenStatus')
     return () => window.removeEventListener('message', handler)
   }, [])
 
@@ -616,9 +638,11 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
           onClick={handleOpenExternally}
           menuLabel="More ways to use this document"
           actions={canSaveAsMarkdown && ready
-            ? [{ icon: 'file-text', label: isSavingMd ? 'Converting…' : 'Save as Markdown', onSelect: handleSaveAsMarkdown, disabled: isSavingMd }]
+            ? [{ icon: EDITABLE_COPY_ICON, label: editableCopyLabel(isSavingMd), onSelect: handleSaveAsMarkdown, disabled: isSavingMd }]
             : []}
         />
+        <ToolbarDivider />
+        <ShareMenu items={shareItems} onSelect={(item) => postShareItem(item, sendToExtension)} />
       </ViewerToolbar>
 
       {deleted && (

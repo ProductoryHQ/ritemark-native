@@ -65,7 +65,7 @@ const ALL_STATES: CommentTaskState[] = [
   assert.equal(presentCommentTask(projection({ state: 'running' })).statusLine, 'Claude is working')
   assert.equal(
     presentCommentTask(projection({ state: 'running', alias: 'codex', runtimeId: 'codex' })).statusLine,
-    'Codex is working',
+    'ChatGPT is working',
   )
   assert.equal(
     presentCommentTask(projection({ state: 'completed', alias: 'opencode', runtimeId: 'opencode', summary: 'Did it.' }))
@@ -184,7 +184,7 @@ const ALL_STATES: CommentTaskState[] = [
   // The caption says so before the click rather than leaving it to be noticed.
   assert.equal(
     destinationCaption('Release note review', { alias: 'codex', conversationRuntimeId: 'claude-code' }),
-    '→ Release note review · Codex takes over',
+    '→ Release note review · ChatGPT takes over',
   )
   assert.equal(
     destinationCaption('Release note review', { alias: 'claude', conversationRuntimeId: 'claude-code' }),

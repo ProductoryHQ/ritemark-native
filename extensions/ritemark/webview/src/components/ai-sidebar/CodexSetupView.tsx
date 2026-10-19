@@ -24,9 +24,9 @@ export function CodexSetupView() {
   const offlineBlocked = !isOnline && (needsAuth || loginInProgress);
 
   const title = isChecking
-    ? 'Checking Codex'
+    ? 'Checking ChatGPT'
     : isBroken
-      ? 'Codex CLI needs repair'
+      ? 'ChatGPT needs repair'
       : offlineBlocked
         ? 'Connect to the internet'
         : loginInProgress
@@ -35,15 +35,15 @@ export function CodexSetupView() {
 
   const description = isBroken
     ? codexStatus.binaryPath
-      ? 'Codex is installed, but it could not start correctly.'
-      : 'Ritemark could not find Codex.'
+      ? 'ChatGPT is installed, but it could not start correctly.'
+      : 'Ritemark could not find ChatGPT.'
     : offlineBlocked
-      ? 'Codex sign-in needs an internet connection. Reconnect, then try again.'
+      ? 'ChatGPT sign-in needs an internet connection. Reconnect, then try again.'
       : loginInProgress
-        ? 'Your browser was opened for ChatGPT sign-in. When you finish there, Codex will become ready here.'
+        ? 'Your browser was opened for ChatGPT sign-in. When you finish there, ChatGPT will be ready here.'
         : needsAuth
-          ? 'To use Codex in Ritemark, sign in with your ChatGPT account.'
-          : 'Preparing Codex for this workspace.';
+          ? 'To use ChatGPT in Ritemark, sign in with your ChatGPT account.'
+          : 'Preparing ChatGPT for this project.';
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -97,7 +97,7 @@ export function CodexSetupView() {
               {isBroken && (
                 <ActionButton onClick={repairCodex}>
                   <Icon name="wrench" size={14} />
-                  Repair Codex
+                  Repair ChatGPT
                 </ActionButton>
               )}
 

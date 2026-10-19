@@ -90,6 +90,16 @@ export interface WelcomeAiSheet {
   openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void>;
 }
 
+/**
+ * Sprint 134: the project list the welcome's sheets read (R2, S54), once its
+ * first fill has run, and Home, where the landing arrives (R10).
+ */
+export interface WelcomeProjects {
+  ready: Promise<void>;
+  entries(): Promise<{ folderUri: string; lastOpenedAt: string; missingSince?: string }[]>;
+  revealHome(): Promise<void>;
+}
+
 // ── Before anything else in activate() ──────────────────────────────────────
 
 /**
@@ -134,8 +144,8 @@ export interface WelcomeHost {
   isOpen(): boolean;
 }
 
-export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet): WelcomeHost {
-  const controller = new WelcomeController(context, profileKind, aiSheet);
+export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet, projects?: WelcomeProjects): WelcomeHost {
+  const controller = new WelcomeController(context, profileKind, aiSheet, projects);
   context.subscriptions.push(
     controller,
     vscode.commands.registerCommand('ritemark.welcome.open', () => controller.open({ reason: 'command' })),
@@ -187,6 +197,7 @@ class WelcomeController implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly profileKind: ProfileKind,
     private readonly aiSheet: WelcomeAiSheet,
+    private readonly projectSource?: WelcomeProjects,
   ) {
     this.kind = welcomeKind(profileKind, context.globalState.get(WELCOME_FINISHED_KEY));
     const dispose = (fn: () => void) => ({ dispose: fn });
@@ -256,7 +267,13 @@ class WelcomeController implements vscode.Disposable {
   }
 
   private async land(record: LandingRecord): Promise<void> {
-    await vscode.commands.executeCommand('workbench.view.explorer');
+    // Sprint 134 (R10): the project's Home first, its projects list in the left column.
+    if (this.projectSource) {
+      await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+      await this.projectSource.revealHome();
+    } else {
+      await vscode.commands.executeCommand('workbench.view.explorer');
+    }
     const placeholder = landingPlaceholder(record.provider);
     if (record.provider && placeholder) {
       await this.aiSheet.openLandingChat(runtimeOfProvider(record.provider), placeholder);
@@ -870,12 +887,23 @@ class WelcomeController implements vscode.Disposable {
   private async refreshProjects(): Promise<void> {
     if (this.kind === 'fresh') return;
     try {
-      const recents = await vscode.commands.executeCommand<{ workspaces?: Array<{ folderUri?: vscode.Uri }> }>('_workbench.getRecentlyOpened');
-      const folders = (recents?.workspaces ?? [])
-        .map((workspace) => workspace.folderUri)
-        .filter((uri): uri is vscode.Uri => !!uri && uri.scheme === 'file')
-        .map((uri) => ({ fsPath: uri.fsPath, uri: uri.toString() }));
-      const lastOpen = await lastOpenTimes(this.context.globalStorageUri.fsPath);
+      // Sprint 134 (R2, S54): Ritemark's own project list, once its first fill has run; a project that is
+      // not found is left off. Without it (tests), VS Code's recent folders as in Sprint 133.
+      let folders: { fsPath: string; uri: string }[];
+      let lastOpen: Map<string, number>;
+      if (this.projectSource) {
+        await this.projectSource.ready;
+        const entries = (await this.projectSource.entries()).filter((entry) => !entry.missingSince);
+        folders = entries.map((entry) => ({ fsPath: vscode.Uri.parse(entry.folderUri).fsPath, uri: entry.folderUri }));
+        lastOpen = new Map(entries.map((entry) => [entry.folderUri, Date.parse(entry.lastOpenedAt)]));
+      } else {
+        const recents = await vscode.commands.executeCommand<{ workspaces?: Array<{ folderUri?: vscode.Uri }> }>('_workbench.getRecentlyOpened');
+        folders = (recents?.workspaces ?? [])
+          .map((workspace) => workspace.folderUri)
+          .filter((uri): uri is vscode.Uri => !!uri && uri.scheme === 'file')
+          .map((uri) => ({ fsPath: uri.fsPath, uri: uri.toString() }));
+        lastOpen = await lastOpenTimes(this.context.globalStorageUri.fsPath);
+      }
       this.projects = projectRows({
         recents: folders,
         currentFolder: vscode.workspace.workspaceFolders?.[0]?.uri.toString(),

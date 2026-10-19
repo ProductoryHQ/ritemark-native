@@ -60,3 +60,33 @@ export type AgentSidebarProtocolMessage =
   | AgentSidebarDiscoveryMessage
   | AgentSidebarStatusCheckingMessage
   | AgentSidebarRuntimeStatusErrorMessage;
+
+/** Sprint 134 (R20): the browser's share question, asked on the AI's sheet about the page in front (#455). */
+export interface BrowserShareQuestionMessage {
+  type: 'browser:share-question';
+  pageId: string;
+  /** The page's title, or its address's host when it has none. */
+  title: string;
+}
+
+/** Sprint 134 (R20): the page in front changed or went before an answer; the question goes. */
+export interface BrowserShareQuestionClearMessage {
+  type: 'browser:share-question-clear';
+}
+
+/** Sprint 134 (R20): the person's answer, from the sheet to the host. */
+export interface BrowserShareAnswerMessage {
+  type: 'browser:share-answer';
+  pageId: string;
+  answer: 'share' | 'notNow';
+  /** "Share pages I open in Ritemark without asking"; counts only with Share. */
+  withoutAsking: boolean;
+}
+
+export function decodeBrowserShareAnswer(value: unknown): BrowserShareAnswerMessage | null {
+  if (!value || typeof value !== 'object') return null;
+  const message = value as Record<string, unknown>;
+  if (message.type !== 'browser:share-answer' || typeof message.pageId !== 'string' || !message.pageId) return null;
+  if (message.answer !== 'share' && message.answer !== 'notNow') return null;
+  return { type: 'browser:share-answer', pageId: message.pageId, answer: message.answer, withoutAsking: message.withoutAsking === true };
+}

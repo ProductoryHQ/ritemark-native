@@ -75,7 +75,10 @@ export interface TranscribeState {
   /** Recordings that belong to other projects — never hidden without saying so. */
   otherProjectCount: number;
   showAllProjects: boolean;
-  /** False when no folder is open, which is its own kind of "project". */
+  /**
+   * False when no folder is open, which is its own kind of "project". True is also when the project's head
+   * is drawn, with Record and Transcribe a file… (Sprint 134 R16; see `panelChrome.ts`).
+   */
   hasProject: boolean;
   /** Sprint 118: direct recording, as the host sees it. */
   recording: RecordingProjection;

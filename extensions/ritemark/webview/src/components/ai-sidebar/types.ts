@@ -463,6 +463,9 @@ export type ExtensionMessage =
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
   | { type: 'active-file-changed'; path: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
+  // Sprint 134 (R20): the browser's share question on this sheet
+  | { type: 'browser:share-question'; pageId: string; title: string }
+  | { type: 'browser:share-question-clear' }
   | { type: 'ai-streaming'; content: string }
   | { type: 'ai-result'; success: boolean; message?: string }
   | { type: 'ai-widget'; toolName: string; args: Record<string, unknown>; selection: EditorSelection }

@@ -113,7 +113,7 @@ export function resolveAIIdentity(input: ResolveAIIdentityInput): AIIdentity {
     const modelId = modelIdForRuntime(input.pendingModelId, input.codexModelId, input.codexModels);
     return {
       runtimeId: 'codex',
-      runtimeLabel: 'Codex',
+      runtimeLabel: 'ChatGPT',
       providerId: 'openai',
       providerLabel: PROVIDERS.openai.label,
       modelId,

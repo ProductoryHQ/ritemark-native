@@ -9,7 +9,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { vscode } from '../../lib/vscode'
-import type { BoardAnswer, BoardHostMessage, BoardRequest, BoardSnapshot, BoardSurface, BoardTab } from '../../../../src/taskBoard/protocol'
+import type { BoardAnswer, BoardHeadRow, BoardHostMessage, BoardRequest, BoardSnapshot, BoardSurface, BoardTab } from '../../../../src/taskBoard/protocol'
 
 type WithRequestId = Extract<BoardRequest, { requestId: string }>
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
@@ -20,6 +20,9 @@ let snapshot: BoardSnapshot | null = null
 const listeners = new Set<() => void>()
 const pending = new Map<string, (answer: BoardAnswer) => void>()
 const focusListeners = new Set<(target: { tab?: BoardTab }) => void>()
+const headRowListeners = new Set<(row: BoardHeadRow) => void>()
+/** A head row that came before the list was drawn; the list takes it when it starts listening. */
+let pendingHeadRow: BoardHeadRow | null = null
 /** The card whose page is the active editor tab (the side bar highlights it). */
 let activePage: string | null = null
 const activeListeners = new Set<() => void>()
@@ -50,6 +53,9 @@ function install(): void {
     } else if (message.type === 'board/active-page') {
       activePage = message.cardId
       for (const listener of activeListeners) listener()
+    } else if (message.type === 'board/head') {
+      if (headRowListeners.size === 0) pendingHeadRow = message.row
+      for (const listener of headRowListeners) listener(message.row)
     }
   })
 }
@@ -67,7 +73,8 @@ function subscribe(listener: () => void): () => void {
 }
 
 export function useBoardSnapshot(): BoardSnapshot | null {
-  return useSyncExternalStore(subscribe, () => snapshot)
+  // The third reads the same value when the list is rendered to markup (tests).
+  return useSyncExternalStore(subscribe, () => snapshot, () => snapshot)
 }
 
 function subscribeActive(listener: () => void): () => void {
@@ -77,7 +84,7 @@ function subscribeActive(listener: () => void): () => void {
 
 /** The card whose page is the active editor tab; null when none. */
 export function useActivePage(): string | null {
-  return useSyncExternalStore(subscribeActive, () => activePage)
+  return useSyncExternalStore(subscribeActive, () => activePage, () => activePage)
 }
 
 /** A request the host answers. Resolves with a refusal if no answer comes in 30 s. */
@@ -109,4 +116,16 @@ export function onFocus(listener: (target: { tab?: BoardTab }) => void): () => v
   install()
   focusListeners.add(listener)
   return () => focusListeners.delete(listener)
+}
+
+/** The project head's rows on Tasks (Sprint 134, R17): New task and Search, run from the shell. */
+export function onHeadRow(listener: (row: BoardHeadRow) => void): () => void {
+  install()
+  headRowListeners.add(listener)
+  if (pendingHeadRow) {
+    const row = pendingHeadRow
+    pendingHeadRow = null
+    listener(row)
+  }
+  return () => headRowListeners.delete(listener)
 }

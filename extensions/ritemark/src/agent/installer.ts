@@ -419,7 +419,7 @@ export function installCodexCli(): void {
   const platform = getCurrentPlatform();
 
   const terminal = vscode.window.createTerminal({
-    name: 'Install Codex',
+    name: 'Install ChatGPT',
     shellPath: platform === 'win32' ? 'powershell.exe' : undefined,
   });
   terminal.show();

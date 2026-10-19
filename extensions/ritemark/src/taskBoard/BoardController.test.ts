@@ -172,7 +172,7 @@ async function main(): Promise<void> {
     assert.equal(snapshot.doing.count, 7);
     assert.equal(snapshot.doing.limit, 3, 'the Doing limit defaults to 3');
     assert.equal(snapshot.defaultRuntime, 'claude-code');
-    assert.equal(snapshot.runtimes.find((r) => r.id === 'codex')?.message, 'Codex is signed out. Sign in and try again.');
+    assert.equal(snapshot.runtimes.find((r) => r.id === 'codex')?.message, 'ChatGPT is signed out. Sign in and try again.');
 
     // Marking a reviewed card done takes it off Your calls.
     await controller.markDone(review);

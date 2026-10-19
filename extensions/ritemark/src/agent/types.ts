@@ -49,7 +49,7 @@ export const AGENTS: Record<AgentId, AgentInfo> = {
   },
   'codex': {
     id: 'codex',
-    label: 'Codex',
+    label: 'ChatGPT',
     description: 'OpenAI coding agent with ChatGPT authentication',
     experimental: true,
     requiresApiKey: null, // Uses ChatGPT OAuth, not API key

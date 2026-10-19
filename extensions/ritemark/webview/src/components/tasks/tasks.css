@@ -6,10 +6,6 @@
  * values follow the design tokens (--r-*). Scoped by the `tb-` prefix.
  */
 .tb-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-.tb-sec-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; }
-.tb-sec-btn:hover { color: var(--r-ink-muted); }
-.tb-sec-btn svg { transition: transform .15s ease; }
-.tb-sec-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
 .tb-tick { position: relative; z-index: 10; width: 20px; height: 20px; margin: -2px -2px 0; border-radius: 999px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--r-ink-faint); flex-shrink: 0; }
 .tb-tick .on { display: none; }
 .tb-tick:hover { color: var(--r-accent); }
@@ -25,13 +21,6 @@
 .tb-actions.stack { flex-direction: column; gap: 6px; }
 .tb-opt { width: 100%; justify-content: flex-start !important; }
 .tb-opt span { overflow: hidden; text-overflow: ellipsis; }
-/* A side bar below 240 px (VS Code goes down to 170): a call's buttons take the
-   whole row, under the glyph (26 px) and the menu (28 px) too, so their words
-   fit (W15). */
-@media (max-width: 239px) {
-  .tb-side-actions { margin-left: -26px; margin-right: -28px; }
-  .tb-side-actions .tb-opt { padding-left: 8px; padding-right: 8px; }
-}
 /* The split button stays inside its column: the label shrinks to an ellipsis
    (its tooltip says it in full) and the arrow stays whole (W15, 170 px). */
 .tb-split { display: inline-flex; min-width: 0; max-width: 100%; }
@@ -101,9 +90,6 @@
 .tb-ev .quote { font-size: 12px; color: var(--r-ink-body); margin-top: 2px; }
 .tb-section-cap { font-size: 12px; color: var(--r-ink-muted); padding: 2px 16px 8px; }
 .tb-firstlook { padding: 4px 16px 12px; font-size: 12px; line-height: 1.5; color: var(--r-ink-muted); }
-.tb-callpanel { background: var(--r-surface); border-top: 1px solid var(--r-hairline); border-bottom: 1px solid var(--r-hairline); margin: 6px 0 10px; padding-bottom: 6px; }
-.tb-callhead { color: var(--r-ink-strong) !important; }
-.tb-blockline { display: flex; align-items: center; gap: 6px; padding: 0 16px 4px; font-size: 11px; font-weight: 600; color: var(--r-warning); }
 .tb-tile.tb-you { box-shadow: inset 3px 0 0 var(--r-accent); border-color: var(--r-accent-fainter); }
 .tb-tile.tb-blocked { box-shadow: inset 3px 0 0 var(--r-warning); border-color: var(--r-warning-soft); }
 .tb-yourmove { margin-top: 6px; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; background: var(--r-accent-soft); color: var(--r-accent-deep); }
@@ -121,7 +107,52 @@
 .tb-inlink { color: var(--r-accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .tb-inlink:hover { text-decoration: underline; }
 .tb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.tb-row-active { background: var(--r-surface-soft); }
+/* The Tasks list in the left column (Sprint 134, R17; experience 6, frame 1; kit: .group2, .row, .tick, .wait).
+   It sits under the project's head, whose rows end 8 above it: 12 to the first row, 14 to a group label. */
+.tb-list { padding: 4px 8px 16px; }
+.tb-group { display: flex; align-items: center; gap: 6px; margin: 14px 8px 8px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-strong); }
+.tb-group:first-child { margin-top: 10px; }
+.tb-group-n { font-weight: 500; letter-spacing: 0; color: var(--r-ink-body); font-variant-numeric: tabular-nums; }
+.tb-group-n.tb-wiptext-full { color: var(--r-accent-deep); } .tb-group-n.tb-wiptext-over { color: var(--r-warning); } /* Doing at or over its limit */
+.tb-fold { position: relative; display: flex; align-items: center; margin-top: 12px; border-radius: 4px; }
+.tb-fold:first-child { margin-top: 0; }
+.tb-fold:hover, .tb-row:hover { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
+.tb-fold-btn svg { transition: transform .15s ease; }
+.tb-fold-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .tb-fold-btn svg { transition: none; } }
+.tb-fold-inner { margin-top: 2px; }
+.tb-fold-add { position: absolute; right: 8px; top: 7px; opacity: 0; }
+.tb-fold:hover .tb-fold-add, .tb-fold:focus-within .tb-fold-add { opacity: 1; }
+.tb-row { position: relative; display: flex; align-items: flex-start; gap: 6px; padding: 7px 8px; border-radius: 4px; }
+.tb-row-title { font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.tb-row.tb-row-active, .tb-row.tb-row-active:hover { background: var(--r-surface); } /* the open task: the column's white row */
+.tb-row.tb-row-active .tb-row-title { color: var(--r-ink-strong); font-weight: 500; }
+/* A task that waits for the person: the dot in place of its glyph, ink while several wait, indigo on the open one. */
+.tb-wait { position: relative; flex-shrink: 0; width: 14px; height: 14px; margin: 2px 1px 0; border-radius: 50%; background: var(--r-hairline); }
+.tb-wait::after { content: ""; position: absolute; left: 5px; top: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--r-ink-strong); }
+.tb-wait.on { background: var(--r-accent-soft); }
+.tb-wait.on::after { background: var(--r-accent); }
+.tb-wfy { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 18px; padding: 0 6px; border-radius: 6px; background: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline); font: 600 11px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); white-space: nowrap; }
+.tb-wfy::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* A side bar below 240 px (VS Code goes down to 170): a waiting task's answers take the whole row, under the
+   mark (22 px) and the menu (24 px) too, so their words fit (W15). */
+@media (max-width: 239px) {
+  .tb-side-actions { margin-left: -22px; margin-right: -24px; }
+  .tb-side-actions .tb-opt { padding-left: 8px; padding-right: 8px; }
+}
+.tb-more { margin: 4px 0 0 30px; } /* under the rows' words */
+.tb-none-line { margin: -2px 8px 0; font: 400 13px/19px var(--ritemark-ui-font-family); color: var(--r-ink-body); } /* an empty To do or Doing (experience 29, frame 2) */
+.tb-none { margin: 10px 8px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+/* No board yet (experience 29, frame 2): what Tasks are for, and New task. */
+.tb-calm { margin: 10px 8px 0; }
+.tb-calm-title { font: 600 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.tb-calm p { margin: 4px 0 12px; font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+/* Search's field over the list: the column's own search field (kit: .rp-search). */
+.tb-search { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 2px 0 8px; border-radius: 6px; background: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); color: var(--r-ink-body); }
+.tb-search:focus-within { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, var(--r-accent)); }
+.tb-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.tb-search input::placeholder { color: var(--r-ink-muted); opacity: 1; }
+.tb-search input::-webkit-search-cancel-button { display: none; }
 .tb-toast { position: fixed; left: 50%; bottom: 16px; z-index: 95; transform: translateX(-50%); max-width: min(420px, calc(100% - 32px)); border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); padding: 8px 12px; font: 12px/1.4 var(--ritemark-ui-font-family); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1); display: flex; gap: 10px; align-items: flex-start; }
 /* The card page (design.md §5): a card open in the Ritemark editor. The strip
    takes DocumentHeader's place; the head sits in the editor's column, which

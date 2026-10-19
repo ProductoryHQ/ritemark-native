@@ -19,7 +19,7 @@ export const STEPS: readonly StepInfo[] = [
   { type: 'llmNode', name: 'LLM prompt', icon: 'chat-text', kind: 'ai', description: 'Writes text with a language model.' },
   { type: 'imageNode', name: 'Image generation', icon: 'image', kind: 'ai', description: 'Makes an image with AI.' },
   { type: 'claudeCodeNode', name: 'Claude Code', icon: 'robot', kind: 'ai', description: 'Gives a task to Claude Code, which can read and change the project\'s files.' },
-  { type: 'codexNode', name: 'Codex', icon: 'code', kind: 'ai', description: 'Gives a task to Codex, which can read and change the project\'s files.' },
+  { type: 'codexNode', name: 'ChatGPT', icon: 'code', kind: 'ai', description: 'Gives a task to ChatGPT, which can read and change the project\'s files.' },
   { type: 'saveFileNode', name: 'Save file', icon: 'floppy-disk', kind: 'action', description: 'Saves what an earlier step made to a file in the project.' },
   { type: 'inputNode', name: 'Input', icon: 'file-text', kind: 'start', description: 'A flow input.' },
 ];

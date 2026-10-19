@@ -1,6 +1,6 @@
 /**
  * Notice — a short line at the bottom of a board surface when the host refused
- * something (Sprint 130): "Only the user marks a card done.", "Codex is signed
+ * something (Sprint 130): "Only the user marks a card done.", "ChatGPT is signed
  * out. Sign in and try again." It goes by itself after a few seconds.
  */
 

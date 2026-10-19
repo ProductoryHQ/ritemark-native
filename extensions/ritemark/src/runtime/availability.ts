@@ -164,7 +164,7 @@ export function listReadyAlternatives(
 
 export const RUNTIME_LABELS: Record<AgentId, string> = {
   'claude-code': 'Claude',
-  codex: 'Codex',
+  codex: 'ChatGPT',
   opencode: 'OpenCode',
 };
 

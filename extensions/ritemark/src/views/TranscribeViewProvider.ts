@@ -63,6 +63,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   private readonly _disposables: vscode.Disposable[] = [];
   /** Sprint 118: direct recording. Owns the file; the webview only captures. */
   private readonly _recording: RecordingController;
+  /** The webview has said `transcribe:ready` and has its state: a record request can reach it. */
+  private _webviewReady = false;
+  /** When the head's Record asked for a recording the webview has not yet been told about (Sprint 134 R16). */
+  private _recordRequestedAt: number | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -90,6 +94,13 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('ritemark.features.transcribe-direct-recording')) void this._pushState();
       }),
+      // Sprint 134 R16: the panel's own Add recording and Record row shows only while no folder is open,
+      // when the project's head is not drawn; the head follows the folders, so the panel does too.
+      vscode.workspace.onDidChangeWorkspaceFolders(() => void this._pushState()),
+      // The head's two rows (patch 018) run these; so does the palette. They do what the panel's own
+      // Record and Add recording do.
+      vscode.commands.registerCommand('ritemark.transcribe.record', () => this.record()),
+      vscode.commands.registerCommand('ritemark.transcribe.addFile', () => this.addFile()),
     );
 
     this._recording = new RecordingController({
@@ -147,8 +158,47 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     await this._recording.dispose();
   }
 
+  /**
+   * Sprint 134 R16: the head's Record (`ritemark.transcribe.record`). The capture runs in the webview, so
+   * this shows the panel and asks it to start; the panel starts exactly when its own Record button would.
+   */
+  async record(): Promise<void> {
+    this._recordRequestedAt = Date.now();
+    await this._reveal();
+    this._deliverRecordRequest();
+  }
+
+  /** Sprint 134 R16: the head's Transcribe a file… (`ritemark.transcribe.addFile`), the panel's Add recording. */
+  async addFile(): Promise<void> {
+    await this._reveal();
+    // As the panel's button: with no engine ready and nothing pending it is disabled, and the panel
+    // shows how to set one up.
+    if (!this._pending) {
+      const engines = await this._registry.statuses();
+      if (!engines.some((engine) => engine.supportedOnPlatform && engine.readiness.ready)) return;
+    }
+    await this._pickFile();
+  }
+
+  private async _reveal(): Promise<void> {
+    try {
+      await vscode.commands.executeCommand(`${TranscribeViewProvider.viewType}.focus`);
+    } catch {
+      // The view may be hidden by its flag; the request then has no panel to reach.
+    }
+  }
+
+  /** Tells the webview once it can hear it; a request older than a few seconds is dropped, never replayed later. */
+  private _deliverRecordRequest(): void {
+    if (this._recordRequestedAt === null || !this._view || !this._webviewReady) return;
+    const fresh = Date.now() - this._recordRequestedAt < RECORD_REQUEST_TTL_MS;
+    this._recordRequestedAt = null;
+    if (fresh) this._post({ type: 'transcribe:recordRequested' });
+  }
+
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this._view = webviewView;
+    this._webviewReady = false;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -159,6 +209,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidDispose(() => {
       if (this._view !== webviewView) return;
       this._view = null;
+      this._webviewReady = false;
       // The capture died with the webview; keep what was written (R6).
       void this._recording.detach();
     });
@@ -177,7 +228,14 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         case 'transcribe:ready':
           // A (re)loaded panel cannot own a capture that was running in the
           // webview it replaced: that recording becomes an interrupted one.
-          void this._recording.detach().then(() => this._pushState());
+          // A record request waiting for this panel follows its first state.
+          void this._recording
+            .detach()
+            .then(() => this._pushState())
+            .then(() => {
+              this._webviewReady = true;
+              this._deliverRecordRequest();
+            });
           break;
         case 'transcribe:pickFile':
           void this._pickFile();
@@ -499,6 +557,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 }
+
+/** How long the head's Record waits for the panel to load before the request is dropped (Sprint 134 R16). */
+const RECORD_REQUEST_TTL_MS = 10_000;
 
 /** The OS privacy page where the user grants Ritemark the microphone. */
 const MICROPHONE_SETTINGS: Partial<Record<NodeJS.Platform, string>> = {

@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
+import { AdvancedSettingsLink } from './AdvancedSettingsLink';
 import { Switch } from '../ui/switch';
 import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
@@ -397,10 +398,10 @@ export function RitemarkSettings() {
             className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
           >
             <option value="bundled">Bundled (recommended) — use the runtimes that ship with Ritemark</option>
-            <option value="system">Use system install — prefer Codex/Claude installed on PATH; bundled is fallback</option>
+            <option value="system">Use system install — prefer ChatGPT and Claude installed on PATH; bundled is fallback</option>
           </select>
           <p className="text-xs text-ink-muted mt-1">
-            Applies to both Codex and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
+            Applies to both ChatGPT and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
           </p>
 
           {settings.environment && (
@@ -417,7 +418,7 @@ export function RitemarkSettings() {
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded bg-surface-soft">
-                <span className="text-ink-muted">Codex</span>
+                <span className="text-ink-muted">ChatGPT</span>
                 <span className="text-ink-strong">
                   {getSourceChipLabel(settings.componentStatus.codex.runtimeStatus.source) ?? 'Not detected'}
                 </span>
@@ -652,8 +653,8 @@ export function RitemarkSettings() {
                   <>
                     <p className="text-xs text-ink-muted mb-3">
                       {codexAuth.binaryMissing
-                        ? 'Codex CLI binary not found. Install it first:'
-                        : 'Codex CLI is installed but broken. Reinstall it first:'}
+                        ? 'ChatGPT is not installed. Install it first:'
+                        : 'ChatGPT is installed but broken. Reinstall it first:'}
                     </p>
                     <code className="block text-xs p-2 rounded bg-surface-soft text-ink-strong font-mono break-all">
                       {codexAuth.repairCommand}
@@ -679,7 +680,7 @@ export function RitemarkSettings() {
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
                     size="lg"
                   >
-                    Repair Codex
+                    Repair ChatGPT
                   </Button>
                   <Button
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
@@ -703,7 +704,7 @@ export function RitemarkSettings() {
             ) : !codexAuth.authenticated ? (
               <>
                 <p className="text-xs text-ink-muted mb-3">
-                  Sign in with your ChatGPT account to use Codex agents without an API key.
+                  Sign in with your ChatGPT account. No API key is needed.
                   Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -780,7 +781,7 @@ export function RitemarkSettings() {
             )}
 
             <p className="text-xs text-ink-muted mt-3">
-              Used for: Codex Agents (autonomous coding)
+              Used for: ChatGPT in chats, flows and the task board
               <a
                 href="https://developers.openai.com/codex/cli"
                 className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
@@ -807,7 +808,7 @@ export function RitemarkSettings() {
                     <option value="never">Never ask — run everything automatically</option>
                   </select>
                   <p className="text-xs text-ink-muted mt-1">
-                    Controls when Codex asks for your approval before executing shell commands or modifying files.
+                    Controls when ChatGPT asks for your approval before executing shell commands or modifying files.
                   </p>
                 </div>
 
@@ -820,12 +821,12 @@ export function RitemarkSettings() {
                     onChange={(e) => handleSettingChange('codex.sandboxMode', e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
                   >
-                    <option value="read-only">Read only — Codex can only read files</option>
+                    <option value="read-only">Read only — ChatGPT can only read files</option>
                     <option value="workspace-write">Workspace write — read and write within project (recommended)</option>
                     <option value="danger-full-access">Full access — includes network and system (use with caution)</option>
                   </select>
                   <p className="text-xs text-ink-muted mt-1">
-                    Controls what Codex is allowed to do on your filesystem.
+                    Controls what ChatGPT is allowed to do on your filesystem.
                   </p>
                 </div>
               </div>
@@ -1594,7 +1595,7 @@ export function RitemarkSettings() {
 
               <RuntimeStatusCard
                 icon={<Icon name="robot" size={16} />}
-                title="Codex"
+                title="ChatGPT"
                 runtimeStatus={settings.componentStatus.codex.runtimeStatus}
                 version={settings.componentStatus.codex.version}
                 errorMessage={settings.componentStatus.codex.error}
@@ -1674,6 +1675,9 @@ export function RitemarkSettings() {
           </button>
         </div>
       </section>
+
+      {/* Sprint 134 (R23): ⌘, opens this page, so VS Code's own settings need a way in. */}
+      <AdvancedSettingsLink post={(type) => vscode.postMessage({ type })} />
     </div>
   );
 }

@@ -41,7 +41,7 @@ const WHERE = 'page'
 
 function actorName(by: string): string {
   if (by === 'claude') return 'Claude'
-  if (by === 'codex') return 'Codex'
+  if (by === 'codex') return 'ChatGPT'
   if (by === 'opencode') return 'OpenCode'
   return 'The agent'
 }

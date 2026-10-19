@@ -403,6 +403,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         }
         break;
 
+      // Sprint 134 (R23): the foot's Advanced settings, VS Code's own settings page
+      case 'settings:openAdvanced':
+        await vscode.commands.executeCommand('workbench.action.openSettings');
+        break;
+
       case 'transcription:clearStorage':
         await this.clearTranscriptionStorage(webview);
         break;
@@ -912,7 +917,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   public async startCodexLoginFromCommand(): Promise<void> {
     if (!this.codexAuth) {
-      vscode.window.showErrorMessage('Codex integration not enabled.');
+      vscode.window.showErrorMessage('ChatGPT is turned off. Turn it on in Advanced settings.');
       return;
     }
 
@@ -923,7 +928,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       vscode.window.showInformationMessage('ChatGPT login started. Complete authentication in your browser.');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      vscode.window.showErrorMessage(`Codex login failed: ${errorMessage}`);
+      vscode.window.showErrorMessage(`ChatGPT sign-in failed: ${errorMessage}`);
     }
   }
 
@@ -1330,7 +1335,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     if (!this.codexAuth) {
       webview.postMessage({
         type: 'codex:authStatus',
-        data: { enabled: false, error: 'Codex integration not enabled' },
+        data: { enabled: false, error: 'ChatGPT is turned off' },
       });
       return;
     }
@@ -1360,7 +1365,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           error: errorMessage,
         },
       });
-      vscode.window.showErrorMessage(`Codex login failed: ${errorMessage}`);
+      vscode.window.showErrorMessage(`ChatGPT sign-in failed: ${errorMessage}`);
     }
   }
 
@@ -1392,7 +1397,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     const terminal = vscode.window.createTerminal({
-      name: 'Codex Repair',
+      name: 'Repair ChatGPT',
       shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
     });
 
@@ -1401,7 +1406,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     emitCodexStatusInvalidated('repair-started');
 
     vscode.window.showInformationMessage(
-      'Opened Codex repair in terminal. After it finishes, reload the window and reopen Settings.'
+      "Opened ChatGPT's repair in a terminal. When it finishes, reload the window and reopen Settings."
     );
   }
 
@@ -1446,7 +1451,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           enabled: true,
           authenticated: false,
           binaryMissing: true,
-          error: binaryStatus.error ?? 'Codex runtime not found.',
+          error: binaryStatus.error ?? 'ChatGPT was not found.',
           diagnostics: binaryStatus.diagnostics,
           repairCommand: binaryStatus.repairCommand,
         },
@@ -1461,7 +1466,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           enabled: true,
           authenticated: false,
           binaryBroken: true,
-          error: binaryStatus.error ?? 'Codex CLI is installed but could not be started.',
+          error: binaryStatus.error ?? 'ChatGPT is installed but could not start.',
           diagnostics: binaryStatus.diagnostics,
           repairCommand: binaryStatus.repairCommand,
         },

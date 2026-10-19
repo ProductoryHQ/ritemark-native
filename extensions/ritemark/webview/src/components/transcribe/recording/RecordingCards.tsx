@@ -89,6 +89,36 @@ export function PermissionCard({ onCancel }: { onCancel: () => void }) {
   );
 }
 
+/**
+ * Sprint 134 R16: the head's Record reached the panel with no click inside it. The panel's audio runs only
+ * after one (Phase 0 S1: the context starts suspended until a user gesture in the webview), so one click
+ * here starts the recording, as the panel's own Record button does.
+ */
+export function RecordPromptCard({ onStart, onCancel }: { onStart: () => void; onCancel: () => void }) {
+  return (
+    <Card label="Recording">
+      <div className="flex items-center gap-2">
+        <Icon name="microphone" size={16} tone="inherit" className="shrink-0 text-accent" />
+        <span className="text-xs font-semibold">Ready to record</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">Records from the microphone.</p>
+      <div className="mt-3 flex gap-2">
+        <Tooltip className="min-w-0 flex-1" label="Record from the microphone">
+          <Button size="sm" className="w-full min-w-0" autoFocus onClick={onStart}>
+            <RecordDot />
+            <span className="truncate">Start recording</span>
+          </Button>
+        </Tooltip>
+        <Tooltip label="Don't record now">
+          <Button variant="secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+        </Tooltip>
+      </div>
+    </Card>
+  );
+}
+
 export function LiveRecordingCard({
   view,
   host,
