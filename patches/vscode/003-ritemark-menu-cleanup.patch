@@ -150,6 +150,22 @@ index b00f8d12879..9034e595f7e 100644
  
  		return { malicious, deprecated, search, autoUpdate };
  	}
+diff --git a/src/vs/platform/windows/electron-main/windowsMainService.ts b/src/vs/platform/windows/electron-main/windowsMainService.ts
+index 52a7cb59a1e..bab4816b836 100644
+--- a/src/vs/platform/windows/electron-main/windowsMainService.ts
++++ b/src/vs/platform/windows/electron-main/windowsMainService.ts
+@@ -296,6 +296,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
+ 	async openAgentsWindow(openConfig: IOpenConfiguration, folderUri?: URI, reveal?: URI | 'new', source?: AgentsWindowOpenSource, folderUriIsDefault = false, draft?: IAgentsWindowDraft, onboardingSessionResource?: URI): Promise<ICodeWindow[]> {
+ 		this.logService.trace('windowsManager#openAgentsWindow');
+ 
++		// Ritemark (Sprint 135): no Agents window. `--agents`, agent links and tryout hand-offs open a normal window instead
++		if (product.applicationName === 'ritemark') {
++			return this.open(openConfig);
++		}
++
+ 		const existingWindows = this.getWindows();
+ 		folderUri = await resolveAgentsWindowFolder(openConfig, folderUri, reveal === 'new' ? undefined : reveal, source, cli => this.doExtractPathsFromCLI(cli));
+ 
 diff --git a/src/vs/workbench/browser/actions/workspaceActions.ts b/src/vs/workbench/browser/actions/workspaceActions.ts
 index 795ac6e007f..83de7a115b7 100644
 --- a/src/vs/workbench/browser/actions/workspaceActions.ts
@@ -401,6 +417,18 @@ index 4c547b3e523..dec7338380d 100644
  	}
  
  	private registerListeners(): void {
+diff --git a/src/vs/workbench/contrib/chat/common/constants.ts b/src/vs/workbench/contrib/chat/common/constants.ts
+index 503ad09076b..c40950f3e31 100644
+--- a/src/vs/workbench/contrib/chat/common/constants.ts
++++ b/src/vs/workbench/contrib/chat/common/constants.ts
+@@ -669,6 +669,7 @@ export const OPEN_WORKSPACE_IN_AGENTS_WINDOW_COMMAND_ID = 'workbench.action.open
+ export const OPEN_AGENTS_WINDOW_COMMAND_ID = 'workbench.action.openAgentsWindow';
+ export { AGENTS_WINDOW_TOTAL_SESSIONS_STORAGE_KEY } from '../../../../platform/chat/common/agentsWindowInvitation.js';
+ export const OPEN_AGENTS_WINDOW_PRECONDITION = ContextKeyExpr.and(
++	ContextKeyExpr.false(), // Ritemark (Sprint 135): no Agents window, so no command, button or shortcut opens one
+ 	ChatEntitlementContextKeys.Setup.hidden.negate(),
+ 	ChatEntitlementContextKeys.Setup.disabledInWorkspace.negate(),
+ 	IsSessionsWindowContext.negate(),
 diff --git a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts b/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
 index 2b745000cb1..60767c75806 100644
 --- a/src/vs/workbench/contrib/debug/browser/debug.contribution.ts
@@ -587,10 +615,10 @@ index bb8dd6560d4..2b6123c13bc 100644
  }], VIEW_CONTAINER);
  
 diff --git a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-index e05b71bd72c..f7f25a9d934 100644
+index e05b71bd72c..8000150f10e 100644
 --- a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
 +++ b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-@@ -41,6 +41,141 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
+@@ -41,6 +41,167 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
  import { IChatAgentService } from '../../chat/common/participants/chatAgents.js';
  import { ChatAgentLocation } from '../../chat/common/constants.js';
  
@@ -714,6 +742,32 @@ index e05b71bd72c..f7f25a9d934 100644
 +	// The walkthrough pickers: Getting Started is Ritemark's welcome (Sprint 133), which Help: Welcome opens (Windows round 3)
 +	'welcome.showAllWalkthroughs',
 +	'github.copilot.open.walkthrough',
++	// Sprint 135, new at VS Code 1.142 (the sprint's research/surfaces-audit.md §5.2): the Agents window, which Ritemark
++	// does not open (patch 003 closes it), and Developer commands outside the families above
++	'workbench.action.openAgentsWindow',
++	'workbench.action.openWorkspaceInAgentsWindow',
++	'workbench.action.startHeapTracing',
++	'workbench.action.onboarding.resetShownState',
++	'developer.onboarding.copyTryoutLink',
++	'agentsVoice.simulateConnection',
++	'agentsVoice.resetOnboarding',
++	'multiDiffEditor.openLayoutDebug',
++	'workbench.action.openSurvey',
++	// Sprint 135: chat's agent host and pet, Developer commands that show only with Copilot Chat
++	'workbench.action.chat.debugAgentHostInDevTools',
++	'agentHost.exportDebugLogs',
++	'workbench.action.chat.inspectAgentHostSubscriptions',
++	'workbench.action.chat.agentHostNetworkDiagnostics',
++	'agentHost.openSessionEventsFile',
++	'workbench.action.chat.profileAgentHost',
++	'workbench.action.chat.stopAgentHostProfile',
++	'workbench.action.chat.restartLocalAgentHost',
++	'workbench.action.chat.resetPermissionWarningDialogs',
++	'workbench.action.chat.resetCopilotHarnessIntroduction',
++	'chat.pet.developer.resetAchievements',
++	'chat.pet.developer.resetSize',
++	'chat.pet.developer.unlockAllAchievements',
++	'workbench.action.chat.agentHost.otel.exportAgentTracesDB',
 +]);
 +
 +/**
@@ -732,7 +786,7 @@ index e05b71bd72c..f7f25a9d934 100644
  export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAccessProvider {
  
  	private static AI_RELATED_INFORMATION_MAX_PICKS = 5;
-@@ -125,10 +260,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
+@@ -125,10 +286,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
  			return [];
  		}
  
@@ -748,10 +802,10 @@ index e05b71bd72c..f7f25a9d934 100644
  				iconClass: ThemeIcon.asClassName(Codicon.gear),
 diff --git a/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
 new file mode 100644
-index 00000000000..de2ac0a670f
+index 00000000000..09b558d7c5d
 --- /dev/null
 +++ b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,262 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -900,6 +954,9 @@ index 00000000000..de2ac0a670f
 +			'resetGettingStartedProgress',
 +			'welcome.showAllWalkthroughs',
 +			'github.copilot.open.walkthrough',
++			'workbench.action.openAgentsWindow',
++			'workbench.action.startHeapTracing',
++			'agentsVoice.resetOnboarding',
 +			// Dropped by prefix, one for each
 +			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
 +			'workbench.action.debug.start',
@@ -936,6 +993,9 @@ index 00000000000..de2ac0a670f
 +			'resetGettingStartedProgress',
 +			'welcome.showAllWalkthroughs',
 +			'github.copilot.open.walkthrough',
++			'workbench.action.openAgentsWindow',
++			'workbench.action.startHeapTracing',
++			'agentsVoice.resetOnboarding',
 +			'workbench.debug.viewlet.action.addDataBreakpointOnAddress',
 +			'workbench.action.debug.start',
 +			'debug.addConfiguration',

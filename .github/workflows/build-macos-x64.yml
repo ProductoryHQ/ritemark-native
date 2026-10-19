@@ -170,6 +170,19 @@ jobs:
           ./scripts/strip-foreign-agent-runtimes.sh "$EXT_DEST" darwin x64
           echo "Extension copied successfully"
 
+      - name: Strip unwanted built-in extensions from output
+        # The same list as scripts/build-prod.sh Step 4.5 and build-windows.yml
+        # (Sprint 135: this workflow stripped none of them before).
+        working-directory: r
+        run: |
+          EXTENSIONS_DIR="VSCode-darwin-x64/Ritemark.app/Contents/Resources/app/extensions"
+          for unwanted_ext in copilot mermaid-markdown-features theme-modern-icons; do
+            if [ -d "$EXTENSIONS_DIR/$unwanted_ext" ]; then
+              rm -rf "$EXTENSIONS_DIR/$unwanted_ext"
+              echo "Removed bundled $unwanted_ext extension"
+            fi
+          done
+
       # =========================================================================
       # Step 9: Inject ritemarkVersion into product.json
       # =========================================================================

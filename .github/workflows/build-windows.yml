@@ -512,12 +512,17 @@ jobs:
         # icon that conflicts with Ritemark's clean UI.
         shell: bash
         working-directory: r
+        # VS Code 1.142 (Sprint 135): Mermaid Markdown Features and Modern Icons
+        # are new visible built-ins, stripped as on the Mac (scripts/build-prod.sh
+        # Step 4.5; keep the three lists in step).
         run: |
-          COPILOT_EXT="VSCode-win32-x64/resources/app/extensions/copilot"
-          if [ -d "$COPILOT_EXT" ]; then
-            rm -rf "$COPILOT_EXT"
-            echo "Removed bundled copilot extension"
-          fi
+          for unwanted_ext in copilot mermaid-markdown-features theme-modern-icons; do
+            EXT_DIR="VSCode-win32-x64/resources/app/extensions/$unwanted_ext"
+            if [ -d "$EXT_DIR" ]; then
+              rm -rf "$EXT_DIR"
+              echo "Removed bundled $unwanted_ext extension"
+            fi
+          done
 
       - name: Hide chat activity bar icon via CSS
         # Belt-and-suspenders: even with the copilot extension removed,
