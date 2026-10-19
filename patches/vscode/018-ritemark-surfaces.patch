@@ -52,6 +52,9 @@ here (019 makes them). A file's extension is drawn apart from its name and muted
 resource label's splitExtension option (base/browser/ui/iconLabel/iconLabel.ts, workbench/browser/labels.ts), asked
 for by the Explorer's rows (explorerViewer.ts) and the tabs (019) (R13).
 
+Sprint 134 (the project at the centre): the Task board tab's count is drawn here, at the icon's lower right as the
+places row draws its badge (019 makes it; R6).
+
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 
@@ -605,10 +608,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..01610913be4
+index 00000000000..c3b682034c2
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1701 @@
+@@ -0,0 +1,1722 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1301,6 +1304,27 @@ index 00000000000..01610913be4
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.sticky-compact > .tab-label > .monaco-icon-label-iconpath {
 +	margin: 0 !important; /* !important: as above */
 +	padding: 0;
++}
++
++/* The Task board tab's count of what waits on you (Sprint 134, R6): the places row's badge, at the icon's lower right */
++.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab > .ritemark-tab-count {
++	position: absolute;
++	left: 21px;
++	top: 17px;
++	min-width: 13px;
++	height: 13px;
++	padding: 0 2px;
++	box-sizing: border-box;
++	border-radius: 7px;
++	background-color: var(--vscode-activityBarBadge-background);
++	color: var(--vscode-activityBarBadge-foreground);
++	font-size: 9px;
++	font-weight: 600;
++	line-height: 13px;
++	text-align: center;
++	font-variant-numeric: tabular-nums;
++	pointer-events: none;
++	z-index: 5;
 +}
 +
 +
