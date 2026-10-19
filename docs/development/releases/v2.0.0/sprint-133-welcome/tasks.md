@@ -91,7 +91,7 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 - [ ] After the merge: the drift check into the release plan's risk register (E7)
 - [ ] PostHog: the four events seen live after a yes on a production build; none before an answer or after a no; a 1.x OK sending from the first start (S24–S30, S52, S53)
 - [ ] Linked issues closed with evidence: [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429), [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338); [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401) closed or updated with the audit
-- [x] The privacy note (opt-in, `build_channel`) sent to the Development manager for ritemark.app (E6) — drafted in the shared notes (`sprint133-closeout-issue-drafts.md`), with Send Feedback's exception and GeoIP
+- [x] The privacy note (opt-in, `build_channel`) for ritemark.app (E6): in `qa-evidence.md`, *Privacy, for the website*, with Send Feedback's exception and GeoIP; it reaches the privacy page through Sprint 136's D5
 - [x] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [ ] Release plan: tracker, feature-complete rows and risk register updated
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)

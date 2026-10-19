@@ -139,13 +139,25 @@ The Development manager's parity check found three gaps in the welcome's scope; 
 
 ## Open findings
 
-Outside this sprint's files, for follow-up issues:
-- Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open.
-- Ritemark Settings doesn't redraw when the runtime choice changes outside the page (in `settings.json`); its own select does.
+Outside this sprint's files, as issues:
+- Flows' storage (`FlowStorage.ts:44`, a recursive `mkdir` of `.ritemark/flows`) brings back a project folder that was deleted while it was open: in Sprint 134 (R13).
+- [#460](https://github.com/ProductoryHQ/ritemark-native/issues/460): Ritemark Settings doesn't redraw when the runtime choice changes outside the page (in `settings.json`); its own select does.
+- [#461](https://github.com/ProductoryHQ/ritemark-native/issues/461): the first-run theme setup overwrites a theme set in `settings.json` before the first start (`window.autoDetectColorScheme`, seen in the Windows round).
+- [#463](https://github.com/ProductoryHQ/ritemark-native/issues/463): `product.json` has no commit, so windows never keep a V8 code cache (the #401 audit's second lead).
+- [#464](https://github.com/ProductoryHQ/ritemark-native/issues/464): the welcome's ChatGPT check reads Codex's error text (`isCodexSignInFailure`); a structured status from Codex would replace it.
+
+## Privacy, for the website (E6)
+
+For ritemark.app's privacy page, through the release's launch plan (Sprint 136's D5):
+- Usage data is off until the person turns it on, with a switch on the welcome and in Ritemark Settings; nothing is sent before that yes. Ritemark 1's OK (or a notice closed without Opt Out) carries over as a yes; Opt Out or no answer is off.
+- Every event carries `build_channel` (`dev` or `prod`), and no event carries a path, a name, a file, a message or an account.
+- New in 2.0 with usage data on: four counts (the welcome shown, an AI signed in, a project opened, the first message sent), beside the app starts and features used.
+- Send Feedback is the person's own choice and is sent even with usage data off: only the reaction and what they typed, under a one-off id that isn't kept, with no location. The box says "What you write here is sent with your feedback."
+- With usage data on, PostHog derives country and city from the request's IP (`disableGeoip: false`).
 
 ## The frame baseline
 
-`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The same after main's #452 was merged in. The baseline is unchanged; the welcome's own scenes are in `qa-evidence/` for Jarmo to approve into the baseline (`docs/development/frame-baseline/README.md`: a new baseline only with his approval).
+`scripts/qa/frame-screenshots.mjs --compare docs/development/frame-baseline` on a fresh profile with the baseline's sample project: 0 of 18 scenes over the 0.5% line (0–0.34%), all of it the muted extensions in the tree and tabs. The same after main's #452 was merged in. The frame's 18 scenes are unchanged. The welcome's own ten scenes joined the baseline with Jarmo's approval on 19 October (`docs/development/frame-baseline/README.md`).
 
 ## Checks
 
