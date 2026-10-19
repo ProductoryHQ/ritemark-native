@@ -492,6 +492,52 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 5c: Every native module in the app has the target's architecture
+#
+# Sprint 135 (R4): VS Code's own .node files (node-pty, @parcel/watcher,
+# @vscode/spdlog, native-keymap, the proxy resolver, ...) and every built-in
+# extension's. A wrong one fails to dlopen at run time (issue #39): the
+# terminal, file watching or logging die quietly. Another platform's payload
+# whose path names it (prebuilds/<os>-<arch>/, darwin-x64, linux, win32) is a
+# warning; any other mismatch fails.
+# -----------------------------------------------------------------------------
+echo ""
+echo "Validating native modules in the app..."
+case "$TARGET" in
+  darwin-arm64|darwin-x64) APP_ROOT="$APP_PATH/Contents" ;;
+  win32-x64) APP_ROOT="$APP_PATH" ;;
+esac
+native_ok=0
+native_foreign=0
+while IFS= read -r node_file; do
+  rel="${node_file#"$APP_ROOT"/}"
+  desc=$(file -b "$node_file" 2>/dev/null)
+  matches=false
+  case "$TARGET" in
+    darwin-arm64) [[ "$desc" == *Mach-O* && "$desc" == *arm64* ]] && matches=true ;;
+    darwin-x64) [[ "$desc" == *Mach-O* && "$desc" == *x86_64* ]] && matches=true ;;
+    win32-x64) [[ "$(pe_machine "$node_file" || true)" == "8664" ]] && matches=true ;;
+  esac
+  if [[ "$matches" == true ]]; then
+    native_ok=$((native_ok + 1))
+  elif echo "$rel" | grep -Eq '(prebuilds/[^/]*-|darwin-x64|darwin-arm64|/x64/|/arm64/|x86_64|linux|win32|windows)'; then
+    native_foreign=$((native_foreign + 1))
+    echo -e "  ${YELLOW}WARN${NC}: another platform's native payload: $rel ($desc)"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo -e "  ${RED}FAIL${NC}: $rel is not a $TARGET native module ($desc)"
+    ERRORS=$((ERRORS + 1))
+  fi
+done < <(find "$APP_ROOT" -name '*.node' -type f 2>/dev/null)
+if [[ $native_ok -eq 0 ]]; then
+  echo -e "  ${RED}FAIL${NC}: no $TARGET native module found in the app"
+  ERRORS=$((ERRORS + 1))
+else
+  echo -e "  ${GREEN}OK${NC}: $native_ok native module(s) for $TARGET; $native_foreign other platforms' payload(s)"
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
 # Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""
