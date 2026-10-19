@@ -297,7 +297,9 @@ Each workstream below follows these, which override its own text where they diff
   |---|---|---|
   | `workbench.debug.viewlet.action.addDataBreakpointOnAddress` | Add Data Breakpoint at Address | Debugging (#456) |
   | `workbench.debug.viewlet.action.addFunctionBreakpointAction` | Add Function Breakpoint | Debugging (#456) |
-  | *(the audit fills the rest)* | | |
+  | *the rest: [`research/palette-audit.md`](research/palette-audit.md) §7, the authoritative list (5 prefixes, 86 IDs)* | | |
+
+  The hunk is one filter on the array `getCommandPicks` returns (`commandsQuickAccess.ts:128–131`), which search, similar commands, recently used and the AI's related picks all read, after patch 015's tested pure-function pattern. Sprint 135's VS Code update runs the audit's search again, since new versions add developer commands.
 
 - Kept by rule (spec R21): Ritemark's commands, the commands a Ritemark menu, doc, skill or QA step names, and those the parity list reaches only through All commands.
 - Tests: a VS Code unit test that a listed ID and a prefixed ID are not offered and a kept one is; S58 by hand.

@@ -337,7 +337,8 @@ As a writer, I want All commands to list what I can use in Ritemark (#456).
 Acceptance criteria:
 - All commands (⇧⌘P, Ctrl+Shift+P on Windows) no longer lists VS Code's developer and debugging commands, such as "Add Data Breakpoint at Address" and "Add Function Breakpoint" (Jarmo, 19 October).
 - It is a filter of command IDs, in patch 003, beside its menu cleanup. The commands stay registered, so a menu, a shortcut or another command that runs one still works.
-- The list of IDs to drop is written first, by an audit (technical plan, Phase 1).
+- The list of IDs to drop is written first, by an audit (technical plan, Phase 1). The [palette audit](research/palette-audit.md) drops 62 debugging IDs (five prefixes and three IDs) and 88 developer IDs, and keeps four developer commands: Reload Window, Toggle Developer Tools, Open Webview Developer Tools and Open Process Explorer, each named by a Ritemark menu, doc, skill or QA step.
+- With no debugger installed (Ritemark ships none), most debugging entries are already hidden. About nine always show today, both of #456's examples among them.
 - A command stays in the palette when:
   - it is Ritemark's own;
   - a Ritemark menu, doc, skill or QA step names it (for example Developer: Reload Window);
@@ -361,6 +362,11 @@ Acceptance criteria:
 - The list comes first: an audit lists every user-visible "Codex" string, with where it is, what it says and what it will say (technical plan, Phase 1).
 - This is a copy pass only. Internal names, setting keys, command IDs, file names, log lines and code identifiers stay as they are, so nothing a person set is lost.
 - A model's own name stays as OpenAI writes it, such as "GPT-5.3 Codex Spark". The audit lists these apart.
+- Per the [Codex strings audit](research/codex-strings-audit.md) (104 strings):
+  - **The comment handle `@codex` stays** for 2.0. It is syntax saved inside people's documents, and changing it would break every comment already assigned with it. The name shown beside it says ChatGPT. A `@chatgpt` handle is a code change for later (to be confirmed by the Development manager);
+  - **VS Code's settings page names a setting from its key**, so "Codex: Approval Policy", "Codex: Sandbox Mode" and "Codex-integration" stay where Advanced settings leads (R23). The AI choice shows "ChatGPT" through `enumItemLabels`, and the settings section is titled "ChatGPT and OpenCode", since it holds OpenCode's setting too;
+  - **words already saved stay**: a flow step's saved label, a card's history line and a chat's history keep "Codex" where it was written before;
+  - **the user documents** (`docs/user/`) are rewritten with Sprint 136's notes (parity list, G9), not in this pass.
 - Text that the bundled runtime itself writes, such as its own error, is shown as it came. Ritemark's words around it say ChatGPT.
 - Settings keeps its layout. The Settings redesign (experience 15) comes after 2.0.
 

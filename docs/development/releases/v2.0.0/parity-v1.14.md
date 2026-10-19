@@ -97,7 +97,7 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | File ▸ Open…, Open Folder…, Open Recent, Save, Close | Same | Main | Done |
 | File ▸ New tab, Switch project, Share | New in the drawings. VS Code's own File ▸ Share (vscode.dev links) is already gone in 1.14 (patch 003); this Share is the document's | S134 | Planned (R8) |
 | View ▸ File Browser | View ▸ Documents | Main | Done |
-| View ▸ Run (Ctrl+Shift+D) | The shortcut and All commands | Main | Left out (Windows round 1 fix: Run is for code) |
+| View ▸ Run (Ctrl+Shift+D) | The shortcut (not All commands, from Sprint 134's R21) | Main | Left out (Windows round 1 fix: Run is for code) |
 | View ▸ Chat | View ▸ Copilot Chat | Main | Done |
 | View ▸ Problems, Output, Debug Console | Same; they open VS Code's bottom panel, as in 1.14 | Main | Done |
 | Help ▸ Support, View License, Toggle Developer Tools, About | Same; Support no longer asks about an outside site | Main | Done |

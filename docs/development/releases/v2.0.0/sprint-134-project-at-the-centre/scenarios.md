@@ -394,9 +394,9 @@ Then the question is about the page now in front, and ritemark.app is not shared
 ### S58: No developer commands
 When the person opens All commands (⇧⌘P) and types "breakpoint", then "debug", then "developer"
 Then "Add Data Breakpoint at Address", "Add Function Breakpoint" and the other IDs on the audit's list do not show, and nothing on the list shows under recently used
-And Ritemark's commands, Preferences: Open Settings, the kept developer commands (such as Developer: Reload Window), refreshing the file list and the AI column's Maximize all show
-When the person opens View ▸ Debug Console
-Then it opens as before: a menu still runs a command the palette dropped.
+And Ritemark's commands, Preferences: Open Settings (UI), the four kept developer commands (Reload Window, Toggle Developer Tools, Open Webview Developer Tools, Open Process Explorer), Refresh Explorer and the AI column's Maximize all show
+When the person runs Help ▸ Toggle Developer Tools from its menu, and a dropped command from a key binding made for the test
+Then each runs as before: a menu or a key still runs a command the palette dropped.
 
 ## Feature: ChatGPT, never Codex (R22)
 
