@@ -29,7 +29,7 @@ The dev build lists Copilot Chat and "Chat Debug" in More, from VS Code's built-
 
 ### The welcome (Sprint 133)
 
-Ten more files, taken at 1440 × 900 from Sprint 133's head (`a3be9376`, merged as `eae1dedd`). **Jarmo approved them into this baseline on 19 October 2026** ("all looks good now! Proceed", through the Development manager).
+Ten more files, taken at 1440 × 900 from Sprint 133's head (`a3be9376`, merged as `eae1dedd`). **Jarmo approved them into this baseline on 19 October 2026** ("all looks good now! Proceed", through the Development manager). The two step-2 files were re-taken the same day after usage data became on by default (#469): only the switch's line changed (0.22%), now on with the Experience lead's final words. **Jarmo approved them on 19 October 2026** ("its ok").
 
 | File | Scene |
 | --- | --- |
