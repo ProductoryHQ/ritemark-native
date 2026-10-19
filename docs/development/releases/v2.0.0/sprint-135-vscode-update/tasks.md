@@ -6,13 +6,13 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Steps 
 
 - [x] Steps 1–3 merged; confirm on `origin/main` and note the commit: `3c8a7c30` (Sprint 134, #467)
 - [x] `git checkout -b sprint-135-vscode-update` from `origin/main`; `git branch --show-current` shows it (2026-10-19, after Jarmo's approval)
-- [ ] Freeze the target by R1's rule; write `notes/freeze.md` (tag, commit, date, Node, Electron, server Node); put the target in the sprint plan's status line (W1, S1)
-- [ ] Record the rollback point: main's last 1.117.0 commit and its clean-room build check, in the release plan's tracker (R10, W11)
-- [ ] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1)
-- [ ] The upstream diff inventory for every patched file (W1)
-- [ ] List Steps 2 and 3's patches and their shell scenarios by number below, under Phase 7 (R7)
-- [ ] Record every patch's file list and count before the rebase, in `notes/rebase.md` (`PATCH-RULES.md` §8)
-- [ ] `vscode/` from a copy-on-write clone; fetch the target and the pin (depth 1); pristine at the target with `clean -fd -e extensions/ritemark`
+- [x] Freeze the target by R1's rule; write `notes/freeze.md` (tag, commit, date, Node, Electron, server Node); put the target in the sprint plan's status line (W1, S1): 1.142.0, `d956e8a6`, 2026-10-19
+- [x] Record the rollback point: main's last 1.117.0 commit and its clean-room build check, in the release plan's tracker (R10, W11): `3c8a7c30` for now, with Sprint 134's E5 build check; confirmed or moved to the PR's base before the PR
+- [x] `check-vscode-drift.sh <target>` on main after Step 3, with the hunk counts, into `notes/drift.md` (E1): 13 of 18 patches fail in 59 file patches; 104 of 400 hunks
+- [x] The upstream diff inventory for every patched file (W1): `notes/upstream-diff.md`
+- [x] List Steps 2 and 3's patches and their shell scenarios by number below, under Phase 7 (R7)
+- [x] Record every patch's file list and count before the rebase, in `notes/rebase.md` (`PATCH-RULES.md` §8)
+- [x] `vscode/` from a copy-on-write clone; fetch the target and the pin (depth 1); pristine at the target with `clean -fd -e extensions/ritemark`
 
 ## Phase 1: Audits first (W2)
 
@@ -49,7 +49,7 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
 - [ ] 016, 017 (cascade at 1.142.0; confirm, or drop if Step 2 removed their base)
 - [ ] 018, following `research/frame-audit.md`
 - [ ] 019
-- [ ] The patches Steps 2 and 3 added (named at Phase 0)
+- [ ] The patches Steps 2 and 3 added (named at Phase 0): none. Steps 2 and 3 added no patch file; they retired 017 (Sprint 133) and grew 001, 003, 009, 015, 018 and 019, which are rebased above
 - [ ] `check-patch-stacking.mjs` passes; any change to its known pairs explained
 - [ ] `apply-patches.sh --dry-run` counts read; a real apply from pristine; a second run applies nothing and exits 0 (S5)
 - [ ] The target's `core-ci` type-check and the minified bundle compile, with no unused imports
@@ -82,7 +82,9 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
 - [ ] `frame-geometry.mjs`, every scene, equal to Sprint 132 merge 2's numbers (S16)
 - [ ] `frame-screenshots.mjs`, light and dark, fresh profile; `qa/screenshot-diff.md` written; pinnable causes pinned; the rest to the Experience lead, then Jarmo (S13–S15, D5)
 - [ ] Sprint 132's scenarios on the updated build, in dev on the Mac (S17): S1–S6, S12–S40, S42–S46. S41 only for the surfaces drawn by then
-- [ ] Steps 2 and 3's shell scenarios, numbers filled in at Phase 0 (S18): …
+- [ ] Steps 2 and 3's shell scenarios (S18), the ones that run through a patch:
+  - Sprint 133 on the Mac: S1, S3, S38, S40, S41, S42, S43, S48, S49, S54 (the first window, Help: Welcome and every way in, the welcome alone on the ground, the muted extension, the empty desks' tiles); on Windows, after the merge: S45–S47
+  - Sprint 134 on the Mac: S12, S13, S18–S21, S27–S31, S33, S44–S46, S48, S50, S52, S55–S58, S61 (the Tasks tab's count, the permanent tabs, the heads' rows, the switcher flyout, File ▸ New tab / Switch project / Share, About this project and the hidden pointer `CLAUDE.md`, the switch question on VS Code's own routes, the splash's ground, the share question on the AI's sheet, the palette with no developer commands, the chosen row's colour); on Windows, after the merge: S41, S42
 - [ ] The inventory (S22) and both profiles (S23)
 - [ ] The browser (S26), the runtimes on darwin-arm64 (S27), saving and the small patches (S28), the native features in dev (S10)
 - [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation
