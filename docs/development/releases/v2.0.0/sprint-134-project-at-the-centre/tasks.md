@@ -17,7 +17,8 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `research/switch-audit.md` (W8, R9): what "the AI is working" means and where it is known; Ritemark's switch paths; VS Code's own Open Folder and Open Recent
 - [ ] `research/splash-audit.md` (W8, R9): `partsSplash.ts`'s colours; the ground in Light and Dark; a v1.14.0 profile's stored splash
 - [ ] `research/about-file-audit.md` (W7, R8): where a file's name is drawn (menu, tab, Documents, Home, the AI sheet) and how each says About this project; how Documents hides only the pointer-only `CLAUDE.md`; the book-open icon and the tooltip on the tab and the Documents row
-- [ ] `research/confirmations.md`: `ritemarkMenu.ts` and a submenu; `revealFileInOS` on Windows; opening the AI's new chat from Home; `BoardStore` writing nothing until the first card
+- [ ] `research/confirmations.md`: `ritemarkMenu.ts` and a submenu; `revealFileInOS` on Windows; opening the AI's new chat from Home; `BoardStore` writing nothing until the first card; how 018's head takes a place's rows and what happens to a view's title-row actions under it; what ⌘T and Ctrl+T run today; every recursive `mkdir` under a project besides Flows' storage
+- [ ] The refresh's design questions answered by the Experience lead: Transcribe's settings button, Share on a PDF and a Word file, rows on Browser (spec, Open Questions)
 - [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
 
 ## Phase 2: The projects subsystem (W1, W2, W3)
@@ -30,6 +31,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `src/projects/waiting.ts` + test (R3)
 - [ ] `src/projects/protocol.ts` + test (E2)
 - [ ] `extension.ts`: `ProjectList.opened` on every activation with a folder; the first fill
+- [ ] The welcome's update sheet and "Where do you want to start?" sheet read the project list (R2, S54)
 - [ ] 019: the Tasks tab's count from the Tasks place's badge, up to "99+", in the accessible name; its VS Code unit test (R6)
 
 ## Phase 3: Home and the permanent tabs (W4, W5)
@@ -53,31 +55,42 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `src/projects/aboutFile.ts` + test: open `AGENTS.md`, or ask and create it with the one-line `CLAUDE.md`; never over an existing `CLAUDE.md` or `AGENTS.md`; the note with Add the line and Not now for a folder's own `CLAUDE.md`; pointer-only recognised (R8)
 - [ ] The file shown as About this project in the menu, its tab, Documents and Home, with the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT", per the about-file audit; Ritemark's pointer-only `CLAUDE.md` hidden in Documents (R8)
 - [ ] 018: `ritemarkMenu.ts` draws an extension-supplied submenu (`ritemark.projects.switcherItems`) (R8)
-- [ ] 018: `ritemark/fileMenu` mapped to the File menu; the extension contributes Switch project (R8)
+- [ ] 018: `ritemark/fileMenu` mapped to the File menu; the extension contributes New tab (⌘T, Ctrl+T), Switch project and Share (R8, S29, S52)
 - [ ] `src/projects/switchProject.ts` + test: the dialog (Cancel, Switch and stop, Open in a new window), Switch and stop as Stop, the switch, the "Switched to…" note with Go back (R9)
 - [ ] VS Code's own Open Folder and Open Recent as the switch audit decided (R9)
 - [ ] 018 (and 001's dark default if kept): the splash in the ground's colour (R9)
+
+## Phase 4b: The other places' heads (W12)
+
+- [ ] 018: `HEAD_PLACES` takes Tasks, Browser and Transcribe, with each place's rows from the extension (R16)
+- [ ] Tasks: New task and Search rows; the list in the order work moves, a call first and marked in its stage, Archived inside Done; test (R17)
+- [ ] Transcribe: Record and Transcribe a file… as rows; "Recordings" in place of "Library"; the settings button where the Experience lead draws it (R16)
+- [ ] Browser: the Recent label with + and Clear history; "No pages yet"; `view/title`'s two entries removed once the page has them (R18)
+- [ ] `FlowStorage` and any other recursive `mkdir` under a project: a gone folder stays gone; test (R13, S53)
 
 ## Phase 5: The document's bar, and removing the launcher (W9, W6)
 
 - [ ] `DocumentHeader.tsx`: Saved from `document:sync-state`; test (R12)
 - [ ] `ExportMenu.tsx` → Share as experience 26's frame 1, with today's handlers and every Google Docs state; test (R12)
+- [ ] The PDF and Word bars: Make an editable copy; Share as the Experience lead draws it; test (R19, W13)
 - [ ] R14's table checked row by row on the branch (S40)
 - [ ] `HomeViewProvider.ts` and its test deleted; `home-launcher` set to `disabled` with a tombstone in `flags.ts`; its `package.json` entries tidied (R14)
 
 ## Phase 6: QA, merge and closeout
 
 - [ ] CDP checks in `scripts/qa/`: the permanent tabs, the Tasks tab's count, switching, the splash (E3)
-- [ ] The screenshot baseline gains Home, the list, the switcher and What moved, light and dark (E3)
+- [ ] `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe (E3)
+- [ ] The screenshot baseline gains Home, the list, the switcher, What moved and the three places with their heads, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md` (Projects), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions, `update-vscode.sh`'s checklist line (E6)
-- [ ] Manual QA on the Mac: S1–S40, S43, S44; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S40, S43–S54; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
-- [ ] After the merge: Windows round from main: S41, S42, S29, the splash and the Tasks tab's count; findings in `qa-evidence.md`
+- [ ] After the merge: Windows round from main: S41, S42, S29, S52, the splash and the Tasks tab's count; findings in `qa-evidence.md`
 - [ ] After the merge: the drift check into the release plan (E7)
 - [ ] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [ ] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated
+- [ ] The [v1.14 parity list](../parity-v1.14.md): every Sprint 134 row checked on the branch and marked done
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)

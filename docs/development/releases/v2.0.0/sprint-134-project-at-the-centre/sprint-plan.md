@@ -1,16 +1,16 @@
 # Sprint 134: The project at the centre
 
-Track: SDD (15 user-facing requirements; a new extension subsystem, the webview, small hunks in patches 018 and 019)
+Track: SDD (19 user-facing requirements; a new extension subsystem, the webview, small hunks in patches 018 and 019)
 Override with: "use plain full track"
 Branch: `sprint-134-project-at-the-centre` (created only after approval, and only once Sprint 133 is merged)
 Release tier: shell (patches 018 and 019, and 001 if the splash audit keeps its hunk; there is no release from main until 2.0)
-Status: Phase 2 (PLAN) drafted 2026-10-18, **awaiting Jarmo's approval**. Not started.
+Status: Phase 2 (PLAN) drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), **awaiting Jarmo's approval**. Not started.
 
 ## SDD Artifacts
 
-- [spec.md](spec.md): the behaviour contract, R1–R15 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S44, the manual QA matrix.
-- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W11, the five audits, one merge.
+- [spec.md](spec.md): the behaviour contract, R1–R19 and E1–E7.
+- [scenarios.md](scenarios.md): S1–S54, the manual QA matrix.
+- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W13, the five audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
 
@@ -18,7 +18,20 @@ The release is [v2.0.0](../release-plan.md), step 3. The design is the Experienc
 
 ## Goal
 
-The project becomes the place a person works in. Each project opens on its own Home, which says what waits for the person and what changed, with Home and Tasks always the first two tabs. On Home the left column lists every project on the computer, with what waits in each, from the first day of 2.0. Switching projects happens in the same window, and each project keeps its own tabs. The document's bar says Saved, and Export becomes Share.
+The project becomes the place a person works in. Each project opens on its own Home, which says what waits for the person and what changed, with Home and Tasks always the first two tabs. On Home the left column lists every project on the computer, with what waits in each, from the first day of 2.0. Every other place carries the project's name at its head. Switching projects happens in the same window, and each project keeps its own tabs. The document's bar says Saved, and Export becomes Share.
+
+## What the refresh added (18 October)
+
+Sprint 132 handed these to step 3 in its sprint plan and QA evidence:
+- **The project's head on Tasks, Browser and Transcribe** (R16), as every place but Home has it in the Experience lead's drawings. Sprint 132 did only the minimum: Browser's title reads "Browser".
+- **Tasks under the head** (R17): New task, Search, and the list in the order work moves (experience 6).
+- **Browser under the head** (R18): the Recent label with its + and Clear, and "No pages yet" for "No recent URLs".
+- **The PDF and Word bars** (R19): Make an editable copy, and Share. The Experience lead's scope of 18 October left both to this step.
+- **The File menu** (R8): New tab and Share join Switch project, as Sprint 132's technical plan left them.
+- **A folder that has gone stays gone** (R13): Flows' storage no longer recreates it (Sprint 133's QA).
+- **The welcome's lists read the project list** (R2), as Sprint 133's plan expects.
+
+The [v1.14 parity list](../parity-v1.14.md) names which of its rows this sprint provides. The ones that need building are in the requirements above.
 
 ## Linked Issues
 
@@ -41,10 +54,14 @@ The project becomes the place a person works in. Each project opens on its own H
 | Saved and Share on the document's bar | R12 |
 | A folder that is not found, an empty project, a project with no board | R13 |
 | Nothing lost; Windows | R14, R15 |
+| The project's head on Tasks, Browser and Transcribe; Tasks' and Browser's pages under it | R16, R17, R18 |
+| Make an editable copy and Share on the PDF and Word bars | R19 |
 | One projects subsystem, Home in the shared bundle, tests, builds, docs, drift | E1–E7 |
 
 **Not in this sprint:**
 - search across projects (Search all projects filters by name);
+- the Task board tab and Transcribe redrawn as experiences 6 and 20 draw them (this sprint gives their places a head, and Tasks its list);
+- the browser's share question on the AI's sheet (experience 28);
 - switching without a reload;
 - sub-projects, recent documents across projects, chosen icons as marks;
 - About this project written by Claude;
@@ -63,6 +80,10 @@ The project becomes the place a person works in. Each project opens on its own H
 | The head's Switch project… (Sprint 132: VS Code's recent list) | Switch project ▸ with Ritemark's projects | R8 |
 | Export: PDF, Word, Google Docs (every state), Copy as Markdown | Share: Send a copy, Google Docs, Copy as Markdown | R12 |
 | Opening a folder from VS Code's File menu | Still there; Ritemark's own paths ask first when the AI is working | R9 |
+| The Browser view's New browser tab and Clear history (title row) | At the right of the Recent label; the palette | R18 |
+| Transcribe's Add recording, Record and settings button | The head's Transcribe a file… and Record; the settings button where the Experience lead draws it | R16 |
+| Tasks' add field, Your calls panel and Archived section | New task; the waiting tasks first and marked in their stage; Archived inside Done | R17 |
+| PDF and Word: Save as Markdown | Make an editable copy | R19 |
 
 The launcher's code is deleted only after every row above is checked on the branch, and its `home-launcher` flag is set to disabled with a tombstone (`CLAUDE.md`'s flag rule).
 
@@ -75,7 +96,7 @@ The launcher's code is deleted only after every row above is checked on the bran
 ## Windows
 
 - **Round 1, before the merge:** the extension side (Home, the list, the head's menu, switching) through the test overlay on the latest Windows build from main.
-- **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (the Tasks tab's count, the splash, File ▸ Switch project) and projects on other drives and network paths (S41, S42).
+- **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe) and projects on other drives and network paths (S41, S42, S52).
 
 ## Tests and the production build
 
@@ -103,6 +124,7 @@ The launcher's code is deleted only after every row above is checked on the bran
 - **2026-10-18 (the Experience lead, About this project's details):** a folder with its own `CLAUDE.md` gets a note with Add the line and Not now, and that `CLAUDE.md` never changes without the click; Documents hides only Ritemark's pointer-only `CLAUDE.md`; the tab and the Documents row read About this project with the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT".
   - The sample project: yes. Ritemark ships one, offered on the welcome (Sprint 133). Here it is an ordinary project, and it gains its line on Home.
   - Usage data for people updating from 1.x: an OK on 1.x's notice carries over as a yes; anyone who opted out or never answered starts off (Sprint 133). Nothing changes here.
+- **2026-10-18 (Sprint 132's handover, the Experience lead):** the project's head on Tasks, Browser and Transcribe comes in step 3 with their content; Browser's + and Clear sit at the right of a "Recent" group label in the column's 11-caps style; Tasks' drawing has New task and its list; Browser's empty text is plain words ("No pages yet"); the PDF bar's words and Share are step 3's.
 - **2026-10-18 (engineering, in this plan):**
   - one merge;
   - the Tasks tab's count is the Tasks place's badge, read in the shell, so the two can never differ; the project's total adds the chats that wait;
@@ -118,6 +140,7 @@ Each has a recommendation, listed in [spec.md](spec.md#open-questions) too.
 
 1. **What counts as a chat that waits.** I recommend a question or an approval the AI is waiting on, not an unread answer.
 2. **Removing 1.x's Home launcher.** I recommend deleting its code once every function on the table above is checked, and setting its `home-launcher` flag to disabled with a tombstone.
+3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own, and the tasks that wait lead their stage, marked; Archived goes inside Done. I recommend yes, as drawn: every task and action stays and the count is unchanged. It changes how a 1.x list looks, so it needs your yes.
 
 ## Feature Flag Check
 
@@ -135,6 +158,10 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 - [ ] Saved and Share work, and every Export item works from Share (R12).
 - [ ] About this project opens or creates `AGENTS.md`, shown as About this project; a `CLAUDE.md` already in the folder changes only through Add the line (R8).
 - [ ] Everything Home's launcher did in v1.14.0 can be done from 2.0's Home (R14).
+- [ ] Tasks, Browser and Transcribe carry the project's head, and nothing their title rows did is lost (R16–R18).
+- [ ] The PDF and Word bars say Make an editable copy and end in Share (R19).
+- [ ] The File menu has New tab, Switch project and Share (R8).
+- [ ] Every Sprint 134 row of the v1.14 parity list is checked on the branch.
 - [ ] Light, Dark and Windows checked (R15).
 - [ ] A production build from a clean-room worktree succeeds after the merge; the drift is recorded (E5, E7).
 
@@ -148,6 +175,8 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 | Switching through VS Code's own Open Folder stops the AI without asking | Audit; at worst today's behaviour, recorded |
 | Removing the launcher loses a function | The table above, checked before the code goes |
 | A folder already has its own `CLAUDE.md` (a code project) | Create never writes over it; the note offers Add the line, which keeps every other byte; S44 |
+| Tasks' new order hides a call | A call leads whatever stage it is in; S49 |
+| A title row's action is lost under the head | Each moves into its page first and stays in the palette; S46 |
 
 The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprint).
 
@@ -155,7 +184,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - **Sprint 132 merged:** the rule that keeps pinned Home and Task board tabs first (019), the head's place and menus (018), the tab row.
 - **Sprint 133 merged:** the landing (`src/welcome/landing.ts`), a new project (`src/welcome/newProject.ts`), the sample project (`extensions/ritemark/sample-project/`), the update marker `ritemark.updatedFrom1x` and the consent gate.
-- **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, and the answers of 18 October (spec, *Resolved Questions*).
+- **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, and the answers of 18 October (spec, *Resolved Questions*). The refresh adds three small design questions (spec, *Open Questions*): Transcribe's settings button, Share on a PDF and a Word file, and rows on Browser.
 
 ## Pre-Implementation Gate
 
