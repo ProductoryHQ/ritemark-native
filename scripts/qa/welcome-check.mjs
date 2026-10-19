@@ -130,8 +130,8 @@ if (expect === 'update') {
 		const checked = usage === 'off' ? 'false' : 'true';
 		check(`R7 the switch is ${usage}`, welcome?.usage === checked, welcome?.usage, checked);
 		const words = usage === 'on' ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
-			: usage === 'default' ? 'On. Anonymous: never your documents, chats or names. You can turn it off here or in Settings.'
-			: 'Off. Turn it on to share anonymous usage data. Never your documents, chats or names.';
+			: usage === 'default' ? 'On. Never your documents, chats or names. You can turn it off here or later in Settings.'
+			: 'Off. Never your documents, chats or names.';
 		check('R7 the switch\'s words', welcome?.usageWords === words, welcome?.usageWords, words);
 	}
 }

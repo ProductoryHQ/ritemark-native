@@ -1350,7 +1350,7 @@ export function RitemarkSettings() {
           description={settings.usageData?.on
             ? (settings.usageData.fromRitemark1
               ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
-              : 'On. Anonymous: never your documents, chats or names.')
+              : 'On. Never your documents, chats or names.')
             : 'Off. Never your documents, chats or names.'}
           checked={settings.usageData?.on ?? false}
           onChange={(value) => {

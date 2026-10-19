@@ -158,12 +158,12 @@ Checked live on a dev build (`3c8a7c30` + this change), each on a fresh profile 
 
 | Case | What was done | What reached the stand-in |
 |---|---|---|
-| A: on, untouched | Step 1, Skip, step 2 (switch on, "On. Anonymous: never your documents, chats or names. You can turn it off here or in Settings."), screenshots in Light and Dark, then Open a folder… | Nothing through step 1 and step 2. On leaving: `app_session_start` and the held `welcome_shown` (`kind: fresh`); after the reload `app_session_start` and `project_opened` (`existing_folder`, `has_ai: false`). All with `$geoip_disable: true` and `build_channel: dev`, one anonymous id. `ritemark.analytics.enabled: true` |
-| B: turned off on step 2 | Skip, the switch off ("Off. Turn it on to share anonymous usage data. Never your documents, chats or names."), then Open a folder… | Nothing, before or 25 s after the landing. `ritemark.analytics.enabled: false` |
+| A: on, untouched | Step 1, Skip, step 2 (switch on, "On. Never your documents, chats or names. You can turn it off here or later in Settings."), screenshots in Light and Dark, then Open a folder… | Nothing through step 1 and step 2. On leaving: `app_session_start` and the held `welcome_shown` (`kind: fresh`); after the reload `app_session_start` and `project_opened` (`existing_folder`, `has_ai: false`). All with `$geoip_disable: true` and `build_channel: dev`, one anonymous id. `ritemark.analytics.enabled: true` |
+| B: turned off on step 2 | Skip, the switch off ("Off. Never your documents, chats or names."), then Open a folder… | Nothing, before or 25 s after the landing. `ritemark.analytics.enabled: false` |
 | C: first window with a folder (R11) | Launched with the folder; no welcome | Nothing in 20 s; no answer written |
 | D: no env key | As A, without `RITEMARK_POSTHOG_PROJECT_KEY` | The yes was written, and the extension host logged "Disabled: no PostHog project key configured": a run from source never uses `product.json`'s key |
 
-Step 2's captures: [on, Light](qa-evidence/usage-on-by-default/light-step-2-on.png), [on, Dark](qa-evidence/usage-on-by-default/dark-step-2-on.png), [off, Light](qa-evidence/usage-on-by-default/light-step-2-off.png). Against the approved baseline's `*-welcome-step-2.png`, only the switch's line changed (0.23%, the words and the switch); step 1 matched to the pixel. The baseline's two step-2 files stay as they are until Jarmo approves the new ones.
+The switch's words are the Experience lead's final ones (19 October, after the run above, which showed the drafted words; the behaviour is unchanged): step 2 was captured again on a fresh profile with them. Step 2's captures: [on, Light](qa-evidence/usage-on-by-default/light-step-2-on.png), [on, Dark](qa-evidence/usage-on-by-default/dark-step-2-on.png), [off, Light](qa-evidence/usage-on-by-default/light-step-2-off.png). Against the approved baseline's `*-welcome-step-2.png`, only the switch's line changed (0.22%, the words and the switch); step 1 matched to the pixel. The baseline's two step-2 files stay as they are until Jarmo approves the new ones.
 
 ## Feedback with usage data off (19 October)
 
