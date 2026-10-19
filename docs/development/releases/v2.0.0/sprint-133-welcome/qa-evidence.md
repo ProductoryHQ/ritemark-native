@@ -123,6 +123,13 @@ Jarmo's test at `d726a382`: the first window on his 1728 × 1084 MacBook opened 
 
   Captured in Light and Dark in `qa-evidence/765/`. The Experience lead approved the compact rhythm and both departures; on their review the 72-high header's logo was set by its drawing, not its box: the SVG keeps about 20 of empty space under the drawn logo at 122 wide, so the box sits 2 below the foot and the drawn logo's foot is 18 from it, about 23 from the top.
 
+## Feedback with usage data off (19 October)
+
+Jarmo's decision on the parity list's G3 ("all recommendations ok"): Send Feedback works with usage data off, since pressing Send is the person's own choice. The gate's `sendFeedback` sends only the events given, from a client made for that one send. Unit-tested in `consent.test.ts`: off, with no answer yet, with a yes, with the kill switch on, and with no key. Checked live against a local stand-in for PostHog, on a fresh profile with usage data off:
+- Escape on the text box sent nothing.
+- Enter sent `reaction_submitted` and `feedback_sent`, carrying the reaction and the text, under one random id, with `$geoip_disable: true`. They carried no `build_channel` or `app_version`, and no session start or held `welcome_shown` went with them.
+- Usage data stayed off, and no anonymous id was stored.
+
 ## The v1.14 parity list (PR #458, 18 October)
 
 The Development manager's parity check found three gaps in the welcome's scope; two are fixed here:

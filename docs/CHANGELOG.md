@@ -48,7 +48,7 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **CSV rows stay one line (Sprint 132).** Long values are read in the formula bar.
 - **The places row gets Ritemark's order once (Sprint 132).** On the first start of 2.0, a 1.14 profile's places row takes Ritemark's order. Places moved after that stay where they are put.
 - **Ritemark 1's usage-data notice is gone (Sprint 133).** If you pressed **OK** on it, or closed it without **Opt Out**, usage data stays on after the update. If you chose **Opt Out** or never answered, it is off.
-- **Feedback reactions follow usage data (Sprint 133).** They are sent only with usage data on. When it is off, Ritemark says so and offers Settings.
+- **Send Feedback says what it sends (Sprint 133).** Under the text box: "What you write here is sent with your feedback." Pressing Send sends your feedback even with usage data off. Then it sends only your reaction and what you typed, under a one-off id that isn't kept, and usage data stays off. Escape sends nothing.
 - **Help's Welcome opens Ritemark's welcome (Sprint 133).** VS Code's Getting Started page is gone. Help's **Welcome** and the walkthrough commands open Ritemark's welcome instead.
 - **File extensions in a lighter ink (Sprint 133).** In the file tree and on tabs, a file's extension is in a lighter ink. The chosen tab and row stay in full ink, and high contrast themes keep full ink.
 

@@ -23,6 +23,7 @@ import {
   usageAnswer,
   type AnswerSource,
   type CaptureClient,
+  type FeedbackEvent,
   type HeldEventName,
   type RecordedAnswer,
   type UsageAnswer,
@@ -78,7 +79,7 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
   gate = new ConsentGate({
     readSetting,
     analyticsAllowed,
-    createClient: () => {
+    createClient: (options) => {
       const config = getAnalyticsConfig();
       if (!config) {
         console.log(
@@ -94,8 +95,9 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
         flushInterval: 0,
         // posthog-node defaults disableGeoip=true (server-SDK assumption). Ritemark
         // runs on the user's machine, so the request IP is the user's real IP and
-        // GeoIP should be enabled for country/city analytics.
-        disableGeoip: false,
+        // GeoIP should be enabled for country/city analytics. Feedback sent without
+        // usage data derives no location (Sprint 133, G3).
+        disableGeoip: options?.oneOff === true,
       });
       client.on('error', (error) => {
         console.warn('[Ritemark Analytics] PostHog error:', error);
@@ -105,6 +107,7 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
       }
       return client;
     },
+    oneOffId: () => generateUUID(),
     anonymousId: () => {
       // Written only after a yes (a 1.x profile already has one).
       let storedId = context.globalState.get<string>(GLOBAL_STATE_UUID_KEY);
@@ -131,6 +134,14 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
     })
   );
   void gate.refresh();
+}
+
+/**
+ * Send feedback the person chose to send: with usage data on, as any event; with it off, only these events, with a
+ * one-off id and no location (Sprint 133, G3). Never turns usage data on.
+ */
+export async function sendFeedback(events: ReadonlyArray<FeedbackEvent>): Promise<boolean> {
+  return gate ? gate.sendFeedback(events) : false;
 }
 
 /**

@@ -18,18 +18,21 @@ function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean
   let clientsCreated = 0;
   let idsRead = 0;
   let shutdowns = 0;
+  const clientOptions: Array<{ oneOff?: boolean } | undefined> = [];
   const deps: ConsentDeps = {
     readSetting: () => state.setting,
     analyticsAllowed: () => state.allowed,
-    createClient: (): CaptureClient | null => {
+    createClient: (options?: { oneOff?: boolean }): CaptureClient | null => {
       if (!state.hasKey) return null;
       clientsCreated += 1;
+      clientOptions.push(options);
       return {
         captureImmediate: async (payload) => { sent.push(payload as Sent); },
         shutdown: async () => { shutdowns += 1; },
       };
     },
     anonymousId: () => { idsRead += 1; return 'anon-1'; },
+    oneOffId: () => 'one-off-1',
     sharedProperties: () => ({ product_area: 'app', app_version: '2.0.0-0', build_channel: 'prod' }),
     sessionProperties: () => ({ version: '2.0.0-0', platform: 'darwin' }),
   };
@@ -41,6 +44,7 @@ function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean
     get clientsCreated() { return clientsCreated; },
     get idsRead() { return idsRead; },
     get shutdowns() { return shutdowns; },
+    clientOptions,
   };
 }
 
@@ -146,6 +150,54 @@ async function main(): Promise<void> {
   assert.equal(usageAnswer(false), 'no');
 
   // ── build_channel (#338) ──
+  // ── G3: feedback the person sends goes with usage data off, and only it ──
+  {
+    const feedback = [
+      { name: 'reaction_submitted' as const, properties: { reaction: 'good', message: 'Nice' } },
+      { name: 'feedback_sent' as const, properties: { message: 'Nice', reaction: 'good' } },
+    ];
+    // Usage data off (a no)
+    const off = harness({ setting: false });
+    await off.gate.refresh();
+    assert.equal(await off.gate.sendFeedback(feedback), true);
+    assert.deepEqual(off.sent.map((s) => s.event), ['reaction_submitted', 'feedback_sent'], 'only the feedback: no session start');
+    for (const s of off.sent) {
+      assert.equal(s.distinctId, 'one-off-1', 'a one-off id');
+      assert.equal(s.properties.build_channel, undefined, 'none of the shared properties');
+      assert.equal(s.properties.app_version, undefined);
+      assert.equal(s.properties.$process_person_profile, false);
+    }
+    assert.equal(off.idsRead, 0, 'the stored anonymous id is neither read nor written');
+    assert.deepEqual(off.clientOptions, [{ oneOff: true }], 'a client made for this send, with no location');
+    assert.equal(off.shutdowns, 1, 'and closed after it');
+    assert.equal(off.gate.answer(), 'no', 'usage data stays off');
+    assert.equal(await off.gate.track('feature_used', { feature: 'editor' }), false, 'and nothing else is sent');
+
+    // No answer yet, with the welcome's events held: they stay held
+    const unknown = harness();
+    await unknown.gate.refresh();
+    await unknown.gate.trackWelcome('welcome_shown', { kind: 'fresh' });
+    assert.equal(await unknown.gate.sendFeedback(feedback.slice(0, 1)), true);
+    assert.deepEqual(unknown.sent.map((s) => s.event), ['reaction_submitted'], 'never the held welcome events');
+    assert.equal(unknown.gate.heldCount(), 1);
+    assert.equal(unknown.gate.answer(), 'unknown');
+
+    // With a yes: sent as any event, with the stored id and the shared properties
+    const on = harness({ setting: true });
+    await on.gate.refresh();
+    assert.equal(await on.gate.sendFeedback(feedback), true);
+    const sentOn = on.sent.filter((s) => s.event !== 'app_session_start');
+    assert.deepEqual(sentOn.map((s) => s.distinctId), ['anon-1', 'anon-1']);
+    assert.equal(sentOn[0].properties.build_channel, 'prod');
+
+    // The kill switch still stops it; a build with no key sends nothing
+    const killed = harness({ setting: false, allowed: false });
+    assert.equal(await killed.gate.sendFeedback(feedback), false);
+    assert.equal(killed.sent.length, 0);
+    const noKey = harness({ setting: false, hasKey: false });
+    assert.equal(await noKey.gate.sendFeedback(feedback), false);
+  }
+
   assert.equal(buildChannel('2.0.0-0', false), 'prod', 'the bundled, floored version');
   assert.equal(buildChannel('2.0.0-ext.3', false), 'prod', 'an extension update');
   assert.equal(buildChannel('1.14.0', false), 'dev', 'a run from source');

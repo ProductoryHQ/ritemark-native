@@ -78,8 +78,13 @@ export interface ConsentDeps {
   readSetting(): boolean | undefined;
   /** The `analytics` flag and the `ritemark.features.analytics` kill switch: they can only turn analytics off. */
   analyticsAllowed(): boolean;
-  /** A PostHog client, or null when the build has no project key. Called only after a yes. */
-  createClient(): CaptureClient | null;
+  /**
+   * A PostHog client, or null when the build has no project key. Called after a yes, or for one piece of feedback the
+   * person chose to send (`oneOff`: no location derived from the request).
+   */
+  createClient(options?: { oneOff?: boolean }): CaptureClient | null;
+  /** An id for one piece of feedback sent without a yes: random, never stored. */
+  oneOffId(): string;
   /** The anonymous id, read or created. Called only after a yes. */
   anonymousId(): string;
   /** Properties every event carries: `product_area`, `app_version`, `build_channel`. */
@@ -88,6 +93,11 @@ export interface ConsentDeps {
   sessionProperties(): EventPayloads['app_session_start'];
   log?(message: string, error?: unknown): void;
 }
+
+/** Feedback's events, which the person sends themselves (G3). */
+export type FeedbackEvent =
+  | { name: 'reaction_submitted'; properties: EventPayloads['reaction_submitted'] }
+  | { name: 'feedback_sent'; properties: EventPayloads['feedback_sent'] };
 
 /** The welcome's events, held in memory until the person answers (R8; Jarmo, 18 October). */
 export type HeldEventName = 'welcome_shown' | 'ai_signed_in';
@@ -165,6 +175,40 @@ export class ConsentGate {
       return 'held';
     }
     return 'dropped';
+  }
+
+  /**
+   * Feedback the person chose to send (Sprint 133, the v1.14 parity list's G3; Jarmo, 19 October): pressing Send is
+   * their own choice, so it goes even with usage data off. With a yes it is sent as any event. Without one, only the
+   * events given go out (the reaction and what they typed), from a client made for this send alone: a one-off id
+   * that is never stored, no location, none of the shared properties, no session start and none of the held welcome
+   * events. The answer is unchanged. The kill switch still stops it.
+   */
+  async sendFeedback(events: ReadonlyArray<FeedbackEvent>): Promise<boolean> {
+    if (!this.deps.analyticsAllowed()) return false;
+    if (this.maySend()) {
+      let sent = true;
+      for (const event of events) sent = (await this.track(event.name, event.properties as never)) && sent;
+      return sent;
+    }
+    const client = this.deps.createClient({ oneOff: true });
+    if (!client) return false;
+    const distinctId = this.deps.oneOffId();
+    let sent = true;
+    try {
+      for (const event of events) {
+        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, $process_person_profile: false } });
+      }
+    } catch (error) {
+      this.deps.log?.('Failed to send feedback', error);
+      sent = false;
+    }
+    try {
+      await client.shutdown();
+    } catch (error) {
+      this.deps.log?.('PostHog shutdown failed', error);
+    }
+    return sent;
   }
 
   /** Drop the held events (the welcome closed without a yes). */

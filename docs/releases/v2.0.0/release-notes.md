@@ -83,7 +83,7 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **Off until you turn it on.** A switch on the welcome and in Ritemark Settings reads "Share anonymous usage data to improve Ritemark. Never your documents, chats or names.", with links to the Privacy Policy and Terms of Use. Nothing is sent before you say yes.
 - **Four new steps, counted anonymously.** With usage data on, Ritemark also counts the welcome shown, an AI signed in, a project opened and the first message sent, beside the app starts and features used it already counted. Never a path, a name, a file, a message or an account.
 - **Off means off.** Turning it off stops sending at once.
-- **Feedback reactions too.** Feedback reactions are sent only with usage data on. When it is off, Ritemark says so and offers Settings.
+- **Feedback is your own choice.** Send Feedback says under its text box that what you write is sent with your feedback. Pressing Send sends it even with usage data off: only your reaction and what you typed, under a one-off id that isn't kept. Usage data stays off, and Escape sends nothing.
 
 ## Updating from 1.14
 
