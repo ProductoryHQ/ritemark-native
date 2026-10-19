@@ -79,19 +79,19 @@ Jarmo approved the sprint plan on 18 October ("approved with your proposals"), a
 ## Phase 6: QA, merge and closeout
 
 - [x] CDP checks in `scripts/qa/`: the welcome alone, the landing, the update sheet (E3) — `welcome-check.mjs`, `welcome-screenshots.mjs`
-- [ ] The screenshot baseline gains the welcome's frames, light and dark (E3) — captured in `qa-evidence/` (light and dark: step 1, step 2, update on and off, start); into `frame-baseline/` only with Jarmo's approval
+- [x] The screenshot baseline gains the welcome's frames, light and dark (E3): step 1, step 2, the update sheet on and off, the start sheet, at 1440 × 900, in `docs/development/frame-baseline/` with Jarmo's approval (19 October, "all looks good now! Proceed")
 - [x] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [x] Docs: `architecture.md`, `CLAUDE.md`'s patch table, `PATCH-RULES.md`, `references/layout-invariants.md` (E6)
 - [x] Manual QA on the Mac: S1–S44, S48–S53; evidence in `qa-evidence.md` — every scenario recorded, with what could not be run here and why
-- [ ] Windows overlay round before the merge: S45, S46 on the extension side
+- [x] Windows overlay round before the merge: S45, S46 on the extension side — overlay run 39159831343 at `2149ecc8`; four findings fixed in #453 (`qa-evidence.md`, *The Windows overlay round*)
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge"
+- [x] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge" — #453; the qa-validator's one blocker (a conflict with main) resolved; merged as `eae1dedd` on Jarmo's "all looks good now! Proceed" (19 October)
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round from main: S45–S47 and the shell parts (Getting Started gone, the welcome alone, the muted extension); findings in `qa-evidence.md`
 - [ ] After the merge: the drift check into the release plan's risk register (E7)
 - [ ] PostHog: the four events seen live after a yes on a production build; none before an answer or after a no; a 1.x OK sending from the first start (S24–S30, S52, S53)
 - [ ] Linked issues closed with evidence: [#429](https://github.com/ProductoryHQ/ritemark-native/issues/429), [#338](https://github.com/ProductoryHQ/ritemark-native/issues/338); [#401](https://github.com/ProductoryHQ/ritemark-native/issues/401) closed or updated with the audit
-- [ ] The privacy note (opt-in, `build_channel`) sent to the Development manager for ritemark.app (E6)
+- [x] The privacy note (opt-in, `build_channel`) sent to the Development manager for ritemark.app (E6) — drafted in the shared notes (`sprint133-closeout-issue-drafts.md`), with Send Feedback's exception and GeoIP
 - [x] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [ ] Release plan: tracker, feature-complete rows and risk register updated
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)
