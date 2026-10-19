@@ -515,6 +515,7 @@ The full record is `docs/development/releases/v2.0.0/sprint-135-vscode-update/` 
 - **Defaults flipped:** `workbench.welcomePage.experimentalOnboarding` (the Copilot sign-in wizard on a fresh profile) is pinned off too.
 - **The core bundles with esbuild** (`build/next/`); `build/lib/optimize.ts` is gone. The packaging takes the whole bundle output, so resource include lists are no longer needed for fonts that a CSS file references.
 - **Electron downloads under the product name in `product.json` at that moment.** Run `npm run electron` after `apply-patches.sh` has put Ritemark's `product.json` in place, or the dev app is `Code - OSS.app`.
+- **A webview's own workers can no longer load resources.** 1.142's webview service worker dropped the route for requests made by a page's workers (1.117 answered them through a message port from the outer frame), so a worker that fetches or imports a `vscode-resource` URL waits until it times out. pdf.js was hit: its worker is now started from the script's text, which `pdfEditorProvider.ts` sends with the PDF (`webview/src/components/viewers/pdfWorker.ts`). A new webview worker must be started the same way, from source in a blob, never by URL.
 - **A new unsigned dev Electron asks the keychain.** Launch dev instances for automation with `--use-mock-keychain`, so no keychain prompt reaches the screen.
 
 ### Rolling back a VS Code update
