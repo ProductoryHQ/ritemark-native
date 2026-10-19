@@ -15,6 +15,7 @@ import { dictationModeFor } from './voiceDictation/whisperCpp';
 import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName, openMicrophoneSettings } from './utils/openExternal';
 import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
+import { ensureProjectSubfolder } from './projects/projectFolderGuard';
 import { trackEvent } from './analytics/posthog';
 import { resolveInternalLinkTarget, isMarkdownFile } from './internalLinkResolver';
 import {
@@ -1056,7 +1057,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               if (!workspaceRoot || !message.name) return;
               const flowsDir = path.join(workspaceRoot, '.ritemark', 'flows');
               try {
-                await fsp.mkdir(flowsDir, { recursive: true });
+                // Only while the project's folder is there (Sprint 134, R13).
+                await ensureProjectSubfolder(workspaceRoot, flowsDir);
                 const stem = String(message.name).replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
                 const flowPath = path.join(flowsDir, `${stem}.flow.json`);
                 if (!fs.existsSync(flowPath)) {
@@ -1294,6 +1296,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       const imagesDir = path.join(docDir, 'images');
       const rawBaseName = path.basename(filename, path.extname(filename));
 
+      // Only while the document's folder is there: a gone project folder is
+      // not brought back by a pasted image (Sprint 134, R13).
+      await ensureProjectSubfolder(docDir, imagesDir);
       const finalFilename = writeImageRelativeTo(
         imagesDir,
         `${rawBaseName}.${extension}`,
@@ -1366,8 +1371,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     webview: vscode.Webview
   ): Promise<void> {
     try {
-      const imagesDir = path.join(path.dirname(document.uri.fsPath), 'images');
-      await fsp.mkdir(imagesDir, { recursive: true });
+      const docDir = path.dirname(document.uri.fsPath);
+      const imagesDir = path.join(docDir, 'images');
+      // Only while the document's folder is there (Sprint 134, R13).
+      await ensureProjectSubfolder(docDir, imagesDir);
 
       const diagramPath = getUniqueDrawioPath(imagesDir);
       await fsp.writeFile(diagramPath, EMPTY_DRAWIO_SVG_TEMPLATE, 'utf-8');

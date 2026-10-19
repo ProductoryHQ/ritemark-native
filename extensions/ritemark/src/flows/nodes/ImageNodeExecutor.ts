@@ -15,6 +15,7 @@ import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
 import { DEFAULT_MODELS, OPENAI_IMAGE_MODEL_IDS } from '../../ai/modelConfig';
+import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -125,15 +126,12 @@ function interpolateVariables(
 }
 
 /**
- * Ensure .flows/images directory exists
+ * Ensure .flows/images directory exists, only while the project's folder is
+ * there (Sprint 134, R13).
  */
 async function ensureImagesDirectory(workspacePath: string): Promise<string> {
   const imagesDir = path.join(workspacePath, '.flows', 'images');
-  try {
-    await fs.access(imagesDir);
-  } catch {
-    await fs.mkdir(imagesDir, { recursive: true });
-  }
+  await ensureProjectSubfolder(workspacePath, imagesDir);
   return imagesDir;
 }
 

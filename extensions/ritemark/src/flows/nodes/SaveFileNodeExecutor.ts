@@ -8,6 +8,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { ensureProjectSubfolder, isInsideProject } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -96,10 +97,16 @@ function getExtension(format: string): string {
 }
 
 /**
- * Ensure output directory exists
+ * Ensure output directory exists. Under the project, only while the project's
+ * folder is there: a run must not bring back a project folder that was
+ * deleted while it was open (Sprint 134, R13).
  */
-async function ensureOutputDirectory(outputPath: string): Promise<void> {
+async function ensureOutputDirectory(outputPath: string, workspacePath: string): Promise<void> {
   const dir = path.dirname(outputPath);
+  if (workspacePath && isInsideProject(workspacePath, dir)) {
+    await ensureProjectSubfolder(workspacePath, dir);
+    return;
+  }
   try {
     await fs.access(dir);
   } catch {
@@ -162,7 +169,7 @@ export async function executeSaveFileNode(
     : path.join(context.workspacePath, relativePath);
 
   // Ensure directory exists
-  await ensureOutputDirectory(outputPath);
+  await ensureOutputDirectory(outputPath, context.workspacePath);
 
   // Write content based on format
   let size: number;

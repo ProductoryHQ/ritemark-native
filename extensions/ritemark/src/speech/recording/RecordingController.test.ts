@@ -636,6 +636,18 @@ async function run(): Promise<void> {
       assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }], 'the webview is told not to capture');
     }
 
+    // ------------------------------------------------ a project folder that has gone (Sprint 134, R13)
+    {
+      fresh();
+      const gone = { name: 'Gone', path: path.join(root, 'Gone') };
+      const h = harness(root, { folders: [gone] });
+      await h.controller.handle({ type: 'transcribe:record/start' });
+      assert.equal(h.controller.activeSessionId, null);
+      assert.equal((await h.controller.projection()).error?.code, 'destination-unavailable', 'the panel says it in its own words');
+      assert.deepEqual(h.events, [{ type: 'transcribe:record/notStarted' }]);
+      assert.equal(fs.existsSync(gone.path), false, 'the deleted project folder is not brought back');
+    }
+
     // ------------------------------------------------ feature off
     {
       fresh();

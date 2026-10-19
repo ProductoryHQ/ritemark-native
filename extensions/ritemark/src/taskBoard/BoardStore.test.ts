@@ -415,6 +415,31 @@ async function main(): Promise<void> {
     assert.deepEqual(cardsOf(await store.list()).map((card) => card.title).sort(), ['In the cloud', 'Still on the board']);
   }
 
+  // ── A card in a project whose folder has gone: refused, nothing made (R13) ─
+  {
+    const parent = tempFolder();
+    const folder = path.join(parent, 'Notes');
+    fs.mkdirSync(folder);
+    const store = newStore(folder);
+    assert.deepEqual(await store.list(), [], 'the board was looked at while the folder was there');
+    fs.rmSync(folder, { recursive: true });
+
+    await assert.rejects(
+      () => store.create({ title: 'Call Maria', stage: 'todo', by: 'you' }),
+      (error: BoardStoreError) =>
+        error instanceof BoardStoreError && error.code === 'write-failed' && /Couldn't save call-maria\.md: .*is not where it was/.test(error.message),
+      'the board says so, in its own words',
+    );
+    assert.equal(fs.existsSync(folder), false, 'the deleted project folder is not brought back');
+    assert.deepEqual(fs.readdirSync(parent), [], 'nothing is made');
+    assert.deepEqual(await store.list(), [], 'and no card was added');
+
+    // An agent's add_card goes through the same create.
+    const fresh = newStore(folder);
+    await assert.rejects(() => fresh.create({ title: 'From an agent', stage: 'idea', by: 'Claude Code' }), BoardStoreError);
+    assert.equal(fs.existsSync(folder), false);
+  }
+
   console.log('taskBoard/BoardStore: all assertions passed');
 }
 
