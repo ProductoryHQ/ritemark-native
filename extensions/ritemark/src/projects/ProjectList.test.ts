@@ -71,10 +71,10 @@ async function main(): Promise<void> {
     await list.addFound([
       { folderUri: LP, lastOpenedAt: '2020-01-01T00:00:00.000Z', foundBy: 'recent' },
       { folderUri: SP, lastOpenedAt: '2026-10-18T09:00:00.000Z', foundBy: 'chats' },
-      { folderUri: BR, lastOpenedAt: '2026-10-17T09:00:00.000Z', foundBy: 'board' },
+      { folderUri: BR, lastOpenedAt: '2026-10-17T09:00:00.000Z', foundBy: 'recent' },
     ]);
     const entries = await list.entries();
-    assert.deepEqual(entries.map((entry) => [entry.folderUri, entry.foundBy]), [[LP, 'opened'], [SP, 'chats'], [BR, 'board']]);
+    assert.deepEqual(entries.map((entry) => [entry.folderUri, entry.foundBy]), [[LP, 'opened'], [SP, 'chats'], [BR, 'recent']]);
     assert.deepEqual(entries[0], before);
     const writes = fs.writes;
     await list.addFound([{ folderUri: SP, lastOpenedAt: '2026-10-18T09:00:00.000Z', foundBy: 'recent' }]);

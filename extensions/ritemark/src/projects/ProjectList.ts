@@ -20,7 +20,8 @@ import { normalizeProjectUri } from '../conversations/projectScope';
 
 export const PROJECT_LIST_VERSION = 1 as const;
 
-export type ProjectFoundBy = 'opened' | 'recent' | 'chats' | 'board' | 'workspace-storage';
+/** How a project joined: a window opened it, or the first fill found it in the recent list or the chats. */
+export type ProjectFoundBy = 'opened' | 'recent' | 'chats';
 
 export interface ProjectEntryV1 {
   /** The folder's `uri.toString()`, as the window that opened it had it. */
@@ -54,7 +55,7 @@ function sameProject(a: string, b: string): boolean {
 function decodeEntry(value: unknown): ProjectEntryV1 | null {
   const entry = value as Partial<ProjectEntryV1> | null;
   if (!entry || typeof entry.folderUri !== 'string' || typeof entry.addedAt !== 'string' || typeof entry.lastOpenedAt !== 'string') return null;
-  const foundBy: ProjectFoundBy = ['opened', 'recent', 'chats', 'board', 'workspace-storage'].includes(entry.foundBy as string) ? entry.foundBy as ProjectFoundBy : 'opened';
+  const foundBy: ProjectFoundBy = ['opened', 'recent', 'chats'].includes(entry.foundBy as string) ? entry.foundBy as ProjectFoundBy : 'opened';
   try {
     if (!/^[a-z][a-z0-9+.-]*:/i.test(entry.folderUri)) return null;
     new URL(entry.folderUri);
