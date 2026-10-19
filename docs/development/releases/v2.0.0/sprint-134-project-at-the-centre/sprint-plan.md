@@ -4,7 +4,7 @@ Track: SDD (24 user-facing requirements; a new extension subsystem, the webview,
 Override with: "use plain full track"
 Branch: `sprint-134-project-at-the-centre` (created 2026-10-19 from `origin/main` `eae1dedd`, after Sprint 133's merge, with [#462](https://github.com/ProductoryHQ/ritemark-native/pull/462)'s plan merged in)
 Release tier: shell (patches 003, 009, 018 and 019, and 001 if the splash audit keeps its hunk; there is no release from main until 2.0)
-Status: **Phase 5 (PR open)**: [#467](https://github.com/ProductoryHQ/ritemark-native/pull/467), Mac QA done ([qa-evidence.md](qa-evidence.md)); waiting on the Windows overlay round and Jarmo's merge. Plan approved by Jarmo on 2026-10-19 ("approved"), with his answers to the three *Decisions for Jarmo* the same day. Drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), and updated on 2026-10-19 with Jarmo's decisions and the Experience lead's answers.
+Status: **Merged** 2026-10-19 as `3c8a7c30` ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467)), on Jarmo's "admin merge 467"; Mac QA in [qa-evidence.md](qa-evidence.md); closeout (E5, E7, the Windows rounds, #455 and #456) in progress. Plan approved by Jarmo on 2026-10-19 ("approved"), with his answers to the three *Decisions for Jarmo* the same day. Drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), and updated on 2026-10-19 with Jarmo's decisions and the Experience lead's answers.
 
 ## SDD Artifacts
 

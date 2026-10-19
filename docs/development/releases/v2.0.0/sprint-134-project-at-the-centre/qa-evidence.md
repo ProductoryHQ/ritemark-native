@@ -168,6 +168,10 @@ Found during QA and not changed in this sprint, each small or outside its scope:
 - Host log noise at every start: Copilot's GitHubLoginFailed; runtime drift between the bundled Claude/Codex and the manifest in this dev tree; the parcel watcher dropping events for the home folder.
 - During S2 (run A) the profile's AI changed to ChatGPT without a click that could be named; not reproduced.
 
+## E7: the drift check (19 October)
+
+`./scripts/check-vscode-drift.sh 1.142.0` at `3c8a7c30` (1.142.0 is still VS Code's newest release): 13 of 18 patches fail in 59 file patches. 006, 011, 012, 014 and 016 apply, as at Sprint 133 (56 file patches). The 3 more are 018's: `src/vs/base/browser/ui/dialog/dialog.ts` and `src/vs/workbench/browser/parts/dialogs/dialogHandler.ts` (a question with Cancel first focuses Cancel, R9) and `src/vs/workbench/contrib/splash/browser/partsSplash.ts` (the splash saves the ground, R9); 018 now fails in 17 files, 002 in 12, 003 in 8. Recorded in the release plan's risk register.
+
 ## Run 1: switching, About this project, the menus, the share question (round one, and its later checks)
 
 | Scenario | Result | Evidence and notes |

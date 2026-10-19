@@ -101,11 +101,11 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [x] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467), done); `qa-validator` review (done, two findings fixed); screenshots to the Experience lead (done, approved); the Development manager's smoke test; Jarmo's "admin merge"
+- [x] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467)); `qa-validator` review (two findings fixed); screenshots to the Experience lead (approved); Jarmo's "admin merge 467": merged 2026-10-19 as `3c8a7c30`
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
 - [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
-- [ ] After the merge: the drift check into the release plan (E7)
+- [x] After the merge: the drift check into the release plan (E7): 13 of 18 patches fail on 1.142.0 in 59 file patches
 - [x] `docs/CHANGELOG.md` and the v2.0.0 release-notes draft
 - [x] Release plan: tracker, feature-complete rows (Home's launcher in the "everything reachable" list) and risk register updated
 - [x] The [v1.14 parity list](../parity-v1.14.md): every Sprint 134 row checked on the branch and marked done
