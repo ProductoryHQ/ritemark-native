@@ -59,7 +59,7 @@ Each scenario's result after the fixes, with the run that holds its evidence (ru
 | S38 A project whose folder is not found | Pass after a fix (tooltips outside the column; the switcher's row) | A, C |
 | S39 An empty project and no board | Pass | A |
 | S40 1.x's Home launcher | Pass (R14's table) | A |
-| S41, S42 Windows | The Windows rounds | — |
+| S41, S42 Windows | Pass: the overlay round before the merge (the extension's side, R15/S42) and round 4 on the signed build of main (the shell's side) | The Windows rounds |
 | S43 Find it… on another project's folder | Pass after a fix (nothing said) | A, C |
 | S44 A `CLAUDE.md` of the person's own | Pass after a fix (the note never showed); the AI's answer after Add the line at Gate 2 | run 1 |
 | S45 Tasks, Browser and Transcribe | Pass | B, C |
@@ -69,7 +69,7 @@ Each scenario's result after the fixes, with the run that holds its evidence (ru
 | S49 The order work moves | Pass after a fix (cut status words, narrow toast) | B, C |
 | S50 Recent, and plain words | Pass (redrawn to the Experience lead's answer) | B; run 1 |
 | S51 Make an editable copy, and Share | Pass; Open in Word not clicked | B |
-| S52 File ▸ New tab and Share | Pass; Share greyed out is checked on Windows | run 1 |
+| S52 File ▸ New tab and Share | Pass; on Windows, round 4 saw Share greyed with About this project in front, where the Mac has it enabled (round 4, open for a Windows re-check) | run 1 |
 | S53 A folder that has gone stays gone | Pass after a fix (a drop made the folder again) | A, C |
 | S54 The welcome's lists | Pass | A; run 1 |
 | S55 Asked on the AI's sheet | Pass, with Claude's answer; ChatGPT's at Gate 2 | run 1 |
@@ -167,6 +167,58 @@ Found during QA and not changed in this sprint, each small or outside its scope:
 - The board's columns scroll sideways with the AI's sheet open, and the board tab's card cuts "Failed · OpenCode stopped …" (the board's redraw comes after 2.0).
 - Host log noise at every start: Copilot's GitHubLoginFailed; runtime drift between the bundled Claude/Codex and the manifest in this dev tree; the parcel watcher dropping events for the home folder.
 - During S2 (run A) the profile's AI changed to ChatGPT without a click that could be named; not reproduced.
+
+## The Windows overlay round (19 October, before the merge)
+
+The Development manager's Windows session ran the 13-item brief on the branch's extension (`9f2ed022`, CI run 39261202398) laid over round 3's shell (`eae1dedd`), so the shell parts of this sprint were absent. #467 merged while it ran.
+
+- **Pass:** S13, S23, S24, S27 (the menu's rows), S30/S32, S31, S36, S37 (no Google client in the overlay, as expected), S51 (the PDF and Word bars and Share, run by hand), S60, and R15/S42 within that PC's limits.
+- **Blocker, S55, fixed by #468 (`b3887add`):** on the older shell the share question looped. That shell answers the share request with its own modal dialog ("Share this browser page with the agent?"), and the AI's sheet polls every 1.5 s: each poll made one more request while the dialog waited, so answering one dialog brought the next, and the restored web tab started it again at the next start. #468 makes one request at a time, and any reply that needs no answer from the sheet settles that page for the window, so a page is asked at most once. Two tests imitate the older shell (`BrowserContextStore.test.ts`); the first fails on the store before the fix. On this sprint's shell the question waits on the AI's sheet (E5 below).
+- **Shell gap, expected:** on the older shell, Tasks, Browser and Transcribe keep their old title rows without the project's head (patch 018), and the overlay had removed their old controls. They come with the shell build.
+- **Notes:** File ▸ Open Recent showed no "Switched to…" note, and a Browser Recent row showed no site icon. Both need this sprint's shell (patch 018's switch guard and the browser's icons), and both are checked on the production build in E5. Typing a UNC path into VS Code's simple Open Folder dialog put the current drive in front ("X:\localhost\…"): VS Code's dialog, recorded only.
+
+## Windows round 4: the signed build of main (19 October, after the merge)
+
+The Development manager's Windows session ran the shell parts on the signed build of `3c8a7c30` (run 39271200319). Everything it checked passes:
+- **S55:** the question comes once, on the AI's sheet, with no loop.
+- **The heads (S45, S48, S50):** Tasks, Browser and Transcribe show the project's head; New task added an item and Search filtered.
+- **S27:** the switcher's flyout reads "Open in a new window – Alt click".
+- **S30/S32:** File ▸ Open Recent shows the "Switched to…" note.
+- **S58:** "breakpoint" finds no commands, "walkthrough" finds only Help: Welcome, and Toggle Developer Tools still runs.
+- **The ×, and the head:** the × is centred in its box; the head spans 8–248 with its ▾ at 228–240.
+- **About this project:** its book icon in the tree and on the tab; the pointer `CLAUDE.md` is hidden.
+- **Startup (#401):** extension host +10.1 s, Ritemark activated +12.2 s, eager work done +30.4 s.
+
+**Found and fixed in [#472](https://github.com/ProductoryHQ/ritemark-native/pull/472) (`012d47f6`):** on Windows the app's `package.json` read "Transcribe a fileâ€¦", "Open a folderâ€¦" and 10 more labels in mojibake. `floor-bundled-extension.sh`'s Python read the file in the Windows code page (cp1252) and wrote it back as UTF-8; it now reads and writes UTF-8.
+
+Three smaller items from round 4, each looked at on the Mac:
+- **The splash on a switch's reload, in Light, read white on Windows (255,255,255), not the ground; Dark was right.** Not reproduced on the Mac. A screencast of a switch in Ritemark Light (dev build, CDP, 720 × 450 frames) shows the whole window in the ground (`#f2f5f9`, the ground `#f1f5f9` after colour management) from the reload until the workbench draws, about 0.9 s. The workbench then draws the left column in the ground and the desk in white, as designed. The desk runs to the window's right edge until the AI's sheet opens, about 5 s later on the dev build. The saved splash colours are the ground on both platforms (patch 018, `partsSplash.ts`; `project-check.mjs` reads them). So the white on Windows may be the desk after the workbench drew rather than the splash. To tell, the Windows check needs a sample from the left column or the top strip during the reload, or a frame capture. Left open for that check.
+- **Browser has no + beside "Recent".** As built to the spec: R18 was revised by the Experience lead on 19 October to a **New page** row under the head (with Documents' New and Transcribe's Record), with only Clear history at the Recent label's right. The older wording ("the Recent label with its + and Clear") stayed in the sprint plan, the technical plan and `architecture.md`'s history row; it is corrected there.
+- **File ▸ Share greyed with About this project (AGENTS.md) in front, on Windows.** The intent is that Share works there: AGENTS.md opens in the Ritemark editor, and Share is enabled for any document in it (`ritemark.document.share`'s enablement is `activeCustomEditorId == ritemark.editor`; S52 greys it only away from a document, as with Home in front). On the Mac it is enabled: All commands, which lists only enabled commands, offers Share with AGENTS.md in front, as with Brief.md. So the command's state is right and the Windows menu showed it greyed. A Windows re-check with AGENTS.md in front: is Share offered in Ctrl+Shift+P? If it is, the menu button's File menu kept an old state (for example from Home in front); if it isn't, the editor in front isn't the Ritemark editor. Left open for that check.
+
+## E5: the production build of the merged commit (19 October)
+
+A clean-room release worktree at `3c8a7c30` (`./scripts/create-release-worktree.sh`, `.worktrees/release-3c8a7c30e30f`), built with `./scripts/build-prod.sh` in the background, unsigned. The app is `.worktrees/release-3c8a7c30e30f/VSCode-darwin-arm64/Ritemark.app`, 2.0 GB, ad-hoc signed by the linker; the worktree with its build is 10 GB.
+
+- **The build stopped at step 6 of 9, at the provenance gate, as designed:** "source commit 3c8a7c30 is not origin/main b3887add". #468 merged while the build ran (17:53; VS Code's build ended 17:57). Steps 1–5 passed: frozen dependencies, the bundled runtimes, VS Code's build, the extension's copy and its check (runtime-complete; `webview.js` 8,607,805 bytes, `extension.js` 5,633,830). `validate-build-output.sh` run on it alone: every check OK but the missing provenance manifest. So the app has `3c8a7c30`'s product bytes and is not a release candidate; main has no release until 2.0. A build of `b3887add` or later needs this worktree removed first (about 10 GB free), which is Jarmo's call under the worktree hygiene rule.
+- **The warning "Extension files corrupted during build! Restoring from backup", found and reproduced: [#471](https://github.com/ProductoryHQ/ritemark-native/issues/471).** It fires on every clean-room Mac build (every build log still on disk: 17, 18 and 19 October). VS Code's `bundle-non-native-extensions-build` packages `vscode/extensions/ritemark`, our symlink to the extension. `vsce.listFiles` returns its 42,446 files as `../../../extensions/ritemark/…`, so after VS Code's rename `gulp.dest('.build')` writes each file back over its own source through the symlink, truncating it while it is read. Reproduced in a development worktree with a watcher: `media/webview.js` and `out/extension.js` went to 65,536 bytes (same inode, old mtime kept), 692 files ended at exactly 64 KiB (both `node_modules`, `media/drawio`, the bundled runtimes), and smaller ones were emptied or cut (`.npmrc` to 0 bytes, `binaries/agents/manifest.json`, 45 files under `src/`). That worktree was repaired by the v1.7.1 recipe (git checkout, both `npm ci`, `fetch-agent-runtimes.sh`, a fresh compile) and its tests pass. The build's backup is of the whole folder and its restore puts all of it back, so E5's app and earlier builds were sound. But the check sees only two files, and in a development tree the same gulp tasks destroy tracked source: the v1.7.1 "0-byte corruption" family, likely the same cause though not proven. The fix proposed in #471 is shell-tier: keep `ritemark` out of VS Code's packaging (patch 004's `excludedExtensions`, or the extension absent as on Windows CI), and make the guard compare a digest of the whole tree.
+
+The app run in the background (`open -n -g`, profile `/tmp/r134e5`, port 9361, PostHog pointed at a closed local port), on a fresh profile with the baseline's sample at `/private/tmp/ritemark-frame/`:
+
+| Check | Result |
+|---|---|
+| `project-check.mjs --close-all --share-question` | 6 of 6 pass: Home and Tasks first and after Close all, the Tasks count, the splash's ground, and **S55: the question waits on the AI's sheet while Home comes forward and the + opens its menu**; it asked once and did not come back |
+| `frame-geometry.mjs` | 22 pass, 0 fail, 2 skipped (the tab labels' line is not measured) |
+| The frame baseline (`frame-screenshots.mjs --compare`) | 30 of 34 the same (0–0.29%). The 4 that differ are what a production build shows: More has no Copilot Chat or Chat Debug (1.05%, 1.01%), and the Settings foot (3.38%, 3.37%) shows the floored extension version 1.14.0-0, the last check's time and the newer runtimes bundled from the frozen manifest (Claude Code 2.1.296, Codex 0.162.1, against the dev tree's 2.1.289 and 0.160.0). The first run stopped when the palette drew a row after the script's fixed wait; `pickRow` now waits for the row up to 3 s, and the second run went through |
+| S58, All commands | "breakpoint": No matching commands; "walkthrough": only Help: Welcome |
+| S30/S32, the "Switched to…" note (the Windows overlay's question) | After File ▸ Open Folder… (VS Code's simple dialog, to a second folder): "Switched to Second project. Harbour leadership programme is kept as you left it." `project-check.mjs --switch-to` through File ▸ Open Recent, both ways: 7 of 7, with "Switched to Harbour leadership programme. Second project is kept as you left it." The note needs this sprint's shell, which is why the overlay round didn't see it. `project-check.mjs` now checks the note |
+| Browser Recent's site icon (the overlay's other note) | A local page with its own icon: Recent's row and the page's tab show it (a `data:image/png` from patch 009) ([e5-browser-recent-share-question-light.png](qa-evidence/e5-browser-recent-share-question-light.png), which also shows the share question waiting and the project's head with its ▾ at the column's right end). The frame script's own page has no icon and shows the globe |
+
+The built app's log had no errors. Its profile, the sample and the test folders are deleted; the release worktree is kept until Jarmo decides (`worktree-hygiene.mjs` holds a worktree with build output).
+
+## E7: the drift check (19 October)
+
+`./scripts/check-vscode-drift.sh 1.142.0` at `3c8a7c30` (1.142.0 is still VS Code's newest release): 13 of 18 patches fail in 59 file patches. 006, 011, 012, 014 and 016 apply, as at Sprint 133 (56 file patches). The 3 more are 018's: `src/vs/base/browser/ui/dialog/dialog.ts` and `src/vs/workbench/browser/parts/dialogs/dialogHandler.ts` (a question with Cancel first focuses Cancel, R9) and `src/vs/workbench/contrib/splash/browser/partsSplash.ts` (the splash saves the ground, R9); 018 now fails in 17 files, 002 in 12, 003 in 8. Recorded in the release plan's risk register.
 
 ## Run 1: switching, About this project, the menus, the share question (round one, and its later checks)
 

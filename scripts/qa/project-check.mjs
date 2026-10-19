@@ -14,8 +14,9 @@
  * - The count: the Tasks tab's count is the Tasks place's (R6, S8).
  * - The splash (with --user-data-dir): the colours saved for the next window's splash are the window's ground, so a
  *   switch shows the ground, not a dark block (R9, S30).
- * - Switching (with --switch-to): File ▸ Open Recent to that folder switches in place onto its Home; Open Recent back
- *   restores the first project's tabs in their order (R9, S30). Nothing may be working in a chat, or Ritemark asks.
+ * - Switching (with --switch-to): File ▸ Open Recent to that folder switches in place onto its Home, which says
+ *   "Switched to …" (S32); Open Recent back restores the first project's tabs in their order (R9, S30). Nothing may
+ *   be working in a chat, or Ritemark asks.
  * - The share question (with --share-question): a page served by this script, opened from Browser's New page, asks on
  *   the AI's sheet, and while it waits the tab row works: Home comes forward and the + opens its menu (R20, S55, #455).
  *   On a profile that shares pages without asking, the question does not come and the check is SKIPPED.
@@ -172,6 +173,30 @@ async function command(label) {
 	await sleep(1200);
 }
 
+/** The first line of text in any webview (the AI's sheet, Home) that contains `needle`, or null. */
+async function webviewLine(needle) {
+	const frames = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+	for (const frame of frames.filter(target => target.type === 'iframe')) {
+		const probe = new WebSocket(frame.webSocketDebuggerUrl);
+		try {
+			await new Promise((resolve, reject) => { probe.addEventListener('open', resolve, { once: true }); probe.addEventListener('error', reject, { once: true }); });
+			const line = await new Promise(resolve => {
+				probe.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.id === 1) { resolve(message.result?.result?.value ?? null); } });
+				probe.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `[document, ...[...document.querySelectorAll('iframe')].map(f => { try { return f.contentDocument; } catch { return null; } })].flatMap(d => (d?.body?.innerText ?? '').split('\\n')).find(line => line.includes(${JSON.stringify(needle)})) ?? null` } }));
+				setTimeout(() => resolve(null), 1500);
+			});
+			if (line) {
+				return line;
+			}
+		} catch {
+			// a frame that went away
+		} finally {
+			probe.close();
+		}
+	}
+	return null;
+}
+
 // ── What the checks read ──
 
 const TABS = `[...document.querySelectorAll('.part.editor .editor-group-container')].filter(group => group.offsetParent)[0]?.querySelectorAll('.tabs-container > .tab') ?? []`;
@@ -258,6 +283,14 @@ if (switchTo) {
 	const landed = await tabs();
 	check(`switched in place to ${switchTo}`, there.includes(switchTo) && landed[0]?.label.startsWith('Home') && (landed.find(tab => tab.active)?.label ?? '').startsWith('Home'), `title "${there}", in front "${landed.find(tab => tab.active)?.label ?? '(none)'}"`, `${switchTo}'s Home in front`);
 	await checkPermanent(`in ${switchTo}`);
+	let note = null;
+	for (let wait = 0; wait < 10 && !note; wait++) {
+		note = await webviewLine('is kept as you left it');
+		if (!note) {
+			await sleep(500);
+		}
+	}
+	check('Home says where it switched from, after Open Recent', note?.startsWith('Switched to ') ?? false, note ? `"${note}"` : 'no note on Home', '"Switched to … is kept as you left it."');
 	console.log(`…  File ▸ Open Recent → ${here}`);
 	await sleep(3000); // the AI's sheet restores its chat after the reload, and may take the focus once
 	await command('File: Open Recent...');
@@ -283,27 +316,11 @@ if (flag('share-question')) {
 	await click('the address', `[...document.querySelectorAll('.part.editor .editor-group-container.active .browser-url-display, .part.editor .editor-group-container.active .browser-url-input')].find(element => element.getBoundingClientRect().width)`);
 	await sleep(500);
 	await typeInto(['desk-input', 'quick-input'], url, true); // 1.117: the address input; 1.142: its picker
-	// The question is drawn in the AI's sheet, a webview: look for it in every frame
+	// The question is drawn in the AI's sheet, a webview
 	let asked = false;
 	for (let wait = 0; wait < 20 && !asked; wait++) {
 		await sleep(500);
-		const frames = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-		for (const frame of frames.filter(target => target.type === 'iframe')) {
-			const probe = new WebSocket(frame.webSocketDebuggerUrl);
-			try {
-				await new Promise((resolve, reject) => { probe.addEventListener('open', resolve, { once: true }); probe.addEventListener('error', reject, { once: true }); });
-				const found = await new Promise(resolve => {
-					probe.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.id === 1) { resolve(message.result?.result?.value === true); } });
-					probe.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `[document, ...[...document.querySelectorAll('iframe')].map(f => { try { return f.contentDocument; } catch { return null; } })].some(d => d?.body?.innerText.includes('Share this page with'))` } }));
-					setTimeout(() => resolve(false), 1500);
-				});
-				asked ||= found;
-			} catch {
-				// a frame that went away
-			} finally {
-				probe.close();
-			}
-		}
+		asked = (await webviewLine('Share this page with')) !== null;
 	}
 	if (!asked) {
 		check('the tab row works while the share question waits', null, 'no question came: this profile shares pages without asking, or the page did not load');

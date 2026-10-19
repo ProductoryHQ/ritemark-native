@@ -115,7 +115,7 @@ Acceptance criteria:
 - New screenshots are taken from the installed signed Windows candidate, with synthetic content and a disposable profile, and their captions reviewed (`ASSETS.md`).
 - Jarmo approves the exact URL and SHA-256 at the moment of Submit, and any warning Partner Center raises, each separately.
 - After certification, a Store-origin install, launch, edit and save, and uninstall are verified. A v1.14.0 Store install updates to 2.0 with its profile.
-- The privacy and terms URLs change only if the web side changed them for 2.0's opt-in usage data (Sprint 133's plan, *Analytics and privacy*).
+- The privacy and terms URLs change only if the web side changed them for 2.0's usage data, on by default with no location since 19 October (Sprint 133's plan, *Analytics and privacy*; Sprint 133's spec, R7).
 
 ### R8: The shell-tier gates, publication and closeout
 

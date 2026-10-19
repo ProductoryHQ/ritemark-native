@@ -18,6 +18,8 @@ import {
   signInAnswered,
   startSignIn,
   updateRows,
+  usageAnswerOnLeave,
+  usageSwitchOn,
   withStartingSignIn,
   type ProviderMemory,
 } from './welcomeState';
@@ -97,5 +99,20 @@ assert.equal(decodeWelcomeRequest({ type: 'welcome/create-project', name: 'x'.re
 assert.equal(decodeWelcomeRequest({ type: 'welcome/open-link', link: 'https://evil' }).ok, false, 'links are named, never URLs');
 assert.equal(decodeWelcomeRequest({ type: 'nope' }).ok, false);
 assert.equal(decodeWelcomeRequest(null).ok, false);
+
+// Usage data on by default (Jarmo, 19 October): the switch shows on with no answer, and leaving for a project answers
+// yes; off answers no at once; a no from Ritemark 1 or an earlier welcome stays off; a yes stays as it is.
+assert.equal(usageSwitchOn('unknown', null), true, 'no answer: on');
+assert.equal(usageAnswerOnLeave('fresh', 'unknown', null), 'yes', 'leaving step 2 with it on answers yes');
+assert.equal(usageAnswerOnLeave('update', 'unknown', null), 'yes', 'no answer on 1.x: the update welcome is on by default too');
+assert.equal(usageSwitchOn('no', null), false, '1.x Opt Out stays off');
+assert.equal(usageAnswerOnLeave('update', 'no', null), null);
+assert.equal(usageSwitchOn('yes', null), true, '1.x OK carries over on');
+assert.equal(usageAnswerOnLeave('update', 'yes', null), null, 'already a yes: nothing to answer');
+assert.equal(usageSwitchOn('no', false), false, 'turned off here (answered no at once)');
+assert.equal(usageAnswerOnLeave('fresh', 'no', false), null, 'off: nothing is sent on leaving');
+assert.equal(usageAnswerOnLeave('fresh', 'no', true), 'yes', 'off, then on again: yes on leaving');
+assert.equal(usageAnswerOnLeave('update', 'yes', false), null, 'a yes turned off here was answered no at once');
+assert.equal(usageAnswerOnLeave('start', 'unknown', null), null, 'the start sheet shows no switch, so leaving it answers nothing');
 
 console.log('✓ welcomeState and protocol tests passed');

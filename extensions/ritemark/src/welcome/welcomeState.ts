@@ -4,6 +4,7 @@
  * what the person does; the page draws what it returns.
  */
 
+import type { UsageAnswer } from '../analytics/consent';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { AccountProviderId, ProviderView, WelcomeKind, WelcomeProviderId } from './protocol';
 import { CHECK_TIMED_OUT, signInEnded, signInProblem, type SignInProblem } from './words';
@@ -142,4 +143,22 @@ export function isAccountProvider(id: WelcomeProviderId): id is AccountProviderI
 export function projectLine(readyProvider: WelcomeProviderId | null): string {
   const who = readyProvider === 'claude' ? 'Claude' : readyProvider === 'chatgpt' ? 'ChatGPT' : readyProvider === 'opencode' ? 'OpenCode' : 'Your AI';
   return `A project is a folder on this computer. ${who} works only inside it.`;
+}
+
+/**
+ * Usage data on the welcome: on by default (Jarmo, 19 October: "usage data on by default, as you suggested"). With no
+ * answer yet the switch shows on, and the choice is taken only when the person leaves the welcome for a project, so
+ * nothing leaves the computer before then. Turning the switch off answers no at once and sends nothing; `pending` is
+ * the switch as the person left it on this welcome, null while they have not touched it.
+ */
+export function usageSwitchOn(answer: UsageAnswer, pending: boolean | null): boolean {
+  return pending ?? answer !== 'no';
+}
+
+/**
+ * What leaving the welcome for a project answers: yes while the switch is on and the answer is not yes already. Only
+ * step 2 and the update welcome show the switch; leaving the start sheet answers nothing.
+ */
+export function usageAnswerOnLeave(kind: WelcomeKind, answer: UsageAnswer, pending: boolean | null): 'yes' | null {
+  return kind !== 'start' && usageSwitchOn(answer, pending) && answer !== 'yes' ? 'yes' : null;
 }

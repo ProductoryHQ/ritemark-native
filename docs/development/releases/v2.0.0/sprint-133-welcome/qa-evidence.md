@@ -148,6 +148,23 @@ Jarmo's test at `d726a382`: the first window on his 1728 × 1084 MacBook opened 
 
   Captured in Light and Dark in `qa-evidence/765/`. The Experience lead approved the compact rhythm and both departures; on their review the 72-high header's logo was set by its drawing, not its box: the SVG keeps about 20 of empty space under the drawn logo at 122 wide, so the box sits 2 below the foot and the drawn logo's foot is 18 from it, about 23 from the top.
 
+## Usage data on by default (19 October, after Sprint 134)
+
+Jarmo's decision, relayed by the Development manager: "usage data on by default, as you suggested". It reverses the 17 October off until yes (spec R7). The switch on step 2 and on the update sheet shows on; nothing leaves before the person leaves the welcome for a project with it on; turning it off there answers no at once and sends nothing; GeoIP is off for every event; a run from source sends only to a key given in `RITEMARK_POSTHOG_PROJECT_KEY`.
+
+Unit-tested in `consent.test.ts` (held until the yes, `$geoip_disable` on every event and on feedback, off drops the held events, no welcome means no send, the 1.x answers) and `welcomeState.test.ts` (the switch and the answer on leaving, for a fresh profile, a 1.x OK, Opt Out and no answer, and the start sheet, which shows no switch and answers nothing).
+
+Checked live on a dev build (`3c8a7c30` + this change), each on a fresh profile in the background, with the env key and host pointing at a local PostHog stand-in that logged every request; projects opened through Open a folder… (VS Code's simple file dialog) to a folder under `/private/tmp`:
+
+| Case | What was done | What reached the stand-in |
+|---|---|---|
+| A: on, untouched | Step 1, Skip, step 2 (switch on, "On. Never your documents, chats or names. You can turn it off here or later in Settings."), screenshots in Light and Dark, then Open a folder… | Nothing through step 1 and step 2. On leaving: `app_session_start` and the held `welcome_shown` (`kind: fresh`); after the reload `app_session_start` and `project_opened` (`existing_folder`, `has_ai: false`). All with `$geoip_disable: true` and `build_channel: dev`, one anonymous id. `ritemark.analytics.enabled: true` |
+| B: turned off on step 2 | Skip, the switch off ("Off. Never your documents, chats or names."), then Open a folder… | Nothing, before or 25 s after the landing. `ritemark.analytics.enabled: false` |
+| C: first window with a folder (R11) | Launched with the folder; no welcome | Nothing in 20 s; no answer written |
+| D: no env key | As A, without `RITEMARK_POSTHOG_PROJECT_KEY` | The yes was written, and the extension host logged "Disabled: no PostHog project key configured": a run from source never uses `product.json`'s key |
+
+The switch's words are the Experience lead's final ones (19 October, after the run above, which showed the drafted words; the behaviour is unchanged): step 2 was captured again on a fresh profile with them. Step 2's captures: [on, Light](qa-evidence/usage-on-by-default/light-step-2-on.png), [on, Dark](qa-evidence/usage-on-by-default/dark-step-2-on.png), [off, Light](qa-evidence/usage-on-by-default/light-step-2-off.png). Against the approved baseline's `*-welcome-step-2.png`, only the switch's line changed (0.22%, the words and the switch); step 1 matched to the pixel. Jarmo approved the new ones into the baseline on 19 October ("its ok"; closeout PR #470).
+
 ## Feedback with usage data off (19 October)
 
 Jarmo's decision on the parity list's G3 ("all recommendations ok"): Send Feedback works with usage data off, since pressing Send is the person's own choice. The gate's `sendFeedback` sends only the events given, from a client made for that one send. Unit-tested in `consent.test.ts`: off, with no answer yet, with a yes, with the kill switch on, and with no key. Checked live against a local stand-in for PostHog, on a fresh profile with usage data off:
@@ -174,11 +191,11 @@ Outside this sprint's files, as issues:
 ## Privacy, for the website (E6)
 
 For ritemark.app's privacy page, through the release's launch plan (Sprint 136's D5):
-- Usage data is off until the person turns it on, with a switch on the welcome and in Ritemark Settings; nothing is sent before that yes. Ritemark 1's OK (or a notice closed without Opt Out) carries over as a yes; Opt Out or no answer is off.
+- Usage data is on by default (Jarmo, 19 October; it was off until yes before), with a switch on the welcome and in Ritemark Settings; nothing is sent until the person leaves the welcome for a project with the switch on, and turning it off there sends nothing. Ritemark 1's OK (or a notice closed without Opt Out) carries over as a yes; an Opt Out stays off; no answer is on by default, as for someone new.
 - Every event carries `build_channel` (`dev` or `prod`), and no event carries a path, a name, a file, a message or an account.
 - New in 2.0 with usage data on: four counts (the welcome shown, an AI signed in, a project opened, the first message sent), beside the app starts and features used.
 - Send Feedback is the person's own choice and is sent even with usage data off: only the reaction and what they typed, under a one-off id that isn't kept, with no location. The box says "What you write here is sent with your feedback."
-- With usage data on, PostHog derives country and city from the request's IP (`disableGeoip: false`).
+- No location: PostHog's GeoIP is off for every event (`disableGeoip: true`, `$geoip_disable` on each event; since 19 October, before which country and city were derived from the request's IP).
 
 ## The frame baseline
 

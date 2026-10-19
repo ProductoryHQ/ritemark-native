@@ -400,7 +400,7 @@
           "ritemark.analytics.enabled": {
             "type": "boolean",
             "default": false,
-            "description": "Share anonymous usage data to improve Ritemark. Off until you turn it on. Never your documents, chats or names.",
+            "description": "Share anonymous usage data to improve Ritemark. On when you leave the welcome with its switch on; turn it off here or in Ritemark Settings. Never your documents, chats or names.",
             "scope": "application"
           }
         }

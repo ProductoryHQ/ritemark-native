@@ -198,6 +198,58 @@ async function main(): Promise<void> {
     assert.equal(await noKey.gate.sendFeedback(feedback), false);
   }
 
+  // ── On by default (Jarmo, 19 October): the welcome answers on leaving; until then nothing leaves ──
+  {
+    // The welcome shows its switch on, and the person has not left it yet: the answer is still none
+    const h = harness();
+    await h.gate.refresh();
+    assert.equal(await h.gate.trackWelcome('welcome_shown', { kind: 'fresh' }), 'held');
+    assert.equal(await h.gate.trackWelcome('ai_signed_in', { provider: 'claude', method: 'account' }), 'held');
+    assert.equal(await h.gate.track('feature_used', { feature: 'editor' }), false);
+    assert.equal(h.sent.length, 0, 'nothing leaves before the welcome is finished');
+    assert.equal(h.clientsCreated, 0);
+    // Leaving step 2 with the switch on is the yes: the session start and the held events go, each with no location
+    h.state.setting = true;
+    await h.gate.refresh();
+    assert.deepEqual(h.sent.map((s) => s.event), ['app_session_start', 'welcome_shown', 'ai_signed_in']);
+    assert.ok(h.sent.every((s) => s.properties.$geoip_disable === true), 'no event carries a location');
+    assert.equal(await h.gate.track('feature_used', { feature: 'editor' }), true);
+    assert.equal(h.sent[h.sent.length - 1].properties.$geoip_disable, true);
+  }
+  {
+    // Turning the switch off on step 2 answers no at once: the held events are dropped and nothing is sent
+    const h = harness();
+    await h.gate.refresh();
+    await h.gate.trackWelcome('welcome_shown', { kind: 'fresh' });
+    h.state.setting = false;
+    await h.gate.refresh();
+    assert.equal(h.gate.heldCount(), 0, 'off drops the held events');
+    assert.equal(h.sent.length, 0);
+    assert.equal(h.clientsCreated, 0, 'no client was ever made');
+    assert.equal(await h.gate.trackWelcome('ai_signed_in', { provider: 'claude', method: 'account' }), 'dropped');
+  }
+  {
+    // A first window opened with a file never shows the welcome: no answer, nothing sent, however long it runs
+    const h = harness();
+    await h.gate.refresh();
+    for (let i = 0; i < 3; i++) assert.equal(await h.gate.track('feature_used', { feature: 'editor' }), false);
+    assert.equal(h.sent.length, 0);
+    // The welcome closed without a project (the window closed): its held events go with it, and the answer stays none
+    await h.gate.trackWelcome('welcome_shown', { kind: 'fresh' });
+    h.gate.dropHeld();
+    assert.equal(h.gate.answer(), 'unknown');
+    assert.equal(h.sent.length, 0);
+  }
+  {
+    // Ritemark 1's answers as now: an Opt Out stays off, an OK carries over as on
+    assert.deepEqual(readOneXAnswer(false, true), { answer: 'no', carryOver: false });
+    assert.deepEqual(readOneXAnswer(undefined, true), { answer: 'yes', carryOver: true });
+    // Feedback sent with usage data off carries no location either
+    const off = harness({ setting: false });
+    assert.equal(await off.gate.sendFeedback([{ name: 'feedback_sent', properties: { kind: 'reaction', has_text: false } as never }]), true);
+    assert.ok(off.sent.every((s) => s.properties.$geoip_disable === true));
+  }
+
   assert.equal(buildChannel('2.0.0-0', false), 'prod', 'the bundled, floored version');
   assert.equal(buildChannel('2.0.0-ext.3', false), 'prod', 'an extension update');
   assert.equal(buildChannel('1.14.0', false), 'dev', 'a run from source');

@@ -116,7 +116,7 @@ const byLabel = (selector, label) => `[...document.querySelectorAll(${JSON.strin
  */
 async function pickRow(label) {
 	const row = `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`;
-	for (let waited = 0; waited < 5000 && !(await evaluate(`!!(${row})`)); waited += 250) {
+	for (let waited = 0; waited < 5000 && !(await evaluate(`!!(${row})?.getBoundingClientRect().width`)); waited += 250) {
 		await sleep(250);
 	}
 	await click(`the row "${label}"`, row);

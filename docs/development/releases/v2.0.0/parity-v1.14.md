@@ -119,7 +119,7 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | Launch check: ChatGPT and Claude signed in, "Click here to log in" | The welcome's cards; Settings' account cards | Main, S133 | Done (Settings); In flight (welcome) |
 | Launch check: Git found or needed | Settings and the welcome, only for this computer's runtime | S133 | **Gap G2** |
 | Launch check: Node, when needed (patch 017) | Settings and the welcome, for this computer's runtime | S133 | In flight (R5, R12) |
-| The usage-data notice (OK, Opt Out, Privacy Policy, Terms of Use) | The welcome's switch, off until yes; Settings ▸ Usage data, with both links; a 1.x OK carried over | S133 | In flight (R7) |
+| The usage-data notice (OK, Opt Out, Privacy Policy, Terms of Use) | The welcome's switch, on by default and sent only once the welcome is left with it on (Jarmo, 19 October); Settings ▸ Usage data, with both links; a 1.x OK carried over, a 1.x Opt Out kept | S133 | In flight (R7) |
 | Walkthroughs (Help ▸ Welcome: Open Walkthrough…, accessibility) | The welcome | S133 | **Gap G8** |
 | The AI sheet focused at start | Kept for project windows; not while the welcome shows | S133 | In flight |
 | The AI's onboarding wizard and setup views | Unchanged, for anyone who skipped the welcome | Main | Done |
@@ -260,7 +260,7 @@ Behaviour is the same on main; the page lies on white and follows a theme change
 | The update notice: install, skip, pause, relaunch | Same; v1.14.0 is offered 2.0.0 as a full release | Main, S136 | Done; Planned (Sprint 136, R1) |
 | The update status bar item | Same | Main | Done |
 | Send Feedback (All commands) | Same place; sends with usage data off | S133 | Decided (Jarmo, 19 October; G3); Sprint 133 builds it |
-| Usage data on by default, with a notice | Off until yes, on the welcome and in Settings | S133 | In flight (Jarmo, 17 and 18 October) |
+| Usage data on by default, with a notice | On by default again, chosen on the welcome's switch and in Settings; nothing sent before the welcome is left; no location | S133 | Decided (Jarmo, 19 October, reversing 17 October's off until yes) |
 | Report AI output | Status bar; AI information | Main | Done |
 
 ## 13. Keyboard
