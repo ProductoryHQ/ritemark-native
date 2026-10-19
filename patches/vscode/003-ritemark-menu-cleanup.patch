@@ -615,10 +615,10 @@ index bb8dd6560d4..2b6123c13bc 100644
  }], VIEW_CONTAINER);
  
 diff --git a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-index e05b71bd72c..8000150f10e 100644
+index e05b71bd72c..01e13f0a5fd 100644
 --- a/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
 +++ b/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts
-@@ -41,6 +41,167 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
+@@ -41,6 +41,169 @@ import { ASK_QUICK_QUESTION_ACTION_ID } from '../../chat/browser/actions/chatQui
  import { IChatAgentService } from '../../chat/common/participants/chatAgents.js';
  import { ChatAgentLocation } from '../../chat/common/constants.js';
  
@@ -768,6 +768,8 @@ index e05b71bd72c..8000150f10e 100644
 +	'chat.pet.developer.resetSize',
 +	'chat.pet.developer.unlockAllAchievements',
 +	'workbench.action.chat.agentHost.otel.exportAgentTracesDB',
++	'workbench.action.chat.exportAgentHostDebugLogs', // Developer: Export Agent Host Debug Logs...
++	'workbench.action.chat.openCopilotCliStateFile', // Developer: Open Agent Host State File
 +]);
 +
 +/**
@@ -786,7 +788,7 @@ index e05b71bd72c..8000150f10e 100644
  export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAccessProvider {
  
  	private static AI_RELATED_INFORMATION_MAX_PICKS = 5;
-@@ -125,10 +286,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
+@@ -125,10 +288,12 @@ export class CommandsQuickAccessProvider extends AbstractEditorCommandsQuickAcce
  			return [];
  		}
  
