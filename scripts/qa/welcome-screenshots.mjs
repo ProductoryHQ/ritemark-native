@@ -90,10 +90,20 @@ async function key(code, modifiers = 0, keyName = code.replace(/^Key/, '').toLow
 	await page.send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, code, key: keyName, windowsVirtualKeyCode: virtualKey });
 }
 
+/**
+ * Picks a quick pick's row by its exact label. The list can take a moment to fill (VS Code 1.142's palette, the first
+ * time after a launch), so it waits up to 5 seconds for the row before it fails the run.
+ */
 async function pickRow(label) {
-	const centre = await page.evaluate(`(() => { const row = [...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(r => { const aria = r.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); }); if (!row) { return null; } const b = row.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`);
+	const find = `(() => { const row = [...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(r => { const aria = r.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); }); if (!row) { return null; } const b = row.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`;
+	let centre = await page.evaluate(find);
+	for (let waited = 0; !centre && waited < 5000; waited += 250) {
+		await sleep(250);
+		centre = await page.evaluate(find);
+	}
 	if (!centre) {
-		throw new Error(`no row "${label}"`);
+		const shown = await page.evaluate(`({ open: document.querySelector('.quick-input-widget')?.style.display !== 'none', value: document.querySelector('.quick-input-widget input')?.value, rows: [...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].slice(0, 5).map(r => r.getAttribute('aria-label')) })`);
+		throw new Error(`no row "${label}" (the quick input: ${JSON.stringify(shown)})`);
 	}
 	for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
 		await page.send('Input.dispatchMouseEvent', { type, x: centre[0], y: centre[1], button: 'left', clickCount: 1 });
