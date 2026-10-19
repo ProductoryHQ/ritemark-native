@@ -2,14 +2,14 @@
 
 Track: SDD (24 user-facing requirements; a new extension subsystem, the webview, small hunks in patches 003, 009, 018 and 019)
 Override with: "use plain full track"
-Branch: `sprint-134-project-at-the-centre` (created only after approval, and only once Sprint 133 is merged)
+Branch: `sprint-134-project-at-the-centre` (created 2026-10-19 from `origin/main` `eae1dedd`, after Sprint 133's merge, with [#462](https://github.com/ProductoryHQ/ritemark-native/pull/462)'s plan merged in)
 Release tier: shell (patches 003, 009, 018 and 019, and 001 if the splash audit keeps its hunk; there is no release from main until 2.0)
-Status: Phase 2 (PLAN) drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), and updated on 2026-10-19 with Jarmo's decisions and the Experience lead's answers, **awaiting Jarmo's approval**. Not started.
+Status: **Phase 3 (IMPLEMENT)**. Plan approved by Jarmo on 2026-10-19 ("approved"), with his answers to the three *Decisions for Jarmo* the same day. Drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), and updated on 2026-10-19 with Jarmo's decisions and the Experience lead's answers.
 
 ## SDD Artifacts
 
 - [spec.md](spec.md): the behaviour contract, R1–R24 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S61, the manual QA matrix.
+- [scenarios.md](scenarios.md): S1–S62, the manual QA matrix.
 - [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W18, the eight audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
@@ -163,7 +163,7 @@ The launcher's code is deleted only after every row above is checked on the bran
   - one merge;
   - the Tasks tab's count is the Tasks place's badge, read in the shell, so the two can never differ; the project's total adds the chats that wait;
   - another project's calls come from the board's own rules (`deriveWho`) and this computer's hand-off records, not the proof of concept's card-only count;
-  - a chat counts as waiting only while a window holds it, so a crash does not leave a count behind;
+  - a chat's question or approval counts as waiting only while a window holds it, so a crash does not leave a count behind (an unread reply, added on 19 October, counts until it is read);
   - the internal recent-folders command is used once, by the first fill;
   - the switcher's submenu and File ▸ Switch project are the two small shell additions the head needs; the splash is the third;
   - no new analytics event.
@@ -180,14 +180,19 @@ The launcher's code is deleted only after every row above is checked on the bran
   - the palette's filter drops entries only from All commands; the commands stay registered;
   - the copy pass changes words only, never a key or an identifier, and a model's own name stays;
   - only a colour the person chose is drawn on an agent's row, not one guessed from its name.
+- **2026-10-19 (Jarmo, at this plan's approval):** the three *Decisions for Jarmo* below.
+- **2026-10-19 (engineering, on Jarmo's answer to Decision 1):**
+  - the chat store keeps when each chat was last read, in its record and in `index.json`, so another project's unread replies are counted without opening it;
+  - chats made before this build count as read, so the first 2.0 start shows no backlog;
+  - a chat that a card runs in is counted through the card's call only, never twice.
 
 ## Decisions for Jarmo
 
-Each has a recommendation, listed in [spec.md](spec.md#open-questions) too.
+Answered by Jarmo on 2026-10-19, with his approval of this plan.
 
-1. **What counts as a chat that waits.** I recommend a question or an approval the AI is waiting on, not an unread answer.
-2. **Removing 1.x's Home launcher.** I recommend deleting its code once every function on the table above is checked, and setting its `home-launcher` flag to disabled with a tombstone.
-3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own, and the tasks that wait lead their stage, marked; Archived goes inside Done. I recommend yes, as drawn: every task and action stays and the count is unchanged. It changes how a 1.x list looks, so it needs your yes.
+1. **What counts as a chat that waits.** The recommendation was a question or an approval the AI is waiting on, not an unread answer. **Jarmo: "Also unread answers".** A chat waits when the AI waits on a question or an approval, and also when it has a finished reply the person has not read. Unread replies are new state: the chat store has no read marker today (spec R3; technical plan, W3).
+2. **Removing 1.x's Home launcher.** **Jarmo: yes, as recommended.** Its code is deleted once every function on the table above is checked, and its `home-launcher` flag is set to disabled with a tombstone.
+3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own, and the tasks that wait lead their stage, marked; Archived goes inside Done. **Jarmo: yes, as drawn.** Every task and action stays and the count is unchanged.
 
 ## Feature Flag Check
 
@@ -249,4 +254,4 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan: "approved" (2026-10-19). His answers to the three *Decisions for Jarmo*, the same day: unread answers count as waiting too ("Also unread answers"); the launcher's code is deleted after the check ("Yes, delete after the check"); Tasks' list as drawn ("Yes, as drawn").

@@ -69,6 +69,16 @@ Then the list counts it, as that project's board does.
 Given a chat of another project left `needs-user` by a crash, with no window holding it
 Then it is not counted.
 
+### S62: An unread reply (Jarmo, 19 October)
+Given "Sales proposal Q4" open in another window, where a reply in one of its chats finished while another chat was in front
+When Home is shown in "Leadership programme"
+Then the list counts it beside "Sales proposal Q4", and Home says what waits in the other projects
+When the person opens that chat in the other window and Home is shown again
+Then it is no longer counted
+And a reply that finishes while its chat is in front on the AI's sheet is never counted
+And a card's finished turn counts once, as the card's review, not as its chat too
+And on a v1.14.0 profile's first start of this build, no old chat counts as unread.
+
 ### S12: The Tasks tab's count
 Given two cards waiting on the person
 Then the Tasks tab shows 2 at its icon's lower right, its tooltip says "Tasks, 2 wait for you", and VoiceOver reads it

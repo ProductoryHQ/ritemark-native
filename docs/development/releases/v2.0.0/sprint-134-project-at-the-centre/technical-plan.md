@@ -60,7 +60,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 
 ## Phase 1 audits
 
-1. **`research/waiting-audit.md`** (R3, R6): computing another project's calls from its card files and its hand-off records (`projectKey(folder)`), mapped as `CardHandoffLedger.list()` maps them, through `deriveWho`; chats that need the person from `index.json` read as it is (never `list()` with no scope, which rewrites it), mapped to folders through the records' scopes, and kept only when a live owner holds them (a `needs-user` left by a crash is not a call); the cost with 20 projects of 50 cards each.
+1. **`research/waiting-audit.md`** (R3, R6): computing another project's calls from its card files and its hand-off records (`projectKey(folder)`), mapped as `CardHandoffLedger.list()` maps them, through `deriveWho`; chats that need the person from `index.json` read as it is (never `list()` with no scope, which rewrites it), mapped to folders through the records' scopes, and kept only when a live owner holds them (a `needs-user` left by a crash is not a call); the cost with 20 projects of 50 cards each. After Jarmo's answer of 19 October ("Also unread answers"), it also settles the read marker: which field records when a chat's newest reply finished (a reply, a failure, or neither for a turn interrupted by a restart), where the marker lives in the record and in `index.json` so another project's unread replies are counted from the raw index, when the sheet marks a chat read (in front on a shown sheet, in the window that has focus or not), how records from before this build count as read, and how a card's chat (`sourceKind: card`) is left to its card.
 2. **`research/first-fill-audit.md`** (R2): the three sources and how each gives a folder path:
    - VS Code's recent folders, read once through `_workbench.getRecentlyOpened`;
    - the chat store's records, whose scopes carry their folder URIs;
@@ -124,12 +124,14 @@ From 19 October it also records:
 ## Workstream 3: What waits (R3, R6)
 
 - `src/projects/waiting.ts` (new), per `research/waiting-audit.md`:
-  - **the open project**: the board's own snapshot (`snapshot.attention.count` and its `calls`) and the chat store's live conversations of this window's scope with `lifecycle.state: 'needs-user'`;
-  - **another project**: its card files (`parseCardFile`) and its hand-off records (by `projectKey`), through `deriveWho`; and its chats from `index.json` with a live owner, as the audit settles;
+  - **the open project**: the board's own snapshot (`snapshot.attention.count` and its `calls`) and the chat store's live conversations of this window's scope with `lifecycle.state: 'needs-user'`, plus its chats with an unread reply;
+  - **another project**: its card files (`parseCardFile`) and its hand-off records (by `projectKey`), through `deriveWho`; and its chats from `index.json`: a `needs-user` with a live owner, or an unread reply, as the audit settles;
+  - a chat that a card runs in counts only through the card's call.
+- **The read marker** (Jarmo, 19 October: "Also unread answers"). The chat store has none today. Each conversation record and its `index.json` entry gain when the chat was last read (proposed `readAt`), beside when its newest reply finished. The AI's sheet marks a chat read when it is in front on a shown sheet, and at once when a reply finishes while it is so. A record without the marker counts as read, so the first start of this build shows no backlog. The field names and the rules are the waiting audit's; the store's decoder keeps both optional, so an older build reading the store is unaffected.
   - a project whose board cannot be read gives no count (`undefined`), never zero.
 - Other projects are read when Home or the switcher is shown, with a short cache (30 s), never on a timer in the background.
 - **The Tasks tab's count** (019, from the PoC): `multiEditorTabsControl.ts` reads the badge of `workbench.view.extension.ritemark-tasks` from `IActivityService` and draws it on the tab whose view type is `mainThreadWebview-ritemark.taskBoard`, up to "99+", with the tab's accessible name including it. The badge is the board's calls, so the tab and the place cannot disagree.
-- Tests: `waiting.test.ts` with fixture boards (each call kind, archived, done, a hand-off that needs the person) and fixture chat indexes (live and stale `needs-user`).
+- Tests: `waiting.test.ts` with fixture boards (each call kind, archived, done, a hand-off that needs the person) and fixture chat indexes (live and stale `needs-user`; an unread reply, a read one, one from before this build, a card's chat). The store's tests cover the marker's round trip and an older record without it.
 
 ## Workstream 4: Home's tab (R4, R10, R11, R13)
 
@@ -294,7 +296,7 @@ From 19 October it also records:
 
 ## Delivery plan: one merge
 
-1. Before the merge: Mac QA (S1–S40, S43–S61), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages, Settings' foot, the copy pass).
+1. Before the merge: Mac QA (S1–S40, S43–S62), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages, Settings' foot, the copy pass).
 2. The merge.
 3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe, the share question and the palette), and the drift check. Fixes from the Windows round go in a small follow-up PR.
 

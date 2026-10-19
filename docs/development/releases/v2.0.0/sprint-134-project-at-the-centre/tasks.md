@@ -4,9 +4,9 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Sprint 133 is on `origin/main`
-- [ ] `git checkout -b sprint-134-project-at-the-centre` from `origin/main`; `git branch --show-current` shows it
-- [ ] VS Code at the pin with every patch from reset + clean + apply (copy-on-write clone for the worktree)
+- [x] Sprint 133 is on `origin/main` (`eae1dedd`, #453)
+- [x] `git checkout -b sprint-134-project-at-the-centre` from `origin/main`; `git branch --show-current` shows it (2026-10-19, with #462's plan merged in)
+- [x] VS Code at the pin with every patch from reset + clean + apply (copy-on-write clone for the worktree): 18 applied, a second run clean, `transpile-client` done
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] The test projects of `scenarios.md` made in a scratch folder, and a v1.14.0 profile with chats and boards in several projects
 
@@ -32,7 +32,8 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] `media/home/cover.jpg` and the Home tab icons as image files (E4)
 - [ ] `src/projects/ProjectList.ts` + test (R2)
 - [ ] `src/projects/firstFill.ts` + test, once per profile (R2)
-- [ ] `src/projects/waiting.ts` + test (R3)
+- [ ] The chat store's read marker: in each record and in `index.json`, set when a chat is in front on a shown sheet, absent on older records (read); store tests (R3, Jarmo's answer of 19 October)
+- [ ] `src/projects/waiting.ts` + test, with unread replies and a card's chat counted once (R3, S62)
 - [ ] `src/projects/protocol.ts` + test (E2)
 - [ ] `extension.ts`: `ProjectList.opened` on every activation with a folder; the first fill
 - [ ] The welcome's update sheet and "Where do you want to start?" sheet read the project list (R2, S54)
@@ -97,7 +98,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] The screenshot baseline gains Home, the list, the switcher, What moved, the three places with their heads, the share question, Settings' foot and a coloured agent, light and dark (E3)
 - [ ] `media/webview.js` measured after; `notes/bundle.md` (E4)
 - [ ] Docs: `architecture.md` (Projects; the browser's share question), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist lines (E6)
-- [ ] Manual QA on the Mac: S1–S40, S43–S61; evidence in `qa-evidence.md`
+- [ ] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"

@@ -6,7 +6,7 @@ Ritemark 2.0's third step makes the project the place a person works in. Each pr
 
 Refreshed on 18 October 2026 with what Sprint 132 handed to step 3 (R16–R19, and changes to R2, R8 and R13), and with the gaps the [v1.14 parity list](../parity-v1.14.md) gives this step.
 
-Updated on 19 October 2026 with Jarmo's decisions of that day (R20–R24) and the Experience lead's answers to the refresh's design questions (R16, R19).
+Updated on 19 October 2026 with Jarmo's decisions of that day (R20–R24) and the Experience lead's answers to the refresh's design questions (R16, R19), and at the plan's approval the same day with Jarmo's answers to its open questions (R3: unread replies count).
 
 ## Principles
 
@@ -52,8 +52,15 @@ As a writer, I want to see what needs me, here and in my other projects.
 
 Acceptance criteria:
 - For each project, what waits is the sum of:
-  - chats that need the person: a question or an approval waiting in a chat of that project (from the chat store);
+  - chats that need the person (from the chat store; Jarmo, 19 October):
+    - a question or an approval the AI is waiting on in a chat of that project;
+    - a reply the person has not read: the AI finished it after the person last had that chat in front on the AI's sheet;
   - tasks that wait on the person: the board's Your calls (from that project's board).
+- A reply is read once its chat is in front on the AI's sheet while the sheet is shown. A reply that finishes while its chat is in front and shown is read at once.
+- A chat that a card runs in is counted through the card's call only, never twice.
+- A question or an approval counts only while a window holds its chat, so a crash leaves no count behind. An unread reply counts until it is read, after a restart too.
+- Chats from before this build count as read, so the first 2.0 start shows no backlog.
+- The chat store has no read marker today. It gains one, kept in the record and in its index, so another project's unread replies are counted without opening that project.
 - The project's total shows in the projects list, in the switcher and in Home's Waiting for you. The board's part of it is the number the Tasks place shows today, and the Tasks tab shows the same (R6).
 - A task counts exactly as the board counts it today (its four kinds of call: needs you, a decision, a review, failed), from the same rules, including what only this computer's hand-off records know.
 - Other projects' counts are read without opening them: from their card files, this computer's hand-off records and the chat store.
@@ -70,7 +77,7 @@ Acceptance criteria:
   - the project's mark and name, not the word Home;
   - the folder it works in, as one muted line, which opens Documents when clicked;
   - the project's line, which the person can edit in place;
-  - **Waiting for you**, with its count, listing what waits (a card's call or a chat's question), each opening where it waits;
+  - **Waiting for you**, with its count, listing what waits (a card's call, a chat's question or approval, or a chat's reply not yet read), each opening where it waits;
   - one line for what waits in the other projects, which are counted in the list;
   - **Start something in <project>**: Text, Table and Web page, as the + offers, on every Home, under Waiting for you and above Last changed (experience 2, frame 4; experience 29, frame 1; the Experience lead, 18 October);
   - **Last changed in <project>**: the documents changed last, each with its folder and when, each opening the document.
@@ -262,7 +269,7 @@ Acceptance criteria:
   - Done, folded, with today's Archived inside it.
 - A task that waits for the person (the board's calls: needs you, a decision, a review, failed) is marked and first in its stage, wherever it is. No call is hidden by the order, and the count is unchanged (R6).
 - Every task the list shows today is still listed, and every action on a row stays: open, the … menu, and Restore and Delete… for an archived task.
-- Your calls is no longer a panel of its own, and Archived is no longer a section of its own. This changes a 1.x behaviour, so it needs Jarmo's yes (Open Question 3).
+- Your calls is no longer a panel of its own, and Archived is no longer a section of its own. This changes a 1.x behaviour; Jarmo said yes on 19 October ("Yes, as drawn").
 
 ### R18: Browser under the head
 
@@ -472,17 +479,15 @@ After 2.0 (Jarmo, 19 October):
 - **2026-10-19 (the Experience lead's answers to the refresh's design questions):**
   - **Transcribe's settings button** is a small icon button, the gear with the tooltip "Transcribe settings", at the right of the "Recordings" group label, under the project's head. It is the same pattern as Browser's + and Clear at the right of "Recent" (R16).
   - **Share on a PDF or a Word file** holds Show in Finder (Show in File Explorer on Windows), so the file can be attached to an email or a message, and Open in Preview for a PDF or Open in Word, where the system's own Share is. Make an editable copy stays on the bar beside Share, as drawn (`comparison/after-pdf.png`). Share has no Export or Google Docs on these files (R19).
+- **2026-10-19 (Jarmo, at this plan's approval):**
+  - **What counts as "waits" in a chat:** "Also unread answers". A chat waits while the AI waits on a question or an approval, and also while it has a finished reply the person has not read (R3). The recommendation had been questions and approvals only.
+  - **Removing 1.x's Home view:** yes, as recommended. The projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone (R14).
+  - **Tasks' list as experience 6 draws it:** "Yes, as drawn" (R17).
 
 ## Open Questions
 
-Each has a recommendation; Jarmo answers at this plan's approval.
+Still open for the Experience lead:
+- Whether Browser has rows under the head (from the refresh). The handover names only the Recent label and its two actions, so the plan draws none.
+- How a chat's unread reply is drawn in Home's Waiting for you, and whether the AI sheet's chat rail marks an unread chat (from Jarmo's answer of 19 October, R3). Until they answer, the reply is listed as a chat's question is, with its own words, and the rail is unchanged.
 
-1. **What counts as "waits" in a chat.** **Recommendation:** a question or an approval the AI is waiting on; a finished turn the person has not read does not count (it is the chat rail's dot, not a call).
-2. **Removing 1.x's Home view** (`ritemark.homeView`, the `home-launcher` flag). **Recommendation:** the projects list takes its container and place; the old view's code is deleted only after R14's table is checked, and the `home-launcher` flag is set to disabled with a tombstone, as `CLAUDE.md`'s flag rule asks.
-
-3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own: the tasks that wait lead their stage, marked. Archived moves inside Done. **Recommendation:** yes, as drawn. Nothing is lost: every task and every action stays, and the count is unchanged. Because it changes how a 1.x list looks, `CLAUDE.md`'s first hard rule asks for Jarmo's yes, as Sprint 132 asked for Agents' sections.
-
-Still open for the Experience lead, from the refresh:
-- Whether Browser has rows under the head. The handover names only the Recent label and its two actions, so the plan draws none.
-
-The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*).
+The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*). Jarmo answered this plan's three open questions at its approval on 19 October (*Resolved Questions*).
