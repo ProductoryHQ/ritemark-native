@@ -38,7 +38,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 | 2 — The welcome | The welcome as a Ritemark page; which AI you use, with each provider's sign-in; setting up a project; landing on it; the usage-data choice on the welcome; the four analytics events; the welcome once for people updating from 1.x | Step 1 merged | **Plan approved** 2026-10-18; [Sprint 133](sprint-133-welcome/sprint-plan.md) in [#453](https://github.com/ProductoryHQ/ritemark-native/pull/453), Mac QA done, waiting on the Windows overlay round |
 | 3 — The project at the centre | The project file and the project list (filled on the first 2.0 start); what waits in each project; Home as the project's page; Home and Tasks as permanent tabs; the projects list in the left column; the column's head; switching in place; the document's bar | Steps 1 and 2 merged | **Plan drafted, awaiting approval** (2026-10-18): [Sprint 134](sprint-134-project-at-the-centre/sprint-plan.md) |
 | Update — VS Code to the current release | One update of the pinned VS Code (1.117.0 today; 1.142.0 is out) to the release of that day: every patch rebased; the Node and Electron versions that come with it, the arm64 build environment, the native-module check and Windows CI; the screenshot baseline compared | Steps 1–3 merged | **Plan drafted, awaiting approval** 2026-10-18: [Sprint 135](sprint-135-vscode-update/sprint-plan.md) |
-| 4 — 2.0 as one release | Updating from v1.14.0; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; the runtime review; version 2.0.0, notes and the store listing | Steps 1–3 and the VS Code update merged | **Not planned** |
+| 4 — 2.0 as one release | Updating from v1.14.0; Dark and Windows checked; a screenshot comparison of the base window in the release checklist; the runtime review; version 2.0.0, notes and the store listing | Steps 1–3 and the VS Code update merged | **Plan drafted, awaiting approval** (2026-10-18): [Sprint 136](sprint-136-release/sprint-plan.md) |
 
 ### Step 1 — Surfaces and frame, theme first
 
@@ -155,6 +155,7 @@ Ritemark 2.0 is one new Ritemark, with three things together:
   - when the AI is working in the project being left, Ritemark says so before switching;
   - ⌥ click opens the project in a new window.
 - **The document's own bar:** Saved, from the sync state the host already sends, and Share, which regroups today's Export menu.
+- **What Sprint 132 handed over** (Sprint 134's plan, refreshed on 18 October): the project's head on Tasks, Browser and Transcribe; Tasks' and Browser's pages under it; Make an editable copy and Share on the PDF and Word bars; New tab and Share in the File menu.
 
 **Depends on**
 
@@ -186,6 +187,8 @@ Ritemark 2.0 is one new Ritemark, with three things together:
 
 **Depends on** steps 1–3 and the VS Code update merged.
 
+**Plan:** [Sprint 136](sprint-136-release/sprint-plan.md), drafted on 18 October, awaiting Jarmo's approval.
+
 **Done when** v2.0.0 is published through the shell-tier gates below, the update feed is updated, and the release is closed out (release skill).
 
 ## Issue Intake
@@ -212,12 +215,12 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 | 2 — The welcome: [Sprint 133](sprint-133-welcome/sprint-plan.md) | `sprint-133-welcome` | Plan: [#446](https://github.com/ProductoryHQ/ritemark-native/pull/446); the sprint: [#453](https://github.com/ProductoryHQ/ritemark-native/pull/453) | #429, #338, #401 (decided in the plan) | Plan approved by Jarmo 2026-10-18; PR #453 open with the Mac QA done ([qa-evidence.md](sprint-133-welcome/qa-evidence.md)); waits on the Windows overlay round (S45, S46) and Jarmo's merge | — | — |
 | 3 — The project at the centre: [Sprint 134](sprint-134-project-at-the-centre/sprint-plan.md) | `sprint-134-project-at-the-centre` | Plan: [#446](https://github.com/ProductoryHQ/ritemark-native/pull/446) | — | Plan drafted 2026-10-18, awaiting Jarmo's approval; starts after Sprint 133 is merged | — | — |
 | Update — VS Code: [Sprint 135](sprint-135-vscode-update/sprint-plan.md) | `sprint-135-vscode-update` | Plan: [#445](https://github.com/ProductoryHQ/ritemark-native/pull/445) | — | Plan drafted 2026-10-18, awaiting Jarmo's approval; starts after Steps 1–3 merge | — | — |
-| 4 — 2.0 as one release | the release worktree and version bump | — | — | Not planned | — | — |
+| 4 — 2.0 as one release: [Sprint 136](sprint-136-release/sprint-plan.md) | `sprint-136-release`, then the release worktree and the version bump | Plan: this docs PR | — | Plan drafted 2026-10-18, awaiting Jarmo's approval; starts after Steps 1–3 and Sprint 135 merge | — | — |
 
 ## Feature-Complete Checklist
 
 - [ ] Steps 1, 2 and 3 merged, each with its issues closed or explicitly deferred with evidence.
-- [ ] Everything v1.14.0 can do is reachable in 2.0, checked against a written list (including Home's launcher, the Getting Started launch check, the terminal and Copilot Chat).
+- [ ] Everything v1.14.0 can do is reachable in 2.0, checked against a written list (including Home's launcher, the Getting Started launch check, the terminal and Copilot Chat). The list: [parity-v1.14.md](parity-v1.14.md).
 - [ ] The base window matches the drawings on the Mac and on Windows, light and dark. Jarmo approves the screenshot baseline.
 - [ ] An update from a lived-in v1.14.0 profile tested on the Mac and on Windows.
 - [ ] The four analytics events verified, sent only after a yes and never from dev runs.

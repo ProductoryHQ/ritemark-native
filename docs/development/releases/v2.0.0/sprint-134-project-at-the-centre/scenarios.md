@@ -43,6 +43,11 @@ Then it joins the list, first.
 When the person removes "Board report 2026" from the list
 Then it leaves the list, and its folder, chats and board are untouched; opening it again adds it back.
 
+### S54: The welcome's lists
+Given a finished profile with "Moved" removed from the list, and a v1.14.0 profile after the first fill
+When a window with no folder shows "Where do you want to start?", and the v1.14.0 profile shows the update sheet
+Then both list projects from Ritemark's project list, in its order, and "Moved" is not on the first.
+
 ## Feature: What waits (R3, R6)
 
 ### S8: The same number everywhere
@@ -167,6 +172,15 @@ Then `CLAUDE.md`'s first line is `@AGENTS.md` and every other byte is as it was,
 On the Mac's File menu and on Windows' menu button's File menu
 Then Switch project is there and opens the switcher.
 
+### S52: File ▸ New tab and Share
+On the Mac's File menu and on Windows' menu button's File menu
+Then New tab (⌘T, Ctrl+T on Windows), Switch project and Share are where experiences/windows frame 2 draws them
+When the person picks New tab, and presses ⌘T (Ctrl+T)
+Then the +'s menu opens each time
+When a document is in front and the person picks Share
+Then the document's Share menu opens
+And with Home in front, Share is greyed out.
+
 ## Feature: Switching in place (R9)
 
 ### S30: Switching and coming back
@@ -242,6 +256,11 @@ Given "Moved" not found
 When the person uses Find it… and picks "Board report 2026"'s folder
 Then Ritemark says that folder is already another project's, and the list stays as it was.
 
+### S53: A folder that has gone stays gone (negative)
+Given "Moved" with a flow in `.ritemark/flows`, open in a window
+When its folder is deleted outside Ritemark, and the person opens Flows, runs the flow's schedule check, and shows Home
+Then the folder does not come back, the list shows "Moved" as Not found, and no `.ritemark` folder is created at the old path.
+
 ### S39: An empty project and no board
 When the person opens "Empty"
 Then Home shows the empty state with Text, Table, Web page and a drop target; a file dropped on it is copied in and the original stays
@@ -259,9 +278,67 @@ And the Export menu's every item works from Share.
 
 ### S41: Home and switching on Windows
 Given a Windows build from main (after the merge) or the test overlay (before it, for the extension side)
-When the person runs S13, S18, S23, S27, S30 and S36
+When the person runs S13, S18, S23, S27, S30, S36, S45, S48 and S50
 Then each holds, with Windows paths, Alt click for a new window, Reveal in File Explorer and Ctrl in every shortcut.
 
 ### S42: Other drives
 Given projects on D: and on a network share, and one on a disconnected USB drive
 Then the first two are listed and open; the third shows as Not found.
+
+## Feature: The project's head on every place (R16)
+
+### S45: Tasks, Browser and Transcribe
+Given "Leadership programme" open
+When the person chooses Tasks, then Browser, then Transcribe in the places row
+Then each shows the project's head: the mark "LP", "Leadership programme" and the chevron, at the numbers Documents has; no "Tasks", "Browser" or "Transcribe" title row
+And under it Tasks shows New task and Search, Transcribe shows Record and Transcribe a file…, and Browser shows the Recent label
+And each place's content follows as before
+When the person clicks the chevron on each
+Then the project's menu opens, as on Documents.
+
+### S46: Nothing on a title row is lost
+Given Browser and Transcribe chosen in turn
+Then Browser's New browser tab and Clear history are at the right of the Recent label, each with its tooltip, and each works as the title row's button did
+And Transcribe's settings button is where the Experience lead drew it (or at the right of the Recordings label until then), and opens Settings at the transcription card
+And Record and Transcribe a file… do what Record and Add recording did.
+
+### S47: No folder open (negative)
+Given a window with no folder, after the welcome is finished
+When the person chooses Browser and Transcribe
+Then each shows its plain place name as Sprint 132 left it, and no project's head.
+
+## Feature: Tasks under the head (R17)
+
+### S48: New task and Search
+When the person clicks New task
+Then the add field shows with the keyboard in it, and Enter adds the task to To do
+When the person clicks Search and types "module"
+Then only tasks with "module" in their title show; Escape shows them all again.
+
+### S49: The order work moves (and nothing hidden)
+Given a board with an idea, two tasks in To do, three in Doing of which one waits on a decision, one failed task in To do, two done and one archived
+Then the list shows Ideas folded, To do with the failed task first and marked, Doing with the decision first and marked "Waiting for you", and Done folded
+When the person opens Done
+Then the archived task is inside it, with Restore and Delete… in its … menu
+And the Tasks place and the Tasks tab both count 2.
+
+## Feature: Browser under the head (R18)
+
+### S50: Recent, and plain words
+Given a fresh profile
+When the person chooses Browser
+Then the Recent label heads the column in 11-caps, and the list says "No pages yet" with today's line under it
+When the person opens ritemark.app from the + at the right of the label
+Then the page shows under Recent with its title
+When the person picks Clear history
+Then the list is empty again and says "No pages yet".
+
+## Feature: The PDF and Word bars (R19)
+
+### S51: Make an editable copy, and Share
+Given a PDF and a Word file in "Leadership programme"
+When each opens
+Then its bar shows page, zoom, fit and find as today, then Make an editable copy and Share
+When the person clicks Make an editable copy
+Then an editable Markdown copy is made exactly as Save as Markdown made it
+And Share holds what the Experience lead drew, with nothing from today's bar gone.

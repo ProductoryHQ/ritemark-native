@@ -1,6 +1,6 @@
 # Sprint 134 Technical Plan
 
-The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), step 3; the research behind it is the release's [feasibility read](../feasibility.md), the Experience lead's technical analysis ("The project at the centre", `ritemark-dev`: `product/design/experience/technical/README.md`), and the proof of concept (`/Users/jarmotuisk/Projects/ritemark-2.0-poc`, branch `poc/2.0-surfaces`, read only). Code shapes here are proposals: when the code needs something else, this file changes first. File references are to `main` at `d781a0e1` (Sprint 132 merge 1) unless marked PoC.
+The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), step 3; the research behind it is the release's [feasibility read](../feasibility.md), the Experience lead's technical analysis ("The project at the centre", `ritemark-dev`: `product/design/experience/technical/README.md`), and the proof of concept (`/Users/jarmotuisk/Projects/ritemark-2.0-poc`, branch `poc/2.0-surfaces`, read only). Code shapes here are proposals: when the code needs something else, this file changes first. File references are to `main` at `d781a0e1` (Sprint 132 merge 1) unless marked PoC. The rows and workstreams added in the 18 October refresh (R16–R19) refer to `main` at `b1c198af`, after Sprint 132's closeout.
 
 ## What exists today
 
@@ -20,6 +20,13 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | The splash | Patch 001 sets the dark auto-detect splash to `#1E1B4B`; otherwise VS Code's `partsSplash.ts` saves `editor.background` (white in Ritemark Light) and the bars' colours. `ritemark.ground` is not used | Unchanged |
 | The document's bar | `header/DocumentHeader.tsx`: Contents, Properties, comments, Agent; dictation, the sync action (only for a conflict or a retry), Export. `ExportMenu.tsx`: Export PDF, Export Word, Google Docs (Connect…, Create, Reconnect…, Sync, Open, Remove link…), Copy as Markdown. The host sends `document:sync-state` (`synced`, `local-only`, `applying`, `conflict`, `apply-error`, `failed`); nothing shows Saved | — |
 | The shared bundle | `webview/src/main.tsx` picks the root by `data-editor-type`; `media/webview.js` is 8,478,880 bytes | — |
+| The heads of the other places | 018's `ritemarkProjectHead.ts` draws the project's head only on Documents and Agents (`HEAD_PLACES`), each with a New menu and a Search command from the extension. Tasks, Browser and Transcribe keep their plain title row ("Tasks", "Browser", "Transcribe"; the Browser view was renamed at Sprint 132's closeout) | — |
+| Tasks' list | `webview/src/components/tasks/TasksPanel.tsx`: an add field ("Add a task…"), Your calls as a panel of its own, then Doing, To do, Ideas, Done and Archived | — |
+| Browser's place | `src/browser/BrowserPanelProvider.ts`: HTML from strings with an escape helper; the empty text "No recent URLs" (`:214`); New browser tab (`ritemark.browser.newTab`) and Clear history (`ritemark.browser.history.clearAll`, no confirmation, `extension.ts:978`) on the view's title row (`package.json` `view/title`) | — |
+| Transcribe's place | `webview/src/components/transcribe/TranscribePanel.tsx`: Add recording and Record on one row, then Transcribing, Needs attention and Library (or All projects); a settings button on the view's title row (`ritemark.transcribe.openSettings`) | — |
+| The PDF and Word bars | `viewers/PDFViewer.tsx:505` and `viewers/DOCXViewer.tsx:619`: Save as Markdown (`src/export/saveAsMarkdown.ts`), behind `save-as-markdown-from-preview`; no Share | — |
+| The File menu | 003 adds New table to VS Code's File menu; there is no New tab and no Switch project | — |
+| Flows' storage | `src/flows/FlowStorage.ts:44` makes `.ritemark/flows` with `recursive: true`, which recreates a project folder that was deleted while it was open (Sprint 133's QA) | — |
 
 ## Architecture overview
 
@@ -33,6 +40,9 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | Patch 019 | The Tasks tab's count | `patches/vscode/019-ritemark-tab-row.patch` |
 | Patch 018 | The splash in the ground's colour; the head's Switch project submenu; File ▸ Switch project | `patches/vscode/018-ritemark-surfaces.patch` |
 | Patch 001 | The dark splash default moves to the dark ground, if the splash audit keeps that hunk | `patches/vscode/001-ritemark-branding.patch` |
+| Patch 018 | The head on Tasks, Browser and Transcribe, with each place's rows from the extension; New tab and Share in the File menu | `patches/vscode/018-ritemark-surfaces.patch` |
+| Extension: the places | Tasks' rows and list; Transcribe's rows and labels; Browser's Recent label, its two actions and its words | `TasksPanel.tsx`, `TranscribePanel.tsx`, `src/browser/BrowserPanelProvider.ts`, `package.json` |
+| Webview: the viewers | Make an editable copy and Share on the PDF and Word bars | `viewers/PDFViewer.tsx`, `viewers/DOCXViewer.tsx`, `viewers/ViewerToolbar.tsx` |
 | Harness | CDP checks for the tabs and switching; Home in the screenshot baseline | `scripts/qa/` |
 
 The release tier is **shell** (`patches/`). The `projects` subsystem is new at `src/<subsystem>/` level, so `architecture.md` gets its section (E6). The new webview ↔ host messages (Home's and the projects list's) are typed in `src/projects/protocol.ts`.
@@ -53,7 +63,10 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
    - Home's Last changed (W4), and the AI sheet where it names a file.
    It also settles how Documents hides the one-line `CLAUDE.md` (decided: only Ritemark's pointer-only file is hidden; a `CLAUDE.md` with the person's words stays visible), and how the tab and the Documents row draw the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT". A folder that has its own `CLAUDE.md` but no `AGENTS.md` is decided (Experience lead, 18 October): Create writes `AGENTS.md` and leaves `CLAUDE.md` as it is, and the page shows the note with Add the line and Not now (spec R8).
 
-`research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home.
+`research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home. From the refresh it also records:
+- how 018's head takes a place's rows from the extension, and what happens to a view's title-row actions under the head (R16);
+- what ⌘T and Ctrl+T run today (VS Code binds them to Go to Symbol in Workspace), so New tab can take them (R8);
+- every place in the extension that creates a folder with `recursive: true` under a project, besides Flows' storage (R13).
 
 ## Workstream 1: The project file (R1)
 
@@ -75,6 +88,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 - `src/projects/firstFill.ts` (new): runs once per profile (`ritemark.projects.filledV1`), per `research/first-fill-audit.md`; merges the sources, keeps local `file:` folders and network paths, skips `.code-workspace` entries and folders that no longer exist at the time (those that existed once but are gone now are not added: they are not known to be projects).
 - The internal recent-folders command is used only by the first fill. Everything after it reads Ritemark's list. The VS Code update sprint checks that the command still exists (its `update-vscode.sh` checklist gains a line).
 - Tests: `ProjectList.test.ts`, `firstFill.test.ts` with fake sources: order, duplicates, a missing folder kept, removal, relocation, the fill running once.
+- **The welcome's lists** (Sprint 133's `src/welcome/recentProjects.ts`): the update sheet and the "Where do you want to start?" sheet read `ProjectList.entries()` in place of VS Code's recent folders. A project marked missing is left off the first three.
 
 ## Workstream 3: What waits (R3, R6)
 
@@ -128,7 +142,11 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
   - **Pointer-only.** A `CLAUDE.md` whose whole content is `@AGENTS.md`, compared with surrounding whitespace and line endings ignored, is Ritemark's pointer and is hidden in Documents; Create and the sample project both write exactly that. A `CLAUDE.md` with anything more, even one more line, stays visible as the person's own file (Experience lead, 18 October).
   - The name About this project is drawn where `research/about-file-audit.md` says; if Documents needs a hunk, it goes into 018's resource-label hunk from Sprint 133.
   - Tests: `aboutFile.test.ts`: open, create both files, an existing `CLAUDE.md` left byte for byte, the note's condition, Add the line (first line, every other byte kept), Not now writing nothing, pointer-only recognised (with surrounding whitespace and CRLF) and a `CLAUDE.md` with one more line not, an existing `AGENTS.md` opened, a read-only folder.
-- **File ▸ Switch project** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`; the extension contributes Switch project there. On the Mac it shows in the native File menu too.
+- **The File menu** (experiences/windows frame 2): 018 maps a `ritemark/fileMenu` contribution to the File menu (`MenuId.MenubarFileMenu`), as it did for `ritemark/projectHead`. The extension contributes three items there, in the drawing's order:
+  - New tab, which runs the +'s menu (019's new-tab command), bound to ⌘T and Ctrl+T in `package.json`, above VS Code's own binding;
+  - Switch project;
+  - Share, which asks the document in front to open its Share menu (a message to its webview), and is greyed out by a `when` clause when no Ritemark document is in front.
+  On the Mac they show in the native File menu too.
 
 ## Workstream 8: Switching in place (R9)
 
@@ -152,23 +170,44 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 - A folder that is not found (experience 33): the list (W6) and the switcher (W7) mark it; choosing it keeps the window in the current project and shows, on the desk's Home, the project's head with a muted 56 mark and one box (radius 10, the strong hairline): "This project's folder is not where it was", the old path in a chip, Find it… (primary) and Remove from the list (ghost). Find it… opens the folder picker at the old path's nearest existing parent; the chosen folder replaces the old path (`ProjectList.relocate`) and the project opens there through W8's switch; a folder that is already another project's is refused in words and the list is kept.
 - An empty project: Home's empty state (W4).
 - No board: Tasks shows the board's empty state, "Nothing waits for you" with New task (experience 29, frame 2), and the tab has no count; `BoardStore` writes nothing until a card is added (it already creates `.ritemark/tasks/` only on the first card, to be confirmed in `research/confirmations.md`).
+- **A folder that has gone stays gone:** `FlowStorage` creates `.ritemark/flows` only when the project's folder itself exists (a `stat` first, then `mkdir` of `.ritemark/flows` alone). Any other recursive `mkdir` under a project that `research/confirmations.md` finds gets the same rule. A test deletes the folder and checks that nothing comes back.
+
+## Workstream 12: The project's head on Tasks, Browser and Transcribe (R16, R17, R18)
+
+- **018's head on three more places.** `HEAD_PLACES` gains `workbench.view.extension.ritemark-tasks`, `…ritemark-browser` and `…ritemark-transcribe`. Today each entry has a New menu and a Search command. It becomes a list of up to two rows, each a command or a menu from the extension, with its words and icon from the command's contribution, plus an optional label over the content:
+  - Documents: New (menu), Search; label Documents (as today);
+  - Agents: New (menu), Search (as today);
+  - Tasks: New task (`ritemark.tasks.newTask`), Search (`ritemark.tasks.search`); no label;
+  - Transcribe: Record (`ritemark.transcribe.record`), Transcribe a file… (`ritemark.transcribe.addFile`); no label (the page draws its own group labels);
+  - Browser: no rows, no label (the page draws Recent).
+  With no folder, the head stays off, as today. The command names are proposals; the confirmations settle them.
+- **The title rows' actions.** Under the head, a view's title-row actions are not shown, as on Documents. So Browser's two actions move into its page (below), and Transcribe's settings button moves into its page beside the Recordings label until the Experience lead draws its place. Each stays in the palette.
+- **Tasks** (`TasksPanel.tsx`, R17): New task shows the add field and focuses it; Search filters by title in the page (the host sends the command to the view). The list's order becomes Ideas (folded), To do, Doing, Done (folded, with Archived inside); a card with a call is marked and sorted first in its stage. The calls come from the board's snapshot as today, so the count does not change. A unit test covers the order, the filter, a call outside Doing and an archived card inside Done.
+- **Transcribe** (`TranscribePanel.tsx`): the Add recording and Record row is replaced by the head's two rows, which run the same handlers; "Library" reads "Recordings" (and "All projects" stays as the switch's other state).
+- **Browser** (`BrowserPanelProvider.ts`, R18): the page draws the Recent label in the column's 11-caps style (the tokens 018's `.ritemark-project-group` uses), with the + and Clear history as icon buttons at its right, each with a tooltip; they post the two existing commands. The empty text becomes "No pages yet". `view/title`'s two entries are removed from `package.json` once the page has them, and both commands stay in the palette.
+
+## Workstream 13: The PDF and Word bars (R19)
+
+- `PDFViewer.tsx` and `DOCXViewer.tsx`: the label "Save as Markdown" becomes "Make an editable copy", with the same handler and the same flag (`save-as-markdown-from-preview`). The flag's label in `flags.ts` follows.
+- `ViewerToolbar.tsx`: a Share button at the end of the bar, as the document's bar has, holding what the Experience lead draws for these files (asked before Phase 5). Nothing on today's bar is removed.
+- Tests: the bar's labels and the Share menu's items for each viewer.
 
 ## Workstream 11: Tests, docs and builds (E3–E7)
 
 - **Extension unit tests** (added to `package.json`'s `test` script): `projects/projectFile.test.ts`, `ProjectList.test.ts`, `firstFill.test.ts`, `waiting.test.ts`, `switchProject.test.ts` (the guard's decisions), `aboutFile.test.ts`, `protocol.test.ts`, `views/permanentTabs.test.ts`.
-- **Webview tests**: Home's states (full, empty, missing cover, What moved), escaping (a project named `<img src=x onerror=…>` renders as text), the projects list's filter, the document bar's Saved.
+- **Webview tests**: Home's states (full, empty, missing cover, What moved), escaping (a project named `<img src=x onerror=…>` renders as text), the projects list's filter, the document bar's Saved, the Tasks list's order and filter, the viewers' bars.
 - **VS Code unit test**: the Tasks tab's count (019).
-- **CDP checks** (`scripts/qa/`): Home and Tasks first after a fresh window, a restart and Close all; the count on the Tasks tab equal to the place's; switching both ways with tabs restored; the splash's colour during a switch.
-- **Screenshots**: the baseline gains Home (full and empty), the projects list, the switcher and What moved, light and dark.
+- **CDP checks** (`scripts/qa/`): Home and Tasks first after a fresh window, a restart and Close all; the count on the Tasks tab equal to the place's; switching both ways with tabs restored; the splash's colour during a switch; `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe as on Documents.
+- **Screenshots**: the baseline gains Home (full and empty), the projects list, the switcher and What moved, and the Tasks, Browser and Transcribe places with their heads, light and dark.
 - **Bundle**: `media/webview.js` before and after.
-- **Docs**: `architecture.md` (a Projects section: the file, the list, what waits, Home, switching; Home's launcher replaced; the version-history row), `references/layout-invariants.md` (Home and Tasks opened by default; on Home the left column holds the projects), `CLAUDE.md`'s patch descriptions for 018 and 019, `update-vscode.sh`'s checklist line for the recent-folders command.
+- **Docs**: `architecture.md` (a Projects section: the file, the list, what waits, Home, switching; Home's launcher replaced; the version-history row), `references/layout-invariants.md` (Home and Tasks opened by default; on Home the left column holds the projects; every other place has the project's head), `CLAUDE.md`'s patch descriptions for 018 and 019, `update-vscode.sh`'s checklist line for the recent-folders command.
 - **Builds**: after the merge, a production build from a clean-room worktree at the merged commit, as a build check; patches apply on the pin, a second run is clean, the stacking check passes; the drift check into the release plan.
 
 ## Delivery plan: one merge
 
-1. Before the merge: Mac QA (S1–S40, S43, S44), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching).
+1. Before the merge: Mac QA (S1–S40, S43–S54), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages).
 2. The merge.
-3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash and File ▸ Switch project), and the drift check. Fixes from the Windows round go in a small follow-up PR.
+3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash, the File menu's three items and the heads on Tasks, Browser and Transcribe), and the drift check. Fixes from the Windows round go in a small follow-up PR.
 
 ## Proof-of-concept map
 
@@ -197,3 +236,7 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | About this project's Create touches a `CLAUDE.md` the person wrote | Never written over; changed only by Add the line, which keeps every other byte; S44 |
 | Showing `AGENTS.md` as About this project needs a shell hunk in Documents | The about-file audit; expected: one more case in 018's resource-label hunk, which the tree and the tabs share |
 | The bundle grows | Images as files; measured before and after |
+| Tasks' new order hides a call that sits outside Doing | A call is marked and first in whatever stage it is in; S49 and the list's unit test use a failed task in To do |
+| Moving a title row's actions under the head loses one | Each moves into its page before `view/title` drops it, and stays in the palette; S46 |
+| ⌘T or Ctrl+T clashes with a binding people use | The confirmations read what they run today; New tab's binding sits above VS Code's; the old command stays in the palette |
+| Another recursive `mkdir` brings a gone folder back | The confirmations list every one under a project; S53 |
