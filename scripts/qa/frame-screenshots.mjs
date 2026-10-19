@@ -192,6 +192,9 @@ async function capture(name) {
 	// The keyboard out of the AI's sheet: a scene that leaves it there (a webview taking the focus as it closes) would
 	// draw the sheet's + with its tooltip and focus ring, which no scene is about
 	await evaluate(`(() => { const element = document.activeElement; if (element && element.closest('.part.auxiliarybar')) { element.blur(); } })()`);
+	// From VS Code 1.142 a tooltip of the sheet's own (the + "New conversation") can stay open with neither focus nor
+	// hover, once a synthetic pointer passed it: close a tooltip left open in the AI's sheet, as Escape would
+	await inWebview('interacting with AI', `(() => { if (!doc.querySelector('[role=tooltip]')) { return false; } doc.activeElement?.blur?.(); doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })); return true; })()`);
 	await sleep(1200);
 	const { w, h, ratio } = await evaluate(`({ w: innerWidth, h: innerHeight, ratio: devicePixelRatio })`);
 	const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: w, height: h, scale: 1 / ratio } });

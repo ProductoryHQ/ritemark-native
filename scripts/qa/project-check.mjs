@@ -120,7 +120,12 @@ async function click(what, elementExpression) {
 	await clickAt(...centre);
 }
 async function pickRow(label) {
-	await click(`the row "${label}"`, `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}) || aria.startsWith(${JSON.stringify(label + ' ')}); })`);
+	// The list can take a moment to fill (VS Code 1.142's palette lists more rows): wait up to 5 seconds for the row
+	const row = `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}) || aria.startsWith(${JSON.stringify(label + ' ')}); })`;
+	for (let waited = 0; waited < 5000 && !(await evaluate(`!!(${row})`)); waited += 250) {
+		await sleep(250);
+	}
+	await click(`the row "${label}"`, row);
 }
 /**
  * Types only where it means to. After a reload the AI's sheet can take the focus a moment later, and text typed
@@ -128,18 +133,20 @@ async function pickRow(label) {
  * browser's address, a focused input on the desk), never into a webview. Anything else stops the run.
  */
 const FOCUS = `(() => { const element = document.activeElement; if (!element || element.tagName === 'IFRAME' || element.closest('.webview, .part.auxiliarybar')) { return 'elsewhere'; } if (element.closest('.quick-input-widget') && element.tagName === 'INPUT') { return 'quick-input'; } if (element.tagName === 'INPUT' && element.closest('.part.editor')) { return 'desk-input'; } return 'elsewhere'; })()`;
+/** `where` is a place, or a list of places any of which may take the text (VS Code 1.142's address is a picker). */
 async function typeInto(where, text, enter = false) {
-	for (let wait = 0; wait < 10 && await evaluate(FOCUS) !== where; wait++) {
+	const places = Array.isArray(where) ? where : [where];
+	for (let wait = 0; wait < 10 && !places.includes(await evaluate(FOCUS)); wait++) {
 		await sleep(300);
 	}
 	const focus = await evaluate(FOCUS);
-	if (focus !== where) {
-		throw new Error(`stopped before typing "${text}": the focus is ${focus}, not the ${where}`);
+	if (!places.includes(focus)) {
+		throw new Error(`stopped before typing "${text}": the focus is ${focus}, not the ${places.join(' or ')}`);
 	}
 	await send('Input.insertText', { text });
 	if (enter) {
 		await sleep(900);
-		if (await evaluate(FOCUS) !== where) {
+		if (!places.includes(await evaluate(FOCUS))) {
 			throw new Error(`stopped before Enter after "${text}": the focus left the ${where}`);
 		}
 		await key('Enter', 0, 'Enter');
@@ -148,6 +155,17 @@ async function typeInto(where, text, enter = false) {
 async function command(label) {
 	await key('KeyP', MOD | 8, 'p');
 	await sleep(600);
+	// In a background window, the key can go nowhere right after a new desk's document takes focus (seen on
+	// VS Code 1.142): then put focus on the status bar, as a click anywhere would, and press again
+	if (await evaluate(FOCUS) !== 'quick-input') {
+		const bar = await evaluate(`(() => { const r = document.querySelector('.part.statusbar')?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`);
+		if (bar) {
+			await clickAt(...bar);
+			await sleep(300);
+		}
+		await key('KeyP', MOD | 8, 'p');
+		await sleep(600);
+	}
 	await typeInto('quick-input', label);
 	await sleep(900);
 	await pickRow(label);
@@ -264,7 +282,7 @@ if (flag('share-question')) {
 	// The address field shows as text until it is clicked, as a person would
 	await click('the address', `[...document.querySelectorAll('.part.editor .editor-group-container.active .browser-url-display, .part.editor .editor-group-container.active .browser-url-input')].find(element => element.getBoundingClientRect().width)`);
 	await sleep(500);
-	await typeInto('desk-input', url, true);
+	await typeInto(['desk-input', 'quick-input'], url, true); // 1.117: the address input; 1.142: its picker
 	// The question is drawn in the AI's sheet, a webview: look for it in every frame
 	let asked = false;
 	for (let wait = 0; wait < 20 && !asked; wait++) {

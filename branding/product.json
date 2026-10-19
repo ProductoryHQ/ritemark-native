@@ -209,6 +209,7 @@
     "workbench.welcomePage.experimentalOnboarding": false,
     "onboarding.enabled": false,
     "update.showPostInstallInfo": false,
+    "workbench.browser.enableChatTools": false,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
       "*.markdown": "ritemark.editor",
