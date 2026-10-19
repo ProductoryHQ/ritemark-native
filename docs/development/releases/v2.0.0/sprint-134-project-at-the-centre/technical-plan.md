@@ -1,6 +1,6 @@
 # Sprint 134 Technical Plan
 
-The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), step 3; the research behind it is the release's [feasibility read](../feasibility.md), the Experience lead's technical analysis ("The project at the centre", `ritemark-dev`: `product/design/experience/technical/README.md`), and the proof of concept (`/Users/jarmotuisk/Projects/ritemark-2.0-poc`, branch `poc/2.0-surfaces`, read only). Code shapes here are proposals: when the code needs something else, this file changes first. File references are to `main` at `d781a0e1` (Sprint 132 merge 1) unless marked PoC. The rows and workstreams added in the 18 October refresh (R16–R19) refer to `main` at `b1c198af`, after Sprint 132's closeout.
+The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), step 3; the research behind it is the release's [feasibility read](../feasibility.md), the Experience lead's technical analysis ("The project at the centre", `ritemark-dev`: `product/design/experience/technical/README.md`), and the proof of concept (`/Users/jarmotuisk/Projects/ritemark-2.0-poc`, branch `poc/2.0-surfaces`, read only). Code shapes here are proposals: when the code needs something else, this file changes first. File references are to `main` at `d781a0e1` (Sprint 132 merge 1) unless marked PoC. The rows and workstreams added in the 18 October refresh (R16–R19) refer to `main` at `b1c198af`, after Sprint 132's closeout. Those added on 19 October (R20–R24, W14–W18) refer to `main` at `e31dd7e4`.
 
 ## What exists today
 
@@ -27,6 +27,11 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | The PDF and Word bars | `viewers/PDFViewer.tsx:505` and `viewers/DOCXViewer.tsx:619`: Save as Markdown (`src/export/saveAsMarkdown.ts`), behind `save-as-markdown-from-preview`; no Share | — |
 | The File menu | 003 adds New table to VS Code's File menu; there is no New tab and no Switch project | — |
 | Flows' storage | `src/flows/FlowStorage.ts:44` makes `.ritemark/flows` with `recursive: true`, which recreates a project folder that was deleted while it was open (Sprint 133's QA) | — |
+| The browser's share question | The AI sheet's host polls the active browser tab (`UnifiedViewProvider._sendActiveBrowserContext`, `views/UnifiedViewProvider.ts:2983`) and, for a page not yet shared, calls `BrowserContextStore.ensureSharedForActiveTab` (`browser/BrowserContextStore.ts:114`). It marks the page as asked, then runs 009's `workbench.action.browser.ensureActiveBrowserShared`, which calls upstream's `setSharedWithAgent(true)`. That opens VS Code's modal confirm dialog ("Share with Agent?", Allow, Deny, "Don't ask again"; upstream's `contrib/browserView/common/browserView.ts:596` at the pin), which blocks the whole window (#455). "Don't ask again" is stored only with Allow, in the profile key `browserView.shareWithAgent.dontAskAgain`. No page content reaches a turn unless shared (`buildTurnContext`, Sprint 67 D5). The control question is 010's own modal (`ensureControlConsent`) | — |
+| The command palette | All commands lists every enabled `MenuId.CommandPalette` entry (`commandsQuickAccess.ts`, `getGlobalCommandPicks`), and the active editor's actions. Patch 003 drops developer and chat entries from menus only. Debugging commands such as `workbench.debug.viewlet.action.addDataBreakpointOnAddress` and `workbench.debug.viewlet.action.addFunctionBreakpointAction` (`breakpointsView.ts`, `f1: true`) are listed (#456) | — |
+| "Codex" in visible strings | A first search on `e31dd7e4` finds about 100 lines with a string literal that names Codex, in some 35 files, not all of them visible, and 10 in `package.json`. Among them: Settings (`RitemarkSettings.tsx`, the ChatGPT card, the Update Center's components), `package.json`'s setting titles and descriptions (its "Codex" section), toasts (`RitemarkSettingsProvider.ts:890–901`, `UnifiedViewProvider.ts:2664`), the AI sheet (`CodexSetupView.tsx`, `RuntimeAvailabilityNotice.tsx`, `aiDisclosure.ts`), the model catalog's descriptions (`bundledCatalog.ts`), flows (`CodexNodeExecutor.ts`, `stepKinds.ts`), the task board (`AgentSplitButton.tsx`, `CardMenu.tsx`) and the install and repair terminals' names. Sprint 133's branch already says ChatGPT in the composer's placeholder and on the welcome | — |
+| Ritemark Settings' foot, VS Code's settings | ⌘, and Ctrl+, run `ritemark.aiSettings` (`package.json` keybindings). VS Code's settings open only from the palette ("Preferences: Open Settings"). `RitemarkSettings.tsx` ends after the Update Center and the component cards, with no link to them | — |
+| The Agents place's row icons | 018's Agents place draws one icon per kind in muted ink (`AgentLibraryViewProvider.ts:658`). An agent's `color:` is still read (`resolveIconAndColor`, `agent/iconPack.ts:132`) and set from the agent's settings (the Color field, `AgentConfiguratorPanel.tsx:488`), but it is drawn nowhere. v1.14.0 drew each row's own icon on a chip in its colour, chosen or guessed from the name (`COLORS`) | — |
 
 ## Architecture overview
 
@@ -43,6 +48,12 @@ The plan for [spec.md](spec.md). The release is [v2.0.0](../release-plan.md), st
 | Patch 018 | The head on Tasks, Browser and Transcribe, with each place's rows from the extension; New tab and Share in the File menu | `patches/vscode/018-ritemark-surfaces.patch` |
 | Extension: the places | Tasks' rows and list; Transcribe's rows and labels; Browser's Recent label, its two actions and its words | `TasksPanel.tsx`, `TranscribePanel.tsx`, `src/browser/BrowserPanelProvider.ts`, `package.json` |
 | Webview: the viewers | Make an editable copy and Share on the PDF and Word bars | `viewers/PDFViewer.tsx`, `viewers/DOCXViewer.tsx`, `viewers/ViewerToolbar.tsx` |
+| Extension and webview: the AI's sheet | The share question, asked on the sheet and answered there | `src/browser/BrowserContextStore.ts`, `src/views/UnifiedViewProvider.ts`, `webview/src/components/ai-sidebar/` |
+| Patch 009 | The share bridge takes the person's answer, so upstream's dialog does not open | `patches/vscode/009-ritemark-browser-context-bridge.patch` |
+| Patch 003 | The palette's filter of command IDs | `patches/vscode/003-ritemark-menu-cleanup.patch` |
+| Extension and webview: words | "ChatGPT, never Codex" in every visible string | the files the Codex audit lists, `package.json` |
+| Extension and webview: Settings | Advanced settings at the foot | `RitemarkSettings.tsx`, `src/settings/RitemarkSettingsProvider.ts` |
+| Extension: the Agents place | An agent's chosen colour on its row's icon; the colours in the theme | `src/views/AgentLibraryViewProvider.ts`, `src/agent/discovery.ts`, `package.json`'s colours |
 | Harness | CDP checks for the tabs and switching; Home in the screenshot baseline | `scripts/qa/` |
 
 The release tier is **shell** (`patches/`). The `projects` subsystem is new at `src/<subsystem>/` level, so `architecture.md` gets its section (E6). The new webview ↔ host messages (Home's and the projects list's) are typed in `src/projects/protocol.ts`.
@@ -62,11 +73,31 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
    - Documents (the resource label, whose name and extension 018 already draws apart since Sprint 133);
    - Home's Last changed (W4), and the AI sheet where it names a file.
    It also settles how Documents hides the one-line `CLAUDE.md` (decided: only Ritemark's pointer-only file is hidden; a `CLAUDE.md` with the person's words stays visible), and how the tab and the Documents row draw the book-open icon and the tooltip "AGENTS.md, read by Claude and ChatGPT". A folder that has its own `CLAUDE.md` but no `AGENTS.md` is decided (Experience lead, 18 October): Create writes `AGENTS.md` and leaves `CLAUDE.md` as it is, and the page shows the note with Add the line and Not now (spec R8).
+6. **`research/share-question-audit.md`** (R20): every path that opens upstream's share dialog:
+   - `ensureSharedForActiveTab`, the one this sprint moves;
+   - the page's own "Share with Agent" toggle (upstream's `browserEditorChatFeatures.ts`);
+   - annotation mode and the control question, which share first when a page is not yet shared.
+   It records which go through the sheet and which keep today's dialog, and how 009's bridge reads and writes `browserView.shareWithAgent.dontAskAgain` without the dialog. It also checks when the host polls (a hidden sheet, a closed AI column), so a question never waits where it cannot be seen.
+7. **`research/palette-audit.md`** (R21): **the list of command IDs to drop**, written into W15's table below. It reads every All commands entry on a dev build of the pin, by category (Debug, Developer, Test, Tasks, Notebook and the rest), with its ID and title. It marks each one drop or keep by spec R21's rule:
+   - Ritemark's own commands are kept;
+   - a command a Ritemark menu, doc, skill or QA step names is kept (for example `workbench.action.reloadWindow`);
+   - a command the parity list reaches through All commands only is kept (refreshing the file list; Maximize for the AI's column, G7; Send feedback);
+   - a family that goes whole may be one ID prefix (for example `workbench.debug.`), with every ID it drops listed.
+   The first two IDs are known: `workbench.debug.viewlet.action.addDataBreakpointOnAddress` and `workbench.debug.viewlet.action.addFunctionBreakpointAction` (#456).
+8. **`research/codex-strings-audit.md`** (R22): **every user-visible "Codex" string**, before any word changes. It is run after Sprint 133 merges, so the welcome's words are counted. For each string it records the file and line, where a person reads it, what it says now and what it will say. It covers string literals in `src/` and `webview/src/`, `package.json` (titles, descriptions, enum descriptions), `flags.ts`, terminal names and the model catalog. It lists apart what stays:
+   - setting keys, command IDs, file names, log lines and code identifiers;
+   - a model's own name, such as "GPT-5.3 Codex Spark";
+   - text the runtime writes itself.
+   Its search, with the list of what stays, is kept so QA can run it again.
 
 `research/confirmations.md` records the smaller checks: VS Code's `revealFileInOS` label on Windows, Ritemark's menu (018's `ritemarkMenu.ts`) taking a submenu, and how the AI sheet's new chat is opened from Home. From the refresh it also records:
 - how 018's head takes a place's rows from the extension, and what happens to a view's title-row actions under the head (R16);
 - what ⌘T and Ctrl+T run today (VS Code binds them to Go to Symbol in Workspace), so New tab can take them (R8);
 - every place in the extension that creates a folder with `recursive: true` under a project, besides Flows' storage (R13).
+
+From 19 October it also records:
+- how the PDF's provider (`pdfEditorProvider.ts`) opens a file in Preview on the Mac and in its default app on Windows, and what that item says on Windows, checked with the Experience lead (R19);
+- that `workbench.action.openSettings` opens VS Code's settings page, not Ritemark Settings, with ⌘, bound to `ritemark.aiSettings` (R23).
 
 ## Workstream 1: The project file (R1)
 
@@ -181,33 +212,91 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
   - Transcribe: Record (`ritemark.transcribe.record`), Transcribe a file… (`ritemark.transcribe.addFile`); no label (the page draws its own group labels);
   - Browser: no rows, no label (the page draws Recent).
   With no folder, the head stays off, as today. The command names are proposals; the confirmations settle them.
-- **The title rows' actions.** Under the head, a view's title-row actions are not shown, as on Documents. So Browser's two actions move into its page (below), and Transcribe's settings button moves into its page beside the Recordings label until the Experience lead draws its place. Each stays in the palette.
+- **The title rows' actions.** Under the head, a view's title-row actions are not shown, as on Documents. So Browser's two actions move into its page (below), and Transcribe's settings button moves into its page as the Experience lead answered on 19 October: a gear icon button with the tooltip "Transcribe settings", at the right of the Recordings label, as Browser's + and Clear sit at the right of Recent. It posts `ritemark.transcribe.openSettings`. Each stays in the palette.
 - **Tasks** (`TasksPanel.tsx`, R17): New task shows the add field and focuses it; Search filters by title in the page (the host sends the command to the view). The list's order becomes Ideas (folded), To do, Doing, Done (folded, with Archived inside); a card with a call is marked and sorted first in its stage. The calls come from the board's snapshot as today, so the count does not change. A unit test covers the order, the filter, a call outside Doing and an archived card inside Done.
-- **Transcribe** (`TranscribePanel.tsx`): the Add recording and Record row is replaced by the head's two rows, which run the same handlers; "Library" reads "Recordings" (and "All projects" stays as the switch's other state).
+- **Transcribe** (`TranscribePanel.tsx`): the Add recording and Record row is replaced by the head's two rows, which run the same handlers; "Library" reads "Recordings" (and "All projects" stays as the switch's other state); the settings gear sits at the right of the Recordings label, in the tokens Browser's Recent label uses.
 - **Browser** (`BrowserPanelProvider.ts`, R18): the page draws the Recent label in the column's 11-caps style (the tokens 018's `.ritemark-project-group` uses), with the + and Clear history as icon buttons at its right, each with a tooltip; they post the two existing commands. The empty text becomes "No pages yet". `view/title`'s two entries are removed from `package.json` once the page has them, and both commands stay in the palette.
 
 ## Workstream 13: The PDF and Word bars (R19)
 
 - `PDFViewer.tsx` and `DOCXViewer.tsx`: the label "Save as Markdown" becomes "Make an editable copy", with the same handler and the same flag (`save-as-markdown-from-preview`). The flag's label in `flags.ts` follows.
-- `ViewerToolbar.tsx`: a Share button at the end of the bar, as the document's bar has, holding what the Experience lead draws for these files (asked before Phase 5). Nothing on today's bar is removed.
-- Tests: the bar's labels and the Share menu's items for each viewer.
+- `ViewerToolbar.tsx`: a Share button at the end of the bar, as the document's bar has. It holds two items, as the Experience lead answered on 19 October:
+  - **Show in Finder** (Show in File Explorer on Windows): the host runs `revealFileInOS` on the file;
+  - **Open in Preview** on a PDF, or **Open in Word** on a Word file. Open in Word runs the Word bar's own `openInExternalApp` message (`officePreview/officePreviewProvider.ts:166`) and takes the label the host already sends (`openStatus`'s `openLabel`). Open in Preview opens the PDF with `utils/openExternal.ts`: Preview on the Mac, and the default app (`openWithDefaultApp`) on Windows, where the item's words come from `research/confirmations.md`.
+- The PDF's provider (`pdfEditorProvider.ts`) gains the two messages; the Word preview's provider gains Show in Finder.
+- Make an editable copy stays where it is drawn: on the PDF's bar beside Share, and in the Word bar's Open in Word menu, as today. Share holds no Export and no Google Docs on these files. Nothing on today's bar is removed.
+- Tests: the bar's labels and the Share menu's two items for each viewer, with each item's message to the host.
+
+## Workstream 14: The browser's share question, on the AI's sheet (R20)
+
+- **When it asks stays.** `ensureSharedForActiveTab` keeps its rule: the first time a page becomes the AI's context in a session, once per page, never once "share without asking" is stored. Only the dialog goes.
+- **009's bridge takes the answer** (per `research/share-question-audit.md`). `workbench.action.browser.ensureActiveBrowserShared` gains an optional argument, `{ answer?: 'share' | 'notNow', withoutAsking?: boolean }`:
+  - with no answer, it shares at once when `browserView.shareWithAgent.dontAskAgain` is stored, as today; otherwise it returns `needsAnswer: true` and opens nothing;
+  - with `share`, it shares the page as Allow does, and stores the key when `withoutAsking` is set, as the dialog's box does;
+  - with `notNow`, it shares nothing.
+  The model gains a Ritemark method that shares without the dialog, beside upstream's `setSharedWithAgent`. The network policy's check and its notice stay as upstream has them.
+- **The host** (`BrowserContextStore`, `UnifiedViewProvider`): on `needsAnswer`, it posts `browser:share-question` to the sheet with the page's id and title and the AI's name. The sheet answers with `browser:share-answer`, and the host calls the bridge with it. A question about a page that is no longer in front is withdrawn (`browser:share-question-clear`), and the page stays unshared. The messages are typed in `agentSidebarProtocol.ts`.
+- **The sheet** (`webview/src/components/ai-sidebar/ShareQuestionCard.tsx`, new): the card above the message box, as experience 28's frame 1 draws it, from the UI components (`Button`, the checkbox, a tooltip on each button). The page's chip shows beside it as today.
+- **The consent boundary stays:** `buildTurnContext` sends nothing about a page that is not shared, so a message sent while the question waits goes without it.
+- The control question (010's `ensureControlConsent`) is not changed.
+- Tests: `BrowserContextStore.test.ts` (new) for when it asks, Share, Not now, the box, a withdrawn question and nothing sent before Share; a webview test for the card's states; a CDP check that the tab row works while the question waits.
+
+## Workstream 15: The command palette without VS Code's developer commands (R21)
+
+- **Patch 003** gains a short list of command IDs, and ID prefixes for whole families, that All commands does not offer. `commandsQuickAccess.ts` skips them in `getGlobalCommandPicks` and in the editor's command picks, so search and the recently used list never show them.
+- The commands stay registered. Their menus, shortcuts and callers are untouched.
+- **The list of IDs to drop** is written here by `research/palette-audit.md`, before the hunk is made:
+
+  | ID or prefix | Title in All commands | Why it goes |
+  |---|---|---|
+  | `workbench.debug.viewlet.action.addDataBreakpointOnAddress` | Add Data Breakpoint at Address | Debugging (#456) |
+  | `workbench.debug.viewlet.action.addFunctionBreakpointAction` | Add Function Breakpoint | Debugging (#456) |
+  | *(the audit fills the rest)* | | |
+
+- Kept by rule (spec R21): Ritemark's commands, the commands a Ritemark menu, doc, skill or QA step names, and those the parity list reaches only through All commands.
+- Tests: a VS Code unit test that a listed ID and a prefixed ID are not offered and a kept one is; S58 by hand.
+
+## Workstream 16: ChatGPT, never Codex (R22)
+
+- **The audit first** (`research/codex-strings-audit.md`): no word changes before its list is written.
+- **Then the copy pass**, file by file from the list: "Codex" becomes "ChatGPT" where it names the AI. Sentences that read oddly after the swap are rewritten in plain words, one point each.
+- Nothing else changes: setting keys (`ritemark.codex.*`), command IDs, file and folder names, log lines, code identifiers, a model's own name and text the runtime writes itself.
+- `package.json`'s "Codex" section title and descriptions change too, because Advanced settings (W17) shows them.
+- Tests whose expected words name Codex change with the words. QA runs the audit's search again (S59).
+
+## Workstream 17: Advanced settings (R23)
+
+- `RitemarkSettings.tsx`: one link at the foot of the page, "Advanced settings", with its tooltip (`ui/tooltip.tsx`). It posts `settings:open-advanced`.
+- `RitemarkSettingsProvider.ts` runs `workbench.action.openSettings` for it.
+- Nothing on the page moves or goes; the pre-commit validator's Settings page check passes.
+- Tests: a webview test that the link is there and posts its message.
+
+## Workstream 18: An agent's colour on its row (R24)
+
+- `agent/discovery.ts`: each agent carries the colour from its file (`color:`) only when the file sets one, apart from the colour `resolveIconAndColor` guesses from the name. The decision names the chosen colour, so a guessed one is not drawn.
+- `AgentLibraryViewProvider.ts`: the row's icon (`.row-icon`) takes the agent's colour when it has one, through eight theme colours, one per name (indigo, blue, green, amber, red, purple, pink, slate). An agent with none keeps the muted icon.
+- The eight colours are `ritemark.*` colours in `package.json`, with a Light and a Dark value, each at 3:1 or more against the column. `themeContrast.test.ts`, which reads those colours, checks them.
+- A change in the agent's settings already rewrites its file, and the place already redraws on file changes, so the row follows without a reload.
+- Nothing else on the place changes: the count line, the empty state, Sort and the tooltips stay as Sprint 132 left them (Jarmo, 19 October).
+- Tests: a unit test for the row data (a chosen colour passed, a guessed one not), and the contrast test.
 
 ## Workstream 11: Tests, docs and builds (E3–E7)
 
-- **Extension unit tests** (added to `package.json`'s `test` script): `projects/projectFile.test.ts`, `ProjectList.test.ts`, `firstFill.test.ts`, `waiting.test.ts`, `switchProject.test.ts` (the guard's decisions), `aboutFile.test.ts`, `protocol.test.ts`, `views/permanentTabs.test.ts`.
-- **Webview tests**: Home's states (full, empty, missing cover, What moved), escaping (a project named `<img src=x onerror=…>` renders as text), the projects list's filter, the document bar's Saved, the Tasks list's order and filter, the viewers' bars.
-- **VS Code unit test**: the Tasks tab's count (019).
-- **CDP checks** (`scripts/qa/`): Home and Tasks first after a fresh window, a restart and Close all; the count on the Tasks tab equal to the place's; switching both ways with tabs restored; the splash's colour during a switch; `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe as on Documents.
-- **Screenshots**: the baseline gains Home (full and empty), the projects list, the switcher and What moved, and the Tasks, Browser and Transcribe places with their heads, light and dark.
+- **Extension unit tests** (added to `package.json`'s `test` script): `projects/projectFile.test.ts`, `ProjectList.test.ts`, `firstFill.test.ts`, `waiting.test.ts`, `switchProject.test.ts` (the guard's decisions), `aboutFile.test.ts`, `protocol.test.ts`, `views/permanentTabs.test.ts`, `browser/BrowserContextStore.test.ts` (W14), the Agents place's row data (W18), and `themeContrast.test.ts` with the eight agent colours.
+- **Webview tests**: Home's states (full, empty, missing cover, What moved), escaping (a project named `<img src=x onerror=…>` renders as text), the projects list's filter, the document bar's Saved, the Tasks list's order and filter, the viewers' bars, the share question's card (W14) and the Advanced settings link (W17).
+- **VS Code unit tests**: the Tasks tab's count (019); the palette's filter (003, W15).
+- **CDP checks** (`scripts/qa/`): Home and Tasks first after a fresh window, a restart and Close all; the count on the Tasks tab equal to the place's; switching both ways with tabs restored; the splash's colour during a switch; `frame-geometry.mjs` measures the head on Tasks, Browser and Transcribe as on Documents; the tab row works while the share question waits (W14).
+- **Screenshots**: the baseline gains Home (full and empty), the projects list, the switcher and What moved, the Tasks, Browser and Transcribe places with their heads, the share question on the AI's sheet, the foot of Ritemark Settings and the Agents place with a coloured agent, light and dark.
+- **Words**: the Codex audit's search run again at QA, with nothing found outside its list of what stays (W16).
 - **Bundle**: `media/webview.js` before and after.
-- **Docs**: `architecture.md` (a Projects section: the file, the list, what waits, Home, switching; Home's launcher replaced; the version-history row), `references/layout-invariants.md` (Home and Tasks opened by default; on Home the left column holds the projects; every other place has the project's head), `CLAUDE.md`'s patch descriptions for 018 and 019, `update-vscode.sh`'s checklist line for the recent-folders command.
+- **Docs**: `architecture.md` (a Projects section: the file, the list, what waits, Home, switching; Home's launcher replaced; the version-history row), `references/layout-invariants.md` (Home and Tasks opened by default; on Home the left column holds the projects; every other place has the project's head), the browser's section in `architecture.md` (the share question on the AI's sheet), `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist line for the recent-folders command and for the palette's filter.
 - **Builds**: after the merge, a production build from a clean-room worktree at the merged commit, as a build check; patches apply on the pin, a second run is clean, the stacking check passes; the drift check into the release plan.
 
 ## Delivery plan: one merge
 
-1. Before the merge: Mac QA (S1–S40, S43–S54), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages).
+1. Before the merge: Mac QA (S1–S40, S43–S61), and an overlay round on Windows for the extension side (Home, the list, the head's menu, switching, the places' pages, Settings' foot, the copy pass).
 2. The merge.
-3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash, the File menu's three items and the heads on Tasks, Browser and Transcribe), and the drift check. Fixes from the Windows round go in a small follow-up PR.
+3. After it: the production build check, the Windows round from main for everything (including the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe, the share question and the palette), and the drift check. Fixes from the Windows round go in a small follow-up PR.
 
 ## Proof-of-concept map
 
@@ -240,3 +329,10 @@ The release tier is **shell** (`patches/`). The `projects` subsystem is new at `
 | Moving a title row's actions under the head loses one | Each moves into its page before `view/title` drops it, and stays in the palette; S46 |
 | ⌘T or Ctrl+T clashes with a binding people use | The confirmations read what they run today; New tab's binding sits above VS Code's; the old command stays in the palette |
 | Another recursive `mkdir` brings a gone folder back | The confirmations list every one under a project; S53 |
+| A page is shared before the person answers, now that nothing blocks | The bridge shares only with an answer or the stored choice; `buildTurnContext` still sends nothing unshared; S57 and the store's test |
+| The share question waits where nobody sees it (a hidden sheet) | The share-question audit checks when the host polls; until it is answered, nothing is shared |
+| The palette's filter hides a command someone needs | The audit's keep rule (Ritemark's commands, those our menus, docs and QA name, the parity list's palette-only rows); the commands stay registered; S58 |
+| The palette's filter breaks on a VS Code update | One small hunk in 003 with its unit test; `update-vscode.sh`'s checklist line |
+| The copy pass renames a setting key or an identifier, and a person's setting is lost | The audit lists what stays before any word changes; keys and IDs are never touched; S59 checks settings made before |
+| A "Codex" string is missed | The audit's search is run again at QA |
+| An agent's colour is hard to see in Dark | Each colour has a Dark value, checked by `themeContrast.test.ts` |

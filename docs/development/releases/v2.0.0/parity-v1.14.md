@@ -1,6 +1,6 @@
 # Ritemark 2.0 — the v1.14 parity list
 
-**Status:** written 2026-10-18 from the code. Docs only. It serves the release plan's feature-complete item: "Everything v1.14.0 can do is reachable in 2.0, checked against a written list". Sprint 134 checks its rows on its branch, and Sprint 136 walks every row on the signed candidate.<br>
+**Status:** written 2026-10-18 from the code; updated 2026-10-19 with Jarmo's decisions of that day (G3, G4, G5 and the drawn redraws). Docs only. It serves the release plan's feature-complete item: "Everything v1.14.0 can do is reachable in 2.0, checked against a written list". Sprint 134 checks its rows on its branch, and Sprint 136 walks every row on the signed candidate.<br>
 **Rule:** HARD RULE #1. Whatever v1.14.0 does keeps a place in 2.0. A function may leave the interface only by a decision that is written down.<br>
 **Read from:**
 - v1.14.0's code at the tag `v1.14.0` (`ed0b6226`): `extensions/ritemark/` (the extension, its `package.json` and the webview) and patches 001–017.
@@ -39,15 +39,15 @@ Each gap is in its section below, with its evidence.
 |---|---|---|---|
 | G1 | The Getting started and Blog links on 1.14's first page. Sprint 133 retires the page; Help opens only the support pages | Sprint 133 (#453) | Add Getting started to the Help menu beside Support, and let the support pages link the blog; or Jarmo accepts Support as their home |
 | G2 | Git's line ("Ritemark found Git" or "needs Git") showed on every 1.14 first page. Sprint 133 shows it only for this computer's runtime | Sprint 133 (#453) | Show Git's line in Settings' "This computer's tools" whatever the runtime, because File changes needs Git either way |
-| G3 | Send feedback works only with usage data on. Usage data is off by default from Sprint 133 | Jarmo, then Sprint 133 | Let Send feedback work with usage data off: pressing Send is the person's own choice, and it carries only what they write |
-| G4 | VS Code's own settings have no visible way in: ⌘, opens Ritemark Settings since Sprint 132. Feature switches, update mode and channel, excluded folders and the transcription export folder live only there | The Settings redesign (not planned for 2.0) | A small "Advanced settings" link at the foot of Ritemark Settings before Sprint 136, as Sprint 132's plan expected of the redesign |
-| G5 | The Agents place changed more than Jarmo's yes covered: the count line is gone; the empty state's two buttons became one line; Sort is reachable only through Search; descriptions, badges and "used by" moved into tooltips; an agent's own colour no longer shows | The Development manager, with Jarmo | Ask Jarmo to accept, since every function is reachable; for the colour, show it on the row's icon or retire the setting with his yes |
+| G3 | Send feedback works only with usage data on. Usage data is off by default from Sprint 133 | Sprint 133 | **Decided** (Jarmo, 19 October): Send feedback sends with usage data off, because pressing Send is the person's own choice and it carries only what they write. Sprint 133 builds it |
+| G4 | VS Code's own settings have no visible way in: ⌘, opens Ritemark Settings since Sprint 132. Feature switches, update mode and channel, excluded folders and the transcription export folder live only there | Sprint 134 (R23) | **Planned in Sprint 134** (Jarmo, 19 October): an "Advanced settings" link at the foot of Ritemark Settings opens VS Code's own settings |
+| G5 | The Agents place changed more than Jarmo's yes covered: the count line is gone; the empty state's two buttons became one line; Sort is reachable only through Search; descriptions, badges and "used by" moved into tooltips; an agent's own colour no longer shows | Sprint 134 (R24) | **Planned in Sprint 134** (Jarmo, 19 October): an agent's chosen colour shows on its row's icon again. The other changes are accepted as they are |
 | G6 | A flow's run says "sign in under Agent Runtime", but the sign-in cards sit under API Keys | A small fix PR | Name the right heading, or link to the card |
 | G7 | Maximize the AI's column: its title row is gone, so it is reachable only from the palette | The AI's sheet pass (not planned for 2.0) | Accept for 2.0 (the palette has it), unless the AI's sheet gains the expand button the drawings show |
 | G8 | Sprint 133 sends every walkthrough command, including VS Code's accessibility walkthrough, to the welcome | Sprint 133 (#453) | Accept: the walkthroughs teach code editing. Jarmo confirms with Sprint 133 |
 | G9 | `docs/user/` describes 1.14's places and words in a dozen pages, and two links are broken | Sprint 136 (R6) | Rewrite the pages with the release notes |
 
-Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sprint-plan.md) as requirements: the project's head on Tasks, Browser and Transcribe, Tasks' and Browser's pages, the PDF and Word bars, New tab and Share in the File menu, the welcome's lists, a gone folder that stays gone, and opening a single document in R14's table.
+Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sprint-plan.md) as requirements: the project's head on Tasks, Browser and Transcribe, Tasks' and Browser's pages, the PDF and Word bars, New tab and Share in the File menu, the welcome's lists, a gone folder that stays gone, and opening a single document in R14's table. Jarmo's decisions of 19 October add G4 (R23), G5 (R24), the browser's share question on the AI's sheet (R20), the palette without VS Code's developer commands (R21) and "ChatGPT, never Codex" in every visible string (R22).
 
 ## 1. The window
 
@@ -85,7 +85,7 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | Status bar: remote and problems | Problems in the View menu | Main | Left out (the comparison) |
 | Status bar: words, AI ready or offline, update ready, scheduled runs, notifications, Report AI issue | Same | Main | Done |
 | The empty editor's letterpress and shortcut hints | An empty desk keeps its sheet and its +; Sprint 133 adds Text, Table and Web page tiles | Main, S133 | Left out (the Experience lead's review of 17 October) |
-| VS Code's settings page (⌘, in 1.14) | All commands ("Preferences: Open Settings") | Main | **Gap G4** |
+| VS Code's settings page (⌘, in 1.14) | Advanced settings at the foot of Ritemark Settings; All commands ("Preferences: Open Settings") | Main, S134 | Planned (R23; G4) |
 
 ## 2. Menus
 
@@ -103,6 +103,7 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | Help ▸ Support, View License, Toggle Developer Tools, About | Same; Support no longer asks about an outside site | Main | Done |
 | — | You ▸ Settings and Help | Main | New |
 | — | More (⋯): places that do not fit, Copilot Chat | Main | New |
+| All commands: every VS Code command, developer and debugging ones included | The same palette without the developer and debugging commands on Sprint 134's audit list. Those stay registered, and their menus still run them | S134 | Planned (R21, #456; Jarmo, 19 October) |
 
 ## 3. The first window
 
@@ -154,7 +155,7 @@ Unchanged on main apart from colours and fixes (Sprint 132's S44, #450).
 | Open in Excel or Numbers | The bar | Main | Done |
 | PDF: page, zoom, fit, find | The bar | Main | Done |
 | PDF and Word: Save as Markdown | Make an editable copy | S134 | Planned (R19) |
-| — | Share on the PDF and Word bars | S134 | Planned (R19) |
+| — | Share on the PDF and Word bars: Show in Finder, and Open in Preview or Open in Word | S134 | Planned (R19) |
 | Word: pages, zoom, find, Open in Word | The bar | Main | Done |
 | PowerPoint: slides, notes, zoom, find, Open in PowerPoint | The bar | Main | Done; notes are a check |
 | draw.io editor, flow editor, transcript workbench | Tabs on the desk | Main | Done; the workbench is a check |
@@ -187,10 +188,10 @@ Unchanged on main apart from colours and fixes (Sprint 132's S44, #450).
 |---|---|---|---|
 | Agent Library: Instructions, Agents, Skills, Commands, Scheduled, Flows | The Agents place, with the project's head | Main | Done |
 | Collapsing a section; the + on each section | New in the head: Agent, Skill, Command (new), Flow | Main | Left out (Jarmo, 18 October: "agents ok") |
-| The count line; the empty state's New skill and New agent | One muted line; New in the head | Main | **Gap G5** |
-| Search and Sort, always shown | Search in the head opens the field; Sort sits inside it | Main | **Gap G5** |
-| Descriptions, the Claude/Codex badge, a flow's "used by" | Each row's tooltip | Main | **Gap G5** |
-| An agent's own icon and colour | One icon per kind; the colour setting no longer shows | Main | **Gap G5** |
+| The count line; the empty state's New skill and New agent | One muted line; New in the head | Main | Done; the count line Left out (Jarmo, 19 October: accepted; G5) |
+| Search and Sort, always shown | Search in the head opens the field; Sort sits inside it | Main | Done (Jarmo, 19 October: accepted; G5) |
+| Descriptions, the Claude/Codex badge, a flow's "used by" | Each row's tooltip | Main | Done (Jarmo, 19 October: accepted; G5) |
+| An agent's own icon and colour | One icon per kind, in the agent's chosen colour | Main, S134 | Planned (R24; G5) |
 | Project / User | This project / All projects | Main | Done |
 | A row's menu: Launch Chat, Open, Duplicate, Reveal, Move scope, Delete… | Same | Main | Done |
 | The agent's settings panel | Same, redrawn | Main | Done |
@@ -216,7 +217,7 @@ Unchanged on main apart from colours and fixes (Sprint 132's S44, #450).
 | Add recording, Record | The head's Transcribe a file… and Record | Main, S134 | Done; Planned (R16) |
 | Engine choice, jobs, first-run set-up, model download | Same | Main | Done |
 | Library and All projects; Open, Open saved document, Rename…, Remove transcript, Relink | Same, under "Recordings" | Main, S134 | Done; Planned (R16) |
-| The gear | Opens Settings at the transcription card | Main, S134 | Done; its place under the head is Planned (R16) |
+| The gear | A gear at the right of the Recordings label; opens Settings at the transcription card | Main, S134 | Done; its place under the head is Planned (R16) |
 | The transcript workbench | A tab on the desk | Main | Done; a check |
 | Voice dictation in documents (Mac and Windows) | The document's bar | Main | Done |
 
@@ -228,7 +229,8 @@ Unchanged on main apart from colours and fixes (Sprint 132's S44, #450).
 | New Browser Tab, Clear history | At the right of the Recent label; the + ▸ Web page | Main, S134 | Done; Planned (R18) |
 | Recent pages: open, remove; "No recent URLs" | Same; "No pages yet" | Main, S134 | Done; Planned (R18) |
 | The tab's bar: back, forward, reload, address, screenshot for the AI, developer tools | Same | Main | Done |
-| Share with the agent; allow control | The same dialogs | Main | Done |
+| Share with the agent | The same question on the AI's sheet, not a dialog | Main, S134 | Done; Planned (R20, #455) |
+| Allow control | The same dialog | Main | Done |
 
 ## 11. Ritemark Settings
 
@@ -240,7 +242,7 @@ Behaviour is the same on main; the page lies on white and follows a theme change
 | Appearance: the theme cards | Same | Main | Done |
 | Agent runtime: bundled or this computer's, what is active | Same; "This computer's tools" (Git, Node) | Main, S133 | Done; In flight |
 | Claude account: install, repair, sign in with Claude.ai or an API key, sign out, status | Same | Main | Done |
-| ChatGPT account: sign in, sign out, plan and credits; Codex approval and sandbox | Same | Main | Done |
+| ChatGPT account: sign in, sign out, plan and credits; Codex approval and sandbox | Same, with ChatGPT in place of Codex in its words | Main, S134 | Done; Planned (R22) |
 | OpenCode: auto-approve | Same | Main | Done |
 | API keys: OpenAI, Google AI, Anthropic, OpenRouter, ElevenLabs | Same | Main | Done |
 | Google Docs: connect, reconnect, disconnect, template | Same | Main | Done; the production client is a check |
@@ -256,7 +258,7 @@ Behaviour is the same on main; the page lies on white and follows a theme change
 |---|---|---|---|
 | The update notice: install, skip, pause, relaunch | Same; v1.14.0 is offered 2.0.0 as a full release | Main, S136 | Done; Planned (Sprint 136, R1) |
 | The update status bar item | Same | Main | Done |
-| Send Feedback (All commands) | Same place; works only with usage data on | S133 | **Gap G3** |
+| Send Feedback (All commands) | Same place; sends with usage data off | S133 | Decided (Jarmo, 19 October; G3); Sprint 133 builds it |
 | Usage data on by default, with a notice | Off until yes, on the welcome and in Settings | S133 | In flight (Jarmo, 17 and 18 October) |
 | Report AI output | Status bar; AI information | Main | Done |
 
@@ -291,14 +293,20 @@ Behaviour is the same on main; the page lies on white and follows a theme change
 
 Still right on main: dictation, comments, previews, editor, document properties (until step 3's bar), blocks, formatting, known issues and installation.
 
-## Drawn but not planned for 2.0
+## Drawn redraws, decided on 19 October
 
-These are not parity gaps: v1.14.0's functions stay reachable without them. They are redraws the Experience lead drew that no 2.0 plan takes yet. The Development manager decides with Jarmo whether 2.0 needs any of them.
+These are not parity gaps: v1.14.0's functions stay reachable without them. They are redraws the Experience lead drew. Jarmo decided on 19 October which of them 2.0 takes ("all recommendations ok").
+
+In 2.0, in Sprint 134:
+- The browser's share question asked on the AI's sheet (experience 28, frame 1; R20).
+- The command palette without VS Code's developer commands, as a filter of command IDs (R21). Plain-word command names (experience 22) come after 2.0.
+- "ChatGPT, never Codex" in every visible string, as a copy pass (R22), and G4 (R23). The Settings redesign itself (experience 15) comes after 2.0.
+
+After 2.0:
 - The Task board tab redrawn (experience 6: its bar, and the tasks that wait inside Doing on the board).
 - Transcribe redrawn (experience 20: the recording's card at the foot of the left column, the transcript as a document, insights in the AI's sheet).
-- The browser's share question asked on the AI's sheet (experience 28).
 - The AI's empty state and the status bar's items ("the AI step" in Sprint 132's scope of 18 October).
-- The indigo icon on the open tree row (a font icon theme).
-- The command palette without VS Code's developer commands (experience 22).
-- The Settings redesign (experience 15), with "Codex" and "Sign in with OpenAI" in plain words, and G4.
+- The indigo icon on the open tree row and the open tab (a font icon theme).
+- The Settings redesign (experience 15), with "Sign in with OpenAI" in plain words.
+- Plain-word command names in the palette (experience 22).
 - The `{date}` chip in a flow's prompt.

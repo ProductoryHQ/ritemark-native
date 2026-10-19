@@ -278,8 +278,8 @@ And the Export menu's every item works from Share.
 
 ### S41: Home and switching on Windows
 Given a Windows build from main (after the merge) or the test overlay (before it, for the extension side)
-When the person runs S13, S18, S23, S27, S30, S36, S45, S48 and S50
-Then each holds, with Windows paths, Alt click for a new window, Reveal in File Explorer and Ctrl in every shortcut.
+When the person runs S13, S18, S23, S27, S30, S36, S45, S48, S50, S51, S55, S58 and S60
+Then each holds, with Windows paths, Alt click for a new window, Reveal in File Explorer, Show in File Explorer and Ctrl in every shortcut.
 
 ### S42: Other drives
 Given projects on D: and on a network share, and one on a disconnected USB drive
@@ -299,7 +299,7 @@ Then the project's menu opens, as on Documents.
 ### S46: Nothing on a title row is lost
 Given Browser and Transcribe chosen in turn
 Then Browser's New browser tab and Clear history are at the right of the Recent label, each with its tooltip, and each works as the title row's button did
-And Transcribe's settings button is where the Experience lead drew it (or at the right of the Recordings label until then), and opens Settings at the transcription card
+And Transcribe's settings button is a gear at the right of the Recordings label, with the tooltip "Transcribe settings", and opens Settings at the transcription card
 And Record and Transcribe a file… do what Record and Add recording did.
 
 ### S47: No folder open (negative)
@@ -338,7 +338,75 @@ Then the list is empty again and says "No pages yet".
 ### S51: Make an editable copy, and Share
 Given a PDF and a Word file in "Leadership programme"
 When each opens
-Then its bar shows page, zoom, fit and find as today, then Make an editable copy and Share
+Then its bar shows page, zoom, fit and find as today, then Make an editable copy and Share on the PDF, and Open in Word (with Make an editable copy in its menu) and Share on the Word file
 When the person clicks Make an editable copy
 Then an editable Markdown copy is made exactly as Save as Markdown made it
-And Share holds what the Experience lead drew, with nothing from today's bar gone.
+When the person opens Share on the PDF
+Then it holds Show in Finder and Open in Preview, and no Export or Google Docs
+When the person picks Show in Finder, then Open in Preview
+Then Finder shows the file selected, and Preview opens it
+When the person opens Share on the Word file and picks Open in Word
+Then Word opens it, as the bar's button does
+And nothing from today's bar is gone.
+
+## Feature: The browser's share question (R20)
+
+### S55: Asked on the AI's sheet, and the tabs still work
+Given a fresh profile with Claude signed in, the AI's sheet open, and "Leadership programme" open with two documents
+When the person opens ritemark.app from the + and the page becomes the AI's context
+Then the AI's sheet shows, above the message box, "Share this page with Claude?", its line, Share this page, Not now and the box "Share pages I open in Ritemark without asking", and no dialog opens
+While it waits, when the person switches to a document tab, closes the other document, and opens a new tab from the +
+Then each works at once (#455)
+When the person comes back to the page and picks Share this page
+Then the page is shared, the chip shows it, and a question about the page gets an answer that uses it
+And with ChatGPT chosen, the title reads "Share this page with ChatGPT?".
+
+### S56: Not now, and sharing without asking
+Given the share question on a page
+When the person picks Not now
+Then nothing about the page is shared, and the question does not come back for that page in this session
+When the person opens another page, ticks the box and picks Share this page
+Then that page is shared, and every page opened after it is shared without asking, also after a restart.
+
+### S57: Before an answer (negative)
+Given the share question waiting on ritemark.app
+When the person sends "What is this page about?"
+Then the turn carries no address, title or content of the page (the trace shows it), and the question is still there
+When the person moves to another page before answering
+Then the question is about the page now in front, and ritemark.app is not shared.
+
+## Feature: The command palette (R21)
+
+### S58: No developer commands
+When the person opens All commands (⇧⌘P) and types "breakpoint", then "debug", then "developer"
+Then "Add Data Breakpoint at Address", "Add Function Breakpoint" and the other IDs on the audit's list do not show, and nothing on the list shows under recently used
+And Ritemark's commands, Preferences: Open Settings, the kept developer commands (such as Developer: Reload Window), refreshing the file list and the AI column's Maximize all show
+When the person opens View ▸ Debug Console
+Then it opens as before: a menu still runs a command the palette dropped.
+
+## Feature: ChatGPT, never Codex (R22)
+
+### S59: The copy pass
+Given ChatGPT signed in, then signed out
+When the tester walks the audit's list: Ritemark Settings (ChatGPT's card, its approval and sandbox, the Update Center), Ritemark's settings in VS Code's settings page, a failed sign-in's and a sign-out's toasts, the AI's sheet and its setup, the model picker, Give to agent on a card, a flow with a ChatGPT step that fails, and the terminal tab that installs or repairs it
+Then each says ChatGPT where it said Codex, and a model's own name, such as "GPT-5.3 Codex Spark", is unchanged
+And the approval mode and sandbox set before the change are kept.
+
+## Feature: Advanced settings (R23)
+
+### S60: A way into every setting
+When the person opens Ritemark Settings with ⌘, (Ctrl+,) and scrolls to its foot
+Then "Advanced settings" is there, with its tooltip
+When they click it
+Then VS Code's settings open, where the feature switches, the update mode and channel, the excluded folders and the transcription export folder can be found and changed
+And nothing else on Ritemark Settings has moved or gone.
+
+## Feature: An agent's colour (R24)
+
+### S61: The chosen colour on the row
+Given one agent with a colour chosen in its settings, and one with none
+When the person opens the Agents place, in Light and in Dark
+Then the first agent's row icon is in its colour, and the second's is muted as before
+When the person changes the first agent's colour in its settings
+Then its row icon follows, without a reload
+And the place is otherwise as Sprint 132 left it: no count line, the empty state's one line with New in the head, Sort inside Search, descriptions and badges in tooltips.

@@ -1,24 +1,24 @@
 # Sprint 134: The project at the centre
 
-Track: SDD (19 user-facing requirements; a new extension subsystem, the webview, small hunks in patches 018 and 019)
+Track: SDD (24 user-facing requirements; a new extension subsystem, the webview, small hunks in patches 003, 009, 018 and 019)
 Override with: "use plain full track"
 Branch: `sprint-134-project-at-the-centre` (created only after approval, and only once Sprint 133 is merged)
-Release tier: shell (patches 018 and 019, and 001 if the splash audit keeps its hunk; there is no release from main until 2.0)
-Status: Phase 2 (PLAN) drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), **awaiting Jarmo's approval**. Not started.
+Release tier: shell (patches 003, 009, 018 and 019, and 001 if the splash audit keeps its hunk; there is no release from main until 2.0)
+Status: Phase 2 (PLAN) drafted 2026-10-18, refreshed the same day with Sprint 132's handover and the [v1.14 parity list](../parity-v1.14.md), and updated on 2026-10-19 with Jarmo's decisions and the Experience lead's answers, **awaiting Jarmo's approval**. Not started.
 
 ## SDD Artifacts
 
-- [spec.md](spec.md): the behaviour contract, R1–R19 and E1–E7.
-- [scenarios.md](scenarios.md): S1–S54, the manual QA matrix.
-- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W13, the five audits, one merge.
+- [spec.md](spec.md): the behaviour contract, R1–R24 and E1–E7.
+- [scenarios.md](scenarios.md): S1–S61, the manual QA matrix.
+- [technical-plan.md](technical-plan.md): what exists today (on main and in the proof of concept), workstreams W1–W18, the eight audits, one merge.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
 
-The release is [v2.0.0](../release-plan.md), step 3. The design is the Experience lead's experience 3 (Home, projects, switching), experience 29 (empty places), experience 32's frame 5 (What moved), experience 33 (a folder that is not found, switching while Claude works), experience 26's frame 1 (Share) and the comparison's document bar, in `ritemark-dev`: `product/design/experience/`.
+The release is [v2.0.0](../release-plan.md), step 3. The design is the Experience lead's experience 3 (Home, projects, switching), experience 29 (empty places), experience 32's frame 5 (What moved), experience 33 (a folder that is not found, switching while Claude works), experience 26's frame 1 (Share), experience 28's frame 1 (the share question on the AI's sheet) and the comparison's document bar, in `ritemark-dev`: `product/design/experience/`.
 
 ## Goal
 
-The project becomes the place a person works in. Each project opens on its own Home, which says what waits for the person and what changed, with Home and Tasks always the first two tabs. On Home the left column lists every project on the computer, with what waits in each, from the first day of 2.0. Every other place carries the project's name at its head. Switching projects happens in the same window, and each project keeps its own tabs. The document's bar says Saved, and Export becomes Share.
+The project becomes the place a person works in. Each project opens on its own Home, which says what waits for the person and what changed, with Home and Tasks always the first two tabs. On Home the left column lists every project on the computer, with what waits in each, from the first day of 2.0. Every other place carries the project's name at its head. Switching projects happens in the same window, and each project keeps its own tabs. The document's bar says Saved, and Export becomes Share. The browser's share question waits on the AI's sheet instead of blocking the window. All commands drops VS Code's developer commands. Every visible string says ChatGPT, never Codex.
 
 ## What the refresh added (18 October)
 
@@ -33,10 +33,25 @@ Sprint 132 handed these to step 3 in its sprint plan and QA evidence:
 
 The [v1.14 parity list](../parity-v1.14.md) names which of its rows this sprint provides. The ones that need building are in the requirements above.
 
+## What 19 October added
+
+Jarmo's decisions of 19 October ("all recommendations ok"):
+- **The browser's share question on the AI's sheet** (R20, #455), as experience 28's frame 1 draws it. When and whether it asks stays as today; only where it asks changes, and the tabs stay usable while it waits.
+- **The command palette without VS Code's developer commands** (R21, #456), as a filter of command IDs in patch 003. An audit writes the list first.
+- **ChatGPT, never Codex** (R22), in every visible string. A copy pass only, after an audit that lists every such string.
+- **Advanced settings** (R23) at the foot of Ritemark Settings, opening VS Code's own settings (parity gap G4).
+- **An agent's colour on its row** (R24). The Agents place's other changes are accepted (parity gap G5).
+- **After 2.0:** the Task board tab's and Transcribe's redraws, the AI step, the indigo icon on the open row and tab, and the Flows {date} chip (*Not in this sprint*).
+
+The Experience lead's answers of 19 October:
+- **Transcribe's settings button** is a gear at the right of the Recordings label, with the tooltip "Transcribe settings" (R16).
+- **Share on a PDF or a Word file** holds Show in Finder, and Open in Preview or Open in Word (R19).
+
 ## Linked Issues
 
+- [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455): the browser's share question blocks the tab row until answered (R20).
+- [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456): the command palette lists VS Code's developer commands (R21).
 - [#107](https://github.com/ProductoryHQ/ritemark-native/issues/107): watched; the bundle is measured before and after (E4).
-- No other open issue is in this step (release plan, Issue Intake).
 
 ## MVP Scope
 
@@ -55,17 +70,29 @@ The [v1.14 parity list](../parity-v1.14.md) names which of its rows this sprint 
 | A folder that is not found, an empty project, a project with no board | R13 |
 | Nothing lost; Windows | R14, R15 |
 | The project's head on Tasks, Browser and Transcribe; Tasks' and Browser's pages under it | R16, R17, R18 |
-| Make an editable copy and Share on the PDF and Word bars | R19 |
+| Make an editable copy and Share on the PDF and Word bars: Show in Finder, and Open in Preview or Open in Word | R19 |
+| The browser's share question on the AI's sheet; the tabs usable while it waits | R20 |
+| All commands without VS Code's developer and debugging commands | R21 |
+| ChatGPT, never Codex, in every visible string | R22 |
+| Advanced settings at the foot of Ritemark Settings | R23 |
+| An agent's chosen colour on its row's icon | R24 |
 | One projects subsystem, Home in the shared bundle, tests, builds, docs, drift | E1–E7 |
 
 **Not in this sprint:**
 - search across projects (Search all projects filters by name);
-- the Task board tab and Transcribe redrawn as experiences 6 and 20 draw them (this sprint gives their places a head, and Tasks its list);
-- the browser's share question on the AI's sheet (experience 28);
+- the AI asking to use a page (experience 28, frames 2 and 3): the control question stays today's dialog;
 - switching without a reload;
 - sub-projects, recent documents across projects, chosen icons as marks;
 - About this project written by Claude;
 - a VS Code update.
+
+**After 2.0** (Jarmo, 19 October):
+- the Task board tab and Transcribe redrawn as experiences 6 and 20 draw them (this sprint gives their places a head, and Tasks its list);
+- the AI step: the AI's empty state and the status bar's items;
+- the indigo icon on the open row and tab;
+- the Flows {date} chip;
+- plain-word command names in the palette (experience 22);
+- the Settings redesign (experience 15).
 
 ## What 1.x did, and where it lives in 2.0 (HARD RULE #1)
 
@@ -81,9 +108,14 @@ The [v1.14 parity list](../parity-v1.14.md) names which of its rows this sprint 
 | Export: PDF, Word, Google Docs (every state), Copy as Markdown | Share: Send a copy, Google Docs, Copy as Markdown | R12 |
 | Opening a folder from VS Code's File menu | Still there; Ritemark's own paths ask first when the AI is working | R9 |
 | The Browser view's New browser tab and Clear history (title row) | At the right of the Recent label; the palette | R18 |
-| Transcribe's Add recording, Record and settings button | The head's Transcribe a file… and Record; the settings button where the Experience lead draws it | R16 |
+| Transcribe's Add recording, Record and settings button | The head's Transcribe a file… and Record; the settings gear at the right of the Recordings label | R16 |
 | Tasks' add field, Your calls panel and Archived section | New task; the waiting tasks first and marked in their stage; Archived inside Done | R17 |
 | PDF and Word: Save as Markdown | Make an editable copy | R19 |
+| Word: Open in Word | On the bar, as today, and in Share | R19 |
+| The browser's "Share with Agent?" dialog, with Don't ask again | The same question on the AI's sheet, with "Share pages I open in Ritemark without asking" | R20 |
+| All commands: VS Code's developer and debugging commands | Still registered, run by their menus and shortcuts; no longer in the palette | R21 |
+| VS Code's settings (⌘, in 1.14) | Advanced settings at the foot of Ritemark Settings; the palette | R23 |
+| Agents: an agent's own colour | Its row's icon, in that colour | R24 |
 
 The launcher's code is deleted only after every row above is checked on the branch, and its `home-launcher` flag is set to disabled with a tombstone (`CLAUDE.md`'s flag rule).
 
@@ -91,18 +123,20 @@ The launcher's code is deleted only after every row above is checked on the bran
 
 - **No new events in this sprint.** The four from Sprint 133 are enough to see whether people reach a project; Home and switching add none. If Jarmo wants one (for example "project switched"), it goes through Sprint 133's consent gate and carries no name or path.
 - **Nothing leaves the computer.** The project list, what waits and the first fill read only what is already on it: VS Code's recent folders, Ritemark's chat store, the boards' files and this computer's hand-off records.
+- **No page reaches the AI before Share.** The share question moves onto the AI's sheet, and the consent boundary stays: nothing about a page goes into a turn until the person shares it (R20).
 - **The folder holds only what the person chose to change.** `.ritemark/project.json` is written only on a change, and holds the name, line and cover, never a path or an account. About this project's `AGENTS.md` and `CLAUDE.md` are written only when the person picks Create.
 
 ## Windows
 
 - **Round 1, before the merge:** the extension side (Home, the list, the head's menu, switching) through the test overlay on the latest Windows build from main.
-- **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe) and projects on other drives and network paths (S41, S42, S52).
+- **Round 2, after the merge:** a Windows build from main for everything, including the shell parts (the Tasks tab's count, the splash, the File menu's three items, the heads on Tasks, Browser and Transcribe, the share question, the palette) and projects on other drives and network paths (S41, S42, S52, S58).
 
 ## Tests and the production build
 
-- Extension unit tests for the project file, the list, the first fill, what waits, the switch guard, the protocol and the permanent tabs.
-- Webview tests for Home's states and escaping, the list's filter and the document bar's Saved.
-- A VS Code unit test for the Tasks tab's count.
+- Extension unit tests for the project file, the list, the first fill, what waits, the switch guard, the protocol, the permanent tabs, the share question and an agent's row colour.
+- Webview tests for Home's states and escaping, the list's filter, the document bar's Saved, the share question's card and Advanced settings.
+- VS Code unit tests for the Tasks tab's count and the palette's filter.
+- The Codex audit's search run again at QA; the theme's contrast test with the agent colours.
 - CDP checks for the permanent tabs, the count, switching and the splash; Home, the list, the switcher and What moved join the screenshot baseline.
 - After the merge, a production build from a clean-room worktree at the merged commit, as a build check; all patches apply on the pin, a second run is clean, the stacking check passes; the drift check.
 
@@ -133,6 +167,19 @@ The launcher's code is deleted only after every row above is checked on the bran
   - the internal recent-folders command is used once, by the first fill;
   - the switcher's submenu and File ▸ Switch project are the two small shell additions the head needs; the splash is the third;
   - no new analytics event.
+- **2026-10-19 (Jarmo, "all recommendations ok"):**
+  - 2.0's scope adds three items to this sprint: the browser's share question on the AI's sheet (#455), the command palette without VS Code's developer commands (#456), and "ChatGPT, never Codex" in every visible string;
+  - an "Advanced settings" link at the foot of Ritemark Settings opens VS Code's own settings (G4);
+  - the Agents place's other changes are accepted, and an agent's chosen colour shows on its row's icon again (G5);
+  - after 2.0: the Task board tab's redraw (experience 6), Transcribe's redraw (experience 20), the AI step, the indigo icon on the open row and tab, and the Flows {date} chip.
+- **2026-10-19 (the Experience lead's answers to the refresh's design questions):**
+  - Transcribe's settings button is a small icon button, the gear with the tooltip "Transcribe settings", at the right of the Recordings label, as Browser's + and Clear sit at the right of Recent;
+  - Share on a PDF or a Word file holds Show in Finder (Show in File Explorer on Windows) and Open in Preview or Open in Word; Make an editable copy stays on the bar beside Share; no Export or Google Docs.
+- **2026-10-19 (engineering, in this plan):**
+  - the share question keeps today's rule for when it asks; 009's bridge takes the answer from the sheet, so upstream's dialog never opens for it;
+  - the palette's filter drops entries only from All commands; the commands stay registered;
+  - the copy pass changes words only, never a key or an identifier, and a model's own name stays;
+  - only a colour the person chose is drawn on an agent's row, not one guessed from its name.
 
 ## Decisions for Jarmo
 
@@ -144,7 +191,7 @@ Each has a recommendation, listed in [spec.md](spec.md#open-questions) too.
 
 ## Feature Flag Check
 
-No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-board` flag keeps working: with it off, Home is first alone and nothing counts tasks (R5, R13). The `home-launcher` flag is retired with the launcher (Decision 2), as `CLAUDE.md` asks when a feature's code goes.
+No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The palette's filter removes no feature: every dropped command stays registered and reachable where it was. The `task-board` flag keeps working: with it off, Home is first alone and nothing counts tasks (R5, R13). The `home-launcher` flag is retired with the launcher (Decision 2), as `CLAUDE.md` asks when a feature's code goes.
 
 ## Success Criteria
 
@@ -161,6 +208,11 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 - [ ] Tasks, Browser and Transcribe carry the project's head, and nothing their title rows did is lost (R16–R18).
 - [ ] The PDF and Word bars say Make an editable copy and end in Share (R19).
 - [ ] The File menu has New tab, Switch project and Share (R8).
+- [ ] The browser's share question is asked on the AI's sheet, and the tabs work while it waits; nothing about a page reaches the AI before Share (R20).
+- [ ] All commands lists no VS Code developer or debugging command on the audit's list, and every kept command is there (R21).
+- [ ] No visible string names the AI "Codex"; no setting is lost (R22).
+- [ ] Advanced settings opens VS Code's settings from the foot of Ritemark Settings (R23).
+- [ ] An agent's chosen colour shows on its row, readable in Light and Dark (R24).
 - [ ] Every Sprint 134 row of the v1.14 parity list is checked on the branch.
 - [ ] Light, Dark and Windows checked (R15).
 - [ ] A production build from a clean-room worktree succeeds after the merge; the drift is recorded (E5, E7).
@@ -177,6 +229,9 @@ No new flag. 2.0 is built on main with no switch (Jarmo, 17 October). The `task-
 | A folder already has its own `CLAUDE.md` (a code project) | Create never writes over it; the note offers Add the line, which keeps every other byte; S44 |
 | Tasks' new order hides a call | A call leads whatever stage it is in; S49 |
 | A title row's action is lost under the head | Each moves into its page first and stays in the palette; S46 |
+| A page is shared before the person answers, now that nothing blocks | Shared only with an answer or the stored choice; nothing unshared goes into a turn; S57 |
+| The palette's filter hides a command someone needs | The audit's keep rule; the commands stay registered; S58 |
+| The copy pass loses a setting | Words only; keys and identifiers listed as staying before any change; S59 |
 
 The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprint).
 
@@ -184,7 +239,8 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - **Sprint 132 merged:** the rule that keeps pinned Home and Task board tabs first (019), the head's place and menus (018), the tab row.
 - **Sprint 133 merged:** the landing (`src/welcome/landing.ts`), a new project (`src/welcome/newProject.ts`), the sample project (`extensions/ritemark/sample-project/`), the update marker `ritemark.updatedFrom1x` and the consent gate.
-- **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, and the answers of 18 October (spec, *Resolved Questions*). The refresh adds three small design questions (spec, *Open Questions*): Transcribe's settings button, Share on a PDF and a Word file, and rows on Browser.
+- **The Experience lead's drawings**, all in: experience 29 for an empty project and a project with no board, experience 33 for a folder that is not found and for switching while Claude works, experience 28's frame 1 for the share question, and the answers of 18 and 19 October (spec, *Resolved Questions*). Of the refresh's three small design questions, two were answered on 19 October (Transcribe's settings button, Share on a PDF and a Word file). Rows on Browser is still open (spec, *Open Questions*).
+- **Sprint 133 merged before the Codex audit**, so the welcome's words are in its list.
 
 ## Pre-Implementation Gate
 
