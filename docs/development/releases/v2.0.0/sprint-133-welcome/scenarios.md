@@ -275,7 +275,7 @@ And it shows the usage-data choice with the welcome's words, with the Privacy Po
 ### S42: The tree and the tabs
 Given a project with `Brief.md`, `report.final.md`, `README`, `.gitignore` and `Kickoff notes.pdf`
 Then in the tree and on tabs each name is in the body ink and its extension in the muted ink (`.md` of `report.final.md` only; none for `README`; `.gitignore` whole in the body ink)
-And on the chosen tab and the open row both parts are the body ink
+And on the chosen tab and the open row, the name is in ink and the extension in body
 And in high contrast the extension keeps 4.5:1.
 
 ### S48: A finished profile's window with no folder

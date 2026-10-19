@@ -34,7 +34,7 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 - **The project at the top.** The left column starts with your project's mark and name, with a menu. Below them, **New** makes a document, folder, agent, skill, command or flow, and **Search** searches the project's files.
 - **A calmer file tree.** The tree has no carets, and its rows are taller.
 - **File icons you can tell apart.** PDF, Word, Excel, CSV, PowerPoint, image and audio files each have their own icon.
-- **Extensions in a lighter ink.** In the file tree and on tabs, a file's extension is in a lighter ink. The chosen row and tab stay in full ink, and high contrast themes keep full ink.
+- **Extensions in a lighter ink.** In the file tree and on tabs, a file's extension is in a lighter ink. On the chosen tab and row it is a step quieter than the name, and high contrast themes keep full ink.
 
 ## Tabs
 
