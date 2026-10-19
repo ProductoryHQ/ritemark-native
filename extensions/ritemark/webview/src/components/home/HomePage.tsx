@@ -67,9 +67,11 @@ function ProjectLine({ line }: { line: string }) {
     )
   }
   return (
-    <button type="button" className={`rh-line${line ? '' : ' empty'}`} onClick={() => setEditing(true)} aria-label={line ? `${line.replace(/[.!?…]+$/, '')}. Edit the line about this project` : 'Add a line about this project'}>
-      {line || 'Add a line about this project'}
-    </button>
+    <Tooltip label={line ? 'Edit the line about this project' : 'Write a line about this project'} side="bottom" className="block">
+      <Button variant="ghost" className={`rh-line${line ? '' : ' empty'}`} onClick={() => setEditing(true)} aria-label={line ? `${line.replace(/[.!?…]+$/, '')}. Edit the line about this project` : 'Add a line about this project'}>
+        {line || 'Add a line about this project'}
+      </Button>
+    </Tooltip>
   )
 }
 
@@ -121,7 +123,8 @@ function Waiting({ state, now }: { state: HomeState; now: number }) {
       {waiting.items.map((item) => {
         const words = waitingWords(item)
         return (
-          <button key={item.id} type="button" className="rh-row" onClick={() => send({ type: 'home/open-waiting', id: item.id })}>
+          <Tooltip key={item.id} label={item.source === 'card' ? 'Open this task’s page' : 'Open this chat on the AI’s sheet'} className="block">
+          <Button variant="ghost" className="rh-row" onClick={() => send({ type: 'home/open-waiting', id: item.id })}>
             {/* An unread reply wears its chat's own bubble, as on the rail (the Experience lead, 19 October) */}
             {item.source === 'chat' && item.kind === 'reply' && item.colorSlot !== null
               ? <span className="rh-ic rh-ic-bubble"><ConversationBubbleIcon identityColorSlot={item.colorSlot} size={14} /></span>
@@ -131,7 +134,8 @@ function Waiting({ state, now }: { state: HomeState; now: number }) {
               : <span className="rh-text rh-quoted"><span className="rh-lead">{`${words.text} “`}</span><span className="rh-quote">{words.quote}</span><span className="rh-lead">”</span></span>}
             {words.tag && <span className="rh-tag">{words.tag}</span>}
             <span className="rh-when">{whenWords(item.since, now, 'minutes')}</span>
-          </button>
+          </Button>
+          </Tooltip>
         )
       })}
       {waiting.items.length === 0 && !others && <p className="rh-sub">{waiting.count === null ? 'Ritemark can’t tell what waits right now.' : 'Nothing waits for you.'}</p>}
@@ -171,12 +175,14 @@ function LastChanged({ state, now }: { state: HomeState; now: number }) {
       <h2 className="rh-h3">Last changed in {state.project.name}</h2>
       <div>
         {state.recent.map((file) => (
-          <button key={file.id} type="button" className="rh-file" onClick={() => send({ type: 'home/open-recent', id: file.id })}>
+          <Tooltip key={file.id} label="Open it in a tab" className="block">
+          <Button variant="ghost" className="rh-file" onClick={() => send({ type: 'home/open-recent', id: file.id })}>
             <Icon name={recentIcon(file)} size={14} tone="muted" />
             <span>{file.name}{file.extension && <span className="rh-ext">{file.extension}</span>}</span>
             {file.folder && <span className="rh-where">in {file.folder}</span>}
             <span className="rh-when">{whenWords(file.changedAt, now, 'days')}</span>
-          </button>
+          </Button>
+          </Tooltip>
         ))}
       </div>
     </section>

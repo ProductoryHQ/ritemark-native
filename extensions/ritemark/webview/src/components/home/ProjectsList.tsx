@@ -50,8 +50,8 @@ function Row({ project, platform }: { project: ProjectRow; platform: ProjectsSta
         <div>
           {/* Below the row, not to its right: the column is the webview's whole width (S38) */}
           <Tooltip label={tip} side="bottom" className="block">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className={`rp-row${project.open ? ' open' : ''}${project.missing ? ' missing' : ''}`}
               aria-current={project.open ? 'true' : undefined}
               aria-label={label}
@@ -64,7 +64,7 @@ function Row({ project, platform }: { project: ProjectRow; platform: ProjectsSta
               ) : (
                 project.count ? <span className="rp-count">{project.count > 99 ? '99+' : project.count}</span> : null
               )}
-            </button>
+            </Button>
           </Tooltip>
         </div>
       </ContextMenuTrigger>

@@ -399,13 +399,15 @@ function SideRow({
   ) : null
   return (
     <div data-waiting={waiting ? '' : undefined} className={cn('tb-row group', active && 'tb-row-active')}>
-      <button
-        type="button"
-        className="absolute inset-0 rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-        aria-label={`${card.title}, ${waiting ? 'waiting for you, ' : ''}${p.row || STAGE_NAMES[card.stage]}`}
-        // Enter or Space (a click with no pointer, detail 0) takes the keyboard to the page (W16).
-        onClick={(event) => openCard(card.id, event.detail === 0)}
-      />
+      <Tooltip label="Open this task’s page" className="absolute inset-0">
+        <Button
+          variant="ghost"
+          className="absolute inset-0 h-auto w-full rounded-[4px] p-0 hover:bg-transparent active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+          aria-label={`${card.title}, ${waiting ? 'waiting for you, ' : ''}${p.row || STAGE_NAMES[card.stage]}`}
+          // Enter or Space (a click with no pointer, detail 0) takes the keyboard to the page (W16).
+          onClick={(event) => openCard(card.id, event.detail === 0)}
+        />
+      </Tooltip>
       {waiting ? <span className={cn('tb-wait', active && 'on')} aria-hidden="true" /> : <CardGlyph card={card} p={p} />}
       <div className="pointer-events-none relative min-w-0 flex-1">
         <div className="tb-row-title line-clamp-2 break-words">{card.title}</div>

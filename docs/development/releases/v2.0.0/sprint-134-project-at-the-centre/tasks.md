@@ -100,7 +100,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [x] Docs: `architecture.md` (Projects; the browser's share question), `references/layout-invariants.md`, `CLAUDE.md`'s patch descriptions for 003, 009, 018 and 019, `update-vscode.sh`'s checklist lines (E6)
 - [x] Manual QA on the Mac: S1–S40, S43–S62; evidence in `qa-evidence.md`
 - [ ] Windows overlay round before the merge: S41 on the extension side
-- [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
+- [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; screenshots to the Experience lead; Jarmo's "admin merge"
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
 - [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`

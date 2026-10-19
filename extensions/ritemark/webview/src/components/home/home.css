@@ -102,7 +102,8 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   text-align: left;
   font: 400 14px/20px var(--ritemark-ui-font-family);
   color: var(--r-ink-muted);
-  cursor: text;
+  height: auto;
+  border-radius: 0;
 }
 .rh-line.empty { font-style: italic; }
 .rh-line:hover { color: var(--r-ink-body); }
@@ -200,6 +201,15 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   border-radius: 0;
 }
 .rh-file:hover { background: var(--r-surface-soft); }
+
+/* The line and the rows are the shadcn Button (Jarmo: never a hand-rolled button), drawn as text and rows: the
+   button's centring, nowrap, transition, press scale, padding beside an icon and 16 icon size give way to theirs */
+.rh-desk .rh-line, .rh-desk .rh-row, .rh-desk .rh-file { justify-content: flex-start; white-space: normal; transition: none; }
+.rh-desk .rh-line:active, .rh-desk .rh-row:active, .rh-desk .rh-file:active { transform: none; }
+.rh-desk .rh-file { padding: 0; }
+.rh-desk .rh-row .rh-ic svg, .rh-desk .rh-file > svg { width: 14px; height: 14px; }
+.rh-desk .rh-file > svg { color: var(--r-ink-muted); }
+.rh-desk .rh-row:focus-visible, .rh-desk .rh-file:focus-visible { border-color: var(--r-hairline); }
 .rh-file .rh-ext { color: var(--r-ink-muted); }
 .rh-file .rh-where { color: var(--r-ink-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rh-file .rh-when { margin-left: auto; flex: none; font-size: 12px; color: var(--r-ink-muted); }
@@ -357,6 +367,11 @@ body.vscode-dark .rh-toast .rh-toast-action:hover, body[data-vscode-theme-kind='
   color: var(--r-ink-strong);
 }
 .rp-row:hover { background: var(--r-surface-soft); }
+/* The shadcn Button, drawn as a row (as Home's rows above) */
+.rp-column .rp-row { justify-content: flex-start; white-space: normal; transition: none; }
+.rp-column .rp-row:active { transform: none; }
+.rp-column .rp-row .rp-missing svg { width: 12px; height: 12px; }
+.rp-column .rp-row:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--r-accent)); outline-offset: -2px; box-shadow: none; }
 .rp-row.open { background: var(--r-surface); }
 .rp-row .rp-mini {
   width: 18px;

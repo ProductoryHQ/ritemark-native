@@ -142,6 +142,13 @@ Fixed after run C on the build of `d35e3e57`, and checked live on run 1's instan
 - **The project's head as wide as the column** (Jarmo, 19 October): the head's box ran 8 to 240 with a long name and shorter with a short one; it is now a select box from 8 to 248, as wide as New and Search, the name taking the room and the chevron at its right end (patch 018). `frame-geometry.mjs` checks the box's edges.
 - **An unexplained file** (a capture run on a reused profile): in the baseline's third run, `AGENTS.md` (`# About this project`) and a `CLAUDE.md` of `@AGENTS.md` appeared in the sample's copy at 13:27:54, between two scenes, and the new AGENTS.md opened in a tab. They are exactly what About this project's Create writes, and the only path that writes them is the project menu's About this project after its dialog's Create. No capture showed the menu or the dialog, and a fourth run with a watcher (every 150 ms: any dialog or Ritemark menu, the tab in front, the focus, and the file) did not reproduce it. Since then every baseline run starts from a fresh profile and a fresh copy of the sample.
 
+### The qa-validator review (head 9f2ed022)
+
+Nothing blocking: the pre-commit validator and `validate-qa.sh` pass, the 18 patches apply and rebuild byte for byte into the tested tree, nothing that should not ship is in the diff, the 1.x launcher's flag stays as a `disabled` tombstone, every scenario is accounted for. Two findings were fixed at once:
+
+- **The project's line on Home had `cursor: text`**, against the pointer rule for anything clickable. It now takes the pointer.
+- **Five controls this sprint added were hand-rolled `<button>`s** (Home's line, Waiting rows and Last changed rows, the projects list's rows, the Tasks list's row): they are now the shadcn `Button`, each with a tooltip saying what it does ("Edit the line about this project", "Open this task’s page", "Open this chat on the AI’s sheet", "Open it in a tab"). Their CSS keeps the rows' own look over the button's (no centring, no press scale, 14 icons, muted file icons). Checked: the frame scenes on a fresh profile match the set before the change in all 34 (Home and the projects list to the pixel); a Waiting row and a Tasks row read 48 high, no padding, 400 at 14, 14 icons, the row's button covering the Tasks row exactly. The other webview files this sprint touched only changed words, and keep their older buttons.
+
 ## Left open
 
 Found during QA and not changed in this sprint, each small or outside its scope:
