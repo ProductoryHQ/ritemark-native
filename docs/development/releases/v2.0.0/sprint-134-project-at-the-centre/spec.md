@@ -6,9 +6,12 @@ Ritemark 2.0's third step makes the project the place a person works in. Each pr
 
 Refreshed on 18 October 2026 with what Sprint 132 handed to step 3 (R16–R19, and changes to R2, R8 and R13), and with the gaps the [v1.14 parity list](../parity-v1.14.md) gives this step.
 
+Updated on 19 October 2026 with Jarmo's decisions of that day (R20–R24) and the Experience lead's answers to the refresh's design questions (R16, R19).
+
 ## Principles
 
-- **The drawings are the contract.** Experience 3 (`ritemark-dev`: `product/design/experience/experiences/home/`), experience 29 (`empty/`), experience 32's frame 5 (`update/`), experience 33 (`missing/`), experience 26's frame 1 (`share/`) and the comparison's document bar (`comparison/after-write.png`). Where a drawing and this spec disagree, the drawing wins and this spec changes first.
+- **The drawings are the contract.** Experience 3 (`ritemark-dev`: `product/design/experience/experiences/home/`), experience 29 (`empty/`), experience 32's frame 5 (`update/`), experience 33 (`missing/`), experience 26's frame 1 (`share/`), experience 28's frame 1 (`web/`) and the comparison's document bar (`comparison/after-write.png`). Where a drawing and this spec disagree, the drawing wins and this spec changes first.
+- **People's names for things.** ChatGPT, never Codex, wherever a person reads the AI's name (R22). The welcome already follows this (Sprint 133).
 - **The project is the place** (principle 1). Projects by name, never by path; where a project lives is one muted line.
 - **What needs the person comes first** (principle 4). The same number for the same thing everywhere: the projects list, Home, the Tasks tab and the Tasks place.
 - **The folder holds what the person owns, the computer holds the rest.** The project's name, mark, cover and line travel with the folder; the list of projects and what Ritemark knows about them stay on this computer (as the task board does, `architecture.md`).
@@ -225,7 +228,7 @@ As a writer on Windows, I want Home, the projects and switching to work the same
 Acceptance criteria:
 - Home, the projects list, the head's menu, switching, Alt click, Reveal in File Explorer and the document's bar work on a Windows PC, with Windows paths and Ctrl in every shortcut.
 - Projects on other drives and on network paths are listed and opened; a disconnected drive shows the project as missing (R13).
-- R16 to R19 hold on Windows too, with Reveal in File Explorer in the project's menu.
+- R16 to R24 hold on Windows too, with Reveal in File Explorer in the project's menu and Show in File Explorer in a PDF's or Word file's Share.
 
 ### R16: The project's head on Tasks, Browser and Transcribe
 
@@ -240,7 +243,7 @@ Acceptance criteria:
   - Browser: no rows; the Recent label and its actions (R18).
 - An action that the place's title row carries today keeps a home:
   - Browser's New browser tab and Clear history go to the Recent label (R18);
-  - Transcribe's settings button, which opens Settings at the transcription card, goes where the Experience lead draws it (design question). Until then it sits at the right of the Recordings label, as Browser's actions do.
+  - Transcribe's settings button, which opens Settings at the transcription card, becomes a small icon button at the right of the "Recordings" group label, under the project's head (the Experience lead, 19 October). It is the gear, with the tooltip "Transcribe settings", in the column's icon-button style beside the 11-caps label. It is the same pattern as Browser's + and Clear at the right of "Recent".
 - The head's row words and their commands come from the extension, as Documents' and Agents' do, so an extension release can change them.
 - With no folder open, each place keeps its plain name, as Sprint 132 left it.
 - The head and its rows work by keyboard and VoiceOver, as on Documents (Sprint 132, S35–S37).
@@ -277,9 +280,103 @@ As a writer, I want a PDF's and a Word file's bar to use the same words as a doc
 
 Acceptance criteria:
 - On the PDF viewer's bar and the Word preview's bar, Save as Markdown becomes **Make an editable copy** (decided with Jarmo on 14 October; the comparison's "Decided with Jarmo"). It does what Save as Markdown does today, behind the same `save-as-markdown-from-preview` flag.
-- Each bar ends in **Share**, as the document's bar does (R12; the comparison's `after-pdf.png`). What Share holds for a file that Ritemark shows but does not edit is a design question for the Experience lead, asked before this work starts. Nothing on today's bar is removed.
+- Each bar ends in **Share**, as the document's bar does (R12; the comparison's `after-pdf.png`). On a PDF or a Word file, Share holds two items (the Experience lead, 19 October):
+  - **Show in Finder** (Show in File Explorer on Windows), so the file can be attached to an email or a message;
+  - **Open in Preview** for a PDF, or **Open in Word** for a Word file, where the system's own Share is. Open in Word takes the name the bar's button already shows.
+- On Windows, where there is no Preview, a PDF's second item opens the file in its default app. Its words go to the Experience lead with the screenshots.
+- Share has no Export and no Google Docs on a PDF or a Word file.
+- Make an editable copy stays on the bar, as drawn. On the PDF's bar it sits beside Share (`after-pdf.png`). On the Word bar it stays in Open in Word's menu, as today (`after-word.png`).
+- Nothing on today's bar is removed.
 - Page, zoom, fit and find stay as they are. The PowerPoint preview keeps its bar.
 - The Experience lead's scope of 18 October left these words and Share to this step (Sprint 132's sprint plan).
+
+### R20: The browser's share question, on the AI's sheet
+
+As a writer, I want the browser's share question to wait beside my work, not block it (#455).
+
+Acceptance criteria:
+- When Ritemark asks whether to share a web page with the AI, it asks on the AI's sheet, above the message box, as experience 28's frame 1 draws it. No dialog opens (Jarmo, 19 October).
+- The question reads (experience 28, frame 1):
+  - title: "Share this page with Claude?" (the AI's name as it is);
+  - line: "Claude reads the page you have open, so you can ask about it. It cannot click or type on it without asking.";
+  - Share this page (primary) and Not now;
+  - a box: "Share pages I open in Ritemark without asking".
+- When and whether it asks stay as today (`BrowserContextStore.ensureSharedForActiveTab`):
+  - it asks the first time a page becomes the AI's context in a session, once per page;
+  - it never asks once the person has chosen to share pages without asking (today's "Don't ask again").
+- Share this page shares the page, as Allow does today. With the box ticked, later pages are shared without asking, as "Don't ask again" does today.
+- Not now shares nothing, as Deny does today. The question is not asked again for that page in this session.
+- The tabs stay usable while the question waits. Switching tabs, closing a tab, the + and the page itself all work (#455: today they do nothing until the dialog is answered).
+- The question is about the page in front. If the person moves to another page before answering, it asks about that page instead, and the page left unanswered is not shared.
+- Nothing about a page (its address, title or content) reaches the AI before Share (Sprint 67's consent boundary). A message sent while the question waits goes without the page.
+- The question is reached by keyboard and read by VoiceOver, and draws in Light and Dark.
+- A page the network policy blocks still gets today's notice.
+- The AI's request to control a page ("Allow AI to control this browser tab?") stays today's dialog (*Non-Requirements*).
+
+### R21: The command palette without VS Code's developer commands
+
+As a writer, I want All commands to list what I can use in Ritemark (#456).
+
+Acceptance criteria:
+- All commands (⇧⌘P, Ctrl+Shift+P on Windows) no longer lists VS Code's developer and debugging commands, such as "Add Data Breakpoint at Address" and "Add Function Breakpoint" (Jarmo, 19 October).
+- It is a filter of command IDs, in patch 003, beside its menu cleanup. The commands stay registered, so a menu, a shortcut or another command that runs one still works.
+- The list of IDs to drop is written first, by an audit (technical plan, Phase 1).
+- A command stays in the palette when:
+  - it is Ritemark's own;
+  - a Ritemark menu, doc, skill or QA step names it (for example Developer: Reload Window);
+  - the parity list reaches a v1.14.0 function through All commands only, such as refreshing the file list and maximising the AI's column (G7).
+- Search and the recently used list never offer a dropped command.
+- The commands keep VS Code's names. Plain-word names (experience 22) come after 2.0.
+
+### R22: ChatGPT, never Codex
+
+As a writer who uses ChatGPT, I want Ritemark to call it ChatGPT everywhere I read it.
+
+Acceptance criteria:
+- Every visible string that names the AI "Codex" says "ChatGPT" (Jarmo, 19 October). This covers:
+  - Ritemark Settings, including its ChatGPT card and the Update Center;
+  - the descriptions VS Code's settings page shows for Ritemark's settings (reached through Advanced settings, R23);
+  - toasts and notifications;
+  - flow error messages and the flow editor's words;
+  - the AI's sheet, the model picker, the task board and comments;
+  - the names of the terminal tabs that install or repair ChatGPT's runtime;
+  - anywhere else a person reads "Codex" as the name of the AI.
+- The list comes first: an audit lists every user-visible "Codex" string, with where it is, what it says and what it will say (technical plan, Phase 1).
+- This is a copy pass only. Internal names, setting keys, command IDs, file names, log lines and code identifiers stay as they are, so nothing a person set is lost.
+- A model's own name stays as OpenAI writes it, such as "GPT-5.3 Codex Spark". The audit lists these apart.
+- Text that the bundled runtime itself writes, such as its own error, is shown as it came. Ritemark's words around it say ChatGPT.
+- Settings keeps its layout. The Settings redesign (experience 15) comes after 2.0.
+
+### R23: Advanced settings
+
+As a writer, I want a visible way into every setting, now that ⌘, opens Ritemark Settings (parity gap G4).
+
+Acceptance criteria:
+- At the foot of Ritemark Settings, one link, "Advanced settings", opens VS Code's own settings (`workbench.action.openSettings`) (Jarmo, 19 October).
+- Its tooltip says what it opens: "Feature switches, updates, excluded folders and every other setting".
+- It is needed because ⌘, (Ctrl+, on Windows) opens Ritemark Settings since Sprint 132. These settings live only in VS Code's settings:
+  - the feature switches;
+  - the update mode and channel;
+  - the excluded folders;
+  - the transcription export folder.
+- Nothing on Ritemark Settings moves or goes (HARD RULE #1).
+- The palette's "Preferences: Open Settings" keeps working (R21).
+
+### R24: An agent's colour on its row
+
+As a writer, I want to know my agents apart at a glance, by the colour I gave them (parity gap G5).
+
+Acceptance criteria:
+- In the Agents place, an agent whose settings give it a colour (the Color field, `color:` in its file) shows its row's icon in that colour, as v1.14.0's rows did (Jarmo, 19 October).
+- An agent with no colour of its own keeps today's muted icon.
+- Each of the eight colours has a Light and a Dark value, and each meets 3:1 against the column.
+- A change of colour in the agent's settings shows on its row without a reload.
+- The Agents place's other changes since v1.14.0 are accepted as they are (Jarmo, 19 October):
+  - the count line is gone;
+  - the empty state's two buttons became one line, with New in the head;
+  - Sort sits inside Search;
+  - descriptions, badges and a flow's "used by" are in each row's tooltip.
+  Nothing else on the place changes.
 
 ## Engineering requirements
 
@@ -299,9 +396,13 @@ Acceptance criteria:
 - Extension unit tests: the project file, the list (first fill, add, remove, missing, order), what waits (counts from fixtures of boards and chats), the permanent tabs' restore order, the switch guard, About this project (open, create, an existing `CLAUDE.md` or `AGENTS.md` left as it is).
 - Webview unit tests for Home's states (full, empty, missing, no board) and for escaping.
 - Webview unit tests for the Tasks list's order and its filter (R17), and for Make an editable copy and Share on the PDF and Word bars (R19).
-- CDP checks on a dev instance: Home and Tasks first, Close all, the count on the Tasks tab, switching both ways with tabs restored.
+- Extension and webview unit tests for the share question: when it asks, Share, Not now, the box, and nothing sent before Share (R20); for the Advanced settings link (R23); and for an agent's row colour, chosen or not (R24).
+- A VS Code unit test for the palette's filter: a dropped ID is not offered and a kept one is (R21).
+- The theme's contrast test covers the eight agent colours in Light and Dark (R24).
+- The copy pass's audit search is run again at QA and finds no user-visible "Codex" outside its list of what stays (R22).
+- CDP checks on a dev instance: Home and Tasks first, Close all, the count on the Tasks tab, switching both ways with tabs restored, and the tab row usable while the share question waits (R20).
 - CDP geometry checks: the head on Tasks, Browser and Transcribe has the numbers it has on Documents (R16).
-- The screenshot baseline gains Home, the projects list and the switcher, light and dark, and the Tasks, Browser and Transcribe places with their heads.
+- The screenshot baseline gains Home, the projects list and the switcher, light and dark, and the Tasks, Browser and Transcribe places with their heads. It also gains the share question on the AI's sheet, the foot of Ritemark Settings and the Agents place with a coloured agent.
 
 ### E4: The bundle (#107)
 
@@ -314,8 +415,9 @@ Acceptance criteria:
 
 ### E6: Docs
 
-- `architecture.md`: a Projects subsystem section (the project file, the list, what waits, Home, switching), the 1.x Home launcher's replacement, the version-history row.
+- `architecture.md`: a Projects subsystem section (the project file, the list, what waits, Home, switching), the 1.x Home launcher's replacement, the version-history row. The browser's section says the share question is asked on the AI's sheet.
 - `references/layout-invariants.md`: Home and Tasks opened by default; on Home the left column holds the projects; every other place has the project's head.
+- `CLAUDE.md`'s patch table: what 003 (the palette's filter) and 009 (the share answer from the sheet) gain.
 
 ### E7: Drift is measured
 
@@ -330,9 +432,16 @@ Acceptance criteria:
 - **Picking an icon or picture as a project's mark.** Marks are initials in ink.
 - **About this project written by Claude**, or offered at other moments than the project's menu (experience 24's open question on when to offer it).
 - **A VS Code update.** The pin stays at 1.117.0.
+- **The AI asking to use a page** (experience 28, frames 2 and 3). The control question stays today's dialog. This sprint moves only the share question (R20).
+
+After 2.0 (Jarmo, 19 October):
 - **The Task board tab redrawn** as experience 6 draws it: its bar with Board, Ideas, Log and New task, and the tasks that wait inside Doing on the board too. This sprint changes the left column's list only (R17).
 - **Transcribe redrawn** as experience 20 draws it: the recording's card at the foot of the left column, the transcript saved as a document, and its insights in the AI's sheet. This sprint gives Transcribe its head and its two rows only (R16).
-- **The browser's share question asked on the AI's sheet** in place of today's dialog (experience 28, frame 1). Today's dialog stays.
+- **The AI step:** the AI's empty state and the status bar's items.
+- **The indigo icon** on the open row and on the open tab.
+- **The {date} chip** in a flow's prompt.
+- **Plain-word command names** in the palette (experience 22). This sprint only drops the developer commands (R21).
+- **The Settings redesign** (experience 15). This sprint only changes words (R22) and adds Advanced settings (R23).
 
 ## Resolved Questions
 
@@ -352,6 +461,17 @@ Acceptance criteria:
   - The Experience lead: Browser's empty text in plain words, "No pages yet" (R18).
   - The Experience lead's scope for step 1: the PDF bar's words and Share are this step's (R19).
   - Sprint 132's technical plan: New tab and Switch project join the File menu in a later step, which is this one (R8).
+- **2026-10-19 (Jarmo, "all recommendations ok"):**
+  - 2.0's scope adds three items to this sprint:
+    - the browser's share question is asked on the AI's sheet, as experience 28 draws it, in place of a dialog that blocks the tab row (#455). When and whether it asks stays as today; only where it asks changes (R20);
+    - the command palette drops VS Code's developer and debugging commands, as a filter of command IDs in patch 003 (#456). Plain-word command names (experience 22) come after 2.0 (R21);
+    - "ChatGPT, never Codex" in every visible string, as a copy pass. The Settings redesign (experience 15) comes after 2.0 (R22).
+  - An "Advanced settings" link at the foot of Ritemark Settings opens VS Code's own settings (parity gap G4; R23).
+  - The Agents place's other changes are accepted: the count line, the empty state's buttons, Sort behind Search, and descriptions and badges in tooltips. An agent's chosen colour shows on its row's icon again (parity gap G5; R24).
+  - After 2.0: the Task board tab's redraw (experience 6), Transcribe's redraw (experience 20), the AI step (the AI's empty state and the status bar's items), the indigo icon on the open row and tab, and the Flows {date} chip (*Non-Requirements*).
+- **2026-10-19 (the Experience lead's answers to the refresh's design questions):**
+  - **Transcribe's settings button** is a small icon button, the gear with the tooltip "Transcribe settings", at the right of the "Recordings" group label, under the project's head. It is the same pattern as Browser's + and Clear at the right of "Recent" (R16).
+  - **Share on a PDF or a Word file** holds Show in Finder (Show in File Explorer on Windows), so the file can be attached to an email or a message, and Open in Preview for a PDF or Open in Word, where the system's own Share is. Make an editable copy stays on the bar beside Share, as drawn (`comparison/after-pdf.png`). Share has no Export or Google Docs on these files (R19).
 
 ## Open Questions
 
@@ -362,9 +482,7 @@ Each has a recommendation; Jarmo answers at this plan's approval.
 
 3. **Tasks' list as experience 6 draws it** (R17). Your calls stops being a panel of its own: the tasks that wait lead their stage, marked. Archived moves inside Done. **Recommendation:** yes, as drawn. Nothing is lost: every task and every action stays, and the count is unchanged. Because it changes how a 1.x list looks, `CLAUDE.md`'s first hard rule asks for Jarmo's yes, as Sprint 132 asked for Agents' sections.
 
-New design questions for the Experience lead, from the refresh:
-- Where Transcribe's settings button goes once the head takes the title row (R16). Until it is drawn, it sits at the right of the Recordings label.
-- What Share holds on a PDF and on a Word file (R19). Experience 26 draws it only for a Markdown document.
+Still open for the Experience lead, from the refresh:
 - Whether Browser has rows under the head. The handover names only the Recent label and its two actions, so the plan draws none.
 
-The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides.
+The first design questions sent to the Experience lead on 18 October were all answered the same day, with experience 33 drawn for the folder that is not found and for switching while Claude works (*Resolved Questions*). Jarmo's answers of the same day settled About this project's file, and the Experience lead's of the same day its note, its name and what Documents hides. Of the refresh's three design questions, the Experience lead answered two on 19 October: Transcribe's settings button and Share on a PDF or a Word file (*Resolved Questions*).
