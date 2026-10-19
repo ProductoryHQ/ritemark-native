@@ -68,7 +68,7 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
 - [x] `npm ci` in `vscode/` under the arm64 wrapper; built-in extensions' `out/` wiped; compile
 - [x] `check-native-modules.sh` derives its list from the `.node` files present; passes; catches an x64 module (S9)
 - [x] `validate-build-output.sh` checks every `.node` file's architecture in the built app
-- [ ] The JSON, CSS and HTML language servers start in dev
+- [ ] The JSON, CSS and HTML language servers start in dev — JSON and CSS: a broken file of each gets its problem marks; HTML opens in Ritemark's browser by default and was not opened as text
 
 ## Phase 6: Windows workflows (W6, R5)
 
@@ -80,14 +80,14 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
 - [x] The extension on the new Node: `npm run compile`, the webview's `npm run build`, the unit tests (R3)
 - [x] VS Code unit tests: `ritemarkPermanentTabs.test.ts`, `ritemarkTerminalTabs.test.ts`, and Steps 2 and 3's (R7)
 - [x] `frame-geometry.mjs`, every scene, equal to Sprint 132 merge 2's numbers (S16)
-- [ ] `frame-screenshots.mjs`, light and dark, fresh profile; `qa/screenshot-diff.md` written; pinnable causes pinned; the rest to the Experience lead, then Jarmo (S13–S15, D5)
+- [ ] `frame-screenshots.mjs`, light and dark, fresh profile; `qa/screenshot-diff.md` written; pinnable causes pinned; the rest to the Experience lead, then Jarmo (S13–S15, D5) — written; the pins in; the Experience lead decided the browser bar (010); Jarmo's baseline approval still to come
 - [ ] Sprint 132's scenarios on the updated build, in dev on the Mac (S17): S1–S6, S12–S40, S42–S46. S41 only for the surfaces drawn by then — mostly pass (qa-evidence S17)
-- [ ] Steps 2 and 3's shell scenarios (S18), the ones that run through a patch:
+- [x] Steps 2 and 3's shell scenarios (S18), the ones that run through a patch — all run on the Mac (qa-evidence); the ones that need a signed-in AI turn or the microphone are Gate 2's
   - Sprint 133 on the Mac: S1, S3, S38, S40, S41, S42, S43, S48, S49, S54 (the first window, Help: Welcome and every way in, the welcome alone on the ground, the muted extension, the empty desks' tiles); on Windows, after the merge: S45–S47
   - Sprint 134 on the Mac: S12, S13, S18–S21, S27–S31, S33, S44–S46, S48, S50, S52, S55–S58, S61 (the Tasks tab's count, the permanent tabs, the heads' rows, the switcher flyout, File ▸ New tab / Switch project / Share, About this project and the hidden pointer `CLAUDE.md`, the switch question on VS Code's own routes, the splash's ground, the share question on the AI's sheet, the palette with no developer commands, the chosen row's colour); on Windows, after the merge: S41, S42
 - [ ] The inventory (S22) and both profiles (S23) — the profiles pass; the inventory partial (qa-evidence S22, S23)
 - [ ] The browser (S26), the runtimes on darwin-arm64 (S27), saving and the small patches (S28), the native features in dev (S10)
-- [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation — the Flows mock suite passes (in `npm test`); Office previews match 1.117; export and dictation not run yet
+- [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation — the Flows mock suite passes (in `npm test`); Office previews match 1.117; PDF and Word export write their files; dictation not run (the microphone)
 - [ ] The fresh-clone walk-through from `SKILL.md` (S8)
 - [x] The rollback rehearsal on a scratch branch, never pushed (S20)
 
