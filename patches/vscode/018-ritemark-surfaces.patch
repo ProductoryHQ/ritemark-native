@@ -53,7 +53,18 @@ resource label's splitExtension option (base/browser/ui/iconLabel/iconLabel.ts, 
 for by the Explorer's rows (explorerViewer.ts) and the tabs (019) (R13).
 
 Sprint 134 (the project at the centre): the Task board tab's count is drawn here, at the icon's lower right as the
-places row draws its badge (019 makes it; R6).
+places row draws its badge (019 makes it; R6). The head (ritemarkProjectHead.ts) gains its rows on Home (no title row),
+Tasks (New task, Search), Browser and Transcribe (Record, Transcribe a file…), each row a command the extension
+contributes (R16, R17); the project menu's Switch project opens a flyout of the projects the extension lists
+(ritemark.projects.switcherItems; ritemarkMenu.ts gains submenus, a checked mark and Alt-click). File ▸ New tab,
+Switch project and Share come from the extension's ritemark/fileMenu (menusExtensionPoint.ts; R8, R21). The project
+root's AGENTS.md is named About this project in the tree and on tabs, with its tooltip and accessible name (labels.ts,
+explorerViewer.ts), and Documents hides the root CLAUDE.md while it is only Ritemark's pointer line `@AGENTS.md`
+(FilesFilter reads it, as it reads .gitignore; R8). A switch that reloads the window (ShutdownReason.LOAD: Open Recent,
+Open Folder…, a drop, Close Folder) waits for the extension's _ritemark.projects.beforeReload, passed the folder the
+host service noted (ritemarkSwitchGuard.ts, nativeHostService.ts); with no command, or no answer and no question shown
+in 10 s, the reload goes on; Reload Window and quitting never ask (R9). The splash saves ritemark.ground as the
+window's background, so a switch shows the ground, not the desk (partsSplash.ts; the switch audit).
 
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
@@ -68,8 +79,8 @@ parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPar
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
-Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14) and base/test/browser/iconLabel.test.ts (Sprint 133,
-R13); run with ./scripts/test.sh --grep Ritemark.
+Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
+R13) and workbench/test/browser/parts/ritemarkSwitchGuard.test.ts (Sprint 134, R9); run with ./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
 index 034c650442a..3b2312d89cd 100644
 --- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
@@ -537,7 +548,7 @@ index 68bcfe4e00f..8b28e2f239f 100644
  	ensureNoDisposablesAreLeakedInTestSuite();
  });
 diff --git a/src/vs/workbench/browser/labels.ts b/src/vs/workbench/browser/labels.ts
-index a414a3d0fcf..6e829e42cd8 100644
+index a414a3d0fcf..a4a30096d9c 100644
 --- a/src/vs/workbench/browser/labels.ts
 +++ b/src/vs/workbench/browser/labels.ts
 @@ -5,7 +5,7 @@
@@ -566,6 +577,36 @@ index a414a3d0fcf..6e829e42cd8 100644
  		if (this.options?.title !== undefined) {
  			iconLabelOptions.title = this.options.title;
  		}
+@@ -668,6 +678,20 @@ class ResourceLabelWidget extends IconLabel {
+ 			}
+ 		}
+ 
++		// Ritemark 2.0 (Sprint 134, R8): the project's own AGENTS.md, at a workspace folder's root, is About this project
++		// in the rows and tabs that ask for Ritemark's names (the Explorer's rows, the editor tabs). Decided here, from the
++		// resource, so it is right on the first frame; any other AGENTS.md keeps its name.
++		let displayName = this.label.name ?? '';
++		if (this.options?.splitExtension && resource && this.options.fileKind !== FileKind.FOLDER && this.options.fileKind !== FileKind.ROOT_FOLDER
++			&& basenameOrAuthority(resource).toLowerCase() === 'agents.md' && isEqual(dirname(resource), this.contextService.getWorkspaceFolder(resource)?.uri)) {
++			if (typeof displayName === 'string' && displayName.toLowerCase() === 'agents.md') {
++				displayName = localize('ritemark.aboutProject', "About this project");
++				iconLabelOptions.matches = undefined; // a find in the tree matched the file's name, not this one
++			}
++			iconLabelOptions.splitExtension = false;
++			iconLabelOptions.title = localize('ritemark.aboutProject.tooltip', "AGENTS.md, read by Claude and ChatGPT");
++		}
++
+ 		if (this.options && !this.options.hideIcon) {
+ 			if (!this.computedIconClasses) {
+ 				this.computedIconClasses = getIconClasses(this.modelService, this.languageService, resource, this.options.fileKind, this.options.icon);
+@@ -721,7 +745,7 @@ class ResourceLabelWidget extends IconLabel {
+ 				`:${this.label.range.startLineNumber}`;
+ 		}
+ 
+-		this.setLabel(this.label.name ?? '', this.label.description, iconLabelOptions);
++		this.setLabel(displayName, this.label.description, iconLabelOptions);
+ 
+ 		this._onDidRender.fire();
+ 
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
 index c213b29de93..3f6375403b9 100644
 --- a/src/vs/workbench/browser/layout.ts
@@ -608,10 +649,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..c3b682034c2
+index 00000000000..bff65c1f2ce
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1722 @@
+@@ -0,0 +1,1760 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1664,6 +1705,33 @@ index 00000000000..c3b682034c2
 +	margin-top: 4px;
 +}
 +
++/* Sprint 134 (R8): a flyout beside a menu (the head's Switch project ▸; experiences/home frame 2: the projects menu,
++   272 wide, 4 right of the project's menu, its first row level with Switch project), and a project's mark in a row */
++.monaco-workbench .ritemark-menu.ritemark-menu-flyout {
++	position: absolute;
++	width: 272px;
++	margin: 0;
++}
++
++.monaco-workbench .ritemark-menu-mark {
++	flex: none;
++	width: 18px;
++	height: 18px;
++	border-radius: 4px;
++	background-color: var(--vscode-foreground);
++	color: var(--rm-desk);
++	font-size: 7px;
++	font-weight: 700;
++	line-height: 18px;
++	letter-spacing: 0.2px;
++	text-align: center;
++}
++
++.monaco-workbench.vs-dark .ritemark-menu-mark {
++	background-color: var(--vscode-tab-inactiveForeground);
++	color: var(--rm-ground);
++}
++
 +/* You's menu (experiences/settings frame 1): 228 wide, 2 under You, its right edge 16 from the window's */
 +.monaco-workbench .ritemark-menu.ritemark-you-menu {
 +	left: -8px;
@@ -1771,6 +1839,17 @@ index 00000000000..c3b682034c2
 +.monaco-workbench .part.sidebar.ritemark-project-place > .ritemark-project-rows {
 +	display: block;
 +	padding: 12px 8px 8px;
++}
++
++/* Sprint 134: a place whose head has no rows and no label (Browser, R18) */
++.monaco-workbench .part.sidebar.ritemark-project-place > .ritemark-project-rows.ritemark-project-rows-empty {
++	display: none;
++}
++
++/* Sprint 134 (R7): on Home the column is the projects list, whose search sits on the head's line; the title row
++   goes and the content takes its height (ritemarkProjectHead.ts, rowsHeight) */
++.monaco-workbench .part.sidebar.ritemark-home-place > .composite.title {
++	display: none !important; /* !important: core shows the title row */
 +}
 +
 +.monaco-workbench .part.sidebar .ritemark-project-row {
@@ -2993,10 +3072,10 @@ index 00000000000..16a18d72338
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkMenu.ts b/src/vs/workbench/browser/parts/ritemarkMenu.ts
 new file mode 100644
-index 00000000000..67f3b47cd9f
+index 00000000000..6935d6682a4
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkMenu.ts
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,232 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3008,6 +3087,9 @@ index 00000000000..67f3b47cd9f
 + * (44 with a second line), each with its 14 icon, the chosen row in the theme's soft indigo, a hairline between
 + * groups (R12). Used by More (⋯) at the end of the places row (R5, R6), by You (R11) and by the left column's head
 + * (R10).
++ *
++ * Sprint 134 (R8): a row may open a flyout beside the menu (the head's Switch project ▸, experiences/home frame 2),
++ * whose rows the extension supplies when it opens; a row may draw a project's mark in place of its icon, and a tick.
 + */
 +
 +import { $, addDisposableListener, append, EventType, getWindow } from '../../../base/browser/dom.js';
@@ -3026,7 +3108,14 @@ index 00000000000..67f3b47cd9f
 +	readonly sub?: string;
 +	/** A quiet icon at the row's right, such as the external-link mark of a page that opens in the browser. */
 +	readonly trailingIconClassNames?: readonly string[];
-+	readonly run: () => void;
++	/** A project's mark (its initials) in place of the icon. */
++	readonly mark?: string;
++	/** The chosen one of a list (the open project), ticked at the row's right. */
++	readonly checked?: boolean;
++	/** Its rows, asked for when it opens: the row opens a flyout beside the menu instead of running. */
++	readonly submenu?: () => Promise<readonly RitemarkMenuEntry[]>;
++	/** `altKey`: the row was chosen with ⌥ (Alt on Windows) held, as a project opened in a new window. */
++	readonly run: (event?: { readonly altKey: boolean }) => void;
 +}
 +
 +/** A hairline between two groups of rows (kit: .menu .sep). */
@@ -3092,21 +3181,33 @@ index 00000000000..67f3b47cd9f
 +	openAnchor = anchor;
 +}
 +
-+function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void, leave: () => void): IDisposable {
++function renderMenu(container: HTMLElement, options: IRitemarkMenuOptions, items: readonly RitemarkMenuEntry[], close: () => void, leave: () => void, flyout?: { readonly parentRow: HTMLElement; readonly back: () => void }): IDisposable {
 +	const disposables = new DisposableStore();
-+	const menu = append(container, $(`.ritemark-menu.${options.className}`, { role: 'menu', 'aria-label': options.ariaLabel }));
++	const menu = append(container, $(`.ritemark-menu.${flyout ? 'ritemark-menu-flyout' : options.className}`, { role: 'menu', 'aria-label': options.ariaLabel }));
++	if (flyout) {
++		// Beside the menu, its top row level with the row that opened it (kit: the projects menu at 252, 4 right of the menu)
++		const parentMenu = flyout.parentRow.closest<HTMLElement>('.ritemark-menu')!;
++		menu.style.left = `${parentMenu.offsetLeft + parentMenu.offsetWidth + 4}px`;
++		menu.style.top = `${parentMenu.offsetTop + flyout.parentRow.offsetTop - 6}px`;
++	}
 +	if (options.heading) {
 +		append(menu, $('.ritemark-menu-head', { 'aria-hidden': 'true' }, options.heading));
 +	}
 +
 +	const rows: HTMLElement[] = [];
++	const openFlyout = new DisposableStore();
++	disposables.add(openFlyout);
 +	for (const item of items) {
 +		if (item === RITEMARK_MENU_SEPARATOR) {
 +			append(menu, $('.ritemark-menu-sep', { role: 'separator' }));
 +			continue;
 +		}
-+		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': item.label }));
-+		append(row, $('span.ritemark-menu-icon')).classList.add(...item.iconClassNames);
++		const row = append(menu, $(`a.ritemark-menu-item${item.detail ? '.tall' : ''}`, { role: 'menuitem', tabIndex: -1, 'aria-label': item.checked ? `${item.label}, open` : item.label }));
++		if (item.mark !== undefined) {
++			append(row, $('span.ritemark-menu-mark', { 'aria-hidden': 'true' }, item.mark));
++		} else {
++			append(row, $('span.ritemark-menu-icon')).classList.add(...item.iconClassNames);
++		}
 +		if (item.detail) {
 +			const text = append(row, $('span.ritemark-menu-text'));
 +			append(text, $('span', undefined, item.label));
@@ -3120,12 +3221,66 @@ index 00000000000..67f3b47cd9f
 +		if (item.trailingIconClassNames) {
 +			append(row, $('span.ritemark-menu-trailing')).classList.add(...item.trailingIconClassNames);
 +		}
-+		const run = () => {
++		if (item.checked) {
++			append(row, $('span.ritemark-menu-trailing.codicon.codicon-check'));
++		}
++		const submenu = item.submenu;
++		if (submenu) {
++			row.setAttribute('aria-haspopup', 'menu');
++			append(row, $('span.ritemark-menu-trailing.codicon.codicon-chevron-right'));
++			// The flyout opens on a pointer resting on the row, a click, Enter or the Right arrow; a pointer on another row closes it.
++			const open = async (focusFirst: boolean) => {
++				if (row.getAttribute('aria-expanded') === 'true') {
++					if (focusFirst) {
++						container.querySelector<HTMLElement>('.ritemark-menu-flyout [role="menuitem"]')?.focus();
++					}
++					return;
++				}
++				openFlyout.clear();
++				const entries = await submenu();
++				if (!row.isConnected || !entries.length) {
++					return;
++				}
++				row.setAttribute('aria-expanded', 'true');
++				openFlyout.add(renderMenu(container, { ...options, ariaLabel: item.label, heading: undefined }, entries, close, () => {
++					openFlyout.clear();
++					row.focus();
++				}, { parentRow: row, back: () => row.focus() }));
++				openFlyout.add(toDisposable(() => {
++					row.setAttribute('aria-expanded', 'false');
++					container.querySelector('.ritemark-menu-flyout')?.remove();
++				}));
++				if (focusFirst) {
++					container.querySelector<HTMLElement>('.ritemark-menu-flyout [role="menuitem"]')?.focus();
++				}
++			};
++			disposables.add(addDisposableListener(row, EventType.CLICK, () => void open(true)));
++			disposables.add(addDisposableListener(row, EventType.MOUSE_ENTER, () => {
++				row.focus();
++				void open(false);
++			}));
++			disposables.add(addDisposableListener(row, EventType.KEY_DOWN, e => {
++				const event = new StandardKeyboardEvent(e);
++				if (event.equals(KeyCode.RightArrow) || event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) {
++					event.preventDefault();
++					event.stopPropagation();
++					void open(true);
++				}
++			}));
++			rows.push(row);
++			continue;
++		}
++		const run = (e: MouseEvent | undefined) => {
 +			close();
-+			item.run();
++			item.run({ altKey: !!e?.altKey });
 +		};
-+		disposables.add(addDisposableListener(row, EventType.CLICK, run));
-+		disposables.add(addDisposableListener(row, EventType.MOUSE_ENTER, () => row.focus()));
++		disposables.add(addDisposableListener(row, EventType.CLICK, e => run(e)));
++		disposables.add(addDisposableListener(row, EventType.MOUSE_ENTER, () => {
++			row.focus();
++			if (!flyout) {
++				openFlyout.clear();
++			}
++		}));
 +		rows.push(row);
 +	}
 +
@@ -3137,6 +3292,8 @@ index 00000000000..67f3b47cd9f
 +			rows[(index + step + rows.length) % rows.length].focus();
 +		} else if ((event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) && index >= 0) {
 +			rows[index].click();
++		} else if (flyout && event.equals(KeyCode.LeftArrow)) {
++			leave();
 +		} else if (event.equals(KeyCode.Escape) || event.equals(KeyCode.Tab)) {
 +			leave();
 +		} else {
@@ -3146,9 +3303,95 @@ index 00000000000..67f3b47cd9f
 +		event.stopPropagation();
 +	}));
 +
-+	getWindow(menu).setTimeout(() => rows[0]?.focus(), 0);
++	if (!flyout) {
++		getWindow(menu).setTimeout(() => rows[0]?.focus(), 0);
++	}
 +	return toDisposable(() => disposables.dispose());
 +}
+diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
+new file mode 100644
+index 00000000000..2b78c3bd68c
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
+@@ -0,0 +1,78 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0 (Sprint 134, R9): a switch that reloads the window asks first while chats are working. Every way VS Code
++ * opens another folder in this window (File ▸ Open Recent, Open Folder…, a folder dropped on the Dock icon, Close
++ * Folder) unloads it with reason LOAD. This contribution holds that unload for the answer of the extension's hidden
++ * command `_ritemark.projects.beforeReload`, passed the folder about to open when the window knows it (the host
++ * service notes it here: Open Recent). The command answers true to stop the reload. Reload Window and quitting never
++ * ask. The window is never stuck: with no such command, or no answer and no question shown within 10 seconds, the
++ * reload goes on as before.
++ */
++
++import { Disposable, toDisposable } from '../../../base/common/lifecycle.js';
++import { URI } from '../../../base/common/uri.js';
++import { ICommandService } from '../../../platform/commands/common/commands.js';
++import { IDialogService } from '../../../platform/dialogs/common/dialogs.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
++import { ILifecycleService, ShutdownReason } from '../../services/lifecycle/common/lifecycle.js';
++
++const BEFORE_RELOAD_COMMAND = '_ritemark.projects.beforeReload';
++
++/** A noted folder counts only for the unload that follows it at once; the main process may open it in a new window instead. */
++const TARGET_FRESH_MS = 5_000;
++
++let noted: { readonly target: URI; readonly at: number } | undefined;
++
++/** Ritemark 2.0: the host service notes the folder it is about to open in this window. */
++export function noteRitemarkSwitchTarget(target: URI): void {
++	noted = { target, at: Date.now() };
++}
++
++function takeSwitchTarget(): URI | undefined {
++	const taken = noted;
++	noted = undefined;
++	return taken && Date.now() - taken.at <= TARGET_FRESH_MS ? taken.target : undefined;
++}
++
++/**
++ * Ritemark 2.0: the extension's answer to an unload that opens another folder here; true stops it. Anything but a
++ * clear true lets the reload go on: no command, an error, or `ceilingMs` without an answer while no question shows.
++ */
++export function askRitemarkBeforeReload(commandService: ICommandService, dialogService: Pick<IDialogService, 'onWillShowDialog'>, target: URI | undefined, ceilingMs = 10_000): Promise<boolean> {
++	return new Promise<boolean>(resolve => {
++		const timer = setTimeout(() => finish(false), ceilingMs);
++		const asking = dialogService.onWillShowDialog(() => clearTimeout(timer)); // the person reads the question
++		const stop = toDisposable(() => { clearTimeout(timer); asking.dispose(); });
++		function finish(veto: boolean): void {
++			stop.dispose();
++			resolve(veto);
++		}
++		commandService.executeCommand<boolean>(BEFORE_RELOAD_COMMAND, target?.toString()).then(answer => finish(answer === true), () => finish(false));
++	});
++}
++
++class RitemarkSwitchGuard extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.ritemarkSwitchGuard';
++
++	constructor(
++		@ILifecycleService lifecycleService: ILifecycleService,
++		@ICommandService commandService: ICommandService,
++		@IDialogService dialogService: IDialogService,
++	) {
++		super();
++
++		this._register(lifecycleService.onBeforeShutdown(e => {
++			const target = takeSwitchTarget();
++			if (e.reason === ShutdownReason.LOAD) {
++				e.veto(askRitemarkBeforeReload(commandService, dialogService, target), RitemarkSwitchGuard.ID);
++			}
++		}));
++	}
++}
++
++registerWorkbenchContribution2(RitemarkSwitchGuard.ID, RitemarkSwitchGuard, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
 new file mode 100644
 index 00000000000..e7200373201
@@ -3439,10 +3682,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..23ff99aa8d9
+index 00000000000..67bf90ea053
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,316 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3450,7 +3693,9 @@ index 00000000000..23ff99aa8d9
 +
 +/*
 + * Ritemark 2.0: the left column's head on Documents (R10) and on Agents (experience 31), as drawn (surfaces/README.md,
-+ * Measurements).
++ * Measurements); from Sprint 134 on Tasks, Browser and Transcribe too (R16), each place with its own rows, whose words
++ * and icons come from the extension's commands. On Home the column holds the projects list (R7): no project head and
++ * no title row, so the list's own search sits on the head's line.
 + *
 + * The project's mark (its initials in a 24 square of ink) and its whole name, with a chevron that opens the
 + * project's menu (the folder tools VS Code shows as icons live there); then New and Search as rows, and the Documents label over the tree. The
@@ -3467,10 +3712,10 @@ index 00000000000..23ff99aa8d9
 +import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { KeyCode } from '../../../../base/common/keyCodes.js';
-+import { Disposable } from '../../../../base/common/lifecycle.js';
++import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
-+import { IMenuService, MenuId, MenuItemAction } from '../../../../platform/actions/common/actions.js';
++import { IMenuService, MenuId, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 +import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
@@ -3479,17 +3724,57 @@ index 00000000000..23ff99aa8d9
 +
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
 +
-+/** The places with the project's head: what their New lists, what their Search runs, and the label over their content. */
++/**
++ * A row under the head: an extension command, whose contribution gives the row its words and icon, run on a click,
++ * or, with a menu, the extension's menu shown under the row (Documents' and Agents' New).
++ */
++interface IRitemarkHeadRow {
++	readonly command: string;
++	readonly menu?: MenuId;
++}
++
++/** The places with the project's head: their rows (up to two), and the label over their content. */
 +interface IRitemarkHeadPlace {
-+	readonly newMenu: MenuId;
-+	readonly search: string;
++	readonly rows: readonly IRitemarkHeadRow[];
 +	readonly group?: string;
 +}
 +
++const NEW_ROW = 'ritemark.projectHead.newRow';
 +const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>([
-+	['workbench.view.explorer', { newMenu: MenuId.for('ritemark/projectHead/new'), search: 'workbench.view.search', group: localize('ritemark.project.documents', "Documents") }],
-+	['workbench.view.extension.ritemark-agent-library', { newMenu: MenuId.for('ritemark/projectHead/agents/new'), search: 'ritemark.agentLibrary.search' }],
++	['workbench.view.explorer', { rows: [{ command: NEW_ROW, menu: MenuId.for('ritemark/projectHead/new') }, { command: 'ritemark.projectHead.search' }], group: localize('ritemark.project.documents', "Documents") }],
++	['workbench.view.extension.ritemark-agent-library', { rows: [{ command: NEW_ROW, menu: MenuId.for('ritemark/projectHead/agents/new') }, { command: 'ritemark.agentLibrary.search' }] }],
++	// Sprint 134 (R16–R18): the project's head on every place but Home
++	['workbench.view.extension.ritemark-tasks', { rows: [{ command: 'ritemark.tasks.newTask' }, { command: 'ritemark.tasks.search' }] }],
++	['workbench.view.extension.ritemark-browser', { rows: [] }],
++	['workbench.view.extension.ritemark-transcribe', { rows: [{ command: 'ritemark.transcribe.record' }, { command: 'ritemark.transcribe.addFile' }] }],
 +]);
++
++/**
++ * Sprint 134 (R8): a project menu entry that opens a flyout, and the extension command that gives its rows when it
++ * opens (the projects, with what waits in each, then All projects, on Home and Open in a new window). A static menu
++ * cannot list projects. Without the command (an older extension) the entry runs as an ordinary item.
++ */
++const FLYOUTS = new Map<string, string>([['ritemark.projectHead.switchProject', 'ritemark.projects.switcherItems']]);
++
++/** One row of a flyout, as the extension describes it. */
++interface IRitemarkFlyoutRow {
++	readonly label: string;
++	readonly mark?: string;
++	readonly sub?: string;
++	readonly checked?: boolean;
++	readonly icon?: string;
++	readonly command: string;
++	readonly args?: readonly unknown[];
++	readonly separatorBefore?: boolean;
++}
++
++function isFlyoutRow(value: unknown): value is IRitemarkFlyoutRow {
++	const row = value as Partial<IRitemarkFlyoutRow> | null;
++	return !!row && typeof row.label === 'string' && typeof row.command === 'string';
++}
++
++/** Home's place (Sprint 134, R7): the column is the projects list, with no title row. */
++const HOME_PLACE = 'workbench.view.extension.ritemark-home';
 +
 +/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
 +export function ritemarkProjectInitials(name: string): string {
@@ -3503,8 +3788,13 @@ index 00000000000..23ff99aa8d9
 +	private readonly mark: HTMLElement;
 +	private readonly name: HTMLElement;
 +	private readonly rows: HTMLElement;
++	private readonly rowList: HTMLElement;
 +	private readonly group: HTMLElement;
 +	private place: IRitemarkHeadPlace | undefined;
++	private home = false;
++	/** The title row's height, measured while it is drawn: Home's content takes it. */
++	private titleHeight = 40;
++	private readonly titleArea: HTMLElement;
 +
 +	private get active(): boolean {
 +		return !!this.place;
@@ -3520,6 +3810,7 @@ index 00000000000..23ff99aa8d9
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 +	) {
 +		super();
++		this.titleArea = titleArea;
 +
 +		// The head: the project's mark, its whole name (in place of the place's own title) and a chevron; the whole
 +		// label opens the project's menu
@@ -3546,39 +3837,52 @@ index 00000000000..23ff99aa8d9
 +			}
 +		}));
 +
-+		// New and Search as rows, then the place's label over its content
++		// The place's rows, then its label over its content
 +		this.rows = $('.ritemark-project-rows');
 +		titleArea.after(this.rows);
 +		this._register({ dispose: () => this.rows.remove() });
-+		const newRow = this.row(Codicon.add, localize('ritemark.project.new', "New"));
-+		newRow.setAttribute('aria-haspopup', 'menu');
-+		this._register(addDisposableListener(newRow, EventType.CLICK, () => {
-+			if (this.place) {
-+				this.showMenu(this.place.newMenu, newRow, localize('ritemark.project.newMenu', "New"));
-+			}
-+		}));
-+		const searchRow = this.row(Codicon.search, localize('ritemark.project.search', "Search"));
-+		this._register(addDisposableListener(searchRow, EventType.CLICK, () => {
-+			if (this.place) {
-+				this.commandService.executeCommand(this.place.search);
-+			}
-+		}));
++		this.rowList = append(this.rows, $('.ritemark-project-row-list'));
 +		this.group = append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }));
++		// The extension's commands may register after the first draw: draw the rows again when they do.
++		this._register(MenuRegistry.onDidChangeMenu(() => {
++			if (this.place) {
++				this.renderRows(this.place);
++			}
++		}));
 +	}
 +
-+	/** What the head adds above the content: its rows (the content gets the rest). */
++	/**
++	 * What the head adds above the content: its rows (the content gets the rest). On Home the title row is not
++	 * drawn, so the content gets its height too.
++	 */
 +	get rowsHeight(): number {
++		if (this.home) {
++			return -this.titleHeight;
++		}
 +		return this.active ? this.rows.offsetHeight : 0;
 +	}
 +
 +	/** The place shown; returns whether the column's head changed. */
 +	update(compositeId: string | undefined): boolean {
++		const home = compositeId === HOME_PLACE;
++		const homeChanged = home !== this.home;
++		if (homeChanged) {
++			// Measure the title row before hiding it, so the content can take its height.
++			if (home && this.titleArea.offsetHeight) {
++				this.titleHeight = this.titleArea.offsetHeight;
++			}
++			this.home = home;
++			this.part.classList.toggle('ritemark-home-place', home);
++		}
 +		const place = compositeId !== undefined && this.workspaceService.getWorkspace().folders.length > 0 ? HEAD_PLACES.get(compositeId) : undefined;
 +		if (place === this.place) {
-+			return false;
++			return homeChanged;
 +		}
 +		const wasActive = this.active;
 +		this.place = place;
++		if (place) {
++			this.renderRows(place);
++		}
 +		this.part.classList.toggle('ritemark-project-place', !!place);
 +		this.group.textContent = place?.group ?? '';
 +		this.group.style.display = place?.group ? '' : 'none';
@@ -3603,11 +3907,38 @@ index 00000000000..23ff99aa8d9
 +		this.name.textContent = folder?.name ?? '';
 +	}
 +
++	/** The place's rows: each command's own words and icon, as the extension contributes them. */
++	private renderRows(place: IRitemarkHeadPlace): void {
++		this.rowStore.clear();
++		this.rowList.replaceChildren();
++		for (const spec of place.rows) {
++			const command = MenuRegistry.getCommand(spec.command);
++			if (!command) {
++				continue; // an older extension: no row rather than a row that does nothing
++			}
++			const text = typeof command.title === 'string' ? command.title : command.title.value;
++			const icon = ThemeIcon.isThemeIcon(command.icon) ? command.icon : Codicon.circleSmall;
++			const row = this.row(icon, text);
++			if (spec.menu) {
++				const menu = spec.menu;
++				row.setAttribute('aria-haspopup', 'menu');
++				this.rowStore.add(addDisposableListener(row, EventType.CLICK, () => this.showMenu(menu, row, text)));
++			} else {
++				this.rowStore.add(addDisposableListener(row, EventType.CLICK, () => this.commandService.executeCommand(spec.command)));
++			}
++		}
++		this.rowList.style.display = this.rowList.childElementCount ? '' : 'none';
++		// A place with no rows and no label (Browser) draws its own content right under the head.
++		this.rows.classList.toggle('ritemark-project-rows-empty', !this.rowList.childElementCount && !place.group);
++	}
++
++	private readonly rowStore = this._register(new DisposableStore());
++
 +	private row(icon: ThemeIcon, text: string): HTMLElement {
-+		const row = append(this.rows, $('a.ritemark-project-row', { role: 'button', tabIndex: 0 }));
++		const row = append(this.rowList, $('a.ritemark-project-row', { role: 'button', tabIndex: 0 }));
 +		append(row, renderIcon(icon));
 +		append(row, $('span', undefined, text));
-+		this._register(addDisposableListener(row, EventType.KEY_DOWN, e => {
++		this.rowStore.add(addDisposableListener(row, EventType.KEY_DOWN, e => {
 +			const event = new StandardKeyboardEvent(e);
 +			if (event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) {
 +				event.preventDefault();
@@ -3615,6 +3946,34 @@ index 00000000000..23ff99aa8d9
 +			}
 +		}));
 +		return row;
++	}
++
++	/** A flyout's rows from the extension's command; none when it answers nothing usable. */
++	private async flyoutRows(command: string): Promise<RitemarkMenuEntry[]> {
++		let rows: unknown;
++		try {
++			rows = await this.commandService.executeCommand(command);
++		} catch {
++			return [];
++		}
++		if (!Array.isArray(rows)) {
++			return [];
++		}
++		const entries: RitemarkMenuEntry[] = [];
++		for (const row of rows.filter(isFlyoutRow)) {
++			if (row.separatorBefore && entries.length) {
++				entries.push(RITEMARK_MENU_SEPARATOR);
++			}
++			entries.push({
++				label: row.label,
++				mark: row.mark,
++				sub: row.sub,
++				checked: row.checked,
++				iconClassNames: row.icon ? ThemeIcon.asClassNameArray(ThemeIcon.fromId(row.icon)) : [],
++				run: event => this.commandService.executeCommand(row.command, ...(row.args ?? []), { newWindow: event?.altKey === true }),
++			});
++		}
++		return entries;
 +	}
 +
 +	/** One of the extension's menus, as a Ritemark menu under its anchor: a hairline between its groups. */
@@ -3627,7 +3986,13 @@ index 00000000000..23ff99aa8d9
 +			}
 +			for (const action of actions) {
 +				const icon = action instanceof MenuItemAction && ThemeIcon.isThemeIcon(action.item.icon) ? action.item.icon : undefined;
-+				entries.push({ label: action.label, iconClassNames: icon ? ThemeIcon.asClassNameArray(icon) : [], run: () => action.run(folder) });
++				const flyout = action instanceof MenuItemAction ? FLYOUTS.get(action.item.id) : undefined;
++				entries.push({
++					label: action.label,
++					iconClassNames: icon ? ThemeIcon.asClassNameArray(icon) : [],
++					run: () => action.run(folder),
++					submenu: flyout ? () => this.flyoutRows(flyout) : undefined,
++				});
 +			}
 +		}
 +		if (!entries.length) {
@@ -3826,9 +4191,18 @@ index c8fc8aa2dd2..39566af5ecd 100644
 +	return folder?.resource;
 +});
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index ed7dbe07826..56fc8df569d 100644
+index ed7dbe07826..bf6fc344953 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+@@ -58,7 +58,7 @@ import { BrowserFileUpload, ExternalFileImport, getMultipleFilesOverwriteConfirm
+ import { toErrorMessage } from '../../../../../base/common/errorMessage.js';
+ import { WebFileSystemAccess } from '../../../../../platform/files/browser/webFileSystemAccess.js';
+ import { IgnoreFile } from '../../../../services/search/common/ignoreFile.js';
+-import { ResourceSet } from '../../../../../base/common/map.js';
++import { ResourceSet, ResourceMap } from '../../../../../base/common/map.js';
+ import { TernarySearchTree } from '../../../../../base/common/ternarySearchTree.js';
+ import { defaultCountBadgeStyles, defaultInputBoxStyles } from '../../../../../platform/theme/browser/defaultStyles.js';
+ import { timeout } from '../../../../../base/common/async.js';
 @@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
  
  export class ExplorerDelegate implements IListVirtualDelegate<ExplorerItem> {
@@ -3848,7 +4222,47 @@ index ed7dbe07826..56fc8df569d 100644
  		});
  
  		const highlightResults = stat.isDirectory ? this.highlightTree.get(stat) : 0;
-@@ -1412,7 +1413,9 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+@@ -1188,6 +1189,10 @@ export class FilesRenderer implements ICompressibleTreeRenderer<ExplorerItem, Fu
+ 	// IAccessibilityProvider
+ 
+ 	getAriaLabel(element: ExplorerItem): string {
++		// Ritemark 2.0 (Sprint 134, R8): the project root's AGENTS.md is read out as it is shown
++		if (!element.isDirectory && element.parent?.isRoot && element.name.toLowerCase() === 'agents.md') {
++			return localize('ritemark.aboutProject.ariaLabel', "About this project, {0}", element.name);
++		}
+ 		return element.name;
+ 	}
+ 
+@@ -1236,6 +1241,8 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+ 	// Note: URI in the ternary search tree is the URI of the folder containing the ignore file
+ 	// It is not the ignore file itself. This is because of the way the IgnoreFile works and nested paths
+ 	private ignoreTreesPerRoot = new Map<string, TernarySearchTree<URI, IgnoreFile>>();
++	// Ritemark 2.0 (Sprint 134, R8): whether a root CLAUDE.md is Ritemark's pointer to About this project
++	private readonly ritemarkPointers = new ResourceMap<boolean | 'reading'>();
+ 
+ 	constructor(
+ 		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
+@@ -1253,6 +1260,13 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+ 			}
+ 		}));
+ 		this.toDispose.push(this.fileService.onDidFilesChange(e => {
++			// Ritemark 2.0 (Sprint 134, R8): a root CLAUDE.md that changed, came or went is read again
++			for (const resource of [...this.ritemarkPointers.keys()]) {
++				if (e.contains(resource)) {
++					this.ritemarkPointers.delete(resource);
++					this._onDidChange.fire();
++				}
++			}
+ 			// Check to see if the update contains any of the ignoreFileResources
+ 			for (const [root, ignoreFileResourceSet] of this.ignoreFileResourcesPerRoot.entries()) {
+ 				ignoreFileResourceSet.forEach(async ignoreResource => {
+@@ -1407,12 +1421,14 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+ 		const cached = this.hiddenExpressionPerRoot.get(stat.root.resource.toString());
+ 		const globMatch = cached?.parsed(path.relative(stat.root.resource.path, stat.resource.path), stat.name, name => !!(stat.parent?.getChild(name)));
+ 		// Small optimization to only run isHiddenResource (traverse gitIgnore) if the globMatch from fileExclude returned nothing
+-		const isHiddenResource = globMatch ? true : this.isIgnored(stat.resource, stat.root.resource, stat.isDirectory);
++		const isHiddenResource = globMatch ? true : (this.isIgnored(stat.resource, stat.root.resource, stat.isDirectory) || this.ritemarkIsPointer(stat));
+ 		if (isHiddenResource || stat.parent?.isExcluded) {
  			stat.isExcluded = true;
  			const editors = this.editorService.visibleEditors;
  			const editor = editors.find(e => e.resource && this.uriIdentityService.extUri.isEqualOrParent(e.resource, stat.resource));
@@ -3859,6 +4273,58 @@ index ed7dbe07826..56fc8df569d 100644
  				this.editorsAffectingFilter.add(editor);
  				return true; // Show all opened files and their parents
  			}
+@@ -1423,6 +1439,27 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+ 		return true;
+ 	}
+ 
++	/**
++	 * Ritemark 2.0 (Sprint 134, R8): Documents hides the project root's CLAUDE.md while it is Ritemark's pointer: its
++	 * whole text, trimmed, is `@AGENTS.md`, and the root has an AGENTS.md. A CLAUDE.md with the person's own words, or one
++	 * not read yet, stays visible; search, Quick Open and Source Control show it as it is.
++	 */
++	private ritemarkIsPointer(stat: ExplorerItem): boolean {
++		if (stat.isDirectory || !stat.parent?.isRoot || stat.name.toLowerCase() !== 'claude.md' || !stat.parent.getChild('AGENTS.md')) {
++			return false;
++		}
++		const known = this.ritemarkPointers.get(stat.resource);
++		if (known === undefined) {
++			this.ritemarkPointers.set(stat.resource, 'reading');
++			this.fileService.readFile(stat.resource, { length: 1024 }).then(content => {
++				this.ritemarkPointers.set(stat.resource, content.value.toString().replace(/^\uFEFF/, '').trim().toLowerCase() === '@agents.md');
++				this._onDidChange.fire();
++			}, () => this.ritemarkPointers.set(stat.resource, false));
++			return false;
++		}
++		return known === true;
++	}
++
+ 	isIgnored(resource: URI, rootResource: URI, isDirectory: boolean): boolean {
+ 		const ignoreFile = this.ignoreTreesPerRoot.get(rootResource.toString())?.findSubstr(resource);
+ 		const isIncludedInTraversal = ignoreFile?.isPathIncludedInTraversal(resource.path, isDirectory);
+diff --git a/src/vs/workbench/contrib/splash/browser/partsSplash.ts b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
+index 8280bf593ca..dbbd5c0dc35 100644
+--- a/src/vs/workbench/contrib/splash/browser/partsSplash.ts
++++ b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
+@@ -70,14 +70,17 @@ export class PartsSplash {
+ 
+ 	private _savePartsSplash() {
+ 		const theme = this._themeService.getColorTheme();
++		// Ritemark 2.0 (Sprint 134, R9): the window's ground, as ritemarkSurfaces.css paints it (--rm-ground), so a switch
++		// or a reload shows the ground, not the desk. 001's defaults in workbench.ts are the same two grounds.
++		const ground = theme.getColor('ritemark.ground') ?? theme.getColor(themes.SIDE_BAR_BACKGROUND);
+ 
+ 		this._partSplashService.saveWindowSplash({
+ 			zoomLevel: this._configService.getValue<undefined>('window.zoomLevel'),
+ 			baseTheme: getThemeTypeSelector(theme.type),
+ 			colorInfo: {
+ 				foreground: theme.getColor(foreground)?.toString(),
+-				background: Color.Format.CSS.formatHex(theme.getColor(editorBackground) || themes.WORKBENCH_BACKGROUND(theme)),
+-				editorBackground: theme.getColor(editorBackground)?.toString(),
++				background: Color.Format.CSS.formatHex(ground || theme.getColor(editorBackground) || themes.WORKBENCH_BACKGROUND(theme)),
++				editorBackground: (ground ?? theme.getColor(editorBackground))?.toString(),
+ 				titleBarBackground: theme.getColor(themes.TITLE_BAR_ACTIVE_BACKGROUND)?.toString(),
+ 				titleBarBorder: theme.getColor(themes.TITLE_BAR_BORDER)?.toString(),
+ 				activityBarBackground: theme.getColor(themes.ACTIVITY_BAR_BACKGROUND)?.toString(),
 diff --git a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
 index 683604c1cc7..880e0e927d2 100644
 --- a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
@@ -3874,20 +4340,21 @@ index 683604c1cc7..880e0e927d2 100644
  	}
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 544300939e9..f76ae836490 100644
+index 544300939e9..515740fa825 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
-@@ -28,7 +28,8 @@ import { NativeWindow } from './window.js';
+@@ -28,7 +28,9 @@ import { NativeWindow } from './window.js';
  import { ModifierKeyEmitter } from '../../base/browser/dom.js';
  import { applicationConfigurationNodeBase, securityConfigurationNodeBase } from '../common/configuration.js';
  import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from '../../platform/window/electron-browser/window.js';
 -import product from '../../platform/product/common/product.js';
 +import '../browser/parts/ritemarkWindowSizes.js'; // Ritemark 2.0: the window makes room for the document (R14)
 +import '../browser/parts/ritemarkWelcomeAlone.js'; // Ritemark 2.0: the welcome alone on the ground (Sprint 133, R1)
++import '../browser/parts/ritemarkSwitchGuard.js'; // Ritemark 2.0: a switch asks while chats work (Sprint 134, R9)
  
  // Actions
  (function registerActions(): void {
-@@ -279,7 +280,7 @@ import product from '../../platform/product/common/product.js';
+@@ -279,7 +281,7 @@ import product from '../../platform/product/common/product.js';
  						localize(`window.menuStyle.native`, "Use the native menu. This is ignored when {0} is set to {1}.", '`#window.titleBarStyle#`', '`custom`'),
  						localize(`window.menuStyle.inherit`, "Matches the menu style to the title bar style defined in {0}.", '`#window.titleBarStyle#`'),
  					],
@@ -3896,7 +4363,7 @@ index 544300939e9..f76ae836490 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
-@@ -288,7 +289,7 @@ import product from '../../platform/product/common/product.js';
+@@ -288,7 +290,7 @@ import product from '../../platform/product/common/product.js';
  			'window.dialogStyle': {
  				'type': 'string',
  				'enum': ['native', 'custom'],
@@ -4037,10 +4504,10 @@ index 6fe575a12dd..b43d7ea930e 100644
  			if (newHeight !== this.cachedWindowControlHeight) {
  				this.cachedWindowControlHeight = newHeight;
 diff --git a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-index 2a2643375a2..84afbc2cd65 100644
+index 2a2643375a2..89e1aba3b9e 100644
 --- a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
 +++ b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-@@ -550,6 +550,22 @@ const apiMenus: IAPIMenu[] = [
+@@ -550,6 +550,28 @@ const apiMenus: IAPIMenu[] = [
  		description: localize('menus.chatNewSession', "The Chat new session menu."),
  		proposed: 'chatSessionsProvider'
  	},
@@ -4060,9 +4527,39 @@ index 2a2643375a2..84afbc2cd65 100644
 +		id: MenuId.for('ritemark/projectHead/agents/new'),
 +		description: localize('menus.ritemarkProjectHeadAgentsNew', "Ritemark: the New menu at the head of the left column, on Agents")
 +	},
++	// Sprint 134 (R8): the extension's items in the File menu (New tab, Switch project, Share)
++	{
++		key: 'ritemark/fileMenu',
++		id: MenuId.MenubarFileMenu,
++		description: localize('menus.ritemarkFileMenu', "Ritemark: the File menu")
++	},
  ];
  
  namespace schema {
+diff --git a/src/vs/workbench/services/host/electron-browser/nativeHostService.ts b/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
+index 86a3d521e1b..78bbd2e6450 100644
+--- a/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
++++ b/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
+@@ -21,6 +21,7 @@ import { VSBuffer } from '../../../../base/common/buffer.js';
+ import { CancellationToken } from '../../../../base/common/cancellation.js';
+ import { showBrowserToast } from '../browser/toasts.js';
+ import { generateUuid } from '../../../../base/common/uuid.js';
++import { noteRitemarkSwitchTarget } from '../../../browser/parts/ritemarkSwitchGuard.js';
+ 
+ class WorkbenchNativeHostService extends NativeHostService {
+ 
+@@ -137,6 +138,11 @@ class WorkbenchHostService extends Disposable implements IHostService {
+ 			}
+ 		}
+ 
++		// Ritemark 2.0 (Sprint 134, R9): a folder about to open in this window is the switch's target, for its question
++		if (toOpen.length === 1 && isFolderToOpen(toOpen[0]) && !options?.forceNewWindow) {
++			noteRitemarkSwitchTarget(toOpen[0].folderUri);
++		}
++
+ 		return this.nativeHostService.openWindow(toOpen, options);
+ 	}
+ 
 diff --git a/src/vs/workbench/services/layout/browser/layoutService.ts b/src/vs/workbench/services/layout/browser/layoutService.ts
 index 46243a4447e..bf92f42c53d 100644
 --- a/src/vs/workbench/services/layout/browser/layoutService.ts
@@ -4098,6 +4595,68 @@ index 46243a4447e..bf92f42c53d 100644
  	if (!hasCustomTitlebar(configurationService)) {
  		return false;
  	}
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
+new file mode 100644
+index 00000000000..c737d2c8ed5
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
+@@ -0,0 +1,56 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../base/common/async.js';
++import { Emitter } from '../../../../base/common/event.js';
++import { URI } from '../../../../base/common/uri.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { askRitemarkBeforeReload } from '../../../browser/parts/ritemarkSwitchGuard.js';
++
++/**
++ * Ritemark 2.0 (Sprint 134, R9): an unload that opens another folder here waits for the extension's answer; anything
++ * but a clear true lets it go on, and a guard that neither answers nor asks within the ceiling never keeps the window.
++ */
++suite('Ritemark switch guard', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	function commands(answer: () => Promise<unknown>, calls: unknown[][] = []): ICommandService {
++		return {
++			executeCommand: (id: string, ...args: unknown[]) => {
++				calls.push([id, ...args]);
++				return answer();
++			}
++		} as unknown as ICommandService;
++	}
++
++	test('the extension\'s answer decides, with the folder about to open', async () => {
++		const dialogs = store.add(new Emitter<void>());
++		const calls: unknown[][] = [];
++		const target = URI.file('/projects/Other');
++		const stop = await askRitemarkBeforeReload(commands(async () => true, calls), { onWillShowDialog: dialogs.event }, target);
++		const go = await askRitemarkBeforeReload(commands(async () => false), { onWillShowDialog: dialogs.event }, undefined);
++		assert.deepStrictEqual({ stop, go, calls }, { stop: true, go: false, calls: [['_ritemark.projects.beforeReload', target.toString()]] });
++	});
++
++	test('no such command, or no answer and no question within the ceiling: the reload goes on', async () => {
++		const dialogs = store.add(new Emitter<void>());
++		const missing = await askRitemarkBeforeReload(commands(() => Promise.reject(new Error('command not found'))), { onWillShowDialog: dialogs.event }, undefined);
++		const silent = await askRitemarkBeforeReload(commands(() => new Promise(() => { })), { onWillShowDialog: dialogs.event }, undefined, 5);
++		assert.deepStrictEqual({ missing, silent }, { missing: false, silent: false });
++	});
++
++	test('a question on screen waits for the person past the ceiling', async () => {
++		const dialogs = store.add(new Emitter<void>());
++		const answer = askRitemarkBeforeReload(commands(async () => {
++			dialogs.fire();
++			await timeout(30);
++			return true;
++		}), { onWillShowDialog: dialogs.event }, undefined, 5);
++		assert.strictEqual(await answer, true);
++	});
++});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
 new file mode 100644
 index 00000000000..50a653619fa

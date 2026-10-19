@@ -28,6 +28,8 @@ you" (ritemarkFoldedTabs.ts, multiEditorTabsControl.ts; drawn by 018's styleshee
 Tests: services/editor/test/browser/ritemarkPermanentTabs.test.ts (R9),
 contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8) and test/browser/parts/editor/ritemarkTabCount.test.ts
 (Sprint 134, R6); run with ./scripts/test.sh --grep Ritemark.
+Sprint 134 also: the Task board tab's count (R6), and ritemark.newTab (File ▸ New tab, ⌘T / Ctrl+T) clicks the +
+of the desk in front (ritemarkNewTab.ts; R21).
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
@@ -869,10 +871,10 @@ index 00000000000..ec6ccab036c
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
 new file mode 100644
-index 00000000000..a0197538ea4
+index 00000000000..1a8c5074d84
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,186 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -885,7 +887,7 @@ index 00000000000..a0197538ea4
 + * Terminal. It sits outside the tabs container, whose children the tabs control maps to tab indexes.
 + */
 +
-+import { $, addDisposableListener, append, EventType, getWindow } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, append, EventType, getActiveWindow, getWindow } from '../../../../base/browser/dom.js';
 +import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
 +import { AnchorAlignment } from '../../../../base/browser/ui/contextview/contextview.js';
 +import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
@@ -894,7 +896,7 @@ index 00000000000..a0197538ea4
 +import { DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
@@ -1048,6 +1050,17 @@ index 00000000000..a0197538ea4
 +	getWindow(menu).setTimeout(() => items[0].focus(), 0);
 +	return disposables;
 +}
++
++/**
++ * Sprint 134 (R8): New tab, from the File menu and ⌘T (Ctrl+T), opens the front desk's + menu, as a click on its +
++ * does. The extension names it in the File menu and binds the keys.
++ */
++CommandsRegistry.registerCommand('ritemark.newTab', () => {
++	const document = getActiveWindow().document;
++	const plus = document.querySelector<HTMLElement>('.part.editor .editor-group-container.active .ritemark-new-tab')
++		?? document.querySelector<HTMLElement>('.part.editor .ritemark-new-tab');
++	plus?.click();
++});
 diff --git a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
 index 0ef439569e1..8909ed3d0cf 100644
 --- a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts

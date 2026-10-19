@@ -11,6 +11,8 @@ gettingStartedGuide.css) and the startupEditor default are gone; Ritemark's welc
 and workbench.startupEditor is "none" in product.json's configurationDefaults. Every way into the page left in
 gettingStarted.contribution.ts (Help: Welcome, Show All Walkthroughs, a walkthrough opening on install) runs
 ritemark.welcome.open instead, and a Getting Started tab saved in an earlier session is dropped (no serializer).
+Sprint 134: the splash's defaults with auto-detect on are the two grounds, #16132F dark and #F1F5F9 light (the
+extension's ritemark.ground, which workbench.ts can't read before the workbench loads; change both together).
 Note: Binary fonts/icons (woff2, svg) handled by apply-patches.sh, not in this diff.
 ---
 diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
@@ -77,20 +79,24 @@ index d7f257db934..6079140d7c8 100644
  	font: normal normal normal 16px/1 codicon;
  	display: inline-block;
 diff --git a/src/vs/code/electron-browser/workbench/workbench.ts b/src/vs/code/electron-browser/workbench/workbench.ts
-index 767fbe08db3..b8aaa434c7d 100644
+index 767fbe08db3..e24fe48451f 100644
 --- a/src/vs/code/electron-browser/workbench/workbench.ts
 +++ b/src/vs/code/electron-browser/workbench/workbench.ts
-@@ -68,13 +68,17 @@
+@@ -66,15 +66,20 @@
+ 				shellForeground = '#000000';
+ 			}
  		} else if (configuration.autoDetectColorScheme) {
++			// Ritemark: the two grounds (the extension's `ritemark.ground`, which this page can't read yet; change both together)
  			if (configuration.colorScheme.dark) {
  				baseTheme = 'vs-dark';
 -				shellBackground = '#1E1E1E';
 -				shellForeground = '#CCCCCC';
-+				shellBackground = '#1E1B4B';
++				shellBackground = '#16132F';
 +				shellForeground = '#F8FAFC';
  			} else {
  				baseTheme = 'vs';
- 				shellBackground = '#FFFFFF';
+-				shellBackground = '#FFFFFF';
++				shellBackground = '#F1F5F9';
  				shellForeground = '#000000';
  			}
 +		} else {
@@ -100,7 +106,7 @@ index 767fbe08db3..b8aaa434c7d 100644
  		}
  
  		const style = document.createElement('style');
-@@ -93,7 +97,7 @@
+@@ -93,7 +98,7 @@
  
  			const splash = document.createElement('div');
  			splash.id = 'monaco-parts-splash';
