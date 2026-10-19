@@ -27,6 +27,18 @@ Two scenes carry what differs per run or per computer, in a few pixels: the sett
 
 The dev build lists Copilot Chat and "Chat Debug" in More, from VS Code's built-in Copilot extension. A production build has neither unless Copilot Chat is installed.
 
+### The welcome (Sprint 133)
+
+Ten more files, taken at 1440 × 900 from Sprint 133's head (`a3be9376`, merged as `eae1dedd`). **Jarmo approved them into this baseline on 19 October 2026** ("all looks good now! Proceed", through the Development manager).
+
+| File | Scene |
+| --- | --- |
+| `*-welcome-step-1.png`, `*-welcome-step-2.png` | A fresh profile's welcome: Your AI, then Set up project |
+| `*-welcome-update-on.png`, `*-welcome-update-off.png` | The update sheet for a v1.14.0 profile that pressed OK, and one that chose Opt Out |
+| `*-welcome-start.png` | A finished profile's window with no folder: "Where do you want to start?" |
+
+The provider rows and cards show what the capturing computer is signed in to (here Claude and ChatGPT), and the update sheet's projects are that profile's recents, so check a capture against these by eye; don't diff it to zero. At a window under about 900 tall the welcome takes its compact rhythm, which these 1440 × 900 frames don't show (Sprint 133's `qa-evidence/765/` does).
+
 ## Taking and comparing
 
 1. Copy `sample-project/Harbour leadership programme` to `/tmp/ritemark-frame/` and launch a dev instance in the background on a **fresh profile** with `/private/tmp/ritemark-frame/Harbour leadership programme`: see `.claude/skills/ritemark-automation` for the `open -n -g` launch with `--remote-debugging-port` and a short `--user-data-dir` and `--extensions-dir`.
@@ -40,3 +52,5 @@ The dev build lists Copilot Chat and "Chat Debug" in More, from VS Code's built-
 3. Measure the frame too: `node scripts/qa/frame-geometry.mjs --port <cdp-port>`, and check the project at the centre: `node scripts/qa/project-check.mjs --port <cdp-port> --user-data-dir <profile> --close-all --share-question` (Sprint 134).
 
 To take a new baseline, run the same command without `--compare`, with `--out docs/development/frame-baseline`.
+
+The welcome's scenes: `node scripts/qa/welcome-screenshots.mjs --port <cdp-port> --out <folder> --scene step-1 --then-skip` on a fresh profile with no folder, `--scene update-on` or `update-off` on a copy of a v1.14.0 profile, and `--scene start --page Welcome` on a finished profile's new window.
