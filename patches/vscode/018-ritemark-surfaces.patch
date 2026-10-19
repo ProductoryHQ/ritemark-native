@@ -783,10 +783,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..f3ba8559e12
+index 00000000000..2acdcde6574
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1790 @@
+@@ -0,0 +1,1791 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1344,6 +1344,7 @@ index 00000000000..f3ba8559e12
 +.monaco-workbench .part.editor .tabs-container > .tab .tab-actions .action-label {
 +	font-size: 12px !important; /* !important: the codicon rule sets 16. Close is 12, muted (kit: .tb .x) */
 +	color: var(--vscode-descriptionForeground) !important; /* !important: multieditortabscontrol.css's tab-actions colour is more specific */
++	justify-content: center; /* the 12 glyph in the middle of its 20 box (core lays it out from the left), for close, pinned and changed alike */
 +}
 +
 +/* The chosen tab's own icon is indigo, where attention is (kit: .tb.on > .ph); a file's icon is an image and keeps its colours */
@@ -1947,12 +1948,12 @@ index 00000000000..f3ba8559e12
 +	display: flex;
 +	align-items: center;
 +	gap: 8px;
-+	flex: 0 1 auto;
++	flex: 1 1 auto; /* as wide as the rows under it, 8 to 248, a select box with its chevron at the right end (Jarmo, 19 October) */
 +	min-width: 0;
-+	max-width: calc(100% - 8px);
++	max-width: 100%; /* the title's 8 padding on each side leaves the rows' 240 */
 +	height: 36px; /* kit: .proj, 36 high at 92; the name on its centre, 110 */
 +	margin: 8px 0 0 0;
-+	padding: 0 6px 0 8px;
++	padding: 0 8px;
 +	box-sizing: border-box;
 +	border-radius: 6px;
 +	outline-offset: -1px;
@@ -1972,7 +1973,7 @@ index 00000000000..f3ba8559e12
 +}
 +
 +.monaco-workbench .part.sidebar.ritemark-project-place > .composite.title > .title-label.ritemark-project-head .ritemark-project-name {
-+	flex: 0 1 auto;
++	flex: 1 1 auto; /* the name takes the room, so the chevron sits at the box's right end */
 +	min-width: 0;
 +	overflow: hidden;
 +	font-weight: 600;
