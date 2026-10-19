@@ -110,9 +110,16 @@ async function click(what, elementExpression) {
 
 const byLabel = (selector, label) => `[...document.querySelectorAll(${JSON.stringify(selector)})].find(element => element.getBoundingClientRect().width && (element.getAttribute('aria-label') || '').startsWith(${JSON.stringify(label)}))`;
 
-/** Picks a quick pick's row by its exact label (never a near match). */
+/**
+ * Picks a quick pick's row by its exact label (never a near match). The list can take a moment to fill (VS Code 1.142's
+ * palette lists more rows than 1.117's), so it waits up to 5 seconds for the row before it fails the run.
+ */
 async function pickRow(label) {
-	await click(`the row "${label}"`, `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`);
+	const row = `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`;
+	for (let waited = 0; waited < 5000 && !(await evaluate(`!!(${row})`)); waited += 250) {
+		await sleep(250);
+	}
+	await click(`the row "${label}"`, row);
 }
 
 async function type(text) {
@@ -122,6 +129,17 @@ async function type(text) {
 async function command(label) {
 	await key('KeyP', MOD | 8, 'p');
 	await sleep(600);
+	// In a background window, the key can go nowhere right after a new desk's document takes focus (seen on
+	// VS Code 1.142): then put focus on the status bar, as a click anywhere would, and press again
+	if (!(await evaluate(`document.querySelector('.quick-input-widget')?.style.display !== 'none'`))) {
+		const bar = await evaluate(`(() => { const r = document.querySelector('.part.statusbar')?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`);
+		if (bar) {
+			await clickAt(...bar);
+			await sleep(300);
+		}
+		await key('KeyP', MOD | 8, 'p');
+		await sleep(600);
+	}
 	await type(label);
 	await sleep(900);
 	await pickRow(label);
@@ -327,7 +345,9 @@ const SCENES = [
 		await sleep(1500);
 		await click('the address', `[...document.querySelectorAll('.part.editor .editor-group-container.active .browser-url-display, .part.editor .editor-group-container.active .browser-url-input')].find(element => element.getBoundingClientRect().width)`);
 		await sleep(500);
-		const focused = await evaluate(`document.activeElement?.classList.contains('browser-url-input') ?? false`);
+		// VS Code 1.117 focused an input; from 1.142 a click on the address opens a picker (a quick input) with the
+		// address selected, and typing replaces it
+		const focused = await evaluate(`(() => { const active = document.activeElement; return !!active && (active.classList.contains('browser-url-input') || active.classList.contains('browser-url-display') || !!active.closest('.quick-input-widget')); })()`);
 		if (!focused) {
 			throw new Error('the browser\'s address did not take the keyboard');
 		}
