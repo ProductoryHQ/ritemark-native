@@ -26,24 +26,22 @@
 # Created: 2026-05-03
 #
 diff --git a/build/.moduleignore b/build/.moduleignore
+index 202d76b197e..248e9e5f511 100644
 --- a/build/.moduleignore
 +++ b/build/.moduleignore
-@@ -222,6 +222,18 @@
- @github/copilot/ripgrep/**
- @github/copilot/**/keytar.node
-
-+# Ritemark: strip remaining cross-platform native binaries inside the
-+# bundled copilot SDK. rcedit.exe (Windows resource editor) iterates every
-+# file in the .app bundle and chokes on non-Windows .node files. The
-+# win32-x64 prebuilds dir is recreated fresh by gulp's
-+# prepareBuiltInCopilotExtensionShims after this strip, so removing the
-+# entire prebuilds tree is safe.
-+@github/copilot/sdk/prebuilds/**
-+@github/copilot/sdk/ripgrep/**
+@@ -226,6 +226,15 @@ zone.js/dist/**
+ # Agent Host uses the runtime bundled with @github/copilot-sdk.
+ @github/copilot/**
+ 
++# Ritemark: strip cross-platform native binaries inside the bundled Claude
++# Agent SDK. rcedit.exe (Windows resource editor) iterates every file in the
++# app and chokes on non-Windows .node files. (@github/copilot is stripped
++# whole above, and the Copilot SDK's platform package is re-added for the
++# target only, so its old lines here are gone.)
 +@anthropic-ai/claude-agent-sdk/vendor/audio-capture/**
 +@anthropic-ai/claude-agent-sdk/vendor/ripgrep/**
 +@anthropic-ai/claude-agent-sdk/vendor/tree-sitter/**
 +
- # @github/copilot platform binaries - not needed
+ # Standalone Copilot CLI platform packages are not product dependencies.
  @github/copilot-darwin-arm64/**
  @github/copilot-darwin-x64/**
