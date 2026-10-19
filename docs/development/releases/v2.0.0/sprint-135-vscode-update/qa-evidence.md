@@ -118,7 +118,8 @@ Sprint 134 (the project at the centre):
 ## Tests
 
 - VS Code's unit tests for Ritemark (`./scripts/test.sh --grep Ritemark` and the patch tests): 76 passing in 12 suites; electron-main: 11 passing.
-- The extension's `npm test` on Node 24: passes (after main was merged in, and after the PDF fix).
+- The extension's `npm test` on Node 24: passes (after main was merged in, and after the PDF fix). It includes the Flows mock suite (`FlowIntegration`, `FlowExecutor`, `FlowScheduler`, the node executors' hermetic tests and the Save File integration test).
+- `./scripts/validate-qa.sh`: passes (its fast chrome check now runs 1.142's `typecheck-client`, `9e58c95e`).
 - `npm run typecheck-client` (tsgo) in `vscode/`: 0 errors; VS Code's `npm run compile`: no errors.
 - `check-patch-stacking.mjs`: OK, 18 patches. The pre-commit validator passes.
 
@@ -129,5 +130,5 @@ Sprint 134 (the project at the centre):
 
 ## Open items before the PR
 
-- Sprint 133's S38, S40, S41, S48, S49 and Sprint 134's S28, S29, S31, S33, S44, S46, S48, S50, S52, S56, S57, S61, the Flows mock suite, and PDF and Word export: they need more background windows, which also bring the macOS file prompt above (asked Jarmo on 19 October).
+- Sprint 133's S38, S40, S41, S48, S49 and Sprint 134's S28, S29, S31, S33, S44, S46, S48, S50, S52, S56, S57, S61, PDF and Word export, and the JSON, CSS and HTML language servers in dev: they need more background windows, which also bring the macOS file prompt above (asked Jarmo on 19 October).
 - The Experience lead's review of the share question's bar (S14).

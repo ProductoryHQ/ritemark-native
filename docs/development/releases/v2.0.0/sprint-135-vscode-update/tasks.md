@@ -87,7 +87,7 @@ One commit per patch, in order. For each: `git apply --3way`, resolve by intent,
   - Sprint 134 on the Mac: S12, S13, S18–S21, S27–S31, S33, S44–S46, S48, S50, S52, S55–S58, S61 (the Tasks tab's count, the permanent tabs, the heads' rows, the switcher flyout, File ▸ New tab / Switch project / Share, About this project and the hidden pointer `CLAUDE.md`, the switch question on VS Code's own routes, the splash's ground, the share question on the AI's sheet, the palette with no developer commands, the chosen row's colour); on Windows, after the merge: S41, S42
 - [ ] The inventory (S22) and both profiles (S23) — the profiles pass; the inventory partial (qa-evidence S22, S23)
 - [ ] The browser (S26), the runtimes on darwin-arm64 (S27), saving and the small patches (S28), the native features in dev (S10)
-- [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation
+- [ ] Flows mock suite (`flow-testing`), PDF and DOCX export, Office previews, dictation — the Flows mock suite passes (in `npm test`); Office previews match 1.117; export and dictation not run yet
 - [ ] The fresh-clone walk-through from `SKILL.md` (S8)
 - [x] The rollback rehearsal on a scratch branch, never pushed (S20)
 
