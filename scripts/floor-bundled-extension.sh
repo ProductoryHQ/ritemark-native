@@ -44,15 +44,17 @@ command -v "$PY" >/dev/null 2>&1 || PY=python
 "$PY" - "$PKG" "$FLOOR_VERSION" <<'PYEOF'
 import json, sys
 path, floor = sys.argv[1], sys.argv[2]
-with open(path) as f:
+# UTF-8 both ways, and non-ASCII kept as is: Windows' default code page (cp1252)
+# otherwise turns "…" into "â€¦" in every label of the installed package.json.
+with open(path, encoding="utf-8") as f:
     data = json.load(f)
 data["version"] = floor
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
+with open(path, "w", encoding="utf-8", newline="\n") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
     f.write("\n")
 PYEOF
 
-ACTUAL=$("$PY" -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$PKG")
+ACTUAL=$("$PY" -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['version'])" "$PKG")
 if [ "$ACTUAL" != "$FLOOR_VERSION" ]; then
   echo "ERROR: failed to floor bundled extension version (got '$ACTUAL', want '$FLOOR_VERSION')" >&2
   exit 1
