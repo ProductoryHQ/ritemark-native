@@ -459,6 +459,80 @@ index 07551319546..fd815be7e21 100644
  				this.updateWindowControls({ height: cachedWindowControlHeight });
  			} else {
  				this.updateWindowControls({ height: DEFAULT_CUSTOM_TITLEBAR_HEIGHT });
+diff --git a/src/vs/platform/windows/electron-main/windowsStateHandler.ts b/src/vs/platform/windows/electron-main/windowsStateHandler.ts
+index 0336fb4be72..24d145b5095 100644
+--- a/src/vs/platform/windows/electron-main/windowsStateHandler.ts
++++ b/src/vs/platform/windows/electron-main/windowsStateHandler.ts
+@@ -16,6 +16,7 @@ import { INativeWindowConfiguration, IWindowSettings } from '../../window/common
+ import { IWindowsMainService } from './windows.js';
+ import { defaultWindowState, ICodeWindow, IWindowState as IWindowUIState, WindowMode } from '../../window/electron-main/window.js';
+ import { isSingleFolderWorkspaceIdentifier, isWorkspaceIdentifier, IWorkspaceIdentifier } from '../../workspace/common/workspace.js';
++import product from '../../product/common/product.js';
+ 
+ export interface IWindowState {
+ 	readonly windowId?: number;
+@@ -50,6 +51,17 @@ interface ISerializedWindowState {
+ 	readonly uiState: IWindowUIState;
+ }
+ 
++/**
++ * Ritemark (Sprint 133): a fresh profile's first window opens at 1440 x 900, the size the 2.0 frame and every drawing
++ * are made for (at 1200 wide the desk has 552 before the AI narrows), or at 90% of the work area where that is smaller.
++ */
++export function ritemarkFirstWindowSize(workArea: { width: number; height: number }): { width: number; height: number } {
++	return {
++		width: Math.min(1440, Math.round(workArea.width * 0.9)),
++		height: Math.min(900, Math.round(workArea.height * 0.9)),
++	};
++}
++
+ export class WindowsStateHandler extends Disposable {
+ 
+ 	private static readonly windowsStateStorageKey = 'windowsState';
+@@ -376,6 +388,17 @@ export class WindowsStateHandler extends Disposable {
+ 		state.x = Math.round(displayToUse.bounds.x + (displayToUse.bounds.width / 2) - (state.width! / 2));
+ 		state.y = Math.round(displayToUse.bounds.y + (displayToUse.bounds.height / 2) - (state.height! / 2));
+ 
++		// Ritemark (Sprint 133): a fresh profile's first window (no window open, none ever saved) gets Ritemark's size,
++		// centred in the work area. A saved window state returned above still wins; later new windows keep VS Code's.
++		if (product.applicationName === 'ritemark' && !lastActive && !this.lastClosedState && !this.state.lastActiveWindow && this.state.openedWindows.length === 0) {
++			const workArea = displayToUse.workArea;
++			const size = ritemarkFirstWindowSize(workArea);
++			state.width = size.width;
++			state.height = size.height;
++			state.x = Math.round(workArea.x + (workArea.width - size.width) / 2);
++			state.y = Math.round(workArea.y + (workArea.height - size.height) / 2);
++		}
++
+ 		// Check for newWindowDimensions setting and adjust accordingly
+ 		const windowConfig = this.configurationService.getValue<IWindowSettings | undefined>('window');
+ 		let ensureNoOverlap = true;
+diff --git a/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts b/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
+index 68bcfe4e00f..8b28e2f239f 100644
+--- a/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
++++ b/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
+@@ -9,7 +9,7 @@ import { join } from '../../../../base/common/path.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
+ import { IWindowState as IWindowUIState, WindowMode } from '../../../window/electron-main/window.js';
+-import { getWindowsStateStoreData, IWindowsState, IWindowState, restoreWindowsState } from '../../electron-main/windowsStateHandler.js';
++import { getWindowsStateStoreData, IWindowsState, IWindowState, restoreWindowsState, ritemarkFirstWindowSize } from '../../electron-main/windowsStateHandler.js';
+ import { IWorkspaceIdentifier } from '../../../workspace/common/workspace.js';
+ 
+ suite('Windows State Storing', () => {
+@@ -200,5 +200,12 @@ suite('Windows State Storing', () => {
+ 		assertEqualWindowsState(expected, windowsState, 'v1_32_empty_window');
+ 	});
+ 
++	test('Ritemark first window: 1440 x 900, or 90% of a smaller work area', () => {
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1728, height: 1084 }), { width: 1440, height: 900 }, 'a 14" MacBook Pro');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1440, height: 875 }), { width: 1296, height: 788 }, 'a 13" MacBook Air');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1366, height: 728 }), { width: 1229, height: 655 }, 'a small Windows laptop');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 2560, height: 1400 }), { width: 1440, height: 900 }, 'a large display');
++	});
++
+ 	ensureNoDisposablesAreLeakedInTestSuite();
+ });
 diff --git a/src/vs/workbench/browser/labels.ts b/src/vs/workbench/browser/labels.ts
 index a414a3d0fcf..6e829e42cd8 100644
 --- a/src/vs/workbench/browser/labels.ts

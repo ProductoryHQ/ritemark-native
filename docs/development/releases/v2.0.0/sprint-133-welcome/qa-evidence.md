@@ -107,6 +107,22 @@ Noted, not this PR:
 - The second Welcome tab with the old Getting Started page is the round 2 shell's: the overlay carries only the extension, and patch 001's retirement comes with the 2.0 app build.
 - `window.autoDetectColorScheme` set to true on a fresh profile's first run is the first-run theme setup (`extension.ts`, Sprint 52, once per profile since Sprint 132), not the welcome. A theme set in settings.json before the first start is overridden by it; worth its own issue.
 
+## The default first window (19 October)
+
+Jarmo's test at `d726a382`: the first window on his 1728 × 1084 MacBook opened at 1208 × 765, and step 2 ran past the bottom (the usage line cut, the switch below the fold, a scrollbar). The welcome's page in that window is 689 tall: the frame takes the 44 strip and a 32 inset below. The Experience lead chose both remedies:
+
+- **The first window** (patch 018, `windowsStateHandler.ts`): a fresh profile's first window opens at 1440 × 900, or 90% of the work area where that is smaller, centred (`ritemarkFirstWindowSize`, tested). Checked: a fresh profile opened at 1440 × 900 at (144, 125) in a 1728 × 1084 work area and kept it on its next start; a copy of a v1.14.0 profile opened at its saved 1200 × 800.
+- **A compact rhythm** where the page is under 822. The Experience lead's line was a page under 860; but 1440 × 900 gives a page of 824, so 860 would have made the drawings' own size compact too. 822 is where the drawn rhythm stops fitting: the update sheet's three projects need 821. One more gap than the lead's list was tightened: the 24 under Your AI's box became 16, as the other gaps did, because without it the update sheet came to 694 in the 689 page. Measured at 1208 × 765, with nothing scrolling in either the page or the sheet:
+
+  | Sheet | Needs (of 689) |
+  |---|---|
+  | Step 1 | 551 |
+  | Step 2 | 585; 653 with Start a new project's field open |
+  | The update sheet, two AIs, three projects | 681 |
+  | The start sheet | 256 |
+
+  Captured in Light and Dark in `qa-evidence/765/`.
+
 ## The v1.14 parity list (PR #458, 18 October)
 
 The Development manager's parity check found three gaps in the welcome's scope; two are fixed here:

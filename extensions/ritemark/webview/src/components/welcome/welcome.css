@@ -239,6 +239,34 @@ body.vscode-high-contrast:not(.vscode-high-contrast-light) .rw-dbtn.rw-dbtn.defa
 .rw-keynote { font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); margin: 0 0 16px; }
 .rw-keyerror { font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); margin-top: 4px; }
 
+/* A short window: a compact rhythm, so every sheet fits whole with no scrollbar (the Experience lead, 19 October). It
+   starts where the drawn rhythm stops fitting: the update sheet with three projects needs a page 821 tall. The frame
+   takes 76 of the window (the 44 strip and a 32 inset below), so 1440 x 900, the drawings' size, keeps the drawn
+   rhythm (page 824) and the default first window on a 1728 x 1084 Mac, 1208 x 765, gets the compact one (page 689). The step-1 cards keep 160,
+   for the button that doesn't move (S46). The sheet sits centred with at least 16 above and below; below about 620
+   it scrolls inside itself. The gap under Your AI's box goes 24 -> 16 with the others, so the update sheet's three
+   projects fit 689. */
+@media (max-height: 821px) {
+  .rw-ground, .rw-ground.short { height: 100vh; min-height: 0; padding: 16px; align-items: center; }
+  .rw-sheet { max-height: calc(100vh - 32px); overflow-y: auto; padding-bottom: 20px; }
+  .rw-head { height: 104px; margin-bottom: 16px; }
+  .rw-head.short { height: 72px; }
+  .rw-head img { bottom: 40px; }
+  .rw-head.short img { bottom: 18px; }
+  .rw-prog { bottom: 10px; }
+  .rw-sheet h1 { margin-bottom: 4px; font-size: 32px; line-height: 38px; }
+  .rw-one, .rw-one.tight, .rw-one.update { margin-bottom: 14px; }
+  .rw-sheet h2, .rw-h2row { margin-bottom: 8px; }
+  .rw-h2row h2 { margin-bottom: 0; }
+  .rw-row { min-height: 52px; padding: 6px 14px; margin-bottom: 8px; }
+  .rw-new { padding: 6px 14px; margin-bottom: 8px; }
+  .rw-project { height: 48px; }
+  .rw-airow { min-height: 40px; padding: 4px 14px; }
+  .rw-airbox { margin-bottom: 16px; }
+  .rw-fine, .rw-usage { margin-top: 12px; padding-top: 12px; }
+  .rw-usage.after-line { margin-top: 8px; padding-top: 0; }
+}
+
 /* A narrow window: the cards stack. */
 @media (max-width: 600px) {
   .rw-choices { grid-template-columns: 1fr; }

@@ -288,6 +288,14 @@ Given a project window
 When the person closes every tab on a desk
 Then that desk offers Text, Table and Web page as tiles, and each opens its kind of tab.
 
+### S54: The default first window
+Given a fresh profile on a 1728 × 1084 Mac screen
+When Ritemark starts
+Then its first window is 1440 × 900, centred, and the welcome shows the drawn rhythm
+When the window is 1208 × 765 instead
+Then step 1, step 2 (also with Start a new project's field open), the update sheet with three projects and the start sheet each fit whole with no scrollbar, in Ritemark Light and Ritemark Dark
+And a profile that saved a window size opens at that size.
+
 ## Feature: Nothing is lost (R14)
 
 ### S43: The inventory

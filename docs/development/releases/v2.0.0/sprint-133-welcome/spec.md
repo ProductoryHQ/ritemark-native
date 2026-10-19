@@ -27,6 +27,8 @@ Acceptance criteria:
 - The welcome works with the mouse and the keyboard (Tab order follows reading order; Enter and Space press; Escape cancels a sign-in in progress), and VoiceOver and Narrator read its question, each card and each state.
 - The welcome draws in Ritemark Light and Ritemark Dark. The header illustration is the one moment the brand's gradient appears (experience 2, decision 3).
 - Text on the sheet meets 4.5:1.
+- Every sheet fits whole, with no scrollbar, in the default first window (Jarmo's test, 19 October; the Experience lead's sizes). Where the welcome's page is too short for the drawn rhythm (under 822, which the update sheet's three projects need), a compact rhythm applies: the fresh header 104 and the update and start headers 72, the title 32/38, tighter gaps, rows 52 (step 2), 48 (projects) and 40 (Your AI); the step-1 cards stay 160 (S46). The sheet sits centred with at least 16 above and below, and below about 620 it scrolls inside itself.
+- A fresh profile's first window opens at 1440 × 900, the size the 2.0 frame and the drawings are made for, or at 90% of the screen's work area where that is smaller, centred. A saved window size wins; later new windows keep VS Code's defaults (patch 018).
 
 ### R2: Which AI do you use?
 
