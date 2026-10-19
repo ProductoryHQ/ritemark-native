@@ -36,8 +36,11 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
   private readWorkerSource(): Promise<string | undefined> {
     this.workerSource ??= fs
       .readFile(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'pdf.worker.min.mjs').fsPath, 'utf8')
-      .catch(() => {
-        this.workerSource = undefined; // the page falls back to workerSrc; the next PDF tries again
+      .catch((error) => {
+        // The page falls back to workerSrc, which VS Code 1.142's webviews cannot load: the PDF would stay on
+        // "Loading PDF…", so say why. The next PDF tries again.
+        console.warn('[Ritemark] PDF viewer: could not read pdf.worker.min.mjs:', error);
+        this.workerSource = undefined;
         return undefined;
       });
     return this.workerSource;

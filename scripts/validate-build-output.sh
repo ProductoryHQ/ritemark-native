@@ -538,6 +538,39 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 5d: Ritemark's fonts are in the app and the workbench's CSS uses them
+#
+# Sprint 135: patch 001 no longer lists the fonts for packaging. From VS Code
+# 1.142 the core is bundled by esbuild, which writes the fonts its CSS
+# references to out/media/, and packaging takes the whole bundle output. If
+# that ever stops, the icons (Phosphor) go blank and the UI font (Sofia Sans)
+# falls back, and nothing else fails.
+# -----------------------------------------------------------------------------
+echo "Validating Ritemark's fonts in the app..."
+case "$TARGET" in
+  darwin-arm64|darwin-x64) APP_OUT="$APP_PATH/Contents/Resources/app/out" ;;
+  win32-x64) APP_OUT="$APP_PATH/resources/app/out" ;;
+esac
+WORKBENCH_CSS=$(find "$APP_OUT/vs/workbench" -maxdepth 1 -name 'workbench.desktop.main.css' 2>/dev/null | head -1)
+for font in phosphor.woff2 SofiaSans-latin.woff2 SofiaSans-latin-ext.woff2; do
+  found=$(find "$APP_OUT" -name "$font" -type f -size +1k 2>/dev/null | head -1)
+  if [[ -z "$found" ]]; then
+    echo -e "  ${RED}FAIL${NC}: $font is not in the app's out/"
+    ERRORS=$((ERRORS + 1))
+  elif [[ -n "$WORKBENCH_CSS" ]] && ! grep -q "$font" "$WORKBENCH_CSS"; then
+    echo -e "  ${RED}FAIL${NC}: the workbench's CSS does not reference $font"
+    ERRORS=$((ERRORS + 1))
+  else
+    echo -e "  ${GREEN}OK${NC}: ${found#"$APP_OUT"/}"
+  fi
+done
+if [[ -z "$WORKBENCH_CSS" ]]; then
+  echo -e "  ${YELLOW}WARN${NC}: workbench.desktop.main.css not found; the fonts' use was not checked"
+  WARNINGS=$((WARNINGS + 1))
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
 # Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""

@@ -1,26 +1,17 @@
 # RiteMark Patch: windows-binary-strip
 #
-# Purpose: Strip cross-platform native binaries inside the bundled copilot
-#          SDK so the Windows packaging step (rcedit.exe) does not choke on
-#          .node files compiled for non-Windows platforms.
+# Purpose: Strip the bundled Claude Agent SDK's non-Windows native binaries
+#          (@anthropic-ai/claude-agent-sdk/vendor/*) so the Windows packaging
+#          step (rcedit.exe) does not choke on .node files built for another
+#          platform.
 #
 # Why:
-#   VS Code 1.117 bundles GitHub Copilot Chat (extensions/copilot/) as a
-#   first-party built-in. Its nested SDK ships native binaries for every
-#   supported platform. During gulp's vscode-win32-x64-min packaging step,
-#   rcedit.exe iterates the entire .app/resources/app/ tree to set Windows
-#   version metadata and fails with exit code 1 on any non-Windows .node
-#   file (e.g. linux-x64/computer.node, arm64-darwin/audio-capture.node).
-#
-#   The existing .moduleignore stripped @github/copilot/prebuilds/** but
-#   missed @github/copilot/sdk/prebuilds/** and the nested
-#   @anthropic-ai/claude-agent-sdk/vendor/* binary trees. This patch adds
-#   the missing strip rules.
-#
-#   The win32-x64 binaries that gulp's prepareBuiltInCopilotExtensionShims
-#   actually needs are recreated fresh by that function (see
-#   vscode/build/lib/copilot.ts: mkdirSync(nodePtyDest, { recursive: true })
-#   followed by cpSync). So stripping the entire prebuilds/** tree is safe.
+#   During gulp's vscode-win32-x64-min packaging step, rcedit.exe walks the
+#   whole resources/app/ tree to set Windows version metadata and fails with
+#   exit code 1 on any non-Windows .node file. At VS Code 1.117 both the
+#   bundled Copilot SDK and the Claude Agent SDK's vendor/ trees carried such
+#   files, and this patch stripped both (Copilot's prebuilds were recreated
+#   for win32-x64 by prepareBuiltInCopilotExtensionShims).
 #
 #   Sprint 135 (VS Code 1.142.0): upstream now strips @github/copilot/** whole
 #   and adds back only the target's Copilot SDK platform package when it

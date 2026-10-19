@@ -10,7 +10,12 @@ import { pdfjs } from 'react-pdf'
  */
 let port: Worker | undefined
 
-/** Makes pdf.js use a worker started from `source`, once per page; pdf.js uses it for every document after. */
+/**
+ * Makes pdf.js use a worker started from `source`, once per page; pdf.js uses it for every document after.
+ * A page shows one PDF today (the host sends it once, on `ready`). Loading a second document into the same page would
+ * need the first loading task destroyed first: react-pdf does not await `destroy()`, and pdf.js refuses a port whose
+ * worker is still being destroyed.
+ */
 export function startPdfWorker(source: string): void {
   if (port) return
   // The blob is read when the worker is made, so its URL can go at once (office-preview does the same)

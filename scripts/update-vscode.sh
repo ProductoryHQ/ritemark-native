@@ -223,5 +223,6 @@ else
     echo "To rollback:"
     echo "  git -C vscode reset -q --hard HEAD && git -C vscode clean -fd -e extensions/ritemark"
     echo "  git -C vscode checkout -q --detach $CURRENT_COMMIT && ./scripts/apply-patches.sh"
+    echo "  git update-index --cacheinfo 160000,$CURRENT_COMMIT,vscode   # the staged pin back to the old version"
     exit 1
 fi

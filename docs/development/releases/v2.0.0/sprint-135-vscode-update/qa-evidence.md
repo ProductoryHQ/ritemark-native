@@ -140,11 +140,14 @@ Sprint 134 (the project at the centre):
 - `./scripts/validate-qa.sh`: passes (its fast chrome check now runs 1.142's `typecheck-client`, `9e58c95e`).
 - `npm run typecheck-client` (tsgo) in `vscode/`: 0 errors; VS Code's `npm run compile`: no errors.
 - `check-patch-stacking.mjs`: OK, 18 patches. The pre-commit validator passes.
+- New in `validate-build-output.sh`, Check 5d: Ritemark's three fonts (Phosphor, Sofia Sans latin and latin-ext) must be in the built app's `out/` and referenced by the workbench's CSS. It passes on the installed v1.14.0 app; S30 runs it on 1.142's build.
 
 ## Seen, not this sprint's
 
 - Dev builds share the installed app's bundle ID (`ai.productory.ritemark`). macOS keeps one recent-folders list per bundle ID, so a dev window's welcome lists folders other dev windows opened, and a dev build's look at `~/Documents` (the welcome's place for new projects) asks for access every time, since an unsigned build's answer is not kept. Jarmo saw those prompts during this QA. It predates this sprint (every dev harness since Sprint 132 runs this way).
 - The extension's `Runtime drift: codex-app-server reports 0.160.0 but manifest says 0.162.1` in the dev log: the worktree's bundled Codex is older than its manifest. Not checked further.
+- **VS Code 1.142's agent host starts at launch** in the dev build ("AgentHostProcessManager: agent host started", asked for by the window at startup). It sits idle: Ritemark's `product.json` has no `agentSdks`, the Agents window is closed and chat tools are pinned off. Whether the production build starts it too, and what it costs, is for S30's check after the merge; keeping it from starting would be a follow-up.
+- **Patch 009's share test is broader than Ritemark's session** (the pr-reviewer review): `ritemarkSharedWithAgent` counts any agent audience, while Ritemark's Playwright session sees only audiences for every session. A page shared only with another agent session would read as shared. It cannot happen while `workbench.browser.enableChatTools` is pinned off and the Agents window is closed; tightening it to the wildcard or `ritemark` session is a follow-up for 009's next change.
 
 ## Left for Gate 2 and after the merge
 

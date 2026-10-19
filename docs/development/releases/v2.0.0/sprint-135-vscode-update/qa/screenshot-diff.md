@@ -56,6 +56,8 @@ All in `branding/product.json` `configurationDefaults`:
 | `workbench.browser.enableChatTools` | false | The browser bar's "Share with Agent" toggle |
 | `workbench.commandPalette.showAskInChat` | false | All commands ends with "Ask in Chat: <what you typed>", opening VS Code's Chat view, whenever a chat agent is registered ([before](palette-1142-ask-in-chat.png), [1.117](palette-1117.png)) |
 
+Not pinned, on purpose: `terminal.integrated.resizeDimensionsOverlay.enabled` is new at 1.142 and on by default. At 1.117 the same columns × rows overlay showed on every terminal resize with no setting, so its default keeps 1.117's behaviour; pinning it off would be a change, not a pin back (the pr-reviewer review asked).
+
 ## Beyond the baseline: 1.142 and 1.117 side by side
 
 The baseline covers the frame. For the surfaces inside it, the 1.142 dev build and the 1.117 build (the rollback rehearsal's tree) ran side by side, each on a fresh profile with the same project, and the same captures were diffed pixel by pixel.
