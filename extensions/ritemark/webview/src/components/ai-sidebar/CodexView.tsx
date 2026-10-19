@@ -62,9 +62,9 @@ export function CodexView() {
             </div>
           )}
           <Icon name="terminal" size={20} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium opacity-70">Codex Agent</p>
+          {/* Named as people know it (Sprint 133): the welcome and the landing say ChatGPT. */}
+          <p className="text-sm font-medium opacity-70">ChatGPT can work with your files</p>
           <p className="text-xs opacity-50 mt-1">
-            OpenAI coding agent with ChatGPT authentication.
             Type a message to start.
           </p>
         </div>

@@ -7,6 +7,8 @@ import { Icon, type PhosphorIconName } from '../ui/Icon';
 interface EmptyStateProps {
   variant: 'chat' | 'agent';
   onPrompt?: (prompt: string) => void;
+  /** The AI in use, named as people know it: Claude, ChatGPT or OpenCode. */
+  aiName?: string;
 }
 
 const chatExamples = [
@@ -21,12 +23,12 @@ const agentExamples = [
   'Find all mentions of X and summarize',
 ];
 
-export function EmptyState({ variant, onPrompt }: EmptyStateProps) {
+export function EmptyState({ variant, onPrompt, aiName = 'Claude' }: EmptyStateProps) {
   const examples = variant === 'agent' ? agentExamples : chatExamples;
   const iconName: PhosphorIconName = variant === 'agent' ? 'robot' : 'chat';
   const title =
     variant === 'agent'
-      ? 'Claude can work with your files'
+      ? `${aiName} can work with your files`
       : 'Ask about your documents or edit text';
 
   return (

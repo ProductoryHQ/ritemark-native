@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] — Unreleased
 
-Ritemark 2.0.0 is built on main in three steps and released as one version. This section covers step 1, Surfaces and frame (Sprint 132). Steps 2 and 3 add to it.
+Ritemark 2.0.0 is built on main in three steps and released as one version. This section covers steps 1 and 2: Surfaces and frame (Sprint 132) and The welcome (Sprint 133). Step 3 adds to it.
 
 ### Added
 - **The places row (Sprint 132).** Ritemark's places sit in one row at the top of the left column: Home, Documents, Tasks, Browser, Agents, Transcribe, then **More** (⋯). More holds Copilot Chat, File changes, Extensions, Search and any other place. A place can be dragged to another spot in the row, and the order is kept.
@@ -20,6 +20,16 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **File icons (Sprint 132).** PDF, Word, Excel, CSV, PowerPoint, image and audio files have their own icons in the file tree.
 - **New → Command in Agents (Sprint 132).** New in Agents makes agents, skills, commands and flows. Commands are new: New → Command makes a command in `.claude/commands/` and opens it.
 - **Closing a running terminal asks first (Sprint 132).** When a terminal's command is still running, closing it asks before stopping the command, with **Don't ask again**.
+- **A welcome on the first start (Sprint 133).** On the first start with no folder open, one sheet sits in the middle of an otherwise empty window, with no strips, tabs or side columns. It has two steps.
+- **Which AI do you use? (Sprint 133).** ChatGPT and Claude each read "Sign in with the account you already use." with **Sign in**, or **Continue** when already signed in. OpenCode reads "Open models, with an API key of your own." with **Set up**, and the step says you can use more than one. **API keys** lets you use Claude with an Anthropic API key of your own, and **Skip for now** goes on without an AI. Each AI shows **Checking…** until its check answers, and a check that does not answer within 20 seconds offers **Try again**.
+- **Where is your work? (Sprint 133).** **Open a folder…**, **Start a new project** or **Try the sample project**. Ritemark makes a new project's folder in Documents/Ritemark, and **Change…** picks another place. The sample project, "A small leadership programme, with documents to work on.", is a folder named "Leadership programme" with a brief, modules, kickoff notes and tasks on its task board. A second copy goes to "Leadership programme 2", and an existing folder is never written over.
+- **The window after the welcome (Sprint 133).** The window opens on the project with Documents open, the AI's sheet on a new chat that reads "Ask Claude about this project" (or the AI you signed in to), and an empty desk.
+- **Tiles on an empty desk (Sprint 133).** Every empty desk offers Text, Table and Web page as tiles.
+- **Welcome to Ritemark 2.0 (Sprint 133).** Updating from Ritemark 1 shows it once. It lists your AIs and whether each is signed in, with **Add another** for more, and up to three recent projects with the one you left first. **Open when you left** brings the window back as it was. **Open another folder…**, **Start a new project** and the usage-data switch are there too.
+- **Where do you want to start? (Sprint 133).** A later window with no folder asks this, with your recent projects, **Open another folder…** and **Start a new project**.
+- **A usage-data switch (Sprint 133).** On the welcome and in Ritemark Settings: "Share anonymous usage data to improve Ritemark. Never your documents, chats or names.", with links to the Privacy Policy and Terms of Use. Usage data is off until you turn it on, and nothing is sent before you say yes. Turning it off stops sending at once.
+- **Four new anonymous counts (Sprint 133).** With usage data on, Ritemark also counts four steps, beside the app starts and features used it already counted: the welcome shown, an AI signed in, a project opened and the first message sent. Never a path, a name, a file, a message or an account.
+- **Git and Node.js in Ritemark Settings (Sprint 133).** When you use this computer's own Claude or Codex, Settings shows Git and Node.js under the runtime choice, the rows from the old launch check.
 
 ### Changed
 - **No title row (Sprint 132).** On the Mac and on Windows, each column starts with a strip that holds its controls on one line: the traffic lights or Windows' buttons, a toggle for each side column, the tabs and **You**.
@@ -37,6 +47,10 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **PDF, Word and PowerPoint pages on a canvas (Sprint 132).** The pages sit on a soft canvas below the viewer's bar.
 - **CSV rows stay one line (Sprint 132).** Long values are read in the formula bar.
 - **The places row gets Ritemark's order once (Sprint 132).** On the first start of 2.0, a 1.14 profile's places row takes Ritemark's order. Places moved after that stay where they are put.
+- **Ritemark 1's usage-data notice is gone (Sprint 133).** If you pressed **OK** on it, or closed it without **Opt Out**, usage data stays on after the update. If you chose **Opt Out** or never answered, it is off.
+- **Send Feedback says what it sends (Sprint 133).** Under the text box: "What you write here is sent with your feedback." Pressing Send sends your feedback even with usage data off. Then it sends only your reaction and what you typed, under a one-off id that isn't kept, and usage data stays off. Escape sends nothing.
+- **Help's Welcome opens Ritemark's welcome (Sprint 133).** VS Code's Getting Started page is gone. Help's **Welcome** and the walkthrough commands open Ritemark's welcome instead.
+- **File extensions in a lighter ink (Sprint 133).** In the file tree and on tabs, a file's extension is in a lighter ink. The chosen tab and row stay in full ink, and high contrast themes keep full ink.
 
 ### Fixed
 - **Updating keeps the theme you chose (Sprint 132).** Ritemark re-applied its theme set-up whenever the version changed, so every update reset a theme picked by hand. The set-up now runs once per profile.
@@ -48,6 +62,7 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **Document properties (Sprint 132).** The Add menu fits its panel, and a property you add takes the cursor.
 - **Menus in the AI's sheet (Sprint 132).** The thinking-effort menu stays inside the AI's sheet, and the dictation language menu closes with Escape.
 - **Transcribe's settings (Sprint 132).** Transcribe's gear opens Settings at transcription's own settings, not at the top of the page.
+- **A Markdown file opens once on the first launch (Sprint 133, #429).** Opening a Markdown file on the very first launch sometimes opened it twice. It now opens once, in the Ritemark editor.
 
 ## [1.14.0] — Unreleased
 

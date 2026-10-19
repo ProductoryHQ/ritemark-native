@@ -312,6 +312,14 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   // Sprint 74 R2 (#82): while an agent runs, the composer stays unlocked and
   // Enter queues the next prompt instead of sending it.
   const runtimeLabel = RUNTIME_LABELS[pendingRuntime.runtimeId];
+  const landing = useAISidebarStore((s) => s.landingPlaceholder);
+  const landingText = landing
+    && landing.conversationId === activeConversationId
+    && landing.runtimeId === pendingRuntime.runtimeId
+    && agentConversation.length === 0
+    && codexConversation.length === 0
+    ? landing.text
+    : null;
   const placeholder = isRuntimeChecking
     ? `Checking ${runtimeLabel}…`
     : isRuntimeError
@@ -324,10 +332,14 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     // next message runs plan-first.
     : composerPolicy.planFirst && planCapable
       ? 'Describe the task — the agent will plan first and wait for your approval…'
+      // Sprint 133 (R6): the welcome's landing, until this new chat has its first message.
+      : landingText
+        ? landingText
       : isClaudeCode
         ? 'Ask Claude... (type @ to mention an agent, / for commands)'
         : isCodex
-          ? 'Ask Codex... (type / for commands)'
+          // Visible words say ChatGPT, never Codex (Sprint 133, the Experience lead).
+          ? 'Ask ChatGPT... (type / for commands)'
           : isOpenCode
             ? 'Ask OpenCode... (type / for commands)'
             : 'Ask anything... (type / for commands)';

@@ -17,7 +17,6 @@ VSCODE_DIR="$ROOT_DIR/vscode"
 EXTENSION_DIR="$ROOT_DIR/extensions/ritemark"
 BUILD_OUTPUT="$ROOT_DIR/VSCode-win32-x64"
 REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || true)"
-WELCOME_DEST="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
 
 use_repo_node() {
     local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
@@ -182,33 +181,7 @@ echo "  This may take 20-30 minutes..."
 yarn gulp vscode-win32-x64-min
 echo ""
 
-# Step 8: Fix welcome page logo (inline SVG as data URI)
-# The vscode-file:// protocol doesn't serve SVGs correctly on Windows,
-# so we replace the FileAccess.asBrowserUri() call with an inline data URI.
-echo -e "${YELLOW}Step 8: Fixing welcome page logo for Windows...${NC}"
-"$ROOT_DIR/scripts/copy-welcome-assets.sh" "$WELCOME_DEST"
-LOGO_SVG="$BUILD_OUTPUT/resources/app/out/vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg"
-WORKBENCH_JS="$BUILD_OUTPUT/resources/app/out/vs/workbench/workbench.desktop.main.js"
-if [ -f "$LOGO_SVG" ] && [ -f "$WORKBENCH_JS" ]; then
-    B64=$(base64 -w0 "$LOGO_SVG")
-    DATA_URI="data:image/svg+xml;base64,${B64}"
-    node -e "
-        const fs = require('fs');
-        let js = fs.readFileSync(process.argv[1], 'utf8');
-        const search = 'Us.asBrowserUri(\"vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg\")';
-        if (js.includes(search)) {
-            js = js.replace(search, '\"' + process.argv[2] + '\"');
-            fs.writeFileSync(process.argv[1], js, 'utf8');
-            console.log('  Logo SVG inlined as data URI');
-        } else {
-            console.log('  Warning: FileAccess.asBrowserUri call not found (may already be fixed)');
-        }
-    " "$WORKBENCH_JS" "$DATA_URI"
-    echo -e "${GREEN}  Welcome page logo fixed${NC}"
-else
-    echo -e "${YELLOW}  Logo SVG or workbench.js not found, skipping${NC}"
-fi
-echo ""
+# Step 8 (the Getting Started page's logo fix) retired with the page in Sprint 133.
 
 # Step 9: Verify build
 echo -e "${YELLOW}Step 9: Verifying build...${NC}"
@@ -271,10 +244,10 @@ else
     echo -e "${RED}  Extension folder missing in build!${NC}"
 fi
 
-if [ -f "$WELCOME_DEST/ritemark-welcome-logo-full.svg" ] && [ -f "$WELCOME_DEST/ritemark-welcome-hero-bg.png" ]; then
-    echo -e "${GREEN}  Welcome assets present${NC}"
+if [ -f "$BUILD_OUTPUT/resources/app/extensions/ritemark/media/welcome/welcome-hero.jpg" ] && [ -f "$BUILD_OUTPUT/resources/app/extensions/ritemark/sample-project/Leadership programme/Brief.md" ]; then
+    echo -e "${GREEN}  Welcome assets and sample project present${NC}"
 else
-    echo -e "${RED}  Welcome assets missing in build!${NC}"
+    echo -e "${RED}  Welcome assets or sample project missing in build!${NC}"
 fi
 
 echo ""

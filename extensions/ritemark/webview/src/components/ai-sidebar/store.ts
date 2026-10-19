@@ -13,6 +13,7 @@
 
 import { create } from 'zustand';
 import { defaultCodexModelId } from './modelPresentation';
+import { resolveAvailableRuntimeModel } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import {
   listConversations,
@@ -308,6 +309,15 @@ interface AISidebarState {
   // ── Chat history (APP-GLOBAL) ──
   savedConversations: SavedConversationV2[];
   showHistoryPanel: boolean;
+  /**
+   * Sprint 133 (R6): the welcome's landing — "Ask Claude about this project"
+   * in the new chat's message box, until that chat has a message.
+   */
+  landingPlaceholder: { conversationId: string; runtimeId: AgentId; text: string } | null;
+  /** The landing waits until its runtime's model is known (OpenCode's needs the providers' keys first). */
+  pendingLanding: { runtimeId: AgentId; text: string; since: number } | null;
+  openLandingChat: (runtimeId: AgentId, text: string) => void;
+  applyPendingLanding: () => void;
   conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
   /** Current host flag; absent on an older host means enabled. */
   durableAgentConversationsEnabled: boolean;
@@ -1001,6 +1011,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     savedConversations: [],
     showHistoryPanel: false,
+    landingPlaceholder: null,
+    pendingLanding: null,
     conversationRolloutMode: 'unknown',
     durableAgentConversationsEnabled: true,
     hostConversations: [],
@@ -2121,6 +2133,41 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
      * wipes the current one and no longer resets any provider session — the old
      * "new chat destroys the live one" semantic is gone.
      */
+    openLandingChat: (runtimeId, text) => {
+      get().startNewConversation();
+      set({ pendingLanding: { runtimeId, text, since: Date.now() } });
+      get().applyPendingLanding();
+    },
+
+    applyPendingLanding: () => {
+      const pending = get().pendingLanding;
+      const conversation = activeConversation();
+      if (!pending || !conversation) return;
+      if (conversation.selectedAgent !== pending.runtimeId || conversation.pendingRuntime.runtimeId !== pending.runtimeId) {
+        const state = get();
+        const modelId = resolveAvailableRuntimeModel(pending.runtimeId, {
+          claude: conversation.selectedModel,
+          codex: conversation.codexSelectedModel,
+          opencode: conversation.opencodeSelectedModel,
+        }, {
+          claude: state.models,
+          codex: state.codexModels,
+          opencode: state.byokProviderModels,
+          acpProviders: state.acpProviders,
+        });
+        if (!modelId) {
+          // Not known yet: the next host message may bring it. After 20 s the chat stays as it is.
+          if (Date.now() - pending.since > 20_000) set({ pendingLanding: null });
+          return;
+        }
+        get().selectRuntimeModel(pending.runtimeId, modelId);
+      }
+      set({
+        pendingLanding: null,
+        landingPlaceholder: { conversationId: conversation.id, runtimeId: pending.runtimeId, text: pending.text },
+      });
+    },
+
     startNewConversation: () => {
       const id = get().activeConversationId;
       if (id) persistConversation(id);
@@ -2864,6 +2911,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           patchConversation(state.activeConversationId, () => ({ isStreaming: false, streamingContent: '' }));
           break;
 
+        case 'landing:new-chat':
+          get().openLandingChat(message.runtimeId, message.placeholder);
+          break;
+
         case 'clear-chat':
           // "New chat" (ritemark.newChat command). Route through
           // startNewConversation so it behaves exactly like the `/new` command:
@@ -3333,6 +3384,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           });
           break;
       }
+
+      // Sprint 133 (R6): a landing that waits for its runtime's model tries again after each message.
+      if (get().pendingLanding) get().applyPendingLanding();
     },
   };
 });

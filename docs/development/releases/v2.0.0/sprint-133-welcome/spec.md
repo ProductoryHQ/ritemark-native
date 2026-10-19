@@ -27,6 +27,8 @@ Acceptance criteria:
 - The welcome works with the mouse and the keyboard (Tab order follows reading order; Enter and Space press; Escape cancels a sign-in in progress), and VoiceOver and Narrator read its question, each card and each state.
 - The welcome draws in Ritemark Light and Ritemark Dark. The header illustration is the one moment the brand's gradient appears (experience 2, decision 3).
 - Text on the sheet meets 4.5:1.
+- Every sheet fits whole, with no scrollbar, in the default first window (Jarmo's test, 19 October; the Experience lead's sizes). Where the welcome's page is too short for the drawn rhythm (under 822, which the update sheet's three projects need), a compact rhythm applies: the fresh header 104 and the update and start headers 72, the title 32/38, tighter gaps, rows 52 (step 2), 48 (projects) and 40 (Your AI); the step-1 cards stay 160 (S46). The sheet sits centred with at least 16 above and below, and below about 620 it scrolls inside itself.
+- A fresh profile's first window opens at 1440 × 900, the size the 2.0 frame and the drawings are made for, or at 90% of the screen's work area where that is smaller, centred. A saved window size wins; later new windows keep VS Code's defaults (patch 018).
 
 ### R2: Which AI do you use?
 
@@ -103,6 +105,7 @@ As someone starting Ritemark, I want to choose about usage data myself, and know
 Acceptance criteria:
 - Step 2 ends with a switch: "Share anonymous usage data to improve Ritemark" / "Off until you turn it on. Never your documents, chats or names." It is off when the welcome opens (experience 2, frame 3). The update welcome's switch shows the person's 1.x answer instead (the last criterion here; R10).
 - **Nothing is sent to PostHog until the switch is turned on**, from any part of Ritemark: not the welcome's events, not the existing events, not on a dev run. Turning it off stops sending at once.
+- **One exception: feedback the person sends** (the v1.14 parity list's G3; Jarmo, 19 October, "all recommendations ok"). Pressing Send in Send Feedback is the person's own choice, so it goes even with usage data off. It carries only the reaction and what they typed. It goes from a client made for that one send, with a one-off id that is never stored and no location derived. It sends no session start and none of the welcome's held events, and it doesn't turn usage data on. Dismissing the text box with Escape sends nothing while usage data is off. The feedback box says under its field: "What you write here is sent with your feedback." The `analytics` kill switch still stops it.
 - Leaving the welcome without turning it on is a no. The welcome never asks again; the choice stays in Settings.
 - The 1.x usage-data notice (the toast with OK, Opt Out, Privacy Policy and Terms of Use) no longer shows. Its Privacy Policy and Terms of Use links stay reachable: beside the switch on the welcome, and in Settings.
 - Ritemark Settings gains the same choice with the same words (it has none today; the only switch is VS Code's `ritemark.analytics.enabled`), and changing it there takes effect at once.
@@ -127,7 +130,7 @@ Acceptance criteria:
 
 - No event carries a path, a folder or project name, a file name, a message, or an account or e-mail.
 - Every event carries the build channel (R9) and the existing shared properties.
-- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer. See *Open Questions*: this is Jarmo's call. On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
+- **The welcome's events are held in memory until the person answers.** A yes sends them; a no, or quitting without an answer, drops them. Nothing is written to disk before the answer (Jarmo, 18 October; *Open Questions* 1). On an update welcome whose switch is on from 1.x, the answer is already yes, so they are sent as they happen.
 - `first_message_sent` is sent once per profile, and only if the switch is on when the message is sent.
 - Each event reaches PostHog once, verified in PostHog's live events, and none appears before an answer or after a no.
 
@@ -179,8 +182,8 @@ Acceptance criteria:
   | Open folder | The welcome's step 2; the head's Open a folder… (Sprint 132) |
   | Recent files and folders | The update welcome's projects (R10); Switch project… (Sprint 132); the project list (Sprint 134) |
   | Launch check: ChatGPT and Claude signed in, "Click here to log in" | The welcome's provider states and Sign in (R2–R4); Settings' sign-in cards |
-  | Launch check: Git found, Node found (only when needed) | A line at the top of step 2 when one is missing, with Use Ritemark's own Claude (R5); rows in Ritemark Settings under the runtime choice, shown for this computer's runtime (new) |
-  | Links: Getting started, Support articles, Blog | Help, under You (Sprint 132 R11), which opens ritemark.app's support pages |
+  | Launch check: Git found, Node found (only when needed) | A line at the top of step 2 when one is missing, with Use Ritemark's own Claude (R5); rows in Ritemark Settings under the runtime choice: Git always, since File changes needs it whichever Claude runs (as 1.x always showed it), and Node.js with this computer's runtime (the v1.14 parity list's G2, the Development manager, 18 October) |
+  | Links: Getting started, Support articles, Blog | Help's Getting started, opening the guide 1.x's page linked to (patch 015; the v1.14 parity list's G1, the Development manager, 18 October); Support in Help and under You (Sprint 132 R11), which opens ritemark.app's support pages. The Blog link is not carried: ritemark.app links it |
   | The logo and tagline | The welcome's header (R1) |
 
 - Patch 001's, 016's and 017's Getting Started hunks are removed, and the files they touched go back to upstream wherever nothing else in them is Ritemark's. Patch 016's Store rule still holds: no download link for Git or Node.js on any Ritemark surface.
@@ -210,7 +213,7 @@ As a writer on Windows, I want the same welcome, with Windows' words.
 Acceptance criteria:
 - The welcome, both sign-ins, OpenCode's setup, Open a folder…, Start a new project and the landing work on a Windows PC with a build from main.
 - Paths show Windows' form; shortcuts say Ctrl; the folder picker is Windows'.
-- The welcome stays responsive during the extension host's first seconds on a fresh Windows profile ([#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): it draws at once, its checks show Checking… until they answer, and a click on Sign in is never lost. See *Open Questions* for the decision on #401 itself.
+- The welcome stays responsive during the extension host's first seconds on a fresh Windows profile ([#401](https://github.com/ProductoryHQ/ritemark-native/issues/401)): it draws at once, its checks show Checking… until they answer, and a click on Sign in is never lost. *Open Questions* 2 records the decision on #401 itself.
 
 ## Engineering requirements
 
@@ -278,10 +281,10 @@ Acceptance criteria:
 
 ## Open Questions
 
-Each needs Jarmo's answer at this plan's approval. Each has a recommendation.
+Both are decided: Jarmo accepted both recommendations with the plan's approval (18 October, "approved with your proposals").
 
-1. **The welcome's events before the yes.** Hold `welcome_shown` and `ai_signed_in` in memory and send them at the yes, or drop everything that happened before the switch was turned on? **Recommendation: hold and send.** Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
-2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan leaves it to this plan. **Recommendation: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee. The case to profile is the first start after a clean install or an update, with Defender on. The logs on Jarmo's Windows PC (18 October) show first starts taking 32–54 s to be fully up, the extension host starting 14–18 s late with three or four "unresponsive" periods, and later starts about 7 s; a fresh profile alone does not reproduce it.
+1. **The welcome's events before the yes: decided, hold and send.** `welcome_shown` and `ai_signed_in` are held in memory, sent at the yes, and dropped otherwise. Without it no fresh start is ever counted (the switch is on step 2, after both), and nothing leaves the computer or is written before the yes.
+2. **[#401](https://github.com/ProductoryHQ/ritemark-native/issues/401), the Windows extension host's first 8 seconds.** The release plan left it to this plan. **Decided: include it as an audit first** (a CPU profile of the extension host on a fresh Windows profile, then the same on the Mac) and fix it in this sprint when the cause is Ritemark's own start-up code. If the cause is outside Ritemark (for example the first scan of the bundled binaries), record it in the issue and keep R15's guarantee. The case to profile is the first start after a clean install or an update, with Defender on. The logs on Jarmo's Windows PC (18 October) show first starts taking 32–54 s to be fully up, the extension host starting 14–18 s late with three or four "unresponsive" periods, and later starts about 7 s; a fresh profile alone does not reproduce it.
 
 The technical point on recognising a 1.x OK is decided (Jarmo, 18 October): a notice closed without Opt Out counts as the OK (technical plan, W1).
 

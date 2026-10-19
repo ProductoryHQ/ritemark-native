@@ -46,7 +46,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { CodexRuntime, CodexSession, buildCodexBaseInstructions } = require('./CodexRuntime') as typeof import('./CodexRuntime');
+const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFailure } = require('./CodexRuntime') as typeof import('./CodexRuntime');
 type CodexRuntime = import('./CodexRuntime').CodexRuntime;
 type CodexSession = import('./CodexRuntime').CodexSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -551,7 +551,18 @@ async function run() {
     console.log('✓ Test 15: every advertised Codex effort reaches turn/start unchanged');
   }
 
-  console.log('\nAll 15 CodexRuntime tests passed!');
+  // ── Test 16: the welcome's ChatGPT check tells a sign-in failure from a network one (Sprint 133) ──
+  {
+    for (const message of ['HTTP 401 Unauthorized', 'Your access token could not be refreshed', 'token expired', 'Please log in again', 'You are signed out']) {
+      assert.equal(isCodexSignInFailure(message), true, message);
+    }
+    for (const message of ['connect ECONNREFUSED 127.0.0.1:443', 'getaddrinfo ENOTFOUND chatgpt.com', 'request timed out', 'HTTP 503 Service Unavailable', 'Unexpected token < in JSON at position 0']) {
+      assert.equal(isCodexSignInFailure(message), false, message);
+    }
+    console.log('✓ Test 16: a sign-in failure is told from a network failure');
+  }
+
+  console.log('\nAll 16 CodexRuntime tests passed!');
 }
 
 run().then(

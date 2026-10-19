@@ -107,6 +107,8 @@ docs-internal/
 
 # RiteMark local settings
 .ritemark/
+# ...except the sample project's task cards, which ship with the app (Sprint 133)
+!extensions/ritemark/sample-project/*/.ritemark/
 
 # Git worktrees (Claude Code agents)
 .worktrees/

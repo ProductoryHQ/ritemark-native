@@ -261,11 +261,12 @@ And 25 fresh launches with a `.md` each end with one tab.
 
 ### S40: Every way in
 When the person tries Help's welcome entry, the command palette's Welcome and walkthrough commands, and starts with `workbench.startupEditor` left at its default
-Then VS Code's Getting Started page never shows: each opens Ritemark's welcome, or is not offered.
+Then VS Code's Getting Started page never shows: each opens Ritemark's welcome, or is not offered
+And Help has Getting started beside Support, opening ritemark.app's Getting started guide, as 1.x's page did.
 
 ### S41: The launch check's rows
 Given Ritemark Settings
-Then, with this computer's own Claude chosen, the Git and Node.js rows show under the runtime choice, as 1.x's launch check did; with Ritemark's own Claude they do not show
+Then Git's row shows under the runtime choice whichever Claude runs, as 1.x's launch check did (File changes needs Git either way); Node.js's row shows only with this computer's own Claude
 And each AI's sign-in state shows with its Sign in
 And it shows the usage-data choice with the welcome's words, with the Privacy Policy and Terms of Use links.
 
@@ -286,6 +287,14 @@ Then a short sheet on the ground asks "Where do you want to start?" with the rec
 Given a project window
 When the person closes every tab on a desk
 Then that desk offers Text, Table and Web page as tiles, and each opens its kind of tab.
+
+### S54: The default first window
+Given a fresh profile on a 1728 × 1084 Mac screen
+When Ritemark starts
+Then its first window is 1440 × 900, centred, and the welcome shows the drawn rhythm
+When the window is 1208 × 765 instead
+Then step 1, step 2 (also with Start a new project's field open), the update sheet with three projects and the start sheet each fit whole with no scrollbar, in Ritemark Light and Ritemark Dark
+And a profile that saved a window size opens at that size.
 
 ## Feature: Nothing is lost (R14)
 

@@ -273,17 +273,6 @@ echo "Stripping foreign-platform agent runtimes (keeping darwin-${KEEP_ARCH})...
 echo -e "${GREEN}Extension copied successfully${NC}"
 echo ""
 
-echo "Copying Welcome media assets into app bundle..."
-WELCOME_DEST="$APP_PATH/Contents/Resources/app/out/vs/workbench/contrib/welcomeGettingStarted/browser/media"
-
-if "$PROJECT_DIR/scripts/copy-welcome-assets.sh" "$WELCOME_DEST"; then
-  echo -e "${GREEN}Welcome media assets copied successfully${NC}"
-else
-  echo -e "${RED}ERROR: Failed to copy Welcome media assets${NC}"
-  exit 1
-fi
-echo ""
-
 # Add ritemarkVersion field to product.json from branding
 # NOTE: We keep VS Code's upstream "version" field intact for internal compatibility
 # RiteMark uses "ritemarkVersion" for update checking
@@ -430,13 +419,13 @@ else
   echo -e "${GREEN}OK${NC}: ${ICON_COUNT} icons"
 fi
 
-# Check Welcome assets are present in build output
-WELCOME_LOGO="$WELCOME_DEST/ritemark-welcome-logo-full.svg"
-WELCOME_BG="$WELCOME_DEST/ritemark-welcome-hero-bg.png"
-if [[ -f "$WELCOME_LOGO" ]] && [[ -f "$WELCOME_BG" ]]; then
-  echo -e "${GREEN}OK${NC}: Welcome assets copied"
+# Check the welcome's assets and the sample project are in the bundled extension (Sprint 133)
+WELCOME_HERO="$EXT_DEST/media/welcome/welcome-hero.jpg"
+SAMPLE_BRIEF="$EXT_DEST/sample-project/Leadership programme/Brief.md"
+if [[ -f "$WELCOME_HERO" ]] && [[ -f "$SAMPLE_BRIEF" ]]; then
+  echo -e "${GREEN}OK${NC}: welcome assets and sample project present"
 else
-  echo -e "${RED}FAIL: Welcome assets missing from build output${NC}"
+  echo -e "${RED}FAIL: welcome assets or sample project missing from the bundled extension${NC}"
   VALIDATION_FAILED=1
 fi
 

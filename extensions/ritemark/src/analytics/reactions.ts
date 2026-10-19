@@ -7,7 +7,8 @@
  */
 
 import * as vscode from 'vscode';
-import { trackEvent } from './posthog';
+import type { FeedbackEvent } from './consent';
+import { sendFeedback, usageDataState } from './posthog';
 
 interface ReactionChoice {
   label: string;
@@ -41,22 +42,21 @@ export function registerReactionCommand(context: vscode.ExtensionContext): void 
     const message = await vscode.window.showInputBox({
       title: 'Want to tell us more?',
       placeHolder: 'Optional — type your feedback and press Enter',
-      prompt: 'Your message is sent anonymously.',
+      // Under the field, so the usage-data switch's "never your documents, chats or names" stays honest (Sprint 133).
+      prompt: 'What you write here is sent with your feedback.',
     });
 
-    // Track the reaction (even if message was dismissed)
-    const reactionSent = await trackEvent('reaction_submitted', {
-      reaction,
-      message: message || undefined,
-    });
-
-    // If there's a message, also fire a dedicated feedback event
-    if (message) {
-      await trackEvent('feedback_sent', {
-        message,
-        reaction,
-      });
+    // Feedback is the person's own choice to send, so it goes with usage data off too (Sprint 133, G3; Jarmo,
+    // 19 October): Enter sends it. With usage data off, Escape sends nothing; with it on, the reaction still
+    // counts when the message is dismissed, as before.
+    if (message === undefined && !usageDataState().on) {
+      return;
     }
+    const events: FeedbackEvent[] = [{ name: 'reaction_submitted', properties: { reaction, message: message || undefined } }];
+    if (message) {
+      events.push({ name: 'feedback_sent', properties: { message, reaction } });
+    }
+    const reactionSent = await sendFeedback(events);
 
     if (reactionSent) {
       vscode.window.showInformationMessage('Thanks for your feedback!');

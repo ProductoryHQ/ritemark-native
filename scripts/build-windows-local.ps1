@@ -33,7 +33,6 @@ $VSCodeDir = Join-Path $RootDir "vscode"
 $ExtDir    = Join-Path $RootDir "extensions\ritemark"
 $BuildOut  = Join-Path $RootDir "VSCode-win32-x64"
 $BrandDir  = Join-Path $RootDir "branding"
-$WelcomeDest = Join-Path $BuildOut "resources\app\out\vs\workbench\contrib\welcomeGettingStarted\browser\media"
 
 $VSCodeVersion = "1.117.0"
 $ElectronTarget = "30.5.1"
@@ -158,15 +157,6 @@ if (Test-Path "$BrandDir\win32\VisualElementsManifest.xml") {
 if (Test-Path "$BrandDir\icons\icon.svg") {
     Copy-Item "$BrandDir\icons\icon.svg" "$VSCodeDir\src\vs\workbench\browser\media\code-icon.svg"
     Write-Host "  Titlebar icon copied"
-}
-
-# Copy welcome assets into source tree
-$welcomeSrc = Join-Path $BrandDir "welcome"
-if (Test-Path $welcomeSrc) {
-    $welcomeBuildSrc = Join-Path $VSCodeDir "src\vs\workbench\contrib\welcomeGettingStarted\browser\media"
-    New-Item -ItemType Directory -Force -Path $welcomeBuildSrc | Out-Null
-    Copy-Item "$welcomeSrc\*" $welcomeBuildSrc -Force
-    Write-Host "  Welcome assets copied to source tree"
 }
 
 # Copy fonts
@@ -304,39 +294,12 @@ if (Test-Path $copilotExt) {
     Write-Host "  Removed bundled copilot extension" -ForegroundColor Green
 }
 
-# Copy welcome assets to build output
-New-Item -ItemType Directory -Force -Path $WelcomeDest | Out-Null
-if (Test-Path $welcomeSrc) {
-    Copy-Item "$welcomeSrc\*" $WelcomeDest -Force
-    Write-Host "  Welcome assets copied to build output"
-}
-
 Write-Host "  Extension copied to build output" -ForegroundColor Green
 
 # ------------------------------------------------------------------
-# Step 10: Inline welcome page logo SVG (Windows vscode-file:// fix)
+# Step 10: (retired) The Getting Started page's logo fix went with the page (Sprint 133)
 # ------------------------------------------------------------------
-Write-Step 10 "Fixing welcome page logo for Windows"
-
-$logoSvg = Join-Path $BuildOut "resources\app\out\vs\workbench\contrib\welcomeGettingStarted\common\media\ritemark-logo.svg"
-$workbenchJs = Join-Path $BuildOut "resources\app\out\vs\workbench\workbench.desktop.main.js"
-
-if ((Test-Path $logoSvg) -and (Test-Path $workbenchJs)) {
-    $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($logoSvg))
-    $dataUri = "data:image/svg+xml;base64,$b64"
-
-    $js = [IO.File]::ReadAllText($workbenchJs)
-    $search = 'Us.asBrowserUri("vs/workbench/contrib/welcomeGettingStarted/common/media/ritemark-logo.svg")'
-    if ($js.Contains($search)) {
-        $js = $js.Replace($search, "`"$dataUri`"")
-        [IO.File]::WriteAllText($workbenchJs, $js)
-        Write-Host "  Logo SVG inlined as data URI" -ForegroundColor Green
-    } else {
-        Write-Host "  FileAccess.asBrowserUri call not found (may already be fixed)" -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "  Logo SVG or workbench.js not found, skipping" -ForegroundColor Yellow
-}
+Write-Step 10 "Nothing to do: the welcome is a page of the extension"
 
 # ------------------------------------------------------------------
 # Step 11: Validate
@@ -387,13 +350,13 @@ if (Test-Path $extensionJs) {
     $errors++
 }
 
-# Check welcome assets
-$welcomeLogo = Join-Path $WelcomeDest "ritemark-welcome-logo-full.svg"
-$welcomeHero = Join-Path $WelcomeDest "ritemark-welcome-hero-bg.png"
-if ((Test-Path $welcomeLogo) -and (Test-Path $welcomeHero)) {
-    Write-Host "  OK: Welcome assets present" -ForegroundColor Green
+# Check the welcome's assets and the sample project (Sprint 133)
+$welcomeHero = Join-Path $BuildOut "resources\app\extensions\ritemark\media\welcome\welcome-hero.jpg"
+$sampleBrief = Join-Path $BuildOut "resources\app\extensions\ritemark\sample-project\Leadership programme\Brief.md"
+if ((Test-Path $welcomeHero) -and (Test-Path $sampleBrief)) {
+    Write-Host "  OK: welcome assets and sample project present" -ForegroundColor Green
 } else {
-    Write-Host "  FAIL: Welcome assets missing" -ForegroundColor Red
+    Write-Host "  FAIL: welcome assets or sample project missing" -ForegroundColor Red
     $errors++
 }
 

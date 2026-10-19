@@ -300,13 +300,8 @@ if [ "$DRY_RUN" = false ] && [ "$REVERSE" = false ]; then
         echo -e "${GREEN}Done${NC}"
     fi
 
-    # Copy Welcome media assets if they exist
-    if [ -d "$BRANDING_DIR/welcome" ]; then
-        echo -n "Copying Welcome media assets... "
-        mkdir -p "$VSCODE_DIR/src/vs/workbench/contrib/welcomeGettingStarted/browser/media"
-        cp "$BRANDING_DIR/welcome/"* "$VSCODE_DIR/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/"
-        echo -e "${GREEN}Done${NC}"
-    fi
+    # The Getting Started page's assets are no longer copied: the page retired in Sprint 133, and
+    # Ritemark's welcome is a page of the extension (extensions/ritemark/media/welcome/).
 
     # Copy custom font assets required by patched workbench CSS
     UI_FONT_SRC_DIR="$ROOT_DIR/extensions/ritemark/webview/src/assets/fonts"

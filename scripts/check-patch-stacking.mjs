@@ -28,9 +28,9 @@ const PATCHES_DIR = join(ROOT, 'patches', 'vscode');
 
 // Pairs that stack today and are allowed to: "earlier>later" by patch number.
 // 009 → 010: the browser action bridge builds on the context bridge.
-// 001 → 016 → 017: the Getting Started page's policy and launch-check fixes.
 // 003 ↔ 015: the menu bar and the actions list (menu cleanup, Help menu policy).
-const KNOWN_PAIRS = new Set(['009>010', '001>016', '001>017', '016>017', '003>015']);
+// (001 → 016 → 017, the Getting Started page's fixes, went with the page in Sprint 133.)
+const KNOWN_PAIRS = new Set(['009>010', '003>015']);
 
 const verbose = process.argv.includes('--verbose');
 

@@ -18,6 +18,10 @@ const ALL_EVENT_NAMES: EventName[] = [
   'agent_used',
   'reaction_submitted',
   'feedback_sent',
+  'welcome_shown',
+  'ai_signed_in',
+  'project_opened',
+  'first_message_sent',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -34,15 +38,34 @@ const _payloadCheck: {
   agent_used: { agent: 'claude' },
   reaction_submitted: { reaction: 'love_it', message: 'Great app!' },
   feedback_sent: { message: 'Please add dark mode', reaction: 'good' },
+  welcome_shown: { kind: 'fresh' },
+  ai_signed_in: { provider: 'chatgpt', method: 'account' },
+  project_opened: { source: 'sample', has_ai: false },
+  first_message_sent: { provider: 'opencode' },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
 
-// ── 2. Opt-out logic (pure extraction) ──────────────────────
+// Sprint 133 (R8): the welcome's four events carry no path, name, file,
+// message, account or e-mail: their only properties are these.
+const WELCOME_EVENT_KEYS: Record<string, string[]> = {
+  welcome_shown: ['kind'],
+  ai_signed_in: ['provider', 'method'],
+  project_opened: ['source', 'has_ai'],
+  first_message_sent: ['provider'],
+};
+for (const [event, keys] of Object.entries(WELCOME_EVENT_KEYS)) {
+  assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
+  for (const key of keys) {
+    assert.doesNotMatch(key, /path|name|file|message|account|email|folder/i, `${event}.${key} names nothing personal`);
+  }
+}
+
+// ── 2. Setting and kill switch (the gate itself is tested in consent.test.ts) ──
 
 /**
- * Pure version of the opt-out check used in posthog.ts.
- * Tests that both the setting and the feature flag must be true.
+ * Both the person's yes and the feature flag must be true. Since Sprint 133
+ * the setting defaults to false: nothing is counted before a yes.
  */
 function isAnalyticsEnabledPure(settingEnabled: boolean, flagEnabled: boolean): boolean {
   return settingEnabled && flagEnabled;

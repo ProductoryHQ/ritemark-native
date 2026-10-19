@@ -44,20 +44,121 @@ Also: a click on the open place in the top row runs ritemark.placeClickedAgain, 
 Built file by file from the Experience lead's proof of concept (branch poc/2.0-surfaces), without its
 proof-of-concept-only code.
 
+Sprint 133 (the welcome): while the extension's welcome is the editor in front and it says so (the context key
+ritemark.welcomeAlone), ritemarkWelcomeAlone.ts puts ritemark-welcome-alone on the workbench: only the welcome's sheet
+on the ground, with the strips' controls, the tab row, the desk's paint and the status bar hidden but nothing written;
+Windows' menu button is not mounted and the window sizes stand down meanwhile (R1). An empty desk's tiles are drawn
+here (019 makes them). A file's extension is drawn apart from its name and muted, in the tree and on tabs: the
+resource label's splitExtension option (base/browser/ui/iconLabel/iconLabel.ts, workbench/browser/labels.ts), asked
+for by the Explorer's rows (explorerViewer.ts) and the tabs (019) (R13).
+
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 
-Files: base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
+Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
 workbench/browser/media/ritemarkSurfaces.css; workbench/browser/parts/{compositeBarActions,paneCompositeBar,
-paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu,ritemarkWindowSizes}.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
+paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu,ritemarkWelcomeAlone,ritemarkWindowSizes}.ts; workbench/browser/labels.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
 parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts,notificationsViewer}.ts;
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
-Test: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14); run with ./scripts/test.sh --grep Ritemark.
+Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14) and base/test/browser/iconLabel.test.ts (Sprint 133,
+R13); run with ./scripts/test.sh --grep Ritemark.
+diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
+index 034c650442a..3b2312d89cd 100644
+--- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
++++ b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
+@@ -43,6 +43,21 @@ export interface IIconLabelValueOptions {
+ 	readonly domId?: string;
+ 	iconPath?: URI | ThemeIcon;
+ 	supportIcons?: boolean;
++	/**
++	 * Ritemark 2.0 (Sprint 133, R13): draw a file name's extension apart from its name, in `span.label-extension`
++	 * inside the name, so the stylesheet can mute it. `ResourceLabel` sets it only for a file whose name ends with
++	 * its resource's extension (the Explorer's rows and the editor tabs ask for it).
++	 */
++	splitExtension?: boolean;
++}
++
++/** Ritemark 2.0: a name's stem and extension at its last dot, or undefined for a name with none or a leading dot only. */
++export function ritemarkSplitExtension(label: string): { stem: string; extension: string } | undefined {
++	const dot = label.lastIndexOf('.');
++	if (dot <= 0 || dot === label.length - 1) {
++		return undefined;
++	}
++	return { stem: label.substring(0, dot), extension: label.substring(dot) };
+ }
+ 
+ class FastLabelNode {
+@@ -295,7 +310,12 @@ class Label {
+ 				this.singleLabel = dom.append(this.container, dom.$('a.label-name', { id: options?.domId }));
+ 			}
+ 
+-			this.singleLabel.textContent = label;
++			const split = options?.splitExtension ? ritemarkSplitExtension(label) : undefined;
++			if (split) {
++				dom.reset(this.singleLabel, split.stem, dom.$('span.label-extension', undefined, split.extension));
++			} else {
++				this.singleLabel.textContent = label;
++			}
+ 		} else {
+ 			this.container.textContent = '';
+ 			this.container.classList.add('multiple');
+@@ -341,6 +361,9 @@ class LabelWithHighlights extends Disposable {
+ 	private singleLabel: HighlightedLabel | undefined = undefined;
+ 	private options: IIconLabelValueOptions | undefined;
+ 	private readonly _labelDisposables = this._register(new DisposableStore());
++	/** Ritemark 2.0: the name's element, and the extension's own label inside it when the name is split (R13). */
++	private singleLabelElement: HTMLElement | undefined = undefined;
++	private extensionLabel: { element: HTMLElement; label: HighlightedLabel } | undefined = undefined;
+ 
+ 	constructor(private container: HTMLElement, private supportIcons: boolean) {
+ 		super();
+@@ -360,17 +383,39 @@ class LabelWithHighlights extends Disposable {
+ 		if (typeof label === 'string') {
+ 			if (!this.singleLabel) {
+ 				this._labelDisposables.clear();
++				this.extensionLabel = undefined;
+ 				this.container.textContent = '';
+ 				this.container.classList.remove('multiple');
+-				this.singleLabel = this._labelDisposables.add(new HighlightedLabel(dom.append(this.container, dom.$('a.label-name', { id: options?.domId }))));
++				this.singleLabelElement = dom.append(this.container, dom.$('a.label-name', { id: options?.domId }));
++				this.singleLabel = this._labelDisposables.add(new HighlightedLabel(this.singleLabelElement));
+ 			}
+ 
+-			this.singleLabel.set(label, options?.matches, undefined, options?.labelEscapeNewLines, supportIcons);
++			// Ritemark 2.0: the extension apart, with the filter's highlights split at the dot (R13). A row reused for a
++			// name that does not split (a folder) drops the extension's label.
++			const split = options?.splitExtension ? ritemarkSplitExtension(label) : undefined;
++			if (split && this.singleLabelElement) {
++				const [stemMatches, extensionMatches] = splitMatches([split.stem, split.extension], '', options?.matches) ?? [undefined, undefined];
++				this.singleLabel.set(split.stem, stemMatches, undefined, options?.labelEscapeNewLines, supportIcons);
++				if (!this.extensionLabel) {
++					const element = dom.append(this.singleLabelElement, dom.$('span.label-extension'));
++					this.extensionLabel = { element, label: this._labelDisposables.add(new HighlightedLabel(element)) };
++				}
++				this.extensionLabel.label.set(split.extension, extensionMatches, undefined, options?.labelEscapeNewLines, supportIcons);
++			} else {
++				if (this.extensionLabel) {
++					this.extensionLabel.element.remove();
++					this._labelDisposables.delete(this.extensionLabel.label);
++					this.extensionLabel = undefined;
++				}
++				this.singleLabel.set(label, options?.matches, undefined, options?.labelEscapeNewLines, supportIcons);
++			}
+ 		} else {
+ 			this._labelDisposables.clear();
+ 			this.container.textContent = '';
+ 			this.container.classList.add('multiple');
+ 			this.singleLabel = undefined;
++			this.singleLabelElement = undefined;
++			this.extensionLabel = undefined;
+ 
+ 			const separator = options?.separator || '/';
+ 			const matches = splitMatches(label, separator, options?.matches);
 diff --git a/src/vs/base/browser/ui/menu/menu.ts b/src/vs/base/browser/ui/menu/menu.ts
 index bbadbf1d73b..68422afd6fa 100644
 --- a/src/vs/base/browser/ui/menu/menu.ts
@@ -123,6 +224,77 @@ index 29240b5c9a4..7cae3011235 100644
  	}
  
  	private updateLabels(titleElement: HTMLElement, buttonElement: HTMLElement, label: string): void {
+diff --git a/src/vs/base/test/browser/iconLabel.test.ts b/src/vs/base/test/browser/iconLabel.test.ts
+new file mode 100644
+index 00000000000..b5391e7c619
+--- /dev/null
++++ b/src/vs/base/test/browser/iconLabel.test.ts
+@@ -0,0 +1,65 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { IconLabel, ritemarkSplitExtension } from '../../browser/ui/iconLabel/iconLabel.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../common/utils.js';
++
++/** Ritemark 2.0 (Sprint 133, R13): a file's extension drawn apart from its name, for the stylesheet to mute. */
++suite('Ritemark IconLabel splitExtension', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	function nameHtml(label: IconLabel): string {
++		return label.element.querySelector('.label-name')!.innerHTML;
++	}
++
++	test('the split itself: the last dot, never a leading dot, never a trailing one', () => {
++		assert.deepStrictEqual(
++			['Brief.md', 'report.final.md', 'README', '.gitignore', 'file.', 'a.b'].map(ritemarkSplitExtension),
++			[
++				{ stem: 'Brief', extension: '.md' },
++				{ stem: 'report.final', extension: '.md' },
++				undefined,
++				undefined,
++				undefined,
++				{ stem: 'a', extension: '.b' },
++			]
++		);
++	});
++
++	test('a tab (no highlights): the extension in its own span inside the name, the text unchanged', () => {
++		const label = store.add(new IconLabel(document.createElement('div')));
++		label.setLabel('report.final.md', undefined, { splitExtension: true });
++		assert.strictEqual(nameHtml(label), 'report.final<span class="label-extension">.md</span>');
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'report.final.md');
++
++		label.setLabel('README', undefined, { splitExtension: true });
++		assert.strictEqual(nameHtml(label), 'README');
++
++		label.setLabel('Brief.md', undefined, {});
++		assert.strictEqual(nameHtml(label), 'Brief.md', 'only callers that ask get the split');
++	});
++
++	test('a tree row (highlights): a filter match across the dot is split with the name', () => {
++		const label = store.add(new IconLabel(document.createElement('div'), { supportHighlights: true }));
++		label.setLabel('Brief.md', undefined, { splitExtension: true, matches: [{ start: 3, end: 7 }] });
++		assert.strictEqual(
++			nameHtml(label),
++			'<span class="monaco-highlighted-label">Bri<span class="highlight">ef</span></span>'
++			+ '<span class="label-extension"><span class="monaco-highlighted-label"><span class="highlight">.m</span>d</span></span>'
++		);
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'Brief.md');
++	});
++
++	test('a reused row that becomes a folder drops the extension', () => {
++		const label = store.add(new IconLabel(document.createElement('div'), { supportHighlights: true }));
++		label.setLabel('Kickoff notes.md', undefined, { splitExtension: true });
++		assert.ok(label.element.querySelector('.label-extension'));
++		label.setLabel('Modules', undefined, {});
++		assert.strictEqual(label.element.querySelector('.label-extension'), null);
++		assert.strictEqual(label.element.querySelector('.label-name')!.textContent, 'Modules');
++	});
++});
 diff --git a/src/vs/platform/quickinput/browser/quickInputList.ts b/src/vs/platform/quickinput/browser/quickInputList.ts
 index f71937903f3..22cce6eb73b 100644
 --- a/src/vs/platform/quickinput/browser/quickInputList.ts
@@ -287,6 +459,110 @@ index 07551319546..fd815be7e21 100644
  				this.updateWindowControls({ height: cachedWindowControlHeight });
  			} else {
  				this.updateWindowControls({ height: DEFAULT_CUSTOM_TITLEBAR_HEIGHT });
+diff --git a/src/vs/platform/windows/electron-main/windowsStateHandler.ts b/src/vs/platform/windows/electron-main/windowsStateHandler.ts
+index 0336fb4be72..24d145b5095 100644
+--- a/src/vs/platform/windows/electron-main/windowsStateHandler.ts
++++ b/src/vs/platform/windows/electron-main/windowsStateHandler.ts
+@@ -16,6 +16,7 @@ import { INativeWindowConfiguration, IWindowSettings } from '../../window/common
+ import { IWindowsMainService } from './windows.js';
+ import { defaultWindowState, ICodeWindow, IWindowState as IWindowUIState, WindowMode } from '../../window/electron-main/window.js';
+ import { isSingleFolderWorkspaceIdentifier, isWorkspaceIdentifier, IWorkspaceIdentifier } from '../../workspace/common/workspace.js';
++import product from '../../product/common/product.js';
+ 
+ export interface IWindowState {
+ 	readonly windowId?: number;
+@@ -50,6 +51,17 @@ interface ISerializedWindowState {
+ 	readonly uiState: IWindowUIState;
+ }
+ 
++/**
++ * Ritemark (Sprint 133): a fresh profile's first window opens at 1440 x 900, the size the 2.0 frame and every drawing
++ * are made for (at 1200 wide the desk has 552 before the AI narrows), or at 90% of the work area where that is smaller.
++ */
++export function ritemarkFirstWindowSize(workArea: { width: number; height: number }): { width: number; height: number } {
++	return {
++		width: Math.min(1440, Math.round(workArea.width * 0.9)),
++		height: Math.min(900, Math.round(workArea.height * 0.9)),
++	};
++}
++
+ export class WindowsStateHandler extends Disposable {
+ 
+ 	private static readonly windowsStateStorageKey = 'windowsState';
+@@ -376,6 +388,17 @@ export class WindowsStateHandler extends Disposable {
+ 		state.x = Math.round(displayToUse.bounds.x + (displayToUse.bounds.width / 2) - (state.width! / 2));
+ 		state.y = Math.round(displayToUse.bounds.y + (displayToUse.bounds.height / 2) - (state.height! / 2));
+ 
++		// Ritemark (Sprint 133): a fresh profile's first window (no window open, none ever saved) gets Ritemark's size,
++		// centred in the work area. A saved window state returned above still wins; later new windows keep VS Code's.
++		if (product.applicationName === 'ritemark' && !lastActive && !this.lastClosedState && !this.state.lastActiveWindow && this.state.openedWindows.length === 0) {
++			const workArea = displayToUse.workArea;
++			const size = ritemarkFirstWindowSize(workArea);
++			state.width = size.width;
++			state.height = size.height;
++			state.x = Math.round(workArea.x + (workArea.width - size.width) / 2);
++			state.y = Math.round(workArea.y + (workArea.height - size.height) / 2);
++		}
++
+ 		// Check for newWindowDimensions setting and adjust accordingly
+ 		const windowConfig = this.configurationService.getValue<IWindowSettings | undefined>('window');
+ 		let ensureNoOverlap = true;
+diff --git a/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts b/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
+index 68bcfe4e00f..8b28e2f239f 100644
+--- a/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
++++ b/src/vs/platform/windows/test/electron-main/windowsStateHandler.test.ts
+@@ -9,7 +9,7 @@ import { join } from '../../../../base/common/path.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
+ import { IWindowState as IWindowUIState, WindowMode } from '../../../window/electron-main/window.js';
+-import { getWindowsStateStoreData, IWindowsState, IWindowState, restoreWindowsState } from '../../electron-main/windowsStateHandler.js';
++import { getWindowsStateStoreData, IWindowsState, IWindowState, restoreWindowsState, ritemarkFirstWindowSize } from '../../electron-main/windowsStateHandler.js';
+ import { IWorkspaceIdentifier } from '../../../workspace/common/workspace.js';
+ 
+ suite('Windows State Storing', () => {
+@@ -200,5 +200,12 @@ suite('Windows State Storing', () => {
+ 		assertEqualWindowsState(expected, windowsState, 'v1_32_empty_window');
+ 	});
+ 
++	test('Ritemark first window: 1440 x 900, or 90% of a smaller work area', () => {
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1728, height: 1084 }), { width: 1440, height: 900 }, 'a 14" MacBook Pro');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1440, height: 875 }), { width: 1296, height: 788 }, 'a 13" MacBook Air');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 1366, height: 728 }), { width: 1229, height: 655 }, 'a small Windows laptop');
++		assert.deepStrictEqual(ritemarkFirstWindowSize({ width: 2560, height: 1400 }), { width: 1440, height: 900 }, 'a large display');
++	});
++
+ 	ensureNoDisposablesAreLeakedInTestSuite();
+ });
+diff --git a/src/vs/workbench/browser/labels.ts b/src/vs/workbench/browser/labels.ts
+index a414a3d0fcf..6e829e42cd8 100644
+--- a/src/vs/workbench/browser/labels.ts
++++ b/src/vs/workbench/browser/labels.ts
+@@ -5,7 +5,7 @@
+ 
+ import { localize } from '../../nls.js';
+ import { URI } from '../../base/common/uri.js';
+-import { dirname, isEqual, basenameOrAuthority } from '../../base/common/resources.js';
++import { dirname, isEqual, basenameOrAuthority, extname } from '../../base/common/resources.js';
+ import { IconLabel, IIconLabelValueOptions, IIconLabelCreationOptions } from '../../base/browser/ui/iconLabel/iconLabel.js';
+ import { ILanguageService } from '../../editor/common/languages/language.js';
+ import { IWorkspaceContextService } from '../../platform/workspace/common/workspace.js';
+@@ -647,6 +647,16 @@ class ResourceLabelWidget extends IconLabel {
+ 
+ 		const resource = toResource(this.label);
+ 
++		// Ritemark 2.0 (Sprint 133, R13): a file's extension apart from its name, for the callers that ask (the Explorer's
++		// rows, the editor tabs). Decided from the resource, so `.gitignore`, folders and names that do not end with
++		// their resource's extension (a diff's "(Working Tree)", a web page) stay whole.
++		const name = this.label.name;
++		if (this.options?.splitExtension && typeof name === 'string' && resource
++			&& this.options.fileKind !== FileKind.FOLDER && this.options.fileKind !== FileKind.ROOT_FOLDER) {
++			const extension = extname(resource);
++			iconLabelOptions.splitExtension = extension.length > 1 && name.endsWith(extension);
++		}
++
+ 		if (this.options?.title !== undefined) {
+ 			iconLabelOptions.title = this.options.title;
+ 		}
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
 index c213b29de93..3f6375403b9 100644
 --- a/src/vs/workbench/browser/layout.ts
@@ -329,10 +605,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..8377705f664
+index 00000000000..01610913be4
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1571 @@
+@@ -0,0 +1,1701 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1904,6 +2180,136 @@ index 00000000000..8377705f664
 +.monaco-workbench > :is(.notifications-toasts, .notifications-center) .notifications-list-container .notification-list-item .notification-list-item-buttons-container > .monaco-button.secondary:hover {
 +	background-color: var(--rm-hover) !important; /* !important: as above */
 +}
++
++
++/*
++ * Sprint 133. The welcome alone (R1; ritemarkWelcomeAlone.ts): only its sheet on the ground. The strips keep their
++ * boxes, so the window still drags by its top; their controls, the tab row's tabs and +, the desk's paint and the
++ * status bar step out. The traffic lights and Windows' buttons are the system's and stay; the welcome's page draws
++ * its own sheet on the ground's colour.
++ */
++
++.monaco-workbench.ritemark-welcome-alone .ritemark-frame-strip > *,
++.monaco-workbench.ritemark-welcome-alone .part.editor .editor-group-container > .title > *,
++.monaco-workbench.ritemark-welcome-alone .part.statusbar {
++	visibility: hidden;
++}
++
++.monaco-workbench.ritemark-welcome-alone .part.editor .editor-group-container > .editor-container {
++	background-color: transparent !important; /* !important: the desk's own rule above, and the inline editor background */
++	box-shadow: none;
++	border-radius: 0;
++}
++
++
++/*
++ * An empty desk offers the + menu's first three as tiles: Text, Table and Web page (R6, S49; ritemarkEmptyDesk.ts;
++ * experience 2, decision 6). They lie on the desk's sheet, centred under the tab row; the letterpress and VS Code's
++ * shortcuts stay hidden. The kit's `.tiles`: three columns 12 apart, radius 10, the strong hairline.
++ */
++
++.monaco-workbench .part.editor > .content .editor-group-container.empty > .editor-group-watermark {
++	display: flex !important; /* !important: the rule above hides the whole watermark */
++	position: absolute;
++	inset: 44px 8px 8px 8px; /* under the tab row, on the sheet */
++	max-width: none;
++	height: auto;
++	margin: 0;
++	z-index: 1;
++	align-items: center;
++	justify-content: center;
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark > .watermark-container {
++	display: none;
++}
++
++.monaco-workbench .part.editor > .content .editor-group-container.empty {
++	opacity: 1; /* the empty desk's tiles stay readable when another desk is the active one */
++}
++
++.monaco-workbench.ritemark-welcome-alone .part.editor > .content .editor-group-container.empty > .editor-group-watermark {
++	display: none !important; /* !important: the empty desk's rule above */
++}
++
++.monaco-workbench .ritemark-empty-desk {
++	display: grid;
++	grid-template-columns: repeat(3, 1fr);
++	gap: 12px;
++	width: min(560px, calc(100% - 48px));
++}
++
++.monaco-workbench .ritemark-empty-desk-tile {
++	display: grid;
++	gap: 10px;
++	padding: 14px;
++	border: 0;
++	border-radius: 10px;
++	box-shadow: 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--vscode-widget-border));
++	background: var(--rm-desk);
++	color: var(--vscode-foreground);
++	font: inherit;
++	text-align: left;
++	cursor: pointer;
++}
++
++.monaco-workbench .ritemark-empty-desk-tile:hover {
++	background-color: var(--vscode-ritemark-aiSheet, var(--rm-hover));
++}
++
++.monaco-workbench .ritemark-empty-desk-tile:focus-visible {
++	outline: 1px solid var(--vscode-focusBorder);
++	outline-offset: 2px;
++}
++
++.monaco-workbench .ritemark-empty-desk-icon {
++	display: grid;
++	place-items: center;
++	width: 32px;
++	height: 32px;
++	border-radius: 8px;
++	background: var(--rm-ground);
++	color: var(--rm-body);
++	font-size: 16px;
++}
++
++.monaco-workbench .ritemark-empty-desk-text {
++	display: grid;
++}
++
++.monaco-workbench .ritemark-empty-desk-text > b {
++	font-size: 14px;
++	line-height: 18px;
++	font-weight: 600;
++	color: var(--vscode-sideBarTitle-foreground);
++}
++
++.monaco-workbench .ritemark-empty-desk-text > span {
++	font-size: 12px;
++	line-height: 16px;
++	color: var(--rm-muted);
++}
++
++
++/*
++ * A file's extension in muted ink, in the documents tree and on tabs (R13; iconLabel.ts `splitExtension`). The name is
++ * the body ink; on the chosen tab, the open row, a pointed-at row or tab, in high contrast, and where a file decoration
++ * colours the name, the extension takes the name's own colour.
++ */
++
++.monaco-workbench .label-extension {
++	color: var(--rm-muted);
++}
++
++.monaco-workbench .tabs-container > .tab.active .label-extension,
++.monaco-workbench .tabs-container > .tab:hover .label-extension,
++.monaco-workbench .monaco-list .monaco-list-row.selected .label-extension,
++.monaco-workbench .monaco-list .monaco-list-row:hover .label-extension,
++.monaco-workbench .monaco-icon-label[class*="monaco-decoration-itemColor-"] .label-extension,
++.monaco-workbench.hc-black .label-extension,
++.monaco-workbench.hc-light .label-extension {
++	color: inherit;
++}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 index 4aaccf3c849..31f3520c15a 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
@@ -2349,10 +2755,10 @@ index ae5536dd7c0..72709290367 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts b/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts
 new file mode 100644
-index 00000000000..05ea0275947
+index 00000000000..a16fb914c93
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,96 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2375,6 +2781,7 @@ index 00000000000..05ea0275947
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
 +import { CustomMenubarControl } from './titlebar/menubarControl.js';
++import { isRitemarkWelcomeAlone, onDidChangeRitemarkWelcomeAlone } from './ritemarkWelcomeAlone.js';
 +
 +/** Ritemark 2.0: whether the main window's strips carry the application menu (Windows; the Mac keeps its menu bar). */
 +export const RITEMARK_FRAME_MENU = RITEMARK_FRAME_WITHOUT_TITLE_ROW && isNative && isWindows;
@@ -2409,6 +2816,7 @@ index 00000000000..05ea0275947
 +
 +		this.place();
 +		this._register(onDidChangeSlots.event(() => this.place()));
++		this._register(onDidChangeRitemarkWelcomeAlone(() => this.place()));
 +		this._register(layoutService.onDidChangePartVisibility(e => {
 +			if (e.partId === Parts.SIDEBAR_PART) {
 +				this.place();
@@ -2418,6 +2826,13 @@ index 00000000000..05ea0275947
 +	}
 +
 +	private place(): void {
++		// The welcome alone has no menu button, only the window buttons (Sprint 133, R1)
++		if (isRitemarkWelcomeAlone()) {
++			this.menu.clear();
++			this.host?.remove();
++			this.host = undefined;
++			return;
++		}
 +		const slot = this.layoutService.isVisible(Parts.SIDEBAR_PART) ? slots.get('column') : slots.get('desk');
 +		if (!slot || this.host?.parentElement === slot) {
 +			return;
@@ -2710,12 +3125,90 @@ index 00000000000..67f3b47cd9f
 +	getWindow(menu).setTimeout(() => rows[0]?.focus(), 0);
 +	return toDisposable(() => disposables.dispose());
 +}
+diff --git a/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
+new file mode 100644
+index 00000000000..e7200373201
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
+@@ -0,0 +1,72 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.0 (Sprint 133, R1): the welcome alone. While the extension's welcome is the editor in front and the
++ * extension says so (the context key `ritemark.welcomeAlone`), the window shows only the welcome's sheet on the
++ * ground: `ritemark-welcome-alone` on the workbench hides the desk's strip and sheet and the status bar
++ * (ritemarkSurfaces.css). The strips keep their boxes, so the window still drags by its top; the traffic lights and
++ * Windows' window buttons stay, and Windows' menu button is not mounted. The class goes as soon as anything else is in
++ * front, and nothing is written: the person's own status bar and tab settings are untouched.
++ */
++
++import { Emitter, Event } from '../../../base/common/event.js';
++import { Disposable } from '../../../base/common/lifecycle.js';
++import { IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
++import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
++import { IEditorService } from '../../services/editor/common/editorService.js';
++import { IWorkbenchLayoutService } from '../../services/layout/browser/layoutService.js';
++
++/** Set by the extension while its welcome is open alone in the window. */
++const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
++
++/** The welcome's webview editor, as the workbench names an extension's webview panel. */
++const WELCOME_VIEW_TYPE = 'mainThreadWebview-ritemark.welcome';
++
++let welcomeAlone = false;
++const onDidChange = new Emitter<boolean>();
++
++/** Ritemark 2.0: fires when the welcome starts or stops being alone in the window. */
++export const onDidChangeRitemarkWelcomeAlone: Event<boolean> = onDidChange.event;
++
++/** Ritemark 2.0: whether the welcome is alone in the window (the menu button and the window sizes stand down). */
++export function isRitemarkWelcomeAlone(): boolean {
++	return welcomeAlone;
++}
++
++class RitemarkWelcomeAlone extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.ritemarkWelcomeAlone';
++
++	constructor(
++		@IContextKeyService private readonly contextKeyService: IContextKeyService,
++		@IEditorService private readonly editorService: IEditorService,
++		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
++	) {
++		super();
++
++		const keys = new Set([WELCOME_ALONE_CONTEXT_KEY]);
++		this._register(contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(keys)) {
++				this.update();
++			}
++		}));
++		this._register(editorService.onDidActiveEditorChange(() => this.update()));
++		this.update();
++	}
++
++	private update(): void {
++		const viewType = (this.editorService.activeEditor as { viewType?: unknown } | undefined)?.viewType;
++		const alone = this.contextKeyService.getContextKeyValue<boolean>(WELCOME_ALONE_CONTEXT_KEY) === true && viewType === WELCOME_VIEW_TYPE;
++		if (alone === welcomeAlone) {
++			return;
++		}
++		welcomeAlone = alone;
++		this.layoutService.mainContainer.classList.toggle('ritemark-welcome-alone', alone);
++		onDidChange.fire(alone);
++	}
++}
++
++registerWorkbenchContribution2(RitemarkWelcomeAlone.ID, RitemarkWelcomeAlone, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
 new file mode 100644
-index 00000000000..01be0d2bbb9
+index 00000000000..c6764e91723
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWindowSizes.ts
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,204 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2739,6 +3232,7 @@ index 00000000000..01be0d2bbb9
 +import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
++import { isRitemarkWelcomeAlone, onDidChangeRitemarkWelcomeAlone } from './ritemarkWelcomeAlone.js';
 +
 +/** The widths the window crosses, widest first: the AI narrows, the left column hides, the AI hides. */
 +const RITEMARK_WINDOW_WIDTHS = [1400, 1200, 960];
@@ -2860,9 +3354,14 @@ index 00000000000..01be0d2bbb9
 +		this.memory = this.load();
 +		this.update();
 +		this._register(layoutService.onDidLayoutMainContainer(() => this.scheduler.schedule()));
++		this._register(onDidChangeRitemarkWelcomeAlone(() => this.scheduler.schedule()));
 +	}
 +
 +	private update(): void {
++		// The welcome alone closed both columns itself: no crossing opens one behind it (Sprint 133, R1)
++		if (isRitemarkWelcomeAlone()) {
++			return;
++		}
 +		const width = this.layoutService.mainContainerDimension.width;
 +		const band = ritemarkWindowBand(width);
 +		if (band === this.memory.band) {
@@ -3303,7 +3802,7 @@ index c8fc8aa2dd2..39566af5ecd 100644
 +	return folder?.resource;
 +});
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index ed7dbe07826..b985501d431 100644
+index ed7dbe07826..56fc8df569d 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 @@ -77,7 +77,7 @@ import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.j
@@ -3315,7 +3814,17 @@ index ed7dbe07826..b985501d431 100644
  
  	getHeight(element: ExplorerItem): number {
  		return ExplorerDelegate.ITEM_HEIGHT;
-@@ -1412,7 +1412,9 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
+@@ -1016,7 +1016,8 @@ export class FilesRenderer implements ICompressibleTreeRenderer<ExplorerItem, Fu
+ 			fileDecorations: this.config.explorer.decorations,
+ 			matches: createMatches(filterData),
+ 			separator: this.labelService.getSeparator(stat.resource.scheme, stat.resource.authority),
+-			domId
++			domId,
++			splitExtension: true // Ritemark 2.0: the extension in muted ink (Sprint 133, R13)
+ 		});
+ 
+ 		const highlightResults = stat.isDirectory ? this.highlightTree.get(stat) : 0;
+@@ -1412,7 +1413,9 @@ export class FilesFilter implements ITreeFilter<ExplorerItem, FuzzyScore> {
  			stat.isExcluded = true;
  			const editors = this.editorService.visibleEditors;
  			const editor = editors.find(e => e.resource && this.uriIdentityService.extUri.isEqualOrParent(e.resource, stat.resource));
@@ -3341,19 +3850,20 @@ index 683604c1cc7..880e0e927d2 100644
  	}
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 544300939e9..5ce62a1fad5 100644
+index 544300939e9..f76ae836490 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
-@@ -28,7 +28,7 @@ import { NativeWindow } from './window.js';
+@@ -28,7 +28,8 @@ import { NativeWindow } from './window.js';
  import { ModifierKeyEmitter } from '../../base/browser/dom.js';
  import { applicationConfigurationNodeBase, securityConfigurationNodeBase } from '../common/configuration.js';
  import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from '../../platform/window/electron-browser/window.js';
 -import product from '../../platform/product/common/product.js';
 +import '../browser/parts/ritemarkWindowSizes.js'; // Ritemark 2.0: the window makes room for the document (R14)
++import '../browser/parts/ritemarkWelcomeAlone.js'; // Ritemark 2.0: the welcome alone on the ground (Sprint 133, R1)
  
  // Actions
  (function registerActions(): void {
-@@ -279,7 +279,7 @@ import product from '../../platform/product/common/product.js';
+@@ -279,7 +280,7 @@ import product from '../../platform/product/common/product.js';
  						localize(`window.menuStyle.native`, "Use the native menu. This is ignored when {0} is set to {1}.", '`#window.titleBarStyle#`', '`custom`'),
  						localize(`window.menuStyle.inherit`, "Matches the menu style to the title bar style defined in {0}.", '`#window.titleBarStyle#`'),
  					],
@@ -3362,7 +3872,7 @@ index 544300939e9..5ce62a1fad5 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
-@@ -288,7 +288,7 @@ import product from '../../platform/product/common/product.js';
+@@ -288,7 +289,7 @@ import product from '../../platform/product/common/product.js';
  			'window.dialogStyle': {
  				'type': 'string',
  				'enum': ['native', 'custom'],
