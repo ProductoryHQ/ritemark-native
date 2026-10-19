@@ -94,7 +94,7 @@ The release tier is **shell**: the release is a full app build, and the runtime 
 Following `docs/microsoft-store-submission/PARTNER-CENTER-RUNBOOK.md` and the v1.14.0 record:
 - After publication, the released installer goes to `windows/v2.0.0/Ritemark-Setup.exe` with the guarded uploader; the anonymous verification and a second refused plan are recorded in `evidence/`.
 - A release-candidate record (`release-candidates/v2.0.0-candidate-N.md`) with the URL, size and SHA-256.
-- `CERTIFICATION-NOTES-v2.0.0.md`: what changed for a tester (the welcome on first start, the sample project, opt-in usage data).
+- `CERTIFICATION-NOTES-v2.0.0.md`: what changed for a tester (the welcome on first start, the sample project, usage data on by default and turned off on the welcome or in Settings).
 - `LISTING-COPY.md` reviewed for 2.0 by the `product-marketer` agent; Jarmo approves.
 - Screenshots: 5–7 from the installed signed Windows candidate at 1920 × 1080, with the sample project and a disposable profile (D4); captions under 200 characters; `ASSETS.md` updated.
 - Partner Center: the package URL only, What's new, certification notes, listing copy and screenshots; validation results recorded honestly; Jarmo's action-time yes for the URL and SHA-256 and for any warning; Submit; the result recorded in `STATUS.md`.
