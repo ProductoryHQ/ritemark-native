@@ -21,7 +21,7 @@ interface SettingsData {
   agentRuntimePreference: 'bundled' | 'system';
   /** Sprint 133 (R12): Git and Node.js for this computer's runtime (null with Ritemark's own). */
   environment?: { gitInstalled: boolean; nodeInstalled: boolean; gitRequired: boolean; nodeRequired: boolean; restartRequired: boolean } | null;
-  /** Sprint 133 (R7): usage data, off until yes. */
+  /** Sprint 133 (R7): usage data; on by default from the welcome (Jarmo, 19 October). */
   usageData?: { on: boolean; fromRitemark1: boolean };
   updatesEnabled: boolean;
   agentTimeout: number;
@@ -1337,7 +1337,7 @@ export function RitemarkSettings() {
         </div>
       </section>
 
-      {/* Usage data (Sprint 133, R7): the welcome's choice and words, off until yes */}
+      {/* Usage data (Sprint 133, R7): the welcome's choice and words; on by default from the welcome (Jarmo, 19 October) */}
       <section className="mb-8" id="settings-section-usage-data">
         <div className="flex items-center gap-2 mb-4">
           <Icon name="shield-check" size={20} className="text-ink-strong" />
@@ -1351,7 +1351,7 @@ export function RitemarkSettings() {
             ? (settings.usageData.fromRitemark1
               ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
               : 'On. Never your documents, chats or names.')
-            : 'Off until you turn it on. Never your documents, chats or names.'}
+            : 'Off. Never your documents, chats or names.'}
           checked={settings.usageData?.on ?? false}
           onChange={(value) => {
             // Answer the click at once, as the theme choice does; the host's resend confirms it.

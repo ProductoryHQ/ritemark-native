@@ -683,7 +683,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Sprint 133 (R12): 1.x's launch check rows: Git always, Node.js for this computer's runtime
         environment,
 
-        // Sprint 133 (R7): usage data, off until the person's yes; the welcome's words
+        // Sprint 133 (R7): usage data, on only after the person's yes (on by default from the welcome); the welcome's words
         usageData: usageDataState(),
 
         // Updates

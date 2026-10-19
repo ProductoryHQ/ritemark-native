@@ -1,11 +1,17 @@
 /**
  * The one consent gate for usage data (Sprint 133, R7–R9, E1).
  *
- * Nothing is counted before yes (Jarmo, 17 October 2026): every send to
- * PostHog passes `ConsentGate`, the PostHog client is not even created before
- * a yes, and the anonymous id is not written before one either. For someone
- * updating from Ritemark 1, an OK on 1.x's usage-data notice is that yes
- * (Jarmo, 18 October): see `readOneXAnswer`.
+ * Nothing is counted before yes: every send to PostHog passes `ConsentGate`,
+ * the PostHog client is not even created before a yes, and the anonymous id is
+ * not written before one either. Usage data is on by default (Jarmo, 19 October
+ * 2026: "usage data on by default, as you suggested", reversing 17 October's
+ * off until yes): the welcome's switch shows on, and leaving the welcome for a
+ * project with it on is the yes (`welcomeState.usageAnswerOnLeave`), so nothing
+ * leaves before the welcome is finished. A profile that never sees the welcome
+ * keeps no answer, and sends nothing. For someone updating from Ritemark 1, an
+ * OK on 1.x's usage-data notice is a yes and an Opt Out a no (Jarmo,
+ * 18 October): see `readOneXAnswer`. No event carries a location
+ * (`$geoip_disable`).
  *
  * No `vscode` import: `posthog.ts` wires the gate to the settings, the feature
  * flag and posthog-node, and the tests drive it with fakes.
@@ -197,7 +203,7 @@ export class ConsentGate {
     let sent = true;
     try {
       for (const event of events) {
-        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, $process_person_profile: false } });
+        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, $process_person_profile: false, $geoip_disable: true } });
       }
     } catch (error) {
       this.deps.log?.('Failed to send feedback', error);
@@ -241,6 +247,7 @@ export class ConsentGate {
           ...properties,
           ...this.deps.sharedProperties(),
           $process_person_profile: false,
+          $geoip_disable: true,
         },
       });
       return true;

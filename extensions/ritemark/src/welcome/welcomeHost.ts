@@ -61,6 +61,8 @@ import {
   providerView,
   runtimeOfProvider,
   type ProviderMemory,
+  usageAnswerOnLeave,
+  usageSwitchOn,
 } from './welcomeState';
 import { folderGone, FOLDER_OPEN_FAILED } from './words';
 import {
@@ -183,6 +185,8 @@ class WelcomeController implements vscode.Disposable {
   private documents: string | null = null;
   private newProjectError: string | null = null;
   private notice: string | null = null;
+  /** The usage-data switch as the person left it on this welcome; null while untouched (on by default). */
+  private pendingUsage: boolean | null = null;
   private opening = false;
   private missingTool: MissingTool | null = null;
   private keysSet: Record<WelcomeKeyName, boolean> = {
@@ -439,7 +443,7 @@ class WelcomeController implements vscode.Disposable {
       readyProvider: this.readyProvider,
       offline: this.offline,
       projects: this.projects.map(({ uri: _uri, ...row }) => row),
-      usageData: { on: usage.on, fromRitemark1: usage.fromRitemark1 },
+      usageData: { on: usageSwitchOn(usage.answer, this.pendingUsage), fromRitemark1: usage.fromRitemark1 },
       missingTool: this.missingTool,
       newProject: { placePrefix: this.placePrefix(), error: this.newProjectError, ...(this.newProjectRequested ? { open: true } : {}) },
       keysSet: this.keysSet,
@@ -594,7 +598,10 @@ class WelcomeController implements vscode.Disposable {
       case 'welcome/open-recent':
         return this.openRecent(request.id);
       case 'welcome/usage-data':
-        await setUsageData(request.on, 'welcome');
+        // On by default (Jarmo, 19 October): on is answered when the person leaves for a project (finish); off is
+        // answered at once, and the welcome's held events are dropped unsent.
+        this.pendingUsage = request.on;
+        if (!request.on) await setUsageData(false, 'welcome');
         this.push();
         return;
       case 'welcome/open-link':
@@ -898,6 +905,11 @@ class WelcomeController implements vscode.Disposable {
   }
 
   private async finish(): Promise<void> {
+    // Leaving for a project with the switch on answers yes: the session start and the held welcome events go now,
+    // before the window reloads (a slow network waits 3 s at most)
+    if (usageAnswerOnLeave(this.kind, usageDataState().answer, this.pendingUsage) === 'yes') {
+      await Promise.race([setUsageData(true, 'welcome'), new Promise((resolve) => setTimeout(resolve, 3000))]);
+    }
     await this.context.globalState.update(WELCOME_FINISHED_KEY, { kind: this.profileKind, at: new Date().toISOString() });
     if (this.profileKind === 'update') {
       await this.context.globalState.update(UPDATED_FROM_1X_KEY, { at: new Date().toISOString() });
