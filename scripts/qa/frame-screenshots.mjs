@@ -110,9 +110,13 @@ async function click(what, elementExpression) {
 
 const byLabel = (selector, label) => `[...document.querySelectorAll(${JSON.stringify(selector)})].find(element => element.getBoundingClientRect().width && (element.getAttribute('aria-label') || '').startsWith(${JSON.stringify(label)}))`;
 
-/** Picks a quick pick's row by its exact label (never a near match). */
+/** Picks a quick pick's row by its exact label (never a near match), waiting up to 3 s for the list to draw it. */
 async function pickRow(label) {
-	await click(`the row "${label}"`, `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`);
+	const row = `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`;
+	for (let waited = 0; waited < 3000 && !(await evaluate(`!!(${row})?.getBoundingClientRect().width`)); waited += 250) {
+		await sleep(250);
+	}
+	await click(`the row "${label}"`, row);
 }
 
 async function type(text) {

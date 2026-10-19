@@ -168,6 +168,37 @@ Found during QA and not changed in this sprint, each small or outside its scope:
 - Host log noise at every start: Copilot's GitHubLoginFailed; runtime drift between the bundled Claude/Codex and the manifest in this dev tree; the parcel watcher dropping events for the home folder.
 - During S2 (run A) the profile's AI changed to ChatGPT without a click that could be named; not reproduced.
 
+## The Windows overlay round (19 October, before the merge)
+
+The Development manager's Windows session ran the 13-item brief on the branch's extension (`9f2ed022`, CI run 39261202398) laid over round 3's shell (`eae1dedd`), so the shell parts of this sprint were absent. #467 merged while it ran.
+
+- **Pass:** S13, S23, S24, S27 (the menu's rows), S30/S32, S31, S36, S37 (no Google client in the overlay, as expected), S51 (the PDF and Word bars and Share, run by hand), S60, and R15/S42 within that PC's limits.
+- **Blocker, S55, fixed by #468 (`b3887add`):** on the older shell the share question looped. That shell answers the share request with its own modal dialog ("Share this browser page with the agent?"), and the AI's sheet polls every 1.5 s: each poll made one more request while the dialog waited, so answering one dialog brought the next, and the restored web tab started it again at the next start. #468 makes one request at a time, and any reply that needs no answer from the sheet settles that page for the window, so a page is asked at most once. Two tests imitate the older shell (`BrowserContextStore.test.ts`); the first fails on the store before the fix. On this sprint's shell the question waits on the AI's sheet (E5 below).
+- **Shell gap, expected:** on the older shell, Tasks, Browser and Transcribe keep their old title rows without the project's head (patch 018), and the overlay had removed their old controls. They come with the shell build.
+- **Notes:** File ▸ Open Recent showed no "Switched to…" note, and a Browser Recent row showed no site icon. Both need this sprint's shell (patch 018's switch guard and the browser's icons), and both are checked on the production build in E5. Typing a UNC path into VS Code's simple Open Folder dialog put the current drive in front ("X:\localhost\…"): VS Code's dialog, recorded only.
+
+The Windows round on the build of main (`3c8a7c30`, run 39271200319) is recorded when its results arrive.
+
+## E5: the production build of the merged commit (19 October)
+
+A clean-room release worktree at `3c8a7c30` (`./scripts/create-release-worktree.sh`, `.worktrees/release-3c8a7c30e30f`), built with `./scripts/build-prod.sh` in the background, unsigned. The app is `.worktrees/release-3c8a7c30e30f/VSCode-darwin-arm64/Ritemark.app`, 2.0 GB, ad-hoc signed by the linker; the worktree with its build is 10 GB.
+
+- **The build stopped at step 6 of 9, at the provenance gate, as designed:** "source commit 3c8a7c30 is not origin/main b3887add". #468 merged while the build ran (17:53; VS Code's build ended 17:57). Steps 1–5 passed: frozen dependencies, the bundled runtimes, VS Code's build, the extension's copy and its check (runtime-complete; `webview.js` 8,607,805 bytes, `extension.js` 5,633,830). `validate-build-output.sh` run on it alone: every check OK but the missing provenance manifest. So the app has `3c8a7c30`'s product bytes and is not a release candidate; main has no release until 2.0. A build of `b3887add` or later needs this worktree removed first (about 10 GB free), which is Jarmo's call under the worktree hygiene rule.
+- **One warning, seen once:** after VS Code's build, "Extension files corrupted during build! Restoring from backup". The guard in `build-prod.sh` fires when `media/webview.js` or `out/extension.js` comes out of VS Code's gulp build nearly empty, and restores both from the backup it made before; step 5 then checked the copied files at full size. No earlier record mentions it firing, so whether every clean-room build hits it is not known.
+
+The app run in the background (`open -n -g`, profile `/tmp/r134e5`, port 9361, PostHog pointed at a closed local port), on a fresh profile with the baseline's sample at `/private/tmp/ritemark-frame/`:
+
+| Check | Result |
+|---|---|
+| `project-check.mjs --close-all --share-question` | 6 of 6 pass: Home and Tasks first and after Close all, the Tasks count, the splash's ground, and **S55: the question waits on the AI's sheet while Home comes forward and the + opens its menu**; it asked once and did not come back |
+| `frame-geometry.mjs` | 22 pass, 0 fail, 2 skipped (the tab labels' line is not measured) |
+| The frame baseline (`frame-screenshots.mjs --compare`) | 30 of 34 the same (0–0.29%). The 4 that differ are what a production build shows: More has no Copilot Chat or Chat Debug (1.05%, 1.01%), and the Settings foot (3.38%, 3.37%) shows the floored extension version 1.14.0-0, the last check's time and the newer runtimes bundled from the frozen manifest (Claude Code 2.1.296, Codex 0.162.1, against the dev tree's 2.1.289 and 0.160.0). The first run stopped when the palette drew a row after the script's fixed wait; `pickRow` now waits for the row up to 3 s, and the second run went through |
+| S58, All commands | "breakpoint": No matching commands; "walkthrough": only Help: Welcome |
+| S30/S32, the "Switched to…" note (the Windows overlay's question) | After File ▸ Open Folder… (VS Code's simple dialog, to a second folder): "Switched to Second project. Harbour leadership programme is kept as you left it." `project-check.mjs --switch-to` through File ▸ Open Recent, both ways: 7 of 7, with "Switched to Harbour leadership programme. Second project is kept as you left it." The note needs this sprint's shell, which is why the overlay round didn't see it. `project-check.mjs` now checks the note |
+| Browser Recent's site icon (the overlay's other note) | A local page with its own icon: Recent's row and the page's tab show it (a `data:image/png` from patch 009) ([e5-browser-recent-share-question-light.png](qa-evidence/e5-browser-recent-share-question-light.png), which also shows the share question waiting and the project's head with its ▾ at the column's right end). The frame script's own page has no icon and shows the globe |
+
+The built app's log had no errors. Its profile, the sample and the test folders are deleted; the release worktree is kept until Jarmo decides (`worktree-hygiene.mjs` holds a worktree with build output).
+
 ## E7: the drift check (19 October)
 
 `./scripts/check-vscode-drift.sh 1.142.0` at `3c8a7c30` (1.142.0 is still VS Code's newest release): 13 of 18 patches fail in 59 file patches. 006, 011, 012, 014 and 016 apply, as at Sprint 133 (56 file patches). The 3 more are 018's: `src/vs/base/browser/ui/dialog/dialog.ts` and `src/vs/workbench/browser/parts/dialogs/dialogHandler.ts` (a question with Cancel first focuses Cancel, R9) and `src/vs/workbench/contrib/splash/browser/partsSplash.ts` (the splash saves the ground, R9); 018 now fails in 17 files, 002 in 12, 003 in 8. Recorded in the release plan's risk register.

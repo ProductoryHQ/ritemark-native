@@ -102,7 +102,7 @@ Nothing here starts before Jarmo approves the sprint plan, and not before Sprint
 - [ ] Windows overlay round before the merge: S41 on the extension side
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [x] PR opened ([#467](https://github.com/ProductoryHQ/ritemark-native/pull/467)); `qa-validator` review (two findings fixed); screenshots to the Experience lead (approved); Jarmo's "admin merge 467": merged 2026-10-19 as `3c8a7c30`
-- [ ] After the merge: a production build from a clean-room worktree at the merged commit (E5)
+- [x] After the merge: a production build from a clean-room worktree at the merged commit (E5): built to step 5 of 9 and stopped at the provenance gate because #468 merged meanwhile; the app's checks pass ([qa-evidence.md](qa-evidence.md), E5)
 - [ ] After the merge: Windows round from main: S41, S42, S29, S52, S58, the splash and the Tasks tab's count; findings in `qa-evidence.md`
 - [ ] Linked issues closed with evidence: [#455](https://github.com/ProductoryHQ/ritemark-native/issues/455), [#456](https://github.com/ProductoryHQ/ritemark-native/issues/456)
 - [x] After the merge: the drift check into the release plan (E7): 13 of 18 patches fail on 1.142.0 in 59 file patches
