@@ -25,7 +25,7 @@ The project becomes the place a person works in. Each project opens on its own H
 Sprint 132 handed these to step 3 in its sprint plan and QA evidence:
 - **The project's head on Tasks, Browser and Transcribe** (R16), as every place but Home has it in the Experience lead's drawings. Sprint 132 did only the minimum: Browser's title reads "Browser".
 - **Tasks under the head** (R17): New task, Search, and the list in the order work moves (experience 6).
-- **Browser under the head** (R18): the Recent label with its + and Clear, and "No pages yet" for "No recent URLs".
+- **Browser under the head** (R18): the Recent label with Clear at its right, and "No pages yet" for "No recent URLs". The + became the New page row under the head (the Experience lead, 19 October; spec R18).
 - **The PDF and Word bars** (R19): Make an editable copy, and Share. The Experience lead's scope of 18 October left both to this step.
 - **The File menu** (R8): New tab and Share join Switch project, as Sprint 132's technical plan left them.
 - **A folder that has gone stays gone** (R13): Flows' storage no longer recreates it (Sprint 133's QA).

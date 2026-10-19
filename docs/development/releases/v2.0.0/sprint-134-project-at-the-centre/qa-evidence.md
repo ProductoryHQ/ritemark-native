@@ -59,7 +59,7 @@ Each scenario's result after the fixes, with the run that holds its evidence (ru
 | S38 A project whose folder is not found | Pass after a fix (tooltips outside the column; the switcher's row) | A, C |
 | S39 An empty project and no board | Pass | A |
 | S40 1.x's Home launcher | Pass (R14's table) | A |
-| S41, S42 Windows | The Windows rounds | — |
+| S41, S42 Windows | Pass: the overlay round before the merge (the extension's side, R15/S42) and round 4 on the signed build of main (the shell's side) | The Windows rounds |
 | S43 Find it… on another project's folder | Pass after a fix (nothing said) | A, C |
 | S44 A `CLAUDE.md` of the person's own | Pass after a fix (the note never showed); the AI's answer after Add the line at Gate 2 | run 1 |
 | S45 Tasks, Browser and Transcribe | Pass | B, C |
@@ -69,7 +69,7 @@ Each scenario's result after the fixes, with the run that holds its evidence (ru
 | S49 The order work moves | Pass after a fix (cut status words, narrow toast) | B, C |
 | S50 Recent, and plain words | Pass (redrawn to the Experience lead's answer) | B; run 1 |
 | S51 Make an editable copy, and Share | Pass; Open in Word not clicked | B |
-| S52 File ▸ New tab and Share | Pass; Share greyed out is checked on Windows | run 1 |
+| S52 File ▸ New tab and Share | Pass; on Windows, round 4 saw Share greyed with About this project in front, where the Mac has it enabled (round 4, open for a Windows re-check) | run 1 |
 | S53 A folder that has gone stays gone | Pass after a fix (a drop made the folder again) | A, C |
 | S54 The welcome's lists | Pass | A; run 1 |
 | S55 Asked on the AI's sheet | Pass, with Claude's answer; ChatGPT's at Gate 2 | run 1 |
@@ -177,7 +177,24 @@ The Development manager's Windows session ran the 13-item brief on the branch's 
 - **Shell gap, expected:** on the older shell, Tasks, Browser and Transcribe keep their old title rows without the project's head (patch 018), and the overlay had removed their old controls. They come with the shell build.
 - **Notes:** File ▸ Open Recent showed no "Switched to…" note, and a Browser Recent row showed no site icon. Both need this sprint's shell (patch 018's switch guard and the browser's icons), and both are checked on the production build in E5. Typing a UNC path into VS Code's simple Open Folder dialog put the current drive in front ("X:\localhost\…"): VS Code's dialog, recorded only.
 
-The Windows round on the build of main (`3c8a7c30`, run 39271200319) is recorded when its results arrive.
+## Windows round 4: the signed build of main (19 October, after the merge)
+
+The Development manager's Windows session ran the shell parts on the signed build of `3c8a7c30` (run 39271200319). Everything it checked passes:
+- **S55:** the question comes once, on the AI's sheet, with no loop.
+- **The heads (S45, S48, S50):** Tasks, Browser and Transcribe show the project's head; New task added an item and Search filtered.
+- **S27:** the switcher's flyout reads "Open in a new window – Alt click".
+- **S30/S32:** File ▸ Open Recent shows the "Switched to…" note.
+- **S58:** "breakpoint" finds no commands, "walkthrough" finds only Help: Welcome, and Toggle Developer Tools still runs.
+- **The ×, and the head:** the × is centred in its box; the head spans 8–248 with its ▾ at 228–240.
+- **About this project:** its book icon in the tree and on the tab; the pointer `CLAUDE.md` is hidden.
+- **Startup (#401):** extension host +10.1 s, Ritemark activated +12.2 s, eager work done +30.4 s.
+
+**Found and fixed in [#472](https://github.com/ProductoryHQ/ritemark-native/pull/472) (`012d47f6`):** on Windows the app's `package.json` read "Transcribe a fileâ€¦", "Open a folderâ€¦" and 10 more labels in mojibake. `floor-bundled-extension.sh`'s Python read the file in the Windows code page (cp1252) and wrote it back as UTF-8; it now reads and writes UTF-8.
+
+Three smaller items from round 4, each looked at on the Mac:
+- **The splash on a switch's reload, in Light, read white on Windows (255,255,255), not the ground; Dark was right.** Not reproduced on the Mac. A screencast of a switch in Ritemark Light (dev build, CDP, 720 × 450 frames) shows the whole window in the ground (`#f2f5f9`, the ground `#f1f5f9` after colour management) from the reload until the workbench draws, about 0.9 s. The workbench then draws the left column in the ground and the desk in white, as designed. The desk runs to the window's right edge until the AI's sheet opens, about 5 s later on the dev build. The saved splash colours are the ground on both platforms (patch 018, `partsSplash.ts`; `project-check.mjs` reads them). So the white on Windows may be the desk after the workbench drew rather than the splash. To tell, the Windows check needs a sample from the left column or the top strip during the reload, or a frame capture. Left open for that check.
+- **Browser has no + beside "Recent".** As built to the spec: R18 was revised by the Experience lead on 19 October to a **New page** row under the head (with Documents' New and Transcribe's Record), with only Clear history at the Recent label's right. The older wording ("the Recent label with its + and Clear") stayed in the sprint plan, the technical plan and `architecture.md`'s history row; it is corrected there.
+- **File ▸ Share greyed with About this project (AGENTS.md) in front, on Windows.** The intent is that Share works there: AGENTS.md opens in the Ritemark editor, and Share is enabled for any document in it (`ritemark.document.share`'s enablement is `activeCustomEditorId == ritemark.editor`; S52 greys it only away from a document, as with Home in front). On the Mac it is enabled: All commands, which lists only enabled commands, offers Share with AGENTS.md in front, as with Brief.md. So the command's state is right and the Windows menu showed it greyed. A Windows re-check with AGENTS.md in front: is Share offered in Ctrl+Shift+P? If it is, the menu button's File menu kept an old state (for example from Home in front); if it isn't, the editor in front isn't the Ritemark editor. Left open for that check.
 
 ## E5: the production build of the merged commit (19 October)
 
