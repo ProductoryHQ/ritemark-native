@@ -21,7 +21,7 @@ export function turnOwnersDir(globalStoragePath: string): string {
 }
 
 /** A process that exists. EPERM means it exists and belongs to someone else. */
-function processIsAlive(pid: number): boolean {
+export function processIsAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
@@ -87,4 +87,29 @@ export class TurnOwners {
   dispose(): void {
     fs.rmSync(path.join(this.dir, `${this.pid}.json`), { force: true });
   }
+}
+
+/**
+ * Sprint 134 (W3): every conversation a running host has claimed, this one's
+ * included. Reads only: a dead host's file is skipped, not removed.
+ */
+export function liveTurnOwnerIds(dir: string, isAlive: (pid: number) => boolean = processIsAlive): Set<string> {
+  const ids = new Set<string>();
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return ids;
+  }
+  for (const name of names) {
+    const match = /^(\d+)\.json$/.exec(name);
+    if (!match || !isAlive(Number(match[1]))) continue;
+    try {
+      const claimed: unknown = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+      if (Array.isArray(claimed)) for (const id of claimed) if (typeof id === 'string') ids.add(id);
+    } catch {
+      // A file mid-write or unreadable claims nothing.
+    }
+  }
+  return ids;
 }

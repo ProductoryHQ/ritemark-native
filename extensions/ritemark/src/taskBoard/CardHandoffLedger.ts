@@ -31,7 +31,7 @@ import { ACTOR_OF_RUNTIME, type HandoffLedger, type StartOutcome, type StartTurn
 import type { BoardStore } from './BoardStore';
 import { buildCardTurn } from './boardPrompt';
 import { CARD_LIMITS, clip, withHistory, type Card } from './cardFile';
-import type { CardHandoffRecordV1, CardTaskStore } from './CardTaskStore';
+import { handoffViewOf, type CardHandoffRecordV1, type CardTaskStore } from './CardTaskStore';
 import { ACTIVE_HANDOFF_STATES, TERMINAL_HANDOFF_STATES, type CardHandoffView, type HandoffState, type WaitReason } from './protocol';
 
 /** What the ledger needs from the sidebar side of the host (UnifiedViewProvider). */
@@ -106,18 +106,7 @@ export class CardHandoffLedger implements HandoffLedger, AgentTaskListener {
 
   list(): ReadonlyMap<string, CardHandoffView> {
     const views = new Map<string, CardHandoffView>();
-    for (const record of this.deps.store.all()) {
-      views.set(record.cardId, {
-        state: record.state,
-        runtimeId: record.runtimeId,
-        since: record.since,
-        ...(record.needs ? { needs: record.needs } : {}),
-        ...(record.waitFor ? { waitFor: record.waitFor } : {}),
-        ...(record.failure ? { failure: record.failure } : {}),
-        canOpen: Boolean(record.conversationId) && record.state !== 'conversation-gone',
-        ...(record.conversationTitle ? { conversationTitle: record.conversationTitle } : {}),
-      });
-    }
+    for (const record of this.deps.store.all()) views.set(record.cardId, handoffViewOf(record));
     return views;
   }
 
