@@ -27,6 +27,8 @@ Sprint 135 (rebased onto VS Code 1.142.0; the sprint's research/surfaces-audit.m
   - The Agents window never opens: OPEN_AGENTS_WINDOW_PRECONDITION is false (chat/common/constants.ts), and
     windowsMainService.ts opens a normal window when --agents, an agent link or a tryout hand-off asks for it.
   - All commands also leaves out the Agents window's two commands and 23 Developer commands new since 1.117.
+  - E5: no agent host prewarm (services/agentHost/electron-browser/agentHostService.ts). With a commit in
+    product.json it started GitHub's Copilot runtime in every window at launch; it now starts only when asked.
 ---
 diff --git a/extensions/git/package.json b/extensions/git/package.json
 index 8c8e8ce632a..0195e79ad08 100644
@@ -1128,6 +1130,23 @@ index 3619cc731c3..29bef88289f 100644
  		});
  	}
  
+diff --git a/src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts b/src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts
+index 6875908db0e..27bf874c513 100644
+--- a/src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts
++++ b/src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts
+@@ -132,7 +132,11 @@ export class AgentHostPrewarmContribution extends Disposable implements IWorkben
+ 		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
+ 	) {
+ 		super();
+-		if (environmentService.remoteAuthority) {
++		// Ritemark (Sprint 135 E5): no prewarm. Ritemark has no Agents window, and with a commit in product.json the
++		// prewarm started GitHub's Copilot runtime in every window at launch. The agent host still starts when
++		// something asks for it (a Copilot Chat user's Copilot CLI session).
++		const ritemarkPrewarm = false;
++		if (!ritemarkPrewarm || environmentService.remoteAuthority) {
+ 			return;
+ 		}
+ 		this._register(autorun(reader => {
 diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
 index d7672e8c7e9..c1cec2180fb 100644
 --- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts

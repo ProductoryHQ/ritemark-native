@@ -12,8 +12,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 |-------|---------|
 | `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome and walkthroughs open Ritemark's welcome (Sprint 133) |
 | `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
-| `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu) |
-| `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK (Sprint 135) |
+| `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu); no Agents window and no agent host prewarm |
+| `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows packaging and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Development launch fallback behavior |
 | `007-ritemark-vscode-1117-compat.patch` | VS Code 1.117 compatibility adjustments; Copilot Chat opens as a tab |

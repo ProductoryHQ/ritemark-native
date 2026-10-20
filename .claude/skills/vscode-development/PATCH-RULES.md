@@ -12,8 +12,8 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 |-------|--------|---------|
 | `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal |
-| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 25 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, defaultChatAgent null-safety |
-| `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK (Sprint 135) |
+| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 26 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, defaultChatAgent null-safety |
+| `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
 | `007-ritemark-vscode-1117-compat.patch` | Compatibility | Copilot Chat compatibility (since 1.117; rebased onto 1.142): the narrow setup actions instead of `ChatSetupContribution`, the onboarding module's fallback, the Copilot Chat launcher opens Copilot Chat as a tab; `webviewEditor.ts` opens a custom editor with no options (upstream's later fix, Sprint 135) |
@@ -39,7 +39,7 @@ and 019, a change goes in the patch that owns its kind: placement, the frame's s
 
 ---
 
-## 2. Patch 003 Complete File Inventory (25 Files)
+## 2. Patch 003 Complete File Inventory (26 Files)
 
 This is the authoritative reference (VS Code 1.142.0, Sprint 135). If ANY file is missing after a future patch change, it is a regression.
 
@@ -68,13 +68,14 @@ This is the authoritative reference (VS Code 1.142.0, Sprint 135). If ANY file i
 | 21 | `src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts` | No Timeline section in Documents. |
 | 22 | `src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts` | No File ▸ New Window with Profile. |
 | 23 | `src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts` | New File… is palette-only, not in the File menu. |
-| 24 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety on `defaultChatAgent`; skips the built-in chat extension's enablement migration (`ensureChatExtensionInitialDisabledState` is empty), so a Marketplace Copilot Chat is never disabled behind the person's back. |
-| 25 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: the same `extensionId?.toLowerCase()` pattern as #24. |
+| 24 | `src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts` | No agent host prewarm at window start (Sprint 135 E5): with a commit in product.json it started GitHub's Copilot runtime in every window; the agent host starts only when something asks for it. |
+| 25 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety on `defaultChatAgent`; skips the built-in chat extension's enablement migration (`ensureChatExtensionInitialDisabledState` is empty), so a Marketplace Copilot Chat is never disabled behind the person's back. |
+| 26 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: the same `extensionId?.toLowerCase()` pattern as #25. |
 
 **Verification command:**
 ```bash
 grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
-# Must show: 25
+# Must show: 26
 ```
 
 ---
@@ -252,7 +253,7 @@ On the Mac the menus can be read from the profile's `storage.json` (`lastKnownMe
 
 ### Build Checklist
 
-- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 25 (§2)
+- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 26 (§2)
 - [ ] `./scripts/apply-patches.sh --dry-run` reports every patch can apply and none conflicts (it checks against `vscode/`'s HEAD, so keep HEAD at the pin)
 - [ ] `node scripts/check-patch-stacking.mjs` passes
 - [ ] TypeScript compiles without "declared but never read" errors (`npm run typecheck-client` in `vscode/`)

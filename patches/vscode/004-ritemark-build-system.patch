@@ -6,6 +6,9 @@ Sprint 135: rebased onto VS Code 1.142.0 (app.ts: upstream's permission handler 
 lists 'media' for the core window; this patch still adds it to the webview list)
 Sprint 135 E5: the packaging step that prepares the built-in Copilot's SDK skips when the packaged Copilot has none
 (a build from source strips it through .moduleignore's @github/copilot/**; Ritemark deletes the built-in Copilot after)
+Sprint 135 E5: the build's commit reader follows a .git file ("gitdir: ..."), so product.json names the commit in release
+worktrees and CI; from 1.142 an app without one reads node modules from node_modules/, not node_modules.asar
+Sprint 135 E5: the commit is RITEMARK_SOURCE_COMMIT when the build sets it (Ritemark's source commit, as in the provenance)
 ---
 diff --git a/build/.moduleignore b/build/.moduleignore
 index 51149993424..202d76b197e 100644
@@ -42,6 +45,49 @@ index 185be479a22..74a6932a5c7 100644
  		prepareBuiltInCopilotRipgrepShim(platform, arch, builtInCopilotExtensionDir, appNodeModulesDir);
  	};
  }
+diff --git a/build/lib/getVersion.ts b/build/lib/getVersion.ts
+index 1dc4600dadf..1fee8ce8292 100644
+--- a/build/lib/getVersion.ts
++++ b/build/lib/getVersion.ts
+@@ -6,6 +6,14 @@
+ import * as git from './git.ts';
+ 
+ export function getVersion(root: string): string | undefined {
++	// Ritemark (Sprint 135 E5): product.json's commit is Ritemark's source commit, as in the build provenance, when the
++	// build sets RITEMARK_SOURCE_COMMIT. BUILD_SOURCEVERSION would set it too, but it also puts the built-in Copilot's
++	// build into CI mode (it then needs VSCODE_QUALITY and rewrites its package.json in the source tree).
++	const ritemarkCommit = process.env['RITEMARK_SOURCE_COMMIT']?.trim();
++	if (ritemarkCommit && /^[0-9a-f]{40}$/i.test(ritemarkCommit)) {
++		return ritemarkCommit;
++	}
++
+ 	let version = process.env['BUILD_SOURCEVERSION'];
+ 
+ 	if (!version || !/^[0-9a-f]{40}$/i.test(version.trim())) {
+diff --git a/build/lib/git.ts b/build/lib/git.ts
+index a3c23d8c29b..161f5c63ebc 100644
+--- a/build/lib/git.ts
++++ b/build/lib/git.ts
+@@ -9,7 +9,18 @@ import fs from 'fs';
+  * Returns the sha1 commit version of a repository or undefined in case of failure.
+  */
+ export function getVersion(repo: string): string | undefined {
+-	const git = path.join(repo, '.git');
++	let git = path.join(repo, '.git');
++	// Ritemark (Sprint 135 E5): in a submodule or worktree checkout .git is a file naming the git directory
++	// ("gitdir: …"), as in Ritemark's release worktrees and CI. The build then found no commit and product.json had
++	// none, and from 1.142 an app without one reads node modules from node_modules/, not node_modules.asar.
++	try {
++		const gitDir = /^gitdir: (.+)$/.exec(fs.readFileSync(git, 'utf8').trim());
++		if (gitDir) {
++			git = path.resolve(repo, gitDir[1]);
++		}
++	} catch (e) {
++		// .git is a directory, or missing
++	}
+ 	const headPath = path.join(git, 'HEAD');
+ 	let head: string;
+ 
 diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
 index 41ec34950fd..0a25133db3d 100644
 --- a/src/vs/code/electron-main/app.ts

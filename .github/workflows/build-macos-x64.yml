@@ -139,6 +139,10 @@ jobs:
       - name: Build VS Code (darwin-x64)
         working-directory: r/vscode
         run: |
+          # product.json's commit: Ritemark's source commit, as build-prod.sh sets it (Sprint 135 E5). Without one a
+          # 1.142 app looks for its node modules outside node_modules.asar and the terminal breaks.
+          RITEMARK_SOURCE_COMMIT="$(git -C .. rev-parse HEAD)"
+          export RITEMARK_SOURCE_COMMIT
           echo "Starting macOS x64 build at $(date)"
           npm run gulp vscode-darwin-x64
           echo "Build completed at $(date)"
@@ -308,6 +312,16 @@ jobs:
               --verify --target darwin-x64 --app "$APP_PATH" \
               --extension-input "$EXT_PATH" \
               --expected-extension-sha "$EXTENSION_SHA"; then
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # product.json names the source commit (validate-build-output.sh Check 5e, Sprint 135 E5): without one a
+          # 1.142 app looks for its node modules outside node_modules.asar and the terminal stays blank
+          PRODUCT_COMMIT=$(sed -n 's/^[[:space:]]*"commit":[[:space:]]*"\([0-9a-fA-F]\{40\}\)".*/\1/p' "$PRODUCT_JSON" | head -1)
+          if [ "$PRODUCT_COMMIT" = "$(git rev-parse HEAD)" ]; then
+            echo "OK: product.json's commit (${PRODUCT_COMMIT:0:12})"
+          else
+            echo "FAIL: product.json's commit is '${PRODUCT_COMMIT}', not the source commit $(git rev-parse HEAD)"
             ERRORS=$((ERRORS + 1))
           fi
 
