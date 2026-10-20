@@ -13,12 +13,14 @@
  * Keep this seed in sync with the published catalog at publish time (Phase 4).
  * Model ids frozen from the Sprint 116 provider/runtime audit on 2026-09-13.
  * Sprint 127 R9 (2026-09-24): the Anthropic lineup follows the bundled Claude
- * Code (2.1.296 since v1.14.0), which supports every model in Anthropic's Claude Code catalog.
+ * Code (2.1.304 since v2.0.0), which supports every model in Anthropic's Claude Code catalog.
  * v1.13.0 (2026-10-04): Sonnet 5.5 joins as the recommended default; Sonnet 5 stays as the previous one.
  * v1.14.0 (2026-10-13): GPT-6.1 Sol, the default of the bundled Codex, becomes the
  * Codex default (#398); GPT-5.6 Sol stays selectable. Haiku 5.5 joins, which Claude Code
  * 2.1.296 resolves `haiku` to. Claude models below 5 (Opus 4.8, Haiku 4.5) are kept
  * for saved selections and hidden from model menus (`CLAUDE_MENU_MIN_GENERATION`).
+ * v2.0.0 (2026-10-20): Claude Code 2.1.304; its live model list is the same as 2.1.296's
+ * (the Sprint 127 probes), so the lineup does not change.
  * `npm run check:anthropic-models` re-checks that before each release (R10).
  */
 

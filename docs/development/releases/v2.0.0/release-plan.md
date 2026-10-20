@@ -280,6 +280,20 @@ Open issues on 2026-10-17 that 2.0 touches. With 1.x paused, any fix that merges
 - **Windows:** the frame without a title row, the menu by mouse and by Alt, the window controls, dragging and snapping.
 - **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
 
+## Runtime versions
+
+Reviewed on 20 October against npm `latest` and the latest Codex GitHub release ([runtime review](sprint-136-release/research/runtime-review.md)). Every release repeats this review.
+
+| Runtime | v1.14.0 | v2.0.0 | Main changes | Decision |
+|---|---|---|---|---|
+| Claude Code / Agent SDK | 2.1.296 / 0.3.296 | **2.1.304 / 0.3.304** (19 October) | 2.1.299 fixes 2.1.296's double run of an approved tool call after a restart in a headless session; SDK MCP tool calls no longer fail or run twice on a reconnect; 2.1.304 stops model switches and interrupts waiting behind a context check; 2.1.302 turns fork subagents on in SDK sessions | Update |
+| Codex | 0.162.1 | **0.163.0** (15 October) | A resumed thread restores its saved permissions, respecting explicit overrides; instant interrupts on by default; an incomplete response ends as an error; the macOS package no longer ships its patched `zsh` | Update, and drop `zsh` from the manifest and the harness |
+| OpenCode | 1.19.0 | **1.19.3** (16 October) | 1.19.1 ends session sharing; 1.19.2 keeps update checks on 1.x; 1.19.3 builds reasoning variants from a model's options. Nothing on ACP, permissions or MCP | Update |
+
+`check:anthropic-models` (catalog v2738, issued 20 October): **OK**. The bundled Claude Code 2.1.304 supports every model in Anthropic's Claude Code catalog, with no warning.
+
+**Decision (Jarmo, 20 October, D1 as recommended):** update all three. Evidence is in `agent-runtime-compatibility.md`, v2.0.0 entry: hashes measured from the published artifacts, fetch 12/12, `verify-agent-runtimes.sh` with the OpenCode gate 4/4, and the Sprint 127 probes. Still to prove: an authenticated turn on each runtime in the 1.142 shell (the dress rehearsal's S18) and the Sprint 128 background probes, which need Jarmo's login.
+
 ## Decisions
 
 **Jarmo, 17 October:**
