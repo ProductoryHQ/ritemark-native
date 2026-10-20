@@ -180,9 +180,9 @@ echo ""
 
 
 # =============================================================================
-# Step 3: Backup & Build VS Code
+# Step 3: Build VS Code
 # =============================================================================
-echo -e "${BLUE}Step 3/9: Backing Up & Building VS Code${NC}"
+echo -e "${BLUE}Step 3/9: Building VS Code${NC}"
 echo "----------------------------------------"
 echo ""
 
@@ -203,7 +203,12 @@ restore_extension_link() {
     ln -s "$EXTENSION_LINK_TARGET" "$EXTENSION_LINK"
   fi
 }
-trap restore_extension_link EXIT
+EXTENSION_SIZES_BEFORE=""
+extension_build_cleanup() {
+  restore_extension_link
+  [[ -n "$EXTENSION_SIZES_BEFORE" ]] && rm -f "$EXTENSION_SIZES_BEFORE"
+}
+trap extension_build_cleanup EXIT
 extension_sizes() {
   (cd "$PROJECT_DIR/extensions/ritemark" && find . -type f -print0 | xargs -0 stat -f '%z %N' | LC_ALL=C sort -k2)
 }
@@ -233,6 +238,10 @@ npm run gulp vscode-$TARGET
 
 cd "$PROJECT_DIR"
 restore_extension_link
+if [[ ! -L "$EXTENSION_LINK" || "$(readlink "$EXTENSION_LINK")" != "$EXTENSION_LINK_TARGET" ]]; then
+  echo -e "${RED}ERROR: vscode/extensions/ritemark is not the extension link again after the VS Code build${NC}"
+  exit 1
+fi
 
 # GUARDRAIL (#471): the whole extension tree must be unchanged by the build.
 # There is no restore: with the extension out of VS Code's tree nothing should
@@ -248,7 +257,6 @@ if [[ "$EXTENSION_DIGEST_AFTER" != "$EXTENSION_DIGEST_BEFORE" ]]; then
   git -C "$PROJECT_DIR" status --short -- extensions/ritemark | head -50
   exit 1
 fi
-rm -f "$EXTENSION_SIZES_BEFORE"
 echo "Extension source unchanged by the build (tree ${EXTENSION_DIGEST_AFTER:0:12})"
 
 echo ""

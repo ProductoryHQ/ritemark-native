@@ -29,13 +29,12 @@ binaries/agents/<platform>-<arch>/
     ├── codex-package.json
     ├── codex-path/
     │   └── rg[.exe]
-    └── codex-resources/
-        ├── zsh/bin/zsh                         # macOS
+    └── codex-resources/                    # empty on macOS since Codex 0.163
         ├── codex-command-runner.exe            # Windows
         └── codex-windows-sandbox-setup.exe     # Windows
 ```
 
-The Codex tree is copied without flattening because app-server resolves code-mode-host, ripgrep, shell resources, and Windows sandbox helpers relative to the official package. OpenCode receives only `opencode-path` at the front of its subprocess `PATH`; this prevents a first-use ripgrep download and does not couple OpenCode to Codex's package.
+The Codex tree is copied without flattening because app-server resolves code-mode-host, ripgrep and the Windows sandbox helpers relative to the official package. Codex 0.163.0 no longer ships its patched `zsh` on macOS (openai/codex#52213). OpenCode receives only `opencode-path` at the front of its subprocess `PATH`; this prevents a first-use ripgrep download and does not couple OpenCode to Codex's package.
 
 Payload directories and `.sha256` sidecars are generated and gitignored. The manifest, validator, fetcher, and this notice are tracked.
 

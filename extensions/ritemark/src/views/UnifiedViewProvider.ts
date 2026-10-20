@@ -1577,10 +1577,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     });
     // #485: the chip follows the document in front of the active desk, and a
     // file closed, renamed or deleted (also from outside Ritemark) leaves it.
-    vscode.window.tabGroups.onDidChangeTabGroups(() => this._sendActiveFile());
-    vscode.workspace.onDidDeleteFiles(() => this._sendActiveFile());
-    vscode.workspace.onDidRenameFiles(() => this._sendActiveFile());
-    vscode.workspace.createFileSystemWatcher('**/*', true, true, false).onDidDelete(() => this._sendActiveFile());
+    // #477: a card's title edit renames its chip. One debounced send, so a
+    // checkout that deletes a thousand files sends one message, not a thousand.
+    const deleteWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
+    const activeFileListeners = [
+      deleteWatcher,
+      deleteWatcher.onDidDelete(() => this._scheduleActiveFile()),
+      vscode.window.tabGroups.onDidChangeTabGroups(() => this._scheduleActiveFile()),
+      vscode.workspace.onDidDeleteFiles(() => this._scheduleActiveFile()),
+      vscode.workspace.onDidRenameFiles(() => this._scheduleActiveFile()),
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        const activeInput = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+        const activeUri = activeInput && typeof activeInput === 'object' && 'uri' in activeInput
+          ? (activeInput as { uri: vscode.Uri }).uri.toString()
+          : undefined;
+        if (event.contentChanges.length > 0 && event.document.uri.toString() === activeUri) this._scheduleActiveFile();
+      }),
+    ];
 
     // Browser annotation mode is toggled by a workbench BrowserView action, not
     // by the extension webview. Poll lightweight metadata while the AI sidebar
@@ -1593,6 +1606,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       if (webviewView.visible) modelCatalog.pollFeedIfStale();
     });
     webviewView.onDidDispose(() => {
+      for (const listener of activeFileListeners) listener.dispose();
+      if (this._activeFileTimer) {
+        clearTimeout(this._activeFileTimer);
+        this._activeFileTimer = undefined;
+      }
       if (this._browserContextPoll) {
         clearInterval(this._browserContextPoll);
         this._browserContextPoll = null;
@@ -3134,6 +3152,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return vscode.workspace.getConfiguration('ritemark.ai').get<string>('selectedModel') || undefined;
   }
 
+  private _activeFileTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private _scheduleActiveFile() {
+    if (this._activeFileTimer) clearTimeout(this._activeFileTimer);
+    this._activeFileTimer = setTimeout(() => {
+      this._activeFileTimer = undefined;
+      this._sendActiveFile();
+    }, 100);
+  }
+
   private _sendActiveFile() {
     const activeFile = this._getActiveFileContext();
     this._view?.webview.postMessage({
@@ -3273,7 +3301,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _fileContextFor(uri: vscode.Uri): { path: string; selection?: string; label?: string } | undefined {
     if (uri.scheme === 'file' && !fs.existsSync(uri.fsPath)) return undefined;
     const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString());
-    const label = openDocument && uri.fsPath.toLowerCase().endsWith('.md') ? cardTitleOf(openDocument.getText()) : null;
+    // Only a file with front matter can be a card; skip the parse for every other document.
+    const text = openDocument && uri.fsPath.toLowerCase().endsWith('.md') ? openDocument.getText() : '';
+    const label = text.startsWith('---') ? cardTitleOf(text) : null;
     return {
       path: vscode.workspace.asRelativePath(uri),
       selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
