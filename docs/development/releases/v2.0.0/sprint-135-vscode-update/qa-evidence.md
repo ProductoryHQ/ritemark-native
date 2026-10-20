@@ -188,6 +188,12 @@ The app, run hidden on a fresh profile with the shared recents cleared and the b
 - **Project and frame.** `project-check.mjs` 6/6, with the share question waiting while the tab row works; `frame-geometry.mjs` 22 pass, 0 fail, 2 skipped. Against the baseline with the new share-question files, 32 of 34 scenes are the same. More differs (1.05%, 1.02%): a production build has no Copilot Chat.
 - **Features.** PDFs render, the file watcher works, Sofia Sans and Phosphor load, and More has no Copilot.
 
+**CI from `d60b9652`.** Both runs pass.
+- **macOS x64** ([run 39467679900](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39467679900)): its new Validate build check reads "OK: product.json's commit (d60b96521b88)".
+- **Windows x64** ([run 39467716747](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39467716747)): signtool was found for 1.142's packaging (#478), and Check 5e reads "OK (d60b96521b88)".
+- **Windows signing** (#483): the plan signs "d3dcompiler_47.dll (status Valid, type Catalog)" and "dxil.dll (status Valid, type Catalog)", 51 of 67 PE files in all, and Verify finds 0 failures.
+- **The Windows installer:** built, signed, and installed and uninstalled as a standard user in CI (S11).
+
 ## Tests
 
 - VS Code's unit tests for Ritemark (`./scripts/test.sh --grep Ritemark` and the patch tests): 76 passing in 12 suites; electron-main: 11 passing. Re-run at the end with the browser view's tests (`--grep "Ritemark|BrowserView|Browser"`, after the 007 and 010 changes): 316 passing, 0 failing.

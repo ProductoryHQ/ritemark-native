@@ -114,7 +114,7 @@ Main stays closed to other shell-tier merges until this phase is green or rolled
 - [x] A clean-room release worktree at the merged commit; `release-preflight.sh`; `build-prod.sh`; `validate-build-output.sh`; provenance names the new gitlink (S30): the third run, at `d60b9652`
 - [ ] The production build: the native features (S10), the fonts, a runtime turn, the frame. Done at `d60b9652` except the runtime turn, which needs a signed-in AI (Gate 2)
 - [x] The production build at launch: no agent host process for a minute (no `agenthost.log`, no "agent host started" in `main.log`); a terminal runs a command; code is coloured; `CachedData/<commit>` fills; About names Ritemark's source commit (E5, second run)
-- [ ] macOS x64 CI green; S27 on darwin-x64
-- [ ] Windows CI green with the installer round trip (S11)
+- [ ] macOS x64 CI green; S27 on darwin-x64. CI green at `d60b9652` (run 39467679900); S27 on darwin-x64 not run
+- [x] Windows CI green with the installer round trip (S11): run 39467716747 at `d60b9652`
 - [ ] On a Windows PC: S12 (with Windows screenshots against the last round's), S27, S29, and Sprint 132's S7–S11
 - [ ] Release plan: tracker updated; the rollback point marked as no longer needed, or used (S21)
