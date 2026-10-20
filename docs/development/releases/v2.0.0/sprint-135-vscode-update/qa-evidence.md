@@ -50,7 +50,7 @@ Each was found by comparing the two builds, and each fix was checked on 1.142 af
 | S27 The three runtimes | Not run | Each needs an authenticated turn; for Jarmo's Gate 2, and darwin-x64 and Windows after the merge. |
 | S28 Saving and the smaller patches | Pass | Both builds: typing then ⌘S saves the text to disk and the bar says Saved (014); an outside edit shows in the editor; the Help menu is Getting started, Support, View License, Advanced ▸ Toggle Developer Tools (015, read from the menu data the workbench sends to the Mac's menu bar). ⌘P from inside a document opens Quick Open. |
 | S29 Windows file handles | After the merge | |
-| S30 The clean-room build | Second run after the fixes | See "E5 after the merge" below: the first two runs found a stop in gulp (#476) and a blank terminal (this fix); the build and validation then passed at `3113b080`. |
+| S30 The clean-room build | Pass | The third run, at `d60b9652`, passes every check (see "E5 after the merge" below). The first run found a stop in gulp (#476); the second, a blank terminal and the agent host (#484). |
 
 ## S17: Sprint 132's scenarios on 1.142
 
@@ -169,7 +169,30 @@ The app, run hidden on a fresh profile with the baseline's sample:
 - `CachedData/3113b080…` filled to 14 MB.
 - No ERR_FILE_NOT_FOUND.
 
-**Seen in passing:** the AI composer kept an "Active: settings-e5.json" chip after that file was closed and deleted.
+**Seen in passing:** the AI composer kept an "Active: settings-e5.json" chip after that file was closed and deleted (#485).
+
+**Third run, at `d60b9652`** (#483 and #484 merged). The release worktree was `.worktrees/release-d60b96521b88`.
+
+The build:
+- The full preflight passed, with only the expected symlink warning.
+- `build-prod.sh` passed. #476's skip was logged; #471's warning was restored from backup.
+- `validate-build-output.sh` passed: 17 native modules, all darwin-arm64; the runtimes arm64; the fonts; Check 5e, "product.json's commit... OK (d60b96521b88)".
+- The provenance names source `d60b9652`, VS Code `d956e8a6` and patch set `8344ff53…`. The app is 2.1 GB.
+
+The app, run hidden on a fresh profile with the shared recents cleared and the baseline's sample:
+- **No agent host at launch.** For 60 s there was no `agenthost.log`, no "agent host started" in `main.log` and no Copilot process, with 3 Node utility processes. After all the checks below, still no `agenthost.log`.
+- **No missing files.** No ERR_FILE_NOT_FOUND. `main.log`'s only error is the older `phosphor.woff2` line, which 1.117's dev build shows too.
+- **#463.** `CachedData/d60b96521b88…` filled to 14 MB.
+- **Terminal and highlighting.** A terminal ran a command ([terminal](qa/e5-d60b9652-terminal.png)), and a JSON file has 5 token classes.
+- **About** names `d60b96521b8818e82d86cfdbf1fc92926ce93fbb` ([About](qa/e5-d60b9652-about.png)).
+- **Project and frame.** `project-check.mjs` 6/6, with the share question waiting while the tab row works; `frame-geometry.mjs` 22 pass, 0 fail, 2 skipped. Against the baseline with the new share-question files, 32 of 34 scenes are the same. More differs (1.05%, 1.02%): a production build has no Copilot Chat.
+- **Features.** PDFs render, the file watcher works, Sofia Sans and Phosphor load, and More has no Copilot.
+
+**CI from `d60b9652`.** Both runs pass.
+- **macOS x64** ([run 39467679900](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39467679900)): its new Validate build check reads "OK: product.json's commit (d60b96521b88)".
+- **Windows x64** ([run 39467716747](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39467716747)): signtool was found for 1.142's packaging (#478), and Check 5e reads "OK (d60b96521b88)".
+- **Windows signing** (#483): the plan signs "d3dcompiler_47.dll (status Valid, type Catalog)" and "dxil.dll (status Valid, type Catalog)", 51 of 67 PE files in all, and Verify finds 0 failures.
+- **The Windows installer:** built, signed, and installed and uninstalled as a standard user in CI (S11).
 
 ## Tests
 

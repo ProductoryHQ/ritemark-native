@@ -34,8 +34,10 @@ $ExtDir    = Join-Path $RootDir "extensions\ritemark"
 $BuildOut  = Join-Path $RootDir "VSCode-win32-x64"
 $BrandDir  = Join-Path $RootDir "branding"
 
-$VSCodeVersion = "1.117.0"
-$ElectronTarget = "30.5.1"
+# The VS Code release at the committed vscode pin, and the Electron it builds native modules for (target= in
+# vscode/.npmrc). update-vscode.sh's checklist names both; they were 1.117.0 and 30.5.1 until Sprint 135.
+$VSCodeVersion = "1.142.0"
+$ElectronTarget = "43.7.7"
 
 function Write-Step($n, $msg) {
     Write-Host ""
@@ -258,6 +260,20 @@ if ($SkipBuild) {
     # product.json's commit: Ritemark's source commit, as build-prod.sh sets it (Sprint 135 E5). Without one a
     # 1.142 app looks for its node modules outside node_modules.asar and the terminal breaks.
     $env:RITEMARK_SOURCE_COMMIT = (& git -C $RootDir rev-parse HEAD).Trim()
+    # VS Code 1.142's patchWin32DependenciesTask runs signtool.exe (verify, and remove /s on a signed file) on every
+    # bundled .node, rg.exe and similar PE before rcedit stamps it, so signtool must be on PATH. Put the newest Windows
+    # SDK's x64 signtool first, as build-windows.yml does (Sprint 135).
+    $SdkBinRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+    $SignToolDir = Get-ChildItem -LiteralPath $SdkBinRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^10\.' -and (Test-Path (Join-Path $_.FullName "x64\signtool.exe")) } |
+        Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+    if ($null -eq $SignToolDir) {
+        Write-Host "ERROR: signtool.exe not found under $SdkBinRoot\<version>\x64 (install the Windows SDK)" -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+    $env:PATH = (Join-Path $SignToolDir.FullName "x64") + ";" + $env:PATH
+    Write-Host "  signtool for packaging: $(Join-Path $SignToolDir.FullName 'x64\signtool.exe')"
     & npx gulp vscode-win32-x64-min
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: VS Code build failed" -ForegroundColor Red

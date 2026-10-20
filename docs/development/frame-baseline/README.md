@@ -25,6 +25,8 @@ Sprint 134 also changed the first 9: Home and the Task board are the tab row's f
 
 Some scenes carry what differs per run or per computer, in a few pixels: the settings foot shows the last update check's time, the bundled runtimes' versions and whether the voice model is installed (0.01% between two runs); Home's Last changed may swap two documents copied in the same second (0.13%); the projects list and Home show the sample's place on disk (hence the fixed copy location below).
 
+**VS Code 1.142 (Sprint 135):** the two share-question files changed with the browser bar and nothing else (0.7% Light, 0.94% Dark). The bar reads back, forward, reload, the address, Show Claude this page and ⋯, with no Add Element to Chat and Developer tools in ⋯, as the Experience lead decided (patch 010). **Jarmo approved the new files on 20 October 2026** ("replace", through the Development manager). They were taken on a fresh profile with the shared recents cleared, from main's product source at `3113b080`. In the same run the other 32 scenes matched: 28 to the pixel, Home at 0.13% and the settings foot at 0.06%, for the reasons above (`docs/development/releases/v2.0.0/sprint-135-vscode-update/qa/screenshot-diff.md`).
+
 The dev build lists Copilot Chat and "Chat Debug" in More, from VS Code's built-in Copilot extension. A production build has neither unless Copilot Chat is installed.
 
 ### The welcome (Sprint 133)
