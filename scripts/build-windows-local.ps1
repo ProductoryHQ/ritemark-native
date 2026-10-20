@@ -34,8 +34,10 @@ $ExtDir    = Join-Path $RootDir "extensions\ritemark"
 $BuildOut  = Join-Path $RootDir "VSCode-win32-x64"
 $BrandDir  = Join-Path $RootDir "branding"
 
-$VSCodeVersion = "1.117.0"
-$ElectronTarget = "30.5.1"
+# The VS Code release at the committed vscode pin, and the Electron it builds native modules for (target= in
+# vscode/.npmrc). update-vscode.sh's checklist names both; they were 1.117.0 and 30.5.1 until Sprint 135.
+$VSCodeVersion = "1.142.0"
+$ElectronTarget = "43.7.7"
 
 function Write-Step($n, $msg) {
     Write-Host ""

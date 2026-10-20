@@ -232,14 +232,14 @@ jobs:
           fi
 
       - name: Strip non-Windows binaries from built-in copilot extension
-        # VS Code 1.117 ships GitHub Copilot Chat (extensions/copilot). Its
-        # nested claude-agent-sdk vendors macOS/Linux native binaries that
-        # rcedit.exe cannot ingest during the win32-x64 packaging step
-        # (audio-capture.node was the specific blocker on the prior run).
-        # We can't drop the whole copilot extension because gulp's
-        # prepareBuiltInCopilotExtensionShims hard-requires it. So we keep
-        # the extension dir but drop every non-Windows binary tree under
-        # the nested SDK's vendor/ folder.
+        # VS Code ships GitHub Copilot Chat as a built-in (extensions/copilot,
+        # since 1.117). Its nested claude-agent-sdk can vendor macOS/Linux
+        # native binaries that rcedit.exe cannot ingest during the win32-x64
+        # packaging step (audio-capture.node was the blocker at 1.117). The
+        # gulp build packages the extension from source, so it stays until
+        # "Strip bundled copilot extension from output" (since 1.142, patch 004
+        # skips the packaging shim that needs Copilot's stripped SDK). So we
+        # drop only every non-Windows binary tree under the SDK's vendor/.
         shell: bash
         working-directory: r/vscode
         run: |
@@ -419,8 +419,8 @@ jobs:
           echo "Extension copied successfully"
 
       - name: Strip bundled copilot extension from output
-        # VS Code 1.117 bundles GitHub Copilot Chat as a built-in extension.
-        # gulp requires it during build, but the final Ritemark app doesn't
+        # VS Code bundles GitHub Copilot Chat as a built-in extension (since 1.117).
+        # gulp packages it during the build, but the final Ritemark app doesn't
         # need it. It adds ~254MB and registers a "Chat Debug" activity bar
         # icon that conflicts with Ritemark's clean UI.
         shell: bash

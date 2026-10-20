@@ -209,7 +209,8 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "         shareWithAgentAnswered to match its Allow path (the network policy's notice, the stored choice, sharing)."
     echo "       - The internal command _workbench.getRecentlyOpened still exists (the project list's first fill, extensions/ritemark/src/projects/projectsHost.ts)."
     echo "     Then, in vscode/: ./scripts/test.sh --grep Ritemark (ritemarkSwitchGuard, ritemarkPalettePolicy, ritemarkTabCount)."
-    echo "  7. Commit the new pin: the script staged the gitlink (git update-index). git status and git add vscode ignore the"
+    echo "  7. Set the new release in scripts/build-windows-local.ps1: \$VSCodeVersion ($TARGET_TAG) and \$ElectronTarget (target= in vscode/.npmrc)."
+    echo "  8. Commit the new pin: the script staged the gitlink (git update-index). git status and git add vscode ignore the"
     echo "     submodule (.gitmodules sets ignore = all); after committing, git ls-tree HEAD vscode must print $TARGET_COMMIT"
 else
     echo ""
