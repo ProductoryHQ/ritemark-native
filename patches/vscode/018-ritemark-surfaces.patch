@@ -73,6 +73,12 @@ right ("1 waits", "Not found", a key); a long name ends in … before it; a proj
 its old place under its name and a warning at its right (S38). The project's mark is two letters, as the welcome draws it
 ("Notes" → "NO"). The project menu's New folder and Collapse folders show on Documents only.
 
+Sprint 135: rebased onto VS Code 1.142.0 (the sprint's research/frame-audit.md). Modern UI
+(workbench.experimental.modernUI) is pinned off in product.json; the frame's lines sit beside its branches.
+sidebarPart.ts and auxiliaryBarPart.ts answer upstream's getRelayoutDimension() with the full size, so a strip is
+not taken off twice; windowImpl.ts places the window controls inside upstream's hasWindowControlOverlay gate;
+overlayWebview.ts sets ritemark-desk-webview in setAnchorElement (webviews now follow their anchor by CSS anchor
+positioning); ritemarkSurfaces.css styles the empty desk through .editor-group-watermark-wrapper.
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 
@@ -91,7 +97,7 @@ R13), workbench/test/browser/parts/ritemarkSwitchGuard.test.ts and base/test/bro
 (Sprint 134, R9), workbench/test/browser/parts/ritemarkMenu.test.ts (Sprint 134, R8: one flyout); run with
 ./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
-index 3169c8326c3..f7d28372c7f 100644
+index 34d22b5d162..644a11f194a 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
 +++ b/src/vs/base/browser/ui/dialog/dialog.ts
 @@ -42,6 +42,8 @@ export enum DialogContentsAlignment {
@@ -101,9 +107,9 @@ index 3169c8326c3..f7d28372c7f 100644
 +	/** Ritemark (Sprint 134, R9): the cancel button is the default: focused first and drawn as the primary. */
 +	readonly ritemarkFocusCancel?: boolean;
  	readonly detail?: string;
- 	readonly alignment?: DialogContentsAlignment;
- 	readonly checkboxLabel?: string;
-@@ -282,7 +284,7 @@ export class Dialog extends Disposable {
+ 	/**
+ 	 * A pre-rendered element to show in place of the plain-text {@link detail}.
+@@ -310,7 +312,7 @@ export class Dialog extends Disposable {
  
  			// Buttons
  			buttonMap.forEach((_, index) => {
@@ -112,17 +118,17 @@ index 3169c8326c3..f7d28372c7f 100644
  
  				let button: IButton;
  				const buttonOptions = this.options.buttonOptions?.[buttonMap[index]?.index];
-@@ -551,8 +553,9 @@ export class Dialog extends Disposable {
- 				this.inputs[0].focus();
+@@ -587,8 +589,9 @@ export class Dialog extends Disposable {
  				this.inputs[0].select();
  			} else {
+ 				let focusedButton = false;
 +				const focusIndex = this.options.ritemarkFocusCancel && typeof this.options.cancelId === 'number' ? this.options.cancelId : 0;
  				buttonMap.forEach((value, index) => {
 -					if (value.index === 0) {
 +					if (value.index === focusIndex) {
  						buttonBar.buttons[index].focus();
+ 						focusedButton = true;
  					}
- 				});
 diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
 index 034c650442a..3b2312d89cd 100644
 --- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
@@ -216,10 +222,10 @@ index 034c650442a..3b2312d89cd 100644
  			const separator = options?.separator || '/';
  			const matches = splitMatches(label, separator, options?.matches);
 diff --git a/src/vs/base/browser/ui/menu/menu.ts b/src/vs/base/browser/ui/menu/menu.ts
-index bbadbf1d73b..68422afd6fa 100644
+index f6b4122a1e5..d67e0605311 100644
 --- a/src/vs/base/browser/ui/menu/menu.ts
 +++ b/src/vs/base/browser/ui/menu/menu.ts
-@@ -1315,6 +1315,41 @@ ${formatRule(Codicon.menuSubmenu)}
+@@ -1441,6 +1441,41 @@ ${formatRule(Codicon.menuSubmenu)}
  
  .monaco-menu .action-item {
  	cursor: default;
@@ -408,10 +414,10 @@ index 00000000000..59285830fe4
 +	});
 +});
 diff --git a/src/vs/platform/dialogs/common/dialogs.ts b/src/vs/platform/dialogs/common/dialogs.ts
-index fc73e57f824..1c2e93c5bce 100644
+index cc27699b80d..3a0cca583dc 100644
 --- a/src/vs/platform/dialogs/common/dialogs.ts
 +++ b/src/vs/platform/dialogs/common/dialogs.ts
-@@ -285,6 +285,8 @@ export interface IOpenDialogOptions {
+@@ -290,6 +290,8 @@ export interface IOpenDialogOptions {
  export const IDialogService = createDecorator<IDialogService>('dialogService');
  
  export interface ICustomDialogOptions {
@@ -421,10 +427,10 @@ index fc73e57f824..1c2e93c5bce 100644
  	readonly markdownDetails?: ICustomDialogMarkdown[];
  	readonly classes?: string[];
 diff --git a/src/vs/platform/quickinput/browser/quickInputList.ts b/src/vs/platform/quickinput/browser/quickInputList.ts
-index f71937903f3..22cce6eb73b 100644
+index 768fa41b90d..36c19813cfc 100644
 --- a/src/vs/platform/quickinput/browser/quickInputList.ts
 +++ b/src/vs/platform/quickinput/browser/quickInputList.ts
-@@ -277,7 +277,7 @@ class QuickInputItemDelegate implements IListVirtualDelegate<IQuickPickElement>
+@@ -278,7 +278,7 @@ class QuickInputItemDelegate implements IListVirtualDelegate<IQuickPickElement>
  		if (element instanceof QuickPickSeparatorElement) {
  			return 30;
  		}
@@ -433,7 +439,7 @@ index f71937903f3..22cce6eb73b 100644
  	}
  
  	getTemplateId(element: IQuickPickElement): string {
-@@ -1405,8 +1405,8 @@ export class QuickInputList extends Disposable {
+@@ -1412,8 +1412,8 @@ export class QuickInputList extends Disposable {
  
  	layout(maxHeight?: number): void {
  		this._tree.getHTMLElement().style.maxHeight = maxHeight ? `${
@@ -473,15 +479,15 @@ index 893665466a9..a700df49784 100644
  			+ 6
  			}px` : '';
 diff --git a/src/vs/platform/theme/browser/defaultStyles.ts b/src/vs/platform/theme/browser/defaultStyles.ts
-index fdc98de1cf6..eef39db7fd4 100644
+index 063beb95f61..e026a141b42 100644
 --- a/src/vs/platform/theme/browser/defaultStyles.ts
 +++ b/src/vs/platform/theme/browser/defaultStyles.ts
 @@ -4,7 +4,7 @@
   *--------------------------------------------------------------------------------------------*/
  import { IButtonStyles } from '../../../base/browser/ui/button/button.js';
  import { IKeybindingLabelStyles } from '../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
--import { ColorIdentifier, keybindingLabelBackground, keybindingLabelBorder, keybindingLabelBottomBorder, keybindingLabelForeground, asCssVariable, widgetShadow, buttonForeground, buttonSeparator, buttonBackground, buttonHoverBackground, buttonSecondaryForeground, buttonSecondaryBackground, buttonSecondaryHoverBackground, buttonBorder, progressBarBackground, inputActiveOptionBorder, inputActiveOptionForeground, inputActiveOptionBackground, editorWidgetBackground, editorWidgetForeground, contrastBorder, checkboxBorder, checkboxBackground, checkboxForeground, problemsErrorIconForeground, problemsWarningIconForeground, problemsInfoIconForeground, inputBackground, inputForeground, inputBorder, textLinkForeground, inputValidationInfoBorder, inputValidationInfoBackground, inputValidationInfoForeground, inputValidationWarningBorder, inputValidationWarningBackground, inputValidationWarningForeground, inputValidationErrorBorder, inputValidationErrorBackground, inputValidationErrorForeground, listFilterWidgetBackground, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetShadow, badgeBackground, badgeForeground, breadcrumbsBackground, breadcrumbsForeground, breadcrumbsFocusForeground, breadcrumbsActiveSelectionForeground, activeContrastBorder, listActiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionIconForeground, listDropOverBackground, listFocusAndSelectionOutline, listFocusBackground, listFocusForeground, listFocusOutline, listHoverBackground, listHoverForeground, listInactiveFocusBackground, listInactiveFocusOutline, listInactiveSelectionBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, tableColumnsBorder, tableOddRowsBackgroundColor, treeIndentGuidesStroke, asCssVariableWithDefault, editorWidgetBorder, focusBorder, pickerGroupForeground, quickInputListFocusBackground, quickInputListFocusForeground, quickInputListFocusIconForeground, selectBackground, selectBorder, selectForeground, selectListBackground, treeInactiveIndentGuidesStroke, menuBorder, menuForeground, menuBackground, menuSelectionBorder, menuSeparatorBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderBackground, scrollbarSliderHoverBackground, listDropBetweenBackground, radioActiveBackground, radioActiveForeground, radioInactiveBackground, radioInactiveForeground, radioInactiveBorder, radioInactiveHoverBackground, radioActiveBorder, checkboxDisabledBackground, checkboxDisabledForeground, widgetBorder } from '../common/colorRegistry.js';
-+import { ColorIdentifier, keybindingLabelBackground, keybindingLabelBorder, keybindingLabelBottomBorder, keybindingLabelForeground, asCssVariable, widgetShadow, buttonForeground, buttonSeparator, buttonBackground, buttonHoverBackground, buttonSecondaryForeground, buttonSecondaryBackground, buttonSecondaryHoverBackground, buttonBorder, progressBarBackground, inputActiveOptionBorder, inputActiveOptionForeground, inputActiveOptionBackground, editorWidgetBackground, editorWidgetForeground, contrastBorder, checkboxBorder, checkboxBackground, checkboxForeground, problemsErrorIconForeground, problemsWarningIconForeground, problemsInfoIconForeground, inputBackground, inputForeground, inputBorder, textLinkForeground, inputValidationInfoBorder, inputValidationInfoBackground, inputValidationInfoForeground, inputValidationWarningBorder, inputValidationWarningBackground, inputValidationWarningForeground, inputValidationErrorBorder, inputValidationErrorBackground, inputValidationErrorForeground, listFilterWidgetBackground, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetShadow, badgeBackground, badgeForeground, breadcrumbsBackground, breadcrumbsForeground, breadcrumbsFocusForeground, breadcrumbsActiveSelectionForeground, activeContrastBorder, listActiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionIconForeground, listDropOverBackground, listFocusAndSelectionOutline, listFocusBackground, listFocusForeground, listFocusOutline, listHoverBackground, listHoverForeground, listInactiveFocusBackground, listInactiveFocusOutline, listInactiveSelectionBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, tableColumnsBorder, tableOddRowsBackgroundColor, treeIndentGuidesStroke, asCssVariableWithDefault, editorWidgetBorder, focusBorder, pickerGroupForeground, quickInputListFocusBackground, quickInputListFocusForeground, quickInputListFocusIconForeground, selectBackground, selectBorder, selectForeground, selectListBackground, treeInactiveIndentGuidesStroke, menuBorder, menuForeground, menuBackground, menuSelectionBorder, menuSelectionBackground, menuSelectionForeground, menuSeparatorBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderBackground, scrollbarSliderHoverBackground, listDropBetweenBackground, radioActiveBackground, radioActiveForeground, radioInactiveBackground, radioInactiveForeground, radioInactiveBorder, radioInactiveHoverBackground, radioActiveBorder, checkboxDisabledBackground, checkboxDisabledForeground, widgetBorder } from '../common/colorRegistry.js';
+-import { ColorIdentifier, keybindingLabelBackground, keybindingLabelBorder, keybindingLabelBottomBorder, keybindingLabelForeground, asCssVariable, widgetShadow, buttonForeground, buttonSeparator, buttonBackground, buttonHoverBackground, buttonSecondaryForeground, buttonSecondaryBackground, buttonSecondaryHoverBackground, buttonBorder, progressBarBackground, inputActiveOptionBorder, inputActiveOptionForeground, inputActiveOptionBackground, editorWidgetBackground, editorWidgetForeground, contrastBorder, checkboxBorder, checkboxBackground, checkboxForeground, problemsErrorIconForeground, problemsWarningIconForeground, problemsInfoIconForeground, inputBackground, inputForeground, inputBorder, textLinkForeground, inputValidationInfoBorder, inputValidationInfoBackground, inputValidationInfoForeground, inputValidationWarningBorder, inputValidationWarningBackground, inputValidationWarningForeground, inputValidationErrorBorder, inputValidationErrorBackground, inputValidationErrorForeground, listFilterWidgetBackground, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetShadow, badgeBackground, badgeForeground, breadcrumbsBackground, breadcrumbsForeground, breadcrumbsFocusForeground, breadcrumbsActiveSelectionForeground, activeContrastBorder, listActiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionIconForeground, listDropOverBackground, listFocusAndSelectionOutline, listFocusBackground, listFocusForeground, listFocusOutline, listHoverBackground, listHoverForeground, listInactiveFocusBackground, listInactiveFocusOutline, listInactiveSelectionBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, tableColumnsBorder, tableOddRowsBackgroundColor, treeIndentGuidesStroke, asCssVariableWithDefault, editorWidgetBorder, focusBorder, pickerGroupForeground, quickInputListFocusBackground, quickInputListFocusForeground, quickInputListFocusIconForeground, selectBackground, selectBorder, selectForeground, selectListBackground, treeInactiveIndentGuidesStroke, menuBorder, menuForeground, menuBackground, menuSelectionBorder, menuSeparatorBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderBackground, scrollbarSliderHoverBackground, listDropBetweenBackground, radioActiveBackground, radioActiveForeground, radioInactiveBackground, radioInactiveForeground, radioInactiveBorder, radioInactiveHoverBackground, radioActiveBorder, checkboxDisabledBackground, checkboxDisabledForeground, widgetBorder, buttonSecondaryBorder } from '../common/colorRegistry.js';
++import { ColorIdentifier, keybindingLabelBackground, keybindingLabelBorder, keybindingLabelBottomBorder, keybindingLabelForeground, asCssVariable, widgetShadow, buttonForeground, buttonSeparator, buttonBackground, buttonHoverBackground, buttonSecondaryForeground, buttonSecondaryBackground, buttonSecondaryHoverBackground, buttonBorder, progressBarBackground, inputActiveOptionBorder, inputActiveOptionForeground, inputActiveOptionBackground, editorWidgetBackground, editorWidgetForeground, contrastBorder, checkboxBorder, checkboxBackground, checkboxForeground, problemsErrorIconForeground, problemsWarningIconForeground, problemsInfoIconForeground, inputBackground, inputForeground, inputBorder, textLinkForeground, inputValidationInfoBorder, inputValidationInfoBackground, inputValidationInfoForeground, inputValidationWarningBorder, inputValidationWarningBackground, inputValidationWarningForeground, inputValidationErrorBorder, inputValidationErrorBackground, inputValidationErrorForeground, listFilterWidgetBackground, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetShadow, badgeBackground, badgeForeground, breadcrumbsBackground, breadcrumbsForeground, breadcrumbsFocusForeground, breadcrumbsActiveSelectionForeground, activeContrastBorder, listActiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionIconForeground, listDropOverBackground, listFocusAndSelectionOutline, listFocusBackground, listFocusForeground, listFocusOutline, listHoverBackground, listHoverForeground, listInactiveFocusBackground, listInactiveFocusOutline, listInactiveSelectionBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, tableColumnsBorder, tableOddRowsBackgroundColor, treeIndentGuidesStroke, asCssVariableWithDefault, editorWidgetBorder, focusBorder, pickerGroupForeground, quickInputListFocusBackground, quickInputListFocusForeground, quickInputListFocusIconForeground, selectBackground, selectBorder, selectForeground, selectListBackground, treeInactiveIndentGuidesStroke, menuBorder, menuForeground, menuBackground, menuSelectionBorder, menuSelectionBackground, menuSelectionForeground, menuSeparatorBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderBackground, scrollbarSliderHoverBackground, listDropBetweenBackground, radioActiveBackground, radioActiveForeground, radioInactiveBackground, radioInactiveForeground, radioInactiveBorder, radioInactiveHoverBackground, radioActiveBorder, checkboxDisabledBackground, checkboxDisabledForeground, widgetBorder, buttonSecondaryBorder } from '../common/colorRegistry.js';
  import { IProgressBarStyles } from '../../../base/browser/ui/progressbar/progressbar.js';
  import { ICheckboxStyles, IToggleStyles } from '../../../base/browser/ui/toggle/toggle.js';
  import { IDialogStyles } from '../../../base/browser/ui/dialog/dialog.js';
@@ -498,19 +504,19 @@ index fdc98de1cf6..eef39db7fd4 100644
  	separatorColor: asCssVariable(menuSeparatorBackground),
  	scrollbarShadow: asCssVariable(scrollbarShadow),
 diff --git a/src/vs/platform/window/common/window.ts b/src/vs/platform/window/common/window.ts
-index 291648bca96..95a8a448383 100644
+index 7e31cd31c3a..139adc101ba 100644
 --- a/src/vs/platform/window/common/window.ts
 +++ b/src/vs/platform/window/common/window.ts
-@@ -6,7 +6,7 @@
- import { VSBuffer } from '../../../base/common/buffer.js';
+@@ -7,7 +7,7 @@ import { VSBuffer } from '../../../base/common/buffer.js';
  import { IStringDictionary } from '../../../base/common/collections.js';
+ import { AGENTS_AUTHORITY } from '../../../base/common/network.js';
  import { PerformanceMark } from '../../../base/common/performance.js';
--import { isMacintosh, isNative, isWeb } from '../../../base/common/platform.js';
-+import { isMacintosh, isNative, isWeb, isWindows } from '../../../base/common/platform.js';
+-import { isMacintosh, isNative, isTahoeOrNewer, isWeb } from '../../../base/common/platform.js';
++import { isMacintosh, isNative, isTahoeOrNewer, isWeb, isWindows } from '../../../base/common/platform.js';
  import { URI, UriComponents, UriDto } from '../../../base/common/uri.js';
  import { ISandboxConfiguration } from '../../../base/parts/sandbox/common/sandboxTypes.js';
  import { IConfigurationService } from '../../configuration/common/configuration.js';
-@@ -284,6 +284,10 @@ export function getWindowControlsStyle(configurationService: IConfigurationServi
+@@ -374,6 +374,10 @@ export function getWindowControlsStyle(configurationService: IConfigurationServi
  		return WindowControlsStyle.NATIVE; // only supported on Windows/Linux desktop with custom titlebar
  	}
  
@@ -521,10 +527,10 @@ index 291648bca96..95a8a448383 100644
  	const configuration = configurationService.getValue<IWindowSettings | undefined>('window');
  	const style = configuration?.controlsStyle;
  	if (style === WindowControlsStyle.CUSTOM || style === WindowControlsStyle.HIDDEN) {
-@@ -295,6 +299,30 @@ export function getWindowControlsStyle(configurationService: IConfigurationServi
- 
- export const DEFAULT_CUSTOM_TITLEBAR_HEIGHT = 35; // includes space for command center
- 
+@@ -391,6 +395,29 @@ export function getMacOSWindowControlsPosition(height: number, osVersion: string
+ 	const offset = Math.floor((height - buttonHeight) / 2);
+ 	return !offset && horizontalInset === undefined ? null : { x: horizontalInset ?? offset + 1, y: offset };
+ }
 +/**
 + * Ritemark 2.0: the main window has no title row of its own, on the Mac and on Windows (Jarmo,
 + * 17 October: Windows "mimic as much apple as possible"). Each column carries a strip at its top:
@@ -548,24 +554,32 @@ index 291648bca96..95a8a448383 100644
 + * at the strip's full height.
 + */
 +export const RITEMARK_FRAME_WINDOW_CONTROLS_HEIGHT = isMacintosh ? RITEMARK_FRAME_CENTRE_LINE * 2 : RITEMARK_FRAME_STRIP_HEIGHT;
-+
+ 
  export function useWindowControlsOverlay(configurationService: IConfigurationService): boolean {
  	if (isWeb) {
- 		return false; // only supported on desktop instances
 diff --git a/src/vs/platform/windows/electron-main/windowImpl.ts b/src/vs/platform/windows/electron-main/windowImpl.ts
-index 07551319546..fd815be7e21 100644
+index 91f11f8deec..bf620f8b7b8 100644
 --- a/src/vs/platform/windows/electron-main/windowImpl.ts
 +++ b/src/vs/platform/windows/electron-main/windowImpl.ts
-@@ -32,7 +32,7 @@ import { IApplicationStorageMainService, IStorageMainService } from '../../stora
+@@ -12,7 +12,7 @@ import { Disposable, DisposableStore, IDisposable, MutableDisposable, toDisposab
+ import { FileAccess, Schemas } from '../../../base/common/network.js';
+ import { join } from '../../../base/common/path.js';
+ import { getMarks, mark } from '../../../base/common/performance.js';
+-import { isTahoeOrNewer, isLinux, isMacintosh, isWindows } from '../../../base/common/platform.js';
++import { isLinux, isMacintosh, isWindows } from '../../../base/common/platform.js';
+ import { URI } from '../../../base/common/uri.js';
+ import { localize } from '../../../nls.js';
+ import { release } from 'os';
+@@ -33,7 +33,7 @@ import { IApplicationStorageMainService, IStorageMainService } from '../../stora
  import { ITelemetryService } from '../../telemetry/common/telemetry.js';
  import { ThemeIcon } from '../../../base/common/themables.js';
  import { IThemeMainService } from '../../theme/electron-main/themeMainService.js';
--import { getMenuBarVisibility, IFolderToOpen, INativeWindowConfiguration, IWindowSettings, IWorkspaceToOpen, MenuBarVisibility, hasNativeTitlebar, useNativeFullScreen, useWindowControlsOverlay, DEFAULT_CUSTOM_TITLEBAR_HEIGHT, TitlebarStyle, MenuSettings } from '../../window/common/window.js';
-+import { getMenuBarVisibility, IFolderToOpen, INativeWindowConfiguration, IWindowSettings, IWorkspaceToOpen, MenuBarVisibility, hasNativeTitlebar, useNativeFullScreen, useWindowControlsOverlay, DEFAULT_CUSTOM_TITLEBAR_HEIGHT, TitlebarStyle, MenuSettings, RITEMARK_FRAME_STRIP_HEIGHT, RITEMARK_FRAME_WINDOW_CONTROLS_HEIGHT, RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../window/common/window.js';
+-import { getMenuBarVisibility, IFolderToOpen, INativeWindowConfiguration, IWindowSettings, IWorkspaceToOpen, MenuBarVisibility, hasNativeTitlebar, useNativeFullScreen, DEFAULT_CUSTOM_TITLEBAR_HEIGHT, TitlebarStyle, MenuSettings, getMacOSWindowControlsPosition } from '../../window/common/window.js';
++import { getMenuBarVisibility, IFolderToOpen, INativeWindowConfiguration, IWindowSettings, IWorkspaceToOpen, MenuBarVisibility, hasNativeTitlebar, useNativeFullScreen, DEFAULT_CUSTOM_TITLEBAR_HEIGHT, TitlebarStyle, MenuSettings, getMacOSWindowControlsPosition, RITEMARK_FRAME_STRIP_HEIGHT, RITEMARK_FRAME_WINDOW_CONTROLS_HEIGHT, RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../window/common/window.js';
  import { defaultBrowserWindowOptions, getAllWindowsExcludingOffscreen, IWindowsMainService, OpenContext, WindowStateValidator } from './windows.js';
  import { ISingleFolderWorkspaceIdentifier, IWorkspaceIdentifier, isSingleFolderWorkspaceIdentifier, isWorkspaceIdentifier, toWorkspaceIdentifier } from '../../workspace/common/workspace.js';
  import { IWorkspacesManagementMainService } from '../../workspaces/electron-main/workspacesManagementMainService.js';
-@@ -185,13 +185,16 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
+@@ -225,13 +225,16 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
  		// Sheet Offsets
  		const useCustomTitleStyle = !hasNativeTitlebar(this.configurationService, options?.titleBarStyle === 'hidden' ? TitlebarStyle.CUSTOM : undefined /* unknown */);
  		if (isMacintosh && useCustomTitleStyle) {
@@ -574,7 +588,7 @@ index 07551319546..fd815be7e21 100644
  		}
  
  		// Update the window controls immediately based on cached or default values
- 		if (useCustomTitleStyle && useWindowControlsOverlay(this.configurationService)) {
+ 		if (this.hasWindowControlOverlay) {
  			const cachedWindowControlHeight = this.stateService.getItem<number>((BaseWindow.windowControlHeightStateStorageKey));
 -			if (cachedWindowControlHeight) {
 +			if (RITEMARK_FRAME_WITHOUT_TITLE_ROW && this instanceof CodeWindow) {
@@ -659,10 +673,10 @@ index 68bcfe4e00f..8b28e2f239f 100644
  	ensureNoDisposablesAreLeakedInTestSuite();
  });
 diff --git a/src/vs/workbench/api/browser/mainThreadMessageService.ts b/src/vs/workbench/api/browser/mainThreadMessageService.ts
-index 288f11659fc..6ff42a5f781 100644
+index 112cef38c03..0f5873e1953 100644
 --- a/src/vs/workbench/api/browser/mainThreadMessageService.ts
 +++ b/src/vs/workbench/api/browser/mainThreadMessageService.ts
-@@ -138,13 +138,17 @@ export class MainThreadMessageService implements MainThreadMessageServiceShape {
+@@ -142,13 +142,17 @@ export class MainThreadMessageService implements MainThreadMessageServiceShape {
  			}
  		}
  
@@ -682,7 +696,7 @@ index 288f11659fc..6ff42a5f781 100644
  
  		return result;
 diff --git a/src/vs/workbench/browser/labels.ts b/src/vs/workbench/browser/labels.ts
-index a414a3d0fcf..a4a30096d9c 100644
+index d81722d63af..8a11889fd80 100644
 --- a/src/vs/workbench/browser/labels.ts
 +++ b/src/vs/workbench/browser/labels.ts
 @@ -5,7 +5,7 @@
@@ -694,7 +708,7 @@ index a414a3d0fcf..a4a30096d9c 100644
  import { IconLabel, IIconLabelValueOptions, IIconLabelCreationOptions } from '../../base/browser/ui/iconLabel/iconLabel.js';
  import { ILanguageService } from '../../editor/common/languages/language.js';
  import { IWorkspaceContextService } from '../../platform/workspace/common/workspace.js';
-@@ -647,6 +647,16 @@ class ResourceLabelWidget extends IconLabel {
+@@ -648,6 +648,16 @@ class ResourceLabelWidget extends IconLabel {
  
  		const resource = toResource(this.label);
  
@@ -711,7 +725,7 @@ index a414a3d0fcf..a4a30096d9c 100644
  		if (this.options?.title !== undefined) {
  			iconLabelOptions.title = this.options.title;
  		}
-@@ -668,6 +678,20 @@ class ResourceLabelWidget extends IconLabel {
+@@ -669,6 +679,20 @@ class ResourceLabelWidget extends IconLabel {
  			}
  		}
  
@@ -732,7 +746,7 @@ index a414a3d0fcf..a4a30096d9c 100644
  		if (this.options && !this.options.hideIcon) {
  			if (!this.computedIconClasses) {
  				this.computedIconClasses = getIconClasses(this.modelService, this.languageService, resource, this.options.fileKind, this.options.icon);
-@@ -721,7 +745,7 @@ class ResourceLabelWidget extends IconLabel {
+@@ -726,7 +750,7 @@ class ResourceLabelWidget extends IconLabel {
  				`:${this.label.range.startLineNumber}`;
  		}
  
@@ -742,10 +756,10 @@ index a414a3d0fcf..a4a30096d9c 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index c213b29de93..3f6375403b9 100644
+index 75f9238fd75..68ad7c003b7 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
-@@ -135,6 +135,12 @@ export const TITLE_BAR_SETTINGS = [
+@@ -151,6 +151,12 @@ export const TITLE_BAR_SETTINGS = [
  ];
  
  const DEFAULT_EMPTY_WINDOW_DIMENSIONS = new Dimension(DEFAULT_EMPTY_WINDOW_SIZE.width, DEFAULT_EMPTY_WINDOW_SIZE.height);
@@ -758,7 +772,7 @@ index c213b29de93..3f6375403b9 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -2934,9 +2940,9 @@ class LayoutStateModel extends Disposable {
+@@ -3023,9 +3029,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -770,7 +784,7 @@ index c213b29de93..3f6375403b9 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3032,8 +3038,8 @@ class LayoutStateModel extends Disposable {
+@@ -3122,8 +3128,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -783,10 +797,10 @@ index c213b29de93..3f6375403b9 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..2acdcde6574
+index 00000000000..1c35204abed
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1791 @@
+@@ -0,0 +1,1794 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1002,7 +1016,7 @@ index 00000000000..2acdcde6574
 +	display: block !important; /* !important: core hides an empty group's sheet */
 +}
 +
-+.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark {
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper {
 +	display: none !important; /* !important: core shows the letterpress on an empty group */
 +}
 +
@@ -2470,11 +2484,12 @@ index 00000000000..2acdcde6574
 + * shortcuts stay hidden. The kit's `.tiles`: three columns 12 apart, radius 10, the strong hairline.
 + */
 +
-+.monaco-workbench .part.editor > .content .editor-group-container.empty > .editor-group-watermark {
++.monaco-workbench .part.editor > .content .editor-group-container.empty > .editor-group-watermark-wrapper {
 +	display: flex !important; /* !important: the rule above hides the whole watermark */
 +	position: absolute;
 +	inset: 44px 8px 8px 8px; /* under the tab row, on the sheet */
 +	max-width: none;
++	width: auto;
 +	height: auto;
 +	margin: 0;
 +	z-index: 1;
@@ -2482,15 +2497,17 @@ index 00000000000..2acdcde6574
 +	justify-content: center;
 +}
 +
-+.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark > .watermark-container {
-+	display: none;
++/* Since 1.142 the tiles sit in the watermark's wrapper, beside the letterpress and the group's toolbar: hide those two */
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper > .editor-group-watermark,
++.monaco-workbench .part.editor > .content .editor-group-container > .editor-group-watermark-wrapper > .editor-group-watermark-toolbar-container {
++	display: none !important; /* !important: core's rules of the same weight show them */
 +}
 +
 +.monaco-workbench .part.editor > .content .editor-group-container.empty {
 +	opacity: 1; /* the empty desk's tiles stay readable when another desk is the active one */
 +}
 +
-+.monaco-workbench.ritemark-welcome-alone .part.editor > .content .editor-group-container.empty > .editor-group-watermark {
++.monaco-workbench.ritemark-welcome-alone .part.editor > .content .editor-group-container.empty > .editor-group-watermark-wrapper {
 +	display: none !important; /* !important: the empty desk's rule above */
 +}
 +
@@ -2579,7 +2596,7 @@ index 00000000000..2acdcde6574
 +	color: var(--rm-body);
 +}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-index 4aaccf3c849..31f3520c15a 100644
+index 168ae722004..37f11376eb1 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 @@ -15,9 +15,9 @@ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.
@@ -2594,10 +2611,10 @@ index 4aaccf3c849..31f3520c15a 100644
  import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
  import { IAction, Separator, SubmenuAction, toAction } from '../../../../base/common/actions.js';
  import { ToggleAuxiliaryBarAction } from './auxiliaryBarActions.js';
-@@ -34,6 +34,13 @@ import { getContextMenuActions } from '../../../../platform/actions/browser/menu
- import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+@@ -35,6 +35,13 @@ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
  import { VisibleViewContainersTracker } from '../visibleViewContainersTracker.js';
  import { Extensions } from '../../panecomposite.js';
+ import { IToolBarResponsiveBehaviorOptions } from '../../../../base/browser/ui/toolbar/toolbar.js';
 +import { Part } from '../../part.js';
 +import { getWindow } from '../../../../base/browser/dom.js';
 +import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -2608,7 +2625,7 @@ index 4aaccf3c849..31f3520c15a 100644
  
  interface IAuxiliaryBarPartConfiguration {
  	position: ActivityBarPosition;
-@@ -84,7 +91,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -85,7 +92,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  	static readonly viewContainersWorkspaceStateKey = 'workbench.auxiliarybar.viewContainersWorkspaceState';
  
  	// Use the side bar dimensions
@@ -2617,7 +2634,7 @@ index 4aaccf3c849..31f3520c15a 100644
  	override readonly maximumWidth: number = Number.POSITIVE_INFINITY;
  	override readonly minimumHeight: number = 0;
  	override readonly maximumHeight: number = Number.POSITIVE_INFINITY;
-@@ -136,7 +143,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -137,7 +144,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  		super(
  			Parts.AUXILIARYBAR_PART,
  			{
@@ -2626,7 +2643,7 @@ index 4aaccf3c849..31f3520c15a 100644
  				trailingSeparator: true,
  				borderWidth: () => (this.getColor(SIDE_BAR_BORDER) || this.getColor(contrastBorder)) ? 1 : 0,
  			},
-@@ -296,6 +303,10 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -309,6 +316,10 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  	}
  
  	protected shouldShowCompositeBar(): boolean {
@@ -2637,7 +2654,7 @@ index 4aaccf3c849..31f3520c15a 100644
  		if (this.configuration.position === ActivityBarPosition.HIDDEN) {
  			return false;
  		}
-@@ -328,9 +339,116 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -341,9 +352,122 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  		}
  	}
  
@@ -2663,6 +2680,12 @@ index 4aaccf3c849..31f3520c15a 100644
 +
 +		// Keep the full grid size, so that a relayout starts from it
 +		Part.prototype.layout.call(this, width, height, top, left);
++	}
++
++	// Ritemark (Sprint 135): a relayout (a header or footer added or removed) starts from the full grid size
++	// restored above, not from the smaller box this part gave its base class (upstream's getRelayoutDimension).
++	protected override getRelayoutDimension() {
++		return this.dimension;
 +	}
 +
  	override toJSON(): object {
@@ -2861,31 +2884,31 @@ index fe7bce2f083..71fd1bb112b 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts b/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
-index 5af4f540bac..4917bfa22d8 100644
+index ae595e8ab3e..d2a137e7255 100644
 --- a/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
 +++ b/src/vs/workbench/browser/parts/dialogs/dialogHandler.ts
-@@ -114,6 +114,7 @@ export class BrowserDialogHandler extends AbstractDialogHandler {
- 			createWorkbenchDialogOptions({
- 				detail,
+@@ -127,6 +127,7 @@ export class BrowserDialogHandler extends AbstractDialogHandler {
+ 				detail: typeof detail === 'string' ? detail : undefined,
+ 				detailElement,
  				cancelId,
 +				ritemarkFocusCancel: customOptions?.ritemarkFocusCancel,
  				type: this.getDialogType(type),
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index 9bb098c68f8..9c7898b39be 100644
+index afa6942390e..06e7b97bf55 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
 @@ -36,6 +36,8 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
  import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
- import { EditorPartMaximizedEditorGroupContext, EditorPartMultipleEditorGroupsContext, EditorTabsVisibleContext } from '../../../common/contextkeys.js';
+ import { EditorAreaFocusContext, EditorPartMaximizedEditorGroupContext, EditorPartMultipleEditorGroupsContext, EditorTabsVisibleContext, IsTopRightEditorGroupContext } from '../../../common/contextkeys.js';
  import { mainWindow } from '../../../../base/browser/window.js';
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
  
- export interface IEditorPartUIState {
- 	readonly serializedGrid: ISerializedGrid;
-@@ -88,6 +90,9 @@ class GridWidgetView<T extends IView> implements IView {
+ /**
+  * The width (in pixels) of the editor card border drawn on every side when the
+@@ -97,6 +99,9 @@ class GridWidgetView<T extends IView> implements IView {
  	}
  }
  
@@ -2895,7 +2918,7 @@ index 9bb098c68f8..9c7898b39be 100644
  export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart, IEditorGroupsView {
  
  	private static readonly EDITOR_PART_UI_STATE_STORAGE_KEY = 'editorpart.state';
-@@ -1026,6 +1031,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1080,6 +1085,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		// Drag & Drop support
  		this.setupDragAndDropSupport(parent, this.container);
  
@@ -2911,8 +2934,8 @@ index 9bb098c68f8..9c7898b39be 100644
  		// Context keys
  		this.handleContextKeys();
  
-@@ -1325,7 +1339,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
- 		this.left = left;
+@@ -1466,7 +1480,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 		}
  
  		// Layout contents
 -		const contentAreaSize = super.layoutContents(width, height).contentSize;
@@ -2922,10 +2945,10 @@ index 9bb098c68f8..9c7898b39be 100644
  		// Layout editor container
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts b/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
-index 82f6975b6d8..31a8cf10fad 100644
+index 38e722820da..f9fbe8c1a61 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
-@@ -421,11 +421,11 @@ export class NotificationsCenter extends Themable implements INotificationsCente
+@@ -433,11 +433,11 @@ export class NotificationsCenter extends Themable implements INotificationsCente
  				// Make sure notifications are not exceeding available height
  				availableHeight = this.workbenchDimensions.height - 35 /* header */;
  				if (this.layoutService.isVisible(Parts.STATUSBAR_PART, mainWindow)) {
@@ -2940,10 +2963,10 @@ index 82f6975b6d8..31a8cf10fad 100644
  
  				availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts b/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
-index bd77caab75a..e6802457ead 100644
+index 0b62b5801da..239089e9ac3 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
-@@ -613,11 +613,11 @@ export class NotificationsToasts extends Themable implements INotificationsToast
+@@ -642,11 +642,11 @@ export class NotificationsToasts extends Themable implements INotificationsToast
  			// Make sure notifications are not exceeding available height
  			availableHeight = this.workbenchDimensions.height;
  			if (this.layoutService.isVisible(Parts.STATUSBAR_PART, mainWindow)) {
@@ -2958,19 +2981,19 @@ index bd77caab75a..e6802457ead 100644
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
-index 7c01c6202c3..d05d50f3035 100644
+index ebb6b6f90c3..9e42d3ffb9f 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
-@@ -37,7 +37,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
+@@ -62,7 +62,7 @@ export function setNotificationRowHeight(height: number): void {
  export class NotificationsListDelegate implements IListVirtualDelegate<INotificationViewItem> {
  
- 	private static readonly ROW_HEIGHT = 42;
+ 	private static get ROW_HEIGHT(): number { return notificationRowHeight; }
 -	private static readonly LINE_HEIGHT = 22;
 +	private static readonly LINE_HEIGHT = 20; // Ritemark 2.0: a notification's message is 13/20 (the Experience lead; ritemarkSurfaces.css)
  
  	private offsetHelper: HTMLElement;
  
-@@ -51,6 +51,12 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+@@ -76,6 +76,12 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
  
  	getHeight(notification: INotificationViewItem): number {
  		if (!notification.expanded) {
@@ -2983,7 +3006,7 @@ index 7c01c6202c3..d05d50f3035 100644
  			return NotificationsListDelegate.ROW_HEIGHT; // return early if there are no more rows to show
  		}
  
-@@ -79,15 +85,15 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+@@ -104,15 +110,15 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
  		return expandedHeight;
  	}
  
@@ -2992,7 +3015,7 @@ index 7c01c6202c3..d05d50f3035 100644
  
  		// Prepare offset helper depending on toolbar actions count
  		let actions = 0;
- 		if (!notification.hasProgress) {
+ 		if (!notification.hasActiveProgress) {
  			actions++; // close
  		}
 -		if (notification.canCollapse) {
@@ -3003,10 +3026,10 @@ index 7c01c6202c3..d05d50f3035 100644
  		if (isNonEmptyArray(notification.actions?.secondary)) {
  			actions++; // secondary actions
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index b00efadf3eb..a47b120fc44 100644
+index 29725b7f835..37ca4a483b0 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-@@ -857,6 +857,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -860,6 +860,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  			}
  		}
  
@@ -3020,10 +3043,10 @@ index b00efadf3eb..a47b120fc44 100644
  		return this.activate();
  	}
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index ae5536dd7c0..72709290367 100644
+index 491c451f7fa..251b2dfaebf 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -612,6 +612,9 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -704,6 +704,9 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  			const padding = this.compositeBarPosition === CompositeBarPosition.TITLE ? 16 : 8;
  			const borderWidth = this.partId === Parts.PANEL_PART ? 0 : 1;
  			let availableWidth = this.contentDimension.width - padding - borderWidth;
@@ -4199,7 +4222,7 @@ index 00000000000..5f751447e51
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index f269e7586a8..bdff8ff66d0 100644
+index cd93a447d1c..5a1176efe49 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -4211,7 +4234,7 @@ index f269e7586a8..bdff8ff66d0 100644
  import { SidebarFocusContext, ActiveViewletContext } from '../../../common/contextkeys.js';
  import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
  import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
-@@ -34,6 +34,11 @@ import { localize2 } from '../../../../nls.js';
+@@ -36,6 +36,11 @@ import { localize2 } from '../../../../nls.js';
  import { IHoverService } from '../../../../platform/hover/browser/hover.js';
  import { VisibleViewContainersTracker } from '../visibleViewContainersTracker.js';
  import { Extensions } from '../../panecomposite.js';
@@ -4221,9 +4244,9 @@ index f269e7586a8..bdff8ff66d0 100644
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
 +import { RitemarkProjectHead } from './ritemarkProjectHead.js';
  
- export class SidebarPart extends AbstractPaneCompositePart {
+ const PRIMARY_SIDE_BAR_SASH_CLASS = 'primary-sidebar-sash';
  
-@@ -177,12 +182,47 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -183,12 +188,53 @@ export class SidebarPart extends AbstractPaneCompositePart {
  		container.style.outlineColor = this.getColor(SIDE_BAR_DRAG_AND_DROP_BACKGROUND) ?? '';
  	}
  
@@ -4269,10 +4292,16 @@ index f269e7586a8..bdff8ff66d0 100644
 +		if (strip || rows) {
 +			Part.prototype.layout.call(this, width, height, top, left);
 +		}
++	}
++
++	// Ritemark (Sprint 135): a relayout (a header or footer added or removed) starts from the full grid size
++	// restored above, not from the smaller box this part gave its base class (upstream's getRelayoutDimension).
++	protected override getRelayoutDimension() {
++		return this.dimension;
  	}
  
- 	protected override getTitleAreaDropDownAnchorAlignment(): AnchorAlignment {
-@@ -216,7 +256,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
+ 	override setBoundarySashes(sashes: IBoundarySashes): void {
+@@ -230,7 +276,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
  			},
  			compositeSize: 0,
  			iconSize: 16,
@@ -4282,7 +4311,7 @@ index f269e7586a8..bdff8ff66d0 100644
  				activeBackgroundColor: theme.getColor(SIDE_BAR_BACKGROUND),
  				inactiveBackgroundColor: theme.getColor(SIDE_BAR_BACKGROUND),
 diff --git a/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css b/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css
-index 1f3b102ebb1..bf449935276 100644
+index 6fc44ed872a..692c7638ef7 100644
 --- a/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css
 +++ b/src/vs/workbench/browser/parts/statusbar/media/statusbarpart.css
 @@ -7,7 +7,7 @@
@@ -4304,20 +4333,20 @@ index 1f3b102ebb1..bf449935276 100644
  	vertical-align: top;
  	max-width: 40vw;
 diff --git a/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts b/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts
-index 18340a8ae9a..0b186f5e736 100644
+index 2ac7bd0c598..e9f6ab4492b 100644
 --- a/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts
 +++ b/src/vs/workbench/browser/parts/statusbar/statusbarPart.ts
-@@ -118,7 +118,7 @@ interface IPendingStatusbarEntry {
+@@ -121,7 +121,7 @@ interface IPendingStatusbarEntry {
  
  class StatusbarPart extends Part implements IStatusbarEntryContainer {
  
 -	static readonly HEIGHT = 22;
 +	static readonly HEIGHT = 24; // Ritemark 2.0
  
- 	//#region IView
- 
+ 	/**
+ 	 * Vertical padding reserved around the main status bar under the floating panels
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index 044fe0be908..3550177b557 100644
+index 745739c61f4..89ada79db92 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 @@ -8,7 +8,7 @@ import { localize, localize2 } from '../../../../nls.js';
@@ -4329,7 +4358,7 @@ index 044fe0be908..3550177b557 100644
  import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
  import { StandardMouseEvent } from '../../../../base/browser/mouseEvent.js';
  import { IConfigurationService, IConfigurationChangeEvent } from '../../../../platform/configuration/common/configuration.js';
-@@ -228,7 +228,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+@@ -235,7 +235,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
  
  	get minimumHeight(): number {
  		const wcoEnabled = isWeb && isWCOEnabled();
@@ -4338,9 +4367,9 @@ index 044fe0be908..3550177b557 100644
  		if (wcoEnabled) {
  			value = Math.max(value, getWCOTitlebarAreaRect(getWindow(this.element))?.height ?? 0);
  		}
-@@ -367,8 +367,8 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
- 
- 	protected onConfigurationChanged(event: IConfigurationChangeEvent): void {
+@@ -373,8 +373,8 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+ 			this.updateStyles();
+ 		}
  
 -		// Custom menu bar (disabled if auxiliary)
 -		if (!this.isAuxiliary && !hasNativeMenu(this.configurationService, this.titleBarStyle) && (!isMacintosh || isWeb)) {
@@ -4349,7 +4378,7 @@ index 044fe0be908..3550177b557 100644
  			if (event.affectsConfiguration(MenuSettings.MenuBarVisibility)) {
  				if (this.currentMenubarVisibility === 'compact') {
  					this.uninstallMenubar();
-@@ -475,6 +475,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+@@ -487,6 +487,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
  		// Menubar: install a custom menu bar depending on configuration
  		if (
  			!this.isAuxiliary &&
@@ -4370,10 +4399,10 @@ index 9250ef3f280..fdd208cd50b 100644
  import { WORKBENCH_BACKGROUND, TITLE_BAR_ACTIVE_BACKGROUND } from '../common/theme.js';
  import { isWeb, isIOS } from '../../base/common/platform.js';
 diff --git a/src/vs/workbench/contrib/files/browser/fileCommands.ts b/src/vs/workbench/contrib/files/browser/fileCommands.ts
-index c8fc8aa2dd2..39566af5ecd 100644
+index 45ada1981b3..d9835ac6360 100644
 --- a/src/vs/workbench/contrib/files/browser/fileCommands.ts
 +++ b/src/vs/workbench/contrib/files/browser/fileCommands.ts
-@@ -728,3 +728,12 @@ CommandsRegistry.registerCommand({
+@@ -760,3 +760,12 @@ CommandsRegistry.registerCommand({
  		});
  	}
  });
@@ -4387,7 +4416,7 @@ index c8fc8aa2dd2..39566af5ecd 100644
 +	return folder?.resource;
 +});
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
-index ed7dbe07826..bf6fc344953 100644
+index 8178f4c4edc..ce07f487a4f 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
 @@ -58,7 +58,7 @@ import { BrowserFileUpload, ExternalFileImport, getMultipleFilesOverwriteConfirm
@@ -4498,13 +4527,13 @@ index ed7dbe07826..bf6fc344953 100644
  		const ignoreFile = this.ignoreTreesPerRoot.get(rootResource.toString())?.findSubstr(resource);
  		const isIncludedInTraversal = ignoreFile?.isPathIncludedInTraversal(resource.path, isDirectory);
 diff --git a/src/vs/workbench/contrib/splash/browser/partsSplash.ts b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
-index 8280bf593ca..dbbd5c0dc35 100644
+index 43cd923deb6..9365ad8152a 100644
 --- a/src/vs/workbench/contrib/splash/browser/partsSplash.ts
 +++ b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
-@@ -70,14 +70,17 @@ export class PartsSplash {
- 
- 	private _savePartsSplash() {
- 		const theme = this._themeService.getColorTheme();
+@@ -73,14 +73,17 @@ export class PartsSplash {
+ 		const theme = this._themeService.getBaseColorTheme();
+ 		const modernUIShellBackground = theme.getColor(themes.MODERN_UI_SHELL_BACKGROUND);
+ 		const modernUIInactiveShellBackground = theme.getColor(themes.MODERN_UI_INACTIVE_SHELL_BACKGROUND);
 +		// Ritemark 2.0 (Sprint 134, R9): the window's ground, as ritemarkSurfaces.css paints it (--rm-ground), so a switch
 +		// or a reload shows the ground, not the desk. 001's defaults in workbench.ts are the same two grounds.
 +		const ground = theme.getColor('ritemark.ground') ?? theme.getColor(themes.SIDE_BAR_BACKGROUND);
@@ -4518,25 +4547,25 @@ index 8280bf593ca..dbbd5c0dc35 100644
 -				editorBackground: theme.getColor(editorBackground)?.toString(),
 +				background: Color.Format.CSS.formatHex(ground || theme.getColor(editorBackground) || themes.WORKBENCH_BACKGROUND(theme)),
 +				editorBackground: (ground ?? theme.getColor(editorBackground))?.toString(),
- 				titleBarBackground: theme.getColor(themes.TITLE_BAR_ACTIVE_BACKGROUND)?.toString(),
+ 				titleBarBackground: theme.getColor(themes.TITLE_BAR_ACTIVE_BACKGROUND)?.makeOpaque(themes.WORKBENCH_BACKGROUND(theme)).toString(),
+ 				titleBarInactiveBackground: theme.getColor(themes.TITLE_BAR_INACTIVE_BACKGROUND)?.makeOpaque(themes.WORKBENCH_BACKGROUND(theme)).toString(),
  				titleBarBorder: theme.getColor(themes.TITLE_BAR_BORDER)?.toString(),
- 				activityBarBackground: theme.getColor(themes.ACTIVITY_BAR_BACKGROUND)?.toString(),
 diff --git a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
-index 683604c1cc7..880e0e927d2 100644
+index 86d357e665c..9b9f66fd54b 100644
 --- a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
 +++ b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
-@@ -187,6 +187,9 @@ export class OverlayWebview extends Disposable implements IOverlayWebview {
- 			return;
- 		}
+@@ -203,6 +203,9 @@ export class OverlayWebview extends Disposable implements IOverlayWebview {
+ 		// Force the overlay layout to be created if it doesn't exist
+ 		this.overlayLayout.setAnchorElement(anchorElement, { clippingContainer });
  
 +		// Ritemark 2.0: a webview on the desk takes the desk's rounded corners
-+		this._overlayLayout.content.classList.toggle('ritemark-desk-webview', !!anchorElement.closest('.part.editor'));
++		this.overlayLayout.content.classList.toggle('ritemark-desk-webview', !!anchorElement.closest('.part.editor'));
 +
- 		this._overlayLayout?.layoutOverAnchorElement(anchorElement, { clippingContainer, fallbackDimension: dimension });
- 	}
+ 		const part = anchorElement.closest('.part');
+ 		this._syncOuterEdgeClasses(part);
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 544300939e9..515740fa825 100644
+index 41250d7b714..b51654a5969 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
 @@ -28,7 +28,9 @@ import { NativeWindow } from './window.js';
@@ -4550,7 +4579,7 @@ index 544300939e9..515740fa825 100644
  
  // Actions
  (function registerActions(): void {
-@@ -279,7 +281,7 @@ import product from '../../platform/product/common/product.js';
+@@ -281,7 +283,7 @@ import product from '../../platform/product/common/product.js';
  						localize(`window.menuStyle.native`, "Use the native menu. This is ignored when {0} is set to {1}.", '`#window.titleBarStyle#`', '`custom`'),
  						localize(`window.menuStyle.inherit`, "Matches the menu style to the title bar style defined in {0}.", '`#window.titleBarStyle#`'),
  					],
@@ -4559,20 +4588,20 @@ index 544300939e9..515740fa825 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
-@@ -288,7 +290,7 @@ import product from '../../platform/product/common/product.js';
+@@ -291,7 +293,7 @@ import product from '../../platform/product/common/product.js';
  			'window.dialogStyle': {
  				'type': 'string',
  				'enum': ['native', 'custom'],
 -				'default': 'native',
 +				'default': 'custom', // Ritemark 2.0: Ritemark's own dialog, one sheet with the menus (experience 31); application-scoped, like window.menuStyle
  				'scope': ConfigurationScope.APPLICATION,
- 				'description': localize('dialogStyle', "Adjust the appearance of dialogs to be native by the OS or custom.")
- 			},
+ 				'description': localize('dialogStyle', "Adjust the appearance of dialogs to be native by the OS or custom."),
+ 				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
-index 6fe575a12dd..b43d7ea930e 100644
+index 9fd23700423..d7f7d78c0ca 100644
 --- a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
-@@ -4,21 +4,22 @@
+@@ -4,14 +4,14 @@
   *--------------------------------------------------------------------------------------------*/
  
  import { Event } from '../../../../base/common/event.js';
@@ -4587,8 +4616,9 @@ index 6fe575a12dd..b43d7ea930e 100644
 -import { isMacintosh, isWindows, isLinux, isTahoeOrNewer } from '../../../../base/common/platform.js';
 +import { isMacintosh, isWindows, isLinux } from '../../../../base/common/platform.js';
  import { IMenuService, MenuId } from '../../../../platform/actions/common/actions.js';
+ import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
  import { BrowserTitlebarPart, BrowserTitleService, IAuxiliaryTitlebarPart } from '../../../browser/parts/titlebar/titlebarPart.js';
- import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+@@ -19,7 +19,8 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
  import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
  import { INativeHostService } from '../../../../platform/native/common/native.js';
@@ -4598,7 +4628,7 @@ index 6fe575a12dd..b43d7ea930e 100644
  import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
  import { Codicon } from '../../../../base/common/codicons.js';
  import { ThemeIcon } from '../../../../base/common/themables.js';
-@@ -38,19 +39,11 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+@@ -39,19 +40,11 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
  			return super.minimumHeight;
  		}
  
@@ -4620,7 +4650,7 @@ index 6fe575a12dd..b43d7ea930e 100644
  	//#endregion
  
  	private maxRestoreControl: HTMLElement | undefined;
-@@ -59,6 +52,9 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+@@ -60,6 +53,9 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
  	private cachedWindowControlStyles: { bgColor: string; fgColor: string } | undefined;
  	private cachedWindowControlHeight: number | undefined;
  
@@ -4630,9 +4660,9 @@ index 6fe575a12dd..b43d7ea930e 100644
  	constructor(
  		id: string,
  		targetWindow: CodeWindow,
-@@ -80,11 +76,33 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+@@ -82,11 +78,33 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
  	) {
- 		super(id, targetWindow, editorGroupsContainer, contextMenuService, configurationService, environmentService, instantiationService, themeService, storageService, layoutService, contextKeyService, hostService, editorService, menuService, keybindingService);
+ 		super(id, targetWindow, editorGroupsContainer, contextMenuService, configurationService, environmentService, instantiationService, themeService, storageService, layoutService, contextKeyService, hostService, editorService, menuService, keybindingService, actionViewItemService);
  
 -		this.tahoeOrNewer = isTahoeOrNewer(environmentService.os.release);
 +		this.ritemarkFrame = RITEMARK_FRAME_WITHOUT_TITLE_ROW && targetWindow.vscodeWindowId === mainWindow.vscodeWindowId;
@@ -4665,7 +4695,7 @@ index 6fe575a12dd..b43d7ea930e 100644
  	private async handleWindowsAlwaysOnTop(targetWindowId: number): Promise<void> {
  		const isWindowAlwaysOnTopContext = IsWindowAlwaysOnTopContext.bindTo(this.contextKeyService);
  
-@@ -253,15 +271,19 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+@@ -255,15 +273,19 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
  		// Part container
  		if (this.element) {
  			if (useWindowControlsOverlay(this.configurationService)) {
@@ -4689,7 +4719,7 @@ index 6fe575a12dd..b43d7ea930e 100644
  					});
  				}
  			}
-@@ -271,7 +293,8 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+@@ -273,7 +295,8 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
  	override layout(width: number, height: number): void {
  		super.layout(width, height);
  
@@ -4700,11 +4730,11 @@ index 6fe575a12dd..b43d7ea930e 100644
  			if (newHeight !== this.cachedWindowControlHeight) {
  				this.cachedWindowControlHeight = newHeight;
 diff --git a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-index 2a2643375a2..89e1aba3b9e 100644
+index e6c222d455c..038d278e14a 100644
 --- a/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
 +++ b/src/vs/workbench/services/actions/common/menusExtensionPoint.ts
-@@ -550,6 +550,28 @@ const apiMenus: IAPIMenu[] = [
- 		description: localize('menus.chatNewSession', "The Chat new session menu."),
+@@ -576,6 +576,28 @@ const apiMenus: IAPIMenu[] = [
+ 		description: localize('menus.agentsChangeInline', "The Changes view inline menu in the agents window."),
  		proposed: 'chatSessionsProvider'
  	},
 +	// Ritemark 2.0: the head of the left column takes its menus from the extension (ritemarkProjectHead.ts)
@@ -4757,13 +4787,13 @@ index 86a3d521e1b..78bbd2e6450 100644
  	}
  
 diff --git a/src/vs/workbench/services/layout/browser/layoutService.ts b/src/vs/workbench/services/layout/browser/layoutService.ts
-index 46243a4447e..bf92f42c53d 100644
+index 6851c3b584c..027d77efbca 100644
 --- a/src/vs/workbench/services/layout/browser/layoutService.ts
 +++ b/src/vs/workbench/services/layout/browser/layoutService.ts
 @@ -11,8 +11,8 @@ import { IDimension } from '../../../../base/browser/dom.js';
  import { Direction, IViewSize } from '../../../../base/browser/ui/grid/grid.js';
  import { isMacintosh, isNative, isWeb } from '../../../../base/common/platform.js';
- import { isAuxiliaryWindow } from '../../../../base/browser/window.js';
+ import { isAuxiliaryWindow, mainWindow } from '../../../../base/browser/window.js';
 -import { CustomTitleBarVisibility, TitleBarSetting, getMenuBarVisibility, hasCustomTitlebar, hasNativeMenu, hasNativeTitlebar } from '../../../../platform/window/common/window.js';
 -import { isFullscreen, isWCOEnabled } from '../../../../base/browser/browser.js';
 +import { CustomTitleBarVisibility, TitleBarSetting, getMenuBarVisibility, hasCustomTitlebar, hasNativeMenu, hasNativeTitlebar, RITEMARK_FRAME_STRIP_HEIGHT, RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
@@ -4771,7 +4801,7 @@ index 46243a4447e..bf92f42c53d 100644
  import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
  import { IDisposable } from '../../../../base/common/lifecycle.js';
  
-@@ -364,7 +364,19 @@ export interface IWorkbenchLayoutService extends ILayoutService {
+@@ -733,7 +733,19 @@ export interface IWorkbenchLayoutService extends ILayoutService {
  	getVisibleNeighborPart(part: Parts, direction: Direction): Parts | undefined;
  }
  
@@ -4791,6 +4821,78 @@ index 46243a4447e..bf92f42c53d 100644
  	if (!hasCustomTitlebar(configurationService)) {
  		return false;
  	}
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
+new file mode 100644
+index 00000000000..7924086e116
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
+@@ -0,0 +1,66 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../base/common/async.js';
++import { IDisposable } from '../../../../base/common/lifecycle.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { IContextViewDelegate, IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
++import { showRitemarkMenu } from '../../../browser/parts/ritemarkMenu.js';
++
++/**
++ * Ritemark 2.0 (Sprint 134, R8): the head's Switch project ▸ opens one flyout. A pointer coming to rest on the row and
++ * a click on it arrive while the flyout's rows are still being asked for; before the fix each drew a flyout of its own.
++ */
++suite('Ritemark menu', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('a pointer resting on a flyout row and a click on it open one flyout', async () => {
++		const container = document.createElement('div');
++		const anchor = document.createElement('div');
++		document.body.append(container, anchor);
++		let rendered: IDisposable | undefined;
++		let onHide: (() => void) | undefined;
++		const contextViewService = {
++			showContextView: (delegate: IContextViewDelegate) => {
++				rendered = delegate.render(container) ?? undefined;
++				onHide = delegate.onHide;
++			},
++			hideContextView: () => {
++				rendered?.dispose();
++				rendered = undefined;
++				container.textContent = '';
++				onHide?.();
++			},
++		} as unknown as IContextViewService;
++		let asked = 0;
++		showRitemarkMenu(contextViewService, anchor, { className: 'ritemark-project-menu', ariaLabel: 'Project', align: 'left' }, [{
++			label: 'Switch project',
++			iconClassNames: [],
++			run: () => { },
++			submenu: async () => {
++				asked++;
++				await timeout(5);
++				return [{ label: 'Sales proposal Q4', iconClassNames: [], run: () => { } }];
++			},
++		}], () => { });
++
++		const row = container.querySelector<HTMLElement>('.ritemark-menu-item')!;
++		row.dispatchEvent(new MouseEvent('mouseenter'));
++		row.click();
++		await timeout(30);
++
++		assert.deepStrictEqual({
++			flyouts: container.querySelectorAll('.ritemark-menu-flyout').length,
++			asked,
++			expanded: row.getAttribute('aria-expanded'),
++		}, { flyouts: 1, asked: 1, expanded: 'true' });
++
++		contextViewService.hideContextView();
++		container.remove();
++		anchor.remove();
++	});
++});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
 index 00000000000..c737d2c8ed5
@@ -4953,76 +5055,4 @@ index 00000000000..50a653619fa
 +	});
 +
 +	ensureNoDisposablesAreLeakedInTestSuite();
-+});
-diff --git a/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
-new file mode 100644
-index 00000000000..7924086e116
---- /dev/null
-+++ b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
-@@ -0,0 +1,66 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Copyright (c) Microsoft Corporation. All rights reserved.
-+ *  Licensed under the MIT License. See License.txt in the project root for license information.
-+ *--------------------------------------------------------------------------------------------*/
-+
-+import assert from 'assert';
-+import { timeout } from '../../../../base/common/async.js';
-+import { IDisposable } from '../../../../base/common/lifecycle.js';
-+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
-+import { IContextViewDelegate, IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
-+import { showRitemarkMenu } from '../../../browser/parts/ritemarkMenu.js';
-+
-+/**
-+ * Ritemark 2.0 (Sprint 134, R8): the head's Switch project ▸ opens one flyout. A pointer coming to rest on the row and
-+ * a click on it arrive while the flyout's rows are still being asked for; before the fix each drew a flyout of its own.
-+ */
-+suite('Ritemark menu', () => {
-+
-+	ensureNoDisposablesAreLeakedInTestSuite();
-+
-+	test('a pointer resting on a flyout row and a click on it open one flyout', async () => {
-+		const container = document.createElement('div');
-+		const anchor = document.createElement('div');
-+		document.body.append(container, anchor);
-+		let rendered: IDisposable | undefined;
-+		let onHide: (() => void) | undefined;
-+		const contextViewService = {
-+			showContextView: (delegate: IContextViewDelegate) => {
-+				rendered = delegate.render(container) ?? undefined;
-+				onHide = delegate.onHide;
-+			},
-+			hideContextView: () => {
-+				rendered?.dispose();
-+				rendered = undefined;
-+				container.textContent = '';
-+				onHide?.();
-+			},
-+		} as unknown as IContextViewService;
-+		let asked = 0;
-+		showRitemarkMenu(contextViewService, anchor, { className: 'ritemark-project-menu', ariaLabel: 'Project', align: 'left' }, [{
-+			label: 'Switch project',
-+			iconClassNames: [],
-+			run: () => { },
-+			submenu: async () => {
-+				asked++;
-+				await timeout(5);
-+				return [{ label: 'Sales proposal Q4', iconClassNames: [], run: () => { } }];
-+			},
-+		}], () => { });
-+
-+		const row = container.querySelector<HTMLElement>('.ritemark-menu-item')!;
-+		row.dispatchEvent(new MouseEvent('mouseenter'));
-+		row.click();
-+		await timeout(30);
-+
-+		assert.deepStrictEqual({
-+			flyouts: container.querySelectorAll('.ritemark-menu-flyout').length,
-+			asked,
-+			expanded: row.getAttribute('aria-expanded'),
-+		}, { flyouts: 1, asked: 1, expanded: 'true' });
-+
-+		contextViewService.hideContextView();
-+		container.remove();
-+		anchor.remove();
-+	});
 +});

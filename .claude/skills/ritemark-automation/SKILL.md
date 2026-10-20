@@ -42,8 +42,8 @@ ls "$REPO_ROOT/vscode/node_modules/.bin/agent-browser"
 # If missing: cd "$REPO_ROOT/vscode" && npm install (or run `./scripts/code.sh` once which auto-installs)
 
 # 2. arm64 Node available? (dev launch needs arm64, NOT the x86_64 v23.0.0 nvm default)
-ls /Users/jarmotuisk/.nvm/versions/node/v22.21.1/bin/node && \
-  file /Users/jarmotuisk/.nvm/versions/node/v22.21.1/bin/node | grep -q arm64 && echo "arm64 ✓" || echo "MISSING arm64 node"
+ls /Users/jarmotuisk/.nvm/versions/node/v24.18.0/bin/node && \
+  file /Users/jarmotuisk/.nvm/versions/node/v24.18.0/bin/node | grep -q arm64 && echo "arm64 ✓" || echo "MISSING arm64 node"
 
 # 3. Port 9224 free?
 lsof -t -i :9224 && echo "port in use" || echo "port free"
@@ -74,7 +74,7 @@ cd "$REPO_ROOT/vscode"
 #                                        "No workspace folder open. Please open a folder first."
 #                                        and you'll waste a debugging session.
 VSCODE_SKIP_PRELAUNCH=1 \
-  PATH=/Users/jarmotuisk/.nvm/versions/node/v22.21.1/bin:$PATH \
+  PATH=/Users/jarmotuisk/.nvm/versions/node/v24.18.0/bin:$PATH \
   ./scripts/code.sh \
     --remote-debugging-port=9224 \
     --user-data-dir=$USERDATA \
@@ -92,7 +92,7 @@ done
 
 **`VSCODE_SKIP_PRELAUNCH=1`** skips the `preLaunch.ts` step that checks/installs node_modules and runs Electron build. After your first launch it's safe to skip; if the launch fails saying Electron is missing, remove the env var for one launch and add it back.
 
-**`PATH=...v22.21.1...`** forces the arm64 Node. The system default `node` is x86_64 under Rosetta — esbuild and tsx blow up with arch-mismatch errors. v22.21.1 is the documented dev-mode Node (see `.claude/skills/vscode-development/SKILL.md`).
+**`PATH=...v24.18.0...`** forces the arm64 Node. The system default `node` is x86_64 under Rosetta — esbuild and tsx blow up with arch-mismatch errors. v24.18.0 is the documented dev-mode Node (see `.claude/skills/vscode-development/SKILL.md`).
 
 ## After-launch UI gotchas — handle these first
 
@@ -397,7 +397,7 @@ lsof -i :9224 && echo "still running" || echo "stopped"
 | `screenshot --full` shows just an HTML page | CDP target auto-switched to integrated browser webview | `agent-browser tab 0` to switch back |
 | AI sidebar replies "No workspace folder open" | Launched without positional workspace arg | Kill, relaunch with `$WORKSPACE` as last arg |
 | Experimental feature flag has no effect | Settings UI no longer surfaces it; you didn't reload window | Edit `$USERDATA/User/settings.json` + Cmd+Shift+P "Developer: Reload Window" |
-| esbuild arch error / `darwin-arm64 ... needs darwin-x64` | x86_64 Node from nvm v23 | Prefix PATH with `/Users/.../v22.21.1/bin` (arm64) |
+| esbuild arch error / `darwin-arm64 ... needs darwin-x64` | x86_64 Node from nvm v23 | Prefix PATH with `/Users/.../v24.18.0/bin` (arm64) |
 | `keyboard type` produces empty text | Monaco editor not focused / dropped silently | Re-press `Ctrl+Cmd+I` to focus chat; fall back to per-char `press` |
 | Two CDP targets and `snapshot` returns sparse output | Connected to the wrong target (the browser webview, not workbench) | `tab` to list, `tab 0` to switch back |
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] — Unreleased
 
-Ritemark 2.0.0 is built on main in three steps and released as one version. This section covers all three: Surfaces and frame (Sprint 132), The welcome (Sprint 133) and The project at the centre (Sprint 134).
+Ritemark 2.0.0 is built on main in three steps and released as one version. This section covers all three: Surfaces and frame (Sprint 132), The welcome (Sprint 133) and The project at the centre (Sprint 134), and the VS Code update under them (Sprint 135).
 
 ### Added
 - **The places row (Sprint 132).** Ritemark's places sit in one row at the top of the left column: Home, Documents, Tasks, Browser, Agents, Transcribe, then **More** (⋯). More holds Copilot Chat, File changes, Extensions, Search and any other place. A place can be dragged to another spot in the row, and the order is kept.
@@ -50,6 +50,7 @@ Ritemark 2.0.0 is built on main in three steps and released as one version. This
 - **Advanced settings (Sprint 134).** A link at the foot of Ritemark Settings opens every other setting, such as the feature switches, updates, excluded folders and the transcription export folder.
 
 ### Changed
+- **Built on VS Code 1.142 (Sprint 135).** Ritemark now runs on VS Code 1.142.0 (it was 1.117.0), with Electron 43 and Chromium 150. VS Code's new Agents window, its Copilot onboarding, the command palette's Ask in Chat and the browser's Add Element to Chat are not part of Ritemark; Developer tools moves into the browser bar's ⋯ menu.
 - **No title row (Sprint 132).** On the Mac and on Windows, each column starts with a strip that holds its controls on one line: the traffic lights or Windows' buttons, a toggle for each side column, the tabs and **You**.
 - **Three levels, no lines (Sprint 132).** The window has a flat ground, the AI on its own sheet, and the documents on a raised desk. There are no lines between the parts.
 - **Ritemark Light and Ritemark Dark redrawn (Sprint 132).** Ritemark Dark uses deep indigo surfaces instead of slate, and its buttons are the light indigo with dark text. Muted text in Ritemark Light is darker (#617187), so it is easier to read.

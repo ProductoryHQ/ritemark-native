@@ -12,14 +12,14 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 |-------|--------|---------|
 | `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal |
-| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 14 files -- Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug/Extensions hidden, defaultChatAgent null-safety |
+| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 25 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, defaultChatAgent null-safety |
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
-| `007-ritemark-vscode-1117-compat.patch` | Compatibility | VS Code 1.117 API fixes; the Copilot Chat launcher opens Copilot Chat as a tab |
-| `008-ritemark-windows-binary-strip.patch` | Windows packaging | Strips non-Windows native binaries from bundled packages |
+| `007-ritemark-vscode-1117-compat.patch` | Compatibility | Copilot Chat compatibility (since 1.117; rebased onto 1.142): the narrow setup actions instead of `ChatSetupContribution`, the onboarding module's fallback, the Copilot Chat launcher opens Copilot Chat as a tab; `webviewEditor.ts` opens a custom editor with no options (upstream's later fix, Sprint 135) |
+| `008-ritemark-windows-binary-strip.patch` | Windows packaging | Strips the Claude Agent SDK's non-Windows native binaries (upstream strips Copilot's itself since 1.142) |
 | `009-ritemark-browser-context-bridge.patch` | Browser | The active browser tab's context for AI chat; navigation pushes for Browser Recent |
-| `010-ritemark-browser-action-bridge.patch` | Browser | AI agent actions in the integrated browser |
+| `010-ritemark-browser-action-bridge.patch` | Browser | AI agent actions in the integrated browser; the bar: no Add Element to Chat, Developer tools in ⋯ (Sprint 135) |
 | `011-ritemark-cloud-file-error.patch` | Windows | OneDrive/SharePoint cloud-file read errors |
 | `012-ritemark-shell-watchdog.patch` | Updates | Quarantines a broken user-dir extension copy |
 | `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |
@@ -39,73 +39,88 @@ and 019, a change goes in the patch that owns its kind: placement, the frame's s
 
 ---
 
-## 2. Patch 003 Complete File Inventory (14 Files)
+## 2. Patch 003 Complete File Inventory (25 Files)
 
-This is the authoritative reference. If ANY file is missing after a future patch change, it is a regression.
+This is the authoritative reference (VS Code 1.142.0, Sprint 135). If ANY file is missing after a future patch change, it is a regression.
 
 | # | File Path | What It Does |
 |---|-----------|-------------|
-| 1 | `src/vs/editor/contrib/comment/browser/comment.ts` | Removes Toggle Line Comment and Toggle Block Comment from Edit menu. Removes `MenuId` import. |
-| 2 | `src/vs/platform/actions/common/actions.ts` | Adds `MenubarViewMenuAdvanced` MenuId for advanced submenu in View menu. |
-| 3 | `src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts` | Null-safety: `defaultChatAgent?.extensionId` (prevents crash when defaultChatAgent is undefined in OSS builds). |
-| 4 | `src/vs/platform/extensionManagement/common/extensionGalleryService.ts` | Null-safety: `defaultChatAgent?.extensionId` in gallery filtering and deprecation logic. Three separate locations patched. |
-| 5 | `src/vs/workbench/browser/parts/editor/editor.contribution.ts` | Removes Editor Layout submenu from View menu (not relevant for markdown editing). |
-| 6 | `src/vs/workbench/browser/parts/titlebar/menubarControl.ts` | Removes Go menu and Terminal menu from the menu bar. Comments out both `MenuRegistry.appendMenuItem` calls. |
-| 7 | `src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts` | Disables Chat view: sets `isDefault=false`, hides via `ritemark.chatDisabled` context key, unregisters view from ViewsRegistry. Uses `void` to suppress unused variable errors. |
-| 8 | `src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts` | Hides Copilot status bar icon. Disposes entry immediately in `update()`. Renames `getEntryProps` to `_getEntryProps`, removes `StatusbarAlignment` import. |
-| 9 | `src/vs/workbench/contrib/debug/browser/debug.contribution.ts` | Hides Run/Debug menu from menu bar. Adds `hideIfEmpty: true` to debug view container. Changes debug welcome view condition from `'simple'` to `'never-show'` to prevent Run and Debug from appearing in activity bar. |
-| 10 | `src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts` | Removes Emmet: Expand Abbreviation from Edit menu. Removes `MenuId` import. |
-| 11 | `src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts` | Removes Extensions entry from View menu by commenting out `openCommandActionDescriptor`. Removes unused `KeyCode`, `KeyMod` imports. |
-| 12 | `src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts` | Null-safety: `defaultChatAgent?.extensionId` in uninstall logic. |
-| 13 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety: `extensionId?.toLowerCase()` and `chatExtensionId?.toLowerCase()` to prevent crash in OSS builds. |
-| 14 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: same `extensionId?.toLowerCase()` pattern as #13. |
+| 1 | `extensions/git/package.json` | Removes Git's "Clone Repository" welcome view from Documents (the explorer). |
+| 2 | `src/vs/editor/contrib/comment/browser/comment.ts` | Removes Toggle Line Comment and Toggle Block Comment from the Edit menu. Removes `MenuId` import. |
+| 3 | `src/vs/platform/actions/common/actions.ts` | Adds `MenubarViewMenuAdvanced` MenuId for the View ▸ Advanced submenu. |
+| 4 | `src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts` | Null-safety: `defaultChatAgent?.extensionId` (OSS builds may lack it). |
+| 5 | `src/vs/platform/extensionManagement/common/extensionGalleryService.ts` | Null-safety: `defaultChatAgent?.extensionId` in gallery filtering and deprecation logic. |
+| 6 | `src/vs/platform/windows/electron-main/windowsMainService.ts` | Sprint 135: no Agents window. `openAgentsWindow` opens a normal window in Ritemark (`--agents`, agent links, tryout hand-offs). |
+| 7 | `src/vs/workbench/browser/actions/workspaceActions.ts` | Hides the workspace (`.code-workspace`) items from the File menu. |
+| 8 | `src/vs/workbench/browser/parts/editor/editor.contribution.ts` | Hides File ▸ Share (vscode.dev links) and View ▸ Editor Layout. |
+| 9 | `src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts` | Hides the Selection, Go and Terminal menus (moved here from `menubarControl.ts` at 1.142). |
+| 10 | `src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts` | Hides the Agents and Chat entries in the command center and the title bar. |
+| 11 | `src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts` | Keeps the Chat view out of the AI column's default; registers the Copilot Chat launcher's container; no Chat entry in the View menu (007 opens Copilot Chat as a tab). |
+| 12 | `src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts` | Hides the Copilot status bar entry: `update()` disposes it. |
+| 13 | `src/vs/workbench/contrib/chat/common/constants.ts` | Sprint 135: `OPEN_AGENTS_WINDOW_PRECONDITION` is false, so no command, button or shortcut opens the Agents window. |
+| 14 | `src/vs/workbench/contrib/debug/browser/debug.contribution.ts` | Hides the Run menu and View ▸ Run; the debug container hides when empty and its welcome view never shows. |
+| 15 | `src/vs/workbench/contrib/emmet/browser/actions/expandAbbreviation.ts` | Removes Emmet: Expand Abbreviation from the Edit menu. |
+| 16 | `src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts` | Null-safety: `defaultChatAgent?.extensionId` in uninstall logic. |
+| 17 | `src/vs/workbench/contrib/files/browser/fileActions.contribution.ts` | The File menu's New Document and New Table; hides Revert File. |
+| 18 | `src/vs/workbench/contrib/outline/browser/outline.contribution.ts` | No Outline section in Documents. |
+| 19 | `src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts` | All commands leaves out VS Code's developer and debugging commands (`isHiddenFromRitemarkPalette`; Sprint 134), and from Sprint 135 the Agents window's commands and 1.142's new Developer commands. |
+| 20 | `src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts` | The palette filter's test. |
+| 21 | `src/vs/workbench/contrib/timeline/browser/timeline.contribution.ts` | No Timeline section in Documents. |
+| 22 | `src/vs/workbench/contrib/userDataProfile/browser/userDataProfile.ts` | No File ▸ New Window with Profile. |
+| 23 | `src/vs/workbench/contrib/welcomeViews/common/newFile.contribution.ts` | New File… is palette-only, not in the File menu. |
+| 24 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety on `defaultChatAgent`; skips the built-in chat extension's enablement migration (`ensureChatExtensionInitialDisabledState` is empty), so a Marketplace Copilot Chat is never disabled behind the person's back. |
+| 25 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: the same `extensionId?.toLowerCase()` pattern as #24. |
 
 **Verification command:**
 ```bash
 grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
-# Must show: 14
+# Must show: 25
 ```
 
 ---
 
 ## 3. Menu Bar Expected State
 
+Ritemark 2.0 on VS Code 1.142 (Sprint 135's QA read the menus from the data the workbench sends to the Mac's menu bar, `lastKnownMenubarData` in the profile's `storage.json`). On Windows the same menus open from the menu button on the left column's strip (018).
+
 | Menu | Visible? | Notes |
 |------|----------|-------|
 | Ritemark (app menu) | YES | macOS app menu |
-| File | YES | Standard file operations |
-| Edit | YES | Cleaned: no Toggle Comment, no Block Comment, no Emmet Expand Abbreviation |
-| Selection | YES | Standard selection operations |
-| View | YES | Cleaned: no Appearance submenu, no Editor Layout submenu, no Extensions entry |
-| Go | NO | Entire menu removed (menubarControl.ts) |
-| Run | NO | Entire menu removed (debug.contribution.ts) |
-| Terminal | NO | Entire menu removed (menubarControl.ts) |
-| Window | YES | Standard window operations |
-| Help | YES | Cleaned of VS Code specific items |
+| File | YES | Includes File ▸ New tab, Switch project and Share (`ritemark/fileMenu`, 018) |
+| Edit | YES | Cleaned: no Toggle Comment, no Block Comment, no Emmet Expand Abbreviation (003) |
+| Selection | NO | Removed in `menubar.contribution.ts` (003) |
+| View | YES | Cleaned: no Appearance submenu, no Editor Layout, no Extensions, no Run; Copilot Chat only while it is installed and not disabled (003, 007) |
+| Go | NO | Removed in `menubar.contribution.ts` (003) |
+| Run | NO | Removed (`debug.contribution.ts`, 003) |
+| Terminal | NO | Removed in `menubar.contribution.ts` (003) |
+| Window | YES | macOS's own |
+| Help | YES | Getting started, Support, View License, Advanced ▸ Toggle Developer Tools; anything else upstream adds stays hidden (015) |
 
 ---
 
-## 4. Title Bar Expected State
+## 4. The Strips (no title row)
 
-| Element | Visible? | Notes |
-|---------|----------|-------|
-| Left sidebar toggle | YES | File explorer toggle |
-| Right sidebar toggle | YES | AI panel / terminal toggle |
-| Settings gear | YES | Opens settings |
-| Chat sparkle icon | NO (goal) | Currently still visible -- known issue. Patch 003 sets `isDefault=false` and unregisters view, but icon may persist from cache. |
-| Accounts icon | NO | Hidden by patch 002 |
-| Panel toggle | NO | Hidden by patch 002 |
+2.0 has no title row on the Mac or on Windows (018). The top line is three 44-high strips, every control centred on the line at 26.
+
+| Element | Where | Notes |
+|---------|-------|-------|
+| macOS traffic lights | Left column's strip | Placed by 018 (`windowImpl.ts`, `window.ts`) |
+| Left column toggle | Left column's strip; the desk's strip when the column is hidden | 018 |
+| Home and Task board tabs, the document tabs, "N ⌄", the + | The desk's strip | 019 |
+| AI toggle, You | The AI's strip | You is a menu: Settings ⌘, and Help (018) |
+| Windows minimize, maximize, close | Right end of the AI's strip | 018 |
+| Chat sparkle, Accounts, layout controls, Copilot entries in the command center | NO | 002, 003 |
 
 ---
 
-## 5. Sidebar Expected State
+## 5. Places Row Expected State
 
 | Item | Visible? | Notes |
 |------|----------|-------|
-| Explorer / Project | YES | Primary navigation |
-| Search | YES | Full-text search |
-| Run and Debug | NO | `hideIfEmpty: true` + welcome view condition set to `'never-show'` (patch 003) |
-| Extensions | YES | Marketplace works, but removed from View menu |
+| Home, Documents, Tasks, Browser, Agents, Transcribe | YES, in this order | The row on top of the left column (002) |
+| More | YES | Copilot Chat (while installed and not disabled, opens as a tab, 007), Search, File changes, Extensions, then other extensions' places (002) |
+| Run and Debug | NO | `hideIfEmpty: true` + welcome view condition `'never-show'` (003) |
+| VS Code's Agents window | NO | Its precondition is false (003) |
 
 ---
 
@@ -113,7 +128,9 @@ grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
 
 | Element | Visible? | Notes |
 |---------|----------|-------|
-| Copilot icon | NO | `chatStatusEntry.ts` disposes entry immediately (patch 003) |
+| Word count, AI Ready, Report AI issue, notifications | YES | The extension's items and the bell |
+| Copilot icon | NO | `chatStatusEntry.ts` disposes the entry (003) |
+| Remote indicator, problem counts | NO | Hidden by 018's stylesheet (`ritemarkSurfaces.css`); Problems stays in the View menu |
 
 ---
 
@@ -122,6 +139,9 @@ grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
 | Keybinding | Default VS Code Behavior | Ritemark Behavior | Enforced By |
 |------------|--------------------------|-------------------|-------------|
 | Cmd+B | Toggle sidebar | Bold text (TipTap) | Patch 002 removes the keybinding |
+| Ctrl+Alt+I (⌃⌘I) | Open Chat | Copilot Chat as a tab, and nothing without a usable Copilot Chat | 007 |
+| Cmd+T / Ctrl+T | Go to Symbol in Workspace | The + of the desk in front (`ritemark.newTab`) | 019 |
+| Ctrl+` | Toggle the terminal panel | A new terminal tab (`workbench.action.createTerminalEditor`) | 002 removes the toggle; the extension's `package.json` binds the new tab |
 
 ---
 
@@ -192,47 +212,50 @@ Compiled JS in `out/` uses numeric constants instead of enum names:
 
 Before declaring ANY patch change complete, verify ALL of the following. Do not skip items.
 
-### Menu Bar Checklist
+### Menu Bar Checklist (§3)
 
-- [ ] File menu visible
+- [ ] File menu visible, with New tab first, Switch project after Open Folder…, Share after Save
 - [ ] Edit menu visible, NO Toggle Comment, NO Block Comment, NO Emmet
-- [ ] Selection menu visible
-- [ ] View menu visible, NO Appearance submenu, NO Editor Layout submenu, NO Extensions
+- [ ] Selection menu NOT visible
+- [ ] View menu visible, NO Appearance submenu, NO Editor Layout submenu, NO Extensions, NO Run
 - [ ] Go menu NOT visible
 - [ ] Run menu NOT visible
 - [ ] Terminal menu NOT visible
 - [ ] Window menu visible
-- [ ] Help menu visible
+- [ ] Help menu: Getting started, Support, View License, Advanced ▸ Toggle Developer Tools
 
-### Title Bar Checklist
+On the Mac the menus can be read from the profile's `storage.json` (`lastKnownMenubarData`) without opening them.
 
-- [ ] Left sidebar toggle visible
-- [ ] Right sidebar toggle visible
-- [ ] Settings gear visible
-- [ ] Accounts icon NOT visible
-- [ ] Panel toggle NOT visible
+### Strips Checklist (§4)
 
-### Sidebar Checklist
+- [ ] No title row on the Mac or on Windows
+- [ ] Left column toggle on the left column's strip; the tab row and the + on the desk's strip; the AI toggle and You on the AI's strip
+- [ ] NO Accounts, chat sparkle or layout controls
 
-- [ ] Explorer visible
-- [ ] Search visible
-- [ ] Run and Debug NOT visible (no icon in activity bar)
-- [ ] Extensions visible
+### Places Row Checklist (§5)
 
-### Status Bar Checklist
+- [ ] Home, Documents, Tasks, Browser, Agents, Transcribe, then More
+- [ ] More: Copilot Chat (only while installed and not disabled), Search, File changes, Extensions
+- [ ] Run and Debug NOT visible
+- [ ] VS Code's Agents window cannot open
+
+### Status Bar Checklist (§6)
 
 - [ ] Copilot icon NOT visible
+- [ ] No remote indicator or problem counts
 
-### Keybinding Checklist
+### Keybinding Checklist (§7)
 
-- [ ] Cmd+B does NOT toggle sidebar
-- [ ] Cmd+B triggers Bold in editor
+- [ ] Cmd+B does NOT toggle the left column; it bolds in the editor
+- [ ] Cmd+T opens the desk's + menu
+- [ ] Ctrl+` opens a terminal tab, never the panel
 
 ### Build Checklist
 
-- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 14
-- [ ] `./scripts/apply-patches.sh --dry-run` shows all patches "Already applied"
-- [ ] TypeScript compiles without "declared but never read" errors
+- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 25 (§2)
+- [ ] `./scripts/apply-patches.sh --dry-run` reports every patch can apply and none conflicts (it checks against `vscode/`'s HEAD, so keep HEAD at the pin)
+- [ ] `node scripts/check-patch-stacking.mjs` passes
+- [ ] TypeScript compiles without "declared but never read" errors (`npm run typecheck-client` in `vscode/`)
 
 ---
 

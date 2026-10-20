@@ -6,12 +6,15 @@ v1.10.0 RC bug fix:
   - Keeps commands available through the Command Menu
   - Covers the policy and separator normalization with unit tests
 Sprint 133: Getting started joins Support in Help, where 1.x's first page linked to it
+Sprint 135: rebased onto VS Code 1.142.0. The main menu's registrations moved upstream to
+menubar.contribution.ts; the Help allowlist stays in menubarControl.ts, which now imports MenuRegistry itself.
+Upstream added its own menubarControl.test.ts (Open Recent's labels); this patch's suite is appended to it.
 ---
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
-index 861a8cda9357..62ee4b047e78 100644
+index 0df05b689ce..3400905b234 100644
 --- a/src/vs/platform/actions/common/actions.ts
 +++ b/src/vs/platform/actions/common/actions.ts
-@@ -119,6 +119,7 @@ export class MenuId {
+@@ -128,6 +128,7 @@ export class MenuId {
  	static readonly MenubarFileMenu = new MenuId('MenubarFileMenu');
  	static readonly MenubarGoMenu = new MenuId('MenubarGoMenu');
  	static readonly MenubarHelpMenu = new MenuId('MenubarHelpMenu');
@@ -87,13 +90,22 @@ index 8251c4a4292..9469cfe27dc 100644
  	registerAction2(OpenDocumentationUrlAction);
  }
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 0891dba..5aa7d86 100644
+index 9d3f6af4e6b..8267bffdf35 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-@@ -42,9 +42,53 @@ import { getFlatContextMenuActions } from '../../../../platform/actions/browser/
- import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+@@ -5,7 +5,7 @@
+ 
+ import './media/menubarControl.css';
+ import { localize, localize2 } from '../../../../nls.js';
+-import { IMenuService, MenuId, IMenu, SubmenuItemAction, registerAction2, Action2, MenuItemAction } from '../../../../platform/actions/common/actions.js';
++import { IMenuService, MenuId, IMenu, SubmenuItemAction, registerAction2, Action2, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
+ import { MenuBarVisibility, IWindowOpenable, getMenuBarVisibility, MenuSettings, hasNativeMenu } from '../../../../platform/window/common/window.js';
+ import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IAction, Action, SubmenuAction, Separator, IActionRunner, ActionRunner, WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification, toAction } from '../../../../base/common/actions.js';
+@@ -43,9 +43,62 @@ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultSty
  import { mainWindow } from '../../../../base/browser/window.js';
  import { ActivityBarPosition } from '../../../services/layout/browser/layoutService.js';
+ import { truncateMiddle } from '../../../../base/common/strings.js';
 +import product from '../../../../platform/product/common/product.js';
  
  export type IOpenRecentAction = IAction & { uri: URI; remoteAuthority?: string };
@@ -141,13 +153,6 @@ index 0891dba..5aa7d86 100644
 +	return filtered;
 +}
 +
- MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
- 	submenu: MenuId.MenubarFileMenu,
- 	title: {
-@@ -101,6 +145,15 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
- 	order: 9
- });
- 
 +if (product.applicationName === 'ritemark') {
 +	MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
 +		title: localize('miHelpAdvanced', "Advanced"),
@@ -160,7 +165,7 @@ index 0891dba..5aa7d86 100644
  export abstract class MenubarControl extends Disposable {
  
  	protected keys = [
-@@ -198,6 +251,11 @@ export abstract class MenubarControl extends Disposable {
+@@ -144,6 +197,11 @@ export abstract class MenubarControl extends Disposable {
  		this.menuUpdater.schedule();
  	}
  
@@ -172,7 +177,7 @@ index 0891dba..5aa7d86 100644
  	protected calculateActionLabel(action: { id: string; label: string }): string {
  		const label = action.label;
  		switch (action.id) {
-@@ -544,10 +602,6 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -493,10 +551,6 @@ export class CustomMenubarControl extends MenubarControl {
  		this._onVisibilityChange.fire(visible);
  	}
  
@@ -183,7 +188,7 @@ index 0891dba..5aa7d86 100644
  	private readonly reinstallDisposables = this._register(new DisposableStore());
  	private readonly updateActionsDisposables = this._register(new DisposableStore());
  	private setupCustomMenubar(firstTime: boolean): void {
-@@ -657,7 +711,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -606,7 +660,7 @@ export class CustomMenubarControl extends MenubarControl {
  					if (!this.focusInsideMenubar) {
  						const actions: IAction[] = [];
  						menuChangedDisposable.clear();
@@ -192,7 +197,7 @@ index 0891dba..5aa7d86 100644
  						this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  					}
  				}));
-@@ -669,7 +723,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -618,7 +672,7 @@ export class CustomMenubarControl extends MenubarControl {
  						if (!this.focusInsideMenubar) {
  							const actions: IAction[] = [];
  							webMenuChangedDisposable.clear();
@@ -201,7 +206,7 @@ index 0891dba..5aa7d86 100644
  							this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  						}
  					}));
-@@ -679,7 +733,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -628,7 +682,7 @@ export class CustomMenubarControl extends MenubarControl {
  			const actions: IAction[] = [];
  			if (menu) {
  				this.updateActionsDisposables.clear();
@@ -211,7 +216,7 @@ index 0891dba..5aa7d86 100644
  
  			if (this.menubar) {
 diff --git a/src/vs/workbench/electron-browser/actions/developerActions.ts b/src/vs/workbench/electron-browser/actions/developerActions.ts
-index f56a9d24177f..5ccdda41c26b 100644
+index d9294805098..5569f449b8c 100644
 --- a/src/vs/workbench/electron-browser/actions/developerActions.ts
 +++ b/src/vs/workbench/electron-browser/actions/developerActions.ts
 @@ -19,6 +19,7 @@ import { getActiveWindow } from '../../../base/browser/dom.js';
@@ -232,7 +237,7 @@ index f56a9d24177f..5ccdda41c26b 100644
  				order: 1
  			}
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
-index 716f2280413e..ea9ea240939d 100644
+index 716f2280413..ea9ea240939 100644
 --- a/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/electron-browser/parts/titlebar/menubarControl.ts
 @@ -25,7 +25,6 @@ import { IPreferencesService } from '../../../services/preferences/common/prefer
@@ -253,20 +258,38 @@ index 716f2280413e..ea9ea240939d 100644
  				if (menubarMenu.items.length === 0) {
  					return false; // Menus are incomplete
 diff --git a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
-new file mode 100644
-index 00000000000..bd7553dea49
---- /dev/null
+index 36c109a8fc6..47f6f6d5ac5 100644
+--- a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
 +++ b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
-@@ -0,0 +1,75 @@
-+/*---------------------------------------------------------------------------------------------
-+ *  Copyright (c) Microsoft Corporation. All rights reserved.
-+ *  Licensed under the MIT License. See License.txt in the project root for license information.
-+ *--------------------------------------------------------------------------------------------*/
-+
-+import assert from 'assert';
+@@ -4,13 +4,13 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import assert from 'assert';
+-import { Separator } from '../../../../../base/common/actions.js';
 +import { Action, IAction, Separator } from '../../../../../base/common/actions.js';
-+import { MenuId, SubmenuItemAction } from '../../../../../platform/actions/common/actions.js';
-+import { filterRitemarkMenubarActions } from '../../../../browser/parts/titlebar/menubarControl.js';
+ import { Event } from '../../../../../base/common/event.js';
+ import { URI } from '../../../../../base/common/uri.js';
+ import { mock } from '../../../../../base/test/common/mock.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+ import { IAccessibilityService } from '../../../../../platform/accessibility/common/accessibility.js';
+-import { IMenu, IMenuService } from '../../../../../platform/actions/common/actions.js';
++import { IMenu, IMenuService, MenuId, SubmenuItemAction } from '../../../../../platform/actions/common/actions.js';
+ import { ICommandService } from '../../../../../platform/commands/common/commands.js';
+ import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
+ import { IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
+@@ -20,7 +20,7 @@ import { INotificationService } from '../../../../../platform/notification/commo
+ import { IStorageService } from '../../../../../platform/storage/common/storage.js';
+ import { IUpdateService, State } from '../../../../../platform/update/common/update.js';
+ import { IRecentlyOpened, IWorkspacesService } from '../../../../../platform/workspaces/common/workspaces.js';
+-import { IOpenRecentAction, MenubarControl } from '../../../../browser/parts/titlebar/menubarControl.js';
++import { filterRitemarkMenubarActions, IOpenRecentAction, MenubarControl } from '../../../../browser/parts/titlebar/menubarControl.js';
+ import { IWorkbenchEnvironmentService } from '../../../../services/environment/common/environmentService.js';
+ import { IHostService } from '../../../../services/host/browser/host.js';
+ import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
+@@ -106,3 +106,69 @@ suite('MenubarControl', () => {
+ 		]);
+ 	});
+ });
 +
 +suite('Ritemark menubar policy', () => {
 +

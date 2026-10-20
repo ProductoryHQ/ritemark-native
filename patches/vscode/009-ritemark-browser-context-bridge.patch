@@ -66,15 +66,25 @@
 #   tab's favicon changes (kind 'favicon', the model's data URL), so Recent's
 #   rows show the site's icon.
 #
+# Sprint 135 (VS Code 1.142.0; the sprint's research/browser-bridge-audit.md):
+#   re-cut onto upstream's agent audiences. A share is an agent audience on the
+#   view (setAudience); ritemarkSharedWithAgent reads the audiences, so the AI's
+#   page context does not depend on VS Code's chat (whose sharingState reads
+#   Unavailable while chat is off). shareWithAgentAnswered follows upstream's
+#   Allow path. Playwright calls take one fixed session,
+#   RITEMARK_PLAYWRIGHT_SESSION ('ritemark'). Browser Recent's ephemeral flag
+#   covers every in-memory tab (private tabs and upstream's Agent storage).
+#
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
 # Updated: 2026-10-19 (Sprint 134: the share question on the AI's sheet)
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
-index ecb40a9e856..832846bd4a5 100644
+index 78cee5deca2..31466d78914 100644
 --- a/src/vs/platform/browserView/common/browserView.ts
 +++ b/src/vs/platform/browserView/common/browserView.ts
-@@ -35,6 +35,14 @@ export enum BrowserViewCommandId {
+@@ -55,6 +55,14 @@ export enum BrowserViewCommandId {
  	// Dev Tools
  	ToggleDevTools = `${commandPrefix}.toggleDevTools`,
  
@@ -90,51 +100,57 @@ index ecb40a9e856..832846bd4a5 100644
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
  	ClearWorkspaceStorage = `${commandPrefix}.clearWorkspaceStorage`,
 diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
-index 849efe3775c..1f88ea4d0e5 100644
+index 38be67fc774..8153d309eca 100644
 --- a/src/vs/workbench/contrib/browserView/common/browserView.ts
 +++ b/src/vs/workbench/contrib/browserView/common/browserView.ts
-@@ -173,11 +173,13 @@ export interface IBrowserViewModel extends IDisposable {
- 	readonly certificateError: IBrowserViewCertificateError | undefined;
- 	readonly storageScope: BrowserViewStorageScope;
- 	readonly sharedWithAgent: boolean;
+@@ -416,6 +416,9 @@ export interface IBrowserViewModel extends IDisposable {
+ 	readonly permissions: BrowserPermissionStore;
+ 	readonly sharingState: BrowserViewSharingState;
+ 	readonly isDirectlyShareable: boolean;
++	/** Ritemark: the page has an agent audience. Unlike sharingState, this does not depend on VS Code's chat being on. */
++	readonly ritemarkSharedWithAgent: boolean;
 +	readonly annotationMode: boolean;
+ 	readonly isRemoteSession: boolean;
  	readonly zoomFactor: number;
  	readonly canZoomIn: boolean;
- 	readonly canZoomOut: boolean;
+@@ -426,6 +429,7 @@ export interface IBrowserViewModel extends IDisposable {
  
- 	readonly onDidChangeSharedWithAgent: Event<boolean>;
-+	readonly onDidChangeAnnotationMode: Event<boolean>;
+ 	readonly onDidChangeSharingState: Event<BrowserViewSharingState>;
  	readonly onDidChangeZoom: Event<void>;
++	readonly onDidChangeAnnotationMode: Event<boolean>;
+ 	readonly onWillNavigate: Event<string>;
  	readonly onDidNavigate: Event<IBrowserViewNavigationEvent>;
  	readonly onDidChangeLoadingState: Event<IBrowserViewLoadingEvent>;
-@@ -209,6 +211,7 @@ export interface IBrowserViewModel extends IDisposable {
- 	getSelectedText(): Promise<string>;
+@@ -464,6 +468,7 @@ export interface IBrowserViewModel extends IDisposable {
  	clearStorage(): Promise<void>;
- 	setSharedWithAgent(shared: boolean): Promise<void>;
+ 	setOwner(owner: IBrowserViewOwner): Promise<void>;
+ 	setSharedWithAgent(shared: boolean): Promise<IBrowserViewModel | undefined>;
 +	setAnnotationMode(annotate: boolean): Promise<void>;
  	trustCertificate(host: string, fingerprint: string): Promise<void>;
  	untrustCertificate(host: string, fingerprint: string): Promise<void>;
- 	zoomIn(): Promise<void>;
-@@ -217,6 +220,10 @@ export interface IBrowserViewModel extends IDisposable {
- 	getConsoleLogs(): Promise<string>;
- 	getElementData(token: CancellationToken): Promise<IElementData | undefined>;
- 	getFocusedElementData(): Promise<IElementData | undefined>;
+ 	deleteHistory(entryIds?: readonly number[]): Promise<void>;
+@@ -477,6 +482,10 @@ export interface IBrowserViewModel extends IDisposable {
+ 	setElementComments(update: IBrowserElementCommentsUpdate): Promise<void>;
+ 	toggleAreaSelection(enabled?: boolean): Promise<void>;
+ 	setDevice(device: IBrowserDeviceProfile | undefined): Promise<void>;
 +	/** Ritemark (Sprint 134, R20): whether the person chose to share pages without asking (upstream's "Don't ask again"). */
 +	readonly ritemarkSharesWithoutAsking: boolean;
 +	/** Ritemark (Sprint 134, R20): the answer to the question on the AI's sheet: what Allow does, without the dialog. */
 +	shareWithAgentAnswered(withoutAsking: boolean): Promise<void>;
  }
  
- export class BrowserViewModel extends Disposable implements IBrowserViewModel {
-@@ -236,11 +243,15 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
- 	private _isEphemeral: boolean = false;
+ export type BrowserViewEventEmitters = { [K in keyof BrowserViewEventData]: Emitter<BrowserViewEventData[K]> };
+@@ -528,6 +537,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
  	private _zoomHost: string | undefined = undefined;
- 	private _sharedWithAgent: boolean = false;
+ 	private _audiences: readonly IBrowserViewAudience[] = [];
+ 	private _lastSharingState: BrowserViewSharingState;
 +	private _annotationMode: boolean = false;
  	private _browserZoomIndex: number = browserZoomDefaultIndex;
- 
- 	private readonly _onDidChangeSharedWithAgent = this._register(new Emitter<boolean>());
- 	readonly onDidChangeSharedWithAgent: Event<boolean> = this._onDidChangeSharedWithAgent.event;
+ 	private _elementSelectionState: IBrowserElementSelectionState = { active: false, options: {} };
+ 	private _isAreaSelectionActive: boolean = false;
+@@ -561,6 +571,9 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 	private readonly _onDidChangeSharingState = this._register(new Emitter<BrowserViewSharingState>());
+ 	readonly onDidChangeSharingState: Event<BrowserViewSharingState> = this._onDidChangeSharingState.event;
  
 +	private readonly _onDidChangeAnnotationMode = this._register(new Emitter<boolean>());
 +	readonly onDidChangeAnnotationMode: Event<boolean> = this._onDidChangeAnnotationMode.event;
@@ -142,16 +158,25 @@ index 849efe3775c..1f88ea4d0e5 100644
  	private readonly _onDidChangeZoom = this._register(new Emitter<void>());
  	readonly onDidChangeZoom: Event<void> = this._onDidChangeZoom.event;
  
-@@ -277,6 +288,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+@@ -727,6 +740,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 			this._audiences = audiences;
+ 			this._updateSharingState();
+ 		}));
++		this._register(this._remoteEvents.onDidChangeAudiences.event(() => this._ritemarkSharingChanged()));
+ 
+ 		this._register(this.browserViewWorkbenchService.onDidChangeSharingAvailable(() => {
+ 			this._updateSharingState();
+@@ -754,6 +768,8 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
  	get certificateError(): IBrowserViewCertificateError | undefined { return this._certificateError; }
  	get storageScope(): BrowserViewStorageScope { return this._storageScope; }
- 	get sharedWithAgent(): boolean { return this._sharedWithAgent; }
+ 	get isRemoteSession(): boolean { return this._isRemoteSession; }
++	get ritemarkSharedWithAgent(): boolean { return this._audiences.some(audience => audience.type === 'agent'); }
 +	get annotationMode(): boolean { return this._annotationMode; }
- 	get zoomFactor(): number { return browserZoomFactors[this._browserZoomIndex]; }
- 	get canZoomIn(): boolean { return this._browserZoomIndex < browserZoomFactors.length - 1; }
- 	get canZoomOut(): boolean { return this._browserZoomIndex > 0; }
-@@ -644,11 +656,60 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
- 		}
+ 	get sharingState(): BrowserViewSharingState {
+ 		if (!this.browserViewWorkbenchService.isSharingAvailable) {
+ 			return BrowserViewSharingState.Unavailable;
+@@ -1049,6 +1065,62 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 		return this;
  	}
  
 +	get ritemarkSharesWithoutAsking(): boolean {
@@ -159,18 +184,23 @@ index 849efe3775c..1f88ea4d0e5 100644
 +	}
 +
 +	async shareWithAgentAnswered(withoutAsking: boolean): Promise<void> {
-+		// The network policy's notice comes first, as in setSharedWithAgent.
-+		if (this._url) {
-+			try {
-+				const uri = URI.parse(this._url);
-+				if (!this.agentNetworkFilterService.isUriAllowed(uri)) {
-+					await this.dialogService.info(
-+						localize('browserView.shareBlocked.title', "Cannot Share with Agent"),
-+						this.agentNetworkFilterService.formatError(uri),
-+					);
-+					return;
-+				}
-+			} catch { }
++		if (this.ritemarkSharedWithAgent) {
++			return;
++		}
++		// The network policy's notice comes first, as in setSharedWithAgent. This is the sharingState
++		// getter's own test: sharingState reads Unavailable while VS Code's chat is off.
++		if (!this.isDirectlyShareable && this._url && !this.agentNetworkFilterService.isUriAllowed(URI.parse(this._url))) {
++			const uri = URI.parse(this._url);
++			await this.dialogService.info(
++				localize('browserView.shareBlocked.title', "Cannot Share with Agent"),
++				this.agentNetworkFilterService.formatError(uri),
++			);
++			return;
++		}
++		if (!this.isDirectlyShareable) {
++			// The network filter is on: upstream shares an isolated copy and asks first.
++			await this.setSharedWithAgent(true);
++			return;
 +		}
 +		if (withoutAsking) {
 +			this.storageService.store(BrowserViewModel.SHARE_DONT_ASK_KEY, true, StorageScope.PROFILE, StorageTarget.USER);
@@ -179,28 +209,23 @@ index 849efe3775c..1f88ea4d0e5 100644
 +			'integratedBrowser.shareWithAgent',
 +			{ shared: true, dontAskAgain: withoutAsking }
 +		);
-+		await this.playwrightService.startTrackingPage(this.id);
-+		this._setSharedWithAgent(true);
++		await this.browserViewService.setAudience(this.id, { type: 'agent' }, true);
 +	}
 +
- 	private _setSharedWithAgent(isShared: boolean): void {
- 		if (isShared !== this._sharedWithAgent) {
- 			this._sharedWithAgent = isShared;
- 			this._onDidChangeSharedWithAgent.fire(isShared);
- 		}
-+		// Annotation mode requires sharedWithAgent; clear it if share is revoked.
-+		if (!isShared && this._annotationMode) {
++	private _ritemarkSharingChanged(): void {
++		// Annotation mode requires the share; clear it if the share is revoked.
++		if (!this.ritemarkSharedWithAgent && this._annotationMode) {
 +			this._annotationMode = false;
 +			this._onDidChangeAnnotationMode.fire(false);
 +		}
 +	}
 +
 +	async setAnnotationMode(annotate: boolean): Promise<void> {
-+		// Annotation requires share to be enabled (we need page tracking to capture screenshots).
-+		if (annotate && !this._sharedWithAgent) {
-+			await this.setSharedWithAgent(true);
-+			if (!this._sharedWithAgent) {
-+				// User denied share — cannot enable annotation.
++		// Annotation requires the share (the screenshot comes from the shared page).
++		if (annotate && !this.ritemarkSharedWithAgent) {
++			const shared = await this.setSharedWithAgent(true);
++			if (shared !== this || !this.ritemarkSharedWithAgent) {
++				// Denied, blocked, or shared as a copy in another tab: no annotation here.
 +				return;
 +			}
 +		}
@@ -208,27 +233,29 @@ index 849efe3775c..1f88ea4d0e5 100644
 +			this._annotationMode = annotate;
 +			this._onDidChangeAnnotationMode.fire(annotate);
 +		}
- 	}
- 
- 	private static _cancellationIdPool = 0;
++	}
++
+ 	private _updateSharingState(): void {
+ 		const sharingState = this.sharingState;
+ 		if (sharingState !== this._lastSharingState) {
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
-index be1e6c7d1cb..3bd599e42e5 100644
+index 7a69461a8f9..9d39a07860c 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
-@@ -28,6 +28,7 @@ import './features/browserEditorChatFeatures.js';
- import './features/browserEditorZoomFeature.js';
- import './features/browserEditorFindFeature.js';
+@@ -40,6 +40,7 @@ import './features/browserEditorFindFeature.js';
+ import './features/browserSearchFeatures.js';
  import './features/browserTabManagementFeatures.js';
+ import './features/browserRemoteFeatures.js';
 +import './features/ritemarkBrowserContextFeature.js';
  
- Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
- 	EditorPaneDescriptor.create(
+ function getBrowserViewStateUrl(viewState: object | undefined): string | undefined {
+ 	const url = Object.entries(viewState ?? {}).find(([key]) => key === 'url')?.[1];
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..affd3e32475
+index 00000000000..666e1e7bb25
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,339 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -238,17 +265,15 @@ index 00000000000..affd3e32475
 +import { Codicon } from '../../../../../base/common/codicons.js';
 +import { VSBuffer } from '../../../../../base/common/buffer.js';
 +import { Action2, MenuId, registerAction2 } from '../../../../../platform/actions/common/actions.js';
-+import { BrowserViewCommandId, BrowserViewStorageScope } from '../../../../../platform/browserView/common/browserView.js';
++import { BrowserViewCommandId, isInMemoryStorageScope } from '../../../../../platform/browserView/common/browserView.js';
 +import { IPlaywrightService } from '../../../../../platform/browserView/common/playwrightService.js';
 +import { ICommandService } from '../../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpr, IContextKey, IContextKeyService, RawContextKey } from '../../../../../platform/contextkey/common/contextkey.js';
 +import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
 +import { ILogService } from '../../../../../platform/log/common/log.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
-+import { BrowserEditor } from '../browserEditor.js';
-+import { BrowserActionCategory } from '../browserViewActions.js';
++import { BrowserActionCategory, BrowserActionGroup, BrowserEditor, BrowserEditorContribution } from '../browserEditor.js';
 +import { IBrowserViewModel } from '../../common/browserView.js';
-+import { BrowserEditorContribution } from '../browserEditor.js';
 +import { DisposableStore } from '../../../../../base/common/lifecycle.js';
 +
 +const CONTEXT_RITEMARK_BROWSER_ANNOTATION_MODE = new RawContextKey<boolean>(
@@ -296,7 +321,7 @@ index 00000000000..affd3e32475
 +		focused: model.focused,
 +		visible: model.visible,
 +		loading: model.loading,
-+		sharedWithAgent: model.sharedWithAgent,
++		sharedWithAgent: model.ritemarkSharedWithAgent,
 +		annotationMode: model.annotationMode,
 +	};
 +}
@@ -323,19 +348,26 @@ index 00000000000..affd3e32475
 +		this.annotationContext = CONTEXT_RITEMARK_BROWSER_ANNOTATION_MODE.bindTo(contextKeyService);
 +	}
 +
-+	protected override subscribeToModel(model: IBrowserViewModel, store: DisposableStore): void {
++	protected override onModelAttached(model: IBrowserViewModel, store: DisposableStore, _isNew: boolean): void {
 +		this.annotationContext.set(model.annotationMode);
 +		store.add(model.onDidChangeAnnotationMode((annotate) => {
 +			this.annotationContext.set(annotate);
 +		}));
 +	}
 +
-+	override clear(): void {
++	override onModelDetached(): void {
 +		this.annotationContext.reset();
 +	}
 +}
 +
 +BrowserEditor.registerContribution(RitemarkBrowserAnnotationContribution);
++
++/**
++ * The Playwright session Ritemark reads and acts in (009 and 010). One session, so a summary's aria refs match the
++ * actions that follow; not upstream's '<default>', so Ritemark never shares Playwright state with VS Code's chat.
++ * A page shared by the person has a wildcard agent audience, so it is visible to this session.
++ */
++export const RITEMARK_PLAYWRIGHT_SESSION = 'ritemark';
 +
 +/** Extension command that keeps Browser Recent (extensions/ritemark/src/browser/browserNavigationRecorder.ts). */
 +const RITEMARK_BROWSER_DID_NAVIGATE_COMMAND = 'ritemark.browser.didNavigate';
@@ -367,7 +399,7 @@ index 00000000000..affd3e32475
 +		super(editor);
 +	}
 +
-+	protected override subscribeToModel(model: IBrowserViewModel, store: DisposableStore): void {
++	protected override onModelAttached(model: IBrowserViewModel, store: DisposableStore, _isNew: boolean): void {
 +		// A tab opened in the background loaded while no pane listened, so report
 +		// what it shows now. The extension ignores a repeat of the tab's last address.
 +		this.send(model, 'navigate', model.url, model.title);
@@ -386,7 +418,7 @@ index 00000000000..affd3e32475
 +			url,
 +			title,
 +			failed: model.error !== undefined,
-+			ephemeral: model.storageScope === BrowserViewStorageScope.Ephemeral,
++			ephemeral: isInMemoryStorageScope(model.storageScope),
 +			favicon: model.favicon,
 +		};
 +		this.commandService.executeCommand(RITEMARK_BROWSER_DID_NAVIGATE_COMMAND, dto).catch(err => {
@@ -431,12 +463,12 @@ index 00000000000..affd3e32475
 +		if (!model) {
 +			return { error: 'No active integrated browser tab.' };
 +		}
-+		if (!model.sharedWithAgent) {
++		if (!model.ritemarkSharedWithAgent) {
 +			return { ...dtoFromModel(model), error: 'Browser page is not shared with Ritemark AI context.' };
 +		}
 +
 +		const playwrightService = accessor.get(IPlaywrightService);
-+		const summary = await playwrightService.getSummary(model.id);
++		const summary = await playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
 +		return { ...dtoFromModel(model), summary };
 +	}
 +}
@@ -482,8 +514,8 @@ index 00000000000..affd3e32475
 +			toggled: ContextKeyExpr.equals(CONTEXT_RITEMARK_BROWSER_ANNOTATION_MODE.key, true),
 +			menu: {
 +				id: MenuId.BrowserActionsToolbar,
-+				group: 'actions',
-+				order: 4,
++				group: BrowserActionGroup.Tools,
++				order: 3,
 +			},
 +		});
 +	}
@@ -523,12 +555,12 @@ index 00000000000..affd3e32475
 +			if (answer.pageId !== model.id) {
 +				return { ...dtoFromModel(model), stale: true };
 +			}
-+			if (answer.answer === 'share' && !model.sharedWithAgent) {
++			if (answer.answer === 'share' && !model.ritemarkSharedWithAgent) {
 +				await model.shareWithAgentAnswered(answer.withoutAsking === true);
 +			}
 +			return dtoFromModel(model);
 +		}
-+		if (!model.sharedWithAgent) {
++		if (!model.ritemarkSharedWithAgent) {
 +			if (!model.ritemarkSharesWithoutAsking) {
 +				return { ...dtoFromModel(model), needsAnswer: true };
 +			}

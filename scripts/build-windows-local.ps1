@@ -7,7 +7,7 @@
     Run from the ritemark-native repository root.
 
     Prerequisites:
-      - Node.js 22.x
+      - Node.js 24.x (the version in vscode/.nvmrc)
       - Python 3.11+
       - Visual Studio Build Tools (C++ Desktop workload)
       - Git
@@ -50,7 +50,7 @@ Write-Step 1 "Checking prerequisites"
 
 $nodeVersion = & node -v 2>$null
 if (-not $nodeVersion) {
-    Write-Host "ERROR: Node.js not found. Install Node 22.x" -ForegroundColor Red
+    Write-Host "ERROR: Node.js not found. Install Node 24.x (vscode/.nvmrc)" -ForegroundColor Red
     exit 1
 }
 Write-Host "  Node.js: $nodeVersion"

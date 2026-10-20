@@ -210,8 +210,9 @@ Read upstream's `browserView` changes from the pin to the target (`common/browse
   ```bash
   git revert <update squash commit>        # in a PR, after Jarmo's yes
   nvm use                                  # back to the root .nvmrc (22.22.1)
-  git submodule update vscode              # the 1.117.0 gitlink
-  git -C vscode reset --hard HEAD && git -C vscode clean -fd -e extensions/ritemark
+  git -C vscode reset --hard HEAD && git -C vscode clean -fd -e extensions/ritemark   # the update's patches off first
+  git submodule update vscode              # the 1.117.0 gitlink (refuses while patches are applied; S20 found it)
+  git -C vscode clean -fd -e extensions/ritemark
   arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use && cd vscode && npm ci'
   ./scripts/apply-patches.sh
   ./scripts/check-native-modules.sh

@@ -38,35 +38,43 @@ if [[ ! -d "$VSCODE_NM" ]]; then
     exit 0
 fi
 
-# Modules known to break dev mode if they're the wrong arch.
-# Universal binaries (utf-8-validate, fsevents) are skipped — they work on both archs.
-MODULES=(
-    "@vscode/spdlog/build/Release/spdlog.node"
-    "node-pty/build/Release/pty.node"
-    "kerberos/build/Release/kerberos.node"
-    "native-keymap/build/Release/keymapping.node"
-    "@parcel/watcher/build/Release/watcher.node"
-    "bufferutil/build/Release/bufferutil.node"
-)
-
+# Every .node file under vscode/node_modules and the built-in extensions' node_modules (dev mode loads both), not
+# a fixed list: a module that upstream adds after a VS Code update is checked too (Sprint 135, R4). For each file:
+#   - a Mach-O file with an arm64 slice (single-arch or universal) passes;
+#   - a Mach-O file without one, whose path names another platform or architecture (prebuilds/<os>-<arch>/,
+#     -darwin-x64, /x64/, linux, win32), is a multi-platform payload and is skipped;
+#   - any other Mach-O file fails: a build/Release build made for the wrong architecture;
+#   - ELF and PE files are other systems' payloads and are skipped.
 ERRORS=0
-MISSING=0
+CHECKED=0
+SKIPPED=0
 
-for rel in "${MODULES[@]}"; do
-    f="$VSCODE_NM/$rel"
-    if [[ ! -f "$f" ]]; then
-        MISSING=$((MISSING + 1))
-        continue
-    fi
-    desc=$(file "$f" 2>/dev/null)
-    if echo "$desc" | grep -q "arm64"; then
-        echo -e "  ${GREEN}OK${NC}    $rel"
-    else
-        echo -e "  ${RED}WRONG${NC} $rel"
-        echo -e "        $desc"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
+while IFS= read -r f; do
+    rel="${f#"$ROOT_DIR/vscode/"}"
+    desc=$(file -b "$f" 2>/dev/null)
+    case "$desc" in
+        *Mach-O*)
+            if echo "$desc" | grep -q "arm64"; then
+                CHECKED=$((CHECKED + 1))
+            elif echo "$rel" | grep -Eq '(prebuilds/[^/]*-|darwin-x64|/x64/|x86_64|linux|win32|windows)'; then
+                SKIPPED=$((SKIPPED + 1))
+            else
+                echo -e "  ${RED}WRONG${NC} $rel"
+                echo -e "        $desc"
+                ERRORS=$((ERRORS + 1))
+            fi
+            ;;
+        *)
+            SKIPPED=$((SKIPPED + 1))
+            ;;
+    esac
+done < <(find "$VSCODE_NM" "$ROOT_DIR/vscode/extensions" -path "$ROOT_DIR/vscode/extensions/ritemark" -prune -o -name '*.node' -type f -print 2>/dev/null)
+
+if [[ $CHECKED -eq 0 && $ERRORS -eq 0 ]]; then
+    echo -e "${RED}No native module found under vscode/node_modules: the install looks incomplete.${NC}"
+    echo "Run: cd vscode && arch -arm64 /bin/zsh -c 'source \"\$HOME/.nvm/nvm.sh\" && nvm use && npm ci'"
+    exit 1
+fi
 
 echo ""
 if [[ $ERRORS -gt 0 ]]; then
@@ -83,8 +91,4 @@ if [[ $ERRORS -gt 0 ]]; then
     exit 1
 fi
 
-if [[ $MISSING -gt 0 ]]; then
-    echo -e "${YELLOW}$MISSING expected native module(s) not present (likely OK if not yet installed).${NC}"
-fi
-
-echo -e "${GREEN}Native modules look fine for arm64 dev mode.${NC}"
+echo -e "${GREEN}Native modules look fine for arm64 dev mode: $CHECKED arm64, $SKIPPED other platforms' payloads skipped.${NC}"

@@ -110,10 +110,13 @@ async function click(what, elementExpression) {
 
 const byLabel = (selector, label) => `[...document.querySelectorAll(${JSON.stringify(selector)})].find(element => element.getBoundingClientRect().width && (element.getAttribute('aria-label') || '').startsWith(${JSON.stringify(label)}))`;
 
-/** Picks a quick pick's row by its exact label (never a near match), waiting up to 3 s for the list to draw it. */
+/**
+ * Picks a quick pick's row by its exact label (never a near match). The list can take a moment to fill (VS Code 1.142's
+ * palette lists more rows than 1.117's), so it waits up to 5 seconds for the row before it fails the run.
+ */
 async function pickRow(label) {
 	const row = `[...document.querySelectorAll('.quick-input-widget .quick-input-list .monaco-list-row')].find(row => { const aria = row.getAttribute('aria-label') || ''; return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(label + ',')}); })`;
-	for (let waited = 0; waited < 3000 && !(await evaluate(`!!(${row})?.getBoundingClientRect().width`)); waited += 250) {
+	for (let waited = 0; waited < 5000 && !(await evaluate(`!!(${row})?.getBoundingClientRect().width`)); waited += 250) {
 		await sleep(250);
 	}
 	await click(`the row "${label}"`, row);
@@ -126,6 +129,17 @@ async function type(text) {
 async function command(label) {
 	await key('KeyP', MOD | 8, 'p');
 	await sleep(600);
+	// In a background window, the key can go nowhere right after a new desk's document takes focus (seen on
+	// VS Code 1.142): then put focus on the status bar, as a click anywhere would, and press again
+	if (!(await evaluate(`document.querySelector('.quick-input-widget')?.style.display !== 'none'`))) {
+		const bar = await evaluate(`(() => { const r = document.querySelector('.part.statusbar')?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`);
+		if (bar) {
+			await clickAt(...bar);
+			await sleep(300);
+		}
+		await key('KeyP', MOD | 8, 'p');
+		await sleep(600);
+	}
 	await type(label);
 	await sleep(900);
 	await pickRow(label);
@@ -178,11 +192,31 @@ async function capture(name) {
 	// The keyboard out of the AI's sheet: a scene that leaves it there (a webview taking the focus as it closes) would
 	// draw the sheet's + with its tooltip and focus ring, which no scene is about
 	await evaluate(`(() => { const element = document.activeElement; if (element && element.closest('.part.auxiliarybar')) { element.blur(); } })()`);
+	// From VS Code 1.142 a tooltip of the sheet's own (the + "New conversation") can stay open with neither focus nor
+	// hover, once a synthetic pointer passed it: close a tooltip left open in the AI's sheet, as Escape would
+	await inWebview('interacting with AI', `(() => { if (!doc.querySelector('[role=tooltip]')) { return false; } doc.activeElement?.blur?.(); doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })); return true; })()`);
 	await sleep(1200);
 	const { w, h, ratio } = await evaluate(`({ w: innerWidth, h: innerHeight, ratio: devicePixelRatio })`);
 	const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: w, height: h, scale: 1 / ratio } });
 	writeFileSync(join(out, `${name}.png`), Buffer.from(data, 'base64'));
 	console.log(`captured ${name} (${w}x${h})`);
+}
+
+/**
+ * Closes the tab in front, by ⌘W (Ctrl+W) and, when the key did not reach the window (a webview in front can keep it
+ * in a background window), by View: Close Editor. A tab left open would show in every scene after it.
+ */
+async function closeFrontTab() {
+	const front = `document.querySelector('.part.editor .editor-group-container.active .tabs-container > .tab.active')?.getAttribute('aria-label') ?? ''`;
+	const before = await evaluate(front);
+	await key('KeyW', MOD, 'w');
+	await sleep(800);
+	if (before && (await evaluate(front)) === before) {
+		await command('View: Close Editor');
+	}
+	if (before && (await evaluate(front)) === before) {
+		throw new Error(`could not close the tab "${before}"`);
+	}
 }
 
 const placeLabel = name => byLabel('.part.sidebar .composite-bar .action-item .action-label', name);
@@ -324,21 +358,23 @@ const SCENES = [
 		if (!inView) {
 			throw new Error('Advanced settings is not in view after scrolling Ritemark Settings to its foot');
 		}
-		return async () => key('KeyW', MOD, 'w');
+		return closeFrontTab;
 	}],
 	['share-question', async () => {
 		await command('Ritemark Browser: New Browser Tab');
 		await sleep(1500);
 		await click('the address', `[...document.querySelectorAll('.part.editor .editor-group-container.active .browser-url-display, .part.editor .editor-group-container.active .browser-url-input')].find(element => element.getBoundingClientRect().width)`);
 		await sleep(500);
-		const focused = await evaluate(`document.activeElement?.classList.contains('browser-url-input') ?? false`);
+		// VS Code 1.117 focused an input; from 1.142 a click on the address opens a picker (a quick input) with the
+		// address selected, and typing replaces it
+		const focused = await evaluate(`(() => { const active = document.activeElement; return !!active && (active.classList.contains('browser-url-input') || active.classList.contains('browser-url-display') || !!active.closest('.quick-input-widget')); })()`);
 		if (!focused) {
 			throw new Error('the browser\'s address did not take the keyboard');
 		}
 		await type(pageUrl);
 		await key('Enter', 0, 'Enter');
 		await sleep(4000);
-		return async () => key('KeyW', MOD, 'w');
+		return closeFrontTab;
 	}],
 	['many-tabs', async () => {
 		// Open the folders, so there are enough documents to fold the row

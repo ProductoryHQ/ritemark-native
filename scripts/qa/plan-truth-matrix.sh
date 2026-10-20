@@ -33,7 +33,7 @@ JSON
     rm -f "$CLAUDE_TRACE" "$CODEX_TRACE"
     md5 -q "$WORKSPACE"/*.md > /tmp/ritemark-qa-plan-truth.md5
     cd "$ROOT/vscode"
-    VSCODE_SKIP_PRELAUNCH=1 PATH="$HOME/.nvm/versions/node/v22.21.1/bin:$PATH" \
+    VSCODE_SKIP_PRELAUNCH=1 PATH="$HOME/.nvm/versions/node/v$(tr -d "[:space:]" < "$ROOT/vscode/.nvmrc")/bin:$PATH" \
       ./scripts/code.sh --remote-debugging-port=9224 --user-data-dir="$USERDATA" "$WORKSPACE" &
     echo "Launched. Drive the ★ scenarios (Claude Plan / Keep planning / approve; Codex Plan; OpenCode gating), then run: $0 assert"
     ;;

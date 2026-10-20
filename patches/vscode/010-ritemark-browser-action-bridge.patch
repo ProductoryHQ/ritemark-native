@@ -8,20 +8,36 @@
 #          directly in BrowserEditor with zero text-tab flicker.
 #          Sprint 78: adds agentSnapshot (read-only ARIA outline, no consent).
 #
+# Sprint 135 (VS Code 1.142.0): revoking control when the share goes moves into
+#   009's audience listener; the .html/.htm resolver uses getOrCreateLazy and
+#   its own label key (ritemark.browser.htmlEditorLabel), beside upstream's new
+#   .html entry, which stays (Ritemark's has default priority and wins); the
+#   actions take RITEMARK_PLAYWRIGHT_SESSION.
+#   The bar, as the Experience lead set it (D5): back, forward, reload, the
+#   address, Show Claude this page, ⋯. 1.142's Add Element to Chat split button
+#   is left off the bar even with Copilot Chat installed (it sends to Copilot
+#   Chat, not to the AI beside the page; its command and shortcut stay), and the
+#   empty tab's subtitle no longer points at it. Developer tools moves into ⋯
+#   (hidden by default, which the bar puts in its ⋯ menu), in sentence case.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
-#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
+#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
 # Created: 2026-05-13
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
+index 31466d78914..e7d9a1af46e 100644
 --- a/src/vs/platform/browserView/common/browserView.ts
 +++ b/src/vs/platform/browserView/common/browserView.ts
-@@ -42,6 +42,15 @@
- 	ToggleAnnotationMode = `${commandPrefix}.toggleAnnotationMode`,
+@@ -63,6 +63,15 @@ export enum BrowserViewCommandId {
  	GetAnnotationMode = `${commandPrefix}.getAnnotationMode`,
  	EnsureActiveBrowserShared = `${commandPrefix}.ensureActiveBrowserShared`,
-+
+ 
 +	// Ritemark AI browser control bridge (Sprint 69 + 78)
 +	EnsureActiveBrowserControlShared = `${commandPrefix}.ensureActiveBrowserControlShared`,
 +	BrowserNavigate = `${commandPrefix}.agentNavigate`,
@@ -30,77 +46,80 @@ diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform
 +	BrowserType = `${commandPrefix}.agentType`,
 +	BrowserScroll = `${commandPrefix}.agentScroll`,
 +	BrowserSnapshot = `${commandPrefix}.agentSnapshot`,
- 
++
  	// Storage
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
+ 	ClearWorkspaceStorage = `${commandPrefix}.clearWorkspaceStorage`,
 diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
+index 8153d309eca..b8dea314834 100644
 --- a/src/vs/workbench/contrib/browserView/common/browserView.ts
 +++ b/src/vs/workbench/contrib/browserView/common/browserView.ts
-@@ -173,12 +173,14 @@
- 	readonly certificateError: IBrowserViewCertificateError | undefined;
- 	readonly storageScope: BrowserViewStorageScope;
- 	readonly sharedWithAgent: boolean;
-+	readonly sharedWithAgentForControl: boolean;
+@@ -419,6 +419,7 @@ export interface IBrowserViewModel extends IDisposable {
+ 	/** Ritemark: the page has an agent audience. Unlike sharingState, this does not depend on VS Code's chat being on. */
+ 	readonly ritemarkSharedWithAgent: boolean;
  	readonly annotationMode: boolean;
++	readonly sharedWithAgentForControl: boolean;
+ 	readonly isRemoteSession: boolean;
  	readonly zoomFactor: number;
  	readonly canZoomIn: boolean;
- 	readonly canZoomOut: boolean;
- 
- 	readonly onDidChangeSharedWithAgent: Event<boolean>;
-+	readonly onDidChangeSharedWithAgentForControl: Event<boolean>;
- 	readonly onDidChangeAnnotationMode: Event<boolean>;
+@@ -430,6 +431,7 @@ export interface IBrowserViewModel extends IDisposable {
+ 	readonly onDidChangeSharingState: Event<BrowserViewSharingState>;
  	readonly onDidChangeZoom: Event<void>;
+ 	readonly onDidChangeAnnotationMode: Event<boolean>;
++	readonly onDidChangeSharedWithAgentForControl: Event<boolean>;
+ 	readonly onWillNavigate: Event<string>;
  	readonly onDidNavigate: Event<IBrowserViewNavigationEvent>;
-@@ -211,6 +213,7 @@
- 	getSelectedText(): Promise<string>;
- 	clearStorage(): Promise<void>;
- 	setSharedWithAgent(shared: boolean): Promise<void>;
-+	setSharedWithAgentForControl(shared: boolean): Promise<void>;
+ 	readonly onDidChangeLoadingState: Event<IBrowserViewLoadingEvent>;
+@@ -469,6 +471,7 @@ export interface IBrowserViewModel extends IDisposable {
+ 	setOwner(owner: IBrowserViewOwner): Promise<void>;
+ 	setSharedWithAgent(shared: boolean): Promise<IBrowserViewModel | undefined>;
  	setAnnotationMode(annotate: boolean): Promise<void>;
++	setSharedWithAgentForControl(shared: boolean): Promise<void>;
  	trustCertificate(host: string, fingerprint: string): Promise<void>;
  	untrustCertificate(host: string, fingerprint: string): Promise<void>;
-@@ -239,12 +242,16 @@
- 	private _isEphemeral: boolean = false;
- 	private _zoomHost: string | undefined = undefined;
- 	private _sharedWithAgent: boolean = false;
-+	private _sharedWithAgentForControl: boolean = false;
+ 	deleteHistory(entryIds?: readonly number[]): Promise<void>;
+@@ -538,6 +541,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 	private _audiences: readonly IBrowserViewAudience[] = [];
+ 	private _lastSharingState: BrowserViewSharingState;
  	private _annotationMode: boolean = false;
++	private _sharedWithAgentForControl: boolean = false;
  	private _browserZoomIndex: number = browserZoomDefaultIndex;
- 
- 	private readonly _onDidChangeSharedWithAgent = this._register(new Emitter<boolean>());
- 	readonly onDidChangeSharedWithAgent: Event<boolean> = this._onDidChangeSharedWithAgent.event;
+ 	private _elementSelectionState: IBrowserElementSelectionState = { active: false, options: {} };
+ 	private _isAreaSelectionActive: boolean = false;
+@@ -574,6 +578,9 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 	private readonly _onDidChangeAnnotationMode = this._register(new Emitter<boolean>());
+ 	readonly onDidChangeAnnotationMode: Event<boolean> = this._onDidChangeAnnotationMode.event;
  
 +	private readonly _onDidChangeSharedWithAgentForControl = this._register(new Emitter<boolean>());
 +	readonly onDidChangeSharedWithAgentForControl: Event<boolean> = this._onDidChangeSharedWithAgentForControl.event;
 +
- 	private readonly _onDidChangeAnnotationMode = this._register(new Emitter<boolean>());
- 	readonly onDidChangeAnnotationMode: Event<boolean> = this._onDidChangeAnnotationMode.event;
+ 	private readonly _onDidChangeZoom = this._register(new Emitter<void>());
+ 	readonly onDidChangeZoom: Event<void> = this._onDidChangeZoom.event;
  
-@@ -284,6 +291,7 @@
- 	get certificateError(): IBrowserViewCertificateError | undefined { return this._certificateError; }
- 	get storageScope(): BrowserViewStorageScope { return this._storageScope; }
- 	get sharedWithAgent(): boolean { return this._sharedWithAgent; }
-+	get sharedWithAgentForControl(): boolean { return this._sharedWithAgentForControl; }
+@@ -770,6 +777,7 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
+ 	get isRemoteSession(): boolean { return this._isRemoteSession; }
+ 	get ritemarkSharedWithAgent(): boolean { return this._audiences.some(audience => audience.type === 'agent'); }
  	get annotationMode(): boolean { return this._annotationMode; }
- 	get zoomFactor(): number { return browserZoomFactors[this._browserZoomIndex]; }
- 	get canZoomIn(): boolean { return this._browserZoomIndex < browserZoomFactors.length - 1; }
-@@ -661,9 +669,28 @@
- 		if (!isShared && this._annotationMode) {
++	get sharedWithAgentForControl(): boolean { return this._sharedWithAgentForControl; }
+ 	get sharingState(): BrowserViewSharingState {
+ 		if (!this.browserViewWorkbenchService.isSharingAvailable) {
+ 			return BrowserViewSharingState.Unavailable;
+@@ -1104,6 +1112,25 @@ export class BrowserViewModel extends Disposable implements IBrowserViewModel {
  			this._annotationMode = false;
  			this._onDidChangeAnnotationMode.fire(false);
-+		}
+ 		}
 +		// Control consent requires read consent; revoking read consent also revokes control.
-+		if (!isShared && this._sharedWithAgentForControl) {
++		if (!this.ritemarkSharedWithAgent && this._sharedWithAgentForControl) {
 +			this._sharedWithAgentForControl = false;
 +			this._onDidChangeSharedWithAgentForControl.fire(false);
- 		}
- 	}
- 
++		}
++	}
++
 +	async setSharedWithAgentForControl(shared: boolean): Promise<void> {
-+		// Control consent requires read consent (page must be tracked by Playwright).
-+		if (shared && !this._sharedWithAgent) {
-+			await this.setSharedWithAgent(true);
-+			if (!this._sharedWithAgent) {
++		// Control consent requires read consent (the page must be shared with the agent).
++		if (shared && !this.ritemarkSharedWithAgent) {
++			const sharedModel = await this.setSharedWithAgent(true);
++			if (sharedModel !== this || !this.ritemarkSharedWithAgent) {
 +				return;
 +			}
 +		}
@@ -108,52 +127,41 @@ diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs
 +			this._sharedWithAgentForControl = shared;
 +			this._onDidChangeSharedWithAgentForControl.fire(shared);
 +		}
-+	}
-+
+ 	}
+ 
  	async setAnnotationMode(annotate: boolean): Promise<void> {
- 		// Annotation requires share to be enabled (we need page tracking to capture screenshots).
- 		if (annotate && !this._sharedWithAgent) {
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
+index 9d39a07860c..926afddea2a 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
-@@ -4,6 +4,7 @@
-  *--------------------------------------------------------------------------------------------*/
- 
- import { localize } from '../../../../nls.js';
-+import { generateUuid } from '../../../../base/common/uuid.js';
- import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
- import { Registry } from '../../../../platform/registry/common/platform.js';
- import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
-@@ -19,6 +20,7 @@
- import { IBrowserViewCDPService, IBrowserViewWorkbenchService } from '../common/browserView.js';
- import { BrowserViewWorkbenchService } from './browserViewWorkbenchService.js';
+@@ -21,6 +21,7 @@ import { BrowserViewWorkbenchService } from './browserViewWorkbenchService.js';
  import { BrowserViewCDPService } from './browserViewCDPService.js';
+ import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
+ import { logBrowserOpen } from '../../../../platform/browserView/common/browserViewTelemetry.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
  
  // Register actions and browser features
- import './browserViewActions.js';
-@@ -29,6 +31,7 @@
- import './features/browserEditorFindFeature.js';
+ import './features/webContentsViewRendererFeature.js';
+@@ -41,6 +42,7 @@ import './features/browserSearchFeatures.js';
  import './features/browserTabManagementFeatures.js';
+ import './features/browserRemoteFeatures.js';
  import './features/ritemarkBrowserContextFeature.js';
 +import './features/ritemarkBrowserActionFeature.js';
  
- Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
- 	EditorPaneDescriptor.create(
-@@ -51,7 +54,8 @@
- 
- 	constructor(
+ function getBrowserViewStateUrl(viewState: object | undefined): string | undefined {
+ 	const url = Object.entries(viewState ?? {}).find(([key]) => key === 'url')?.[1];
+@@ -70,6 +72,7 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
  		@IEditorResolverService editorResolverService: IEditorResolverService,
--		@IInstantiationService instantiationService: IInstantiationService
-+		@IInstantiationService instantiationService: IInstantiationService,
+ 		@IBrowserViewWorkbenchService browserViewWorkbenchService: IBrowserViewWorkbenchService,
+ 		@ITelemetryService telemetryService: ITelemetryService,
 +		@IEditorService editorService: IEditorService,
  	) {
  		editorResolverService.registerEditor(
  			`${Schemas.vscodeBrowser}:/**`,
-@@ -90,6 +94,53 @@
+@@ -145,6 +148,57 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
  				}
- 			}
- 		);
+ 			);
+ 		}
 +
 +		// Sprint 69: route file:// HTML opens directly to BrowserEditor. Replaces
 +		// the extension-side BrowserHtmlOpenRedirector reactive-listener approach
@@ -164,11 +172,15 @@ diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.c
 +		// Reuse rule: if a BrowserEditorInput already exists with the same file
 +		// URL, focus that one instead of creating a new tab. Avoids tab pile-up
 +		// when the user clicks the same .html file repeatedly.
++		//
++		// Sprint 135: upstream registers its own file:/**/*.{html,htm,mhtml,mht} entry above at
++		// option priority (a resource-backed tab with a read-only address bar). Ritemark's entry
++		// stays the default, as a plain page.
 +		editorResolverService.registerEditor(
 +			'**/*.{html,htm}',
 +			{
 +				id: BrowserEditorInput.EDITOR_ID,
-+				label: localize('browser.htmlEditorLabel', "Ritemark Browser"),
++				label: localize('ritemark.browser.htmlEditorLabel', "Ritemark Browser"),
 +				priority: RegisteredEditorPriority.default,
 +			},
 +			{
@@ -189,7 +201,7 @@ diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.c
 +						};
 +					}
 +
-+					const browserInput = instantiationService.createInstance(BrowserEditorInput, {
++					const browserInput = browserViewWorkbenchService.getOrCreateLazy({
 +						id: generateUuid(),
 +						url: fileUrl,
 +					});
@@ -204,8 +216,80 @@ diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.c
  	}
  }
  
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
+index 5832512f349..647a560fa65 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts
+@@ -49,7 +49,7 @@ class ToggleDevToolsAction extends Action2 {
+ 	constructor() {
+ 		super({
+ 			id: ToggleDevToolsAction.ID,
+-			title: localize2('browser.toggleDevToolsAction', 'Developer Tools'),
++			title: localize2('browser.toggleDevToolsAction', 'Developer tools'),
+ 			category: BrowserActionCategory,
+ 			icon: Codicon.developerTools,
+ 			f1: true,
+@@ -59,6 +59,9 @@ class ToggleDevToolsAction extends Action2 {
+ 				id: MenuId.BrowserActionsToolbar,
+ 				group: BrowserActionGroup.Tools,
+ 				order: 2,
++				// Ritemark (Sprint 135, the Experience lead's drawings): in the bar's ⋯ menu, not on the bar. The bar puts
++				// an item hidden by default in its ⋯ menu
++				isHiddenByDefault: true,
+ 			},
+ 			keybinding: {
+ 				weight: KeybindingWeight.WorkbenchContrib,
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
+index 079394d0068..b460413eaed 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts
+@@ -1109,7 +1109,10 @@ MenuRegistry.appendMenuItem(MenuId.BrowserActionsToolbar, {
+ 	icon: Codicon.inspect,
+ 	group: BrowserActionGroup.Tools,
+ 	order: 1,
+-	when: ChatContextKeys.enabled,
++	// Ritemark (Sprint 135, the Experience lead): not on Ritemark's bar, even with Copilot Chat installed. It sends to
++	// Copilot Chat, not to the AI beside the page, and would sit next to Show Claude this page. Its command and
++	// shortcut stay for Copilot Chat's users
++	when: ContextKeyExpr.false(),
+ 	isSplitButton: {
+ 		togglePrimaryAction: true,
+ 		primaryActionIds: [AddElementToChatAction.ID, AddElementCommentToChatAction.ID]
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
+index 62a4c272e93..20fb0cdb554 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
+@@ -5,8 +5,6 @@
+ 
+ import { localize } from '../../../../../nls.js';
+ import { DisposableStore } from '../../../../../base/common/lifecycle.js';
+-import { IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
+-import { ChatContextKeys } from '../../../chat/common/actions/chatContextKeys.js';
+ import { createBrowserWelcome } from '../../browser/browserWelcome.js';
+ import { IBrowserViewModel } from '../../common/browserView.js';
+ import { BrowserEditorInput } from '../../common/browserEditorInput.js';
+@@ -28,16 +26,13 @@ export class BrowserWelcomeFeature extends BrowserEditorContribution {
+ 
+ 	constructor(
+ 		editor: BrowserEditor,
+-		@IContextKeyService contextKeyService: IContextKeyService,
+ 	) {
+ 		super(editor);
+ 
+-		const chatEnabled = contextKeyService.getContextKeyValue<boolean>(ChatContextKeys.enabled.key);
++		// Ritemark (Sprint 135): one subtitle. The chat one pointed at Add Element to Chat, which Ritemark's bar leaves out
+ 		this._container = createBrowserWelcome(
+ 			localize('browser.welcomeTitle', "Browser"),
+-			chatEnabled
+-				? localize('browser.welcomeSubtitleChat', "Use Add Element to Chat to reference UI elements in chat prompts.")
+-				: localize('browser.welcomeSubtitle', "Enter a URL above to get started."),
++			localize('browser.welcomeSubtitle', "Enter a URL above to get started."),
+ 		);
+ 
+ 		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
+index 00000000000..e358a3e8a8c
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 @@ -0,0 +1,489 @@
@@ -222,8 +306,8 @@ new file mode 100644
 +import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
 +import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
 +import { ACTIVE_GROUP, IEditorService } from '../../../../services/editor/common/editorService.js';
-+import { BrowserEditor } from '../browserEditor.js';
-+import { BrowserActionCategory } from '../browserViewActions.js';
++import { BrowserActionCategory, BrowserEditor } from '../browserEditor.js';
++import { RITEMARK_PLAYWRIGHT_SESSION } from './ritemarkBrowserContextFeature.js';
 +import { IBrowserViewModel } from '../../common/browserView.js';
 +import { Schemas } from '../../../../../base/common/network.js';
 +import { generateUuid } from '../../../../../base/common/uuid.js';
@@ -361,7 +445,7 @@ new file mode 100644
 +			}
 +		}
 +		try {
-+			const summary = await playwrightService.getSummary(model.id);
++			const summary = await playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
 +			return { ...modelMeta(model), summary };
 +		} catch (err) {
 +			return {
@@ -440,7 +524,7 @@ new file mode 100644
 +		if (validationError) {
 +			return { ...modelMeta(model), error: validationError };
 +		}
-+		const result = await playwrightService.invokeFunction(model.id, functionBody, invokeArgs);
++		const result = await playwrightService.invokeFunction(RITEMARK_PLAYWRIGHT_SESSION, model.id, functionBody, invokeArgs);
 +		if (result.error) {
 +			return { ...modelMeta(model), summary: result.summary, error: result.error };
 +		}
@@ -673,11 +757,11 @@ new file mode 100644
 +			// Snapshot is read-only — no control consent needed, but it must respect
 +			// the same read-consent gate as the GetActiveSummary bridge: never expose
 +			// URL, title, or page content for a tab the user has not shared with AI.
-+			if (!model.sharedWithAgent) {
++			if (!model.ritemarkSharedWithAgent) {
 +				return { error: 'Browser page is not shared with Ritemark AI context. Ask the user to share the browser tab with AI first.' };
 +			}
 +			try {
-+				const summary = await playwrightService.getSummary(model.id);
++				const summary = await playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
 +				return { ...modelMeta(model), summary };
 +			} catch (err) {
 +				return {

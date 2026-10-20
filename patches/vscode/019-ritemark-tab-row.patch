@@ -30,16 +30,19 @@ contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts (R8) and test/browser
 (Sprint 134, R6); run with ./scripts/test.sh --grep Ritemark.
 Sprint 134 also: the Task board tab's count (R6), and ritemark.newTab (File ▸ New tab, ⌘T / Ctrl+T) clicks the +
 of the desk in front (ritemarkNewTab.ts; R21).
+Sprint 135: rebased onto VS Code 1.142.0. The pinned tabs' width is summed in upstream's loop and
+RITEMARK_TABS_INSET is added after it; Close all chains its filter after upstream's CannotClose filter; the empty
+desk's tiles render into the watermark's wrapper.
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
 multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
 terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
-index 28d0480ab86..08b6f36aa5f 100644
+index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
 +++ b/src/vs/workbench/browser/parts/editor/editor.ts
-@@ -234,6 +234,9 @@ export interface IEditorGroupsView {
+@@ -240,6 +240,9 @@ export interface IEditorGroupsView {
  	arrangeGroups(arrangement: GroupsArrangement, target?: IEditorGroupView | GroupIdentifier): void;
  	toggleMaximizeGroup(group?: IEditorGroupView | GroupIdentifier): void;
  	toggleExpandGroup(group?: IEditorGroupView | GroupIdentifier): void;
@@ -50,10 +53,10 @@ index 28d0480ab86..08b6f36aa5f 100644
  
  export interface IEditorGroupTitleHeight {
 diff --git a/src/vs/workbench/browser/parts/editor/editorCommands.ts b/src/vs/workbench/browser/parts/editor/editorCommands.ts
-index ef66fad7e3b..6d4ae8cb3bd 100644
+index da9871eaee6..c77789297d7 100644
 --- a/src/vs/workbench/browser/parts/editor/editorCommands.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorCommands.ts
-@@ -288,6 +288,7 @@ function registerEditorMoveCopyCommand(): void {
+@@ -291,6 +291,7 @@ function registerEditorMoveCopyCommand(): void {
  		const configurationService = accessor.get(IConfigurationService);
  
  		let targetGroup: IEditorGroup | undefined;
@@ -61,7 +64,7 @@ index ef66fad7e3b..6d4ae8cb3bd 100644
  
  		switch (args.to) {
  			case 'left':
-@@ -349,6 +350,14 @@ function registerEditorMoveCopyCommand(): void {
+@@ -352,6 +353,14 @@ function registerEditorMoveCopyCommand(): void {
  				sourceGroup.copyEditors(editorsWithOptions, targetGroup);
  			}
  
@@ -77,7 +80,7 @@ index ef66fad7e3b..6d4ae8cb3bd 100644
  		}
  	}
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
-index a2344eaf8f2..33cf0878cc8 100644
+index 57087fd2e20..0594ce6ed7b 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 @@ -18,7 +18,7 @@ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar
@@ -89,7 +92,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  import { EditorPanes } from './editorPanes.js';
  import { IEditorProgressService } from '../../../../platform/progress/common/progress.js';
  import { EditorProgressIndicator } from '../../../services/progress/browser/progressIndicator.js';
-@@ -59,6 +59,12 @@ import { IHostService } from '../../../services/host/browser/host.js';
+@@ -61,6 +61,12 @@ import { IHostService } from '../../../services/host/browser/host.js';
  import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
  import { FileSystemProviderCapabilities, IFileService } from '../../../../platform/files/common/files.js';
  
@@ -102,7 +105,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  export class EditorGroupView extends Themable implements IEditorGroupView {
  
  	//#region factory
-@@ -191,7 +197,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -205,7 +211,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			this.createContainerContextMenu();
  
  			// Watermark & shortcuts
@@ -111,7 +114,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  
  			// Progress bar
  			this.progressBar = this._register(new ProgressBar(this.element, defaultProgressBarStyles));
-@@ -1113,6 +1119,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1147,6 +1153,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doStickEditor(candidate: EditorInput | undefined, sticky: boolean): void {
@@ -122,7 +125,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  		if (candidate && this.model.isSticky(candidate) !== sticky) {
  			const oldIndexOfEditor = this.getIndexOfEditor(candidate);
  
-@@ -1165,17 +1175,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1199,17 +1209,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		// Fire the event letting everyone know we are about to open an editor
  		this._onWillOpenEditor.fire({ editor, groupId: this.id });
  
@@ -147,7 +150,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  			transient: !!options?.transient,
  			inactiveSelection: internalOptions?.inactiveSelection,
  			active: this.count === 0 || !options?.inactive,
-@@ -1391,6 +1404,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1425,6 +1438,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			return true;
  		}
  
@@ -159,7 +162,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  		// Move across groups
  		else {
  			return this.doMoveOrCopyEditorAcrossGroups(editor, target, options, { ...internalOptions, keepCopy: false });
-@@ -1398,11 +1416,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1432,11 +1450,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doMoveEditorInsideGroup(candidate: EditorInput, options?: IEditorOpenOptions): void {
@@ -180,7 +183,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  		// Update model and make sure to continue to use the editor we get from
  		// the model. It is possible that the editor was already opened and we
  		// want to ensure that we use the existing instance in that case.
-@@ -1522,9 +1548,38 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1556,9 +1582,38 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	//#region closeEditor()
  
  	async closeEditor(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions): Promise<boolean> {
@@ -219,7 +222,7 @@ index a2344eaf8f2..33cf0878cc8 100644
  	private async doCloseEditorWithConfirmationHandling(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions, internalOptions?: IInternalEditorCloseOptions): Promise<boolean> {
  		if (!editor) {
  			return false;
-@@ -1880,6 +1935,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1921,6 +1976,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doGetEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
@@ -230,16 +233,16 @@ index a2344eaf8f2..33cf0878cc8 100644
  		if (Array.isArray(args)) {
  			return args;
  		}
-@@ -1969,7 +2028,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2015,7 +2074,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doCloseAllEditors(options?: ICloseAllEditorsOptions): void {
--		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options);
-+		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options).filter(editor => !this.isRitemarkPermanent(editor)); // Ritemark 2.0
+-		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options).filter(editor => options?.force || !editor.hasCapability(EditorInputCapabilities.CannotClose));
++		let editors = this.model.getEditors(EditorsOrder.SEQUENTIAL, options).filter(editor => options?.force || !editor.hasCapability(EditorInputCapabilities.CannotClose)).filter(editor => !this.isRitemarkPermanent(editor)); // Ritemark 2.0
  		if (options?.excludeConfirming) {
  			editors = editors.filter(editor => !this.shouldConfirmClose(editor));
  		}
-@@ -2171,6 +2230,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2233,6 +2292,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.lastLayout = { width, height, top, left };
  		this.element.classList.toggle('max-height-478px', height <= 478);
  
@@ -259,11 +262,11 @@ index a2344eaf8f2..33cf0878cc8 100644
 +		left += gap.left;
 +		top += gap.top;
 +
- 		// Layout the title control first to receive the size it occupies
- 		const titleControlSize = this.titleControl.layout({
- 			container: new Dimension(width, height),
-@@ -2186,6 +2261,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
- 		this.editorPane.layout({ width, height: editorHeight, top: top + titleControlSize.height, left });
+ 		const contentWidth = Math.max(0, width - this._contentRightInset);
+ 
+ 		// Keep tabs full-width while the header and editor pane follow the content inset.
+@@ -2265,6 +2340,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+ 		this.relayout();
  	}
  
 +	/** Ritemark 2.0: the desk's gaps, and which of the editor area's edges it touches (no neighbour there). */
@@ -291,10 +294,10 @@ index a2344eaf8f2..33cf0878cc8 100644
  		if (this.lastLayout) {
  			const { width, height, top, left } = this.lastLayout;
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts b/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
-index e53401481f3..ceeecf1d506 100644
+index a63f37ce249..f99b30f6765 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorGroupWatermark.ts
-@@ -16,6 +16,8 @@ import { IKeybindingService } from '../../../../platform/keybinding/common/keybi
+@@ -19,6 +19,8 @@ import { IKeybindingService } from '../../../../platform/keybinding/common/keybi
  import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
  import { defaultKeybindingLabelStyles } from '../../../../platform/theme/browser/defaultStyles.js';
  import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
@@ -303,7 +306,7 @@ index e53401481f3..ceeecf1d506 100644
  
  interface WatermarkEntry {
  	readonly id: string;
-@@ -82,11 +84,13 @@ export class EditorGroupWatermark extends Disposable {
+@@ -86,12 +88,14 @@ export class EditorGroupWatermark extends Disposable {
  
  	constructor(
  		container: HTMLElement,
@@ -312,15 +315,16 @@ index e53401481f3..ceeecf1d506 100644
  		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
  		@IContextKeyService private readonly contextKeyService: IContextKeyService,
  		@IConfigurationService private readonly configurationService: IConfigurationService,
--		@IStorageService private readonly storageService: IStorageService
-+		@IStorageService private readonly storageService: IStorageService,
+ 		@IStorageService private readonly storageService: IStorageService,
+-		@IInstantiationService private readonly instantiationService: IInstantiationService
++		@IInstantiationService private readonly instantiationService: IInstantiationService,
 +		@ICommandService commandService: ICommandService
  	) {
  		super();
  
-@@ -103,6 +107,9 @@ export class EditorGroupWatermark extends Disposable {
- 		append(container, elements.root);
- 		this.shortcuts = elements.shortcuts;
+@@ -118,6 +122,9 @@ export class EditorGroupWatermark extends Disposable {
+ 			menuOptions: { shouldForwardArgs: true }
+ 		}));
  
 +		// Ritemark 2.0: an empty desk offers the +'s first three as tiles (Sprint 133, R6)
 +		this._register(renderRitemarkEmptyDesk(elements.root, commandService, ritemarkActivateGroup));
@@ -329,19 +333,19 @@ index e53401481f3..ceeecf1d506 100644
  
  		this.render();
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-index b0a44e2c23a..040e7ede5e1 100644
+index 1c06de9c41f..f95abbd7234 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-@@ -100,7 +100,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -104,7 +104,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
  
  	private static readonly EDITOR_TAB_HEIGHT = {
 -		normal: 35 as const,
 +		normal: 44 as const, // Ritemark 2.0: the desk's strip, with the tabs 36 high at its foot (ritemarkSurfaces.css)
- 		compact: 22 as const
- 	};
- 
-@@ -451,7 +451,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+ 		compact: 22 as const,
+ 		// Modern UI multi-tab mode adds 4px top + 4px bottom padding to
+ 		// the tabs-and-actions-container (tabs.css), so the total title-bar height is the
+@@ -640,7 +640,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	}
  
  	protected getHoverTitle(editor: EditorInput): string | IManagedHoverTooltipMarkdownString {
@@ -351,10 +355,10 @@ index b0a44e2c23a..040e7ede5e1 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index b56047d66e1..9184503e6a5 100644
+index 2ab980e4786..672248b6170 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-@@ -44,7 +44,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
+@@ -45,7 +45,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
  import { IPath, win32, posix } from '../../../../base/common/path.js';
  import { coalesce, insert } from '../../../../base/common/arrays.js';
  import { isHighContrast } from '../../../../platform/theme/common/theme.js';
@@ -363,7 +367,7 @@ index b56047d66e1..9184503e6a5 100644
  import { equals } from '../../../../base/common/objects.js';
  import { EditorActivation, IEditorOptions } from '../../../../platform/editor/common/editor.js';
  import { UNLOCK_GROUP_COMMAND_ID } from './editorCommands.js';
-@@ -58,6 +58,9 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
+@@ -59,6 +59,9 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
  import { IHostService } from '../../../services/host/browser/host.js';
  import { BugIndicatingError } from '../../../../base/common/errors.js';
  import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
@@ -373,7 +377,7 @@ index b56047d66e1..9184503e6a5 100644
  
  interface IEditorInputLabel {
  	readonly editor: EditorInput;
-@@ -87,6 +90,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
+@@ -88,6 +91,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
  	options?: IMultiEditorTabsControlLayoutOptions;
  }
  
@@ -386,19 +390,19 @@ index b56047d66e1..9184503e6a5 100644
  export class MultiEditorTabsControl extends EditorTabsControl {
  
  	private static readonly SCROLLBAR_SIZES = {
-@@ -107,6 +116,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
- 
+@@ -110,6 +119,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private titleContainer: HTMLElement | undefined;
  	private tabsAndActionsContainer: HTMLElement | undefined;
+ 	private stickyTabsBackground: HTMLElement | undefined;
 +	private ritemarkFoldedTabs: RitemarkFoldedTabs | undefined;
 +	private ritemarkActivityService: IActivityService | undefined;
  	private tabsContainer: HTMLElement | undefined;
  	private tabsScrollbar: ScrollableElement | undefined;
- 	private tabSizingFixedDisposables: DisposableStore | undefined;
-@@ -190,6 +201,19 @@ export class MultiEditorTabsControl extends EditorTabsControl {
- 		// Tabs Container listeners
- 		this.registerTabsContainerListeners(this.tabsContainer, this.tabsScrollbar);
- 
+ 	private connectedTabOverflowEdge: HTMLElement | undefined;
+@@ -291,6 +302,18 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 		if (this.menuIds?.tabsBarAddTab) {
+ 			this.addTabContainer = this.createAddTabControl(this.tabsContainer, this.menuIds.tabsBarAddTab);
+ 		}
 +		// Ritemark 2.0: tabs that do not fit fold into "N ⌄" before the +, which asks what kind of new tab
 +		this.ritemarkFoldedTabs = this._register(this.instantiationService.createInstance(RitemarkFoldedTabs, this.tabsAndActionsContainer, this.groupView));
 +		// Ritemark 2.0 (Sprint 134, R6): the Tasks tab carries the Tasks place's count, redrawn when it changes
@@ -411,11 +415,10 @@ index b56047d66e1..9184503e6a5 100644
 +			}));
 +		}
 +		this._register(this.instantiationService.invokeFunction(accessor => createRitemarkNewTabButton(accessor, this.tabsAndActionsContainer!, () => this.groupsView.activateGroup(this.groupView))));
-+
+ 
  		// Create Editor Toolbar
  		this.createEditorActionsToolBar(this.tabsAndActionsContainer, ['editor-actions']);
- 
-@@ -1632,8 +1656,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1833,8 +1856,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  			description = tabLabel.description || '';
  		}
  
@@ -429,7 +432,7 @@ index b56047d66e1..9184503e6a5 100644
  			// Set aria-description to empty string so that screen readers would not read the title as well
  			// More details https://github.com/microsoft/vscode/issues/95378
  			tabContainer.setAttribute('aria-description', '');
-@@ -1643,7 +1671,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1845,7 +1872,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		tabLabelWidget.setResource(
  			{ name, description, resource: EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.BOTH }) },
  			{
@@ -438,7 +441,7 @@ index b56047d66e1..9184503e6a5 100644
  				extraClasses: coalesce(['tab-label', fileDecorationBadges ? 'tab-label-has-badge' : undefined].concat(editor.getLabelExtraClasses())),
  				italic: !this.tabsModel.isPinned(editor),
  				forceLabel,
-@@ -1654,6 +1682,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1856,6 +1883,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  				icon: editor.getIcon(),
  				hideIcon: options.showIcons === false,
  				namePrefix,
@@ -446,8 +449,8 @@ index b56047d66e1..9184503e6a5 100644
  			}
  		);
  
-@@ -1798,12 +1827,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
- 			// the real height of the title area with wrapping.
+@@ -2005,12 +2033,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 		) {
  			height = this.tabsAndActionsContainer.offsetHeight;
  		} else {
 -			height = this.tabHeight;
@@ -526,7 +529,7 @@ index b56047d66e1..9184503e6a5 100644
  	layout(dimensions: IEditorTitleControlDimensions, options?: IMultiEditorTabsControlLayoutOptions): Dimension {
  
  		// Remember dimensions that we get
-@@ -2014,6 +2109,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2335,6 +2429,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private doLayoutTabsNonWrapping(options?: IMultiEditorTabsControlLayoutOptions): void {
  		const [tabsContainer, tabsScrollbar] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar);
  
@@ -535,16 +538,15 @@ index b56047d66e1..9184503e6a5 100644
  		//
  		// Synopsis
  		// - allTabsWidth:   			sum of all tab widths
-@@ -2049,7 +2146,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
- 					break;
+@@ -2370,6 +2466,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 				}
+ 				stickyTabsWidth += this.connectedTabLabels && stickyTabWidth > 0 && tab ? tab.offsetWidth : stickyTabWidth;
  			}
- 
--			stickyTabsWidth = this.tabsModel.stickyCount * stickyTabWidth;
-+			stickyTabsWidth = RITEMARK_TABS_INSET + this.tabsModel.stickyCount * stickyTabWidth; // Ritemark 2.0: the row's inset
++			stickyTabsWidth += RITEMARK_TABS_INSET; // Ritemark 2.0: the row's inset, after the pinned tabs' own places
  		}
  
  		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
-@@ -2166,7 +2263,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2565,7 +2662,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	}
  
  	private get visible(): boolean {
@@ -1062,10 +1064,10 @@ index 00000000000..1a8c5074d84
 +	plus?.click();
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
-index 0ef439569e1..8909ed3d0cf 100644
+index 05c6ecb9a54..2f3a608c528 100644
 --- a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
-@@ -320,6 +320,7 @@ export class SingleEditorTabsControl extends EditorTabsControl {
+@@ -335,6 +335,7 @@ export class SingleEditorTabsControl extends EditorTabsControl {
  					},
  					icon: editor.getIcon(),
  					hideIcon: options.showIcons === false,
@@ -1468,10 +1470,10 @@ index f7ce1dab62b..cab412b5b77 100644
  		if (colorClass) {
  			extraClasses.push(colorClass);
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts b/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
-index 50a4c0f4917..db53f732c98 100644
+index 4c79ff0e300..247930cb089 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
-@@ -2127,7 +2127,9 @@ export class TerminalInstance extends Disposable implements ITerminalInstance {
+@@ -2204,7 +2204,9 @@ export class TerminalInstance extends Disposable implements ITerminalInstance {
  				}
  				break;
  		}
@@ -1483,10 +1485,10 @@ index 50a4c0f4917..db53f732c98 100644
  	}
  
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
-index 4e645b1cd3f..e13df38998a 100644
+index 576424a1298..be57eb737ff 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminalMenus.ts
-@@ -663,14 +663,9 @@ export function setupTerminalMenus(): void {
+@@ -699,14 +699,9 @@ export function setupTerminalMenus(): void {
  		]
  	);
  
@@ -1504,7 +1506,7 @@ index 4e645b1cd3f..e13df38998a 100644
  
  	MenuRegistry.appendMenuItem(MenuId.EditorTitleContext, {
  		command: {
-@@ -681,32 +676,6 @@ export function setupTerminalMenus(): void {
+@@ -717,32 +712,6 @@ export function setupTerminalMenus(): void {
  		group: '2_files'
  	});
  

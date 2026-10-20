@@ -346,9 +346,13 @@ echo ""
 # Microsoft started bundling GitHub Copilot Chat + Mermaid Chat Features as
 # first-party built-in extensions. Sprint 71 supports Marketplace-installed
 # Copilot instead, so production builds still strip the bundled copies.
+# VS Code 1.142 (Sprint 135): Mermaid Markdown Features replaces Mermaid Chat
+# Features (its commands, menus and chat tools), and Modern Icons adds an icon
+# theme. Both are new visible surfaces, so they go too. Keep this list in step
+# with build-windows.yml and build-macos-x64.yml.
 # =============================================================================
 EXTENSIONS_DIR="$APP_PATH/Contents/Resources/app/extensions"
-for unwanted_ext in copilot mermaid-chat-features; do
+for unwanted_ext in copilot mermaid-markdown-features theme-modern-icons; do
   if [[ -d "$EXTENSIONS_DIR/$unwanted_ext" ]]; then
     rm -rf "$EXTENSIONS_DIR/$unwanted_ext"
     echo -e "${GREEN}Removed unwanted built-in extension: $unwanted_ext${NC}"

@@ -9,13 +9,14 @@ first-run bug. This patch:
   - adds `configurationDefaults` to IProductConfiguration
   - registers `product.configurationDefaults` in DefaultConfiguration
     (additive; user/workspace settings still override)
+Sprint 135: rebased onto VS Code 1.142.0 (product.ts beside upstream's new product configuration interfaces).
 
 diff --git a/src/vs/base/common/product.ts b/src/vs/base/common/product.ts
-index a352bdd7d61..82a29046dc1 100644
+index 0767bb78c5a..7006cccdd3d 100644
 --- a/src/vs/base/common/product.ts
 +++ b/src/vs/base/common/product.ts
-@@ -65,6 +65,14 @@ export type ExtensionVirtualWorkspaceSupport = {
- };
+@@ -97,6 +97,14 @@ export interface IDictationRuntimeProductConfig {
+ }
  
  export interface IProductConfiguration {
 +	/**
@@ -30,7 +31,7 @@ index a352bdd7d61..82a29046dc1 100644
  	readonly date?: string;
  	readonly quality?: string;
 diff --git a/src/vs/workbench/services/configuration/browser/configuration.ts b/src/vs/workbench/services/configuration/browser/configuration.ts
-index b34ba019c26..24a0fe65b03 100644
+index a83c04f4d13..2ec6eaaffce 100644
 --- a/src/vs/workbench/services/configuration/browser/configuration.ts
 +++ b/src/vs/workbench/services/configuration/browser/configuration.ts
 @@ -4,6 +4,7 @@

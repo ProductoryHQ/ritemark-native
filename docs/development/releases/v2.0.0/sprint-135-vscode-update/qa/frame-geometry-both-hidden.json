@@ -1,0 +1,406 @@
+{
+	"label": "both-hidden",
+	"measured": {
+		"window": {
+			"w": 1440,
+			"h": 900,
+			"zoom": "1"
+		},
+		"classes": {
+			"nosidebar": true,
+			"noauxiliarybar": true,
+			"mac": true,
+			"windows": false
+		},
+		"titlebarShown": false,
+		"sidebar": null,
+		"auxiliarybar": null,
+		"aiContent": null,
+		"editor": {
+			"x": 0,
+			"y": 0,
+			"w": 1440,
+			"h": 868,
+			"right": 1440,
+			"bottom": 868,
+			"cx": 720,
+			"cy": 434
+		},
+		"statusbar": {
+			"x": 0,
+			"y": 876,
+			"w": 1440,
+			"h": 24,
+			"right": 1440,
+			"bottom": 900,
+			"cx": 720,
+			"cy": 888
+		},
+		"leftStrip": null,
+		"leftToggle": null,
+		"aiToggle": null,
+		"you": null,
+		"deskLeftStrip": {
+			"x": 0,
+			"y": 0,
+			"w": 124,
+			"h": 44,
+			"right": 124,
+			"bottom": 44,
+			"cx": 62,
+			"cy": 22
+		},
+		"deskLeftToggle": {
+			"x": 84,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 112,
+			"bottom": 40,
+			"cx": 98,
+			"cy": 26
+		},
+		"deskAiToggle": {
+			"x": 1368,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 1396,
+			"bottom": 40,
+			"cx": 1382,
+			"cy": 26
+		},
+		"deskYou": {
+			"x": 1404,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 1432,
+			"bottom": 40,
+			"cx": 1418,
+			"cy": 26
+		},
+		"deskRightStrip": {
+			"x": 1356,
+			"y": 0,
+			"w": 84,
+			"h": 44,
+			"right": 1440,
+			"bottom": 44,
+			"cx": 1398,
+			"cy": 22
+		},
+		"desks": [
+			{
+				"group": {
+					"x": 0,
+					"y": 0,
+					"w": 1440,
+					"h": 868,
+					"right": 1440,
+					"bottom": 868,
+					"cx": 720,
+					"cy": 434
+				},
+				"sheet": {
+					"x": 8,
+					"y": 44,
+					"w": 1424,
+					"h": 824,
+					"right": 1432,
+					"bottom": 868,
+					"cx": 720,
+					"cy": 456
+				},
+				"title": {
+					"x": 8,
+					"y": 0,
+					"w": 1424,
+					"h": 44,
+					"right": 1432,
+					"bottom": 44,
+					"cx": 720,
+					"cy": 22
+				}
+			}
+		],
+		"deskSeparators": 0,
+		"tabs": [
+			{
+				"x": 132,
+				"y": 8,
+				"w": 38,
+				"h": 36,
+				"right": 170,
+				"bottom": 44,
+				"cx": 151,
+				"cy": 26,
+				"active": false,
+				"sticky": true,
+				"label": null
+			},
+			{
+				"x": 170,
+				"y": 8,
+				"w": 38,
+				"h": 36,
+				"right": 208,
+				"bottom": 44,
+				"cx": 189,
+				"cy": 26,
+				"active": false,
+				"sticky": true,
+				"label": null
+			},
+			{
+				"x": 208,
+				"y": 8,
+				"w": 112.9375,
+				"h": 36,
+				"right": 320.9375,
+				"bottom": 44,
+				"cx": 264.46875,
+				"cy": 26,
+				"active": true,
+				"sticky": false,
+				"label": {
+					"x": 242,
+					"y": 18,
+					"w": 46.9375,
+					"h": 15.5,
+					"right": 288.9375,
+					"bottom": 33.5,
+					"cx": 265.46875,
+					"cy": 25.75
+				}
+			}
+		],
+		"newTab": {
+			"x": 1320,
+			"y": 12,
+			"w": 28,
+			"h": 28,
+			"right": 1348,
+			"bottom": 40,
+			"cx": 1334,
+			"cy": 26
+		},
+		"folded": null,
+		"places": [
+			{
+				"fill": null,
+				"label": "Home"
+			},
+			{
+				"fill": null,
+				"label": "Documents (⇧⌘E)"
+			},
+			{
+				"fill": null,
+				"label": "Tasks"
+			},
+			{
+				"fill": null,
+				"label": "Browser"
+			},
+			{
+				"fill": null,
+				"label": "Agents"
+			},
+			{
+				"fill": null,
+				"label": "Transcribe"
+			},
+			{
+				"fill": null,
+				"label": "More"
+			}
+		],
+		"projectHead": null,
+		"projectRows": [
+			null,
+			null
+		],
+		"documentsLabel": null,
+		"activePlace": null,
+		"treeRows": []
+	},
+	"results": [
+		{
+			"name": "R1 the main window has no title row",
+			"result": "PASS",
+			"actual": false,
+			"expected": false
+		},
+		{
+			"name": "R1 the left strip is 44 high",
+			"result": "SKIP",
+			"expected": 44
+		},
+		{
+			"name": "R1 the left toggle sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R1 the AI toggle sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R11 You sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R11 You is a 28 circle",
+			"result": "SKIP",
+			"actual": null,
+			"expected": "28x28"
+		},
+		{
+			"name": "R11 You ends 8 from the window's right edge (the Mac)",
+			"result": "SKIP",
+			"expected": 1432
+		},
+		{
+			"name": "R7 tab 1 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 1's label sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 2 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 2's label sits on the line (26)",
+			"result": "SKIP",
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 3 is 36 high from 8",
+			"result": "PASS",
+			"actual": "8+36",
+			"expected": "8+36"
+		},
+		{
+			"name": "R1 tab 3's label sits on the line (26)",
+			"result": "PASS",
+			"actual": 25.8,
+			"expected": 26
+		},
+		{
+			"name": "R7 tab 3 is at most 200 wide (as wide as its name)",
+			"result": "PASS",
+			"actual": 112.9,
+			"expected": "<=200"
+		},
+		{
+			"name": "R7 the + sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the desk starts at 44",
+			"result": "PASS",
+			"actual": 44,
+			"expected": 44
+		},
+		{
+			"name": "R1 the desk ends 8 above the status bar",
+			"result": "PASS",
+			"actual": 868,
+			"expected": 868
+		},
+		{
+			"name": "R1 the status bar is 24",
+			"result": "PASS",
+			"actual": 24,
+			"expected": 24
+		},
+		{
+			"name": "R1 with the left column hidden, the desk sits 8 from the window's left edge",
+			"result": "PASS",
+			"actual": 8,
+			"expected": 8
+		},
+		{
+			"name": "R1 with the AI hidden, the desk sits 8 from the window's right edge",
+			"result": "PASS",
+			"actual": 8,
+			"expected": 8
+		},
+		{
+			"name": "R5 the places are 32 high",
+			"result": "SKIP",
+			"expected": 32
+		},
+		{
+			"name": "R5 the places row sits at 48 (centre 64)",
+			"result": "SKIP",
+			"expected": 64
+		},
+		{
+			"name": "R5 the first place's fill starts 8 into the column (its icon on the text edge, 16)",
+			"result": "SKIP",
+			"expected": 8
+		},
+		{
+			"name": "R1 with the left column hidden, its controls sit on the desk's strip and the tabs start after them",
+			"result": "PASS",
+			"actual": 132,
+			"expected": ">= 124"
+		},
+		{
+			"name": "R1 the desk strip's left toggle sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the desk strip's AI toggle sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the desk strip's You sits on the line (26)",
+			"result": "PASS",
+			"actual": 26,
+			"expected": 26
+		},
+		{
+			"name": "R1 the left toggle keeps its place when the column hides (84, after the traffic lights)",
+			"result": "PASS",
+			"actual": 84,
+			"expected": 84
+		},
+		{
+			"name": "R1 You keeps its place when the AI hides (8 from the right edge)",
+			"result": "PASS",
+			"actual": 1432,
+			"expected": 1432
+		},
+		{
+			"name": "R1 with the AI hidden, its controls sit on the desk's strip and the + stops before them",
+			"result": "PASS",
+			"actual": 1348,
+			"expected": "<= 1356"
+		},
+		{
+			"name": "R1 ... and so do the tabs",
+			"result": "PASS",
+			"actual": 320.9,
+			"expected": "<= 1356"
+		}
+	]
+}

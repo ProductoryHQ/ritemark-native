@@ -28,7 +28,23 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
     );
   }
 
+  /** pdf.js's worker script, read once and sent with each PDF (the webview's pdfWorker.ts says why). */
+  private workerSource: Promise<string | undefined> | undefined;
+
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  private readWorkerSource(): Promise<string | undefined> {
+    this.workerSource ??= fs
+      .readFile(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'pdf.worker.min.mjs').fsPath, 'utf8')
+      .catch((error) => {
+        // The page falls back to workerSrc, which VS Code 1.142's webviews cannot load: the PDF would stay on
+        // "Loading PDF…", so say why. The next PDF tries again.
+        console.warn('[Ritemark] PDF viewer: could not read pdf.worker.min.mjs:', error);
+        this.workerSource = undefined;
+        return undefined;
+      });
+    return this.workerSource;
+  }
 
   async openCustomDocument(
     uri: vscode.Uri,
@@ -139,6 +155,7 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
   ): Promise<void> {
     const base64 = document.buffer.toString('base64');
     const filename = path.basename(document.uri.fsPath);
+    const workerSource = await this.readWorkerSource();
 
     webview.postMessage({
       type: 'load',
@@ -148,6 +165,7 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
       filename: filename,
       sizeBytes: document.buffer.length,
       workerSrc: workerUri.toString(),
+      workerSource,
       features: {
         voiceDictation: isEnabled('voice-dictation'),
         markdownExport: isEnabled('markdown-export'),

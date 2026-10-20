@@ -10,6 +10,7 @@ import { stripExt } from '../../utils/imageNaming'
 import { matchCountLabel, normalizeQuery, stepMatch } from '../../utils/textSearch'
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
 import { buildMatchRange, isPageTextLayerRendered, scrollPageIntoView } from './pdfSearchDom'
+import { startPdfWorker } from './pdfWorker'
 import { buildPdfSearchIndex, findDocumentMatches, resolvePdfMatch, type PdfSearchIndex } from './pdfSearchIndex'
 import { PageIndicator, ShareMenu, ToolbarDivider, ToolbarIconButton, ToolbarSpacer, ToolbarTextButton, ViewerToolbar, ZoomControls } from './ViewerToolbar'
 import { fitPageZoom, fitWidthZoom, stepZoom, type FitMode } from './viewerLayout'
@@ -28,6 +29,8 @@ interface PDFViewerProps {
   content: string  // base64-encoded PDF
   filename: string
   workerSrc?: string
+  /** pdf.js's worker script itself (Sprint 135): a worker started from it needs no request (pdfWorker.ts) */
+  workerSource?: string
   canSaveAsMarkdown?: boolean
 }
 
@@ -152,7 +155,7 @@ function LazyPage({
   )
 }
 
-export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: PDFViewerProps) {
+export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveAsMarkdown }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
@@ -215,12 +218,16 @@ export function PDFViewer({ content, filename, workerSrc, canSaveAsMarkdown }: P
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matches, searchIndex, renderedVersion])
 
-  // Configure PDF.js worker
+  // Configure PDF.js worker: started from its script when the host sends it (from VS Code 1.142 a worker cannot load
+  // the script by URL), else by URL
   useEffect(() => {
+    if (workerSource) {
+      startPdfWorker(workerSource)
+    }
     if (workerSrc) {
       pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
     }
-  }, [workerSrc])
+  }, [workerSrc, workerSource])
 
   // Listen for the Make-an-editable-copy result and the system from the extension host.
   useEffect(() => {

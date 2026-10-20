@@ -1,49 +1,47 @@
 # RiteMark Patch: windows-binary-strip
 #
-# Purpose: Strip cross-platform native binaries inside the bundled copilot
-#          SDK so the Windows packaging step (rcedit.exe) does not choke on
-#          .node files compiled for non-Windows platforms.
+# Purpose: Strip the bundled Claude Agent SDK's non-Windows native binaries
+#          (@anthropic-ai/claude-agent-sdk/vendor/*) so the Windows packaging
+#          step (rcedit.exe) does not choke on .node files built for another
+#          platform.
 #
 # Why:
-#   VS Code 1.117 bundles GitHub Copilot Chat (extensions/copilot/) as a
-#   first-party built-in. Its nested SDK ships native binaries for every
-#   supported platform. During gulp's vscode-win32-x64-min packaging step,
-#   rcedit.exe iterates the entire .app/resources/app/ tree to set Windows
-#   version metadata and fails with exit code 1 on any non-Windows .node
-#   file (e.g. linux-x64/computer.node, arm64-darwin/audio-capture.node).
+#   During gulp's vscode-win32-x64-min packaging step, rcedit.exe walks the
+#   whole resources/app/ tree to set Windows version metadata and fails with
+#   exit code 1 on any non-Windows .node file. At VS Code 1.117 both the
+#   bundled Copilot SDK and the Claude Agent SDK's vendor/ trees carried such
+#   files, and this patch stripped both (Copilot's prebuilds were recreated
+#   for win32-x64 by prepareBuiltInCopilotExtensionShims).
 #
-#   The existing .moduleignore stripped @github/copilot/prebuilds/** but
-#   missed @github/copilot/sdk/prebuilds/** and the nested
-#   @anthropic-ai/claude-agent-sdk/vendor/* binary trees. This patch adds
-#   the missing strip rules.
-#
-#   The win32-x64 binaries that gulp's prepareBuiltInCopilotExtensionShims
-#   actually needs are recreated fresh by that function (see
-#   vscode/build/lib/copilot.ts: mkdirSync(nodePtyDest, { recursive: true })
-#   followed by cpSync). So stripping the entire prebuilds/** tree is safe.
+#   Sprint 135 (VS Code 1.142.0): upstream now strips @github/copilot/** whole
+#   and adds back only the target's Copilot SDK platform package when it
+#   packages (build/lib/copilot.ts), so the two @github/copilot/sdk lines are
+#   upstream's and leave this patch. The three claude-agent-sdk vendor/ lines
+#   stay: the SDK installed now ships its binary in per-platform packages and
+#   has no vendor/ folder, so they guard the older layout. Windows CI's
+#   packaging (rcedit) is the proof.
 #
 # File(s): build/.moduleignore
 # Created: 2026-05-03
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/build/.moduleignore b/build/.moduleignore
+index 202d76b197e..248e9e5f511 100644
 --- a/build/.moduleignore
 +++ b/build/.moduleignore
-@@ -222,6 +222,18 @@
- @github/copilot/ripgrep/**
- @github/copilot/**/keytar.node
-
-+# Ritemark: strip remaining cross-platform native binaries inside the
-+# bundled copilot SDK. rcedit.exe (Windows resource editor) iterates every
-+# file in the .app bundle and chokes on non-Windows .node files. The
-+# win32-x64 prebuilds dir is recreated fresh by gulp's
-+# prepareBuiltInCopilotExtensionShims after this strip, so removing the
-+# entire prebuilds tree is safe.
-+@github/copilot/sdk/prebuilds/**
-+@github/copilot/sdk/ripgrep/**
+@@ -226,6 +226,15 @@ zone.js/dist/**
+ # Agent Host uses the runtime bundled with @github/copilot-sdk.
+ @github/copilot/**
+ 
++# Ritemark: strip cross-platform native binaries inside the bundled Claude
++# Agent SDK. rcedit.exe (Windows resource editor) iterates every file in the
++# app and chokes on non-Windows .node files. (@github/copilot is stripped
++# whole above, and the Copilot SDK's platform package is re-added for the
++# target only, so its old lines here are gone.)
 +@anthropic-ai/claude-agent-sdk/vendor/audio-capture/**
 +@anthropic-ai/claude-agent-sdk/vendor/ripgrep/**
 +@anthropic-ai/claude-agent-sdk/vendor/tree-sitter/**
 +
- # @github/copilot platform binaries - not needed
+ # Standalone Copilot CLI platform packages are not product dependencies.
  @github/copilot-darwin-arm64/**
  @github/copilot-darwin-x64/**

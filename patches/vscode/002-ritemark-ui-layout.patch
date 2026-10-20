@@ -19,6 +19,10 @@ Sprint 132 (Ritemark 2.0 step 1, 2026-10-17): this patch keeps placement; 018 an
   In the places row only Ritemark's six take a spot: every other place lives in More, even while open, and More
   takes the chosen fill then; a place new to a saved row never goes in among the six (compositeBar.ts). Documents
   stays a place while its tree is not registered yet, and is called Documents (explorerViewlet.ts).
+Sprint 135: rebased onto VS Code 1.142.0. The places row and the 40-high header, title and activity bar as before;
+  compositeSize is upstream's (actionHeight + actionGap, 40 with Modern UI off, which product.json pins); the
+  Appearance submenu stays out of View; layoutActions.ts also drops its KeyMod/KeyCode import, used at 1.142 only
+  by the Cmd+B binding this patch removes.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -77,10 +81,18 @@ index 833787070f3..164ba274dfd 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index 86f783cefa4..a39529f50c3 100644
+index f7b82f298f7..c0589d974ad 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
-@@ -41,9 +41,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
+@@ -10,7 +10,6 @@ import { IConfigurationService } from '../../../platform/configuration/common/co
+ import { alert } from '../../../base/browser/ui/aria/aria.js';
+ import { EditorActionsLocation, EditorTabsMode, IWorkbenchLayoutService, LayoutSettings, ModernUIDensity, Parts, Position, ZenModeSettings, positionToString } from '../../services/layout/browser/layoutService.js';
+ import { ServicesAccessor, IInstantiationService } from '../../../platform/instantiation/common/instantiation.js';
+-import { KeyMod, KeyCode } from '../../../base/common/keyCodes.js';
+ import { isWindows, isLinux, isWeb, isMacintosh, isNative } from '../../../base/common/platform.js';
+ import { KeybindingWeight } from '../../../platform/keybinding/common/keybindingsRegistry.js';
+ import { ContextKeyExpr, ContextKeyExpression, IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
+@@ -40,9 +39,10 @@ const menubarIcon = registerIcon('menuBar', Codicon.layoutMenubar, localize('men
  const activityBarLeftIcon = registerIcon('activity-bar-left', Codicon.layoutActivitybarLeft, localize('activityBarLeft', "Represents the activity bar in the left position"));
  const activityBarRightIcon = registerIcon('activity-bar-right', Codicon.layoutActivitybarRight, localize('activityBarRight', "Represents the activity bar in the right position"));
  const panelLeftIcon = registerIcon('panel-left', Codicon.layoutSidebarLeft, localize('panelLeft', "Represents a side bar in the left position"));
@@ -93,7 +105,7 @@ index 86f783cefa4..a39529f50c3 100644
  const panelIcon = registerIcon('panel-bottom', Codicon.layoutPanel, localize('panelBottom', "Represents the bottom panel"));
  const statusBarIcon = registerIcon('statusBar', Codicon.layoutStatusbar, localize('statusBarIcon', "Represents the status bar"));
  
-@@ -169,17 +170,18 @@ export class ToggleSidebarPositionAction extends Action2 {
+@@ -172,17 +172,18 @@ export class ToggleSidebarPositionAction extends Action2 {
  
  registerAction2(ToggleSidebarPositionAction);
  
@@ -122,7 +134,7 @@ index 86f783cefa4..a39529f50c3 100644
  
  
  MenuRegistry.appendMenuItems([{
-@@ -272,10 +274,28 @@ registerAction2(class extends Action2 {
+@@ -275,11 +276,28 @@ registerAction2(class extends Action2 {
  	}
  });
  
@@ -139,6 +151,7 @@ index 86f783cefa4..a39529f50c3 100644
 -	group: '2_appearance',
 -	title: localize({ key: 'miAppearance', comment: ['&& denotes a mnemonic'] }, "&&Appearance"),
 -	submenu: MenuId.MenubarAppearanceMenu,
+-	when: IsSessionsWindowContext.negate(),
 +	group: '9_advanced',
 +	title: localize('miViewAdvanced', "Advanced"),
 +	submenu: MenuId.MenubarViewMenuAdvanced,
@@ -154,7 +167,7 @@ index 86f783cefa4..a39529f50c3 100644
  	order: 1
  });
  
-@@ -300,9 +320,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
+@@ -304,9 +322,10 @@ export class ToggleSidebarVisibilityAction extends Action2 {
  			},
  			category: Categories.View,
  			f1: true,
@@ -167,7 +180,7 @@ index 86f783cefa4..a39529f50c3 100644
  			},
  			menu: [
  				{
-@@ -347,23 +368,19 @@ MenuRegistry.appendMenuItems([
+@@ -351,23 +370,19 @@ MenuRegistry.appendMenuItems([
  			when: ContextKeyExpr.and(SideBarVisibleContext, ContextKeyExpr.equals('viewContainerLocation', ViewContainerLocationToString(ViewContainerLocation.Sidebar))),
  			order: 2
  		}
@@ -177,7 +190,7 @@ index 86f783cefa4..a39529f50c3 100644
 +	{
  		id: MenuId.LayoutControlMenu,
  		item: {
- 			group: '2_pane_toggles',
+ 			group: 'navigation',
  			command: {
  				id: ToggleSidebarVisibilityAction.ID,
  				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
@@ -197,9 +210,9 @@ index 86f783cefa4..a39529f50c3 100644
  			order: 0
  		}
  	}, {
-@@ -371,19 +388,13 @@ MenuRegistry.appendMenuItems([
+@@ -375,19 +390,13 @@ MenuRegistry.appendMenuItems([
  		item: {
- 			group: '2_pane_toggles',
+ 			group: 'navigation',
  			command: {
 -				id: ToggleSidebarVisibilityAction.ID,
 -				title: localize('toggleSideBar', "Toggle Primary Side Bar"),
@@ -224,7 +237,7 @@ index 86f783cefa4..a39529f50c3 100644
  	}
  ]);
 diff --git a/src/vs/workbench/browser/media/part.css b/src/vs/workbench/browser/media/part.css
-index f17465a5e4a..6dbeda329ca 100644
+index a9cd407de3c..bcdbe6bdc34 100644
 --- a/src/vs/workbench/browser/media/part.css
 +++ b/src/vs/workbench/browser/media/part.css
 @@ -29,7 +29,7 @@
@@ -237,10 +250,10 @@ index f17465a5e4a..6dbeda329ca 100644
  	box-sizing: border-box;
  	overflow: hidden;
 diff --git a/src/vs/workbench/browser/part.ts b/src/vs/workbench/browser/part.ts
-index 50776ac10da..1233e89ccee 100644
+index 059221692f5..7db02765cf9 100644
 --- a/src/vs/workbench/browser/part.ts
 +++ b/src/vs/workbench/browser/part.ts
-@@ -201,8 +201,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
+@@ -215,8 +215,8 @@ export abstract class Part<MementoType extends object = object> extends Componen
  
  class PartLayout {
  
@@ -248,41 +261,37 @@ index 50776ac10da..1233e89ccee 100644
 -	private static readonly TITLE_HEIGHT = 35;
 +	private static readonly HEADER_HEIGHT = 40; // Ritemark: taller tab bar
 +	private static readonly TITLE_HEIGHT = 40; // Ritemark: taller tab bar
- 	private static readonly Footer_HEIGHT = 35;
- 
- 	private headerVisible: boolean = false;
+ 	private static readonly FOOTER_HEIGHT = 35;
+ 	// KEEP IN SYNC WITH: modernUI/browser/media/padding.css
+ 	private static readonly AREA_HEIGHT_MODERN_UI = 32;
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-index 86c8b184706..76f32bc0688 100644
+index e8edbe1bfdd..8837bedea5e 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 +++ b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-@@ -42,13 +42,13 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+@@ -44,10 +44,10 @@ import { IHostService } from '../../../services/host/browser/host.js';
  
  export class ActivitybarPart extends Part {
  
 -	static readonly ACTION_HEIGHT = 48;
 +	static readonly ACTION_HEIGHT = 40;
- 	static readonly COMPACT_ACTION_HEIGHT = 32;
+ 	static readonly COMPACT_ACTION_HEIGHT = 28;
  
 -	static readonly ACTIVITYBAR_WIDTH = 48;
 +	static readonly ACTIVITYBAR_WIDTH = 40;
  	static readonly COMPACT_ACTIVITYBAR_WIDTH = 36;
  
+ 	/** Narrower dimensions used when the floating panels (Modern UI) experiment is enabled. */
+@@ -67,7 +67,7 @@ export class ActivitybarPart extends Part {
+ 	 */
+ 	static readonly FLOATING_COMPACT_ACTION_GAP = 4;
+ 
 -	static readonly ICON_SIZE = 24;
 +	static readonly ICON_SIZE = 16;
  	static readonly COMPACT_ICON_SIZE = 16;
  
- 	static readonly pinnedViewContainersKey = 'workbench.activity.pinnedViewlets2';
-@@ -133,7 +133,7 @@ export class ActivitybarPart extends Part {
- 			preventLoopNavigation: true,
- 			recomputeSizes: false,
- 			fillExtraContextMenuActions: (actions, e?: MouseEvent | GestureEvent) => { },
--			compositeSize: 52,
-+			compositeSize: 40,
- 			colors: (theme: IColorTheme) => ({
- 				activeForegroundColor: theme.getColor(ACTIVITY_BAR_FOREGROUND),
- 				inactiveForegroundColor: theme.getColor(ACTIVITY_BAR_INACTIVE_FOREGROUND),
+ 	/**
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
-index a40a3515c96..646f0a42e3e 100644
+index 75345d97c8a..100f2a24752 100644
 --- a/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
 +++ b/src/vs/workbench/browser/parts/activitybar/media/activityaction.css
 @@ -6,13 +6,19 @@
@@ -416,10 +425,10 @@ index 568a7212980..4f53ff1e855 100644
  
  /** Menu Bar */
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-index 4eefda8085b..d8453b0cbdb 100644
+index 1ffa4871293..0bb4a0c940e 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarActions.ts
-@@ -3,6 +3,7 @@
+@@ -3,13 +3,14 @@
   *  Licensed under the MIT License. See License.txt in the project root for license information.
   *--------------------------------------------------------------------------------------------*/
  
@@ -427,16 +436,15 @@ index 4eefda8085b..d8453b0cbdb 100644
  import { Codicon } from '../../../../base/common/codicons.js';
  import { localize, localize2 } from '../../../../nls.js';
  import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
-@@ -10,7 +11,7 @@ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextke
+ import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
  import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
  import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
- import { alert } from '../../../../base/browser/ui/aria/aria.js';
--import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext, IsAuxiliaryWindowContext } from '../../../common/contextkeys.js';
-+import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext } from '../../../common/contextkeys.js';
+-import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext, IsAuxiliaryWindowContext, SecondarySideBarVisibleContext } from '../../../common/contextkeys.js';
++import { AuxiliaryBarMaximizedContext, AuxiliaryBarVisibleContext, SecondarySideBarVisibleContext } from '../../../common/contextkeys.js';
  import { ViewContainerLocation, ViewContainerLocationToString } from '../../../common/views.js';
  import { ActivityBarPosition, IWorkbenchLayoutService, LayoutSettings, Parts } from '../../../services/layout/browser/layoutService.js';
  import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
-@@ -22,10 +23,7 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+@@ -21,10 +22,7 @@ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
  const maximizeIcon = registerIcon('auxiliarybar-maximize', Codicon.screenFull, localize('maximizeIcon', 'Icon to maximize the secondary side bar.'));
  const closeIcon = registerIcon('auxiliarybar-close', Codicon.close, localize('closeIcon', 'Icon to close the secondary side bar.'));
  
@@ -448,7 +456,7 @@ index 4eefda8085b..d8453b0cbdb 100644
  
  export class ToggleAuxiliaryBarAction extends Action2 {
  
-@@ -139,45 +137,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
+@@ -129,45 +127,8 @@ registerAction2(class FocusAuxiliaryBarAction extends Action2 {
  });
  
  MenuRegistry.appendMenuItems([
@@ -456,7 +464,7 @@ index 4eefda8085b..d8453b0cbdb 100644
  	{
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '2_pane_toggles',
+-			group: 'navigation',
 -			command: {
 -				id: ToggleAuxiliaryBarAction.ID,
 -				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
@@ -475,7 +483,7 @@ index 4eefda8085b..d8453b0cbdb 100644
 -	}, {
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '2_pane_toggles',
+-			group: 'navigation',
 -			command: {
 -				id: ToggleAuxiliaryBarAction.ID,
 -				title: localize('toggleSecondarySideBar', "Toggle Secondary Side Bar"),
@@ -496,7 +504,7 @@ index 4eefda8085b..d8453b0cbdb 100644
  		item: {
  			group: '3_workbench_layout_move',
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-index c89c0e4eee8..4aaccf3c849 100644
+index 7f8bd13e5ae..168ae722004 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 @@ -10,7 +10,7 @@ import { IContextMenuService } from '../../../../platform/contextview/browser/co
@@ -508,7 +516,7 @@ index c89c0e4eee8..4aaccf3c849 100644
  import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
  import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
-@@ -42,6 +42,40 @@ interface IAuxiliaryBarPartConfiguration {
+@@ -43,6 +43,40 @@ interface IAuxiliaryBarPartConfiguration {
  	showLabels: boolean;
  }
  
@@ -549,9 +557,9 @@ index c89c0e4eee8..4aaccf3c849 100644
  export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  
  	static readonly activeViewSettingsKey = 'workbench.auxiliarybar.activepanelid';
-@@ -97,6 +131,8 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -98,6 +132,8 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  		@IMenuService menuService: IMenuService,
- 		@IConfigurationService private readonly configurationService: IConfigurationService
+ 		@IConfigurationService configurationService: IConfigurationService
  	) {
 +		migrateRitemarkAuxiliaryBarOrder(storageService);
 +
@@ -559,10 +567,10 @@ index c89c0e4eee8..4aaccf3c849 100644
  			Parts.AUXILIARYBAR_PART,
  			{
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
-index aec3de2d96d..40753c7e66b 100644
+index c94d7e903ce..de787dc0ef3 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/media/auxiliaryBarPart.css
-@@ -105,3 +105,53 @@
+@@ -110,3 +110,53 @@
  .monaco-workbench .auxiliarybar.pane-composite-part > .title.has-composite-bar > .title-actions .monaco-action-bar .action-item {
  	max-width: 150px;
  }
@@ -825,10 +833,10 @@ index 8d1020b6621..b211fb7cf90 100644
  		for (let index = 0; index < this.items.length; index++) {
  			if (this.items[index].id === id) {
 diff --git a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-index 4c7da5f5466..06c584c57ed 100644
+index 86c87f9d3ed..94f59178895 100644
 --- a/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
 +++ b/src/vs/workbench/browser/parts/editor/media/editorgroupview.css
-@@ -205,7 +205,7 @@
+@@ -231,7 +231,7 @@
  
  .monaco-workbench .part.editor > .content .editor-group-container > .editor-group-container-toolbar {
  	display: none;
@@ -838,18 +846,18 @@ index 4c7da5f5466..06c584c57ed 100644
  
  .monaco-workbench .part.editor > .content .editor-group-container.empty.locked > .editor-group-container-toolbar,
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-index 48220d63dc3..d5b081e981f 100644
+index d0f5bd1bd21..99dcc1581a4 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-@@ -53,7 +53,6 @@ export class GlobalCompositeBar extends Disposable {
+@@ -60,7 +60,6 @@ export class GlobalCompositeBar extends Disposable {
  	readonly element: HTMLElement;
  
  	private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
 -	private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
  	private readonly globalActivityActionBar: ActionBar;
  
- 	constructor(
-@@ -102,10 +101,6 @@ export class GlobalCompositeBar extends Disposable {
+ 	private readonly _onDidChange = this._register(new Emitter<void>());
+@@ -112,10 +111,6 @@ export class GlobalCompositeBar extends Disposable {
  			preventLoopNavigation: true
  		}));
  
@@ -860,7 +868,7 @@ index 48220d63dc3..d5b081e981f 100644
  		this.globalActivityActionBar.push(this.globalActivityAction);
  
  		this.registerListeners();
-@@ -132,27 +127,15 @@ export class GlobalCompositeBar extends Disposable {
+@@ -143,29 +138,16 @@ export class GlobalCompositeBar extends Disposable {
  	}
  
  	getContextMenuActions(): IAction[] {
@@ -869,14 +877,17 @@ index 48220d63dc3..d5b081e981f 100644
  	}
  
  	private toggleAccountsActivity() {
--		if (this.globalActivityActionBar.length() === 2 && this.accountsVisibilityPreference) {
+-		const accountsVisible = this.globalActivityActionBar.length() === 2;
+-		if (accountsVisible === this.accountsVisibilityPreference) {
 -			return;
 -		}
- 		if (this.globalActivityActionBar.length() === 2) {
+-		if (accountsVisible) {
++		if (this.globalActivityActionBar.length() === 2) {
  			this.globalActivityActionBar.pull(GlobalCompositeBar.ACCOUNTS_ACTION_INDEX);
 -		} else {
 -			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
  		}
+ 		this._onDidChange.fire();
  	}
  
 -	private get accountsVisibilityPreference(): boolean {
@@ -889,7 +900,7 @@ index 48220d63dc3..d5b081e981f 100644
  }
  
  abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionViewItem {
-@@ -233,7 +216,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
+@@ -248,7 +230,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
  		return this.contextMenuActionsProvider();
  	}
  
@@ -898,7 +909,7 @@ index 48220d63dc3..d5b081e981f 100644
  		const disposables = new DisposableStore();
  		const menu = disposables.add(this.menuService.createMenu(this.menuId, this.contextKeyService));
  		const actions = await this.resolveMainMenuActions(menu, disposables);
-@@ -600,6 +583,7 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
+@@ -716,6 +698,7 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
  		@IKeybindingService keybindingService: IKeybindingService,
  		@IInstantiationService instantiationService: IInstantiationService,
  		@IActivityService activityService: IActivityService,
@@ -906,7 +917,7 @@ index 48220d63dc3..d5b081e981f 100644
  	) {
  		const action = instantiationService.createInstance(CompositeBarAction, {
  			id: GLOBAL_ACTIVITY_ID,
-@@ -657,6 +641,10 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
+@@ -773,6 +756,10 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
  	protected override computeTitle(): string {
  		return this.userDataProfileService.currentProfile.isDefault ? super.computeTitle() : localize('manage profile', "Manage {0} (Profile)", this.userDataProfileService.currentProfile.name);
  	}
@@ -917,7 +928,7 @@ index 48220d63dc3..d5b081e981f 100644
  }
  
  export class SimpleAccountActivityActionViewItem extends AccountsActivityActionViewItem {
-@@ -711,7 +699,8 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
+@@ -829,7 +816,8 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
  		@IKeybindingService keybindingService: IKeybindingService,
  		@IInstantiationService instantiationService: IInstantiationService,
  		@IActivityService activityService: IActivityService,
@@ -927,7 +938,7 @@ index 48220d63dc3..d5b081e981f 100644
  	) {
  		super(() => simpleActivityContextMenuActions(storageService, false),
  			{
-@@ -722,7 +711,7 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
+@@ -840,7 +828,7 @@ export class SimpleGlobalActivityActionViewItem extends GlobalActivityActionView
  				}),
  				hoverOptions,
  				compact: true,
@@ -937,7 +948,7 @@ index 48220d63dc3..d5b081e981f 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/media/paneCompositePart.css b/src/vs/workbench/browser/parts/media/paneCompositePart.css
-index fe0f2adfc11..a8d1ff5ce3c 100644
+index 42908982bb3..a1488a5dd63 100644
 --- a/src/vs/workbench/browser/parts/media/paneCompositePart.css
 +++ b/src/vs/workbench/browser/parts/media/paneCompositePart.css
 @@ -83,8 +83,10 @@
@@ -961,7 +972,7 @@ index fe0f2adfc11..a8d1ff5ce3c 100644
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item:not(.icon) .action-label,
-@@ -288,6 +290,7 @@
+@@ -300,6 +302,7 @@
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked,
  .monaco-workbench .pane-composite-part > .header-or-footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.icon.checked {
  	background-color: var(--vscode-activityBarTop-activeBackground);
@@ -969,7 +980,7 @@ index fe0f2adfc11..a8d1ff5ce3c 100644
  }
  
  .monaco-workbench .pane-composite-part > .title > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked .active-item-indicator:before,
-@@ -300,7 +303,7 @@
+@@ -312,7 +315,7 @@
  	bottom: 2px;
  	width: 100%;
  	height: 0;
@@ -979,11 +990,11 @@ index fe0f2adfc11..a8d1ff5ce3c 100644
  }
  
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index a35c19c2a06..ae5536dd7c0 100644
+index 7626411fdee..491c451f7fa 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
 @@ -18,7 +18,7 @@ import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.j
- import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow } from '../../../base/browser/dom.js';
+ import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow, scheduleAtNextAnimationFrame, computeScreenAwareSize } from '../../../base/browser/dom.js';
  import { Registry } from '../../../platform/registry/common/platform.js';
  import { INotificationService } from '../../../platform/notification/common/notification.js';
 -import { IStorageService } from '../../../platform/storage/common/storage.js';
@@ -991,9 +1002,9 @@ index a35c19c2a06..ae5536dd7c0 100644
  import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
  import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
  import { IThemeService } from '../../../platform/theme/common/themeService.js';
-@@ -156,6 +156,11 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
- 		@IExtensionService private readonly extensionService: IExtensionService,
+@@ -160,6 +160,11 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  		@IMenuService protected readonly menuService: IMenuService,
+ 		@IConfigurationService protected readonly configurationService: IConfigurationService,
  	) {
 +		// Ritemark: auxiliary bar always starts on AI panel
 +		if (partId === Parts.AUXILIARYBAR_PART) {
@@ -1003,7 +1014,7 @@ index a35c19c2a06..ae5536dd7c0 100644
  		super(
  			notificationService,
  			storageService,
-@@ -167,7 +172,7 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -171,7 +176,7 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  			themeService,
  			Registry.as<PaneCompositeRegistry>(registryId),
  			activePaneCompositeSettingsKey,
@@ -1013,7 +1024,7 @@ index a35c19c2a06..ae5536dd7c0 100644
  			compositeCSSClass,
  			titleForegroundColor,
 diff --git a/src/vs/workbench/browser/parts/panel/panelActions.ts b/src/vs/workbench/browser/parts/panel/panelActions.ts
-index 10fcbca0b96..18a93a0558f 100644
+index 01242285428..18a93a0558f 100644
 --- a/src/vs/workbench/browser/parts/panel/panelActions.ts
 +++ b/src/vs/workbench/browser/parts/panel/panelActions.ts
 @@ -9,7 +9,7 @@ import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
@@ -1043,7 +1054,7 @@ index 10fcbca0b96..18a93a0558f 100644
 -	{
 -		id: MenuId.LayoutControlMenu,
 -		item: {
--			group: '2_pane_toggles',
+-			group: 'navigation',
 -			command: {
 -				id: TogglePanelAction.ID,
 -				title: localize('togglePanel', "Toggle Panel"),
@@ -1096,10 +1107,10 @@ index decb51aba55..8329ebe6258 100644
  
  .monaco-workbench .part.sidebar > .header-or-footer.footer > .composite-bar-container > .composite-bar > .monaco-action-bar .action-item.checked:not(:focus) .active-item-indicator:before,
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-index be622a4452e..2b6de990373 100644
+index 68961abf8b2..eae5102caaf 100644
 --- a/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
 +++ b/src/vs/workbench/browser/parts/titlebar/media/titlebarpart.css
-@@ -411,6 +411,7 @@
+@@ -434,6 +434,7 @@
  }
  
  /* Action Tool Bar Controls */
@@ -1107,7 +1118,7 @@ index be622a4452e..2b6de990373 100644
  .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container {
  	display: none;
  	padding-right: 4px;
-@@ -427,33 +428,47 @@
+@@ -455,35 +456,49 @@
  	margin-left: auto;
  }
  
@@ -1119,7 +1130,9 @@ index be622a4452e..2b6de990373 100644
 +	margin-right: 8px;
 +}
 +
- .monaco-workbench.mac:not(.web) .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container {
+ .monaco-workbench.mac:not(.web) .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container,
+ .monaco-workbench.mac:not(.web) .part.titlebar > .titlebar-container > .titlebar-right > .update-toolbar-container {
+ 	position: relative;
  	right: 8px;
  }
  
@@ -1155,9 +1168,9 @@ index be622a4452e..2b6de990373 100644
  .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar .badge .badge-content {
  	padding: 3px 5px;
  	border-radius: 11px;
-@@ -499,3 +514,61 @@
- 	border-radius: 16px;
- 	text-align: center;
+@@ -543,3 +558,61 @@
+ 	width: 12px;
+ 	height: 12px;
  }
 +
 +/* Ritemark: titlebar layout control button styling — Indigo-Editorial tokens */
@@ -1218,29 +1231,30 @@ index be622a4452e..2b6de990373 100644
 +	display: none;
 +}
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index fb96d03d3a2..044fe0be908 100644
+index bfc8839cc65..745739c61f4 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-@@ -33,7 +33,7 @@ import { CommandCenterControl } from './commandCenterControl.js';
- import { Categories } from '../../../../platform/action/common/actionCommonCategories.js';
+@@ -34,7 +34,7 @@ import { Categories } from '../../../../platform/action/common/actionCommonCateg
  import { HiddenItemStrategy, MenuWorkbenchToolBar, WorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
+ import { IActionViewItemService } from '../../../../platform/actions/browser/actionViewItemService.js';
  import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../../common/activity.js';
 -import { AccountsActivityActionViewItem, isAccountsActionVisible, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
 +import { AccountsActivityActionViewItem, SimpleAccountActivityActionViewItem, SimpleGlobalActivityActionViewItem } from '../globalCompositeBar.js';
  import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
  import { IEditorGroupsContainer, IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
- import { ActionRunner, IAction } from '../../../../base/common/actions.js';
-@@ -47,7 +47,8 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
+ import { ActionRunner, IAction, Separator } from '../../../../base/common/actions.js';
+@@ -48,7 +48,9 @@ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
  import { EditorCommandsContextActionRunner } from '../editor/editorTabsControl.js';
  import { IEditorCommandsContext, IEditorPartOptionsChangeEvent, IToolbarActions } from '../../../common/editor.js';
  import { CodeWindow, mainWindow } from '../../../../base/browser/window.js';
--import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
+-import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION, TitleBarLeadingActionsGroup } from './titlebarActions.js';
 +// Ritemark: removed ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION - activity actions hidden from titlebar
 +// import { ACCOUNTS_ACTIVITY_TILE_ACTION, GLOBAL_ACTIVITY_TITLE_ACTION } from './titlebarActions.js';
++import { TitleBarLeadingActionsGroup } from './titlebarActions.js';
  import { IView } from '../../../../base/browser/ui/grid/grid.js';
  import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
  import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
-@@ -703,13 +704,14 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+@@ -766,13 +768,14 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
  			}
  
  			// --- Activity Actions (always at the end)
@@ -1263,19 +1277,19 @@ index fb96d03d3a2..044fe0be908 100644
  			this.actionToolBar.setActions(prepareActions(actions.primary), prepareActions(actions.secondary));
  		};
 diff --git a/src/vs/workbench/browser/workbench.contribution.ts b/src/vs/workbench/browser/workbench.contribution.ts
-index bdc603ff1a4..e0bbe7af85f 100644
+index 75c746cf9eb..b434f06ca79 100644
 --- a/src/vs/workbench/browser/workbench.contribution.ts
 +++ b/src/vs/workbench/browser/workbench.contribution.ts
-@@ -772,7 +772,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -816,7 +816,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  					localize('layoutcontrol.type.toggles', "Shows several buttons for toggling the visibility of the panels and side bar."),
  					localize('layoutcontrol.type.both', "Shows both the dropdown and toggle buttons."),
  				],
 -				'default': 'both',
 +				'default': 'toggles', // Ritemark: default to toggles
  				'description': localize('layoutControlType', "Controls whether the layout control in the custom title bar is displayed as a single menu button or with multiple UI toggles."),
+ 				agentsWindow: { default: 'both', readOnly: true },
  			},
- 			'workbench.tips.enabled': {
-@@ -830,7 +830,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
+@@ -916,7 +916,7 @@ const registry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Con
  			},
  			[LayoutSettings.COMMAND_CENTER]: {
  				type: 'boolean',
@@ -1283,9 +1297,9 @@ index bdc603ff1a4..e0bbe7af85f 100644
 +				default: false, // Ritemark: disable command center
  				markdownDescription: isWeb ?
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
- 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`')
+ 					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`'),
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index ecc6af48668..c83d0ad766a 100644
+index 565fb42cb18..6f8076410b8 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -1297,7 +1311,7 @@ index ecc6af48668..c83d0ad766a 100644
  import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
-@@ -185,7 +185,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+@@ -186,7 +186,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
  		if (viewDescriptor.id === VIEW_ID) {
  			return this.instantiationService.createInstance(ExplorerView, {
@@ -1308,7 +1322,7 @@ index ecc6af48668..c83d0ad766a 100644
  					willOpenElement: e => {
  						if (!isMouseEvent(e)) {
  							return; // only delay when user clicks
-@@ -256,28 +258,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -257,28 +259,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -1341,7 +1355,7 @@ index ecc6af48668..c83d0ad766a 100644
  const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
  const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
  const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
-@@ -325,7 +325,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -326,7 +326,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -1350,7 +1364,7 @@ index ecc6af48668..c83d0ad766a 100644
  	when: ContextKeyExpr.and(
  		// editors are opened
  		ContextKeyExpr.has('editorIsOpen'),
-@@ -342,7 +342,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -343,7 +343,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -1360,7 +1374,7 @@ index ecc6af48668..c83d0ad766a 100644
  		// no editor is open
  		ContextKeyExpr.has('editorIsOpen')?.negate(),
 diff --git a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
-index db5712fe9b0..a60d1e2daf2 100644
+index c6cae5ccaef..92ed135afb6 100644
 --- a/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 +++ b/src/vs/workbench/contrib/files/browser/media/explorerviewlet.css
 @@ -23,6 +23,7 @@
@@ -1371,7 +1385,7 @@ index db5712fe9b0..a60d1e2daf2 100644
  }
  
  .explorer-folders-view .explorer-item > a,
-@@ -106,3 +107,29 @@
+@@ -118,3 +119,29 @@
  .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
  	outline: none !important;
  }
@@ -1402,10 +1416,10 @@ index db5712fe9b0..a60d1e2daf2 100644
 +}
 +
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-index 5b115684ac0..8677e1f68e7 100644
+index cf95db6aa79..d242c6d41e3 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-@@ -430,7 +430,27 @@ export class ExplorerView extends ViewPane implements IExplorerView {
+@@ -494,7 +494,27 @@ export class ExplorerView extends ViewPane implements IExplorerView {
  					// No action needed, active file is already focused and selected
  					return;
  				}
@@ -1434,7 +1448,7 @@ index 5b115684ac0..8677e1f68e7 100644
  			}
  		}
  	}
-@@ -1066,12 +1086,7 @@ registerAction2(class extends Action2 {
+@@ -1156,12 +1176,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('refreshExplorer', "Refresh Explorer"),
  			f1: true,
  			icon: Codicon.refresh,
@@ -1448,7 +1462,7 @@ index 5b115684ac0..8677e1f68e7 100644
  			metadata: {
  				description: nls.localize2('refreshExplorerMetadata', "Forces a refresh of the Explorer.")
  			},
-@@ -1094,12 +1109,7 @@ registerAction2(class extends Action2 {
+@@ -1184,12 +1199,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('collapseExplorerFolders', "Collapse Folders in Explorer"),
  			f1: true,
  			icon: Codicon.collapseAll,
@@ -1463,7 +1477,7 @@ index 5b115684ac0..8677e1f68e7 100644
  				description: nls.localize2('collapseExplorerFoldersMetadata', "Folds all folders in the Explorer.")
  			}
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
-index be3baf06aeb..1cd14898cb7 100644
+index 4a994f9f6dd..c01859b6802 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 +++ b/src/vs/workbench/contrib/terminal/browser/terminal.contribution.ts
 @@ -4,7 +4,6 @@
@@ -1477,16 +1491,16 @@ index be3baf06aeb..1cd14898cb7 100644
 @@ -20,7 +19,7 @@ import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContaine
  import { WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
  import { EditorExtensions, IEditorFactoryRegistry } from '../../../common/editor.js';
- import { IViewContainersRegistry, IViewsRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, WindowVisibility } from '../../../common/views.js';
+ import { IViewContainersRegistry, IViewsRegistry, Extensions as ViewContainerExtensions, ViewContainerLocation, WindowEnablement } from '../../../common/views.js';
 -import { ITerminalProfileService, TERMINAL_VIEW_ID, TerminalCommandId } from '../common/terminal.js';
 +import { ITerminalProfileService, TERMINAL_VIEW_ID } from '../common/terminal.js';
  import { TerminalEditingService } from './terminalEditingService.js';
  import { registerColors } from '../common/terminalColorRegistry.js';
  import { registerTerminalConfiguration } from '../common/terminalConfiguration.js';
-@@ -123,15 +122,8 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
+@@ -121,15 +120,8 @@ Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews
  	canMoveView: true,
  	ctorDescriptor: new SyncDescriptor(TerminalViewPane),
- 	windowVisibility: WindowVisibility.Both,
+ 	windowEnablement: WindowEnablement.Both,
 -	openCommandActionDescriptor: {
 -		id: TerminalCommandId.Toggle,
 -		mnemonicTitle: nls.localize({ key: 'miToggleIntegratedTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal"),

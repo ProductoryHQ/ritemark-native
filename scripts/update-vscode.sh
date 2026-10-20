@@ -2,16 +2,21 @@
 #
 # update-vscode.sh - Update VS Code submodule and re-apply RiteMark patches
 #
-# Usage: ./scripts/update-vscode.sh [--check] [tag]
+# Usage: ./scripts/update-vscode.sh <tag>
+#        ./scripts/update-vscode.sh --check <tag>
 #
 # Options:
-#   --check   Only check if patches will apply, don't actually update
-#   tag       Specific VS Code tag to update to (e.g., 1.85.0)
-#             If not specified, updates to latest tag
+#   --check   Only measure whether the patches apply to <tag>. Runs
+#             check-vscode-drift.sh, which works in a temporary clone and
+#             touches nothing here: no stash and no checkout in vscode/.
+#   tag       The VS Code release to update to (e.g., 1.142.0). Required:
+#             the vscode/ submodule is shallow and its tags stop long before
+#             the newest release. Read the newest from GitHub:
+#               gh api 'repos/microsoft/vscode/releases?per_page=5' --jq '.[].tag_name'
 #
 # This script:
-#   1. Removes existing patches from vscode/
-#   2. Pulls the latest (or specified) VS Code release
+#   1. Fetches exactly <tag> into vscode/
+#   2. Resets vscode/ to a pristine tree at <tag>, keeping the extension link
 #   3. Re-applies all RiteMark patches
 #   4. Reports any conflicts that need manual resolution
 #
@@ -42,6 +47,19 @@ for arg in "$@"; do
     esac
 done
 
+if [ -z "$TARGET_TAG" ]; then
+    echo "Usage: $0 [--check] <tag>" >&2
+    echo "" >&2
+    echo "The tag is required. The newest VS Code releases:" >&2
+    echo "  gh api 'repos/microsoft/vscode/releases?per_page=5' --jq '.[].tag_name'" >&2
+    exit 2
+fi
+
+# Check mode - measure the drift in a temporary clone; nothing here is touched
+if [ "$CHECK_ONLY" = true ]; then
+    exec "$SCRIPT_DIR/check-vscode-drift.sh" "$TARGET_TAG"
+fi
+
 echo "========================================"
 echo "VS Code Submodule Updater"
 echo "========================================"
@@ -50,28 +68,22 @@ echo ""
 cd "$VSCODE_DIR"
 
 # Get current state
-CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
-CURRENT_COMMIT=$(git rev-parse --short HEAD)
+CURRENT_COMMIT=$(git rev-parse HEAD)
+CURRENT_NODE=$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || echo "unknown")
 
-echo "Current VS Code version: $CURRENT_TAG ($CURRENT_COMMIT)"
+echo "Current VS Code commit: $CURRENT_COMMIT (Node $CURRENT_NODE)"
 
-# Fetch latest from upstream
+# Fetch exactly the target tag from upstream
 echo ""
-echo -e "${CYAN}Fetching from upstream...${NC}"
-git fetch --tags origin
+echo -e "${CYAN}Fetching $TARGET_TAG from upstream...${NC}"
+git fetch --depth 1 origin tag "$TARGET_TAG"
 
-# Determine target
-if [ -z "$TARGET_TAG" ]; then
-    # Get latest release tag (exclude insider builds)
-    TARGET_TAG=$(git tag -l '[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
-fi
-
-TARGET_COMMIT=$(git rev-parse --short "$TARGET_TAG" 2>/dev/null || echo "unknown")
+TARGET_COMMIT=$(git rev-parse "$TARGET_TAG^{commit}")
 
 echo "Target VS Code version: $TARGET_TAG ($TARGET_COMMIT)"
 echo ""
 
-if [ "$CURRENT_TAG" = "$TARGET_TAG" ]; then
+if [ "$CURRENT_COMMIT" = "$TARGET_COMMIT" ]; then
     echo -e "${GREEN}Already at target version.${NC}"
     echo ""
     echo "Checking patch status..."
@@ -79,30 +91,9 @@ if [ "$CURRENT_TAG" = "$TARGET_TAG" ]; then
     exit 0
 fi
 
-# Check mode - test if patches will apply to new version
-if [ "$CHECK_ONLY" = true ]; then
-    echo -e "${CYAN}Check mode: Testing if patches apply to $TARGET_TAG${NC}"
-    echo ""
-
-    # Stash any current changes
-    git stash -q 2>/dev/null || true
-
-    # Checkout target
-    git checkout -q "$TARGET_TAG"
-
-    # Test patches
-    "$SCRIPT_DIR/apply-patches.sh" --dry-run
-    RESULT=$?
-
-    # Return to previous state
-    git checkout -q -
-    git stash pop -q 2>/dev/null || true
-
-    exit $RESULT
-fi
-
 # Confirm update
-echo -e "${YELLOW}This will update VS Code from $CURRENT_TAG to $TARGET_TAG${NC}"
+echo -e "${YELLOW}This will update VS Code from $CURRENT_COMMIT to $TARGET_TAG${NC}"
+echo "Local changes in vscode/ (the applied patches and anything else) are discarded."
 echo ""
 read -p "Continue? [y/N] " -n 1 -r
 echo ""
@@ -112,34 +103,42 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Step 1: Remove current patches
+# Step 1: Discard the applied patches and any other local changes. The clean
+# removes the files patches create; -e keeps the dev extension symlink
+# (vscode/extensions/ritemark -> ../../extensions/ritemark).
 echo ""
-echo -e "${CYAN}Step 1: Removing current patches...${NC}"
-"$SCRIPT_DIR/apply-patches.sh" --reverse 2>/dev/null || true
+echo -e "${CYAN}Step 1: Resetting vscode/ to a pristine tree...${NC}"
+git reset -q --hard HEAD
+git clean -fd -e extensions/ritemark
 
-# Step 2: Discard any other local changes
+# Step 2: Check out the target
 echo ""
-echo -e "${CYAN}Step 2: Cleaning local changes...${NC}"
-git checkout .
-git clean -fd
+echo -e "${CYAN}Step 2: Checking out $TARGET_TAG...${NC}"
+git checkout -q --detach "$TARGET_COMMIT"
+git clean -fd -e extensions/ritemark
+# Stage the new gitlink now. .gitmodules sets ignore = all, so git status and git diff do not show that the pin moved,
+# and git add vscode stages nothing: a branch can carry rebased patches over the old pin unnoticed (Sprint 135)
+git -C "$ROOT_DIR" update-index --cacheinfo "160000,$TARGET_COMMIT,vscode"
 
-# Step 3: Update to target
-echo ""
-echo -e "${CYAN}Step 3: Updating to $TARGET_TAG...${NC}"
-git checkout "$TARGET_TAG"
+TARGET_NODE=$(tr -d '[:space:]' < "$VSCODE_DIR/.nvmrc" 2>/dev/null || echo "unknown")
+ROOT_NODE=$(tr -d '[:space:]' < "$ROOT_DIR/.nvmrc" 2>/dev/null || echo "unknown")
+NODE_CHANGED=false
+if [ "$TARGET_NODE" != "$ROOT_NODE" ]; then
+    NODE_CHANGED=true
+fi
 
-# Step 4: Re-apply patches
+# Step 3: Re-apply patches
 echo ""
-echo -e "${CYAN}Step 4: Re-applying RiteMark patches...${NC}"
+echo -e "${CYAN}Step 3: Re-applying RiteMark patches...${NC}"
 if "$SCRIPT_DIR/apply-patches.sh"; then
-    # Step 5: Wipe stale built-in extension out/ dirs
+    # Step 4: Wipe stale built-in extension out/ dirs
     # Upstream commits sometimes flip an extension to ESM (e.g. 91b02efb235 in 1.117.0
     # for HTML/CSS/JSON language servers) by changing package.json + tsconfig but leave
     # the existing tsc-compiled out/ alone. Gulp's incremental compile then sees fresh
     # mtimes and skips rebuild — Node 22 loads CJS .js as ESM and the LSP server crashes.
     # GitHub issue #41. Cheap to always wipe; the next compile recreates them.
     echo ""
-    echo -e "${CYAN}Step 5: Wiping stale built-in extension compiled output...${NC}"
+    echo -e "${CYAN}Step 4: Wiping stale built-in extension compiled output...${NC}"
     WIPED=0
     # Match only first-party extension build output, e.g. extensions/<ext>/server/out
     # and extensions/<ext>/client/out. Exclude paths under node_modules.
@@ -150,12 +149,12 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
         -type d \( -path '*/server/out' -o -path '*/client/out' \) -print 2>/dev/null)
     echo "  Wiped $WIPED out/ dir(s) under vscode/extensions/. Will be rebuilt by 'npm run compile'."
 
-    # Step 6: Native module arch check (warn-only)
+    # Step 5: Native module arch check (warn-only)
     # GitHub issue #39 — npm install from a non-arm64 shell rebuilds native modules as
-    # x86_64, breaking dlopen at runtime. We only check here; rebuild is on the user
-    # because it's slow (10+ min) and only needed if check fails.
+    # x86_64, breaking dlopen at runtime. This checks the node_modules that are there
+    # now; after the npm ci below, run it again.
     echo ""
-    echo -e "${CYAN}Step 6: Checking VS Code native module architecture...${NC}"
+    echo -e "${CYAN}Step 5: Checking VS Code native module architecture...${NC}"
     if ! "$SCRIPT_DIR/check-native-modules.sh"; then
         echo ""
         echo -e "${YELLOW}Warning: native modules need rebuilding (see command above).${NC}"
@@ -166,18 +165,33 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "Update successful!"
     echo "========================================${NC}"
     echo ""
-    echo "VS Code updated: $CURRENT_TAG -> $TARGET_TAG"
+    echo "VS Code updated: $CURRENT_COMMIT -> $TARGET_TAG ($TARGET_COMMIT)"
     echo "All patches applied successfully."
     echo ""
     echo "Next steps:"
-    echo "  1. Rebuild: arch -arm64 /bin/zsh -c \\"
-    echo "       'source \"\$HOME/.nvm/nvm.sh\" && nvm use && cd vscode && npm run compile'"
-    echo "  2. Test the build (dev mode + production)"
-    echo "  3. Check Ritemark's frame in a dev instance (fresh profile, the sample project; docs/development/frame-baseline/README.md):"
+    if [ "$NODE_CHANGED" = true ]; then
+        echo -e "  ${YELLOW}0. Node changes with this release: $ROOT_NODE -> $TARGET_NODE (vscode/.nvmrc).${NC}"
+        echo "     In one commit, set it in the repository root .nvmrc and in the workflows that pin Node:"
+        echo "       build-windows.yml, build-macos-x64.yml, windows-canary.yml, windows-test-overlay.yml,"
+        echo "       build-whisper.yml, agent-runtime-matrix.yml (then grep for $ROOT_NODE outside docs/ and vscode/)."
+        echo "     Install it as arm64: arch -arm64 /bin/zsh -c 'source \"\$HOME/.nvm/nvm.sh\" && nvm install $TARGET_NODE'"
+        echo "     Re-check the Windows node-gyp workarounds in build-windows.yml and windows-canary.yml for the new npm."
+    fi
+    echo "  1. Install and rebuild under the arm64 wrapper, then check the native modules again:"
+    echo "       arch -arm64 /bin/zsh -c 'unset ELECTRON_RUN_AS_NODE; source \"\$HOME/.nvm/nvm.sh\" && nvm use && cd vscode && npm ci && npm run compile'"
+    echo "       ./scripts/check-native-modules.sh"
+    echo "  2. The default-drift scan: review every new or changed 'default': that touches what people see,"
+    echo "       git -C vscode diff $CURRENT_COMMIT $TARGET_COMMIT -- src/vs/workbench/browser/workbench.contribution.ts"
+    echo "     (and the other contribution files that register chrome settings), and pin what Ritemark's look"
+    echo "     depends on in branding/product.json configurationDefaults."
+    echo "  3. The product.json merge: branding/product.json replaces upstream's whole. Merge the fields upstream added:"
+    echo "       git -C vscode diff $CURRENT_COMMIT $TARGET_COMMIT -- product.json src/vs/base/common/product.ts"
+    echo "  4. Test the build (dev mode + production)"
+    echo "  5. Check Ritemark's frame in a dev instance (fresh profile, the sample project; docs/development/frame-baseline/README.md):"
     echo "       node scripts/qa/frame-geometry.mjs --port <cdp-port>"
     echo "       node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <folder> --compare docs/development/frame-baseline"
     echo "     A changed scene is fixed, or shown to Jarmo for a new baseline."
-    echo "  4. Re-check the upstream places the project at the centre leans on (Sprint 134), under vscode/src/vs/:"
+    echo "  6. Re-check the upstream places the project at the centre leans on (Sprint 134), under vscode/src/vs/:"
     echo "       - workbench/contrib/splash/browser/partsSplash.ts: _savePartsSplash still saves the splash; 018 saves ritemark.ground there."
     echo "       - workbench/services/host/electron-browser/nativeHostService.ts: doOpenWindow still opens a folder in this window; 018 notes the switch target there."
     echo "       - workbench/services/lifecycle/common/lifecycle.ts: ShutdownReason.LOAD still means another folder in this window,"
@@ -191,7 +205,8 @@ if "$SCRIPT_DIR/apply-patches.sh"; then
     echo "         shareWithAgentAnswered to match its Allow path (the network policy's notice, the stored choice, sharing)."
     echo "       - The internal command _workbench.getRecentlyOpened still exists (the project list's first fill, extensions/ritemark/src/projects/projectsHost.ts)."
     echo "     Then, in vscode/: ./scripts/test.sh --grep Ritemark (ritemarkSwitchGuard, ritemarkPalettePolicy, ritemarkTabCount)."
-    echo "  5. Update submodule reference: git add vscode && git commit"
+    echo "  7. Commit the new pin: the script staged the gitlink (git update-index). git status and git add vscode ignore the"
+    echo "     submodule (.gitmodules sets ignore = all); after committing, git ls-tree HEAD vscode must print $TARGET_COMMIT"
 else
     echo ""
     echo -e "${RED}========================================"
@@ -206,6 +221,8 @@ else
     echo "  3. Re-run: ./scripts/apply-patches.sh"
     echo ""
     echo "To rollback:"
-    echo "  git -C vscode checkout $CURRENT_TAG"
+    echo "  git -C vscode reset -q --hard HEAD && git -C vscode clean -fd -e extensions/ritemark"
+    echo "  git -C vscode checkout -q --detach $CURRENT_COMMIT && ./scripts/apply-patches.sh"
+    echo "  git update-index --cacheinfo 160000,$CURRENT_COMMIT,vscode   # the staged pin back to the old version"
     exit 1
 fi

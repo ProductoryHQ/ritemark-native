@@ -8,10 +8,12 @@
 #      renderer at module load time when defaultChatAgent is not configured.
 #      Ritemark does not ship Microsoft Copilot onboarding, so the assertion
 #      fires every prod boot. Fix: replace the assertion with a soft fallback
-#      (`?? {}`) so the module loads. The wizard itself remains unreachable
-#      because no UI links to it.
+#      (`?? {}`) so the module loads. The wizard itself stays closed: at 1.117
+#      no UI linked to it; from 1.142 upstream shows it on a first launch
+#      while workbench.welcomePage.experimentalOnboarding is on (startupPage.ts),
+#      which branding/product.json pins off, with onboarding.enabled (Sprint 135).
 #
-#   2. chat.contribution.ts (NEW in 1.117) registers
+#   2. chat.contribution.ts (NEW in 1.117; chat.shared.contribution.ts from 1.142) registers
 #      ChatSetupContribution + ChatTeardownContribution which add a
 #      "Chat Debug" item with a setup badge to the activity bar — even
 #      though Ritemark already gates the chat view via patch 003. Disable
@@ -35,14 +37,31 @@
 #      view bindings, and does nothing without a usable Copilot Chat: VS Code's
 #      own Chat never opens in its place (S21, Windows round 2, 2026-10-18).
 #
+#   4. Sprint 135 (VS Code 1.142.0): upstream moved the chat registrations into
+#      chat.shared.contribution.ts; the two changes go there unchanged, now two
+#      hunks. Upstream renamed ChatConfiguration.AIDisabled to
+#      ChatAIDisabledSettingId (same setting, chat.disableAIFeatures); this
+#      patch's one use follows it.
+#
+#   5. Sprint 135: 1.142 lets a custom editor reveal a selection it is opened
+#      with (CustomEditorInput.applyOptions), and webviewEditor.ts called it
+#      even when the editor was opened with no options, so `options.selection`
+#      threw and the document showed "The editor could not be opened". Open
+#      Editor at Index (which Ritemark runs for the welcome's landing, the
+#      permanent tabs, Home, Settings and the Task board) and Open Next Editor
+#      open with none. Upstream's later fix is taken as it is: options may be
+#      undefined, and navigation applies only when there are some.
+#
 # File(s): src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts,
-#          src/vs/workbench/contrib/chat/browser/chat.contribution.ts,
+#          src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts,
 #          src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts,
-#          src/vs/workbench/browser/parts/paneCompositeBar.ts
+#          src/vs/workbench/browser/parts/paneCompositeBar.ts,
+#          src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
 # Created: 2026-05-02
+# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
 #
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index bc6003e2f44..b00efadf3eb 100644
+index ee76b0ef3b4..29725b7f835 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 @@ -31,6 +31,13 @@ import { GestureEvent } from '../../../base/browser/touch.js';
@@ -59,7 +78,7 @@ index bc6003e2f44..b00efadf3eb 100644
  
  interface IPlaceholderViewContainer {
  	readonly id: string;
-@@ -221,6 +228,15 @@ export class PaneCompositeBar extends Disposable {
+@@ -225,6 +232,15 @@ export class PaneCompositeBar extends Disposable {
  		this._register(this.viewDescriptorService.onDidChangeViewContainers(({ added, removed }) => this.onDidChangeViewContainers(added, removed)));
  		this._register(this.viewDescriptorService.onDidChangeContainerLocation(({ viewContainer, from, to }) => this.onDidChangeViewContainerLocation(viewContainer, from, to)));
  
@@ -75,7 +94,7 @@ index bc6003e2f44..b00efadf3eb 100644
  		// View Container Visibility Changes
  		this._register(this.paneCompositePart.onDidPaneCompositeOpen(e => this.onDidChangeViewContainerVisibility(e.getId(), true)));
  		this._register(this.paneCompositePart.onDidPaneCompositeClose(e => this.onDidChangeViewContainerVisibility(e.getId(), false)));
-@@ -431,6 +447,11 @@ export class PaneCompositeBar extends Disposable {
+@@ -438,6 +454,11 @@ export class PaneCompositeBar extends Disposable {
  		const viewContainer = isString(viewContainerOrId) ? this.getViewContainer(viewContainerOrId) : viewContainerOrId;
  		const viewContainerId = isString(viewContainerOrId) ? viewContainerOrId : viewContainerOrId.id;
  
@@ -87,7 +106,7 @@ index bc6003e2f44..b00efadf3eb 100644
  		if (viewContainer) {
  			if (viewContainer.hideIfEmpty) {
  				if (this.viewService.isViewContainerActive(viewContainerId)) {
-@@ -776,6 +797,7 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -779,6 +800,7 @@ class ViewContainerActivityAction extends CompositeBarAction {
  		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
  		@IConfigurationService private readonly configurationService: IConfigurationService,
  		@IActivityService private readonly activityService: IActivityService,
@@ -95,7 +114,7 @@ index bc6003e2f44..b00efadf3eb 100644
  	) {
  		super(compositeBarActionItem);
  		this.updateActivity();
-@@ -808,6 +830,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -811,6 +833,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  
  		const focus = (event && 'preserveFocus' in event) ? !event.preserveFocus : true;
  
@@ -108,50 +127,55 @@ index bc6003e2f44..b00efadf3eb 100644
  		if (this.part === Parts.ACTIVITYBAR_PART) {
  			const sideBarVisible = this.layoutService.isVisible(Parts.SIDEBAR_PART);
  			const activeViewlet = this.paneCompositePart.getActivePaneComposite();
-diff --git a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
-index e76d44b8645..91b73daa38a 100644
---- a/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
-+++ b/src/vs/workbench/contrib/chat/browser/chat.contribution.ts
-@@ -141,7 +141,7 @@ import { ChatPasteProvidersFeature } from './widget/input/editor/chatPasteProvid
- import { QuickChatService } from './widgetHosts/chatQuick.js';
- import { ChatResponseAccessibleView } from './accessibility/chatResponseAccessibleView.js';
- import { ChatTerminalOutputAccessibleView } from './accessibility/chatTerminalOutputAccessibleView.js';
+diff --git a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+index 4c35090081b..e20b9f1dfcc 100644
+--- a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+@@ -228,7 +228,7 @@ import { ChatPromoNotificationContribution } from './chatPromoNotification.js';
+ import { ChatExpNotificationContribution } from './expNotification/chatExpNotificationContribution.js';
+ import { ChatQuotaNotificationContribution } from './chatQuotaNotification.js';
+ import { ChatRepoInfoContribution } from './chatRepoInfo.js';
 -import { ChatSetupContribution, ChatTeardownContribution } from './chatSetup/chatSetupContributions.js';
 +import { ChatSetupActionsContribution, ChatSetupContribution, ChatTeardownContribution } from './chatSetup/chatSetupContributions.js';
+ import { ChatMicrosoftSignInProbeContribution, ChatMicrosoftSignInProbeService, IChatMicrosoftSignInProbeService } from './chatSetup/chatSetupMicrosoftProbe.js';
+ import { ChatSessionOptionSlashCommandsContribution, ChatSlashCommandsContribution } from './chatSlashCommands.js';
  import { ChatStatusBarEntry } from './chatStatus/chatStatusEntry.js';
- import { ChatVariablesService } from './attachments/chatVariables.js';
- import { ChatWidget } from './widget/chatWidget.js';
-@@ -2107,8 +2107,15 @@ registerWorkbenchContribution2(ChatCopyActionRendering.ID, ChatCopyActionRenderi
+@@ -3338,13 +3338,20 @@ registerWorkbenchContribution2(ChatModelFeedbackSurveyPromptContribution.ID, Cha
  registerWorkbenchContribution2(ChatImplicitContextContribution.ID, ChatImplicitContextContribution, WorkbenchPhase.Eventually);
  registerWorkbenchContribution2(ChatViewsWelcomeHandler.ID, ChatViewsWelcomeHandler, WorkbenchPhase.BlockStartup);
  registerWorkbenchContribution2(ChatGettingStartedContribution.ID, ChatGettingStartedContribution, WorkbenchPhase.Eventually);
 -registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
--registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
 +// Ritemark: ChatSetupContribution adds a chat icon to the activity bar (with setup badge)
 +// even when chat views are disabled. ChatTeardownContribution is its sibling. Both removed
 +// to keep the activity bar clean. Keep only the setup/sign-in commands that Copilot
 +// calls from its contained chat view.
 +registerWorkbenchContribution2(ChatSetupActionsContribution.ID, ChatSetupActionsContribution, WorkbenchPhase.BlockRestore);
 +// registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
+ registerWorkbenchContribution2(ChatMicrosoftSignInProbeContribution.ID, ChatMicrosoftSignInProbeContribution, WorkbenchPhase.Eventually);
+ registerWorkbenchContribution2(ChatQuotaNotificationContribution.ID, ChatQuotaNotificationContribution, WorkbenchPhase.AfterRestored);
+ registerWorkbenchContribution2(ChatPromoNotificationContribution.ID, ChatPromoNotificationContribution, WorkbenchPhase.AfterRestored);
+ registerWorkbenchContribution2(ChatExpNotificationContribution.ID, ChatExpNotificationContribution, WorkbenchPhase.AfterRestored);
+ registerWorkbenchContribution2(HasByokModelsContribution.ID, HasByokModelsContribution, WorkbenchPhase.BlockRestore);
+-registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
 +// registerWorkbenchContribution2(ChatTeardownContribution.ID, ChatTeardownContribution, WorkbenchPhase.AfterRestored);
 +void ChatSetupContribution;
 +void ChatTeardownContribution;
  registerWorkbenchContribution2(ChatStatusBarEntry.ID, ChatStatusBarEntry, WorkbenchPhase.BlockRestore);
+ registerWorkbenchContribution2(CodexStatusBarEntry.ID, CodexStatusBarEntry, WorkbenchPhase.BlockRestore);
  registerWorkbenchContribution2(BuiltinToolsContribution.ID, BuiltinToolsContribution, WorkbenchPhase.Eventually);
- registerWorkbenchContribution2(UsagesToolContribution.ID, UsagesToolContribution, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-index 2ea65ba8917..b306396b330 100644
+index dafd354c00d..b3a6e0b477f 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/chatSetup/chatSetupContributions.ts
-@@ -7,6 +7,7 @@ import * as dom from '../../../../../base/browser/dom.js';
- import { BaseActionViewItem, IBaseActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
+@@ -8,6 +8,7 @@ import { BaseActionViewItem, IBaseActionViewItemOptions } from '../../../../../b
  import { IAction, WorkbenchActionExecutedClassification, WorkbenchActionExecutedEvent } from '../../../../../base/common/actions.js';
+ import { CancellationToken } from '../../../../../base/common/cancellation.js';
  import { Event } from '../../../../../base/common/event.js';
 +import { KeyCode, KeyMod } from '../../../../../base/common/keyCodes.js';
  import { Lazy } from '../../../../../base/common/lazy.js';
  import { Disposable, DisposableStore, markAsSingleton, MutableDisposable } from '../../../../../base/common/lifecycle.js';
  import Severity from '../../../../../base/common/severity.js';
-@@ -27,20 +28,25 @@ import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.j
+@@ -28,12 +29,14 @@ import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.j
  import { IEnvironmentService } from '../../../../../platform/environment/common/environment.js';
  import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
  import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
@@ -160,34 +184,32 @@ index 2ea65ba8917..b306396b330 100644
  import { IMarkerService } from '../../../../../platform/markers/common/markers.js';
  import { IOpenerService } from '../../../../../platform/opener/common/opener.js';
  import product from '../../../../../platform/product/common/product.js';
+ import { GitHubPaths, IDefaultAccountService } from '../../../../../platform/defaultAccount/common/defaultAccount.js';
  import { IProductService } from '../../../../../platform/product/common/productService.js';
 +import { IStorageService, StorageScope, StorageTarget } from '../../../../../platform/storage/common/storage.js';
  import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
- import { IWorkbenchContribution } from '../../../../common/contributions.js';
- import { IViewDescriptorService, ViewContainerLocation } from '../../../../common/views.js';
--import { ChatEntitlement, ChatEntitlementContext, ChatEntitlementRequests, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
-+import { ChatEntitlement, ChatEntitlementContext, ChatEntitlementContextKeys, ChatEntitlementRequests, ChatEntitlementService, IChatEntitlementService, isProUser } from '../../../../services/chat/common/chatEntitlementService.js';
- import { EnablementState, IWorkbenchExtensionEnablementService } from '../../../../services/extensionManagement/common/extensionManagement.js';
- import { ExtensionUrlHandlerOverrideRegistry, IExtensionUrlHandlerOverride } from '../../../../services/extensions/browser/extensionUrlHandler.js';
- import { IExtensionService } from '../../../../services/extensions/common/extensions.js';
+ import { ToggleTitleBarConfigAction } from '../../../../browser/parts/titlebar/titlebarActions.js';
+ import { ACCOUNTS_SHARED_SIGN_IN_GROUP } from '../../../../common/activity.js';
+@@ -47,6 +50,9 @@ import { CONTEXT_DEFAULT_ACCOUNT_STATE, DefaultAccountStatus } from '../../../..
  import { IHostService } from '../../../../services/host/browser/host.js';
  import { IWorkbenchLayoutService, Parts } from '../../../../services/layout/browser/layoutService.js';
+ import { InEditorZenModeContext } from '../../../../common/contextkeys.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { EditorsOrder } from '../../../../common/editor.js';
 +import { ChatEditorInput } from '../widgetHosts/editor/chatEditorInput.js';
  import { ILifecycleService } from '../../../../services/lifecycle/common/lifecycle.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
  import { IExtension, IExtensionsWorkbenchService } from '../../../extensions/common/extensions.js';
-@@ -49,7 +55,7 @@ import { IChatModeService } from '../../common/chatModes.js';
+@@ -55,7 +61,7 @@ import { ChatContextKeys } from '../../common/actions/chatContextKeys.js';
  import { IChatSessionsService } from '../../common/chatSessionsService.js';
- import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
+ import { ChatAIDisabledSettingId, ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
  import { CHAT_CATEGORY, CHAT_SETUP_ACTION_ID, CHAT_SETUP_SUPPORT_ANONYMOUS_ACTION_ID } from '../actions/chatActions.js';
--import { ChatViewContainerId, IChatWidgetService } from '../chat.js';
-+import { ChatViewContainerId, ChatViewId, IChatWidgetService } from '../chat.js';
+-import { ChatViewContainerId, IChatWidget, IChatWidgetService } from '../chat.js';
++import { ChatViewContainerId, ChatViewId, IChatWidget, IChatWidgetService } from '../chat.js';
+ import { ChatInputNotificationSeverity, IChatInputNotificationService } from '../widget/input/chatInputNotificationService.js';
  import { chatViewsWelcomeRegistry } from '../viewsWelcome/chatViewsWelcome.js';
- import { ChatSetupAnonymous, ChatSetupStrategy } from './chatSetup.js';
- import { ChatSetupController } from './chatSetupController.js';
-@@ -66,6 +72,329 @@ const defaultChat = {
+ import { buildUpgradeUrlWithRedirect, ChatSetupAnonymous, ChatSetupSource, ChatSetupStrategy, IChatSetupCommandOptions, IChatSetupResult, refreshTokens } from './chatSetup.js';
+@@ -69,6 +75,329 @@ const defaultChat = {
  };
  
  const SIGN_IN_TITLE_BAR_ACTION_ID = 'workbench.action.chat.signInIndicator';
@@ -389,7 +411,7 @@ index 2ea65ba8917..b306396b330 100644
 +				const configurationService = accessor.get(IConfigurationService);
 +
 +				await context.update({ hidden: false });
-+				configurationService.updateValue(ChatConfiguration.AIDisabled, false);
++				configurationService.updateValue(ChatAIDisabledSettingId, false);
 +
 +				if (mode) {
 +					const chatWidget = await widgetService.revealWidget();
@@ -515,10 +537,42 @@ index 2ea65ba8917..b306396b330 100644
 +	}
 +}
  
- export class ChatSetupContribution extends Disposable implements IWorkbenchContribution {
+ export const ChatSetupFromAccountsWhen = ContextKeyExpr.and(
+ 	ChatContextKeys.Setup.hidden.negate(),
+diff --git a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
+index ece5b5c75f2..1c767f00455 100644
+--- a/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
++++ b/src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts
+@@ -137,7 +137,7 @@ export class WebviewEditor extends EditorPane {
+ 		super.clearInput();
+ 	}
  
+-	public override async setInput(input: EditorInput, options: IEditorOptions, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
++	public override async setInput(input: EditorInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
+ 		if (this.input && input.matches(this.input)) {
+ 			await this.applyNavigationOptions(options, token);
+ 			return;
+@@ -165,13 +165,15 @@ export class WebviewEditor extends EditorPane {
+ 		await this.applyNavigationOptions(options, token);
+ 	}
+ 
+-	public override setOptions(options: IEditorOptions): void {
++	public override setOptions(options: IEditorOptions | undefined): void {
+ 		super.setOptions(options);
+ 		void this.applyNavigationOptions(options, CancellationToken.None);
+ 	}
+ 
+-	private async applyNavigationOptions(options: IEditorOptions, token: CancellationToken): Promise<void> {
+-		if (this.input instanceof WebviewInput) {
++	// Ritemark (Sprint 135): upstream's later fix, taken early. An editor opened with no options (Open Editor at Index,
++	// Open Next Editor, the welcome's landing) made a custom editor read `options.selection` of undefined and fail to open
++	private async applyNavigationOptions(options: IEditorOptions | undefined, token: CancellationToken): Promise<void> {
++		if (options && this.input instanceof WebviewInput) {
+ 			await this.input.applyOptions(options, token);
+ 		}
+ 	}
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
-index e1486cb5c58..6cf78728d39 100644
+index ff993368801..f274838de2b 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 +++ b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 @@ -10,7 +10,6 @@ import { isCancellationError } from '../../../../base/common/errors.js';
@@ -529,9 +583,9 @@ index e1486cb5c58..6cf78728d39 100644
  import { FileAccess } from '../../../../base/common/network.js';
  import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
  import { KeyCode } from '../../../../base/common/keyCodes.js';
-@@ -70,8 +69,10 @@ type OnboardingActionEvent = {
- 	argument: string | undefined;
- };
+@@ -78,8 +77,10 @@ type OnboardingActionEvent = {
+ 
+ type EnterpriseSignInUiState = 'options' | 'instance' | 'progress';
  
 -assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');
 -const defaultChat = product.defaultChatAgent;

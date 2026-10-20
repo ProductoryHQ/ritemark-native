@@ -258,10 +258,12 @@ Because the host is one flat bundle, new code must not reintroduce the layout as
 | Context | Required | Why |
 |---|---|---|
 | Production builds | arm64 Node pinned by `vscode/.nvmrc` | Clean build and CI must use the submodule-owned toolchain version, not a machine default |
-| Dev mode (`./vscode/scripts/code.sh`) | Node v22.22.1 arm64 (`nvm use` at repo root) | Matches the repo-root development pin. Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need. Node 20 fails with `ERR_UNKNOWN_FILE_EXTENSION` |
-| Webview Vite build | Node v20 (uses compiled rollup) | OK |
+| Dev mode (`./vscode/scripts/code.sh`) | Node v24.18.0 arm64 (`nvm use` at repo root) | Matches the repo-root development pin (VS Code 1.142, Sprint 135). Node 22+ has native `.ts` loading which VS Code's build scripts (`build/lib/preLaunch.ts`) need |
+| Extension compile, webview Vite build, extension tests | The same Node 24.18.0 arm64 | Checked in Sprint 135: `npm ci`, `npm run compile` and the webview's `npm run build` pass, and the bundles come out byte for byte the same as on Node 22 |
 
-Repo root `.nvmrc` pins 22.22.1, matching `vscode/.nvmrc`. `nvm use` from repo root picks it up automatically. Keep the two in step: VS Code 1.117's `preinstall` gate reads the submodule's pin and hard-fails anything older, so a lower root pin makes `npm install` in `vscode/` abort before it starts. x64/Rosetta Node fails all builds (missing arm64 native binaries).
+Repo root `.nvmrc` pins 24.18.0, matching `vscode/.nvmrc`. `nvm use` from repo root picks it up automatically. Keep the two in step, and with the six workflows that pin Node (`build-windows.yml`, `build-macos-x64.yml`, `windows-canary.yml`, `windows-test-overlay.yml`, `build-whisper.yml`, `agent-runtime-matrix.yml`): VS Code's `preinstall` gate demands the same major as `vscode/.nvmrc` and at least its minor, so a wrong pin makes `npm ci` in `vscode/` abort before it starts. x64/Rosetta Node fails all builds (missing arm64 native binaries). Install it from an arm64 shell: `arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm install 24.18.0'`, then `node -p process.arch` says `arm64`.
+
+Keep the npm that comes with Node 24.18.0 (11.16.0). npm 11 warns "Unknown project config "target"" for `vscode/.npmrc`'s Electron keys, and npm 12 will ignore them (the native modules would then build against Node's headers), while VS Code's gate would still let npm 12 through. Don't upgrade npm globally.
 
 Simple dev launch:
 
@@ -500,6 +502,38 @@ See: `.claude/skills/vscode-development/PATCH-RULES.md` for the full patching co
 ### VS Code 1.117 upgrade pitfalls
 
 Three runtime crashes appeared only in prod bundle (dev mode unaffected): `onboardingVariationA` assertDefined, `ChatSetupContribution` activity-bar leak, `builtInExtensionsEnabledWithAutoUpdates` required field — plus newly-bundled `copilot`/`mermaid-chat-features` built-in extensions. Patched in v1.6.1 commit `275da52` + patch 007.
+
+### VS Code 1.142 upgrade pitfalls (Sprint 135)
+
+The full record is `docs/development/releases/v2.0.0/sprint-135-vscode-update/` (`notes/rebase.md`, the four `research/` audits). What the next update should know:
+
+- **Modern UI defaults to on.** `workbench.experimental.modernUI` (floating cards, 4 px gaps, rounded parts, new tab and pane heights) changes every frame number. It is pinned off in `branding/product.json`; every branch it adds sits behind `isFloatingPanelsEnabled()`. If upstream ever removes the classic branch (in `part.ts`, `paneCompositePart.ts`, `editorPart.ts`, `statusbarPart.ts`, `editorTabsControl.ts`), the frame's mechanism needs a new home (Sprint 135's D3).
+- **New required product field:** `sharedDataFolderName`. Without it the main process throws in the storage service before any window opens. `IProductConfiguration` in `src/vs/base/common/product.ts` lists the required fields; diff it at every update.
+- **Copilot Chat's API proposals:** `extensionEnabledApiProposals["github.copilot-chat"]` in `branding/product.json` replaces the extension's own list. Match it to the in-tree `extensions/copilot/package.json` `enabledApiProposals` (65 at 1.142).
+- **Files that moved:** the main menu's registrations (`titlebar/menubar.contribution.ts`), the chat registrations (`chat/browser/chat.shared.contribution.ts`). The three-way merge (`git cherry-pick` of each patch's commit made on the pin) carries most of the rest; `git apply --3way` misses renames and moves.
+- **The Agents window** (`src/vs/sessions`) ships in the app. Patch 003 closes it: its precondition is false, `windowsMainService.openAgentsWindow` opens a normal window in Ritemark, and All commands leaves its commands out.
+- **Defaults flipped:** `workbench.welcomePage.experimentalOnboarding` (the Copilot sign-in wizard on a fresh profile) is pinned off too, and so is `workbench.commandPalette.showAskInChat`: at 1.142 All commands ends with "Ask in Chat: …" (VS Code's own Chat view, not Copilot Chat's tab) whenever a chat agent is registered, which the dev build's built-in Copilot does without sign-in.
+- **The core bundles with esbuild** (`build/next/`); `build/lib/optimize.ts` is gone. The packaging takes the whole bundle output, so resource include lists are no longer needed for fonts that a CSS file references.
+- **Electron downloads under the product name in `product.json` at that moment.** Run `npm run electron` after `apply-patches.sh` has put Ritemark's `product.json` in place, or the dev app is `Code - OSS.app`.
+- **A webview's own workers can no longer load resources.** 1.142's webview service worker dropped the route for requests made by a page's workers (1.117 answered them through a message port from the outer frame), so a worker that fetches or imports a `vscode-resource` URL waits until it times out. pdf.js was hit: its worker is now started from the script's text, which `pdfEditorProvider.ts` sends with the PDF (`webview/src/components/viewers/pdfWorker.ts`). A new webview worker must be started the same way, from source in a blob, never by URL.
+- **A new unsigned dev Electron asks the keychain.** Launch dev instances for automation with `--use-mock-keychain`, so no keychain prompt reaches the screen.
+
+### Rolling back a VS Code update
+
+The update lands as one squash commit (the gitlink, the patches, `branding/product.json`, the Node pins, the harness). To go back to the version before it:
+
+```bash
+git revert <update squash commit>        # in a PR, after Jarmo's yes
+nvm use                                  # back to the root .nvmrc of the reverted tree
+git -C vscode reset --hard HEAD && git -C vscode clean -fd -e extensions/ritemark   # the update's patches off first
+git submodule update vscode              # the old gitlink (refuses while patches are applied)
+git -C vscode clean -fd -e extensions/ritemark
+arch -arm64 /bin/zsh -c 'source ~/.nvm/nvm.sh && nvm use && cd vscode && npm ci'
+./scripts/apply-patches.sh
+./scripts/check-native-modules.sh
+```
+
+Then wipe the built-in extensions' compiled language servers (`update-vscode.sh` step 4) and compile. Each developer worktree with its own `vscode/` needs the same, or a new copy-on-write clone. In a worktree whose `vscode/` is a shallow clone, the old version may first need `git -C vscode fetch --depth 1 origin tag <old tag>`; `./scripts/update-vscode.sh <old tag>` does the fetch, the reset and the apply in one go.
 
 ### Native module arch check after submodule bump
 

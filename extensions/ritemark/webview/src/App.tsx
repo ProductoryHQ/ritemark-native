@@ -73,6 +73,7 @@ function App() {
   const [encoding, setEncoding] = useState<string | undefined>()
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
   const [workerSrc, setWorkerSrc] = useState<string | undefined>()
+  const [workerSource, setWorkerSource] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
   const [_hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
@@ -273,6 +274,7 @@ function App() {
           setEncoding(message.encoding as string | undefined)
           setSizeBytes(message.sizeBytes as number | undefined)
           if (message.workerSrc) setWorkerSrc(message.workerSrc as string)
+          if (message.workerSource) setWorkerSource(message.workerSource as string)
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
@@ -743,6 +745,7 @@ function App() {
         content={content}
         filename={filename}
         workerSrc={workerSrc}
+        workerSource={workerSource}
         canSaveAsMarkdown={features.saveAsMarkdownFromPreview}
       />
     )
