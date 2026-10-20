@@ -139,6 +139,9 @@ jobs:
       - name: Build VS Code (darwin-x64)
         working-directory: r/vscode
         run: |
+          # product.json's commit: Ritemark's source commit, as build-prod.sh sets it (Sprint 135 E5). Without one a
+          # 1.142 app looks for its node modules outside node_modules.asar and the terminal breaks.
+          export RITEMARK_SOURCE_COMMIT="$(git -C .. rev-parse HEAD)"
           echo "Starting macOS x64 build at $(date)"
           npm run gulp vscode-darwin-x64
           echo "Build completed at $(date)"

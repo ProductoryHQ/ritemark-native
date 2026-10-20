@@ -388,6 +388,9 @@ jobs:
           fi
           export PATH="$SIGNTOOL_DIR:$PATH"
           echo "signtool for packaging: $SIGNTOOL_DIR/signtool.exe"
+          # product.json's commit: Ritemark's source commit, as build-prod.sh sets it (Sprint 135 E5). Without one a
+          # 1.142 app looks for its node modules outside node_modules.asar and the terminal breaks.
+          export RITEMARK_SOURCE_COMMIT="$(git -C .. rev-parse HEAD)"
           echo "Starting Windows build at $(date)"
           npx gulp vscode-win32-x64-min
           echo "Build completed at $(date)"

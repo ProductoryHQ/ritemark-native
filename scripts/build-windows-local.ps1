@@ -255,6 +255,9 @@ if ($SkipBuild) {
     Write-Host "  Skipping (--SkipBuild)" -ForegroundColor Yellow
 } else {
     Push-Location $VSCodeDir
+    # product.json's commit: Ritemark's source commit, as build-prod.sh sets it (Sprint 135 E5). Without one a
+    # 1.142 app looks for its node modules outside node_modules.asar and the terminal breaks.
+    $env:RITEMARK_SOURCE_COMMIT = (& git -C $RootDir rev-parse HEAD).Trim()
     & npx gulp vscode-win32-x64-min
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: VS Code build failed" -ForegroundColor Red
