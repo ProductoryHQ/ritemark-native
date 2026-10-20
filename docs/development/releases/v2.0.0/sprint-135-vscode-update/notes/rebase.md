@@ -46,7 +46,7 @@ Conflicts in 8 files; the other 15 merged cleanly with identical `+`/`-` lines (
 - Behavioural differences against main's patch: none beyond the above.
 
 ### 004 build system: 4 → 5 files, 7 → 8 hunks
-- `electron-main/app.ts` (1 of 7): **re-based**. The permission handler stays `async` and asks for the microphone on the Mac (dictation); upstream renamed the handler's first parameter `_webContents` → `webContents` (it now checks auxiliary windows) and added `'media'` to the core window's list. 004 still adds `'media'` to the webview list.
+- `electron-main/app.ts` (1 of 8): **re-based**. The permission handler stays `async` and asks for the microphone on the Mac (dictation); upstream renamed the handler's first parameter `_webContents` → `webContents` (it now checks auxiliary windows) and added `'media'` to the core window's list. 004 still adds `'media'` to the webview list.
 - `build/gulpfile.vscode.ts` (8 of 8): **new, after the merge (E5)**. The clean-room build stopped in gulp's packaging: a build that packages the built-in Copilot from source (upstream's CI downloads it as a VSIX) filters its `node_modules` through `build/.moduleignore`, whose new `@github/copilot/**` strips its SDK too, and the next task, `prepareBuiltInCopilotRipgrepShim`, throws "Copilot SDK directory not found". Upstream main has both lines unchanged. Dev builds never run this task. The task now skips, with a log line, when the packaged Copilot has no SDK: the shim writes only inside that extension, and Ritemark deletes the built-in Copilot after the gulp build (`build-prod.sh` step 4.5 and both CI workflows).
 - Behavioural differences against main's patch: none beyond the packaging skip.
 

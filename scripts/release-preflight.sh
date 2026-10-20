@@ -39,10 +39,14 @@ WEBVIEW_DIR="$EXTENSION_DIR/webview"
 PATCHES_DIR="$PROJECT_ROOT/patches/vscode"
 # The VS Code release Ritemark builds on: the version in package.json at the committed submodule pin (Sprint 135; this was
 # a fixed "1.117.0" that a VS Code update had to remember, and E5 after the 1.142 update found it stale)
-VSCODE_PIN=$(git -C "$PROJECT_ROOT" ls-tree HEAD vscode 2>/dev/null | awk '{print $3}')
-VSCODE_TAG=$(git -C "$PROJECT_ROOT/vscode" show "$VSCODE_PIN:package.json" 2>/dev/null | sed -n 's/^  "version": "\([^"]*\)".*/\1/p' | head -1)
+VSCODE_PIN=$(git -C "$PROJECT_ROOT" ls-tree HEAD vscode 2>/dev/null | awk '{print $3}' || true)
+VSCODE_TAG=$(git -C "$PROJECT_ROOT/vscode" show "$VSCODE_PIN:package.json" 2>/dev/null | sed -n 's/^  "version": "\([^"]*\)".*/\1/p' | head -1 || true)
 if [ -z "$VSCODE_TAG" ] && [ -f "$PROJECT_ROOT/vscode/package.json" ]; then
     VSCODE_TAG=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' "$PROJECT_ROOT/vscode/package.json" | head -1)
+fi
+if [ -z "$VSCODE_TAG" ]; then
+    echo "ERROR: cannot read the VS Code version: no committed vscode pin, and no vscode/package.json (is the submodule initialised?)" >&2
+    exit 1
 fi
 NVMRC_PATH="$PROJECT_ROOT/vscode/.nvmrc"
 REQUIRED_NODE_VERSION=""
