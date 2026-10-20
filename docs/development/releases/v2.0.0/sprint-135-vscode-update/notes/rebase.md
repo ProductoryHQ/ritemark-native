@@ -45,9 +45,10 @@ Conflicts in 8 files; the other 15 merged cleanly with identical `+`/`-` lines (
 - **New in this sprint, for 1.142's new surfaces** (`research/surfaces-audit.md` §1.1, §5.2; the R8 commit): `chat/common/constants.ts` makes `OPEN_AGENTS_WINDOW_PRECONDITION` false, so no command, button or shortcut opens the Agents window; `platform/windows/electron-main/windowsMainService.ts` opens a normal window when `--agents`, an agent link or a tryout hand-off asks for the Agents window; All commands leaves out the Agents window's two commands and 23 new Developer commands (7 shown without Copilot Chat, 16 with it), and the palette test covers three of them. Two of the 16 were found on the running build: the workbench registers "Export Agent Host Debug Logs..." as `workbench.action.chat.exportAgentHostDebugLogs` and "Open Agent Host State File" as `workbench.action.chat.openCopilotCliStateFile`; the audit's `agentHost.exportDebugLogs` and `agentHost.openSessionEventsFile` are the Agents window's copies (`src/vs/sessions`), kept in the list as well. Two files join 003 (25).
 - Behavioural differences against main's patch: none beyond the above.
 
-### 004 build system: 4 → 4 files, 7 → 7 hunks
+### 004 build system: 4 → 5 files, 7 → 8 hunks
 - `electron-main/app.ts` (1 of 7): **re-based**. The permission handler stays `async` and asks for the microphone on the Mac (dictation); upstream renamed the handler's first parameter `_webContents` → `webContents` (it now checks auxiliary windows) and added `'media'` to the core window's list. 004 still adds `'media'` to the webview list.
-- Behavioural differences against main's patch: none.
+- `build/gulpfile.vscode.ts` (8 of 8): **new, after the merge (E5)**. The clean-room build stopped in gulp's packaging: a build that packages the built-in Copilot from source (upstream's CI downloads it as a VSIX) filters its `node_modules` through `build/.moduleignore`, whose new `@github/copilot/**` strips its SDK too, and the next task, `prepareBuiltInCopilotRipgrepShim`, throws "Copilot SDK directory not found". Upstream main has both lines unchanged. Dev builds never run this task. The task now skips, with a log line, when the packaged Copilot has no SDK: the shim writes only inside that extension, and Ritemark deletes the built-in Copilot after the gulp build (`build-prod.sh` step 4.5 and both CI workflows).
+- Behavioural differences against main's patch: none beyond the packaging skip.
 
 ### 005 Windows and OSS: 3 → 3 files, 5 → 5 hunks
 - `build/lib/electron.ts`: **carried** by the three-way merge (Productory as company and copyright).
@@ -123,7 +124,7 @@ At 1.142.0, by `grep '^diff --git'`. Every difference from the lists above is ex
 | `001-ritemark-branding.patch` | 12 | 10 | 21 | 17 | out: `build/gulpfile.vscode.ts`; out: `build/lib/optimize.ts` |
 | `002-ritemark-ui-layout.patch` | 25 | 25 | 83 | 83 | — |
 | `003-ritemark-menu-cleanup.patch` | 23 | 25 | 44 | 44 | out: `src/vs/workbench/browser/parts/titlebar/menubarControl.ts`; in: `src/vs/platform/windows/electron-main/windowsMainService.ts`; in: `src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts`; in: `src/vs/workbench/contrib/chat/common/constants.ts` |
-| `004-ritemark-build-system.patch` | 4 | 4 | 7 | 7 | — |
+| `004-ritemark-build-system.patch` | 4 | 5 | 7 | 8 | in: `build/gulpfile.vscode.ts` (E5) |
 | `005-ritemark-windows-and-oss-fixes.patch` | 3 | 3 | 5 | 5 | — |
 | `006-ritemark-dev-launch-fallback.patch` | 4 | 4 | 4 | 4 | — |
 | `007-ritemark-vscode-1117-compat.patch` | 4 | 5 | 13 | 16 | out: `src/vs/workbench/contrib/chat/browser/chat.contribution.ts`; in: `src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts`; in: `src/vs/workbench/contrib/webviewPanel/browser/webviewEditor.ts` |
