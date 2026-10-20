@@ -169,5 +169,11 @@ if ($ReportPath) {
   $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportFullPath -Encoding utf8NoBOM
 }
 
+if ($Mode -eq 'PrepareSigning') {
+  # The plan in the log: which files get signed, and whether a vendor's own signature or only a catalog vouched for them
+  foreach ($entry in @($files | Where-Object action -eq 'Sign')) {
+    Write-Host "  sign $($entry.path) (status $($entry.signatureStatus), type $(if ($entry.signatureType) { $entry.signatureType } else { 'none' }))"
+  }
+}
 Write-Host "Windows PE check: $($peFiles.Count) file(s), $($signingTargets.Count) to sign, $($failures.Count) failure(s)."
 if ($failures.Count -gt 0) { throw ($failures -join [Environment]::NewLine) }
