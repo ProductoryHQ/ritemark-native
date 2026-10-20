@@ -242,6 +242,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   const clearPinnedAgentContent = useAISidebarStore((s) => s.clearPinnedAgentContent);
   const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
+  const activeFileLabel = useAISidebarStore((s) => s.activeFileLabel);
   const currentBrowserContext = useAISidebarStore((s) => s.currentBrowserContext);
   // Selection state — needed to stack the queue notch under SelectedContextTab
   // without a visible seam (Sprint 74 R2 notch-stack rule).
@@ -1196,9 +1197,10 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           <div className="flex gap-1.5 px-2.5 pt-2 flex-wrap">
             {showActiveFileChip && (
               <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
-                <Icon name="file-text" size={12} className="shrink-0" />
-                <span className="min-w-0 truncate max-w-[140px]" title={activeFilePath!}>
-                  Active: {getDisplayPath(activeFilePath!)}
+                {/* #477: a task card shows its task mark and title, as its tab does (the Experience lead). */}
+                <Icon name={activeFileLabel ? 'check-square' : 'file-text'} size={12} className="shrink-0" />
+                <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
+                  {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
                 </span>
                 <Tooltip label="Remove from this message">
                   <Button

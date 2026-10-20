@@ -7,34 +7,34 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [x] Steps 1–3 and Sprint 135 merged; `origin/main` is `16b5bf0d` or later, and the commit is noted: `16b5bf0d` (2026-10-20)
 - [x] `git checkout -b sprint-136-release` from `origin/main`; `git branch --show-current` shows it (2026-10-20, after Jarmo's approval)
 - [ ] Windows round 4's results (run 39467716747's installer) recorded from the Development manager; each defect becomes a fix in Phase 2
-- [ ] The milestone v2.0.0 holds #475, #477, #482, #485–#488, and gains #459, #471 and #480 (the Development manager); every other open issue that 2.0 touches is listed as deferred (spec, Non-Requirements)
+- [x] The milestone v2.0.0 holds #475, #477, #482, #485–#488, and gains #459, #471 and #480 (the Development manager, 20 October); every other open issue that 2.0 touches is listed as deferred (spec, Non-Requirements)
 - [x] The parity list brought up to date: G1 and G2 done (Sprint 133's QA evidence), G6 → #459, G7 and G8 with Jarmo's answer (D5), G9 → R6 (W9); no row reads Gap
 - [x] The list of PRs merged from `v1.14.0` to main, sorted into product, harness and docs (W6): [notes/prs-since-v1.14.0.md](notes/prs-since-v1.14.0.md), 33 merges
 - [x] `node ./scripts/worktree-hygiene.mjs --check` reported, with the free disk: 30 GB free; Sprint 135's worktree REVIEW (9.5 GB, kept for now as this sprint's VS Code 1.142 source); Sprint 134's BLOCKED by a `dist/` (8 GB); the three Store worktrees held
 
 ## Phase 1: Audits and asks
 
-- [ ] `research/update-path-audit.md`: every one-time change 2.0 makes to a v1.14.0 profile, the recent folders' copy into the shared list (#475), how each is marked done, what each step's QA already proved; the user-directory extension copies; v1.14.0 on a 2.0 profile (W1, R1, E4)
-- [ ] `research/installed-app-cdp.md`: the frame scripts against a signed, installed app (v1.14.0 first), with `--shared-data-dir`, the test marker and `--arch x86_64`; on Windows, whether the session can run them; More's production scenes (W2, W3, R2, R3)
-- [ ] `research/runtime-review.md`: each runtime against the latest since v1.14.0; `check:anthropic-models`; Node 24 and Electron 43; Codex and the keychain; the recommendation for D1 (W4, R4)
-- [ ] The Experience lead's answers, through the Development manager: dictation's menu (#486) and a card's tab (#477)
+- [x] `research/update-path-audit.md`: every one-time change 2.0 makes to a v1.14.0 profile, the recent folders' copy into the shared list (#475), how each is marked done, what each step's QA already proved; the user-directory extension copies; v1.14.0 on a 2.0 profile (W1, R1, E4)
+- [x] `research/installed-app-cdp.md`: the frame scripts against a signed, installed app (v1.14.0 first), with `--shared-data-dir`, the test marker and `--arch x86_64`; on Windows, whether the session can run them; More's production scenes (W2, W3, R2, R3)
+- [x] `research/runtime-review.md`: each runtime against the latest since v1.14.0; `check:anthropic-models`; Node 24 and Electron 43; Codex and the keychain; the recommendation for D1 (W4, R4)
+- [x] The Experience lead's answers, through the Development manager: dictation's menu (#486: a pick only sets the language; "ET ⌄"; "Dictate, in Estonian") and a card's tab (#477: the check-square and the title, on the tab and the chip)
 - [x] Jarmo's answers to D1–D5 recorded in the sprint plan (all as recommended, 2026-10-20)
 
 ## Phase 2: The fixes and the harness, the first sprint PR (W11, W12, W3, W4)
 
-- [ ] #477: a card's tab shows its title and follows an edit; the chip's label (R11; S35)
-- [ ] #485: the chip follows the document in front; closed and deleted files leave it (R11; S36)
-- [ ] #482: Settings' ChatGPT line and `ai-agents.md` lines 142 and 151 (R11; S37)
-- [ ] #486: dictation's first language from the display language; the menu as the Experience lead decided; the pick kept across documents and a restart (R11; S38)
-- [ ] #487: no Documents refresh from a turn at any of the three call sites; Documents still lists the AI's files (R11; S39)
-- [ ] #488: a turn's active duration saved and restored; older turns show "Done" (R11; S40)
-- [ ] #459: a flow's Claude Code step names the right Settings heading (R11, G6; S41)
-- [ ] #480: `RITEMARK_BUILD_CHANNEL=test` in `consent.ts`, with its test (R10; S34)
+- [x] #477: a card's tab shows its title and follows an edit; the chip's label (R11; S35)
+- [x] #485: the chip follows the document in front; closed and deleted files leave it (R11; S36)
+- [x] #482: Settings' ChatGPT line and `ai-agents.md` lines 142 and 151 (R11; S37)
+- [x] #486: dictation's first language from the operating system's language (`VSCODE_NLS_CONFIG.osLocale`; Ritemark has no language packs, so the display language is always English); the menu as the Experience lead decided; the pick's persistence is checked in the dev walk (R11; S38)
+- [x] #487: no Documents refresh from a turn at any of the three call sites; Documents still lists the AI's files (R11; S39)
+- [x] #488: a turn's active duration saved and restored; older turns show "Done" (R11; S40)
+- [x] #459: a flow's Claude Code step names the right Settings heading (R11, G6; S41)
+- [x] #480: `RITEMARK_BUILD_CHANNEL=test` in `consent.ts`, with its test (R10; S34)
 - [ ] Any fix from Windows round 4
-- [ ] #475: `--shared-data-dir` and the test marker in `rundev.md`, the `ritemark-automation` skill, `plan-truth-matrix.sh` and the frame baseline's README (E4)
-- [ ] #471: `build-prod.sh` without the link during gulp, the whole-tree digest guard, the `vscode-development` skill's note (E5)
-- [ ] The release skill's Step 2 and the `release-manager` agent's "Test Checklist Generation": "The base window against the baseline" and the launch rule (R3)
-- [ ] `frame-screenshots.mjs`: usage text for installed apps; an option only if the audit needs one; `frame-baseline/README.md`: "Comparing a release candidate" (R3)
+- [x] #475: `--shared-data-dir` and the test marker in `rundev.md`, the `ritemark-automation` skill, `plan-truth-matrix.sh` and the frame baseline's README (E4)
+- [x] #471: `build-prod.sh` without the link during gulp, the whole-tree digest guard, the `vscode-development` skill's note (E5); proved by the dress rehearsal (S44)
+- [x] The release skill's Step 2 and the `release-manager` agent's "Test Checklist Generation": "The base window against the baseline" and the launch rule (R3)
+- [x] `frame-screenshots.mjs`: usage text for installed apps; `--release` for More's release images (D2); `frame-baseline/README.md`: "Comparing a release candidate" (R3)
 - [ ] The runtime review table in the release plan; if Jarmo approves (D1), the update per the release skill, with every check in W4 and the compatibility matrix entry (R4)
 - [ ] The extension's `npm run compile`, the webview's build, the full `npm test`; `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] The fixes walked in a dev build with the launch rule (S35–S41, S34)
@@ -76,7 +76,8 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [ ] `docs/releases/v2.0.0/TEST-CHECKLIST.md` with the Gate 2 list, R3's section, the parity rows, R10's check and E4's line (S14)
 - [ ] The frame scripts on the installed arm64 candidate; More's release images shown to Jarmo (S9, D2)
 - [ ] S1, S4–S7, S33, S34 on the candidate with "Harbour" and fresh profiles
-- [ ] With Jarmo's yes: a copy of his profile folder, and `~/.ritemark-shared` moved aside (S43, D3)
+- [ ] Before Gate 1 on Jarmo's Mac (S43, D3): read his profile's own recent list (`state.vscdb`, `history.recentlyOpenedPathsList`) to see that his 1.x list is still there, and list the entries that point into `/private/tmp` or a Claude scratchpad (the Social manager found two); show them to him and remove them only on his OK
+- [ ] With Jarmo's yes: a copy of his profile folder, and `~/.ritemark-shared` moved aside, not deleted (S43, D3)
 - [ ] Gate 1: Jarmo's pass, including S12 where possible, S13, S18 (arm64), the Mac parity rows, S32, S35–S41 and S43
 - [ ] At least 60 minutes from the DMG's build, nothing new found; `notarize-dmg.sh` exits 0 (S27)
 

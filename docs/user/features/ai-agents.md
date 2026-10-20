@@ -139,7 +139,7 @@ OpenAI's autonomous coding agent, powered by ChatGPT. Codex uses ChatGPT OAuth a
 - Autonomous file reading and editing
 - Shell command execution (with approval)
 - Code generation and refactoring
-- Works with ChatGPT subscription (Plus, Pro, Team, or Business)
+- Works with any ChatGPT account, Free included; paid plans get higher usage limits
 
 **Status:** Experimental. It is on by default; there is nothing to enable.
 
@@ -148,7 +148,7 @@ OpenAI's autonomous coding agent, powered by ChatGPT. Codex uses ChatGPT OAuth a
 | Requirement | Required on | Notes |
 |-------------|-------------|-------|
 | Codex | All platforms | Included with Ritemark; nothing to install |
-| ChatGPT account | All platforms | Plus, Pro, Team, or Business subscription |
+| ChatGPT account | All platforms | Any plan, Free included. Paid plans get higher usage limits |
 
 ### How Ritemark Detects Codex
 

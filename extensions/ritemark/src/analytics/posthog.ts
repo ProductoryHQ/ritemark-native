@@ -79,7 +79,7 @@ function analyticsAllowed(): boolean {
 export function initAnalytics(context: vscode.ExtensionContext): void {
   extensionContext = context;
   const extensionVersion = context.extension.packageJSON.version as string;
-  const channel = buildChannel(extensionVersion, context.extensionMode === vscode.ExtensionMode.Development);
+  const channel = buildChannel(extensionVersion, context.extensionMode === vscode.ExtensionMode.Development, process.env);
 
   gate = new ConsentGate({
     readSetting,

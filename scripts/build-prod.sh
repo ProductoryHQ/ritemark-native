@@ -186,12 +186,33 @@ echo -e "${BLUE}Step 3/9: Backing Up & Building VS Code${NC}"
 echo "----------------------------------------"
 echo ""
 
-# GUARDRAIL: Backup ritemark extension before build
-# VS Code gulp build can corrupt files via symlink
-BACKUP_DIR="$PROJECT_DIR/.ritemark-backup-$$"
-echo "Creating backup of ritemark extension..."
-cp -R "$PROJECT_DIR/extensions/ritemark" "$BACKUP_DIR"
-echo "Backup created at: $BACKUP_DIR"
+# GUARDRAIL (#471): VS Code's gulp packaging writes through the
+# vscode/extensions/ritemark link into the extension's own source, truncating
+# files while it reads them. Build the shell with the extension out of VS Code's
+# tree, as Windows CI does (stage-extension-for-shell-build.sh), and prove
+# afterwards that the source is byte for byte what it was. Step 4 copies the
+# extension into the app either way.
+EXTENSION_LINK="$PROJECT_DIR/vscode/extensions/ritemark"
+if [[ ! -L "$EXTENSION_LINK" ]]; then
+  echo -e "${RED}ERROR: vscode/extensions/ritemark is not the extension link the patched source gate checked${NC}"
+  exit 1
+fi
+EXTENSION_LINK_TARGET="$(readlink "$EXTENSION_LINK")"
+restore_extension_link() {
+  if [[ ! -e "$EXTENSION_LINK" && ! -L "$EXTENSION_LINK" ]]; then
+    ln -s "$EXTENSION_LINK_TARGET" "$EXTENSION_LINK"
+  fi
+}
+trap restore_extension_link EXIT
+extension_sizes() {
+  (cd "$PROJECT_DIR/extensions/ritemark" && find . -type f -print0 | xargs -0 stat -f '%z %N' | LC_ALL=C sort -k2)
+}
+echo "Recording the extension's source digest..."
+EXTENSION_DIGEST_BEFORE="$(node "$PROJECT_DIR/scripts/tree-sha256.mjs" "$PROJECT_DIR/extensions/ritemark")"
+EXTENSION_SIZES_BEFORE="$(mktemp)"
+extension_sizes > "$EXTENSION_SIZES_BEFORE"
+rm "$EXTENSION_LINK"
+echo "The extension is out of VS Code's tree while gulp runs"
 echo ""
 
 echo "This will take approximately 25 minutes..."
@@ -211,25 +232,24 @@ export RITEMARK_SOURCE_COMMIT
 npm run gulp vscode-$TARGET
 
 cd "$PROJECT_DIR"
+restore_extension_link
 
-# GUARDRAIL: Check if extension was corrupted during build
+# GUARDRAIL (#471): the whole extension tree must be unchanged by the build.
+# There is no restore: with the extension out of VS Code's tree nothing should
+# touch it, so any difference is a new defect to find, not to paper over.
 echo ""
-echo "Checking for build-time corruption..."
-WEBVIEW_AFTER=$(stat -f%z "$PROJECT_DIR/extensions/ritemark/media/webview.js" 2>/dev/null || echo 0)
-EXTENSION_AFTER=$(stat -f%z "$PROJECT_DIR/extensions/ritemark/out/extension.js" 2>/dev/null || echo 0)
-
-if [[ $WEBVIEW_AFTER -lt 500000 ]] || [[ $EXTENSION_AFTER -lt 1000 ]]; then
-  echo -e "${YELLOW}WARNING: Extension files corrupted during build!${NC}"
-  echo "Restoring from backup..."
-  rm -rf "$PROJECT_DIR/extensions/ritemark"
-  cp -R "$BACKUP_DIR" "$PROJECT_DIR/extensions/ritemark"
-  echo -e "${GREEN}Extension restored from backup${NC}"
-else
-  echo "Extension files intact after build"
+echo "Checking the extension's source after the VS Code build..."
+EXTENSION_DIGEST_AFTER="$(node "$PROJECT_DIR/scripts/tree-sha256.mjs" "$PROJECT_DIR/extensions/ritemark")"
+if [[ "$EXTENSION_DIGEST_AFTER" != "$EXTENSION_DIGEST_BEFORE" ]]; then
+  echo -e "${RED}ERROR: the VS Code build changed the extension's source (#471)${NC}"
+  echo "Files whose size changed, appeared or went (before < > after):"
+  diff "$EXTENSION_SIZES_BEFORE" <(extension_sizes) | head -50 || true
+  echo "Tracked files that differ from git:"
+  git -C "$PROJECT_DIR" status --short -- extensions/ritemark | head -50
+  exit 1
 fi
-
-# Clean up backup
-rm -rf "$BACKUP_DIR"
+rm -f "$EXTENSION_SIZES_BEFORE"
+echo "Extension source unchanged by the build (tree ${EXTENSION_DIGEST_AFTER:0:12})"
 
 echo ""
 echo "Build completed at: $(date '+%H:%M:%S')"

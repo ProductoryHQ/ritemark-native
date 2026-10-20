@@ -67,9 +67,21 @@ export function readOneXAnswer(
  * `X.Y.Z-0`, an update is `X.Y.Z-ext.N`. A run from source has the plain
  * `package.json` version, and an extension launched for development is dev
  * whatever its version.
+ *
+ * `test` (#480) for our own test launches of an installed build: release
+ * gates, QA profiles, captures and Windows rounds start it with
+ * `RITEMARK_BUILD_CHANNEL=test`, so they never count as people. Like `dev`, it
+ * sends only to a key given for that run (`RITEMARK_POSTHOG_PROJECT_KEY`).
  */
-export function buildChannel(version: string, developmentMode: boolean): 'dev' | 'prod' {
+export type BuildChannel = 'dev' | 'prod' | 'test';
+
+export function buildChannel(
+  version: string,
+  developmentMode: boolean,
+  env: Record<string, string | undefined> = {},
+): BuildChannel {
   if (developmentMode) return 'dev';
+  if (env.RITEMARK_BUILD_CHANNEL?.trim().toLowerCase() === 'test') return 'test';
   return /^\d+\.\d+\.\d+-.+$/.test(version) ? 'prod' : 'dev';
 }
 

@@ -43,7 +43,11 @@ export function projectionToConversation(
         ...(terminalEvent ? { result: {
           text: assistantContent,
           filesModified: [],
-          metrics: { durationMs: 0, costUsd: null, model: null },
+          // #488: the saved working time, or no metrics at all (the status line
+          // then says "Done"). A 0 here read as "Done in 0.0s".
+          ...(terminalEvent.kind === 'assistant-message' && terminalEvent.activeDurationMs !== undefined
+            ? { metrics: { durationMs: terminalEvent.activeDurationMs, costUsd: null, model: null } }
+            : {}),
           ...(terminalEvent.kind === 'boundary'
             ? terminalEvent.boundaryKind === 'failed'
               ? { error: terminalEvent.message }

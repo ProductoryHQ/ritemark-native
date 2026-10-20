@@ -3,9 +3,11 @@
  * frame-screenshots.mjs - capture Ritemark 2.0's frame in fixed scenes, light and dark (Sprint 132, E3).
  *
  * Usage: node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <dir> [--size 1440x900] [--compare <baseline-dir>]
+ *          [--release <release-images-dir>]
  *
- * Connects over the Chrome DevTools Protocol to a Ritemark dev instance started with --remote-debugging-port
- * (see .claude/skills/ritemark-automation; launch it with `open -n -g` and an isolated --user-data-dir, never on
+ * Connects over the Chrome DevTools Protocol to a Ritemark dev instance or an installed build (a release candidate)
+ * started with --remote-debugging-port (see .claude/skills/ritemark-automation; launch it with `open -n -g`, an
+ * isolated --user-data-dir and --shared-data-dir, and for an installed build RITEMARK_BUILD_CHANNEL=test, never on
  * Jarmo's own profile), with the sample project open: a folder of Markdown documents. For the baseline, use a
  * fresh profile and zoom level 0. The page is laid out at --size (1440 x 900 unless given) for the whole run, whatever
  * the window's own size, so captures from different screens compare.
@@ -18,6 +20,10 @@
  * image library needed): the share of pixels that differ is printed per scene, and <out>/compare.html shows the
  * baseline, the capture and their difference side by side. The exit code is the number of scenes that differ by
  * more than 0.5% or are missing from the baseline.
+ *
+ * With --release (Sprint 136, R3), a scene that has an image in <release-images-dir> is compared with that image
+ * instead: a production build differs from the dev baseline by design in a few scenes (More has no Copilot Chat).
+ * docs/development/frame-baseline/README.md says which images a release uses and who approves them.
  *
  * The set approved at merge 2 is the baseline for the later steps of 2.0 and for update-vscode.sh's checklist.
  *
@@ -39,9 +45,10 @@ const option = (name, fallback) => {
 const port = option('port');
 const out = option('out');
 const baseline = option('compare');
+const releaseImages = option('release');
 const [width, height] = option('size', '1440x900').split('x').map(Number);
 if (!port || !out) {
-	console.error('usage: node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <dir> [--size 1440x900] [--compare <baseline-dir>]');
+	console.error('usage: node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <dir> [--size 1440x900] [--compare <baseline-dir>] [--release <release-images-dir>]');
 	process.exit(2);
 }
 
@@ -420,7 +427,8 @@ if (baseline) {
 	for (const themeName of ['light', 'dark']) {
 		for (const [scene] of SCENES) {
 			const name = `${themeName}-${scene}`;
-			const before = join(baseline, `${name}.png`);
+			const releaseImage = releaseImages ? join(releaseImages, `${name}.png`) : null;
+			const before = releaseImage && existsSync(releaseImage) ? releaseImage : join(baseline, `${name}.png`);
 			const now = readFileSync(join(out, `${name}.png`)).toString('base64');
 			if (!existsSync(before)) {
 				console.log(`MISSING  ${name}: not in the baseline`);
@@ -456,7 +464,7 @@ if (baseline) {
 			const percent = Math.round(result.share * 10000) / 100;
 			const differs = percent > 0.5;
 			differing += differs ? 1 : 0;
-			console.log(`${differs ? 'DIFFERS' : 'SAME   '}  ${name}: ${percent}% of pixels changed`);
+			console.log(`${differs ? 'DIFFERS' : 'SAME   '}  ${name}: ${percent}% of pixels changed${before === releaseImage ? ' (release image)' : ''}`);
 			rows.push({ name, percent, then, now, diff: result.diff });
 		}
 	}

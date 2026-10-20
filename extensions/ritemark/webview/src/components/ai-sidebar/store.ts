@@ -278,6 +278,8 @@ interface AISidebarState {
   // ── Editor context (APP-GLOBAL — one active editor regardless of thread count) ──
   selection: EditorSelection;
   activeFilePath: string | null;
+  /** A task card's title, shown in the chip instead of its file path (#477). */
+  activeFileLabel: string | null;
   currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; screenshotPreview?: { dataUrl: string } | null; error?: string } | null;
   /** Sprint 134 (R20): the share question about the page in front, waiting above the message box. */
   browserShareQuestion: { pageId: string; title: string } | null;
@@ -988,6 +990,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     selection: { text: '', isEmpty: true, from: 0, to: 0 },
     activeFilePath: null,
+    activeFileLabel: null,
     currentBrowserContext: null,
     browserShareQuestion: null,
     answerBrowserShareQuestion: (answer, withoutAsking) => {
@@ -2835,12 +2838,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'selection-update':
           set({
             selection: message.selection,
-            ...(message.activeFilePath !== undefined ? { activeFilePath: message.activeFilePath ?? null } : {}),
+            ...(message.activeFilePath !== undefined
+              ? { activeFilePath: message.activeFilePath ?? null, activeFileLabel: message.activeFileLabel ?? null }
+              : {}),
           });
           break;
 
         case 'active-file-changed':
-          set({ activeFilePath: message.path });
+          set({ activeFilePath: message.path, activeFileLabel: message.label ?? null });
           break;
 
         case 'active-browser-changed':

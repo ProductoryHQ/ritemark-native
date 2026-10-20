@@ -81,4 +81,34 @@ assert.equal(
   'reload restores the friendly error and API-key recovery category from the canonical boundary',
 );
 
+// Sprint 136 (#488): a restored Claude turn keeps its working time, and an
+// older record without one gets no metrics, so the status line says "Done".
+const timedProjection = structuredClone(projection);
+timedProjection.runtimeSummary = ['claude-code'];
+timedProjection.events = [
+  {
+    kind: 'user-message', eventId: 'user-t1', turnId: 'turn-t1', sequence: 0,
+    occurredAt: '2026-08-23T10:00:00.000Z', runtimeId: 'claude-code',
+    text: 'Sum up the brief', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'assistant-message', eventId: 'assistant-t1', turnId: 'turn-t1', sequence: 1,
+    occurredAt: '2026-08-23T10:00:30.000Z', runtimeId: 'claude-code',
+    content: 'The brief asks for four modules.', terminalStatus: 'completed', activeDurationMs: 8000,
+  },
+  {
+    kind: 'user-message', eventId: 'user-t2', turnId: 'turn-t2', sequence: 2,
+    occurredAt: '2026-08-23T10:01:00.000Z', runtimeId: 'claude-code',
+    text: 'And the budget?', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'assistant-message', eventId: 'assistant-t2', turnId: 'turn-t2', sequence: 3,
+    occurredAt: '2026-08-23T10:01:20.000Z', runtimeId: 'claude-code',
+    content: 'It is in Budget.csv.', terminalStatus: 'completed',
+  },
+];
+const timed = projectionToConversation(timedProjection);
+assert.equal(timed.agentConversation[0].result?.metrics?.durationMs, 8000, 'the saved working time comes back');
+assert.equal(timed.agentConversation[1].result?.metrics, undefined, 'no saved time: no metrics, never a zero');
+
 console.log('conversationProjection.test.ts: all tests passed');

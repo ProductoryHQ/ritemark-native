@@ -277,7 +277,8 @@ export interface AgentConversationTurn {
   result?: {
     text: string;
     filesModified: string[];
-    metrics: AgentMetrics;
+    /** Absent on a restored turn whose working time was never saved (#488). */
+    metrics?: AgentMetrics;
     error?: string;
     failureKind?: RuntimeFailureKind;
   };
@@ -460,8 +461,9 @@ export type ExtensionMessage =
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags; generation?: number; revision?: number; error?: string }
-  | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string }
-  | { type: 'active-file-changed'; path: string | null }
+  | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string; activeFileLabel?: string | null }
+  /** `label`: a task card's title, shown in the chip instead of its file (#477). */
+  | { type: 'active-file-changed'; path: string | null; label?: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
   // Sprint 134 (R20): the browser's share question on this sheet
   | { type: 'browser:share-question'; pageId: string; title: string }

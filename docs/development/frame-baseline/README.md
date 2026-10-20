@@ -55,4 +55,23 @@ The provider rows and cards show what the capturing computer is signed in to (he
 
 To take a new baseline, run the same command without `--compare`, with `--out docs/development/frame-baseline`.
 
+## Comparing a release candidate
+
+Every shell release's test checklist carries this check, from Sprint 136 (its R3; the `release` skill, Step 2):
+
+1. Install the candidate as a person would, then launch it in the background with its own short profile, extensions and shared data folders, the test marker and a debugging port (the `ritemark-automation` skill, "Launching an installed build"). `--shared-data-dir` keeps the run's folders out of the installed app's recent list (#475), and `RITEMARK_BUILD_CHANNEL=test` keeps it from counting as a person in usage data (#480). Open the sample project on a fresh profile, as for the baseline.
+2. Compare, with the release images:
+
+   ```bash
+   node scripts/qa/frame-screenshots.mjs --port <cdp-port> --out <folder> \
+     --compare docs/development/frame-baseline --release docs/development/frame-baseline/release
+   node scripts/qa/frame-geometry.mjs --port <cdp-port>
+   ```
+
+3. A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes.
+
+**The release images.** A production build differs from this dev baseline by design in More, which has no Copilot Chat (Sprint 135's E5: 1.05% and 1.02%). `release/` holds a production build's image for each such scene, and `--release` compares that scene with it; every other scene compares with the baseline above. The first images come from Sprint 136's first candidate, and they change only with Jarmo's approval, as the baseline does. Until `release/` exists, More's two scenes are read by eye against the dev images.
+
+**Windows.** The window buttons and the menu button make Windows' top different from the Mac's, so Windows has its own images (`release-win32/`) where the Windows session can run the scripts; otherwise its screenshots are compared by eye with the last Windows round's.
+
 The welcome's scenes: `node scripts/qa/welcome-screenshots.mjs --port <cdp-port> --out <folder> --scene step-1 --then-skip` on a fresh profile with no folder, `--scene update-on` or `update-off` on a copy of a v1.14.0 profile, and `--scene start --page Welcome` on a finished profile's new window.

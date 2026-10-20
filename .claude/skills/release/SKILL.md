@@ -185,6 +185,15 @@ first run against the production client.
 
 Generate test checklist in `docs/releases/vX.Y.Z/TEST-CHECKLIST.md`.
 
+Every checklist carries the section **"The base window against the baseline"** (Sprint 136, R3). The frame rests on VS Code's internal class names, which a VS Code update or a build difference can change without warning, so no shell release skips it:
+
+- Launch the installed candidate in the background with its own short `--user-data-dir`, `--extensions-dir` and `--shared-data-dir`, `RITEMARK_BUILD_CHANNEL=test` in the environment and a debugging port (the `ritemark-automation` skill, "Launching an installed build"), on a fresh profile with the baseline's sample project.
+- Run `node scripts/qa/frame-screenshots.mjs --port <port> --out <dir> --compare docs/development/frame-baseline --release docs/development/frame-baseline/release` and `node scripts/qa/frame-geometry.mjs --port <port>`, on the Mac and, where the Windows session can run them, on Windows.
+- A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes. The release images (`frame-baseline/release/`) change only with his approval.
+- Every other scripted test launch of a candidate uses the same launch rule, so test folders stay out of the installed app's recent list (#475) and test runs never count as people (#480).
+
+How to read the results: `docs/development/frame-baseline/README.md`, "Comparing a release candidate".
+
 ### Step 3 — Sign + DMG arm64 (NO notarization yet)
 
 ```bash

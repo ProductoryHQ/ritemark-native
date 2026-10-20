@@ -22,6 +22,8 @@ export type DocumentRenderPayload =
       agentSkills?: unknown[];
       /** A task card shown as a page (Sprint 130): the view shows the card strip, not properties. */
       cardMode?: { cardId: string };
+      /** The operating system's language, such as "et-ee": dictation's first default (#486). */
+      systemLanguage?: string;
     }
   | {
       fileType: 'csv';

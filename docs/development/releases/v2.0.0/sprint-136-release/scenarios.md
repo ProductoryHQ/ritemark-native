@@ -15,7 +15,7 @@ Given v1.14.0 installed in Applications with "Harbour", and Ritemark quit with â
 When the 2.0 candidate's DMG replaces the app and Ritemark starts with an empty shared data folder
 Then the update welcome shows once, already signed in, with the usage-data switch on and "On, as you chose in Ritemark 1."
 And its recent projects are Harbour's three, and after "Open when you left" the last of them opens
-And the places row is on top in Ritemark's order, the AI column holds only the AI, the terminal is a tab, Search is in More, and the theme is still Ritemark Dark
+And the places row is on top in Ritemark's order, the AI column holds only the AI (no terminal there; a terminal the profile kept is a tab, and when v1.14 kept none the evidence says so), Search is in More, and the theme is still Ritemark Dark
 And the projects list holds all three projects, each opening on its Home, and What moved shows once.
 
 ### S2: Windows, from a lived-in profile
@@ -49,7 +49,7 @@ Then 2.0's bundled extension runs (its version in the About dialog and the exten
 Given "Harbour" after S1
 When v1.14.0's DMG replaces 2.0 and Ritemark starts
 Then v1.14.0 starts and nothing in the profile is deleted
-And whatever looks different (the places row, the AI column, the recent folders) is written into the release notes' known issues.
+And whatever looks different (the places row, the AI column, an empty Open Recent, because 1.142 moved the list) is written into the release notes' known issues.
 
 ### S8: The update offer, after publication
 Given v1.14.0 on the Mac and on Windows, after 2.0 is published
@@ -192,11 +192,11 @@ Given a local stand-in for PostHog that records each request (`RITEMARK_POSTHOG_
 When a fresh profile says yes on the welcome, a second fresh profile says no, and "Harbour" (closed with OK) and a v1.14.0 profile that opted out are updated
 Then the yes profile and "Harbour" send the four events with `build_channel: prod`
 And the no profile and the opted-out profile send nothing at all
-And one live run to PostHog, marked `test`, arrives in PostHog's live events.
+And one live run with the project key given and `RITEMARK_BUILD_CHANNEL=test` arrives in PostHog's live events, marked `test`.
 
 ### S34: Our own runs are marked (#480)
 Given the installed candidate launched with `RITEMARK_BUILD_CHANNEL=test` and a fresh profile that says yes
-Then every event it sends carries `build_channel: test`
+Then nothing reaches Ritemark's PostHog project, and with the stand-in's key given every event carries `build_channel: test`
 When the same build starts without the variable
 Then its events carry `build_channel: prod`
 And a fresh profile seeded with `"ritemark.features.analytics": false` sends nothing, from any part of Ritemark.
@@ -206,7 +206,8 @@ And a fresh profile seeded with `"ritemark.features.analytics": false` sends not
 ### S35: A task card's tab (#477)
 Given a project whose board has "Draft Module 4 from the brief", stored as `.ritemark/tasks/m4d7r2-draft-module-4.md`
 When the card is opened from Tasks
-Then its tab reads "Draft Module 4 from the brief", and the AI's chip reads "Active: Draft Module 4 from the brief"
+Then its tab reads "Draft Module 4 from the brief" with the check-square, and the AI's chip shows the check-square and "Draft Module 4 from the brief"
+And the Task board's own tab keeps its kanban mark
 When the card's title is changed on the board
 Then the open tab follows
 And a plain Markdown file, `Brief.md`, keeps "Brief.md" on its tab and in the chip.
@@ -226,12 +227,13 @@ Then none says a paid plan is needed or names a price, and Settings says any Cha
 
 ### S38: Dictation's first language (#486)
 Given a fresh profile with Ritemark's display language English
-Then the editor's dictation button shows EN, and the recent list holds English
+Then the editor's dictation control reads "EN âŒ„" beside the microphone, the microphone's tooltip says "Dictate, in English", and the recent list holds English
 Given a fresh profile with a display language Whisper has (for example Estonian or German)
 Then the button shows that language, and the recent list holds it and English
 When the person picks Finnish, closes the document, opens another one and restarts Ritemark
 Then Finnish is still set
-And picking a language in the menu does what the Experience lead decided, and the menu shows which language is set.
+And picking a language in the menu only sets it, never turns the microphone on, and the menu ticks the set language
+And the next press of the microphone dictates in that language.
 
 ### S39: The left column stays where it is (#487, negative)
 Given the left column closed, and a chat with Claude about Participants.csv

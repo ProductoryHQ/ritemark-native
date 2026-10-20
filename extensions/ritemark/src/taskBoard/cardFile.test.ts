@@ -3,6 +3,7 @@ import {
   CARD_LIMITS,
   cardFileName,
   cardSlug,
+  cardTitleOf,
   checkDoneWhen,
   checkFiles,
   checkTitle,
@@ -325,6 +326,11 @@ function main(): void {
     const clipped = clip('one two three four five six seven', 20);
     assert.ok(clipped.length <= 20 && clipped.endsWith('…'));
   }
+
+  // Sprint 136 (#477): a card names itself by its title, never by its file.
+  assert.equal(cardTitleOf(EXAMPLE), 'Rewrite the launch plan intro');
+  assert.equal(cardTitleOf('# Brief\n\nNot a card.'), null, 'a plain document has no card title');
+  assert.equal(cardTitleOf('---\nritemark: task/1\nid: k3f9x2\ntitle: [unclosed\n---\n'), null, 'a broken card opens as a plain document');
 
   console.log('taskBoard/cardFile: all assertions passed');
 }

@@ -116,6 +116,8 @@ VS Code supports building for multiple platforms from a single host.
 
 ### Gulp Commands (Raw VS Code)
 
+⛔ **Never run a gulp task that packages extensions** (`vscode-darwin-*`, `compile-extensions-build`, `compile-non-native-extensions-build`) **in a development tree while `vscode/extensions/ritemark` is the link to our extension.** VS Code's packaging writes through the link into the extension's own source and truncates it: `media/webview.js`, `out/extension.js`, `src/*.ts`, `node_modules` and the bundled runtimes (#471; recovery is the v1.7.1 recipe in the `release` skill). `build-prod.sh` takes the link out for gulp and checks the whole tree's digest afterwards; Windows CI builds with the extension absent.
+
 ```bash
 cd vscode
 

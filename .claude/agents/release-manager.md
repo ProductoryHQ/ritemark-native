@@ -289,9 +289,12 @@ Before asking Jarmo to test at Gate 1 (i.e. right after the un-notarized arm64 D
 3. **Installation:**
    - macOS: DMG opens, no Gatekeeper warning, runs from /Applications.
    - Windows: installer runs, no SmartScreen block, launches from Start Menu.
-4. **Sign-off table** for tracking approvals across platforms.
+4. **The base window against the baseline** (Sprint 136, R3; permanent for every shell release): the installed candidate launched in the background with its own short `--user-data-dir`, `--extensions-dir` and `--shared-data-dir`, `RITEMARK_BUILD_CHANNEL=test` and a debugging port; `frame-screenshots.mjs --compare docs/development/frame-baseline --release docs/development/frame-baseline/release` and `frame-geometry.mjs` on the Mac, and on Windows where the Windows session can run them (otherwise its screenshots by eye against the last Windows round's). A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes. How: `docs/development/frame-baseline/README.md`, "Comparing a release candidate".
+5. **Sign-off table** for tracking approvals across platforms.
 
-Per-platform sections: macOS arm64, macOS x64 (Rosetta NOT required — native Intel binary), Windows x64.
+Every scripted test launch of a candidate follows the same launch rule as item 4: its own profile and shared data folder (so test folders stay out of the installed app's recent list, #475), and `RITEMARK_BUILD_CHANNEL=test` (so it never counts as a person in usage data, #480).
+
+Per-platform sections: macOS arm64, macOS x64 (Rosetta NOT required — native Intel binary; where no Intel Mac is at hand, run it under Rosetta on the release Mac with `open --arch x86_64` and say so), Windows x64.
 
 ## Post-Release: Marketing Handoff
 

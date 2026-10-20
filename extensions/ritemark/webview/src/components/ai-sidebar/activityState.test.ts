@@ -103,6 +103,8 @@ assert.equal(
 // presentation: done label carries active seconds; idle renders nothing
 assert.equal(presentActivityState('idle'), null);
 assert.match(presentActivityState('done', { activeSeconds: 92 })!.label, /1m 32s/);
+assert.equal(presentActivityState('done', { activeSeconds: 0 })!.label, 'Done', '#488: no "Done in 0.0s"');
+assert.equal(presentActivityState('done', {})!.label, 'Done');
 assert.equal(presentActivityState('plan-review')!.tone, 'amber');
 
 // formatSeconds

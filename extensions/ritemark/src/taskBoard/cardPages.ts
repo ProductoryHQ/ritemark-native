@@ -20,7 +20,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { BoardStore, CardDocuments } from './BoardStore';
-import { parseCardFile, spliceCardBody, splitCardText } from './cardFile';
+import { cardTitleOf, parseCardFile, spliceCardBody, splitCardText } from './cardFile';
 import { connectBoardSurface, type BoardSurfaceContext } from './boardSurface';
 import type { BoardRequest } from './protocol';
 
@@ -180,6 +180,12 @@ export class CardPages implements vscode.Disposable {
     const parsed = parseCardFile(document.getText());
     if (parsed.kind !== 'card') return null;
     return { cardId: this.store.cardIdOfFile(path.basename(document.uri.fsPath)) ?? parsed.card.id };
+  }
+
+  /** A card page's title, for its tab and the AI's chip (#477); null when the file isn't a card. */
+  cardTitleFor(document: vscode.TextDocument): string | null {
+    if (!this.cardModeFor(document)) return null;
+    return cardTitleOf(document.getText());
   }
 
   /**

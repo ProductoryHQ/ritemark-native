@@ -54,8 +54,9 @@ export async function executeClaudeCodeNode(
   // Ritemark 2.0: the step's settings no longer carry a sign-in note, so the run says what to do and where
   if (setupStatus.state !== 'ready') {
     throw new Error(setupStatus.state === 'needs-auth' || setupStatus.state === 'auth-in-progress'
-      ? 'Claude Code is not signed in. Open Settings and sign in under Agent Runtime, then run the flow again.'
-      : 'Claude Code is not set up. Open Settings and set it up under Agent Runtime, then run the flow again.');
+      // #459: Claude's card is Claude Account, under API Keys (not Agent Runtime)
+      ? 'Claude is not signed in. In Ritemark Settings, sign in with Claude.ai under API Keys, then run the flow again.'
+      : 'Claude is not set up. In Ritemark Settings, set it up in Claude Account under API Keys, then run the flow again.');
   }
 
   const result = await runAgent({

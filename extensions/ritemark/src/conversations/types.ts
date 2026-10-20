@@ -92,6 +92,12 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   failureKind?: RuntimeFailureKind;
   /** Provider-observed applied value; absent/null means the provider did not expose it. */
   appliedThinkingEffort?: ExplicitThinkingEffort | null;
+  /**
+   * Sprint 136 (#488): the turn's working time in ms (its duration less the
+   * time it waited on the person), so a restored chat shows the same "Done in"
+   * as the live one. Absent in older records and when the runtime reported none.
+   */
+  activeDurationMs?: number;
 }
 
 export interface ActivityEventV1 extends ConversationEventBaseV1 {
@@ -457,6 +463,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
         failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
       }),
       appliedThinkingEffort,
+      ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: integerAt(input.activeDurationMs, `${path}.activeDurationMs`) }),
     };
   }
   if (kind === 'activity') {
@@ -725,6 +732,17 @@ export function decodeTombstoneV1(value: unknown): TombstoneV1 {
  * that completed or failed, or a failed turn. A reply the person stopped and a
  * turn a restart ended are not replies.
  */
+/**
+ * Sprint 136 (#488): a turn's working time from the runtime's metrics, or
+ * undefined when none was measured (the host's `{ durationMs: 0 }` stand-in).
+ */
+export function turnActiveDurationMs(
+  metrics: { durationMs: number; waitedMs?: number } | undefined,
+): number | undefined {
+  if (!metrics || !Number.isFinite(metrics.durationMs) || metrics.durationMs <= 0) return undefined;
+  return Math.max(0, Math.round(metrics.durationMs - (metrics.waitedMs ?? 0)));
+}
+
 export function lastReplyAtOf(events: readonly ConversationEventV1[]): string | undefined {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];

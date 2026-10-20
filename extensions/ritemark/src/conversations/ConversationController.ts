@@ -463,6 +463,8 @@ export class ConversationController {
     error?: string;
     failureKind?: RuntimeFailureKind;
     appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
+    /** Sprint 136 (#488): the turn's working time, kept so a restored chat shows it. */
+    activeDurationMs?: number;
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
   }): Promise<ConversationRecordV1> {
@@ -501,6 +503,7 @@ export class ConversationController {
               ...(input.error ? { error: input.error } : {}),
               ...(input.failureKind ? { failureKind: input.failureKind } : {}),
               appliedThinkingEffort: input.appliedThinkingEffort ?? null,
+              ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: input.activeDurationMs }),
             }]
           : [{
               kind: 'boundary' as const,

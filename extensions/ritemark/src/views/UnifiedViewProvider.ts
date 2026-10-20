@@ -113,7 +113,8 @@ import { TurnOwners, turnOwnersDir } from '../conversations/turnOwners';
 import { ConversationCutoverState } from '../conversations/ConversationCutoverState';
 import { LegacyConversationMigrator } from '../conversations/LegacyConversationMigrator';
 import { isConversationRequestMessage } from '../conversations/protocol';
-import type { ConversationRecordV1 } from '../conversations/types';
+import { turnActiveDurationMs, type ConversationRecordV1 } from '../conversations/types';
+import { cardTitleOf } from '../taskBoard/cardFile';
 import { resolveProjectScope } from '../conversations/projectScope';
 import { ConversationTitleGenerator } from '../conversations/ConversationTitleGenerator';
 import { showConversationDeleteNotification } from '../conversations/conversationDeleteNotification';
@@ -784,9 +785,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // frozen at acceptance. The sidebar sends that back on the execute
           // message; using it instead of the active tab is the whole of F11/F12.
           const commentTaskId = typeof message.taskId === 'string' ? message.taskId : undefined;
-          // Sprint 130: a task-board card's turn. The user is likely looking at
-          // the Tasks side bar, so the end of the turn must not switch it away.
-          const cardTurn = message.taskKind === 'card';
           const commentTaskSourcePath = typeof message.sourceDisplayPath === 'string' && message.sourceDisplayPath
             ? message.sourceDisplayPath
             : undefined;
@@ -1143,7 +1141,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 error,
                 failureKind,
               });
-              this._refreshExplorerForAgentWrites(result.filesModified, cardTurn);
+              this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 // Cancel normalisation (F24). Claude answers `session.cancel()`
@@ -1163,6 +1161,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   error,
                   failureKind,
                   appliedThinkingEffort,
+                  activeDurationMs: turnActiveDurationMs(result.metrics),
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
@@ -1203,7 +1202,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 status: result.status,
                 error: result.error,
               });
-              this._refreshExplorerForAgentWrites(undefined, cardTurn);
+              this._refreshExplorerForAgentWrites(undefined);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 const runtimeCompleted = !result.error && !/error|failed|cancelled/i.test(result.status);
@@ -1576,6 +1575,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       this._sendActiveFile();
       void this._sendActiveBrowserContext();
     });
+    // #485: the chip follows the document in front of the active desk, and a
+    // file closed, renamed or deleted (also from outside Ritemark) leaves it.
+    vscode.window.tabGroups.onDidChangeTabGroups(() => this._sendActiveFile());
+    vscode.workspace.onDidDeleteFiles(() => this._sendActiveFile());
+    vscode.workspace.onDidRenameFiles(() => this._sendActiveFile());
+    vscode.workspace.createFileSystemWatcher('**/*', true, true, false).onDidDelete(() => this._sendActiveFile());
 
     // Browser annotation mode is toggled by a workbench BrowserView action, not
     // by the extension webview. Poll lightweight metadata while the AI sidebar
@@ -1624,6 +1629,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'selection-update',
       selection,
       activeFilePath: activeFile?.path,
+      activeFileLabel: activeFile?.label ?? null,
     });
   }
 
@@ -3133,6 +3139,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({
       type: 'active-file-changed',
       path: activeFile?.path ?? null,
+      label: activeFile?.label ?? null,
     });
   }
 
@@ -3229,14 +3236,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * Get the active file context from the editor.
    * Uses tabGroups API which works for both TextEditor and custom editors (Ritemark).
-   * Falls back to activeTextEditor for non-custom editors.
+   *
+   * #485: only the tab in front of the active desk counts. With Home, Tasks, a
+   * terminal or a page in front there is no file, and a file that no longer
+   * exists is no context: the agent would be pointed at nothing. (This used to
+   * fall back to the last text editor, which kept a closed file in the chip.)
+   * `label` names a task card by its title (#477).
    */
-  private _getActiveFileContext(): { path: string; selection?: string } | undefined {
-    // Try tabGroups first — works for custom editors (Ritemark .md files)
+  private _getActiveFileContext(): { path: string; selection?: string; label?: string } | undefined {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
-    if (activeTab?.input && typeof activeTab.input === 'object' && 'uri' in activeTab.input) {
-      const uri = (activeTab.input as { uri: vscode.Uri }).uri;
-      const viewType = (activeTab.input as { viewType?: string }).viewType;
+    const input = activeTab?.input;
+    if (input instanceof vscode.TabInputTextDiff) {
+      return this._fileContextFor(input.modified);
+    }
+    if (input && typeof input === 'object' && 'uri' in input) {
+      const uri = (input as { uri: vscode.Uri }).uri;
+      const viewType = (input as { viewType?: string }).viewType;
 
       // Sprint 108: the Transcript Workbench's document is an AUDIO file. Hand
       // the agent the saved transcript instead — a path to an .m4a is not
@@ -3249,22 +3264,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           : undefined;
       }
 
-      return {
-        path: vscode.workspace.asRelativePath(uri),
-        selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
-      };
-    }
-
-    // Fallback to activeTextEditor (standard text files)
-    const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor) {
-      return {
-        path: vscode.workspace.asRelativePath(activeEditor.document.uri),
-        selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
-      };
+      return this._fileContextFor(uri);
     }
 
     return undefined;
+  }
+
+  private _fileContextFor(uri: vscode.Uri): { path: string; selection?: string; label?: string } | undefined {
+    if (uri.scheme === 'file' && !fs.existsSync(uri.fsPath)) return undefined;
+    const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString());
+    const label = openDocument && uri.fsPath.toLowerCase().endsWith('.md') ? cardTitleOf(openDocument.getText()) : null;
+    return {
+      path: vscode.workspace.asRelativePath(uri),
+      selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
+      ...(label ? { label } : {}),
+    };
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -3309,14 +3323,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return text;
   }
 
-  /** Bug #33: After an agent finishes writing files, nudge the explorer so it doesn't show stale state. */
   /**
-   * `keepSideBar` (Sprint 130): VS Code's refresh command also OPENS the
-   * Explorer, which switched the Tasks side bar away the moment a card's agent
-   * finished. A card's turn keeps the file-provider nudge (the stats, the first
-   * half of the #33 fix) and leaves the side bar alone.
+   * Bug #33: after an agent finishes writing files, nudge the file provider
+   * (a stat of each parent folder) so Documents doesn't show stale state.
+   *
+   * It never runs VS Code's refresh command: that command also OPENS Documents,
+   * which switched the left column away from where the person left it at the
+   * end of every turn (Sprint 130 for cards, #487 for every chat). The file
+   * watcher keeps Documents current, and Refresh Explorer
+   * (`ritemark.explorer.refresh`) is there for a change the watcher misses.
    */
-  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined, keepSideBar = false): void {
+  private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
     const parentDirs = new Set<string>();
     if (filesModified) {
       for (const file of filesModified) {
@@ -3324,13 +3341,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         if (parent && parent !== file) parentDirs.add(parent);
       }
     }
-    void Promise.all(
-      Array.from(parentDirs).map((dir) =>
-        vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined)
-      )
-    ).then(() => {
-      if (!keepSideBar) void vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
-    });
+    for (const dir of parentDirs) {
+      void vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined);
+    }
   }
 
   // ── Runtime sessions (Sprint 99) ─────────────────────────────────────
@@ -3515,6 +3528,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           status,
           error,
           failureKind,
+          activeDurationMs: turnActiveDurationMs(result.metrics),
         }), hostConversationEnabled);
         if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
           this._disposeRuntimeSessionsForAgent('claude-code');
