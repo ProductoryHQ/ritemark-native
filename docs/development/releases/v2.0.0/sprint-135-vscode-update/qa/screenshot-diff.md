@@ -22,7 +22,7 @@ The re-run on the branch's head (main merged in, the bar as the Experience lead 
 | home (both themes) | 0.13% | Below the threshold: two "today" rows of Last changed in another order (the fresh sample copy's file times). |
 | settings-foot (both themes) | 0.02% | Below the threshold. |
 | many-tabs | 0.01% | Below the threshold. |
-| **share-question** | **0.7% light, 0.94% dark** | The decided bar alone: one button fewer than 1.117's, so the address field is longer, and Chromium 150's text in the test page. The tab row matches the baseline. Waits for Jarmo. |
+| **share-question** | **0.7% light, 0.94% dark** | The decided bar alone: one button fewer than 1.117's, so the address field is longer, and Chromium 150's text in the test page. The tab row matches the baseline. Jarmo approved the new files on 20 October; they are in the baseline now. |
 
 Two earlier attempts at this re-run were not clean, and neither came from the update:
 - 1.62% and 1.88% on share-question: the frame script's ⌘W after the settings-foot scene had not reached the window, so a Ritemark Settings tab stayed in the row. The script now checks each close and falls back to View: Close Editor (`frame-screenshots.mjs`, `closeFrontTab`).
@@ -44,6 +44,8 @@ Full windows, before the decision: [Light](share-question-light-1142.png), [Dark
 4. **The test page's own text** is drawn a little differently by Chromium 150 (Electron 43): edge pixels of the heading and paragraph. Nothing to pin.
 
 **The Experience lead's decision (D5, 19 October):** (a) Add Element to Chat stays off Ritemark's bar even with Copilot Chat installed: it would sit beside Show Claude this page and send to Copilot Chat, not to the AI beside it. (b) Developer tools goes into the bar's ⋯ menu, as the drawings have it. Both are in patch 010. The 1.142 bar now reads back, forward, reload, the address, Show Claude this page, ⋯, with Developer tools (F12) in ⋯ ([the bar and its ⋯ menu](browser-bar-more-menu-1142.png)). The baseline's share-question scenes still differ (the bar has one button fewer than 1.117's); the baseline changes only with Jarmo's approval.
+
+**The new baseline (20 October):** Jarmo approved replacing the two files ("replace", through the Development manager). They were re-taken on a fresh profile with the shared recents cleared, from main's product source at `3113b080`. They are byte-identical to the clean run's captures above. In the same run, the other 32 scenes matched: 28 to the pixel, Home at 0.13% (the Last changed list follows the copied sample's file times) and the settings foot at 0.06% (the last update check's time).
 
 Pinned, so it no longer differs (S15): 1.142 added a "Share with Agent" toggle to the same bar. `workbench.browser.enableChatTools` is pinned off in `branding/product.json`.
 
