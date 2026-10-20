@@ -50,7 +50,7 @@ Each was found by comparing the two builds, and each fix was checked on 1.142 af
 | S27 The three runtimes | Not run | Each needs an authenticated turn; for Jarmo's Gate 2, and darwin-x64 and Windows after the merge. |
 | S28 Saving and the smaller patches | Pass | Both builds: typing then ⌘S saves the text to disk and the bar says Saved (014); an outside edit shows in the editor; the Help menu is Getting started, Support, View License, Advanced ▸ Toggle Developer Tools (015, read from the menu data the workbench sends to the Mac's menu bar). ⌘P from inside a document opens Quick Open. |
 | S29 Windows file handles | After the merge | |
-| S30 The clean-room build | After the merge | |
+| S30 The clean-room build | Second run after the fixes | See "E5 after the merge" below: the first two runs found a stop in gulp (#476) and a blank terminal (this fix); the build and validation then passed at `3113b080`. |
 
 ## S17: Sprint 132's scenarios on 1.142
 
@@ -132,6 +132,44 @@ Sprint 134 (the project at the centre):
 | S56 Not now, and sharing without asking | Pass; after a restart not run | Not now: the question went; a new page asked again; ticked and shared: the question went, and the next page was shared without asking. |
 | S57 Before an answer | Pass for the page; the turn at Gate 2 | On a fresh profile, page one asked ("127.0.0.1:…/one"); opening page two moved the question to it ("…/two"). A turn sent while it waits needs a signed-in turn (`BrowserContextStore.test.ts` covers it). |
 | S61 The chosen colour on the row | Pass | `proofreader.md` (`color: green`): its icon rgb(21, 128, 61) in Light and rgb(74, 222, 128) in Dark; `summariser.md` muted (rgb(97, 113, 135), rgb(148, 163, 184)). |
+
+## E5 after the merge
+
+**First run, at `440988a8`.** It stopped in gulp's packaging: "Copilot SDK directory not found". The fix-forward was #476 (patch 004 skips the shim when the packaged Copilot has no SDK), and `release-preflight.sh` now reads the pinned VS Code. macOS x64 CI failed the same way.
+
+**Second run, at `3113b080`** (#478 fixed Windows CI's signtool). The release worktree was `.worktrees/release-3113b0802137`.
+
+The build:
+- `build-prod.sh` passed in 7 minutes. #476's skip was logged; #471's known "Extension files corrupted during build!" was restored from backup as usual.
+- `validate-build-output.sh` passed: 17 native modules, all darwin-arm64; the runtimes arm64; Check 5d's fonts.
+- The provenance names VS Code `d956e8a6`, and the app is 2.2 GB.
+
+The app, run hidden on a fresh profile with the baseline's sample:
+- `project-check.mjs` 6/6 and `frame-geometry.mjs` 22 pass, 0 fail, 2 skipped.
+- The frame baseline: 32 of 34 the same. More differs (1.05%, 1.02%), because a production build has no Copilot Chat.
+- PDFs render, the file watcher works, Sofia Sans and Phosphor load, and More has no Copilot.
+
+**Found: the terminal opened blank, and code had no colours.**
+- The window asked `app/node_modules/` for xterm.js, vscode-textmate and vscode-oniguruma (ERR_FILE_NOT_FOUND). VS Code 1.142's packaging moves them into `node_modules.asar`, which the window reads only when `product.json` has a commit.
+- The build had none: VS Code reads it from `vscode/.git/HEAD`, and in a release worktree `vscode/.git` is a `gitdir:` file. v1.14.0 had none either, but its `node_modules` was a folder.
+- Evidence: [e5-no-commit-terminal-blank.png](qa/e5-no-commit-terminal-blank.png); a JSON file showed only `mtk1`.
+- Fixed by patch 004 and Check 5e, which also fixes #463 (no V8 code cache).
+
+**Found with the fix: a commit lets VS Code's agent host find the Copilot SDK runtime.**
+- Its prewarm then started GitHub's Copilot runtime in every window at launch ("CopilotClient started successfully"), scanning for Copilot CLI sessions.
+- Without a commit, it started at launch, failed 4 times and idled, at about 77–100 MB.
+- Patch 003 now removes the prewarm, so the agent host starts only when something asks for it. Mission Control asks only after someone turns its sharing on; the web client is web-only.
+
+**The fix shown on a gulp build of `3113b080`'s source** with both changes, `RITEMARK_SOURCE_COMMIT` set, and the bundled extension and the three stripped built-ins as `build-prod.sh` leaves them:
+- `product.json` names `3113b080…`.
+- For a minute after launch there was no `agenthost.log`, no "agent host started" and no Copilot process: 3 Node utility processes, against the 4 on E5's app.
+- A terminal ran `echo e5-$((6*7)) > file` ([e5-commit-terminal.png](qa/e5-commit-terminal.png)).
+- A JSON file had 5 token colours.
+- About names the commit ([e5-commit-about.png](qa/e5-commit-about.png)).
+- `CachedData/3113b080…` filled to 14 MB.
+- No ERR_FILE_NOT_FOUND.
+
+**Seen in passing:** the AI composer kept an "Active: settings-e5.json" chip after that file was closed and deleted.
 
 ## Tests
 

@@ -179,7 +179,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | --- | --- |
 | `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; every way into VS Code's Getting Started page (Help: Welcome, walkthroughs) opens Ritemark's welcome instead (Sprint 133); the splash's auto-detect defaults are the two grounds (Sprint 134) |
 | `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
-| `003-ritemark-menu-cleanup.patch` | Hide VS Code dev features (chat, debug, go menu); All commands offers no developer commands (`commandsQuickAccess.ts`, Sprint 134); no Agents window: VS Code 1.142's second workbench never opens (`constants.ts`, `windowsMainService.ts`, Sprint 135) |
+| `003-ritemark-menu-cleanup.patch` | Hide VS Code dev features (chat, debug, go menu); All commands offers no developer commands (`commandsQuickAccess.ts`, Sprint 134); no Agents window: VS Code 1.142's second workbench never opens (`constants.ts`, `windowsMainService.ts`, Sprint 135); no agent host prewarm at window start (`agentHostService.ts`, Sprint 135 E5) |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
 | `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |

@@ -32,7 +32,7 @@ Conflicts in 9 files; `auxiliaryBarPart.ts`, `paneCompositePart.ts` and `workben
 - `layoutActions.ts`, found by the type-check: the `KeyMod, KeyCode` import goes too. At 1.142.0 its only use is the Cmd+B binding 002 removes (at the pin, other bindings in the file still used it).
 - Behavioural differences against main's patch: none (the hunk-level diff shows only upstream's context lines).
 
-### 003 menus: 23 → 25 files, 44 → 44 hunks
+### 003 menus: 23 → 26 files, 44 → 45 hunks
 Conflicts in 8 files; the other 15 merged cleanly with identical `+`/`-` lines (the palette filter in `commandsQuickAccess.ts` and its test among them).
 - `menubarControl.ts` → `menubar.contribution.ts` (2 hunks): **moved**. Upstream moved the main menu's registrations (File, Edit, Selection, View, Go, Terminal, Help, Preferences) into the new `workbench/browser/parts/titlebar/menubar.contribution.ts`. 003's removal of Selection, Go and Terminal goes there, with the same comments. `menubarControl.ts` leaves 003's file list, `menubar.contribution.ts` joins it (net 23).
 - `workspaceActions.ts`: **re-based**. The four workspace items stay hidden; upstream had dropped `IsSessionsWindowContext` from one of their `when`s.
@@ -43,6 +43,7 @@ Conflicts in 8 files; the other 15 merged cleanly with identical `+`/`-` lines (
 - `userDataProfile.ts`: **re-based**. No File ▸ New Window with Profile.
 - `extensionEnablementService.ts`: **re-cut**. Upstream moved the built-in chat extension migration into `ensureChatExtensionInitialDisabledState()`, called from the constructor and on each profile's first enablement read. 003 empties that method instead of the constructor block (the same skip: Copilot Chat installed from the Marketplace is never disabled behind the person's back); the `ChatEntitlementService` and `ChatAIDisabledSettingId` imports that only it used go. The `defaultChatAgent?.…?.toLowerCase()` null-safety re-based.
 - **New in this sprint, for 1.142's new surfaces** (`research/surfaces-audit.md` §1.1, §5.2; the R8 commit): `chat/common/constants.ts` makes `OPEN_AGENTS_WINDOW_PRECONDITION` false, so no command, button or shortcut opens the Agents window; `platform/windows/electron-main/windowsMainService.ts` opens a normal window when `--agents`, an agent link or a tryout hand-off asks for the Agents window; All commands leaves out the Agents window's two commands and 23 new Developer commands (7 shown without Copilot Chat, 16 with it), and the palette test covers three of them. Two of the 16 were found on the running build: the workbench registers "Export Agent Host Debug Logs..." as `workbench.action.chat.exportAgentHostDebugLogs` and "Open Agent Host State File" as `workbench.action.chat.openCopilotCliStateFile`; the audit's `agentHost.exportDebugLogs` and `agentHost.openSessionEventsFile` are the Agents window's copies (`src/vs/sessions`), kept in the list as well. Two files join 003 (25).
+- `services/agentHost/electron-browser/agentHostService.ts`: **new, after the merge (E5, second run)**. The agent host prewarm doesn't run. Once `product.json` names a commit (patch 004), the agent host finds the Copilot SDK runtime in `node_modules.asar.unpacked` (`appNodeModules.ts` reads the commit), and the prewarm started GitHub's Copilot runtime in every window at launch, scanning for Copilot CLI sessions. The agent host still starts when something asks for it.
 - Behavioural differences against main's patch: none beyond the above.
 
 ### 004 build system: 4 → 7 files, 7 → 10 hunks
@@ -124,7 +125,7 @@ At 1.142.0, by `grep '^diff --git'`. Every difference from the lists above is ex
 |---|---|---|---|---|---|
 | `001-ritemark-branding.patch` | 12 | 10 | 21 | 17 | out: `build/gulpfile.vscode.ts`; out: `build/lib/optimize.ts` |
 | `002-ritemark-ui-layout.patch` | 25 | 25 | 83 | 83 | — |
-| `003-ritemark-menu-cleanup.patch` | 23 | 25 | 44 | 44 | out: `src/vs/workbench/browser/parts/titlebar/menubarControl.ts`; in: `src/vs/platform/windows/electron-main/windowsMainService.ts`; in: `src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts`; in: `src/vs/workbench/contrib/chat/common/constants.ts` |
+| `003-ritemark-menu-cleanup.patch` | 23 | 26 | 44 | 45 | out: `src/vs/workbench/browser/parts/titlebar/menubarControl.ts`; in: `src/vs/platform/windows/electron-main/windowsMainService.ts`; in: `src/vs/workbench/browser/parts/titlebar/menubar.contribution.ts`; in: `src/vs/workbench/contrib/chat/common/constants.ts`; in: `src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts` (E5) |
 | `004-ritemark-build-system.patch` | 4 | 7 | 7 | 10 | in: `build/gulpfile.vscode.ts`, `build/lib/getVersion.ts`, `build/lib/git.ts` (E5) |
 | `005-ritemark-windows-and-oss-fixes.patch` | 3 | 3 | 5 | 5 | — |
 | `006-ritemark-dev-launch-fallback.patch` | 4 | 4 | 4 | 4 | — |
