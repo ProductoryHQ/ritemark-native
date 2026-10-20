@@ -310,7 +310,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     return { fileType, filename, content, sizeBytes: integer(input, 'sizeBytes') };
   }
   if (fileType !== 'markdown') throw new DocumentProtocolError('Unknown render file type');
-  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills', 'cardMode']);
+  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills', 'cardMode', 'systemLanguage']);
   if (typeof input.hasProperties !== 'boolean') throw new DocumentProtocolError('hasProperties must be boolean');
   if (input.isAgentMode !== undefined && typeof input.isAgentMode !== 'boolean') throw new DocumentProtocolError('isAgentMode must be boolean');
   const features = record(input.features, 'features');
@@ -342,6 +342,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     ...(input.agentFlows === undefined ? {} : { agentFlows: stringArray(input.agentFlows, 'agentFlows') }),
     ...(input.agentSkills === undefined ? {} : { agentSkills: array(input.agentSkills, 'agentSkills') }),
     ...(input.cardMode === undefined ? {} : { cardMode: cardModeOf(input.cardMode) }),
+    ...(input.systemLanguage === undefined ? {} : { systemLanguage: requiredString(input, 'systemLanguage', 64) }),
   };
 }
 

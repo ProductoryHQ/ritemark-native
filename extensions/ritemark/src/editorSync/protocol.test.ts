@@ -74,6 +74,33 @@ test('validates host update payloads at runtime', () => {
   assert.equal(message.type, 'document:update');
 });
 
+test('a document carries the operating system\'s language for dictation (#486)', () => {
+  const update = (systemLanguage: unknown) => parseDocumentHostMessage({
+    type: 'document:update',
+    ...identity,
+    revision: 1,
+    baseDiskHash: sha,
+    modelHash: sha,
+    payloadHash: sha,
+    reason: 'open',
+    attempt: 1,
+    payload: {
+      fileType: 'markdown',
+      filename: 'example.md',
+      content: '# Example',
+      properties: {},
+      hasProperties: false,
+      imageMappings: {},
+      features: { voiceDictation: true, markdownExport: true },
+      systemLanguage,
+    },
+  });
+  const message = update('et-ee');
+  assert.ok(message.type === 'document:update' && message.payload.fileType === 'markdown');
+  assert.equal(message.type === 'document:update' && message.payload.fileType === 'markdown' && message.payload.systemLanguage, 'et-ee');
+  assert.throws(() => update(42), DocumentProtocolError);
+});
+
 test('a task card page carries its card id, and nothing else', () => {
   const update = (cardMode: unknown) => parseDocumentHostMessage({
     type: 'document:update',

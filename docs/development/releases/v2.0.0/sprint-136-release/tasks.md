@@ -36,7 +36,7 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [x] The release skill's Step 2 and the `release-manager` agent's "Test Checklist Generation": "The base window against the baseline" and the launch rule (R3)
 - [x] `frame-screenshots.mjs`: usage text for installed apps; `--release` for More's release images (D2); `frame-baseline/README.md`: "Comparing a release candidate" (R3)
 - [ ] The runtime review table in the release plan; if Jarmo approves (D1), the update per the release skill, with every check in W4 and the compatibility matrix entry (R4)
-- [ ] The extension's `npm run compile`, the webview's build, the full `npm test`; `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
+- [ ] The extension's `npm run compile`, the webview's build, and every offline test script (`npm test` and each `test:*` but `test:integration`, which calls real models: `test:editor-sync` caught a payload key `npm test` did not); `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
 - [ ] The fixes walked in a dev build with the launch rule (S35–S41, S34)
 - [ ] The PR opened; the Development manager's smoke test; `qa-validator`; Jarmo's "admin merge"
 

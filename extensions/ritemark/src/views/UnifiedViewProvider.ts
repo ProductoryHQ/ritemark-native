@@ -3325,13 +3325,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Bug #33: after an agent finishes writing files, nudge the file provider
-   * (a stat of each parent folder) so Documents doesn't show stale state.
+   * (a stat of each parent folder) and refresh Documents, so it doesn't show
+   * stale state when the file watcher missed the agent's writes.
    *
-   * It never runs VS Code's refresh command: that command also OPENS Documents,
-   * which switched the left column away from where the person left it at the
-   * end of every turn (Sprint 130 for cards, #487 for every chat). The file
-   * watcher keeps Documents current, and Refresh Explorer
-   * (`ritemark.explorer.refresh`) is there for a change the watcher misses.
+   * The refresh passes `{ reveal: false }` (patch 002): VS Code's refresh
+   * command otherwise OPENS Documents, which switched the left column away
+   * from where the person left it at the end of every turn (Sprint 130 for
+   * cards, #487 for every chat).
    */
   private _refreshExplorerForAgentWrites(filesModified: string[] | undefined): void {
     const parentDirs = new Set<string>();
@@ -3341,9 +3341,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         if (parent && parent !== file) parentDirs.add(parent);
       }
     }
-    for (const dir of parentDirs) {
-      void vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined);
-    }
+    void Promise.all(
+      Array.from(parentDirs).map((dir) =>
+        vscode.workspace.fs.stat(vscode.Uri.file(dir)).then(undefined, () => undefined)
+      )
+    ).then(() => vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer', { reveal: false }))
+      .then(undefined, () => undefined);
   }
 
   // ── Runtime sessions (Sprint 99) ─────────────────────────────────────

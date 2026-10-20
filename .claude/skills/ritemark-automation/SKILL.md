@@ -70,6 +70,9 @@ cd "$REPO_ROOT/vscode"
 # Launch in background. The three knobs that matter:
 #   --remote-debugging-port=9224       — enables CDP (the whole point)
 #   --user-data-dir=$USERDATA          — isolates from your daily Ritemark profile
+#   --use-mock-keychain                — an unsigned dev Electron otherwise asks the
+#                                        keychain at start: a password prompt lands on
+#                                        Jarmo's screen and blocks the main process (CDP hangs)
 #   --shared-data-dir=$SHAREDDATA      — VS Code 1.142 keeps the recent folders in a
 #                                        folder every build shares (~/.ritemark-shared);
 #                                        without this, test folders land in the installed
@@ -84,6 +87,7 @@ VSCODE_SKIP_PRELAUNCH=1 \
     --remote-debugging-port=9224 \
     --user-data-dir=$USERDATA \
     --shared-data-dir=$SHAREDDATA \
+    --use-mock-keychain \
     $WORKSPACE &
 
 # Connect with retry — first launch is slow.
@@ -110,7 +114,7 @@ mkdir -p "$S/ud/User" "$S/ext" "$S/shared"
 RITEMARK_BUILD_CHANNEL=test open -n -g -a /Applications/Ritemark.app --args \
   --remote-debugging-port=9411 \
   --user-data-dir="$S/ud" --extensions-dir="$S/ext" --shared-data-dir="$S/shared" \
-  --new-window "$WORKSPACE"
+  --use-mock-keychain --new-window "$WORKSPACE"
 ```
 
 - A run that does not test usage data can also turn it off before the first start: `{ "ritemark.features.analytics": false }` in `$S/ud/User/settings.json`.
