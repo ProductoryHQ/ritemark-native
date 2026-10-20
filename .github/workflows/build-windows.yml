@@ -521,7 +521,8 @@ jobs:
             -CatalogPath windows-pe-signing-catalog.txt `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
             -OwnedPathPattern 'Ritemark.exe' `
-            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}'
+            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
+            -ReportPath windows-pe-signing-plan.json
 
       - name: Sign Windows binaries (Azure Artifact Signing)
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
@@ -689,6 +690,7 @@ jobs:
             r/${{ steps.installer.outputs.installer_path }}
             r/installer-output/Ritemark-Setup.sha256.txt
             r/installer-output/roundtrip-evidence
+            r/windows-pe-signing-plan.json
           if-no-files-found: warn
           retention-days: 30
 

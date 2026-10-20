@@ -48,7 +48,7 @@ try {
       }
       'catalog-only.dll' {
         # Valid only through a Windows system catalog: no signature in the file itself.
-        [pscustomobject]@{ Status = 'Valid'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Microsoft Windows' }; TimeStamperCertificate = [pscustomobject]@{} }
+        [pscustomobject]@{ Status = 'Valid'; SignatureType = 'Catalog'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Microsoft Windows' }; TimeStamperCertificate = [pscustomobject]@{} }
       }
       'missing-timestamp.node' {
         [pscustomobject]@{ Status = 'Valid'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Productory Services OÜ' }; TimeStamperCertificate = $null }
@@ -76,6 +76,9 @@ try {
   $catalogOnly = $prepared.files | Where-Object path -eq 'catalog-only.dll'
   if ($null -eq $catalogOnly -or $catalogOnly.action -ne 'Sign') {
     throw 'A PE valid only through a Windows catalog (no embedded signature) must be signed.'
+  }
+  if ($catalogOnly.signatureType -ne 'Catalog') {
+    throw "The report must record the catalog-only PE's signature type, got '$($catalogOnly.signatureType)'."
   }
 
   $failure = $null

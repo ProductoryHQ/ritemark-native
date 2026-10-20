@@ -99,6 +99,8 @@ foreach ($file in $peFiles) {
 
   $signature = & $SignatureProvider $file.FullName
   $status = [string]$signature.Status
+  # 'Authenticode' (in the file) or 'Catalog' (a system catalog vouches for it); in the report as evidence
+  $signatureType = if ($signature.PSObject.Properties.Name -contains 'SignatureType') { [string]$signature.SignatureType } else { '' }
   $publisherMatches = Test-Publisher $signature.SignerCertificate $ExpectedPublisher
   $timestamped = $null -ne $signature.TimeStamperCertificate
 
@@ -139,6 +141,7 @@ foreach ($file in $peFiles) {
     owned = $owned
     action = $action
     signatureStatus = $status
+    signatureType = $signatureType
     productoryPublisher = $publisherMatches
     timestamped = $timestamped
   })
