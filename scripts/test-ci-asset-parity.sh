@@ -14,7 +14,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VSCODE_TAG="1.117.0"
+# The VS Code release Ritemark builds on: the version in package.json at the committed submodule pin (Sprint 135; this was
+# a fixed "1.117.0" that a VS Code update had to remember, and E5 after the 1.142 update found it stale)
+VSCODE_PIN=$(git -C "$PROJECT_ROOT" ls-tree HEAD vscode 2>/dev/null | awk '{print $3}' || true)
+VSCODE_TAG=$(git -C "$PROJECT_ROOT/vscode" show "$VSCODE_PIN:package.json" 2>/dev/null | sed -n 's/^  "version": "\([^"]*\)".*/\1/p' | head -1 || true)
+if [ -z "$VSCODE_TAG" ] && [ -f "$PROJECT_ROOT/vscode/package.json" ]; then
+  VSCODE_TAG=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' "$PROJECT_ROOT/vscode/package.json" | head -1)
+fi
+if [ -z "$VSCODE_TAG" ]; then
+  echo "ERROR: cannot read the VS Code version: no committed vscode pin, and no vscode/package.json (is the submodule initialised?)" >&2
+  exit 1
+fi
 VANILLA_CACHE="/tmp/vscode-vanilla-$VSCODE_TAG"
 TMP_ROOT="$(mktemp -d /tmp/ritemark-ci-assets.XXXXXX)"
 trap 'rm -rf "$TMP_ROOT"' EXIT

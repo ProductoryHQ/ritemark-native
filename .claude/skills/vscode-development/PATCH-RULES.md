@@ -13,7 +13,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal |
 | `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 25 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, defaultChatAgent null-safety |
-| `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip |
+| `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
 | `007-ritemark-vscode-1117-compat.patch` | Compatibility | Copilot Chat compatibility (since 1.117; rebased onto 1.142): the narrow setup actions instead of `ChatSetupContribution`, the onboarding module's fallback, the Copilot Chat launcher opens Copilot Chat as a tab; `webviewEditor.ts` opens a custom editor with no options (upstream's later fix, Sprint 135) |

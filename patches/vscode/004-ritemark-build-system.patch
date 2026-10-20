@@ -4,6 +4,8 @@ Also delegates the microphone Permissions-Policy feature to webview iframes
 (required since Electron 39 enforces iframe media policy; fixes voice dictation, GH #116)
 Sprint 135: rebased onto VS Code 1.142.0 (app.ts: upstream's permission handler now takes webContents and
 lists 'media' for the core window; this patch still adds it to the webview list)
+Sprint 135 E5: the packaging step that prepares the built-in Copilot's SDK skips when the packaged Copilot has none
+(a build from source strips it through .moduleignore's @github/copilot/**; Ritemark deletes the built-in Copilot after)
 ---
 diff --git a/build/.moduleignore b/build/.moduleignore
 index 51149993424..202d76b197e 100644
@@ -21,6 +23,25 @@ index 51149993424..202d76b197e 100644
  jschardet/dist/jschardet.js
  
  es6-promise/lib/**
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+index 185be479a22..74a6932a5c7 100644
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -544,6 +544,14 @@ function prepareCopilotRipgrepShimTask(platform: string, arch: string, destinati
+ 		const appNodeModulesDir = path.join(appBase, 'node_modules.asar.unpacked');
+ 
+ 		const builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');
++		// Ritemark (Sprint 135): a build that packages the built-in Copilot from source filters its node_modules
++		// through build/.moduleignore, whose `@github/copilot/**` strips the SDK this shim needs, so it would throw.
++		// The shim writes only inside that extension, and Ritemark removes the built-in Copilot after packaging
++		// (build-prod.sh step 4.5 and the CI workflows), so there is nothing to prepare.
++		if (!fs.existsSync(path.join(builtInCopilotExtensionDir, 'node_modules', '@github', 'copilot', 'sdk'))) {
++			console.log(`[prepareCopilotRipgrepShimTask] Ritemark: skipped, the packaged built-in Copilot has no SDK (${builtInCopilotExtensionDir})`);
++			return;
++		}
+ 		prepareBuiltInCopilotRipgrepShim(platform, arch, builtInCopilotExtensionDir, appNodeModulesDir);
+ 	};
+ }
 diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
 index 41ec34950fd..0a25133db3d 100644
 --- a/src/vs/code/electron-main/app.ts
