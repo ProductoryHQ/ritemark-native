@@ -520,7 +520,8 @@ jobs:
             -Root VSCode-win32-x64 `
             -CatalogPath windows-pe-signing-catalog.txt `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
-            -OwnedPathPattern 'Ritemark.exe'
+            -OwnedPathPattern 'Ritemark.exe' `
+            -SignToolPath '${{ steps.signing-tools.outputs.signtool }}'
 
       - name: Sign Windows binaries (Azure Artifact Signing)
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
