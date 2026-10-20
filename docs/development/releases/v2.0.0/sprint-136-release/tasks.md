@@ -35,10 +35,10 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [x] #471: `build-prod.sh` without the link during gulp, the whole-tree digest guard, the `vscode-development` skill's note (E5); proved by the dress rehearsal (S44)
 - [x] The release skill's Step 2 and the `release-manager` agent's "Test Checklist Generation": "The base window against the baseline" and the launch rule (R3)
 - [x] `frame-screenshots.mjs`: usage text for installed apps; `--release` for More's release images (D2); `frame-baseline/README.md`: "Comparing a release candidate" (R3)
-- [ ] The runtime review table in the release plan; if Jarmo approves (D1), the update per the release skill, with every check in W4 and the compatibility matrix entry (R4)
-- [ ] The extension's `npm run compile`, the webview's build, and every offline test script (`npm test` and each `test:*` but `test:integration`, which calls real models: `test:editor-sync` caught a payload key `npm test` did not); `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] The fixes walked in a dev build with the launch rule (S35–S41, S34)
-- [ ] The PR opened; the Development manager's smoke test; `qa-validator`; Jarmo's "admin merge"
+- [x] The runtime review table in the release plan; if Jarmo approves (D1), the update per the release skill, with every check in W4 and the compatibility matrix entry (R4): Claude Code 2.1.304 / SDK 0.3.304, Codex 0.163.0 (no macOS zsh), OpenCode 1.19.3
+- [x] The extension's `npm run compile`, the webview's build, and every offline test script (`npm test` and each `test:*` but `test:integration`, which calls real models: `test:editor-sync` caught a payload key `npm test` did not); `./scripts/validate-qa.sh`; the pre-commit validator by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
+- [x] The fixes walked in a dev build with the launch rule (S35–S41, S34): [qa-evidence.md](qa-evidence.md); two defects found and fixed (the payload key, Documents going stale: patch 002's `{ reveal: false }`)
+- [ ] The PR opened ([#490](https://github.com/ProductoryHQ/ritemark-native/pull/490)); `qa-validator` (nothing blocking; its fixes in `ac7164d2`); the Development manager's smoke test; Jarmo's "admin merge"
 
 ## Phase 3: The dress rehearsal (W12, W1, E3)
 
