@@ -578,7 +578,7 @@ echo ""
 # commit. Without one the window asks node_modules/ for xterm, vscode-textmate
 # and vscode-oniguruma, so the terminal stays blank and code loses its colours,
 # and nothing else fails. The commit is Ritemark's source commit
-# (RITEMARK_SOURCE_COMMIT, set by every build entry point; patch 004), so it
+# (RITEMARK_SOURCE_COMMIT, set by every release build entry point; patch 004), so it
 # must also be the build provenance's sourceCommit.
 # -----------------------------------------------------------------------------
 echo -n "Checking product.json's commit... "
@@ -586,8 +586,8 @@ case "$TARGET" in
   darwin-arm64|darwin-x64) APP_PRODUCT="$APP_PATH/Contents/Resources/app/product.json" ;;
   win32-x64) APP_PRODUCT="$APP_PATH/resources/app/product.json" ;;
 esac
-PRODUCT_COMMIT=$(sed -n 's/^[[:space:]]*"commit":[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' "$APP_PRODUCT" 2>/dev/null | head -1)
-PROVENANCE_COMMIT=$(sed -n 's/.*"sourceCommit":[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' "$PROVENANCE_PATH" 2>/dev/null | head -1)
+PRODUCT_COMMIT=$(sed -n 's/^[[:space:]]*"commit":[[:space:]]*"\([0-9a-fA-F]\{40\}\)".*/\1/p' "$APP_PRODUCT" 2>/dev/null | head -1 | tr 'A-F' 'a-f')
+PROVENANCE_COMMIT=$(sed -n 's/.*"sourceCommit":[[:space:]]*"\([0-9a-fA-F]\{40\}\)".*/\1/p' "$PROVENANCE_PATH" 2>/dev/null | head -1 | tr 'A-F' 'a-f')
 if [[ -z "$PRODUCT_COMMIT" ]]; then
   echo -e "${RED}FAIL${NC} (no 40-character commit in $APP_PRODUCT; set RITEMARK_SOURCE_COMMIT before gulp)"
   ERRORS=$((ERRORS + 1))

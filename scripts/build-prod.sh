@@ -203,7 +203,8 @@ cd vscode
 # product.json's commit is Ritemark's source commit, as in the build provenance (Sprint 135 E5, patch 004's
 # getVersion.ts). Since VS Code 1.142 an app without a commit looks for its node modules outside node_modules.asar,
 # and the terminal and code highlighting break; validate-build-output.sh Check 5e fails such a build.
-export RITEMARK_SOURCE_COMMIT="$(git -C "$PROJECT_DIR" rev-parse HEAD)"
+RITEMARK_SOURCE_COMMIT="$(git -C "$PROJECT_DIR" rev-parse HEAD)"
+export RITEMARK_SOURCE_COMMIT
 
 # Use npm (VS Code switched from yarn)
 # Build for specified target
