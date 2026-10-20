@@ -72,10 +72,10 @@ if ($Mode -ne 'Detect' -and $null -eq $SignatureProvider) {
   $SignatureProvider = { param($Path) Get-AuthenticodeSignature -LiteralPath $Path }
 }
 
-if ($Mode -eq 'Verify' -and $null -eq $SignToolVerifier) {
+if ($Mode -ne 'Detect' -and $null -eq $SignToolVerifier) {
   if (-not $SignToolPath) { $SignToolPath = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source }
   if (-not $SignToolPath -or -not (Test-Path -LiteralPath $SignToolPath -PathType Leaf)) {
-    throw 'Verify requires a valid -SignToolPath.'
+    throw "$Mode requires a valid -SignToolPath."
   }
   $SignToolVerifier = {
     param($Path, $ToolPath)
@@ -99,11 +99,19 @@ foreach ($file in $peFiles) {
 
   $signature = & $SignatureProvider $file.FullName
   $status = [string]$signature.Status
+  # 'Authenticode' (in the file) or 'Catalog' (a system catalog vouches for it); in the report as evidence
+  $signatureType = if ($signature.PSObject.Properties.Name -contains 'SignatureType') { [string]$signature.SignatureType } else { '' }
   $publisherMatches = Test-Publisher $signature.SignerCertificate $ExpectedPublisher
   $timestamped = $null -ne $signature.TimeStamperCertificate
 
   if ($Mode -eq 'PrepareSigning') {
-    if ($status -eq 'NotSigned' -or ($owned -and ($status -ne 'Valid' -or -not $publisherMatches -or -not $timestamped))) {
+    # 'Valid' from Get-AuthenticodeSignature also covers a file that only a Windows system catalog vouches
+    # for, with no signature of its own: Electron 43's d3dcompiler_47.dll and dxil.dll on the build runner.
+    # A user's PC need not have that catalog entry, and Verify's `signtool verify /pa /all` rejects such a
+    # file, so a vendor file that fails it is signed like an unsigned one.
+    $embedded = $status -eq 'Valid' -and (& $SignToolVerifier $file.FullName $SignToolPath)
+    if ($status -eq 'NotSigned' -or ($status -eq 'Valid' -and -not $embedded) -or
+        ($owned -and ($status -ne 'Valid' -or -not $publisherMatches -or -not $timestamped))) {
       $signingTargets.Add($file.FullName)
       $action = 'Sign'
     } elseif ($status -eq 'Valid') {
@@ -133,6 +141,7 @@ foreach ($file in $peFiles) {
     owned = $owned
     action = $action
     signatureStatus = $status
+    signatureType = $signatureType
     productoryPublisher = $publisherMatches
     timestamped = $timestamped
   })
@@ -160,5 +169,11 @@ if ($ReportPath) {
   $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportFullPath -Encoding utf8NoBOM
 }
 
+if ($Mode -eq 'PrepareSigning') {
+  # The plan in the log: which files get signed, and whether a vendor's own signature or only a catalog vouched for them
+  foreach ($entry in @($files | Where-Object action -eq 'Sign')) {
+    Write-Host "  sign $($entry.path) (status $($entry.signatureStatus), type $(if ($entry.signatureType) { $entry.signatureType } else { 'none' }))"
+  }
+}
 Write-Host "Windows PE check: $($peFiles.Count) file(s), $($signingTargets.Count) to sign, $($failures.Count) failure(s)."
 if ($failures.Count -gt 0) { throw ($failures -join [Environment]::NewLine) }

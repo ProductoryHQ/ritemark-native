@@ -21,17 +21,17 @@ function Write-PeFixture {
 
 try {
   New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
-  foreach ($name in 'unsigned.exe','wrong.dll','missing-timestamp.node','extensionless') {
+  foreach ($name in 'unsigned.exe','wrong.dll','catalog-only.dll','missing-timestamp.node','extensionless') {
     Write-PeFixture -Path (Join-Path $fixtureRoot $name)
   }
   Set-Content -LiteralPath (Join-Path $fixtureRoot 'not-a-pe.exe') -Value 'plain text'
 
   & $scriptPath -Mode Detect -Root $fixtureRoot -ReportPath $detectReport
   $detected = Get-Content -LiteralPath $detectReport -Raw | ConvertFrom-Json
-  if ($detected.portableExecutableCount -ne 4) {
-    throw "Expected four content-detected PEs, got $($detected.portableExecutableCount)."
+  if ($detected.portableExecutableCount -ne 5) {
+    throw "Expected five content-detected PEs, got $($detected.portableExecutableCount)."
   }
-  $expected = @('extensionless','missing-timestamp.node','unsigned.exe','wrong.dll')
+  $expected = @('catalog-only.dll','extensionless','missing-timestamp.node','unsigned.exe','wrong.dll')
   if ((@($detected.files.path | Sort-Object) -join '|') -ne ($expected -join '|')) {
     throw "PE discovery missed .exe, .dll, .node, or extensionless content."
   }
@@ -46,6 +46,10 @@ try {
       'wrong.dll' {
         [pscustomobject]@{ Status = 'Valid'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Wrong Publisher' }; TimeStamperCertificate = [pscustomobject]@{} }
       }
+      'catalog-only.dll' {
+        # Valid only through a Windows system catalog: no signature in the file itself.
+        [pscustomobject]@{ Status = 'Valid'; SignatureType = 'Catalog'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Microsoft Windows' }; TimeStamperCertificate = [pscustomobject]@{} }
+      }
       'missing-timestamp.node' {
         [pscustomobject]@{ Status = 'Valid'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Productory Services OÜ' }; TimeStamperCertificate = $null }
       }
@@ -55,16 +59,26 @@ try {
     }
   }
 
+  # signtool sees an embedded signature in every Valid file except the catalog-only one.
+  $embeddedSignature = { param($Path, $ToolPath) [System.IO.Path]::GetFileName($Path) -ne 'catalog-only.dll' }
   & $scriptPath -Mode PrepareSigning -Root $fixtureRoot -CatalogPath $catalogPath `
-    -ReportPath $prepareReport -OwnedPathPattern 'unsigned.exe' -SignatureProvider $signatureProvider
-  $catalog = @(Get-Content -LiteralPath $catalogPath)
-  if ($catalog.Count -ne 1 -or $catalog[0] -notmatch 'unsigned\.exe$') {
-    throw "Expected only unsigned.exe in signing catalog, got: $($catalog -join ', ')"
+    -ReportPath $prepareReport -OwnedPathPattern 'unsigned.exe' -SignatureProvider $signatureProvider `
+    -SignToolVerifier $embeddedSignature
+  $catalog = @(Get-Content -LiteralPath $catalogPath | ForEach-Object { [System.IO.Path]::GetFileName($_) } | Sort-Object)
+  if (($catalog -join '|') -ne 'catalog-only.dll|unsigned.exe') {
+    throw "Expected unsigned.exe and catalog-only.dll in signing catalog, got: $($catalog -join ', ')"
   }
   $prepared = Get-Content -LiteralPath $prepareReport -Raw | ConvertFrom-Json
   $vendor = $prepared.files | Where-Object path -eq 'wrong.dll'
   if ($null -eq $vendor -or $vendor.action -ne 'Preserve') {
     throw 'A valid vendor-signed PE must be preserved rather than re-signed.'
+  }
+  $catalogOnly = $prepared.files | Where-Object path -eq 'catalog-only.dll'
+  if ($null -eq $catalogOnly -or $catalogOnly.action -ne 'Sign') {
+    throw 'A PE valid only through a Windows catalog (no embedded signature) must be signed.'
+  }
+  if ($catalogOnly.signatureType -ne 'Catalog') {
+    throw "The report must record the catalog-only PE's signature type, got '$($catalogOnly.signatureType)'."
   }
 
   $failure = $null
