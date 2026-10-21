@@ -169,6 +169,12 @@ This was a recurring regression across v1.6.0, v1.6.1, and v1.6.3 because only o
 
 **Fix:** Only upload `Ritemark-Setup.exe`. If both exist on a release, delete the versioned one: `gh release delete-asset vX.Y.Z "Ritemark-X.Y.Z-win32-x64-setup.exe" -R jarmo-productory/ritemark-public -y`
 
+### An update leaves the old version's files behind (Sprint 136)
+
+**Cause:** an update installs over the previous folder, and `[Files]` only adds and overwrites. 2.0 over 1.14 kept 1.14's unpacked `resources\app\node_modules` (VS Code 1.117; 1.142 ships `node_modules.asar`), and its stale `@vscode/proxy-agent` stopped the extension host on the first start. A clean install, and CI's old round trip, never see it.
+
+**Fix:** `ritemark.iss` has an `[InstallDelete]` section with VS Code's own list from `build/win32/code.iss`: `out`, `plugins`, `extensions`, `node_modules`, `node_modules.asar.unpacked` and `node_modules.asar` under `{app}\resources\app`. Only `{app}` is touched; the person's data (`%APPDATA%\Ritemark`, `%USERPROFILE%\.ritemark`) is never under it. CI's standard-user check now also installs v1.14.0 first, installs the new build over it, fails on any file a fresh install does not hold, and starts the app (`scripts/verify-windows-app-starts.ps1`). On a PC, the same start check runs by hand against an install: `pwsh -File scripts\verify-windows-app-starts.ps1 -AppRoot "$env:LOCALAPPDATA\Programs\Ritemark" -EvidenceDirectory <folder>`; it uses a profile of its own.
+
 ## Linux/Docker alternative (from macOS)
 
 The `scripts/create-windows-installer.sh` script uses Docker with the `amake/innosetup` image. Key differences:

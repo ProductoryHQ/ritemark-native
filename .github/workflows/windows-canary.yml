@@ -47,6 +47,9 @@ env:
   # Keep in lockstep with build-windows.yml so the canary exercises the same
   # Node (hence the same bundled npm/node-gyp) the real build relies on.
   NODE_VERSION: '24.18.0'
+  # Lockstep with build-windows.yml too: the release the replay updates from.
+  PREVIOUS_RELEASE_INSTALLER_URL: 'https://github.com/jarmo-productory/ritemark-public/releases/download/v1.14.0/Ritemark-Setup.exe'
+  PREVIOUS_RELEASE_INSTALLER_SHA256: '8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48'
 
 jobs:
   canary:
@@ -213,7 +216,7 @@ jobs:
   verify-preserved-installer:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.installer_run_id != '' }}
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       actions: read
       contents: read
@@ -279,8 +282,24 @@ jobs:
           }
           "signtool=$($candidates[0].FullName)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
+      - name: Fetch the previous release's installer
+        id: previous-release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $path = Join-Path $env:RUNNER_TEMP 'Ritemark-Previous-Setup.exe'
+          Invoke-WebRequest -Uri $env:PREVIOUS_RELEASE_INSTALLER_URL -OutFile $path
+          $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne $env:PREVIOUS_RELEASE_INSTALLER_SHA256) {
+            throw "Previous release installer SHA-256 mismatch (got '$sha')."
+          }
+          "path=$path" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
       - name: Verify install and uninstall as a standard user
         shell: pwsh
+        env:
+          PREVIOUS_INSTALLER_PATH: ${{ steps.previous-release.outputs.path }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/verify-windows-installer-roundtrip.ps1 `
@@ -290,6 +309,9 @@ jobs:
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
             -ExpectedPublisher 'Productory Services OÜ' `
             -ExpectedVersion '${{ inputs.expected_version }}' `
+            -PreviousInstallerPath $env:PREVIOUS_INSTALLER_PATH `
+            -PreviousInstallerSha256 $env:PREVIOUS_RELEASE_INSTALLER_SHA256 `
+            -AppStartVerifierPath 'scripts\verify-windows-app-starts.ps1' `
             -EvidenceDirectory 'roundtrip-evidence'
 
       - name: Upload roundtrip evidence

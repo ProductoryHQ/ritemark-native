@@ -593,6 +593,10 @@ cp "$W/dist/update-feed.json" "$E/"
 cp "$W"/dist/*.dmg.sha256 "$E/"                                          # build-time (pre-staple) hashes
 cp "$W/dist/win-ci/Ritemark-Setup.sha256.txt" "$E/Ritemark-$V-win32-x64-setup.sha256.txt"
 cp "$W"/dist/win-ci/roundtrip-evidence/*result.json "$E/win32-roundtrip/"
+cp "$W/dist/win-ci/roundtrip-evidence/update-stale-files.txt" "$E/win32-roundtrip/"   # empty when the update left nothing
+for run in fresh-app-start update-app-start; do                                      # did the app start, fresh and updated
+  cp "$W/dist/win-ci/roundtrip-evidence/$run/app-start-result.json" "$E/win32-roundtrip/$run-result.json"
+done
 cp "$W/VSCode-darwin-arm64/ritemark-extension-pre-sign.sha256" "$E/darwin-arm64-extension-pre-sign.sha256"
 cp "$W/VSCode-darwin-x64/ritemark-extension-pre-sign.sha256"   "$E/darwin-x64-extension-pre-sign.sha256"
 cp "$T/published.txt" "$E/published-assets.txt"   # authoritative post-staple published hashes
@@ -603,10 +607,11 @@ What is deliberately left out:
 - The DMGs and the installer — the GitHub Release is their archive, and 10.1
   just proved it holds the same bytes. Partner Center and `getritemark.com`
   take that same file; neither needs the local copy.
-- `win-ci/roundtrip-evidence/*.log` — about 9 MB of Inno Setup install and
-  uninstall logs, Git-ignored by `*.log`. Their outcomes are in the
-  `.result.json` files, and the `ritemark-windows-installer` CI artifact keeps
-  the full set for 30 days after the run.
+- `win-ci/roundtrip-evidence/*.log` and the start checks' `logs/` folders —
+  Inno Setup install, update and uninstall logs and Ritemark's own logs,
+  Git-ignored by `*.log`. Their outcomes are in the `.result.json` files, and
+  the `ritemark-windows-installer` CI artifact keeps the full set for 30 days
+  after the run.
 - `x64-ci/` — empty once `extract-macos-x64-artifact.sh` has run.
 
 Add `docs/releases/vX.Y.Z/evidence/closeout.md` recording, in a few lines: the

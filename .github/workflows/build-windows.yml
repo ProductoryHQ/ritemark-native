@@ -16,6 +16,11 @@ permissions:
 env:
   NODE_VERSION: '24.18.0'
   WINDOWS_PUBLISHER: 'Productory Services OÜ'
+  # The standard-user check also updates from this release: v1.14.0 is the
+  # last on VS Code 1.117's layout (unpacked resources\app\node_modules).
+  # Pinned by URL and SHA-256 (docs/releases/v1.14.0/evidence/published-assets.txt).
+  PREVIOUS_RELEASE_INSTALLER_URL: 'https://github.com/jarmo-productory/ritemark-public/releases/download/v1.14.0/Ritemark-Setup.exe'
+  PREVIOUS_RELEASE_INSTALLER_SHA256: '8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48'
 
 jobs:
   build:
@@ -46,6 +51,7 @@ jobs:
           sparse-checkout: |
             scripts/windows-standard-user-registry-probe.ps1
             scripts/verify-windows-installer-roundtrip.ps1
+            scripts/verify-windows-app-starts.ps1
           sparse-checkout-cone-mode: false
 
       - name: Verify canonical release source
@@ -668,11 +674,26 @@ jobs:
             'Partner Center must receive this same file and SHA-256.'
           ) | Set-Content -LiteralPath installer-output/Ritemark-Setup.sha256.txt -Encoding utf8NoBOM
 
+      - name: Fetch the previous release's installer
+        id: previous-release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $path = Join-Path $env:RUNNER_TEMP 'Ritemark-Previous-Setup.exe'
+          Invoke-WebRequest -Uri $env:PREVIOUS_RELEASE_INSTALLER_URL -OutFile $path
+          $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne $env:PREVIOUS_RELEASE_INSTALLER_SHA256) {
+            throw "Previous release installer SHA-256 mismatch (got '$sha')."
+          }
+          "path=$path" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
       - name: Verify install and uninstall as a standard user
         shell: pwsh
         working-directory: r
         env:
           INSTALLER_PATH: ${{ steps.installer.outputs.installer_path }}
+          PREVIOUS_INSTALLER_PATH: ${{ steps.previous-release.outputs.path }}
         run: |
           $ErrorActionPreference = 'Stop'
           & (Resolve-Path '..\ci-harness\scripts\verify-windows-installer-roundtrip.ps1').Path `
@@ -682,6 +703,9 @@ jobs:
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}' `
             -ExpectedPublisher $env:WINDOWS_PUBLISHER `
             -ExpectedVersion '${{ steps.release.outputs.version }}' `
+            -PreviousInstallerPath $env:PREVIOUS_INSTALLER_PATH `
+            -PreviousInstallerSha256 $env:PREVIOUS_RELEASE_INSTALLER_SHA256 `
+            -AppStartVerifierPath '..\ci-harness\scripts\verify-windows-app-starts.ps1' `
             -EvidenceDirectory 'installer-output\roundtrip-evidence'
 
       - name: Upload signed Windows artifacts
@@ -700,5 +724,5 @@ jobs:
         shell: bash
         working-directory: r
         run: |
-          echo "Windows build, Productory signing, standard-user install/uninstall, and SHA-256 checks passed."
+          echo "Windows build, Productory signing, standard-user install, update from v1.14.0, start and uninstall, and SHA-256 checks passed."
           ls -lh "${{ steps.installer.outputs.installer_path }}" installer-output/Ritemark-Setup.sha256.txt

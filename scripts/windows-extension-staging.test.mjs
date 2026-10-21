@@ -9,6 +9,8 @@ const workflowPath = path.join(projectRoot, '.github', 'workflows', 'build-windo
 const canaryWorkflowPath = path.join(projectRoot, '.github', 'workflows', 'windows-canary.yml');
 const registryProbePath = path.join(projectRoot, 'scripts', 'windows-standard-user-registry-probe.ps1');
 const roundtripPath = path.join(projectRoot, 'scripts', 'verify-windows-installer-roundtrip.ps1');
+const appStartsPath = path.join(projectRoot, 'scripts', 'verify-windows-app-starts.ps1');
+const installerScriptPath = path.join(projectRoot, 'installer', 'windows', 'ritemark.iss');
 
 test('Windows release workflow separates immutable product source from workflow revision', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
@@ -177,6 +179,74 @@ test('Windows standard-user test uses one observable, replayable roundtrip harne
   assert.doesNotMatch(roundtrip, /HKEY_USERS|NTUSER\.DAT|reg\.exe (?:load|unload)|Mount-TestUserHive|Dismount-TestUserHive/, 'admin-side profile hive mounting must not return');
   assert.match(workflow.slice(uploadStep), /- name: Upload signed Windows artifacts\n\s+if: always\(\)/, 'a built signed installer must remain downloadable when the roundtrip test fails');
   assert.match(workflow.slice(uploadStep), /r\/installer-output\/roundtrip-evidence/, 'release artifacts must retain roundtrip diagnostics');
+});
+
+test('an update clears the previous version\'s app code before installing (Sprint 136)', async () => {
+  const installerScript = await readFile(installerScriptPath, 'utf8');
+  const installDelete = installerScript.indexOf('\n[InstallDelete]\n');
+  const files = installerScript.indexOf('\n[Files]\n');
+  assert.ok(installDelete >= 0 && installDelete < files, '[InstallDelete] must come before [Files]');
+
+  const section = installerScript.slice(installDelete, files);
+  for (const folder of ['out', 'plugins', 'extensions', 'node_modules', 'node_modules.asar.unpacked']) {
+    assert.match(
+      section,
+      new RegExp(`^Type: filesandordirs; Name: "\\{app\\}\\\\resources\\\\app\\\\${folder.replace(/\./g, '\\.')}"$`, 'm'),
+      `an update must clear resources\\app\\${folder}`,
+    );
+  }
+  assert.match(section, /^Type: files; Name: "\{app\}\\resources\\app\\node_modules\.asar"$/m);
+  for (const line of section.split('\n').filter((entry) => entry.startsWith('Type:'))) {
+    assert.match(line, /Name: "\{app\}\\resources\\app\\/, `only the app's own code may be cleared: ${line}`);
+  }
+});
+
+test('the standard-user check also updates from the previous release and starts the app', async () => {
+  const [workflow, canaryWorkflow, roundtrip, appStarts] = await Promise.all([
+    readFile(workflowPath, 'utf8'),
+    readFile(canaryWorkflowPath, 'utf8'),
+    readFile(roundtripPath, 'utf8'),
+    readFile(appStartsPath, 'utf8'),
+  ]);
+
+  for (const definition of [workflow, canaryWorkflow]) {
+    assert.match(definition, /PREVIOUS_RELEASE_INSTALLER_URL: 'https:\/\/github\.com\/jarmo-productory\/ritemark-public\/releases\/download\/v[0-9.]+\/Ritemark-Setup\.exe'/);
+    assert.match(definition, /PREVIOUS_RELEASE_INSTALLER_SHA256: '[0-9a-f]{64}'/);
+    assert.match(definition, /- name: Fetch the previous release's installer[\s\S]*?Get-FileHash[\s\S]*?\$env:PREVIOUS_RELEASE_INSTALLER_SHA256/);
+    const verification = definition.slice(definition.indexOf('- name: Verify install and uninstall as a standard user'));
+    assert.match(verification, /-PreviousInstallerPath \$env:PREVIOUS_INSTALLER_PATH/);
+    assert.match(verification, /-PreviousInstallerSha256 \$env:PREVIOUS_RELEASE_INSTALLER_SHA256/);
+    assert.match(verification, /-AppStartVerifierPath '[^']*verify-windows-app-starts\.ps1'/);
+  }
+  assert.match(workflow, /sparse-checkout: \|[\s\S]*?scripts\/verify-windows-app-starts\.ps1/, 'the reviewed harness must carry the start check');
+  assert.match(workflow, /-AppStartVerifierPath '\.\.\\ci-harness\\scripts\\verify-windows-app-starts\.ps1'/);
+
+  const freshUninstalled = roundtrip.indexOf("Invoke-RegistryProbe 'verify-uninstalled'");
+  const freshFiles = roundtrip.indexOf('$freshFiles = ');
+  const freshStart = roundtrip.indexOf("'fresh-app-start'");
+  const previousInstall = roundtrip.indexOf("-Label 'previous-installer'");
+  const updateInstall = roundtrip.indexOf("-Label 'update-installer'");
+  const staleCheck = roundtrip.indexOf('$staleFiles = @(Get-InstalledFiles');
+  const updateStart = roundtrip.indexOf("'update-app-start'");
+  const updateUninstall = roundtrip.indexOf("-Label 'update-uninstaller'");
+  assert.ok(freshFiles >= 0 && freshFiles < freshUninstalled, "a fresh install's files are recorded before it is uninstalled");
+  assert.ok(freshStart > freshFiles && freshStart < freshUninstalled, 'a fresh install must start');
+  assert.ok(previousInstall > freshUninstalled, 'the update runs after the fresh round trip');
+  assert.ok(updateInstall > previousInstall, 'this release installs over the previous one');
+  assert.ok(staleCheck > updateInstall, 'leftovers are checked after the update');
+  assert.ok(updateStart > staleCheck, 'the updated app must start');
+  assert.ok(updateUninstall > updateStart, 'the update is uninstalled last');
+  assert.match(roundtrip, /Get-FileHash -LiteralPath \$stagedPreviousInstaller -Algorithm SHA256/, 'the staged previous installer bytes must be checked');
+  assert.match(roundtrip, /\/LOG=\$previousInstallLog/);
+  assert.match(roundtrip, /\/LOG=\$updateInstallLog/);
+  assert.match(roundtrip, /\/LOG=\$updateUninstallLog/);
+
+  assert.match(appStarts, /ExtensionService#_doActivateExtension ritemark\.ritemark/);
+  assert.match(appStarts, /'terminated unexpectedly'/);
+  assert.match(appStarts, /RITEMARK_BUILD_CHANNEL = 'test'/, 'a test launch is marked as one for usage data');
+  for (const flag of ['--user-data-dir', '--extensions-dir', '--shared-data-dir']) {
+    assert.match(appStarts, new RegExp(`"${flag}=`), `a test launch gets its own ${flag}`);
+  }
 });
 
 test('free Windows canary exercises the shared current-user registry verifier', async () => {
