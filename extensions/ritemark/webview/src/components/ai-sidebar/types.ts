@@ -270,6 +270,8 @@ export interface AgentConversationTurn {
   thinkingEffort?: ThinkingEffort;
   /** Active file path that was included as context (when not skipped) */
   activeFilePath?: string;
+  /** A task card's title, shown for that context instead of its file (#477) */
+  activeFileLabel?: string;
   attachments?: FileAttachment[];
   activities: AgentProgress[];
   /** Subagents spawned during this turn */
@@ -386,6 +388,8 @@ export interface CodexConversationTurn {
   requestedPlanMode?: boolean;
   /** Active file path that was included as context */
   activeFilePath?: string;
+  /** A task card's title, shown for that context instead of its file (#477) */
+  activeFileLabel?: string;
   attachments?: FileAttachment[];
   streamingText: string;
   activities: AgentProgress[];

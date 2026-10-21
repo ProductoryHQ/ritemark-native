@@ -1345,6 +1345,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           ? conversation.thinkingEffortByRuntime['claude-code'] ?? 'auto'
           : 'auto',
         activeFilePath: activeFile,
+        activeFileLabel: activeFile ? state.activeFileLabel ?? undefined : undefined,
         attachments,
         activities: [],
         isRunning: true,
@@ -1711,6 +1712,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           : 'auto',
         requestedPlanMode: codexPlanFirst,
         activeFilePath: skipActiveFile ? undefined : get().activeFilePath || undefined,
+        activeFileLabel: skipActiveFile ? undefined : get().activeFileLabel ?? undefined,
         attachments,
         streamingText: '',
         activities: [],
@@ -1792,6 +1794,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           : 'auto',
         requestedPlanMode: false,
         activeFilePath: options?.skipActiveFile ? undefined : get().activeFilePath || undefined,
+        activeFileLabel: options?.skipActiveFile ? undefined : get().activeFileLabel ?? undefined,
         attachments,
         streamingText: '',
         activities: [],

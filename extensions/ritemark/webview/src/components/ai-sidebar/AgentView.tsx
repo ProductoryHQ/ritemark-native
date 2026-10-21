@@ -77,7 +77,7 @@ export function AgentTurnBlock({
           <span>{RUNTIME_TURN_HEADER}</span>
         </div>
       ) : (
-        <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath}>
+        <UserPromptBubble attachments={turn.attachments} activeFilePath={turn.activeFilePath} activeFileLabel={turn.activeFileLabel}>
           {turn.userPrompt}
         </UserPromptBubble>
       )}
