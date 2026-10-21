@@ -609,8 +609,13 @@ export function activate(context: vscode.ExtensionContext) {
     const userClaudeRoot = path.join(os.homedir(), '.claude');
     if (fs.existsSync(userClaudeRoot)) {
       try {
-        const userWatcher = fs.watch(userClaudeRoot, { recursive: true }, () => {
-          agentLibraryViewProvider?.refresh();
+        // Only the Agent Library's own folders: Claude Code writes its sessions under
+        // ~/.claude/projects all the time, and each write refreshed the library.
+        const userWatcher = fs.watch(userClaudeRoot, { recursive: true }, (_event, filename) => {
+          const top = String(filename ?? '').split(/[\\/]/)[0];
+          if (!filename || top === 'agents' || top === 'skills' || top === 'commands') {
+            agentLibraryViewProvider?.refresh();
+          }
         });
         context.subscriptions.push({ dispose: () => userWatcher.close() });
       } catch {

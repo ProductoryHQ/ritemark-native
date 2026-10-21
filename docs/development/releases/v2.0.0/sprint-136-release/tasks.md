@@ -42,14 +42,14 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 
 ## Phase 3: The dress rehearsal (W12, W1, E3)
 
-- [ ] "Harbour" made with the installed v1.14.0 on the Mac, in the background, and archived outside the repository
+- [x] "Harbour" made with the installed v1.14.0 on the Mac, in the background, and archived outside the repository (`/private/tmp/claude-501/harbour-v1.14.0.zip`, with its manifest)
 - [ ] "Harbour" made on the Windows PC by the Windows session, and archived there
-- [ ] A new release worktree at main's commit; `release-preflight.sh`; `check:anthropic-models` (Step 0)
-- [ ] `build-prod.sh` under the arm64 wrapper; S44; `validate-build-output.sh`
-- [ ] The app run hidden: Sprint 135's E5 checks; `project-check.mjs`; `frame-geometry.mjs`; R3's section with `--compare`; S1, S4, S5, S6, S18 (arm64), S34 (S45)
-- [ ] macOS x64 CI and Windows CI green on the same commit (the visibility toggled and back)
+- [x] A new release worktree at main's commit; `release-preflight.sh`; `check:anthropic-models` (Step 0): `release-8052a182c16a`
+- [x] `build-prod.sh` under the arm64 wrapper; S44; `validate-build-output.sh`
+- [x] The app run hidden: Sprint 135's E5 checks; `project-check.mjs`; `frame-geometry.mjs`; R3's section with `--compare`; S1, S4, S5, S18 (arm64), S42 (S45); S6 and S34 moved to the candidate ([qa-evidence.md](qa-evidence.md))
+- [x] macOS x64 CI and Windows CI green on the same commit (the visibility toggled and back): 39540339261, 39540359645
 - [ ] Windows round 5 on that installer: S35–S41 on Windows and S2 (S46)
-- [ ] Findings listed; each fixed in Phase 4 or deferred by Jarmo
+- [ ] Findings listed; each fixed in Phase 4 or deferred by Jarmo: the file watcher stall (fixed: no recursive home-folder watch; S47), the context line (fixed), the Settings foot's release images (D2, at Gate 1)
 - [ ] The dress rehearsal's worktree removed, with Jarmo's yes (E2)
 
 ## Phase 4: The release documents, the second sprint PR (W6, W7, W9)

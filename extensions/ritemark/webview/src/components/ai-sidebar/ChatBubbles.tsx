@@ -24,9 +24,11 @@ interface UserPromptBubbleProps {
   attachments?: FileAttachment[];
   /** Active file path that was included as context */
   activeFilePath?: string;
+  /** A task card's title: shown with the task mark instead of the file (#477) */
+  activeFileLabel?: string;
 }
 
-export function UserPromptBubble({ children, attachments, activeFilePath }: UserPromptBubbleProps) {
+export function UserPromptBubble({ children, attachments, activeFilePath, activeFileLabel }: UserPromptBubbleProps) {
   return (
     <div
       className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)]"
@@ -35,9 +37,9 @@ export function UserPromptBubble({ children, attachments, activeFilePath }: User
       {/* Active file context indicator */}
       {activeFilePath && (
         <div className="flex items-center gap-1 mb-1.5 text-[10px] text-[var(--r-ink-muted)]">
-          <Icon name="file-text" size={12} className="shrink-0" />
-          <span className="truncate" title={activeFilePath}>
-            Context: {displayFileName(activeFilePath)}
+          <Icon name={activeFileLabel ? 'check-square' : 'file-text'} size={12} className="shrink-0" />
+          <span className="truncate" title={activeFileLabel ?? activeFilePath}>
+            {activeFileLabel ?? `Context: ${displayFileName(activeFilePath)}`}
           </span>
         </div>
       )}
