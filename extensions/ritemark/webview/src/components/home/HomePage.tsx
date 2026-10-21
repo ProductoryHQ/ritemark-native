@@ -94,7 +94,7 @@ function Head({ state }: { state: HomeState }) {
   )
 }
 
-function WhatMoved() {
+function WhatMoved({ copilotChat }: { copilotChat: boolean }) {
   return (
     <section className="rh-card" aria-label="What moved in Ritemark 2.0">
       <div className="rh-card-head">
@@ -105,7 +105,8 @@ function WhatMoved() {
         </Tooltip>
       </div>
       <div className="rh-moved"><span className="rh-ic"><Icon name="terminal" size={12} tone="inherit" /></span><span><b>The terminal is a tab.</b> Yours sits beside your documents; a new one comes from the +.</span></div>
-      <div className="rh-moved"><span className="rh-ic"><Icon name="dots-three" size={12} tone="inherit" /></span><span><b>Copilot Chat is in More,</b> at the end of the places on the left, and opens as a tab.</span></div>
+      {/* Only where there is one: Ritemark 1 never had Copilot Chat, and More shows it only while it is installed (Windows round 5) */}
+      {copilotChat && <div className="rh-moved"><span className="rh-ic"><Icon name="dots-three" size={12} tone="inherit" /></span><span><b>Copilot Chat is in More,</b> at the end of the places on the left, and opens as a tab.</span></div>}
       <div className="rh-moved"><span className="rh-ic"><Icon name="user" size={12} tone="inherit" /></span><span><b>Settings and Help are under you,</b> at the top right; {navigator.platform.startsWith('Win') ? 'Ctrl+,' : '⌘,'} opens Settings.</span></div>
     </section>
   )
@@ -282,7 +283,7 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
             </Tooltip>
           </div>
         )}
-        {state.whatMoved && <WhatMoved />}
+        {state.whatMoved && <WhatMoved copilotChat={state.copilotChat} />}
         <Waiting state={state} now={now} />
         <StartSomething name={state.project.name} />
         {state.empty ? <DropFiles /> : <LastChanged state={state} now={now} />}

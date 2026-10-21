@@ -73,6 +73,8 @@ export interface HomeState {
   boardEnabled: boolean;
   /** Experience 32, frame 5: shown once on a profile updated from Ritemark 1. */
   whatMoved: boolean;
+  /** Copilot Chat is installed and enabled, so What moved can say it is in More (Sprint 136). */
+  copilotChat: boolean;
   /** "Switched to … Go back": the project this window came from. */
   switchedFrom: { name: string } | null;
   /** A project of the list whose folder is not found, chosen from the list (experience 33). */

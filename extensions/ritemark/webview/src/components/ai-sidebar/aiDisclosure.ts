@@ -170,6 +170,17 @@ export function includesBrowserContext(input: BrowserContextInclusionInput): boo
 }
 
 /**
+ * Whether a send tells the host to leave the page out. It does when the chip is
+ * not shown, except while the share question waits on the sheet (Sprint 136,
+ * Windows round 5): then the host holds the turn for the person's answer and
+ * adds the page only after Share, only the page asked about. A page the person
+ * took off the message stays off.
+ */
+export function skipsBrowserContext(input: { chipShown: boolean; removedForTurn: boolean; shareQuestionWaiting: boolean }): boolean {
+  return input.removedForTurn || (!input.chipShown && !input.shareQuestionWaiting);
+}
+
+/**
  * The detail view always explains every category that can be transmitted. The
  * active marker is intentionally descriptive, not a promise that the provider
  * will receive only these values: an approved agent can read more workspace
