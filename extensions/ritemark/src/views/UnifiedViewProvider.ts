@@ -2537,11 +2537,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * user's home, sends the list again (debounced; discovery reads the files synchronously).
    */
   private _watchAgentFiles(): void {
-    const pattern = '.claude/{agents,commands,skills}/**';
-    const roots = [this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, os.homedir()]
-      .filter((root): root is string => !!root);
-    for (const root of new Set(roots)) {
-      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(root), pattern));
+    const patterns: vscode.RelativePattern[] = [];
+    // The project's folder is watched by VS Code anyway, so a pattern based there costs nothing extra.
+    const workspaceRoot = this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot) patterns.push(new vscode.RelativePattern(vscode.Uri.file(workspaceRoot), '.claude/{agents,commands,skills}/**'));
+    // In the home folder each folder is its own base. A pattern based at the home folder made
+    // VS Code watch the whole home folder recursively: thousands of events a few minutes from
+    // Library and other apps' folders (Sprint 136's dress rehearsal).
+    const homeClaude = vscode.Uri.joinPath(vscode.Uri.file(os.homedir()), '.claude');
+    for (const folder of ['agents', 'commands', 'skills']) {
+      patterns.push(new vscode.RelativePattern(vscode.Uri.joinPath(homeClaude, folder), '**'));
+    }
+    for (const pattern of patterns) {
+      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
       const changed = () => {
         if (this._agentDiscoveryTimer) clearTimeout(this._agentDiscoveryTimer);
         this._agentDiscoveryTimer = setTimeout(() => {

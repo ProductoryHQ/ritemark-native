@@ -36,7 +36,7 @@ And a chat continues in the same conversation.
 
 ### S5: The second start
 When Ritemark is quit and started again after S1 and S2
-Then no welcome and no What moved show, and nothing in the window moves
+Then no welcome shows, and nothing in the window moves; What moved shows until the person presses Got it (Sprint 134's R11), and never after
 When the person drags Transcribe before Browser and restarts
 Then Transcribe stays where they put it.
 
@@ -280,6 +280,12 @@ Given main after this sprint's fixes and the runtime update merged
 When a clean-room production build of main's commit is made and run in the background
 Then Sprint 135's E5 app checks pass (no agent host at launch, a terminal answers, code is coloured, the code cache fills, About names the commit), S1, S4, S5, S6 and S18 (arm64) pass with "Harbour", and R3's section runs against it
 And macOS x64 CI and Windows CI are green on the same commit.
+
+### S47: Documents after a flood of file events (found at the dress rehearsal)
+Given the candidate running with trace logs (`--log trace`) on a project, and Documents showing it
+When 5,000 files are created and deleted in a scratch folder in the home folder, and then again inside the project
+Then the window's `fileWatcher.log` asks for no recursive watch of the home folder
+And a file created outside Ritemark in the project afterwards shows in Documents within 4 s, every minute for five minutes.
 
 ### S46: Windows on the dress rehearsal's installer
 Given the Windows installer from S45's CI run, on the Windows PC
