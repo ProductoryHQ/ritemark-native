@@ -2,7 +2,7 @@
 
 ## Ownership
 
-The **Ritemark** name, logo, and brand identity are trademarks of **Productory OÜ**.
+The **Ritemark** name, logo, and brand identity are trademarks of **Productory Services OÜ**.
 
 The MIT License grants rights to the source code only. It does **not** grant rights to use the Ritemark name, logos, or brand assets.
 
@@ -15,7 +15,7 @@ The MIT License grants rights to the source code only. It does **not** grant rig
 ## What You Cannot Do
 
 - **Distribute a fork called "Ritemark"** — forks must use a different name and different branding
-- **Use the Ritemark logo** in your own projects, products, or marketing without written permission from Productory OÜ
+- **Use the Ritemark logo** in your own projects, products, or marketing without written permission from Productory Services OÜ
 - **Imply endorsement** by Productory or the Ritemark project without explicit approval
 - **Use "Ritemark" in a domain name, app store listing, or product name** for a derivative work
 
@@ -32,7 +32,7 @@ This is the same model used by Mozilla Firefox (forks must rebrand — e.g., "Ic
 
 ## Permitted Use in This Project
 
-The Ritemark brand is permitted for use exclusively within the official `ritemark-native` repository and its official distributions (signed releases published by Productory OÜ). Contributors to this repository may use the brand assets in the context of their contributions to the project.
+The Ritemark brand is permitted for use exclusively within the official `ritemark-native` repository and its official distributions (signed releases published by Productory Services OÜ). Contributors to this repository may use the brand assets in the context of their contributions to the project.
 
 ## Requesting Permission
 
@@ -44,4 +44,4 @@ Open-source code and brand identity serve different purposes. The MIT License en
 
 ---
 
-*Ritemark is a trademark of Productory OÜ. This policy may be updated from time to time.*
+*Ritemark is a trademark of Productory Services OÜ. This policy may be updated from time to time.*

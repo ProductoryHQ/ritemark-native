@@ -115,6 +115,6 @@ This project uses [Claude Code](https://claude.ai/code) for development. The `.c
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2024-2026 Productory OÜ
+[MIT](LICENSE) — Copyright (c) 2024-2026 Productory Services OÜ
 
-The Ritemark name, logos, and brand assets are trademarks of Productory OÜ. See [TRADEMARK.md](TRADEMARK.md) for details.
+The Ritemark name, logos, and brand assets are trademarks of Productory Services OÜ. See [TRADEMARK.md](TRADEMARK.md) for details.

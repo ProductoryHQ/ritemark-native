@@ -191,6 +191,8 @@ Copyright (c) 2026 Jarmo Tuisk
 Permission is hereby granted, free of charge, to any person obtaining a copy...
 ```
 
+> **2026-10-21 (Jarmo):** the legal entity is **Productory Services OÜ**; there is no Productory OÜ. The copyright and trademark lines (`LICENSE`, `branding/LICENSE`, `README.md`, `TRADEMARK.md`, the Store listing) name Productory Services OÜ from this date. The decision below is kept as it was written.
+
 **Decision: Productory OÜ** — The Ritemark brand is owned by Productory and permitted for use only in this OSS project. See `TRADEMARK.md` and `branding/LICENSE` for enforcement.
 
 #### 1.2 Choose a contribution model

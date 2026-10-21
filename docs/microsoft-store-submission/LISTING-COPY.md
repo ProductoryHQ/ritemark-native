@@ -77,7 +77,7 @@ Copy release-specific text into that candidate's record and keep it under 1,500 
 | Field | Copy |
 |---|---|
 | Developed by | `Productory Services OÜ` |
-| Copyright and trademark | `Copyright 2024–2026 Productory OÜ. Ritemark is released under the MIT License.` |
+| Copyright and trademark | `Copyright 2024–2026 Productory Services OÜ. Ritemark is released under the MIT License.` |
 | Applicable license terms | `https://www.productory.ai/en/terms/` |
 
 Unchanged for 2.0.
