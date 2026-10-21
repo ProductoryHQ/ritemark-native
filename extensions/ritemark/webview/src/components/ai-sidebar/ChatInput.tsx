@@ -27,7 +27,7 @@ import {
   AIInformationDialog,
   useAIInformationDisclosure,
 } from './AIInformation';
-import { includesBrowserContext, resolveAIIdentity } from './aiDisclosure';
+import { includesBrowserContext, resolveAIIdentity, skipsBrowserContext } from './aiDisclosure';
 import { defaultCodexModelId, modelDisplayName, parseModelDescription } from './modelPresentation';
 import { shouldQueueInsteadOfSend } from './composerQueue';
 import { queueFor } from './promptQueue';
@@ -217,6 +217,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
   } = activeConversation;
   const isOnline = useAISidebarStore((s) => s.isOnline);
   const runtimeCapabilities = useAISidebarStore((s) => s.runtimeCapabilities);
+  const browserShareQuestion = useAISidebarStore((s) => s.browserShareQuestion);
   const thinkingEffortCapabilities = useAISidebarStore((s) => s.thinkingEffortCapabilities);
   const thinkingEffortNotice = useAISidebarStore((s) => activeConversationId
     ? s.thinkingEffortNotices[activeConversationId] ?? null
@@ -297,6 +298,12 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     runtimeTakesBrowserContext: runtimeCapabilities[pendingRuntime.runtimeId]?.browserContext === true,
     removedForTurn: hideBrowserContext,
   });
+  // Sprint 136: a send while the share question waits lets the host wait for the answer.
+  const skipBrowserContext = skipsBrowserContext({
+    chipShown: showBrowserContextChip,
+    removedForTurn: hideBrowserContext,
+    shareQuestionWaiting: browserShareQuestion !== null,
+  });
   // OpenCode zero-key check: all four provider booleans are false
   const openCodeHasNoKeys = isOpenCode && acpProviders
     && !acpProviders.google && !acpProviders.openai && !acpProviders.anthropic && !acpProviders.openrouter;
@@ -370,7 +377,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
       source: 'composer',
       attachments: attachments.length > 0 ? attachments : undefined,
       skipActiveFile: hideActiveFile,
-      skipBrowserContext: !showBrowserContextChip,
+      skipBrowserContext,
       mentionedAgentPaths,
     });
     if (outcome === 'full') {
@@ -378,7 +385,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
       setTimeout(() => setQueueFullNotice(false), 4000);
     }
     return outcome;
-  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, showBrowserContextChip, enqueuePrompt]);
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, skipBrowserContext, enqueuePrompt]);
 
 
   // Build final message with path chips and pinned agent prepended
@@ -459,11 +466,11 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
         prompt,
         attachments.length > 0 ? attachments : undefined,
         pendingRuntime.mode,
-        !showBrowserContextChip,
+        skipBrowserContext,
         hideActiveFile,
       );
     } else {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext: !showBrowserContextChip, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
     }
     setValue('');
     setAttachments([]);
@@ -476,7 +483,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     clearPinnedAgentDismissal();
     // The composer height follows `value` (layout effect below), so clearing
     // the text is what shrinks it back.
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, showBrowserContextChip, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, skipBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on

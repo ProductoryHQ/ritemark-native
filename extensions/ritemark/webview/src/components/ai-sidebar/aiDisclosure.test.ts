@@ -8,6 +8,7 @@ import {
   acknowledgeFirstUseDisclosure,
   buildDisclosureContextRows,
   includesBrowserContext,
+  skipsBrowserContext,
   resolveAIIdentity,
   shouldShowFirstUseDisclosure,
   type DisclosureStorage,
@@ -115,6 +116,20 @@ function testContextState() {
   assert.equal(rows.find((row) => row.id === 'tool-results')?.activeNow, false);
 }
 
+function testASendWhileTheShareQuestionWaitsLetsTheHostWait() {
+  const skips = (overrides: Partial<Parameters<typeof skipsBrowserContext>[0]>) => skipsBrowserContext({
+    chipShown: false,
+    removedForTurn: false,
+    shareQuestionWaiting: false,
+    ...overrides,
+  });
+  assert.equal(skips({}), true, 'no chip and nothing asked: the page stays out');
+  assert.equal(skips({ chipShown: true }), false, 'a shared page goes with the turn');
+  assert.equal(skips({ shareQuestionWaiting: true }), false, 'the question waits: the host waits for the answer');
+  assert.equal(skips({ shareQuestionWaiting: true, removedForTurn: true }), true, 'a page taken off the message stays off');
+  assert.equal(skips({ chipShown: true, removedForTurn: true }), true);
+}
+
 function testBrowserContextFollowsShareConsent() {
   const tab = { url: 'https://example.com/pricing', sharedWithAgent: true };
   const included = (overrides: Partial<Parameters<typeof includesBrowserContext>[0]>) => includesBrowserContext({
@@ -153,6 +168,7 @@ function main() {
   testOpenCodeIdentity();
   testContextState();
   testBrowserContextFollowsShareConsent();
+  testASendWhileTheShareQuestionWaitsLetsTheHostWait();
   console.log('AI disclosure tests passed.');
 }
 

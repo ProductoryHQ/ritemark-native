@@ -53,6 +53,7 @@ function home(overrides: Partial<HomeState> = {}): HomeState {
     empty: false,
     boardEnabled: true,
     whatMoved: false,
+    copilotChat: false,
     switchedFrom: null,
     missing: null,
     notice: null,
@@ -98,6 +99,13 @@ assert.match(fullMarkup, />Six weeks for new team leads</, 'the line')
 assert.match(fullMarkup, />~\/Documents\/Leadership programme</, 'the folder line')
 assert.ok(!/Codex/.test(fullMarkup), 'ChatGPT, never Codex')
 assert.deepEqual(posted, [], 'drawing Home sends nothing')
+
+// ── What moved (Sprint 136, Windows round 5): Copilot Chat's line only while it is installed ──
+
+const movedLines = (state: HomeState) => parse(render(state)).querySelectorAll('.rh-moved').map(words)
+assert.equal(movedLines(home()).length, 0, 'no What moved unless the profile came from Ritemark 1')
+assert.deepEqual(movedLines(home({ whatMoved: true })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Settings and Help are'], 'no Copilot Chat line without Copilot Chat')
+assert.deepEqual(movedLines(home({ whatMoved: true, copilotChat: true })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Copilot Chat is in', 'Settings and Help are'])
 
 // ── Empty (R4, S39): the starts and a drop target, no Last changed ──
 

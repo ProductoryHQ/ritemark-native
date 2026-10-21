@@ -45,6 +45,12 @@ export type ShareQuestionChange =
 
 export type ShareAnswer = 'share' | 'notNow';
 
+/** How a turn's wait for the share question ended (Sprint 136): the page it waited on, when there was a question. */
+export interface ShareWaitResult {
+  outcome: 'answered' | 'stopped';
+  pageId?: string;
+}
+
 function pageTitleOf(snapshot: BrowserContextSnapshot): string {
   if (snapshot.title?.trim()) return snapshot.title.trim();
   try {
@@ -112,6 +118,10 @@ export class BrowserContextStore {
    */
   private asking = false;
   private autoControlSharedPageIds = new Set<string>();
+  /** Told, with its page, when a shown question is answered, withdrawn, replaced or dropped (Sprint 136: a turn waits for it). */
+  private readonly settledListeners = new Set<(pageId: string) => void>();
+  /** The workbench request `asking` waits on, so a turn can wait for the question it may bring. */
+  private askInFlight: Promise<unknown> | null = null;
 
   public getLastSnapshot(): BrowserContextSnapshot | null {
     return this.lastSnapshot;
@@ -156,7 +166,9 @@ export class BrowserContextStore {
     const snapshot = this.lastSnapshot;
     const shown = this.shownQuestion;
     const withdraw = (): ShareQuestionChange => {
+      const current = this.shownQuestion;
       this.shownQuestion = null;
+      if (current) this.settle(current.pageId);
       return shown ? { kind: 'clear' } : { kind: 'unchanged' };
     };
     if (!snapshot?.pageId || !snapshot.url || snapshot.sharedWithAgent || this.autoSharedPageIds.has(snapshot.pageId)) return withdraw();
@@ -165,12 +177,15 @@ export class BrowserContextStore {
 
     let result: unknown;
     this.asking = true;
+    const request = Promise.resolve(vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND));
+    this.askInFlight = request;
     try {
-      result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND);
+      result = await request;
     } catch {
       return withdraw(); // the workbench failed: nothing shared, asked again on a later poll
     } finally {
       this.asking = false;
+      if (this.askInFlight === request) this.askInFlight = null;
     }
     // A reply that needs no answer from the sheet settles the page asked about, even when another page is in front by
     // now: an older shell asked the person in its own dialog, and a page is asked at most once per window.
@@ -183,13 +198,80 @@ export class BrowserContextStore {
       this.autoSharedPageIds.add(snapshot.pageId);
       return withdraw();
     }
+    // A question about another page is replaced: it is settled, unanswered.
+    const replaced = this.shownQuestion;
     this.shownQuestion = { pageId: snapshot.pageId, title: pageTitleOf(this.lastSnapshot) };
+    if (replaced && replaced.pageId !== snapshot.pageId) this.settle(replaced.pageId);
     return { kind: 'show', question: this.shownQuestion };
   }
 
   /** The AI's sheet loaded again: a waiting question is posted again on the next poll. */
   public sheetReloaded(): void {
+    const shown = this.shownQuestion;
     this.shownQuestion = null;
+    if (shown) this.settle(shown.pageId);
+  }
+
+  /** The share question the AI's sheet shows now, if any. */
+  public waitingQuestion(): ShareQuestion | null {
+    return this.shownQuestion;
+  }
+
+  /**
+   * Called with its page once a shown question is settled: answered (after the workbench has shared the page, or
+   * not), withdrawn or replaced because another page is in front, or dropped when the sheet reloads or closes.
+   */
+  public onQuestionSettled(listener: (pageId: string) => void): { dispose(): void } {
+    this.settledListeners.add(listener);
+    return { dispose: () => { this.settledListeners.delete(listener); } };
+  }
+
+  /** The number of waiters listening, for tests. */
+  public settledListenerCount(): number {
+    return this.settledListeners.size;
+  }
+
+  private settle(pageId: string): void {
+    for (const listener of [...this.settledListeners]) listener(pageId);
+  }
+
+  /**
+   * Sprint 136 (Windows round 5): a message sent while the share question waits on the AI's sheet waits for it, so
+   * a Share reaches its turn. On 1.142 the question shows as soon as a page loads; a message sent then used to start
+   * without the page, and Share reached only the next turn. `refresh` brings the question up to date first (a page
+   * opened a moment ago may not have been asked about yet, and an ask in flight is waited for). The wait ends when
+   * the question about that page settles, or on `stop`, which works from the moment this returns.
+   */
+  public waitForAnswer(refresh: () => Promise<void>): { stop: () => void; done: Promise<ShareWaitResult> } {
+    let stopped = false;
+    let endWait: ((outcome: ShareWaitResult['outcome']) => void) | null = null;
+    const stop = () => {
+      stopped = true;
+      endWait?.('stopped');
+    };
+    const done = (async (): Promise<ShareWaitResult> => {
+      await refresh();
+      if (this.askInFlight) await this.askInFlight.catch(() => undefined);
+      const question = this.shownQuestion;
+      if (stopped) return { outcome: 'stopped', pageId: question?.pageId };
+      if (!question) return { outcome: 'answered' };
+      const outcome = await new Promise<ShareWaitResult['outcome']>((resolve) => {
+        let finished = false;
+        const finish = (result: ShareWaitResult['outcome']) => {
+          if (finished) return;
+          finished = true;
+          endWait = null;
+          subscription.dispose();
+          resolve(result);
+        };
+        const subscription = this.onQuestionSettled((pageId) => {
+          if (pageId === question.pageId) finish('answered');
+        });
+        endWait = finish;
+      });
+      return { outcome, pageId: question.pageId };
+    })();
+    return { stop, done };
   }
 
   /**
@@ -199,17 +281,23 @@ export class BrowserContextStore {
    * changes nothing and returns false.
    */
   public async answerShareQuestion(pageId: string, answer: ShareAnswer, withoutAsking: boolean): Promise<boolean> {
-    if (this.shownQuestion?.pageId === pageId) this.shownQuestion = null;
-    let result: unknown;
+    const answered = this.shownQuestion?.pageId === pageId;
+    if (answered) this.shownQuestion = null;
     try {
-      result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND, { pageId, answer, withoutAsking: answer === 'share' && withoutAsking });
-    } catch {
-      return false;
+      let result: unknown;
+      try {
+        result = await vscode.commands.executeCommand<unknown>(ENSURE_ACTIVE_BROWSER_SHARED_COMMAND, { pageId, answer, withoutAsking: answer === 'share' && withoutAsking });
+      } catch {
+        return false;
+      }
+      if (!isUsableSnapshot(result) || result.error || result.stale) return false;
+      this.autoSharedPageIds.add(pageId);
+      if (this.lastSnapshot?.pageId === pageId) this.lastSnapshot = { ...this.lastSnapshot, ...result };
+      return true;
+    } finally {
+      // Only now: a waiting turn reads the page, so the workbench must have shared it first.
+      if (answered) this.settle(pageId);
     }
-    if (!isUsableSnapshot(result) || result.error || result.stale) return false;
-    this.autoSharedPageIds.add(pageId);
-    if (this.lastSnapshot?.pageId === pageId) this.lastSnapshot = { ...this.lastSnapshot, ...result };
-    return true;
   }
 
   /**

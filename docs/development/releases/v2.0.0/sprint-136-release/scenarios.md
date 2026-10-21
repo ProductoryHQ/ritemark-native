@@ -256,6 +256,27 @@ Given Claude Code signed out and a flow with a Claude Code step
 When the flow runs
 Then its error names the Settings heading that holds Claude's sign-in card, and that heading exists.
 
+### S48: The update's welcome stays in front (Windows round 5)
+Given a v1.14.0 profile whose terminal comes back (a terminal in the AI column at quit)
+When 2.0 starts on it for the first time
+Then the welcome is in front, the terminal is a tab behind it, and "Open when you left" brings the tab that was in front, or Home, never the terminal
+When a terminal tab takes the front by itself during the welcome's first minute
+Then the welcome comes back in front, once; a terminal the person picks after that stays in front.
+
+### S49: A message sent while the share question waits (Windows round 5)
+Given a web page in front that asks "Share this page with Claude?" on the AI's sheet
+When the person sends "What is the title of the web page I have open?" before answering
+Then the turn shows Working… and sends nothing to Claude while the question waits
+When the person picks Share this page
+Then the turn reads the page and answers with its title
+When the person sends on another page that asks, and presses Stop while the turn waits
+Then the turn ends Stopped, as a stopped turn does, and nothing reached Claude.
+
+### S50: What moved without Copilot Chat (Windows round 5)
+Given a profile updated from Ritemark 1 on a production build (no Copilot Chat)
+When Home shows What moved
+Then it names the terminal and Settings and Help, and says nothing about Copilot Chat; with Copilot Chat installed and enabled, its line shows.
+
 ## Feature: Recent folders and the build (E4, E5)
 
 ### S42: A fresh profile on a computer with another 2.0 build (#475)

@@ -200,6 +200,12 @@ class WelcomeController implements vscode.Disposable {
   private alone = false;
   /** Set while the welcome itself replaces or closes its panel, so that is not read as the person closing it. */
   private closingQuietly = false;
+  /**
+   * Sprint 136 (Windows round 5): on the first start after an update, until this time, a restored terminal tab that
+   * takes the front is sent behind the welcome again, once. Ritemark 1's terminal comes back as a tab while the
+   * window settles, and on Windows it came in front of the welcome. 0 once the person uses the welcome.
+   */
+  private keepInFrontUntil = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -316,9 +322,12 @@ class WelcomeController implements vscode.Disposable {
       this.panel.reveal(vscode.ViewColumn.One, false);
       return;
     }
-    // Sprint 134 (R10): the tab the window had in front, for "Open when you left"
+    // Sprint 134 (R10): the tab the window had in front, for "Open when you left". On the first start after an update
+    // never a terminal: Ritemark 1 had no terminal tabs, so one in front is the one 2.0 brought back (Windows round 5),
+    // and Home stands in for it.
     const before = vscode.window.tabGroups.activeTabGroup.activeTab;
-    this.tabBefore = before ? { label: before.label, viewColumn: before.group.viewColumn } : null;
+    const terminalAfterUpdate = options.reason === 'start' && this.kind === 'update' && before?.input instanceof vscode.TabInputTerminal;
+    this.tabBefore = before && !terminalAfterUpdate ? { label: before.label, viewColumn: before.group.viewColumn } : null;
     const panel = vscode.window.createWebviewPanel(
       WELCOME_VIEW_TYPE,
       'Welcome',
@@ -351,6 +360,7 @@ class WelcomeController implements vscode.Disposable {
     );
     const hasFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
     this.alone = !hasFolder || (reason === 'start' && this.kind === 'update');
+    if (reason === 'start' && this.kind === 'update') this.keepInFrontUntil = Date.now() + 60_000;
     if (this.alone) {
       await vscode.commands.executeCommand('setContext', WELCOME_ALONE_CONTEXT_KEY, true);
       // Alone on the ground (R1): both columns closed. They close in this window's
@@ -373,6 +383,7 @@ class WelcomeController implements vscode.Disposable {
     for (const disposable of this.panelDisposables) disposable.dispose();
     this.panelDisposables = [];
     this.panel = null;
+    this.keepInFrontUntil = 0;
     const wasAlone = this.alone;
     this.alone = false;
     void vscode.commands.executeCommand('setContext', WELCOME_ALONE_CONTEXT_KEY, false);
@@ -415,6 +426,16 @@ class WelcomeController implements vscode.Disposable {
   /** A document opened in a window with no folder (R11, File ▸ Open): the welcome steps aside for it. */
   private onTabsChanged(event: vscode.TabChangeEvent): void {
     if (!this.panel || this.opening) return;
+    if (Date.now() < this.keepInFrontUntil) {
+      const front = vscode.window.tabGroups.activeTabGroup.activeTab;
+      // A terminal the person opens is named Terminal, Terminal 2, … (patch 019); one that came back keeps its shell's name.
+      const restoredTerminal = front?.input instanceof vscode.TabInputTerminal && !/^Terminal( \d+)?$/.test(front.label);
+      if (restoredTerminal && !this.panel.active) {
+        this.keepInFrontUntil = 0;
+        this.panel.reveal(vscode.ViewColumn.One, false);
+        return;
+      }
+    }
     if ((vscode.workspace.workspaceFolders?.length ?? 0) > 0) return;
     if (event.opened.some((tab) => isDocumentTab(tab))) {
       this.panel.dispose();
@@ -550,6 +571,8 @@ class WelcomeController implements vscode.Disposable {
       return;
     }
     const request: WelcomeRequest = decoded.request;
+    // The person is using the welcome: what comes to the front from now on is theirs.
+    if (request.type !== 'welcome/ready') this.keepInFrontUntil = 0;
     switch (request.type) {
       case 'welcome/ready':
         this.push();

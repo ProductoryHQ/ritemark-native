@@ -25,6 +25,8 @@ import { displayPlace } from '../welcome/recentProjects';
 
 export const HOME_VIEW_TYPE = 'ritemark.home';
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
+/** product.json's defaultChatAgent.chatExtensionId; More shows Copilot Chat only while it is installed and enabled. */
+const COPILOT_CHAT_EXTENSION_ID = 'GitHub.copilot-chat';
 const FILE_SCAN_LIMIT = 5000;
 const REDRAW_DEBOUNCE_MS = 1500;
 
@@ -78,6 +80,8 @@ export class HomeHost implements vscode.Disposable {
     };
     this.disposables.push(chats, chats.onDidChange(onChats), chats.onDidCreate(onChats));
     this.disposables.push(deps.projectList.onDidChange(() => this.scheduleRedraw()) as unknown as vscode.Disposable);
+    // Copilot Chat installed, enabled or removed: What moved's line follows it.
+    this.disposables.push(vscode.extensions.onDidChange(() => this.scheduleRedraw()));
   }
 
   private subscribeBoard(): (() => void) | undefined {
@@ -405,6 +409,7 @@ export class HomeHost implements vscode.Disposable {
       empty: recent.empty,
       boardEnabled: this.deps.boardEnabled(),
       whatMoved: showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY)),
+      copilotChat: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
       switchedFrom: this.switchedFrom ? { name: this.switchedFrom.name } : null,
       missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place, here: this.missing.folderUri === folder.uri.toString() } : null,
       notice: this.notice ?? (details.unreadable && !this.unreadableSeen ? 'Ritemark can’t read this project’s settings file (.ritemark/project.json), so it shows the defaults and leaves the file as it is.' : null),

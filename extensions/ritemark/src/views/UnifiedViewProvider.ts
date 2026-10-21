@@ -56,7 +56,7 @@ import {
   type OnboardingStatus,
   traceClaude,
 } from '../agent';
-import { BrowserContextStore } from '../browser/BrowserContextStore';
+import { BrowserContextStore, type ShareWaitResult } from '../browser/BrowserContextStore';
 import { decodeBrowserShareAnswer, type BrowserShareQuestionClearMessage, type BrowserShareQuestionMessage } from './agentSidebarProtocol';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -267,6 +267,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * about it (audit F24).
    */
   private readonly _cancelIntents = new Set<string>();
+  /** Turns waiting for the browser's share question, by conversation: calling one stops its wait (Sprint 136). */
+  private readonly _shareWaits = new Map<string, () => void>();
   /** The turn currently running in each conversation, so a cancel that carries
    *  no turn id can still be attributed to the exact turn. */
   private readonly _activeConversationTurnIds = new Map<string, string>();
@@ -846,9 +848,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // macOS-only AI Browser Control flag, which gates only the browser
           // tools below: Sprint 79 had put it behind that flag, and Windows
           // stopped receiving shared pages.
+          let stoppedBeforeStart = false;
           if (!skipBrowserContext && capabilitiesFor(agentId as import('../agent/types').AgentId).browserContext) {
-            const browserContext = await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
-            if (browserContext) {
+            // Sprint 136 (Windows round 5): a message sent while the share question waits on this sheet waits for
+            // the answer, so a Share reaches this turn; Stop ends it before it starts. Comment tasks never wait.
+            const shareWait = commentTaskId ? null : await this._waitForShareAnswer([clientConversationId, conversationId]);
+            stoppedBeforeStart = shareWait?.outcome === 'stopped';
+            // A long wait: the conversation may have been deleted or taken over meanwhile.
+            if (!isCurrentRuntimeTurn()) break;
+            const browserContext = stoppedBeforeStart ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
+            // After a wait, only the page asked about: a page brought to the front meanwhile was not the question.
+            if (browserContext && (!shareWait?.pageId || browserContext.snapshot.pageId === shareWait.pageId)) {
               prompt = `${browserContext.promptBlock}\n\n---\n\n${prompt}`;
               if (browserContext.claudeAttachments.length > 0) {
                 turnAttachments = [...(turnAttachments ?? []), ...browserContext.claudeAttachments];
@@ -1318,6 +1328,24 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               failureCategory: 'runtime-unavailable',
             });
           }
+          // A Stop while the turn was being prepared (the share wait, or any step above): nothing reached the agent yet.
+          if (!stoppedBeforeStart && conversationTurnId
+            && [clientConversationId, conversationId].some((id) => this._cancelIntents.has(this._cancelIntentKey(id, conversationTurnId)))) {
+            stoppedBeforeStart = true;
+          }
+          if (stoppedBeforeStart) {
+            // Stopped before it started: nothing reached the agent. It ends as a runtime's own stop does
+            // (AgentRunner's 'Execution cancelled', Codex's 'interrupted'), so the sheet says Stopped. The stop is
+            // recorded under the conversation's own id, where the completion looks for it.
+            this._cancelIntents.delete(this._cancelIntentKey(clientConversationId, conversationTurnId));
+            this._noteCancelIntent(conversationId, conversationTurnId);
+            if (isClaudeCode) {
+              sessionConfig.onComplete?.({ text: '', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null }, error: 'Execution cancelled' });
+            } else {
+              sessionConfig.onCodexComplete?.({ status: 'interrupted' });
+            }
+            break;
+          }
           try {
             const session = await this._openRuntimeSession(conversationId, agentId as AgentId, runtime, sessionConfig);
             if (isCurrentRuntimeTurn() && hostConversationEnabled && conversationTurnId) {
@@ -1401,6 +1429,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             message.conversationId,
             typeof message.conversationTurnId === 'string' ? message.conversationTurnId : undefined,
           );
+          // A turn still waiting for the share question's answer ends before it starts (Sprint 136).
+          this._shareWaits.get(message.conversationId)?.();
           const session = this._findRuntimeSession(message.conversationId, message.agentId as AgentId);
           await session?.cancel();
           break;
@@ -1615,6 +1645,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         clearInterval(this._browserContextPoll);
         this._browserContextPoll = null;
       }
+      // The question this sheet showed is gone with it: a turn waiting on it goes on without the page (Sprint 136).
+      if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) BrowserContextStore.instance.sheetReloaded();
       if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
         this._view = undefined;
         this._sidebarReady = false;
@@ -1721,6 +1753,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const working = [...this._activeConversationTurnIds.keys()];
     for (const conversationId of working) {
       this._noteCancelIntent(conversationId);
+      // A turn still waiting for the share question's answer ends before it starts (Sprint 136).
+      this._shareWaits.get(conversationId)?.();
       for (const session of this._runtimeSessions.get(conversationId)?.values() ?? []) {
         await session.cancel().catch((error: unknown) => console.warn('[Projects] Could not stop a chat before switching:', error));
       }
@@ -3177,6 +3211,24 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       path: activeFile?.path ?? null,
       label: activeFile?.label ?? null,
     });
+  }
+
+  /**
+   * Sprint 136 (Windows round 5): a message sent while the browser's share question waits on this sheet waits for
+   * the person's answer (`BrowserContextStore.waitForAnswer`). Stop ends the wait from the moment it starts. A sheet
+   * out of sight asks nothing, so nothing waits.
+   */
+  private async _waitForShareAnswer(conversationIds: string[]): Promise<ShareWaitResult> {
+    if (!this._view?.visible) return { outcome: 'answered' };
+    const wait = BrowserContextStore.instance.waitForAnswer(() => this._sendActiveBrowserContext());
+    for (const id of conversationIds) this._shareWaits.set(id, wait.stop);
+    try {
+      return await wait.done;
+    } finally {
+      for (const id of conversationIds) {
+        if (this._shareWaits.get(id) === wait.stop) this._shareWaits.delete(id);
+      }
+    }
   }
 
   private async _sendActiveBrowserContext() {
