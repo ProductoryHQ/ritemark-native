@@ -187,8 +187,10 @@ test('an update clears the previous version\'s app code before installing (Sprin
   const files = installerScript.indexOf('\n[Files]\n');
   assert.ok(installDelete >= 0 && installDelete < files, '[InstallDelete] must come before [Files]');
 
-  const section = installerScript.slice(installDelete, files);
-  for (const folder of ['out', 'plugins', 'extensions', 'node_modules', 'node_modules.asar.unpacked']) {
+  const uninstallDelete = installerScript.indexOf('\n[UninstallDelete]\n');
+  assert.ok(uninstallDelete > installDelete && uninstallDelete < files, '[UninstallDelete] follows [InstallDelete]');
+  const section = installerScript.slice(installDelete, uninstallDelete);
+  for (const folder of ['out', 'plugins', 'extensions', 'node_modules', 'node_modules.asar.unpacked', 'node-compile-cache']) {
     assert.match(
       section,
       new RegExp(`^Type: filesandordirs; Name: "\\{app\\}\\\\resources\\\\app\\\\${folder.replace(/\./g, '\\.')}"$`, 'm'),
@@ -196,8 +198,14 @@ test('an update clears the previous version\'s app code before installing (Sprin
     );
   }
   assert.match(section, /^Type: files; Name: "\{app\}\\resources\\app\\node_modules\.asar"$/m);
-  for (const line of section.split('\n').filter((entry) => entry.startsWith('Type:'))) {
-    assert.match(line, /Name: "\{app\}\\resources\\app\\/, `only the app's own code may be cleared: ${line}`);
+  const uninstallSection = installerScript.slice(uninstallDelete, files);
+  assert.match(
+    uninstallSection,
+    /^Type: filesandordirs; Name: "\{app\}\\resources\\app\\node-compile-cache"$/m,
+    'uninstalling removes the compile cache entries written after install',
+  );
+  for (const line of installerScript.slice(installDelete, files).split('\n').filter((entry) => entry.startsWith('Type:'))) {
+    assert.match(line, /Name: "\{app\}\\resources\\app\\/, `only the app's own files may be cleared: ${line}`);
   }
 });
 

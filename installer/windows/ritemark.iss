@@ -100,6 +100,15 @@ Type: filesandordirs; Name: "{app}\resources\app\extensions"
 Type: filesandordirs; Name: "{app}\resources\app\node_modules"
 Type: filesandordirs; Name: "{app}\resources\app\node_modules.asar.unpacked"
 Type: files; Name: "{app}\resources\app\node_modules.asar"
+; VS Code 1.142's Node compile cache ships here, and Ritemark's processes can
+; add to it as they run (an extension host's exit wrote new entries in CI).
+; Each release brings its own, so an update starts it afresh.
+Type: filesandordirs; Name: "{app}\resources\app\node-compile-cache"
+
+[UninstallDelete]
+; The compile cache entries written after install are not in the uninstall
+; log; without this, uninstalling leaves the install folder behind.
+Type: filesandordirs; Name: "{app}\resources\app\node-compile-cache"
 
 [Files]
 ; Copy everything from the built app, excluding deeply nested node_modules that exceed MAX_PATH (260 chars)
