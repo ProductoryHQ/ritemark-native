@@ -18,9 +18,10 @@ The previews share one toolbar. Scroll to move through the pages or slides.
 | **−** / **+** | Zoom out or in |
 | **Fit width ▾** | The zoom menu: **Fit width** makes the page as wide as the window, **Fit page** (**Fit slide** for a presentation) shows a whole one, or pick a size from 50 % to 200 % |
 | Magnifier (Word, PowerPoint) | Find text. See below |
-| **Open in Word ▾** (Word) | Open the file in Microsoft Word, or in Pages or your default app when Word is not installed. The arrow beside it offers **Save as Markdown** |
+| **Open in Word ▾** (Word) | Open the file in Microsoft Word, or in Pages or your default app when Word is not installed. The arrow beside it offers **Make an editable copy** |
 | **Open in PowerPoint** (PowerPoint) | Open the file in Microsoft PowerPoint, or in Keynote or your default app when PowerPoint is not installed |
-| **Save as Markdown** (PDF) | Save the document as a Markdown file, with its images in `./images/` |
+| **Make an editable copy** (PDF) | Save the document as a Markdown file you can edit, with its images in `./images/` |
+| **Share** (Word, PDF) | **Show in Finder** (**Show in File Explorer** on Windows), to attach the file to an email or a message, and **Open in Word** for a Word file or **Open in Preview** for a PDF (**Open in default app** on Windows) |
 
 Fit width and fit page follow the window as you resize it, until you zoom by hand.
 In a narrow window the labels become icons; hover one to see what it does.
@@ -112,4 +113,4 @@ The PowerPoint preview can be turned off with the setting
 
 ---
 
-Related: [Export](export.md) · [Spreadsheets](spreadsheets.md)
+Related: [Share](export.md) · [Spreadsheets](spreadsheets.md)

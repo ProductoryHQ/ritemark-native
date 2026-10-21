@@ -24,13 +24,13 @@ Turn a meeting, interview or workshop recording into a speaker-attributed transc
 
 ### 1. Add a recording
 
-Click the waveform icon in the Activity Bar, then **Add recording** — or drag an audio file in from the Folder view.
+Click **Transcribe** in the places row at the top left, then **Transcribe a file…** under the project's name — or drag an audio file in from Documents.
 
 Ritemark reads the length and shows what each engine would do with it. Nothing runs until you choose one.
 
 #### Record directly
 
-Press **Record**, the button with a dot beside **Add recording**. The first time, your computer asks whether Ritemark may use the microphone; the panel shows **Waiting for microphone permission…** until you answer. If access is denied, the panel says so, and **Microphone Settings** opens the right page of your system settings.
+Press **Record**, under the project's name. The first time, your computer asks whether Ritemark may use the microphone; the panel shows **Waiting for microphone permission…** until you answer. If access is denied, the panel says so, and **Microphone Settings** opens the right page of your system settings.
 
 Where the recording is saved depends on what you have open:
 
@@ -60,7 +60,7 @@ Hover over any button in the panel to see what it does, or why it is unavailable
 
 This is a real trade, not a preference: today, "the audio never leaves my machine" and "I know who said what" cannot both be true. Pick per recording.
 
-To use ElevenLabs, add an API key in **Settings → API Keys → ElevenLabs**. The gear in the Transcribe title bar takes you there.
+To use ElevenLabs, add an API key in **Settings → API Keys → ElevenLabs**. The gear at the right of the **Recordings** label, in the Transcribe place, takes you there.
 
 ### 3. Work with the transcript
 
@@ -104,7 +104,7 @@ regeneration does not update a snapshot you already created.
 
 **Save to document** asks which folder, then writes Markdown with front matter, speaker headings and timestamps — and opens it in Ritemark's editor. The document stays linked in the workbench header.
 
-From there it is an ordinary Ritemark document: edit it, export it to PDF or Word, or ask the AI sidebar about it. With the workbench open, the sidebar treats the saved transcript as the active file.
+From there it is an ordinary Ritemark document: edit it, share a copy as PDF or Word, or ask the AI sidebar about it. With the workbench open, the sidebar treats the saved transcript as the active file.
 
 The transcript Save action and **Create insights document** are deliberately
 separate. Saving the transcript keeps its established link in the workbench;
@@ -114,9 +114,9 @@ creating an Insights document never changes that link.
 
 ## Good to Know
 
-**Long recordings.** A 60-minute file transcribes on-device in roughly two and a half minutes on Apple silicon. On other computers Ritemark uses only the processor, so a typical Windows laptop takes about as long as the recording itself, roughly 50 minutes for an hour; Intel Macs are slow too. Close the panel and it keeps going — the Activity Bar icon shows how many jobs are running. **Cancel** stops it at once. If Ritemark closes mid-transcription, the recording comes back marked **Interrupted**, never silently dropped.
+**Long recordings.** A 60-minute file transcribes on-device in roughly two and a half minutes on Apple silicon. On other computers Ritemark uses only the processor, so a typical Windows laptop takes about as long as the recording itself, roughly 50 minutes for an hour; Intel Macs are slow too. Close the panel and it keeps going — the Transcribe icon in the places row shows how many jobs are running. **Cancel** stops it at once. If Ritemark closes mid-transcription, the recording comes back marked **Interrupted**, never silently dropped.
 
-**One project at a time.** Transcripts belong to the folder that was open when you made them. Opening a different project shows that project's recordings.
+**One project at a time.** Transcripts belong to the folder that was open when you made them, and are listed under **Recordings**. Opening a different project shows that project's recordings.
 
 **If a recording moves.** The row says so and offers **Find it** — the transcript is not lost, only the path went stale.
 
@@ -130,7 +130,7 @@ creating an Insights document never changes that link.
 
 **Recording keeps everything the microphone hears.** There is no echo cancellation or noise suppression, so if you record a call played through your speakers, the other side is recorded too. The recording is an ordinary file in your folder and is uploaded only if you choose ElevenLabs for it.
 
-**To hide Record**, turn off the setting `ritemark.features.transcribe-direct-recording`. A recording already in progress still finishes, and saved recordings are not touched.
+**To hide Record**, turn off the setting `ritemark.features.transcribe-direct-recording` in **Advanced settings**, at the foot of Ritemark Settings. A recording already in progress still finishes, and saved recordings are not touched.
 
 **Your transcripts are stored by Ritemark**, not in the folder. That is why saving matters: the saved document is the copy you own, back up and sync. **Settings** shows how much space transcripts use and can clear them — without touching your recordings or anything you saved.
 

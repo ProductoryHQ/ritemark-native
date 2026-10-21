@@ -50,10 +50,10 @@ Ritemark auto-saves after 1 second. If changes aren't saving:
 
 ---
 
-## AI Agents and Agent Library
+## AI Agents and the Agents Place
 
 > The earlier built-in "Ritemark Agent" chat assistant was removed in v1.7.2. The AI sidebar now runs
-> **Claude**, **Codex**, and **OpenCode**. For per-agent setup and troubleshooting (sign-in, "needs repair",
+> **Claude**, **ChatGPT**, and **OpenCode**. For per-agent setup and troubleshooting (sign-in, "needs repair",
 > spawn errors), see [AI Agents](features/ai-agents.md). For OpenAI-key issues in Flows, see
 > [Set Up AI → OpenAI API Key for Flows](setup-ai.md#openai-api-key-for-flows).
 
@@ -66,17 +66,18 @@ If Ritemark can't reach the AI provider, the sidebar shows an **AI Offline** bad
 3. Once connectivity is back, **Check again** brings the sidebar online without a restart.
 4. If it stays offline with a working connection, verify your API key / sign-in on the affected agent (see [AI Agents](features/ai-agents.md)).
 
-### New helpers do not appear in the Agent Library
+### New helpers do not appear in Agents
 
 1. Check that the helper exists under `.claude/` or `.agents/`
-2. Make sure the file uses the expected `.md` / `SKILL.md` structure
-3. Reload the window if the sidebar has not refreshed yet
+2. Check that **This project** or **All projects** at the top of Agents matches where the helper lives
+3. Make sure the file uses the expected `.md` / `SKILL.md` structure
+4. Reload the window if the list has not refreshed yet
 
 ### Launch Chat is missing
 
 1. Confirm you are right-clicking an **agent** row, not a skill row
 2. Make sure the helper is recognized as an agent configuration file
-3. If the helper is new, wait for the sidebar to rescan or reload the window
+3. If the helper is new, wait for Agents to rescan or reload the window
 
 ### Report AI issue doesn't open an email
 
@@ -90,23 +91,23 @@ If the window says your email app is opening but nothing appears, use **Copy rep
 
 ---
 
-## Export
+## Share
 
-### PDF export fails
+### A PDF copy fails
 
 1. Check you have write permission to save location
 2. Try saving to Desktop first
 3. Make sure document isn't corrupted
 
-### Word export has wrong formatting
+### A Word copy has wrong formatting
 
 1. Complex tables may need manual adjustment
 2. Some markdown features don't translate perfectly
 3. Consider PDF for consistent formatting
 
-### Export button not visible
+### Share has no PDF or Word
 
-Export only works for markdown files. CSV and Excel files use different tools.
+**Share** on a markdown document's bar sends a copy as PDF or Word, publishes to Google Docs, or copies the document as Markdown. On a PDF or Word file, **Share** only shows the file in Finder (File Explorer on Windows) or opens it in another app. CSV and Excel files use different tools.
 
 ---
 
@@ -135,24 +136,24 @@ For very large data, use a dedicated spreadsheet app.
 
 ---
 
-## Source Control
+## File Changes (Source Control)
 
 ### "Source control depends on Git being installed"
 
-Source Control uses Git, a separate program that doesn't come with Ritemark. When Git isn't installed, the Source Control view says:
+**File changes**, in **More** (⋯) at the end of the places row, uses Git, a separate program that doesn't come with Ritemark. When Git isn't installed, File changes says:
 
 > Source control depends on Git being installed.
 > After installing Git, please reload (or troubleshoot).
 
-The welcome page says the same thing: **Ritemark needs Git. Install Git to use Source Control.** Ritemark no longer links to a Git download; it only tells you Git is missing.
+Ritemark Settings says the same thing, under **Agent Runtime** in **This computer's tools**: **Git isn't installed on this computer. File changes needs it.** Ritemark doesn't link to a Git download; it only tells you Git is missing.
 
 1. Install Git yourself, for example from [git-scm.com](https://git-scm.com/downloads)
-2. Back in Ritemark, click **reload** in the Source Control message, or run **Reload Window** (Cmd+Shift+P, or Ctrl+Shift+P on Windows)
-3. If Source Control still says Git is missing, click **troubleshoot** to see Git's log
+2. Back in Ritemark, click **reload** in the File changes message, or run **Reload Window** (Cmd+Shift+P, or Ctrl+Shift+P on Windows)
+3. If File changes still says Git is missing, click **troubleshoot** to see Git's log
 
-Once Git is installed, Source Control works as before.
+Once Git is installed, File changes works as before.
 
-The welcome page reports Node the same way (**Ritemark needs Node.**) and doesn't link to a download either. If you need Node.js, install it from [nodejs.org](https://nodejs.org) and restart Ritemark.
+If you use a Claude installed on this computer (**Runtime preference** set to **Use system install**), the welcome's second step and **This computer's tools** also say when it needs Git or Node.js, for example: **Claude from this computer needs Node.js, and Node.js isn't installed.** On the welcome, choose **Use Ritemark's own Claude**; in Settings, set **Runtime preference** back to **Bundled**. Or install Node.js from [nodejs.org](https://nodejs.org) and restart Ritemark.
 
 ---
 
@@ -180,7 +181,7 @@ Ritemark ships two kinds of updates. Most day-to-day fixes and features arrive a
 
 By default, small extension updates download and verify in the background automatically. When one's ready, a **"Ritemark X.Y.Z ready"** notice appears in the status bar (bottom of the window) — click it to relaunch and apply it. No separate download step.
 
-Don't want this automatic? Set `ritemark.updates.mode` to `"prompt"` in Settings to go back to being asked before each install.
+Don't want this automatic? Open **Advanced settings** at the foot of Ritemark Settings and set `ritemark.updates.mode` to `"prompt"` to go back to being asked before each install.
 
 ### "Update available" won't go away (full app updates only)
 
@@ -201,8 +202,9 @@ Don't want this automatic? Set `ritemark.updates.mode` to `"prompt"` in Settings
 
 ### Get Help
 
-- Check [Feature Documentation](../features/README.md) for how things should work
-- Review [Getting Started](../guides/getting-started.md) for setup steps
+- Check [Feature Documentation](features/README.md) for how things should work
+- Review [Getting Started](getting-started.md) for setup steps
+- **You** (top right) → **Help** opens Ritemark's support pages
 
 ### Report an Issue
 
@@ -223,5 +225,5 @@ If you've found a bug:
 | Can't open app | Right-click → Open |
 | File won't save | Check folder permissions |
 | Slow performance | Restart Ritemark |
-| Source Control says Git is missing | Install Git, then click **reload** |
+| File changes says Git is missing | Install Git, then click **reload** |
 | Report AI issue shows no email | **Copy report**, then email info@productory.eu |

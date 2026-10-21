@@ -10,7 +10,7 @@ Select text, drop a note in the right margin, and keep your writing clean — th
 
 - **Anchor a comment on selected text** — select any passage and click **Comment** in the bubble menu; Ritemark highlights the text and opens a note beside it in the right margin
 - **Drop a quick standalone note** — type `///` anywhere to add a margin note that isn't tied to a specific passage
-- **Hand a passage to an AI agent** — type `@` in a comment, pick Claude, Codex, or OpenCode, and send the note and the commented text to the conversation you have open in the AI sidebar
+- **Hand a passage to an AI agent** — type `@` in a comment, pick Claude, ChatGPT, or OpenCode, and send the note and the commented text to the conversation you have open in the AI sidebar
 - **Watch the work honestly** — the comment says what its own task is actually doing: queued, working, waiting for you, finished, or failed
 - **Notes that persist** — comments save into the Markdown file itself; they are still there when you reopen the document
 
@@ -61,10 +61,12 @@ Mention an agent inside a comment note:
 | Mention | Agent |
 |-------|-------|
 | `@claude` | Claude (Anthropic) |
-| `@codex` | Codex (OpenAI) |
+| `@codex` | ChatGPT (OpenAI) |
 | `@opencode` | OpenCode (bring-your-own-key) |
 
-A **Send to Claude** (or Codex, or OpenCode) button appears on the comment. Above it, one line names where the work will go. Pressing the button sends:
+ChatGPT keeps the handle `@codex`, so comments you assigned before still work; the `@` list shows ChatGPT beside it.
+
+A **Send to Claude** (or ChatGPT, or OpenCode) button appears on the comment. Above it, one line names where the work will go. Pressing the button sends:
 
 - your note, without the `@mention`
 - the exact passage the comment is anchored to, so the agent reads the same words you did
@@ -76,7 +78,7 @@ A **Send to Claude** (or Codex, or OpenCode) button appears on the comment. Abov
 
 - The line above the Send button names that conversation, so you always know before you press it. If nothing is open yet, it says **New conversation**.
 - If that conversation is busy, your task waits in its queue and runs next.
-- If that conversation is running a different agent, the task still goes there and runs as the agent you mentioned — the same runtime switch the sidebar composer offers. The line above the Send button says so before you press it, by adding **· Claude takes over** (or Codex, or OpenCode).
+- If that conversation is running a different agent, the task still goes there and runs as the agent you mentioned — the same runtime switch the sidebar composer offers. The line above the Send button says so before you press it, by adding **· Claude takes over** (or ChatGPT, or OpenCode).
 - Once sent, the task stays with that conversation. Switching to another conversation afterwards does not move it.
 
 ### Sending several at once
@@ -87,7 +89,7 @@ Each group answers for itself, as its answer arrives:
 
 ```text
 ✓ Claude · 2 queued → Release note review
-! Codex · Codex is signed out. Sign in and try again.   [Sign in]
+! ChatGPT · ChatGPT is signed out. Sign in and try again.   [Sign in]
 ```
 
 You never get a blanket "all sent" when only one group was accepted.
@@ -153,5 +155,5 @@ Each comment also carries a short identifier so that a queued task keeps pointin
 
 - [Core Editor](editor.md) — basic editing, slash commands
 - [Text Formatting](formatting.md) — bubble menu, bold, italic, links
-- [AI Agents](ai-agents.md) — Claude, Codex, and OpenCode in the sidebar
+- [AI Agents](ai-agents.md) — Claude, ChatGPT, and OpenCode in the sidebar
 - [Keyboard Shortcuts](keyboard-shortcuts.md) — shortcut reference

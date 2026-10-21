@@ -1,10 +1,10 @@
 # AI Agents
 
-> Three built-in AI agents for different workflows: Claude, Codex, and OpenCode.
+> Three built-in AI agents for different workflows: Claude, ChatGPT, and OpenCode.
 
-Ritemark includes three AI agents in the sidebar, each with different capabilities and authentication methods. Switch between them using the dropdown at the top of the AI sidebar.
+Ritemark includes three AI agents in the sidebar on the right, each with different capabilities and authentication methods. Switch between them with the picker in the message box: click the AI and model name under the box, such as **Claude · Sonnet 5**.
 
-If you want to manage custom helpers, see [Agent Library](agent-library.md) for creating, launching, and organizing your own agents and skills.
+If you want to manage custom helpers, see [Agents](agent-library.md) for creating, launching, and organizing your own agents and skills.
 
 > **New in v1.11.0:** A **Report AI issue** item in the status bar lets you report AI output you object to — see [Reporting AI output](#reporting-ai-output). The built-in model list now includes **Claude Fable 5.1** and **GPT-6 Astra**.
 
@@ -12,7 +12,7 @@ If you want to manage custom helpers, see [Agent Library](agent-library.md) for 
 
 > **New in v1.10.0:** Agent conversations are saved locally per project in one durable **Conversations** list. A permanent right rail keeps Pinned, working, needs-you, recent, and otherwise-absent current conversations close without making the rail the owner of history.
 
-> **New in v1.7.3:** **OpenCode** joins Claude and Codex as a third, bring-your-own-key runtime over the Agent Client Protocol. See [OpenCode](#opencode) below and [Set Up AI → OpenCode](../setup-ai.md#opencode-bring-your-own-key) for setup. The sidebar composer also gained a [prompt queue](#running-agents-the-composer-and-plan-approval) and a fixed plan-approval flow this release.
+> **New in v1.7.3:** **OpenCode** joins Claude and ChatGPT as a third, bring-your-own-key runtime over the Agent Client Protocol. See [OpenCode](#opencode) below and [Set Up AI → OpenCode](../setup-ai.md#opencode-bring-your-own-key) for setup. The sidebar composer also gained a [prompt queue](#running-agents-the-composer-and-plan-approval) and a fixed plan-approval flow this release.
 
 > **Changed in v1.7.2:** The earlier "Ritemark Agent" runtime (a direct OpenAI/Gemini chat runtime, also known as the Legacy Agent) has been removed, along with the document-search (RAG) subsystem. Conversations you previously had with the Ritemark Agent still open **read-only** so your history is preserved.
 
@@ -23,7 +23,7 @@ If you want to manage custom helpers, see [Agent Library](agent-library.md) for 
 | Agent | Best for | Authentication | Status |
 |-------|----------|---------------|--------|
 | **Claude** | Autonomous file work, multi-turn sessions | Claude.ai account or Anthropic API key | Stable |
-| **Codex** | Coding tasks, autonomous coding agent | ChatGPT account (OAuth) | Experimental |
+| **ChatGPT** | Autonomous file work with OpenAI's models | ChatGPT account (OAuth), any plan | Experimental |
 | **OpenCode** | Using any provider you have a key for | Bring-your-own provider API key | Experimental |
 
 Agent selection is per turn inside a conversation. You can keep one thread open and switch runtimes without starting over.
@@ -44,7 +44,7 @@ The AI sidebar is no longer a single conversation. You can run **several indepen
 - **Restored transcript, honest context.** Opening a saved transcript does not start an agent. On your next Send, Ritemark first tries that runtime's compatible saved session. If it cannot use it—or you change agent—it starts a fresh session with a bounded text transcript and says so before the turn. Tool state, approvals, partial replies, and attachment contents are never replayed.
 - **Agents keep working in the background.** Start a run in one thread, switch to another, and the first agent keeps going. Responses always land in the thread that asked — threads never cross-talk.
 - **A thread cap.** To keep resource use in check there's a limit on how many threads can be open at once. Open past it and Ritemark tells you instead of silently spawning more sessions.
-- **Runtime is per thread.** Switching Claude ↔ Codex ↔ OpenCode applies immediately and keeps your draft in the composer. A failed or running previous agent is stopped; nothing new starts until you Send. If transcript fallback is needed, one quiet line between turns says that earlier messages were included as context. An unanswered request is labelled context rather than silently resent as a second command.
+- **Runtime is per thread.** Switching Claude ↔ ChatGPT ↔ OpenCode applies immediately and keeps your draft in the composer. A failed or running previous agent is stopped; nothing new starts until you Send. If transcript fallback is needed, one quiet line between turns says that earlier messages were included as context. An unanswered request is labelled context rather than silently resent as a second command.
 
 ---
 
@@ -131,9 +131,9 @@ Settings reflects the truthful auth state by querying the Claude CLI directly. A
 
 ---
 
-## Codex
+## ChatGPT
 
-OpenAI's autonomous coding agent, powered by ChatGPT. Codex uses ChatGPT OAuth authentication (no API key needed).
+OpenAI's autonomous agent, signed in with your ChatGPT account (no API key needed). Ritemark runs it through Codex, OpenAI's agent program, which ships with the app.
 
 **Capabilities:**
 - Autonomous file reading and editing
@@ -147,10 +147,10 @@ OpenAI's autonomous coding agent, powered by ChatGPT. Codex uses ChatGPT OAuth a
 
 | Requirement | Required on | Notes |
 |-------------|-------------|-------|
-| Codex | All platforms | Included with Ritemark; nothing to install |
+| Codex (the program behind ChatGPT) | All platforms | Included with Ritemark; nothing to install |
 | ChatGPT account | All platforms | Any plan, Free included. Paid plans get higher usage limits |
 
-### How Ritemark Detects Codex
+### How Ritemark Finds Codex
 
 Ritemark uses the copy of Codex that ships with the app. If you set **Settings → Agent Runtime → Runtime preference** to **Use system install**, Ritemark looks for your own Codex on the system PATH first, and falls back to the bundled copy if it finds none:
 
@@ -165,20 +165,20 @@ For your own install, Ritemark runs `codex --version` to verify it. It also chec
 - Node.js version used during installation vs. Ritemark's runtime version
 - Architecture match (detects Rosetta/x64 installs on Apple Silicon)
 
-The Claude and Codex cards in Settings show which copy is in use: **Bundled with app** or **System installation**.
+**Currently active**, in Settings' **Agent Runtime** section, shows which copy Claude and ChatGPT use: **Bundled with app** or **System installation**.
 
 ### Authentication
 
-Codex uses **ChatGPT OAuth** - click "Sign in with ChatGPT" to open a browser for authentication. Your email and plan are shown after sign-in.
+ChatGPT uses **ChatGPT OAuth** - click "Sign in with ChatGPT" on the welcome, in the **ChatGPT Account** card in Settings, or in the AI sidebar to open a browser for authentication. Your email and plan are shown after sign-in.
 
-### Troubleshooting Codex
+### Troubleshooting ChatGPT
 
 | Problem | Solution |
 |---------|----------|
-| "Codex runtime not found" | The copy of Codex that ships with Ritemark is missing. Reinstall Ritemark. With **Use system install**, also check your own install (`npm install -g @openai/codex`) |
-| "The bundled Codex runtime could not start" | Reinstall Ritemark. "Repair Codex" repairs only your own install; for the bundled copy it tells you to reinstall Ritemark |
+| "ChatGPT was not found" | The copy of Codex that ships with Ritemark is missing. Reinstall Ritemark. With **Use system install**, also check your own install (`npm install -g @openai/codex`) |
+| "The bundled ChatGPT could not start" | Reinstall Ritemark. "Repair ChatGPT" repairs only your own install; for the bundled copy it tells you to reinstall Ritemark |
 | "spawn codex ENOENT" | Update Ritemark - this was a known bug with Windows path resolution |
-| Your own Codex install broke after a Node update | Click "Repair Codex" to open a repair terminal |
+| Your own Codex install broke after a Node update | Click "Repair ChatGPT" to open a repair terminal |
 | Node version mismatch warning | Applies to your own install only. Reinstall Codex using the same Node version as Ritemark, or set **Runtime preference** back to **Bundled** |
 
 ---
@@ -188,7 +188,7 @@ Codex uses **ChatGPT OAuth** - click "Sign in with ChatGPT" to open a browser fo
 > Added in v1.7.3.
 
 OpenCode is a third chat runtime integrated over the **Agent Client Protocol (ACP)**. Unlike Claude
-and Codex, it has no sign-in of its own — it is **bring-your-own-key**. Configure a provider API key
+and ChatGPT, it has no sign-in of its own — it is **bring-your-own-key**. Configure a provider API key
 in Settings and OpenCode runs against that provider's models.
 
 **Capabilities:**
@@ -196,7 +196,7 @@ in Settings and OpenCode runs against that provider's models.
 - Streaming responses, with reasoning summarized as a few "Thinking" entries and tool calls shown as activities
 - File edits gated behind a per-edit File Change Approval card (out-of-workspace writes are always blocked)
 
-**Choosing a model:** the model picker shows an **OpenCode** group after Codex. Only providers whose
+**Choosing a model:** the model picker in the message box shows an **OpenCode** group after ChatGPT. Only providers whose
 key you've configured appear there — add a Google AI key and Gemini models show up, add OpenAI and you
 get GPT models. With no keys configured, the group prompts you to open Settings. The group refreshes
 the moment a key is saved or removed.
@@ -214,7 +214,7 @@ For full setup, see [Set Up AI → OpenCode (bring your own key)](../setup-ai.md
 
 > Updated in v1.7.3.
 
-These behaviors apply to agent runs in the AI sidebar (Claude and Codex).
+These behaviors apply to agent runs in the AI sidebar (Claude and ChatGPT).
 
 ### Keep typing while an agent runs — your prompts queue
 
@@ -245,7 +245,7 @@ The composer footer has two independent controls instead of the old three-button
   Switching between them mid-thread keeps the conversation memory — the agent does not forget what you discussed.
 - **Plan chip.** Turn it on and the next message runs **plan-first**: the agent works in an enforced read-only phase, then presents a reviewable plan. Nothing in your workspace changes until you approve. The chip stays on until a plan is **approved** (then it turns itself off); cancelling a plan leaves it on.
 
-The Plan chip only appears for runtimes that can genuinely enforce it (Claude and Codex). OpenCode has no plan contract yet, so it shows no Plan control — by design, not omission.
+The Plan chip only appears for runtimes that can genuinely enforce it (Claude and ChatGPT). OpenCode has no plan contract yet, so it shows no Plan control — by design, not omission.
 
 ### Thinking effort
 
@@ -286,15 +286,15 @@ This does not change safety behavior: agents still refuse instructions embedded 
 
 ## Switching Between Agents
 
-Use the dropdown at the top of the AI sidebar to switch agents:
+Use the picker in the message box to switch agents:
 
-1. Click the agent name (e.g., "Claude - Opus")
-2. Select a different agent from the dropdown
+1. Click the AI and model name under the message box (e.g., "Claude · Opus 5")
+2. Select a model in another agent's group: **Claude**, **ChatGPT** or **OpenCode**
 3. The selected runtime is used for the next turn, while the conversation stays continuous
 
-The dropdown shows all available agents and their models. Agents that require setup show a setup wizard instead of the chat interface.
+The picker shows all available agents and their models. Agents that require setup show a setup wizard instead of the chat interface.
 
-You can also pin a custom agent from the [Agent Library](agent-library.md) for the next turn — the previous role is automatically retired so the AI gets a clean handoff.
+You can also pin a custom agent from [Agents](agent-library.md) for the next turn — the previous role is automatically retired so the AI gets a clean handoff.
 
 ![Handover between two pinned agents inside one chat](../releases/v1.6.3/screenshots/1-6-3-agents-handover-in-chat.png)
 
@@ -302,15 +302,15 @@ You can also pin a custom agent from the [Agent Library](agent-library.md) for t
 
 ## Environment Checks
 
-On Windows, Ritemark checks for what the agents actually need. The Claude and Codex that ship with Ritemark need neither Git nor Node.js, so those two checks run only when **Settings → Agent Runtime → Runtime preference** is **Use system install**:
+On Windows, Ritemark checks for what the agents actually need. The Claude Code and Codex (ChatGPT) that ship with Ritemark need neither Git nor Node.js, so those two checks run only when **Settings → Agent Runtime → Runtime preference** is **Use system install**:
 
 | Check | When | Why | Recovery |
 |-------|------|-----|----------|
 | PowerShell available | Always | Built into Windows. Claude installation and sign-in use it, and Claude runs its commands in PowerShell when Git is not installed | Restore PowerShell on your system |
 | Git installed | Use system install only | A Claude you installed yourself may need Git Bash | Install [Git for Windows](https://git-scm.com/download/win), or set **Runtime preference** back to **Bundled** |
-| Node.js installed | Use system install only | A Claude or Codex installed with npm runs on Node.js | Install [Node.js](https://nodejs.org), or set **Runtime preference** back to **Bundled** |
+| Node.js installed | Use system install only | A Claude or ChatGPT installed with npm needs Node.js | Install [Node.js](https://nodejs.org), or set **Runtime preference** back to **Bundled** |
 
-These checks appear as an "Environment checks" notice in the setup wizard, and Git and Node.js appear in the first-run checklist only with **Use system install**. Only a missing PowerShell stops Claude installation; Git and Node.js never block it.
+These checks appear as an "Environment checks" notice in the setup wizard. With **Use system install**, a missing Git or Node.js also shows on the welcome's second step and under **This computer's tools** in Settings' **Agent Runtime** section. Only a missing PowerShell stops Claude installation; Git and Node.js never block it.
 
 After installing a prerequisite, you may need to **reload the window** for Ritemark to detect the change (PATH updates require a restart).
 
@@ -322,14 +322,14 @@ Before the first AI sidebar interaction, the composer states that you are intera
 
 The detail view uses the active conversation's shared runtime/model state. It shows:
 
-- **Runtime:** Claude Code, Codex, or OpenCode
-- **Provider/service:** Anthropic for Claude Code, OpenAI for Codex, or the selected Google/OpenAI/Anthropic/OpenRouter route for OpenCode
+- **Runtime:** Claude Code, ChatGPT, or OpenCode
+- **Provider/service:** Anthropic for Claude Code, OpenAI for ChatGPT, or the selected Google/OpenAI/Anthropic/OpenRouter route for OpenCode
 - **Model:** the model currently selected in the composer
 - **Context categories:** prompt, active file, selected text, attachments, shared browser context, recent cross-runtime context, and tool results
 
 A check beside a context category means that category is present in the current composer state. It is not a guarantee that the agent can read only those items. Depending on the selected permission mode and approvals, an agent can read other workspace files or use tools while completing the task.
 
-The active-file chip can be removed before sending. The shared browser page is shown and sent with your messages only for Claude Code and Codex; OpenCode does not receive it. On macOS, OpenCode can still read a page you shared through its browser tools (see [In-app Browser](browser.md#re-observing-a-page--browser_snapshot)). Sprint 102 also ensures that active-file removal reaches Codex and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
+The active-file chip can be removed before sending. The shared browser page is shown and sent with your messages only for Claude Code and ChatGPT; OpenCode does not receive it. On macOS, OpenCode can still read a page you shared through its browser tools (see [In-app Browser](browser.md#re-observing-a-page--browser_snapshot)). Sprint 102 also ensures that active-file removal reaches ChatGPT and OpenCode and that OpenCode attachment payloads reach its runtime instead of being dropped at the composer boundary.
 
 AI output can be inaccurate or incomplete. Review facts, sources, calculations, commands, and file changes before relying on, publishing, or acting on the result. Approval controls reduce unintended actions; they do not verify correctness.
 
@@ -371,15 +371,16 @@ If no email appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue
 ## Privacy and analytics
 
 - **Claude**: Text is sent to Anthropic's API via Claude Code
-- **Codex**: Text is sent to OpenAI's API via ChatGPT
+- **ChatGPT**: Text is sent to OpenAI through your ChatGPT account
 - **OpenCode**: Text is sent to whichever provider's API key you configured (OpenAI, Google AI, Anthropic, or OpenRouter)
 
 Credentials are stored locally using the operating system's secure storage and the installed runtime. AI sidebar requests are not proxied through a Productory server; the selected runtime connects to its provider using your account or key. Files stay on your computer as files, but prompts and relevant file, selection, attachment, browser, conversation, and tool context can be transmitted when you invoke cloud-connected AI.
 
-Separately, Ritemark sends anonymous product-usage events to PostHog when analytics is enabled (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents. If you explicitly submit written feedback, the feedback text you enter is sent with that event. To turn analytics off, choose **Opt Out** in the notice Ritemark shows on first launch, or turn off `ritemark.analytics.enabled` in Settings (Cmd+, on macOS, Ctrl+, on Windows).
+Separately, Ritemark sends anonymous product-usage events to PostHog when usage data is on (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents, names, or where you are. On a first start, nothing is sent until you leave the welcome with the switch on. If you explicitly submit written feedback with **Send Feedback**, the feedback text you enter is sent with that event, even with usage data off. To turn usage data off, turn off **Share anonymous usage data to improve Ritemark** on the welcome, or the same switch under **Usage data** in Ritemark Settings (Cmd+, on macOS, Ctrl+, on Windows).
 
 ---
 
 ## Related
 
 - [Flows](flows.md) - Visual AI workflows using agents
+- [Agents](agent-library.md) - Your own agents, skills and commands

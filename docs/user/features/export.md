@@ -1,34 +1,35 @@
-# Export
+# Share
 
-> Share your documents as PDF or Word files with one click.
+> Send a copy of your document as a PDF or Word file with one click.
 
-Export your markdown documents to professional formats that anyone can open. Export V2 uses HTML-based rendering for higher visual fidelity.
+**Share**, at the right end of the document's bar, sends a copy of your markdown document in a format anyone can open. The document itself stays on your computer; sharing sends a copy. The copies use HTML-based rendering for higher visual fidelity.
 
 ---
 
 ## What You Can Do
 
-- **Export to PDF** - Universal format, looks the same everywhere
-- **Export to Word** - Editable .docx for Microsoft Word or Google Docs
-- **HTML-based rendering** - Export from editor HTML, not line-by-line markdown parsing
-- **Template styles** - Choose `Default` or `Clean` template from Export menu
-- **Preserve formatting** - Headings, lists, tables, code blocks, and metadata export more reliably
+- **Send a copy as a PDF** - For reading and printing; looks the same everywhere
+- **Send a copy as a Word document** - Editable .docx for people who edit in Word or Google Docs
+- **Publish to Google Docs** - One Google Doc you update from here. See [Publish to Google Docs](google-docs.md)
+- **Copy as Markdown** - For email and chat
+- **HTML-based rendering** - Copies are made from the editor's HTML, not line-by-line markdown parsing
+- **Preserve formatting** - Headings, lists, tables, code blocks, and metadata carry over reliably
 
 ---
 
-## How to Export
+## How to Share a Copy
 
 1. Open any markdown document
-2. Click **Export** in the document header (top-right)
-3. Choose **PDF** or **Word** template option (`Default` or `Clean`)
+2. Click **Share** on the document's bar (top-right), or choose **File → Share**
+3. Under **Send a copy**, choose **PDF** or **Word document**
 4. Pick a save location
 5. Done - file is saved
 
-The export button only appears for markdown files (not CSV or Excel).
+Share's PDF, Word and Google Docs items are for markdown documents. A PDF or Word file has its own **Share**, with **Show in Finder** (**Show in File Explorer** on Windows) and **Open in Preview** or **Open in Word**; see [Previews](previews.md).
 
 ---
 
-## PDF Export
+## PDF Copy
 
 Creates a `.pdf` file that looks great on any device.
 
@@ -59,11 +60,11 @@ If you've set [document properties](document-properties.md):
 
 - **Size:** A4
 - **Margins:** 1 inch on all sides
-- **Templates:** Default (sans-serif), Clean (serif)
+- **Style:** one clean sans-serif style for every document; there is no template to choose
 
 ---
 
-## Word Export
+## Word Copy
 
 Creates a `.docx` file editable in Microsoft Word, Google Docs, or LibreOffice.
 
@@ -72,7 +73,7 @@ Creates a `.docx` file editable in Microsoft Word, Google Docs, or LibreOffice.
 | Element | How It Appears |
 |---------|----------------|
 | Headings | Styled as Heading 1, 2, 3 |
-| Paragraphs | Normal style with template fonts |
+| Paragraphs | Normal style |
 | Bold/Italic | Preserved |
 | Lists | Proper bullet/number formatting (incl. nested) |
 | Tables | Formatted tables |
@@ -86,7 +87,7 @@ If you've set document properties:
 
 ### Page Format
 
-- **Font:** Based on chosen template (`Default` or `Clean`)
+- **Font:** The same style for every document
 - **Size:** Letter/A4 (depends on your region)
 
 ---
@@ -115,10 +116,10 @@ You can change the name in the save dialog.
 
 ## Tips
 
-- **Check before sharing** - Open the exported file to verify formatting
-- **Large documents** - Export works on documents of any size
-- **Tables** - Complex tables may need manual adjustment after Word export
-- **No batch export** - Export one document at a time
+- **Check before sending** - Open the copy to verify formatting
+- **Large documents** - Share works on documents of any size
+- **Tables** - Complex tables may need manual adjustment in a Word copy
+- **One at a time** - Share sends one document at a time
 
 ---
 
@@ -137,4 +138,5 @@ You can change the name in the save dialog.
 ## Related
 
 - [Document Properties](document-properties.md) - Add title and author
+- [Publish to Google Docs](google-docs.md) - Share's Google Docs items
 - [Core Editor](editor.md) - Basic editing

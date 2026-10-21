@@ -2,7 +2,18 @@
 
 > Every shortcut in Ritemark, organized by category.
 
-All shortcuts use Mac notation. Cmd = Command key (⌘).
+All shortcuts use Mac notation. Cmd = Command key (⌘), Control = Control key (⌃). The window shortcuts also give the Windows keys.
+
+---
+
+## Window and Tabs
+
+| Action | Mac | Windows |
+|--------|-----|---------|
+| Ritemark Settings | Cmd+, | Ctrl+, |
+| New tab (the **+** menu: Text, Table, Web page, Terminal) | Cmd+T | Ctrl+T |
+| New terminal tab | Control+` | Ctrl+` |
+| Copilot Chat, as a tab (only while Copilot Chat is installed) | Control+Cmd+I | Ctrl+Alt+I |
 
 ---
 
@@ -72,6 +83,12 @@ All shortcuts use Mac notation. Cmd = Command key (⌘).
 ## Quick Reference Card
 
 ```
+WINDOW
+Cmd+,          Ritemark Settings (Ctrl+,)
+Cmd+T          New tab (Ctrl+T)
+Control+`      Terminal tab (Ctrl+`)
+Control+Cmd+I  Copilot Chat (Ctrl+Alt+I)
+
 FORMATTING
 Cmd+B          Bold
 Cmd+I          Italic

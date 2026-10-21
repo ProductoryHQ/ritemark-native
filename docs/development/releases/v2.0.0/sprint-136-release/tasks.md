@@ -49,16 +49,16 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [x] The app run hidden: Sprint 135's E5 checks; `project-check.mjs`; `frame-geometry.mjs`; R3's section with `--compare`; S1, S4, S5, S18 (arm64), S42 (S45); S6 and S34 moved to the candidate ([qa-evidence.md](qa-evidence.md))
 - [x] macOS x64 CI and Windows CI green on the same commit (the visibility toggled and back): 39540339261, 39540359645
 - [ ] Windows round 5 on that installer: S35–S41 on Windows and S2 (S46)
-- [ ] Findings listed; each fixed in Phase 4 or deferred by Jarmo: the file watcher stall (fixed: no recursive home-folder watch; S47), the context line (fixed), the Settings foot's release images (D2, at Gate 1)
-- [ ] The dress rehearsal's worktree removed, with Jarmo's yes (E2)
+- [x] Findings listed; each fixed in Phase 4 or deferred by Jarmo: the file watcher stall (fixed in #491: no recursive home-folder watch; S47), the context line (fixed in #491), the Settings foot's release images (D2, at Gate 1)
+- [x] The dress rehearsal's worktree removed, with Jarmo's yes (E2): "admin merge 491 and remove the folder", 21 October
 
 ## Phase 4: The release documents, the second sprint PR (W6, W7, W9)
 
-- [ ] Release notes drafted with `product-marketer`, covering every product PR since v1.14.0, R11's fixes, What moved and known issues; Jarmo approves the words (R6)
-- [ ] `docs/CHANGELOG.md`'s 2.0.0 section complete, still undated (R6)
-- [ ] `docs/user/` pages rewritten for 2.0, as the parity list's docs rows name them (R6, G9, S21)
-- [ ] `docs/microsoft-store-submission/`: `CERTIFICATION-NOTES-v2.0.0.md`, `LISTING-COPY.md` reviewed, the screenshot plan in `ASSETS.md` with the Experience lead's scenes (R7)
-- [ ] The fixes from Phase 3, each with its scenario re-run
+- [ ] Release notes drafted with `product-marketer`, covering every product PR since v1.14.0, R11's fixes, What moved and known issues; Jarmo approves the words (R6): drafted, waiting for his words
+- [x] `docs/CHANGELOG.md`'s 2.0.0 section complete, still undated (R6)
+- [x] `docs/user/` pages rewritten for 2.0, as the parity list's docs rows name them (R6, G9, S21): 17 pages, the broken links fixed
+- [x] `docs/microsoft-store-submission/`: `CERTIFICATION-NOTES-v2.0.0.md`, `LISTING-COPY.md` reviewed, the screenshot plan in `ASSETS.md` with the Experience lead's scenes (R7): drafted; Jarmo approves the listing copy; the scenes go to the Experience lead
+- [x] The fixes from Phase 3, each with its scenario re-run: #491, smoke-tested by the Development manager
 - [ ] `./scripts/validate-qa.sh`; the pre-commit validator by hand
 - [ ] The PR opened; `qa-validator`; Jarmo's "admin merge"
 

@@ -21,17 +21,17 @@ Run the flow once, and Ritemark executes each step in sequence.
 
 ## Accessing Flows
 
-Click the **Flows** icon in the Activity Bar (left sidebar). This opens the Flows panel where you can:
+Flows live in **Agents**, in the places row at the top left. Its **Flows** section lists your project's flows. From there you can:
 
 - View existing flows
-- Create new flows
-- Edit and run flows
+- Create new flows with **New ▸ Flow**, under the project's name (Documents' **New** has **Flow** too)
+- Open a flow to edit and run it in the flow editor, as a tab
 
 ---
 
 ## Node Types
 
-Flows are built from four node types, organized in three categories.
+Flows are built from six kinds of step, organized in three categories.
 
 ### Start
 
@@ -45,6 +45,8 @@ Flows are built from four node types, organized in three categories.
 |------|---------|
 | **LLM Prompt** | Send a prompt to an LLM (GPT-4o, etc.). Use `{{variableName}}` to inject values from connected nodes. Outputs generated text. |
 | **Image Generation** | Create images with AI (GPT Image 2 by default, or Gemini 3.1 Flash Image with the Google Gemini provider). Input: text description. Output: path to generated image file. |
+| **Claude Code** | Give a task to Claude Code, which can read and change the project's files. Needs Claude signed in. |
+| **ChatGPT** | Give a task to ChatGPT, which can read and change the project's files. Needs ChatGPT signed in. |
 
 ### Output
 
@@ -58,16 +60,16 @@ Flows are built from four node types, organized in three categories.
 
 ### 1. Create a New Flow
 
-1. Open the Flows panel (Activity Bar icon)
-2. Click **New Flow**
-3. Give your flow a name
+1. Open **Agents** in the places row
+2. Click **New**, under the project's name, then **Flow**
+3. Type your flow's name in the flow editor's bar
 
 ### 2. Add Nodes
 
-Drag nodes from the left palette onto the canvas:
+Drag steps from the left palette onto the canvas:
 
 - Start with a **Trigger** node (required)
-- Add **LLM** or **Image** nodes for AI processing
+- Add **LLM**, **Image**, **Claude Code** or **ChatGPT** steps for AI processing
 - End with **Save File** nodes to write outputs
 
 ### 3. Connect Nodes
@@ -104,12 +106,14 @@ Click a node to open its configuration panel on the right:
 
 ### Execute a Flow
 
-1. Select the flow in the Flows panel
-2. Click **Run** in the toolbar
+1. Open the flow from **Agents ▸ Flows**
+2. Click **Run flow** in the flow editor's bar
 3. If the Trigger has variables without defaults, you'll be prompted to enter values
-4. Watch execution progress in the Execution Panel
+4. Watch execution progress in the run panel on the right
 
-### Execution Panel
+The clock button beside it runs the flow on a schedule.
+
+### The Run Panel
 
 Shows real-time status:
 - Current node being executed
@@ -142,19 +146,22 @@ Each flow is a JSON file containing:
 
 ### API Keys
 
-Flows require API keys configured in Ritemark Settings:
+Flows require API keys or sign-ins configured in Ritemark Settings:
 
 | Node Type | Requires |
 |-----------|----------|
 | LLM Prompt | OpenAI API key |
 | Image Generation | OpenAI API key with image generation access |
+| Claude Code | Claude signed in |
+| ChatGPT | ChatGPT signed in |
+
+A Claude Code or ChatGPT step that isn't signed in says where in Ritemark Settings to sign in.
 
 ### Configuring API Keys
 
-1. Open Flows panel
-2. Click **Settings** (gear icon)
-3. Enter your OpenAI API key
-4. Select default models for LLM and Image generation
+1. Open **Settings** (**You** ▸ Settings at the top right, or Cmd+, / Ctrl+,)
+2. Under **API Keys**, enter your OpenAI API key
+3. Choose each LLM and Image step's model in its configuration panel
 
 ---
 
@@ -182,5 +189,6 @@ Flows require API keys configured in Ritemark Settings:
 
 ## Related
 
-- [AI Agents](ai-agents.md) - Claude and Codex in the sidebar
+- [AI Agents](ai-agents.md) - Claude and ChatGPT in the sidebar
+- [Agents](agent-library.md) - Where your flows are listed
 - [Document Properties](document-properties.md) - YAML frontmatter for metadata

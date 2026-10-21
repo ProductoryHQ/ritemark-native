@@ -24,7 +24,7 @@ Ritemark handles spreadsheet files directly - edit CSV files inline or preview E
 
 ### Opening a CSV
 
-Double-click any `.csv` file in the explorer. It opens in spreadsheet view instead of raw text.
+Double-click any `.csv` file in Documents. It opens in spreadsheet view instead of raw text. To start a new one, choose **Table** from the **+** at the end of the tab row, from **Start something** on Home, or from **New** in Documents.
 
 ### The Interface
 
@@ -156,4 +156,4 @@ This opens the actual file in the external app, not a copy.
 ## Related
 
 - [Core Editor](editor.md) - Markdown editing
-- [Export](export.md) - Export markdown documents
+- [Share](export.md) - Send a markdown document as PDF or Word

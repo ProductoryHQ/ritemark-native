@@ -2,13 +2,13 @@
 
 > Keep a list of what you want done in each project folder, and hand any task to an agent.
 
-Every project folder gets its own task board. Write down what you want done, give a task to Claude, Codex or OpenCode, and come back when it is ready for you to look at. The board shows what waits on you, so you don't have to remember which agent was doing what.
+Every project folder gets its own task board. Write down what you want done, give a task to Claude, ChatGPT or OpenCode, and come back when it is ready for you to look at. The board shows what waits on you, so you don't have to remember which agent was doing what.
 
 ---
 
 ## What You Can Do
 
-- **Write tasks down** in the Tasks side bar or on the board, each with an optional "Done when" line
+- **Write tasks down** in the Tasks place or on the board, each with an optional "Done when" line
 - **Give a task to an agent** with one button; it runs in its own conversation in the AI sidebar
 - **See what waits on you** under **Your calls**: results to review, decisions an agent left you, agents waiting for an approval, and failures
 - **Review a result** and either **Mark done** or **Ask for changes…**
@@ -19,29 +19,29 @@ Every project folder gets its own task board. Write down what you want done, giv
 
 ## Opening the board
 
-Click the **Tasks** icon in the activity bar on the left, right below the File browser. The Task board opens in front, and the side bar lists your tasks:
+Click **Tasks** in the places row at the top left. The Task board comes to the front, and the left column lists your tasks under the project's name, in the order work moves:
 
 | Section | What it holds |
 |---|---|
-| **Your calls** | Tasks that wait on you, the longest-waiting first. Shown only when something waits |
-| **Doing** | Tasks being worked on, by you or an agent |
+| **Ideas** | One-line ideas that are not tasks yet. Folded |
 | **To do** | Tasks waiting to start. The top one is marked **Next up** |
-| **Ideas** | One-line ideas that are not tasks yet |
-| **Done** | Tasks finished in the last four weeks |
-| **Archived** | Tasks you put away. Collapsed, at the bottom |
+| **Doing** | Tasks being worked on, by you or an agent |
+| **Done** | Tasks finished in the last four weeks. Folded, with **Archived** inside it |
 
-The number on the Tasks icon counts the tasks that wait on you.
+A task that waits on you is marked **Waiting for you** and comes first in its section. The number on Tasks counts the tasks that wait on you.
 
-If you closed the board, click **Open the task board** at the top of the side bar, or **Task board** on the Home tab. If Tasks was open when you last closed Ritemark, the board waits for your click instead of jumping in front of your document. The board has four tabs: **Your calls**, **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
+The Task board is always the second tab in the tab row, after Home, pinned as an icon. Its tab shows the same count. Home's **Waiting for you** lists these tasks too. The board has four tabs: **Your calls** (what waits on you, the longest-waiting first), **Board** (the columns), **Ideas** and **Log** (what was done, day by day).
 
-The board needs a project folder. With no folder open, the side bar offers to open one.
+The board needs a project folder. With no folder open, Tasks offers to open one.
 
 ---
 
 ## Adding a task
 
-- Type the title in **Add a task…** at the top of the side bar and press Enter or the send button, or click **+** on a column header on the board. The field grows with a long title, so you can read it whole
-- Or run **Tasks: Add a Task…** from the Command Palette; the task goes to the top of To do and you stay in your document
+- Click **New task**, under the project's name in Tasks, type the title in **Add a task…** and press Enter or the send button, or click **+** on a column header on the board. The field grows with a long title, so you can read it whole
+- Or run **Tasks: Add a Task…** from All commands (Cmd+Shift+P, Ctrl+Shift+P on Windows); the task goes to the top of To do and you stay in your document
+
+**Search**, under New task, filters the list by a task's title as you type. Escape clears it.
 
 Click a task to open it as a page. The page is an ordinary Ritemark document: write what you want in the body, add a **Done when** line ("one page, names the three audiences"), and list the files the task is about under **Files**. Agents work better when they know what done looks like.
 
@@ -51,9 +51,9 @@ The strip at the top of the page shows the stage, the state, the main action for
 
 ## Giving a task to an agent
 
-Press **Give to Claude** (the button names the agent; the arrow next to it lets you pick Claude Code, Codex or OpenCode). The task moves to **Doing** and the agent works on it in a new conversation in the AI sidebar. Your document keeps the focus.
+Press **Give to Claude** (the button names the agent; the arrow next to it lets you pick Claude Code, ChatGPT or OpenCode). The task moves to **Doing** and the agent works on it in a new conversation in the AI sidebar. Your document keeps the focus.
 
-While the agent works, the task says so: **Sending…**, **Queued**, **Working · Claude**. If the agent needs an approval or asks a question in its conversation, the task shows **Needs you** and appears under Your calls. **Open conversation** takes you there.
+While the agent works, the task says so: **Sending…**, **Queued**, **Working · Claude**. If the agent needs an approval or asks a question in its conversation, the task shows **Needs you**, appears under Your calls on the board, and is marked **Waiting for you** in Tasks. **Open conversation** takes you there.
 
 When the agent finishes, the task stays in Doing as **Ready to review**, with:
 
@@ -99,7 +99,7 @@ With the verdict come one sentence why, a size, and a suggested task title and d
 
 ## Archive and delete
 
-- **Archive** (in a task's … menu) takes a task off the board without deleting it. Archived tasks are listed under **Archived** at the bottom of the side bar; open one and press **Restore** to put it back where it was.
+- **Archive** (in a task's … menu) takes a task off the board without deleting it. Archived tasks are listed under **Archived**, inside **Done** in Tasks; open one and press **Restore** to put it back where it was.
 - **Archive all done** on the Done column archives every finished task at once.
 - **Delete…** moves the task's file to the system trash. Press Enter or click **Delete** to confirm.
 
@@ -113,7 +113,7 @@ Each task is a Markdown file in your project folder, in `.ritemark/tasks/`. The 
 
 Which conversation a task runs in is kept on this computer only. On another computer the same tasks show up, but without their running agents.
 
-You can edit a task file in any editor; the board picks up the change. A file the board cannot read is listed under the board with its problem, and is never overwritten.
+You can edit a task file in any editor; the board picks up the change. A file the board cannot read, such as a cloud file that hasn't downloaded yet, is listed under **Couldn't read** with its problem, and is never overwritten. The rest of the board loads as usual.
 
 ---
 
@@ -125,4 +125,4 @@ Agents get tools for the board in every conversation: they can list and read tas
 
 ## Turning the board off
 
-The board is on by default. To turn it off, set `ritemark.features.task-board` to `false` in Settings (JSON). The task files stay in your folder.
+The board is on by default. To turn it off, open **Advanced settings** at the foot of Ritemark Settings and set `ritemark.features.task-board` to `false`. The Task board tab and the counts then go; the task files stay in your folder.
