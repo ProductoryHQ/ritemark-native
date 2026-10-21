@@ -19,10 +19,38 @@ param(
   [string]$ExpectedVersion,
 
   [Parameter(Mandatory)]
-  [string]$EvidenceDirectory
+  [string]$EvidenceDirectory,
+
+  # The update case, optional: install this earlier release first, then
+  # InstallerPath over it, as a person updating does. Nothing the new release
+  # does not ship may be left behind (Sprint 136: 1.14's unpacked node_modules
+  # stopped 2.0's extension host).
+  [string]$PreviousInstallerPath,
+
+  [string]$PreviousInstallerSha256,
+
+  # Optional: scripts/verify-windows-app-starts.ps1, run after the fresh
+  # install and after the update.
+  [string]$AppStartVerifierPath
 )
 
 $ErrorActionPreference = 'Stop'
+
+$previousInstaller = $null
+if (-not [string]::IsNullOrWhiteSpace($PreviousInstallerPath)) {
+  if ($PreviousInstallerSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'PreviousInstallerSha256 must be the exact SHA-256 of the previous release''s installer.'
+  }
+  $previousInstaller = (Resolve-Path -LiteralPath $PreviousInstallerPath).Path
+  $previousInstallerSha = (Get-FileHash -LiteralPath $previousInstaller -Algorithm SHA256).Hash
+  if ($previousInstallerSha -ine $PreviousInstallerSha256) {
+    throw "Previous installer SHA-256 mismatch (got '$previousInstallerSha', expected '$PreviousInstallerSha256')."
+  }
+}
+$appStartVerifier = $null
+if (-not [string]::IsNullOrWhiteSpace($AppStartVerifierPath)) {
+  $appStartVerifier = (Resolve-Path -LiteralPath $AppStartVerifierPath).Path
+}
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
 $signatureVerifier = (Resolve-Path -LiteralPath $SignatureVerifierPath).Path
@@ -59,6 +87,9 @@ $profileRoot = $null
 $userEvidence = $null
 $installLog = $null
 $uninstallLog = $null
+$previousInstallLog = $null
+$updateInstallLog = $null
+$updateUninstallLog = $null
 
 New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires | Out-Null
 try {
@@ -250,6 +281,21 @@ $ErrorActionPreference = 'Stop'
   $installedRegistration = Invoke-RegistryProbe 'verify-installed'
   Write-Host "Verified $($installedRegistration.Count) current-user Ritemark registration after install."
 
+  # Every file of a fresh install, relative to the install folder; Inno's own
+  # uninstaller files are not the app's.
+  function Get-InstalledFiles {
+    $prefix = $installRoot.TrimEnd('\') + '\'
+    @(Get-ChildItem -LiteralPath $installRoot -Recurse -File -Force |
+      ForEach-Object { $_.FullName.Substring($prefix.Length) } |
+      Where-Object { $_ -notmatch '^unins\d+\.(exe|dat|msg)$' })
+  }
+  $freshFiles = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]](Get-InstalledFiles), [System.StringComparer]::OrdinalIgnoreCase)
+  Write-Host "A fresh install holds $($freshFiles.Count) files."
+  if ($appStartVerifier) {
+    & $appStartVerifier -AppRoot $installRoot -EvidenceDirectory (Join-Path $evidenceRoot 'fresh-app-start')
+  }
+
   $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
   if ($null -eq $uninstaller) {
     throw 'Signed uninstaller was not installed.'
@@ -283,6 +329,110 @@ $ErrorActionPreference = 'Stop'
   $removedRegistration = Invoke-RegistryProbe 'verify-uninstalled'
   Write-Host "Verified $($removedRegistration.Count) current-user Ritemark registrations after uninstall."
 
+  $update = $null
+  if ($previousInstaller) {
+    # The update case, as the same standard user into the same folder: the
+    # previous release, then this installer over it.
+    foreach ($mode in 'verify-installed', 'verify-uninstalled') {
+      $freshResult = Join-Path $userEvidence "registry-$mode.result.json"
+      if (Test-Path -LiteralPath $freshResult) {
+        Move-Item -LiteralPath $freshResult -Destination (Join-Path $userEvidence "fresh-registry-$mode.result.json") -Force
+      }
+    }
+    $stagedPreviousInstaller = Join-Path $profileRoot 'Ritemark-Previous-Setup.exe'
+    Copy-Item -LiteralPath $previousInstaller -Destination $stagedPreviousInstaller
+    if ((Get-FileHash -LiteralPath $stagedPreviousInstaller -Algorithm SHA256).Hash -ine $PreviousInstallerSha256) {
+      throw 'Standard-user staging changed the previous installer bytes.'
+    }
+    $previousInstallLog = Join-Path $profileRoot 'Ritemark-previous-install.log'
+    $updateInstallLog = Join-Path $profileRoot 'Ritemark-update-install.log'
+    $updateUninstallLog = Join-Path $profileRoot 'Ritemark-update-uninstall.log'
+
+    $previousInstall = Invoke-UserProcess `
+      -Label 'previous-installer' `
+      -FilePath $stagedPreviousInstaller `
+      -Environment $userProcessEnvironment `
+      -ArgumentList @(
+        '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
+        "/DIR=$installRoot", "/LOG=$previousInstallLog"
+      )
+    if ($previousInstall.ExitCode -ne 0) {
+      throw "The previous release's silent install failed ($($previousInstall.ExitCode))."
+    }
+    $updateInstall = Invoke-UserProcess `
+      -Label 'update-installer' `
+      -FilePath $stagedInstaller `
+      -Environment $userProcessEnvironment `
+      -ArgumentList @(
+        '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
+        "/DIR=$installRoot", "/LOG=$updateInstallLog"
+      )
+    if ($updateInstall.ExitCode -ne 0) {
+      throw "Installing over the previous release failed ($($updateInstall.ExitCode))."
+    }
+    $updatedRegistration = Invoke-RegistryProbe 'verify-installed'
+    Write-Host "Verified $($updatedRegistration.Count) current-user Ritemark registration after the update."
+
+    # Anything a fresh install of this release does not hold was left by the previous one.
+    $staleFiles = @(Get-InstalledFiles | Where-Object { -not $freshFiles.Contains($_) })
+    [System.IO.File]::WriteAllLines((Join-Path $evidenceRoot 'update-stale-files.txt'), [string[]]$staleFiles)
+    if ($staleFiles.Count -gt 0) {
+      Write-Host "The update left $($staleFiles.Count) files the new release does not ship, first ones:"
+      $staleFiles | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+    }
+    $updateStartFailure = $null
+    if ($appStartVerifier) {
+      try {
+        & $appStartVerifier -AppRoot $installRoot -EvidenceDirectory (Join-Path $evidenceRoot 'update-app-start')
+      } catch {
+        $updateStartFailure = $_.Exception.Message
+        Write-Host "After the update: $updateStartFailure"
+      }
+    }
+
+    $updateUninstaller = Get-ChildItem -LiteralPath $installRoot -Filter 'unins*.exe' -File | Select-Object -First 1
+    if ($null -eq $updateUninstaller) {
+      throw 'The update left no uninstaller.'
+    }
+    $updateUninstall = Invoke-UserProcess `
+      -Label 'update-uninstaller' `
+      -FilePath $updateUninstaller.FullName `
+      -Environment $userProcessEnvironment `
+      -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$updateUninstallLog"
+    if ($updateUninstall.ExitCode -ne 0) {
+      throw "Uninstalling after the update failed ($($updateUninstall.ExitCode))."
+    }
+    $cleanupDeadline = [DateTime]::UtcNow.AddSeconds(15)
+    while (((Test-Path -LiteralPath $installRoot) -or (Test-Path -LiteralPath $startMenu)) -and
+           [DateTime]::UtcNow -lt $cleanupDeadline) {
+      Start-Sleep -Milliseconds 250
+    }
+    if (Test-Path -LiteralPath $installRoot) {
+      throw 'Uninstalling after the update left the Ritemark install directory behind.'
+    }
+    if (Test-Path -LiteralPath $startMenu) {
+      throw 'Uninstalling after the update left the Ritemark Start menu group behind.'
+    }
+    $null = Invoke-RegistryProbe 'verify-uninstalled'
+
+    if ($staleFiles.Count -gt 0 -or $updateStartFailure) {
+      $problems = @()
+      if ($staleFiles.Count -gt 0) {
+        $problems += "$($staleFiles.Count) files of the previous release were left behind (update-stale-files.txt)"
+      }
+      if ($updateStartFailure) {
+        $problems += $updateStartFailure
+      }
+      throw "The update from the previous release failed: $($problems -join '; ')."
+    }
+    $update = [ordered]@{
+      previousInstallerSha256 = $PreviousInstallerSha256.ToLowerInvariant()
+      staleFiles = 0
+      appStarted = [bool]$appStartVerifier
+    }
+    Write-Host 'The update from the previous release left nothing behind.'
+  }
+
   [ordered]@{
     status = 'passed'
     installer = [System.IO.Path]::GetFileName($installer)
@@ -290,9 +440,11 @@ $ErrorActionPreference = 'Stop'
     publisher = $ExpectedPublisher
     version = $ExpectedVersion
     standardUser = "$env:COMPUTERNAME\$userName"
+    freshAppStarted = [bool]$appStartVerifier
+    update = $update
   } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceRoot 'roundtrip-result.json') -Encoding utf8NoBOM
 } finally {
-  foreach ($path in @($installLog, $uninstallLog)) {
+  foreach ($path in @($installLog, $uninstallLog, $previousInstallLog, $updateInstallLog, $updateUninstallLog)) {
     if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path -LiteralPath $path)) {
       Copy-Item -LiteralPath $path -Destination $evidenceRoot -Force
     }

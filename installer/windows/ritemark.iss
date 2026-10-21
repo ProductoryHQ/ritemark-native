@@ -84,6 +84,32 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "associatewithfiles"; Description: "Associate with .md files"; GroupDescription: "File associations:"; Flags: unchecked
 Name: "addtopath"; Description: "Add to PATH"; GroupDescription: "Other:"; Flags: unchecked
 
+[InstallDelete]
+; An update installs over the previous version's folder, and [Files] only adds
+; and overwrites. Clear the app's own code first, the same list as VS Code's
+; build/win32/code.iss, so nothing the new version no longer ships stays behind.
+; Ritemark 1.14 (VS Code 1.117) shipped resources\app\node_modules unpacked;
+; 2.0 (VS Code 1.142) packs it into node_modules.asar, and the old folder's
+; @vscode/proxy-agent stopped 2.0's extension host on its first start.
+; Only paths inside {app}: the person's own data (%APPDATA%\Ritemark,
+; %USERPROFILE%\.ritemark, which holds extension updates and dictation models,
+; and %USERPROFILE%\.ritemark-shared) is never under {app}.
+Type: filesandordirs; Name: "{app}\resources\app\out"
+Type: filesandordirs; Name: "{app}\resources\app\plugins"
+Type: filesandordirs; Name: "{app}\resources\app\extensions"
+Type: filesandordirs; Name: "{app}\resources\app\node_modules"
+Type: filesandordirs; Name: "{app}\resources\app\node_modules.asar.unpacked"
+Type: files; Name: "{app}\resources\app\node_modules.asar"
+; VS Code 1.142's Node compile cache ships here, and Ritemark's processes can
+; add to it as they run (an extension host's exit wrote new entries in CI).
+; Each release brings its own, so an update starts it afresh.
+Type: filesandordirs; Name: "{app}\resources\app\node-compile-cache"
+
+[UninstallDelete]
+; The compile cache entries written after install are not in the uninstall
+; log; without this, uninstalling leaves the install folder behind.
+Type: filesandordirs; Name: "{app}\resources\app\node-compile-cache"
+
 [Files]
 ; Copy everything from the built app, excluding deeply nested node_modules that exceed MAX_PATH (260 chars)
 ; NOTE: docx\build IS needed for Word export - do NOT exclude it
