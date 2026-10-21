@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { decodeConversationRecordV1, type ConversationRecordV1 } from './types';
+import { decodeConversationRecordV1, turnActiveDurationMs, type ConversationRecordV1 } from './types';
 import { resolveProjectScope } from './projectScope';
 import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
 
@@ -213,6 +213,24 @@ function run(): void {
   assert.equal(migratedLegacy.continuations?.codex?.runtimeVersion, 'legacy-unknown');
   assert.equal(migratedLegacy.continuations?.codex?.compatibilityFingerprint, 'legacy-incompatible');
   assert.equal(migratedLegacy.continuations?.codex?.coveredThroughEventId, null);
+
+  // Sprint 136 (#488): a turn's working time survives the store, and a bad one is refused.
+  const timed = record();
+  timed.events.push({
+    kind: 'assistant-message', eventId: 'assistant-timed', turnId: 'turn-1', sequence: 1,
+    occurredAt: '2026-08-22T10:00:09.000Z', runtimeId: 'codex',
+    content: 'Planned', terminalStatus: 'completed', appliedThinkingEffort: null, activeDurationMs: 8000,
+  });
+  assert.deepEqual(decodeConversationRecordV1(JSON.parse(JSON.stringify(timed))), timed);
+  const badTime = JSON.parse(JSON.stringify(timed)) as { events: Array<Record<string, unknown>> };
+  badTime.events[1].activeDurationMs = -1;
+  assert.throws(() => decodeConversationRecordV1(badTime), /activeDurationMs/);
+  assert.equal(turnActiveDurationMs({ durationMs: 9500, waitedMs: 1500 }), 8000, 'waiting on the person is not working time');
+  assert.equal(turnActiveDurationMs({ durationMs: 8000 }), 8000);
+  assert.equal(turnActiveDurationMs({ durationMs: 0 }), undefined, "the host's stand-in is no time at all");
+  assert.equal(turnActiveDurationMs(undefined), undefined);
+  assert.equal(turnActiveDurationMs({ durationMs: 1000, waitedMs: 3000 }), 0, 'never negative');
+
   console.log('types.test.ts: all tests passed');
 }
 

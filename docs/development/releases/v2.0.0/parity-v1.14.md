@@ -1,6 +1,6 @@
 # Ritemark 2.0 — the v1.14 parity list
 
-**Status:** written 2026-10-18 from the code; updated 2026-10-19 with Jarmo's decisions of that day (G3, G4, G5 and the drawn redraws), and again on 2026-10-19 with Sprint 134's rows checked on its branch at `aeb1f3d7` by its Mac QA ([qa-evidence.md](sprint-134-project-at-the-centre/qa-evidence.md)). Docs only. It serves the release plan's feature-complete item: "Everything v1.14.0 can do is reachable in 2.0, checked against a written list". Sprint 134 checks its rows on its branch, and Sprint 136 walks every row on the signed candidate.<br>
+**Status:** written 2026-10-18 from the code; updated 2026-10-19 with Jarmo's decisions of that day (G3, G4, G5 and the drawn redraws), and again on 2026-10-19 with Sprint 134's rows checked on its branch at `aeb1f3d7` by its Mac QA ([qa-evidence.md](sprint-134-project-at-the-centre/qa-evidence.md)), and on 2026-10-20 at Sprint 136's start: G1 and G2 marked done from Sprint 133's QA evidence, G7 and G8 accepted by Jarmo, G6's last half and G9 given to Sprint 136. Docs only. It serves the release plan's feature-complete item: "Everything v1.14.0 can do is reachable in 2.0, checked against a written list". Sprint 134 checks its rows on its branch, and Sprint 136 walks every row on the signed candidate.<br>
 **Rule:** HARD RULE #1. Whatever v1.14.0 does keeps a place in 2.0. A function may leave the interface only by a decision that is written down.<br>
 **Read from:**
 - v1.14.0's code at the tag `v1.14.0` (`ed0b6226`): `extensions/ritemark/` (the extension, its `package.json` and the webview) and patches 001–017.
@@ -38,14 +38,14 @@ Each gap is in its section below, with its evidence.
 
 | # | Gap | Owner | Recommendation |
 |---|---|---|---|
-| G1 | The Getting started and Blog links on 1.14's first page. Sprint 133 retires the page; Help opens only the support pages | Sprint 133 (#453) | Add Getting started to the Help menu beside Support, and let the support pages link the blog; or Jarmo accepts Support as their home |
-| G2 | Git's line ("Ritemark found Git" or "needs Git") showed on every 1.14 first page. Sprint 133 shows it only for this computer's runtime | Sprint 133 (#453) | Show Git's line in Settings' "This computer's tools" whatever the runtime, because File changes needs Git either way |
+| G1 | The Getting started and Blog links on 1.14's first page. Sprint 133 retires the page; Help opens only the support pages | Sprint 133 (#453) | **Done in Sprint 133** ([QA evidence](sprint-133-welcome/qa-evidence.md)): Help has Getting started beside Support (patch 015); ritemark.app links the blog |
+| G2 | Git's line ("Ritemark found Git" or "needs Git") showed on every 1.14 first page. Sprint 133 shows it only for this computer's runtime | Sprint 133 (#453) | **Done in Sprint 133** ([QA evidence](sprint-133-welcome/qa-evidence.md)): Settings' "This computer's tools" shows Git whatever the runtime |
 | G3 | Send feedback works only with usage data on. Usage data is off by default from Sprint 133 | Sprint 133 | **Decided** (Jarmo, 19 October): Send feedback sends with usage data off, because pressing Send is the person's own choice and it carries only what they write. Sprint 133 builds it |
 | G4 | VS Code's own settings have no visible way in: ⌘, opens Ritemark Settings since Sprint 132. Feature switches, update mode and channel, excluded folders and the transcription export folder live only there | Sprint 134 (R23) | **Done on Sprint 134's branch** (Jarmo, 19 October; S60): an "Advanced settings" link at the foot of Ritemark Settings opens VS Code's own settings |
 | G5 | The Agents place changed more than Jarmo's yes covered: the count line is gone; the empty state's two buttons became one line; Sort is reachable only through Search; descriptions, badges and "used by" moved into tooltips; an agent's own colour no longer shows | Sprint 134 (R24) | **Done on Sprint 134's branch** (Jarmo, 19 October; S61): an agent's chosen colour shows on its row's icon again. The other changes are accepted as they are |
-| G6 | A flow's run says "sign in under Agent Runtime", but the sign-in cards sit under API Keys | A small fix PR | Name the right heading, or link to the card. Half done on Sprint 134's branch: its copy pass (R22) made a ChatGPT step say "Sign in with ChatGPT in Ritemark Settings". A Claude Code step still names Agent Runtime |
-| G7 | Maximize the AI's column: its title row is gone, so it is reachable only from the palette | The AI's sheet pass (not planned for 2.0) | Accept for 2.0 (the palette has it, and Sprint 134's palette filter keeps it, S58), unless the AI's sheet gains the expand button the drawings show |
-| G8 | Sprint 133 sends every walkthrough command, including VS Code's accessibility walkthrough, to the welcome | Sprint 133 (#453) | Accept: the walkthroughs teach code editing. Jarmo confirms with Sprint 133 |
+| G6 | A flow's run says "sign in under Agent Runtime", but the sign-in cards sit under API Keys | Sprint 136 (R11, [#459](https://github.com/ProductoryHQ/ritemark-native/issues/459)) | Name the right heading, or link to the card. Half done in Sprint 134: its copy pass (R22) made a ChatGPT step say "Sign in with ChatGPT in Ritemark Settings". The Claude Code step is Sprint 136's fix (S41) |
+| G7 | Maximize the AI's column: its title row is gone, so it is reachable only from the palette | The AI's sheet pass (not planned for 2.0) | **Accepted for 2.0 by Jarmo** (2026-10-20, Sprint 136's D5): the palette has it, and Sprint 134's palette filter keeps it (S58) |
+| G8 | Sprint 133 sends every walkthrough command, including VS Code's accessibility walkthrough, to the welcome | Sprint 133 (#453) | **Accepted for 2.0 by Jarmo** (2026-10-20, Sprint 136's D5): the walkthroughs teach code editing, and every command they name stays available |
 | G9 | `docs/user/` describes 1.14's places and words in a dozen pages, and two links are broken | Sprint 136 (R6) | Rewrite the pages with the release notes |
 
 Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sprint-plan.md) as requirements: the project's head on Tasks, Browser and Transcribe, Tasks' and Browser's pages, the PDF and Word bars, New tab and Share in the File menu, the welcome's lists, a gone folder that stays gone, and opening a single document in R14's table. Jarmo's decisions of 19 October add G4 (R23), G5 (R24), the browser's share question on the AI's sheet (R20), the palette without VS Code's developer commands (R21) and "ChatGPT, never Codex" in every visible string (R22). All of them are done on Sprint 134's branch, each row below naming the scenario it rests on. The steps that need a signed-in AI's answer (S28, S44, S55, S57) are Gate 2 items, because Claude is signed out in the profiles Mac QA uses.
@@ -80,7 +80,7 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | The settings gear at the foot of the bar | You ▸ Settings; ⌘, (Ctrl+,) | Main | Done |
 | The AI panel's settings gear | You ▸ Settings; ⌘, | Main | Done |
 | Show and hide the side columns | One toggle per strip | Main | Done |
-| The AI column's Maximize and "…" | All commands (Sprint 134's palette filter keeps it, S58) | Main | **Gap G7** |
+| The AI column's Maximize and "…" | All commands (Sprint 134's palette filter keeps it, S58) | Main | Left out (G7, accepted by Jarmo 2026-10-20) |
 | The window title | The project's name in the left column's head; Home's page | Main, S134 | Done on Documents and Agents; Done on the branch for Tasks, Browser and Transcribe and on Home (R4, R16; S13, S45, S47) |
 | The breadcrumb | The tab's tooltip shows the path in the project | Main | Left out (the comparison) |
 | Status bar: remote and problems | Problems in the View menu | Main | Left out (the comparison) |
@@ -115,12 +115,12 @@ Step 3's own gaps are in [Sprint 134's plan](sprint-134-project-at-the-centre/sp
 | Getting Started: Open folder | The welcome's step 2; the head's Open a folder… | Main, S133 | Done; In flight |
 | Getting Started: recent files and folders (up to six) | The welcome's lists (three); the projects list; File ▸ Open Recent (workspaces too) | S133, S134 | Done (S133); Done on the branch (R2; S5, S54) |
 | Getting Started: Support articles link | Help ▸ Support; You ▸ Help | Main | Done |
-| Getting Started: Getting started and Blog links | None | S133 | **Gap G1** |
+| Getting Started: Getting started and Blog links | Help ▸ Getting started, beside Support (patch 015); the blog from ritemark.app | S133 | Done (G1) |
 | Launch check: ChatGPT and Claude signed in, "Click here to log in" | The welcome's cards; Settings' account cards | Main, S133 | Done (Settings); In flight (welcome) |
-| Launch check: Git found or needed | Settings and the welcome, only for this computer's runtime | S133 | **Gap G2** |
+| Launch check: Git found or needed | Settings' "This computer's tools", whatever the runtime | S133 | Done (G2) |
 | Launch check: Node, when needed (patch 017) | Settings and the welcome, for this computer's runtime | S133 | In flight (R5, R12) |
 | The usage-data notice (OK, Opt Out, Privacy Policy, Terms of Use) | The welcome's switch, on by default and sent only once the welcome is left with it on (Jarmo, 19 October); Settings ▸ Usage data, with both links; a 1.x OK carried over, a 1.x Opt Out kept | S133 | In flight (R7) |
-| Walkthroughs (Help ▸ Welcome: Open Walkthrough…, accessibility) | The welcome | S133 | **Gap G8** |
+| Walkthroughs (Help ▸ Welcome: Open Walkthrough…, accessibility) | The welcome | S133 | Left out (G8, accepted by Jarmo 2026-10-20) |
 | The AI sheet focused at start | Kept for project windows; not while the welcome shows | S133 | In flight |
 | The AI's onboarding wizard and setup views | Unchanged, for anyone who skipped the welcome | Main | Done |
 
@@ -198,7 +198,7 @@ Unchanged on main apart from colours and fixes (Sprint 132's S44, #450).
 | The agent's settings panel | Same, redrawn | Main | Done |
 | Scheduled agents: consent, runs, approve, open result | Agents ▸ Scheduled; status bar; notifications | Main | Done; a check |
 | Flows: create, edit, run, schedule, six kinds of step | Agents ▸ Flows; New ▸ Flow; the flow editor redrawn | Main | Done |
-| A flow's run when Claude Code or Codex is not signed in | It says where to sign in. A ChatGPT step names Ritemark Settings (Sprint 134's copy pass, S59); a Claude Code step still names the wrong heading | Main, S134 | **Gap G6** (Claude Code's half) |
+| A flow's run when Claude Code or Codex is not signed in | It says where to sign in. A ChatGPT step names Ritemark Settings (Sprint 134's copy pass, S59); a Claude Code step still names the wrong heading | Main, S134, S136 | Planned (G6: Sprint 136's R11, #459) |
 | A flow's Note boxes | One help line under Timeout | Main | Done (the Experience lead) |
 
 ## 8. Tasks

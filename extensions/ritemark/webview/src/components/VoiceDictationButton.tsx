@@ -8,6 +8,9 @@ import { dictationProblemCopy, dictationStateCopy, type DictationAction } from '
 import { Tooltip } from './ui/tooltip'
 import { webviewPlatform } from '../hooks/usePlatform'
 import { sendToExtension } from '../bridge'
+import { defaultDictationLanguage, defaultRecentLanguages } from './dictationLanguage'
+
+const KNOWN_LANGUAGES = WHISPER_LANGUAGES.map(l => l.code)
 
 // Local storage keys
 const RECENT_LANGUAGES_KEY = 'ritemark-dictation-recent-languages'
@@ -23,7 +26,7 @@ function getRecentLanguages(): string[] {
   } catch {
     // Ignore errors
   }
-  return ['et', 'en'] // Default: Estonian and English
+  return defaultRecentLanguages(KNOWN_LANGUAGES) // The person's own language, then English (#486)
 }
 
 // Get last used language
@@ -36,7 +39,7 @@ function getLastLanguage(): string {
   } catch {
     // Ignore errors
   }
-  return 'et' // Default: Estonian
+  return defaultDictationLanguage(KNOWN_LANGUAGES)
 }
 
 // Get language name by code
@@ -73,8 +76,8 @@ export function VoiceDictationButton() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showFullPicker, setShowFullPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [recentLanguages, setRecentLanguages] = useState<string[]>(['et', 'en'])
-  const [lastLanguage, setLastLanguage] = useState<string>('et')
+  const [recentLanguages, setRecentLanguages] = useState<string[]>(getRecentLanguages)
+  const [lastLanguage, setLastLanguage] = useState<string>(getLastLanguage)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const dropdownTriggerRef = useRef<HTMLButtonElement>(null)
 
@@ -145,13 +148,13 @@ export function VoiceDictationButton() {
     }
   }
 
-  // Handle language selection from dropdown
+  // A pick only sets the language; dictation starts on the next press of the
+  // microphone, so a menu choice never turns the microphone on (the Experience lead, #486).
   const handleLanguageSelect = (code: string) => {
     saveRecentLanguage(code)
     setLastLanguage(code)
     setRecentLanguages(getRecentLanguages())
     setShowDropdown(false)
-    startDictation(code)
   }
 
   // Get icon and styling based on state. Tooltips: dictationStateCopy (R12).
@@ -190,6 +193,8 @@ export function VoiceDictationButton() {
   }
 
   const { icon, color, title } = getStateStyles(state)
+  const stateLabel = isActive ? dictationStateCopy(state, mode, '').label : null
+  const shownLanguage = isActive ? (currentLanguage || lastLanguage) : lastLanguage
 
   return (
     <div className="dictation-split-btn" ref={dropdownRef}>
@@ -199,13 +204,11 @@ export function VoiceDictationButton() {
           className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
           onClick={handlePrimaryClick}
           disabled={state === 'finishing'}
+          aria-label={title}
           style={{ color }}
         >
           {icon}
-          <span className="dictation-label">
-            {(isActive && dictationStateCopy(state, mode, '').label)
-              || (isActive ? (currentLanguage || lastLanguage) : lastLanguage).toUpperCase()}
-          </span>
+          {stateLabel ? <span className="dictation-label">{stateLabel}</span> : null}
         </button>
       </Tooltip>
 
@@ -220,6 +223,7 @@ export function VoiceDictationButton() {
           disabled={isActive}
           style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
         >
+          <span className="dictation-label">{shownLanguage.toUpperCase()}</span>
           <Icon name="caret-down" size={12} />
         </button>
       </Tooltip>
@@ -232,9 +236,15 @@ export function VoiceDictationButton() {
             <button
               key={code}
               className={`dictation-dropdown-item ${code === lastLanguage ? 'active' : ''}`}
+              aria-current={code === lastLanguage ? 'true' : undefined}
               onClick={() => handleLanguageSelect(code)}
             >
-              {getLanguageName(code)}
+              <span className="dictation-dropdown-name">
+                <span className="dictation-dropdown-tick">
+                  {code === lastLanguage ? <Icon name="check" size={14} /> : null}
+                </span>
+                {getLanguageName(code)}
+              </span>
               <span className="dictation-dropdown-code">{code.toUpperCase()}</span>
             </button>
           ))}
@@ -296,7 +306,10 @@ export function VoiceDictationButton() {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 6px 6px;
+          gap: 4px;
+          padding: 6px 8px;
+          font-size: 13px;
+          font-family: var(--ritemark-ui-font-family);
           background: transparent;
           border: none;
           border-left: 1px solid transparent;
@@ -370,6 +383,17 @@ export function VoiceDictationButton() {
           color: var(--r-accent-deep);
         }
 
+        .dictation-dropdown-name {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .dictation-dropdown-tick {
+          display: inline-flex;
+          width: 14px;
+        }
+
         .dictation-dropdown-code {
           font-size: 11px;
           color: var(--r-ink-muted);
@@ -423,7 +447,6 @@ export function VoiceDictationButton() {
           setLastLanguage(code)
           setRecentLanguages(getRecentLanguages())
           setShowFullPicker(false)
-          startDictation(code)
         }}
         currentLanguage={recentLanguages[0] || null}
       />

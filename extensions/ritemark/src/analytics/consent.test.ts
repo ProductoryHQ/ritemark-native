@@ -254,6 +254,12 @@ async function main(): Promise<void> {
   assert.equal(buildChannel('2.0.0-ext.3', false), 'prod', 'an extension update');
   assert.equal(buildChannel('1.14.0', false), 'dev', 'a run from source');
   assert.equal(buildChannel('2.0.0-0', true), 'dev', 'an extension launched for development');
+  // #480: our own test launches of an installed build are marked, never people.
+  assert.equal(buildChannel('2.0.0-0', false, { RITEMARK_BUILD_CHANNEL: 'test' }), 'test', 'a test launch of an installed build');
+  assert.equal(buildChannel('2.0.0-0', false, { RITEMARK_BUILD_CHANNEL: ' TEST ' }), 'test', 'case and spaces do not matter');
+  assert.equal(buildChannel('2.0.0-0', false, { RITEMARK_BUILD_CHANNEL: 'prod' }), 'prod', 'only "test" changes the channel');
+  assert.equal(buildChannel('2.0.0-0', false, {}), 'prod', 'a person\'s installed app');
+  assert.equal(buildChannel('2.0.0-0', true, { RITEMARK_BUILD_CHANNEL: 'test' }), 'dev', 'development wins');
 
   console.log('✓ consent gate tests passed');
 }

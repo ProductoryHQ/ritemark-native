@@ -48,6 +48,7 @@ import {
 } from '../../src/editorSync/protocol'
 import { canonicalJson } from '../../src/editorSync/state'
 import { onDocChanged } from './lib/docChange'
+import { setDictationSystemLanguage } from './components/dictationLanguage'
 
 // Word documents open in the Office preview bundle (Sprint 124), not here.
 type FileType = 'markdown' | 'csv' | 'xlsx' | 'pdf'
@@ -187,6 +188,7 @@ function App() {
       setProperties(payload.properties as DocumentProperties)
       setHasProperties(payload.hasProperties)
       setImageMappings(payload.imageMappings)
+      setDictationSystemLanguage(payload.systemLanguage)
       setFeatures({
         voiceDictation: payload.features.voiceDictation,
         markdownExport: payload.features.markdownExport,

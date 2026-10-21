@@ -59,6 +59,7 @@ REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 # Pick a fresh user-data-dir for each automation run so prior consent dialogs,
 # auto-share state, and feature-flag toggles don't leak between runs.
 USERDATA="/tmp/ritemark-automation-userdata"
+SHAREDDATA="/tmp/ritemark-automation-shared"
 WORKSPACE="/tmp/ritemark-automation-workspace"
 SCREENSHOT_DIR="/tmp/ritemark-screenshots/$(date +%Y-%m-%dT%H-%M-%S)"
 mkdir -p "$WORKSPACE" "$SCREENSHOT_DIR"
@@ -69,6 +70,13 @@ cd "$REPO_ROOT/vscode"
 # Launch in background. The three knobs that matter:
 #   --remote-debugging-port=9224       — enables CDP (the whole point)
 #   --user-data-dir=$USERDATA          — isolates from your daily Ritemark profile
+#   --use-mock-keychain                — an unsigned dev Electron otherwise asks the
+#                                        keychain at start: a password prompt lands on
+#                                        Jarmo's screen and blocks the main process (CDP hangs)
+#   --shared-data-dir=$SHAREDDATA      — VS Code 1.142 keeps the recent folders in a
+#                                        folder every build shares (~/.ritemark-shared);
+#                                        without this, test folders land in the installed
+#                                        app's Open Recent and projects list (#475)
 #   $WORKSPACE (positional)            — gives Ritemark a workspace folder
 #                                        WITHOUT THIS, agent execution blocks with
 #                                        "No workspace folder open. Please open a folder first."
@@ -78,6 +86,8 @@ VSCODE_SKIP_PRELAUNCH=1 \
   ./scripts/code.sh \
     --remote-debugging-port=9224 \
     --user-data-dir=$USERDATA \
+    --shared-data-dir=$SHAREDDATA \
+    --use-mock-keychain \
     $WORKSPACE &
 
 # Connect with retry — first launch is slow.
@@ -93,6 +103,23 @@ done
 **`VSCODE_SKIP_PRELAUNCH=1`** skips the `preLaunch.ts` step that checks/installs node_modules and runs Electron build. After your first launch it's safe to skip; if the launch fails saying Electron is missing, remove the env var for one launch and add it back.
 
 **`PATH=...v24.18.0...`** forces the arm64 Node. The system default `node` is x86_64 under Rosetta — esbuild and tsx blow up with arch-mismatch errors. v24.18.0 is the documented dev-mode Node (see `.claude/skills/vscode-development/SKILL.md`).
+
+### Launching an installed build (a release candidate, or the installed app)
+
+The same isolation, plus one more rule: an installed build reports usage data as `prod`, so a test run would count as a person (#480). Mark every test launch with `RITEMARK_BUILD_CHANNEL=test`; such a run reports `build_channel: test` and, like a dev run, sends only to a key given for it. `open` passes the shell's environment to the new instance:
+
+```bash
+S=/private/tmp/claude-501/rc1          # short: the IPC socket path has a length limit
+mkdir -p "$S/ud/User" "$S/ext" "$S/shared"
+RITEMARK_BUILD_CHANNEL=test open -n -g -a /Applications/Ritemark.app --args \
+  --remote-debugging-port=9411 \
+  --user-data-dir="$S/ud" --extensions-dir="$S/ext" --shared-data-dir="$S/shared" \
+  --use-mock-keychain --new-window "$WORKSPACE"
+```
+
+- A run that does not test usage data can also turn it off before the first start: `{ "ritemark.features.analytics": false }` in `$S/ud/User/settings.json`.
+- A run that checks the events' payloads sends them to a local stand-in instead: `RITEMARK_POSTHOG_PROJECT_KEY=<any> RITEMARK_POSTHOG_HOST=http://127.0.0.1:<port>`.
+- Pick a port other than 9224, and quit only your own instance (its command line names your `--user-data-dir`).
 
 ## After-launch UI gotchas — handle these first
 

@@ -267,7 +267,8 @@ export function dictationStateCopy(
   switch (state) {
     case 'idle':
       return {
-        tooltip: deferred ? `Start dictation (${language}). Your text appears after you stop.` : `Start dictation (${language})`,
+        // The Experience lead, 2026-10-20 (#486): "Dictate, in Estonian".
+        tooltip: deferred ? `Dictate, in ${language}. Your text appears after you stop.` : `Dictate, in ${language}`,
         placeholder: null,
         label: null,
       }

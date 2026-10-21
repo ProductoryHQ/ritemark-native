@@ -114,7 +114,8 @@ export function presentActivityState(
     case 'done':
       return {
         icon: 'check', tone: 'muted',
-        label: opts?.activeSeconds != null ? `Done in ${formatSeconds(opts.activeSeconds)}` : 'Done',
+        // #488: a zero is a time nobody measured, never "Done in 0.0s".
+        label: opts?.activeSeconds ? `Done in ${formatSeconds(opts.activeSeconds)}` : 'Done',
       };
     case 'failed':
       return {

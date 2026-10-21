@@ -433,6 +433,12 @@ export function cardSlug(title: string): string {
  *  card page reads well (design.md §5). `copy` 2, 3… is added when the name is
  *  taken. Older `<id>-<slug>.md` files keep working: identity is the id in the
  *  front matter. */
+/** A card file's title, for its tab and the AI's chip (#477), or null when the text is not a card. */
+export function cardTitleOf(text: string): string | null {
+  const parsed = parseCardFile(text);
+  return parsed.kind === 'card' ? parsed.card.title : null;
+}
+
 export function cardFileName(title: string, copy = 1): string {
   return copy > 1 ? `${cardSlug(title)}-${copy}.md` : `${cardSlug(title)}.md`;
 }

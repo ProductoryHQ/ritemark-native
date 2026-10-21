@@ -32,7 +32,8 @@ export type {
 export interface RuntimeTurnResult {
   text?: string;
   filesModified?: string[];
-  metrics?: { durationMs: number; costUsd: number | null; model: string | null };
+  /** `waitedMs`: of `durationMs`, the time spent waiting on the person (Sprint 103 R7). */
+  metrics?: { durationMs: number; costUsd: number | null; model: string | null; waitedMs?: number };
   error?: string;
   /** Stable, auth-method-aware recovery category; provider text stays diagnostic-only. */
   failureKind?: RuntimeFailureKind;

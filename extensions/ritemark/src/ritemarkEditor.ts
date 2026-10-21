@@ -35,6 +35,7 @@ import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePa
 import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
+import { systemLanguage } from './voiceDictation/systemLanguage';
 
 // Properties type for front-matter
 export interface DocumentProperties {
@@ -373,6 +374,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
         commentCallouts: isEnabled('comment-callouts')
       },
+      systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,
       ...(cardMode ? { cardMode } : {}),
     };
@@ -756,6 +758,29 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       ? cardPages.connect(document, webviewPanel.webview)
       : null;
 
+    // #477: a card page's tab shows its card's title and the task mark, as
+    // drawn (the Experience lead, 2026-10-20), and follows an edit of the title.
+    // Every other file keeps its file name and icon.
+    let cardTabTitle: string | null = null;
+    const applyCardTab = () => {
+      const title = cardPage ? cardPages?.cardTitleFor(document) ?? null : null;
+      if (title === cardTabTitle) return;
+      cardTabTitle = title;
+      webviewPanel.title = title ?? path.basename(document.uri.fsPath);
+      webviewPanel.iconPath = title
+        ? {
+          light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-light.svg'),
+          dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-dark.svg'),
+        }
+        : undefined;
+    };
+    applyCardTab();
+    const cardTabWatcher = cardPage
+      ? vscode.workspace.onDidChangeTextDocument((event) => {
+        if (event.document === document) applyCardTab();
+      })
+      : null;
+
     // Show word count status bar only for markdown files
     const fileType = this.getFileType(document.uri.fsPath);
     if (fileType === 'markdown') {
@@ -1137,6 +1162,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       }
       imageWatcher.dispose();
       cardPage?.dispose();
+      cardTabWatcher?.dispose();
       this.documentSync.disposeView(document, webview);
       this.dictationControllers.get(webview)?.cleanup();
       this.dictationControllers.delete(webview);

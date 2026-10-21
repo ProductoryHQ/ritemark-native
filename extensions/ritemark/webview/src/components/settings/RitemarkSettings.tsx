@@ -705,7 +705,7 @@ export function RitemarkSettings() {
               <>
                 <p className="text-xs text-ink-muted mb-3">
                   Sign in with your ChatGPT account. No API key is needed.
-                  Requires ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.
+                  Any ChatGPT account works, Free included. Paid plans get higher limits.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {codexLoading ? (
