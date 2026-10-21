@@ -2,7 +2,9 @@
 
 > Turn a markdown document into a Google Doc, and update that same Doc whenever you change the file.
 
-Ritemark can publish a markdown document as a Google Doc in your own Google Drive. After that, **Sync** replaces the Doc's text with your current version, so colleagues who work in Google Docs always read the latest copy. Your markdown file stays the original: nothing from the Google Doc is ever read back into it.
+Ritemark can publish a markdown document as a Google Doc in your own Google Drive. After that, **Update the Google Doc** replaces the Doc's text with your current version, so colleagues who work in Google Docs always read the latest copy. Your markdown file stays the original: nothing from the Google Doc is ever read back into it.
+
+Everything here is under **Google Docs** in **Share**, on the document's bar.
 
 *Available from Ritemark 1.12.*
 
@@ -10,7 +12,7 @@ Ritemark can publish a markdown document as a Google Doc in your own Google Driv
 
 ## Connect your Google account
 
-1. Open **Ritemark Settings** and find the **Google Docs** card. Or choose **Export → Connect Google Docs…** in any markdown document, which opens Settings at that card.
+1. Open **Ritemark Settings** (**You** ▸ Settings, or Cmd+, / Ctrl+,) and find the **Google Docs** card. Or choose **Share → Publish to Google Docs** in any markdown document before you connect: it opens Settings at that card.
 2. Click **Connect Google account**. Google's sign-in page opens in your browser.
 3. Choose your account and allow access. The browser shows "Ritemark is connected", and the card shows your email address.
 
@@ -23,22 +25,22 @@ To stop, click **Disconnect** on the same card. Ritemark asks Google to revoke i
 ## Create a Google Doc
 
 1. Save the markdown file. An unsaved new document can't be published.
-2. Click **Export** in the document header, then **Create Google Doc**.
+2. Click **Share** on the document's bar, then **Publish to Google Docs**.
 3. A notification shows the progress, then **Google Doc created**, with a button to open it.
 
-The Doc's title comes from the document's `title` property when it has one, and otherwise from the file name. Ritemark remembers which Google Doc belongs to which file, so the Export menu now offers **Sync Google Doc** and **Open Google Doc** for this file.
+The Doc's title comes from the document's `title` property when it has one, and otherwise from the file name. Ritemark remembers which Google Doc belongs to which file, so Share now offers **Update the Google Doc** and **Open in Google Docs** for this file.
 
 ---
 
-## Sync changes
+## Update the Google Doc
 
-Edit your markdown as usual, then choose **Export → Sync Google Doc**. The same Google Doc is updated; no copy is made.
+Edit your markdown as usual, then choose **Share → Update the Google Doc**. It says when you last updated it. The same Google Doc is updated; no copy is made.
 
-- **The first Sync asks for confirmation.** Sync replaces the whole text of the Google Doc, so any edits made directly in Google Docs are overwritten. Ritemark asks once per document.
-- **If someone edited the Doc in Google Docs** since your last Sync, Ritemark warns you and offers **Overwrite with Ritemark** or **Open Google Doc**, so you can check the changes first. Ritemark can't merge them.
+- **The first update asks for confirmation.** Updating replaces the whole text of the Google Doc, so any edits made directly in Google Docs are overwritten. Ritemark asks once per document.
+- **If someone edited the Doc in Google Docs** since your last update, Ritemark warns you and offers **Overwrite with Ritemark** or **Open Google Doc**, so you can check the changes first. Ritemark can't merge them.
 - **If nothing changed**, Ritemark says the Doc is already up to date and writes nothing.
 
-Sync replaces only the text. The Doc's header, footer, named styles, sharing settings, and any tabs you add later in Google Docs stay as they are.
+An update replaces only the text. The Doc's header, footer, named styles, sharing settings, and any tabs you add later in Google Docs stay as they are.
 
 ---
 
@@ -48,7 +50,7 @@ A template gives new Google Docs your own look: fonts, colours, header and foote
 
 1. Make or pick a Google Doc with the styles you want.
 2. In the Google Docs card in Settings, click **Choose template**. Google's file picker opens in your browser. Choose the Doc.
-3. From now on, **Create Google Doc** makes a copy of the template and writes your text into it.
+3. From now on, **Publish to Google Docs** makes a copy of the template and writes your text into it.
 
 The template applies only when a Doc is created. If the template has several document tabs, the new Doc keeps only the first one. Use **Change template** or **Remove template** on the same card.
 
@@ -76,14 +78,14 @@ To get local images into the Doc, Ritemark uploads each one to your Google Drive
 
 | You see | What to do |
 |---|---|
-| **Reconnect Google account…** in the Export menu | This file was published with a different Google account. Connect that account in Settings to sync it. |
+| **Reconnect your Google account** in Share | This file was published with a different Google account, named under it. Connect that account in Settings to update the Doc. |
 | "The linked Google Doc is in your Google Drive trash" | Restore it in Google Drive, or choose **Remove publishing link** to create a new Doc. |
-| "The linked Google Doc is unavailable" | It was deleted or you lost access. Choose **Remove publishing link**, then **Create Google Doc**. |
+| "The linked Google Doc is unavailable" | It was deleted or you lost access. Choose **Remove publishing link**, then **Publish to Google Docs**. |
 | "Google no longer accepts this connection" | You revoked access or the sign-in expired. Click **Reconnect** in Settings. |
 | "Google is temporarily limiting requests" / "temporarily unavailable" | Wait a moment and try again. Your markdown file is never affected. |
 | "Google Docs publishing isn't available in this version of Ritemark" | This build has no Google client configured. Use an official Ritemark release. |
 
-**Remove Google Docs link…** in the Export menu makes Ritemark forget which Doc a file is published to. The Google Doc itself is not deleted. Afterwards **Create Google Doc** makes a new one.
+**Remove the link…** in Share makes Ritemark forget which Doc a file is published to. The Google Doc itself is not deleted. Afterwards **Publish to Google Docs** makes a new one.
 
 ---
 
@@ -95,5 +97,5 @@ Everything travels directly between your computer and Google; nothing passes thr
 
 ## Related
 
-- [Export](export.md): PDF and Word files
+- [Share](export.md): PDF and Word copies
 - [Document Properties](document-properties.md): the `title` that names your Google Doc

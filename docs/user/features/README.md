@@ -27,7 +27,7 @@ Write and edit markdown with a visual editor.
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
 | [Comments](comments.md) | Margin notes on any passage, and handing one to an agent |
 | [Voice Dictation](dictation.md) | Speak into your document; speech is turned into text on your computer |
-| [AI Agents](ai-agents.md) | Built-in Claude, Codex, and OpenCode agents in the sidebar |
+| [AI Agents](ai-agents.md) | Built-in Claude, ChatGPT, and OpenCode agents in the sidebar |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 
 ---
@@ -57,10 +57,10 @@ Build and run AI workflows.
 
 | Feature | Description |
 |---------|-------------|
-| [AI Agents](ai-agents.md) | Three built-in agents: Claude, Codex, and OpenCode |
+| [AI Agents](ai-agents.md) | Three built-in agents: Claude, ChatGPT, and OpenCode |
 | [Task Board](task-board.md) | A task list in each project folder; hand any task to an agent |
-| [Agent Library](agent-library.md) | Create, launch, and manage custom agents and skills |
-| [Browser](browser.md) | In-app browser with AI context — open `.html` files and localhost next to your markdown |
+| [Agents](agent-library.md) | Create, launch, and manage custom agents and skills |
+| [Browser](browser.md) | In-app browser with AI context — open web pages, `.html` files and localhost next to your markdown |
 | [Ritemark Flows](flows.md) | Visual AI workflow automation |
 | [Reporting AI output](ai-agents.md#reporting-ai-output) | Report inappropriate or harmful AI output from **Report AI issue** in the status bar |
 
@@ -75,8 +75,8 @@ These work across all modes.
 |---------|-------------|
 | [Transcribe](transcribe.md) | Record or add a recording, and turn it into a speaker-attributed document |
 | [Word, PowerPoint and PDF Previews](previews.md) | Read `.docx`, `.pptx` and `.pdf` files: zoom, fit, search, speaker notes, open in Word or PowerPoint |
-| [Export](export.md) | PDF and Word export |
-| [Publish to Google Docs](google-docs.md) | Create a Google Doc from a document and keep it in sync |
+| [Share](export.md) | Send a copy as PDF or Word, or copy as Markdown |
+| [Publish to Google Docs](google-docs.md) | Publish a document as a Google Doc and keep it up to date |
 
 ---
 
@@ -91,7 +91,7 @@ These work across all modes.
 | `.xlsx`, `.xls` | Data | View and open in Excel/Numbers |
 | `.docx` | Preview | Read page by page, search, open in Word ([previews](previews.md)) |
 | `.pptx` | Preview | Read slide by slide with speaker notes, search, open in PowerPoint ([previews](previews.md)) |
-| `.pdf` | Preview | Read page by page, save as Markdown ([previews](previews.md)) |
+| `.pdf` | Preview | Read page by page, make an editable copy ([previews](previews.md)) |
 
 ### Key Shortcuts
 
@@ -106,7 +106,7 @@ These work across all modes.
 
 ### AI Tools
 
-Ritemark's AI lives in the sidebar as three agents — **Claude**, **Codex**, and **OpenCode** — that
+Ritemark's AI lives in the sidebar on the right as three agents — **Claude**, **ChatGPT**, and **OpenCode** — that
 can read and edit your files in a multi-turn conversation.
 
 [AI Agents guide →](ai-agents.md)
@@ -115,6 +115,6 @@ can read and edit your files in a multi-turn conversation.
 
 ## Guides
 
-- [Getting Started](../guides/getting-started.md) - First-run walkthrough
-- [Set Up AI](../setup-ai.md) - Set up Claude, Codex, and OpenCode (and OpenAI keys for Flows)
-- [Troubleshooting](../troubleshooting/common-issues.md) - Common issues and solutions
+- [Getting Started](../getting-started.md) - First-run walkthrough
+- [Set Up AI](../setup-ai.md) - Set up Claude, ChatGPT, and OpenCode (and OpenAI keys for Flows)
+- [Troubleshooting](../troubleshooting.md) - Common issues and solutions

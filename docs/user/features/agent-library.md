@@ -1,63 +1,57 @@
-# Agent Library
+# Agents
 
 > Create, browse, configure, and launch custom agents and skills from inside Ritemark.
 
-The Agent Library is the place to manage AI helpers that live in your workspace or user profile. It scans your agent and skill folders, shows them in the sidebar, and gives you actions to create, configure, duplicate, move, reveal, delete, and launch them.
+**Agents**, in the places row at the top left, is where you manage AI helpers that live in your project or in your home folder. It scans your agent and skill folders, lists them in the left column under the project's name, and gives you actions to create, configure, duplicate, move, reveal, delete, and launch them.
 
-> **Updated in v1.7.3:** the library now separates **Instructions files** from **Agents**, sections are collapsible, and agent files open with a visual **Agent Configurator** panel — no YAML editing required. See the [v1.7.3 agent guide](../../releases/v1.7.3/agent-configurator-guide.md) for the full walkthrough.
+> **Updated in v1.7.3:** the list separates **Instructions files** from **Agents**, and agent files open with a visual **Agent Configurator** panel — no YAML editing required. See the [v1.7.3 agent guide](../../releases/v1.7.3/agent-configurator-guide.md) for the full walkthrough.
 
 ---
 
-## What the library shows
+## What Agents shows
 
-Ritemark discovers helpers from these locations and groups them into collapsible sections:
+Ritemark discovers helpers from these locations and groups them into sections:
 
 | Section | Source | What it is |
 |---|---|---|
-| **Instructions** | `CLAUDE.md`, `AGENTS.md` (workspace root) | Project-wide rules loaded into **every** AI session. Not agents — they have no settings to configure, only text to edit. |
+| **Instructions** | `CLAUDE.md`, `AGENTS.md` (project root) | Project-wide rules loaded into **every** AI session. Not agents — they have no settings to configure, only text to edit. |
 | **Agents** | `.claude/agents/*.md` | Your custom agents — each one a specialized AI assistant with its own instructions, model, and tool permissions |
-| **Skills** | `.claude/skills/`, `.agents/skills/` | Reusable workflows. Codex-side skills (`.agents/skills/`) show a provenance badge; skills present on both sides show **shared** |
+| **Skills** | `.claude/skills/`, `.agents/skills/` | Reusable workflows. A skill's tooltip says **For Claude** (`.claude/skills/`) or **For ChatGPT** (`.agents/skills/`) |
 | **Commands** | `.claude/commands/` | Slash commands |
+| **Scheduled** | Scheduled agents' runs | Whether scheduled agents may run in this folder, and their runs |
 | **Flows** | `.ritemark/flows/` | Visual AI workflows |
 
-If the same skill appears in both `.claude/` and `.agents/`, it is shown once with a **shared** badge.
+If the same skill appears in both `.claude/` and `.agents/`, it is shown once, and its tooltip says **Shared**.
 
-### Collapsible sections
+Hover a row to see its file, its description and who it is for; a flow's tooltip says which agents use it. An agent you gave a colour (the **Color** field in its settings) shows its icon in that colour.
 
-Click any section header to collapse or expand it. The state is remembered — if you only work with Agents and Skills, collapse the rest and the library stays that way.
+### This project and All projects
 
-### Project and User scope
+The switch at the top of the list chooses what it shows:
 
-- **Project** — helpers that live in this workspace and are shared with your team via git
-- **User** — personal helpers in your home folder (`~/.claude/`), available in every project
+- **This project** — helpers that live in this project and are shared with your team via git
+- **All projects** — personal helpers in your home folder (`~/.claude/`), available in every project
 
 ---
 
 ## Creating helpers
 
-When the library is empty, you can start with:
-
-- **New skill**
-- **New agent**
-
-![Agent Library empty state with New skill and New agent buttons](../releases/v1.6.3/screenshots/1-6-3-agent-library-empty.png)
-
-You can also click the **+** button in the Agents or Skills section header once helpers already exist.
+Click **New**, under the project's name, and choose **Agent**, **Skill**, **Command** or **Flow**. An empty list says so in one line; New is always there.
 
 ![New-agent modal — name and scope fields](../releases/v1.6.3/screenshots/1-6-3-agent-library-new-agent.png)
 
-Ritemark creates a valid starter file for you, opens it in the editor, and leaves you ready to configure it.
+For an agent, skill or command, give it a name and choose **This project** or **All projects**. Ritemark creates a valid starter file for you, opens it in the editor, and leaves you ready to configure it.
 
 ---
 
 ## Configuring an agent
 
-Open any agent from the library and Ritemark switches to **agent editing mode**:
+Open any agent from Agents and Ritemark switches to **agent editing mode**:
 
 - The document area shows the agent's **instructions** — plain markdown that tells the agent who it is and how to behave. Edit it like any document.
 - The right panel shows the **Agent Configurator** — a visual editor for the agent's settings.
 
-The top toolbar has three panel toggles: **Contents** (☰), **Properties** (ⓘ), and **Agent** (🤖). Click to switch between them.
+The document's bar has three panel toggles on the left: **Contents** (☰), **Properties** (ⓘ), and **Agent settings** (the robot). Click to switch between them.
 
 ![An agent file open with the Agent Configurator panel on the right](../../releases/v1.7.3/screenshots/1-7-3-agent-library-agent-editor-open.png)
 
@@ -80,16 +74,16 @@ Changes are written into the agent's file immediately — agents are plain files
 
 ## Row actions
 
-Each helper row supports a context menu with actions such as:
+Right-click a helper row, or click its **…** button, for actions such as:
 
 - **Open** — open the source file
 - **Launch Chat** — start a conversation with this agent pinned (agents only)
 - **Duplicate** — fork the helper into a new file
-- **Reveal in Finder** — show the file in Finder
-- **Move scope** — move between project and user scope
+- **Reveal in Finder** (**Reveal in File Explorer** on Windows) — show the file in its folder
+- **Move to All projects** / **Move to This project** — move the helper between your project and your home folder
 - **Delete…** — move the file to the OS trash
 
-Project-scope helpers may show an impact note before deletion so you know whether you are affecting a shared workspace helper.
+Helpers in This project may show an impact note before deletion so you know whether you are affecting a helper your team shares.
 
 ---
 
@@ -112,29 +106,29 @@ This is useful when you want to talk to a specific helper without manually copyi
 
 ---
 
-## Visuals and sorting
+## Search and sorting
 
-The library uses compact icon chips so helpers are easier to scan at a glance.
+Each kind of helper has its own icon, so the list is easy to scan at a glance.
 
-You can also sort the list by:
+Click **Search**, under the project's name, to open the search field. It filters by name, description, and file path. **Sort**, beside the field, orders the list by:
 
-- **Alphabetical**
+- **Name (A → Z)**
 - **Recently modified**
 
-Recently modified is the quickest way to find the helper you just edited. The search box filters by name, description, and file path.
+Recently modified is the quickest way to find the helper you just edited.
 
 ---
 
 ## Live updates
 
-The library refreshes when files change on disk. That includes edits from:
+Agents refreshes when files change on disk. That includes edits from:
 
 - Ritemark itself
 - your terminal
 - another editor
-- another machine syncing the same workspace
+- another machine syncing the same project
 
-If you add or edit a helper under `.claude/` or `.agents/`, the sidebar should update automatically.
+If you add or edit a helper under `.claude/` or `.agents/`, the list should update automatically.
 
 ---
 
@@ -149,6 +143,6 @@ The starter pack gives you a few working examples you can read, edit, duplicate,
 ## Related
 
 - [How to Configure and Use AI Agents (v1.7.3 guide)](../../releases/v1.7.3/agent-configurator-guide.md) - Full configurator walkthrough with recipes
-- [AI Agents](ai-agents.md) - Built-in Claude, Codex, and OpenCode runtimes, sign-in and setup
+- [AI Agents](ai-agents.md) - Built-in Claude, ChatGPT, and OpenCode runtimes, sign-in and setup
 - [Set Up AI](../setup-ai.md) - Sign in and configure the built-in runtimes
 - [Getting Started](../getting-started.md) - First-run walkthrough

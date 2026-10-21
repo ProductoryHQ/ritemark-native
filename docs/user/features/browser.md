@@ -8,11 +8,23 @@ Ritemark includes a built-in browser that lets you open local `.html` files, `lo
 
 ## Opening pages
 
-**Local HTML files:** click any `.html` file in the Explorer and it opens as a rendered page. To edit the HTML source instead, right-click the file and choose **Open as Text**.
+**Local HTML files:** click any `.html` file in Documents and it opens as a rendered page. To edit the HTML source instead, right-click the file and choose **Open as Text**.
 
-**Localhost:** `Cmd+click` (macOS) or `Ctrl+click` (Windows/Linux) on any `localhost:*` link in the terminal opens it in the integrated browser instead of your system browser.
+**Localhost:** `Cmd+click` (macOS) or `Ctrl+click` (Windows/Linux) on any `localhost:*` link in a terminal tab opens it in the integrated browser instead of your system browser.
 
-**Any URL:** use **File → Open URL** or the address bar at the top of an open browser tab.
+**Any URL:** click the **+** at the end of the tab row and choose **Web page**, or **New page** in the Browser place, then type the address in the address bar at the top of the tab.
+
+---
+
+## The Browser place
+
+**Browser**, in the places row at the top left, lists the pages you opened lately:
+
+- **New page**, under the project's name, opens a new browser tab
+- **Recent** lists your pages, each with the site's icon, its title and its domain. Click one to open it again, or remove it from the list
+- **Clear history**, at the right of the Recent label, empties the list
+
+With no pages yet, the list says **No pages yet**.
 
 ---
 
@@ -25,16 +37,16 @@ The browser toolbar (visible inside a browser tab) provides:
 | Back / Forward | Navigate page history |
 | Reload | Reload the current page |
 | Address bar | Shows the current URL; click to type a new one |
-| DevTools | Opens Chromium DevTools for the current page |
 | Camera icon | Toggle annotation mode — adds a viewport screenshot to the next AI turn |
+| ⋯ menu | Holds **Developer tools**, which opens Chromium's developer tools for the current page |
 
 ---
 
 ## Browser tabs
 
-Browser tabs behave like editor tabs:
+Browser tabs behave like document tabs:
 
-- Drag to reorder or move between editor groups
+- Drag to reorder or move to the other desk
 - Split with the usual split-editor commands
 - Close with `Cmd+W` / `Ctrl+W`
 - Multiple browser tabs can be open at once
@@ -47,16 +59,16 @@ When a browser tab is active and the AI sidebar is open, the AI can read the pag
 
 ### Consent
 
-When a browser tab becomes the active tab while the AI sidebar is open, Ritemark asks **"Share with Agent?"** for that tab.
+When a browser tab becomes the active tab while the AI sidebar is open, Ritemark asks on the AI sidebar, above the message box: **"Share this page with Claude?"** (or the AI you use). It asks once per page. Your tabs keep working while the question waits, and a message you send meanwhile goes without the page.
 
-- **Allow** — page URL, title, and a compact ARIA outline (headings, buttons, links, form labels, visible text) flow to the AI on every turn while the tab is shared.
-- **Deny** — nothing about the page reaches the AI: not the URL, not the title, not the DOM.
+- **Share this page** — page URL, title, and a compact ARIA outline (headings, buttons, links, form labels, visible text) flow to the AI on every turn while the tab is shared.
+- **Not now** — nothing about the page reaches the AI: not the URL, not the title, not the DOM.
 
-Check **Don't ask again** to skip the prompt for future tabs in the same session.
+Tick **Share pages I open in Ritemark without asking** to skip the question for later pages in the same session.
 
 ### The browser chip
 
-The chip in the chat composer shows what goes with your next message, so it appears only while the active tab is shared with the AI. A tab you denied — or one whose prompt is still waiting for your answer — shows no chip. OpenCode never receives browser context, so no chip appears while an OpenCode model is selected.
+The chip in the chat composer shows what goes with your next message, so it appears only while the active tab is shared with the AI. A page you answered **Not now** for — or one whose question is still waiting for your answer — shows no chip. OpenCode never receives browser context, so no chip appears while an OpenCode model is selected.
 
 - **Gray URL chip** — the AI receives the page's text summary (ARIA outline, ~12k characters).
 - **Screenshot thumbnail chip** *(v1.7.3)* — when annotation mode is on, the composer shows a live screenshot thumbnail of the page (the same 56×56 format as a pasted image) in place of the URL chip. It previews exactly the screenshot the AI will receive and refreshes automatically as you scroll or interact with the page (≈5 s).
@@ -69,8 +81,8 @@ Click the **×** on the chip to drop browser context for the next message only. 
 
 The AI can re-check a shared page **without re-navigating to it**. The `browser_snapshot` tool returns the active tab's current ARIA outline (URL, title, and full accessibility tree) — useful after the page changes from a click or a form fill, where re-navigating would lose page state.
 
-- macOS only: it ships alongside the [AI Browser Control](#ai-browser-control) tools. Claude Code sees it as `mcp__ritemark_browser__browser_snapshot`, Codex as `ritemark_browser_snapshot`, and OpenCode gets it through the `ritemark_browser` MCP adapter.
-- **Read-only and consent-aware:** it only works on tabs you've shared via "Share with Agent?". An unshared tab returns an error — no URL, title, or page content leaks.
+- macOS only: it ships alongside the [AI Browser Control](#ai-browser-control) tools. Claude Code sees it as `mcp__ritemark_browser__browser_snapshot`, ChatGPT (through Codex) as `ritemark_browser_snapshot`, and OpenCode gets it through the `ritemark_browser` MCP adapter.
+- **Read-only and consent-aware:** it only works on pages you've shared with **Share this page**. An unshared tab returns an error — no URL, title, or page content leaks.
 - It does not need control consent: reading a page you shared is enough. Clicking, typing, and navigating also need control consent for that tab.
 
 ### Annotation mode
@@ -103,7 +115,7 @@ Windows and Linux are not supported.
 
 ### The control consent dialog
 
-The first time the AI tries to act on a browser tab, Ritemark shows a dialog distinct from the read-share prompt:
+The first time the AI tries to act on a browser tab, Ritemark shows a dialog, separate from the share question:
 
 > **Allow AI to control this browser tab?**
 >
@@ -135,7 +147,7 @@ Every tool returns the updated ARIA page summary after acting, so the AI sees th
 Same five capabilities in all three runtimes:
 
 - **Claude Code SDK** — tools appear as `mcp__ritemark_browser__browser_navigate`, `mcp__ritemark_browser__browser_click`, etc. Implemented as an in-process MCP server.
-- **Codex App Server** — tools appear as the bare names `ritemark_browser_navigate`, `ritemark_browser_click`, etc., attached via the experimental `dynamicTools` parameter on `thread/start`. Cold-start can take up to 120 seconds for Codex when dynamic tools are active.
+- **ChatGPT (Codex App Server)** — tools appear as the bare names `ritemark_browser_navigate`, `ritemark_browser_click`, etc., attached via the experimental `dynamicTools` parameter on `thread/start`. Cold-start can take up to 120 seconds for ChatGPT when dynamic tools are active.
 - **OpenCode (ACP)** — tools come from the `ritemark_browser` MCP adapter that Ritemark attaches to each OpenCode session.
 
 The consent dialog, the Playwright action layer, and the page-summary readback are identical across all three runtimes.
@@ -165,7 +177,7 @@ These are tracked as candidates for future sprints.
 
 ## Privacy
 
-- Nothing about the page reaches the AI until you accept "Share with Agent?"
+- Nothing about the page reaches the AI until you choose **Share this page**
 - Annotation (screenshot) is a separate, explicit opt-in — the camera icon must be toggled on.
 - **AI Browser Control** is on by default on macOS, but the AI cannot act on a tab until you choose **Allow Control** in that tab's "Allow AI to control this browser tab?" dialog.
 - Read consent and control consent are tracked separately. Revoking read consent for a tab also revokes its control consent automatically.
@@ -175,5 +187,5 @@ These are tracked as candidates for future sprints.
 
 ## Related
 
-- [AI Agents](ai-agents.md) — Claude, Codex, OpenCode, and how to switch between them
+- [AI Agents](ai-agents.md) — Claude, ChatGPT, OpenCode, and how to switch between them
 - [Set Up AI](../setup-ai.md) — configure AI and agent runtimes

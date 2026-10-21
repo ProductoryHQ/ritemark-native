@@ -4,12 +4,13 @@
 
 Ritemark works great without any AI features. But if you want AI-powered editing, here's how to set everything up.
 
-Ritemark's AI sidebar runs three agents — **Claude Code**, **Codex**, and **OpenCode**. Set up
-whichever one you want to use below. If you use **Flows**, you'll also need an OpenAI API key (see
-[OpenAI API Key for Flows](#openai-api-key-for-flows)).
+Ritemark's AI sidebar runs three agents — **Claude Code**, **ChatGPT**, and **OpenCode**. The welcome
+asks which you use the first time you open Ritemark. To set one up later, open **Settings**: **You**
+at the top right ▸ **Settings**, or Cmd+, (Ctrl+, on Windows). If you use **Flows**, you'll also need an
+OpenAI API key (see [OpenAI API Key for Flows](#openai-api-key-for-flows)).
 
-> **New in v1.7.3:** **OpenCode** joins Claude Code and Codex as a third, bring-your-own-key chat
-> runtime. Where Claude and Codex use their own sign-in, OpenCode points at any provider you already
+> **New in v1.7.3:** **OpenCode** joins Claude Code and ChatGPT as a third, bring-your-own-key chat
+> runtime. Where Claude and ChatGPT use their own sign-in, OpenCode points at any provider you already
 > have an API key for. See [OpenCode (bring your own key)](#opencode-bring-your-own-key) below.
 
 > **Changed in v1.7.2:** The earlier built-in "Ritemark Agent" — a direct OpenAI chat assistant with
@@ -23,18 +24,19 @@ whichever one you want to use below. If you use **Flows**, you'll also need an O
 Claude Code is Anthropic's coding agent. As of v1.6.3, you sign in entirely from inside Ritemark — no terminal commands required.
 
 For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
-For custom helpers and Launch Chat, see [Agent Library](features/agent-library.md).
+For custom helpers and Launch Chat, see [Agents](features/agent-library.md).
 
 ### In-app sign-in (recommended)
 
 1. Open Ritemark.
 2. Either:
-   - Open **Settings** (gear icon) and find the Claude row, **or**
-   - Open the **AI sidebar** and switch the agent to Claude.
-3. Click **Sign in**. Your system browser opens with the Anthropic OAuth flow.
+   - Choose **Claude** on the welcome, **or**
+   - Open **Settings** (**You** ▸ Settings, or Cmd+,) and find the **Claude Account** card under **API Keys**, **or**
+   - In the **AI sidebar**, pick Claude in the message box's picker.
+3. Click **Sign in with Claude.ai**. Your system browser opens with the Anthropic OAuth flow.
 4. Approve, return to Ritemark — Settings and the AI sidebar both update to "Connected".
 
-If you'd rather paste a key instead of using OAuth, click **Use Anthropic API key** in the same flow and paste your key. Ritemark stores it in your system's secure credential store.
+If you'd rather paste a key instead of using OAuth, click **Use Anthropic API key** in Settings (or **API keys** on the welcome) and paste your key. Ritemark stores it in your system's secure credential store.
 
 You can cancel an in-progress sign-in from the same UI; sign-in times out after 5 minutes.
 
@@ -65,19 +67,20 @@ Ritemark keeps using the Claude that ships with the app until you set **Settings
 
 ---
 
-## OpenAI Codex
+## ChatGPT
 
-Codex is OpenAI's coding agent. As of v1.6.3, sign-in is unified across Settings and the AI sidebar — both surfaces open your system browser instead of dropping you into a terminal, and they stay in sync.
+ChatGPT works in Ritemark with your ChatGPT account; any plan works, Free included. Ritemark runs it through Codex, OpenAI's agent program, which ships with the app. Sign-in is the same in Settings and the AI sidebar — both open your system browser instead of dropping you into a terminal, and they stay in sync.
 
 For the authoritative agent overview, see [AI Agents](features/ai-agents.md).
-For custom helpers and Launch Chat, see [Agent Library](features/agent-library.md).
+For custom helpers and Launch Chat, see [Agents](features/agent-library.md).
 
 ### In-app sign-in (recommended)
 
 1. Open Ritemark.
 2. Either:
-   - Open **Settings** (gear icon) and find the ChatGPT row, **or**
-   - Open the **AI sidebar** and switch the agent to Codex, then click **Sign in with ChatGPT**.
+   - Choose **ChatGPT** on the welcome, **or**
+   - Open **Settings** (**You** ▸ Settings, or Cmd+,) and find the **ChatGPT Account** card under **API Keys**, **or**
+   - In the **AI sidebar**, pick ChatGPT in the message box's picker, then click **Sign in with ChatGPT**.
 3. Your system browser opens with the OpenAI OAuth flow.
 4. Approve, return to Ritemark — both Settings and the AI sidebar update.
 
@@ -85,18 +88,18 @@ Signing out from one surface signs you out everywhere.
 
 ### Learn more
 
-For Codex usage instructions, see OpenAI's official documentation:
+For the program behind ChatGPT in Ritemark, see OpenAI's documentation:
 **[Codex CLI Documentation](https://github.com/openai/codex)**
 
 ### Advanced / fallback — manual install
 
-If you prefer to manage Codex yourself:
+If you prefer to manage the program yourself:
 
 ```bash
 npm install -g @openai/codex
 ```
 
-Then set **Settings → Agent Runtime → Runtime preference** to **Use system install**. Until you do, Ritemark keeps using the Codex that ships with the app.
+Then set **Settings → Agent Runtime → Runtime preference** to **Use system install**. Until you do, Ritemark keeps using the copy that ships with the app.
 
 Set your API key (only needed for the standalone CLI, not for in-app sign-in):
 
@@ -110,8 +113,8 @@ export OPENAI_API_KEY='your-key-here'
 
 > Added in v1.7.3.
 
-OpenCode is a third AI chat runtime, alongside Claude Code and Codex, integrated over the **Agent
-Client Protocol (ACP)**. Unlike Claude and Codex, OpenCode has no sign-in of its own — it is
+OpenCode is a third AI chat runtime, alongside Claude Code and ChatGPT, integrated over the **Agent
+Client Protocol (ACP)**. Unlike Claude and ChatGPT, OpenCode has no sign-in of its own — it is
 **bring-your-own-key**. You point it at any provider you already have an API key for and pick from
 that provider's models.
 
@@ -119,8 +122,8 @@ The OpenCode runtime ships bundled with Ritemark; there is nothing to install.
 
 ### Step 1: Add a provider API key
 
-1. Open **Settings** (gear icon).
-2. Find the API-key fields and paste a key for any provider you want OpenCode to use:
+1. Choose **OpenCode** on the welcome, or open **Settings** (**You** ▸ Settings, or Cmd+,).
+2. Find the API-key fields under **API Keys** and paste a key for any provider you want OpenCode to use:
    - **OpenAI** — GPT models
    - **Google AI** — Gemini models
    - **Anthropic** — Claude models
@@ -134,8 +137,8 @@ OpenCode.
 
 ### Step 2: Pick an OpenCode model
 
-1. Open the **AI sidebar** and open the model picker.
-2. Scroll to the **OpenCode** group (it appears after Codex).
+1. In the **AI sidebar**, click the AI and model name under the message box to open the model picker.
+2. Scroll to the **OpenCode** group (it appears after ChatGPT).
 3. The group lists models only from providers whose key you've configured — add a Google AI key and
    Gemini models appear, add OpenAI and GPT models appear, and so on. With no keys configured, the
    group prompts you to open Settings.
@@ -164,7 +167,7 @@ For OpenCode usage and provider details, see the project's documentation:
 ## OpenAI API Key for Flows
 
 [Flows](features/flows.md) use an OpenAI API key for their **LLM Prompt** and **Image Generation**
-nodes. This key is not needed for the Claude or Codex sidebar agents — only for running Flows.
+steps. This key is not needed for the Claude or ChatGPT sidebar agents — only for running Flows.
 
 ### Step 1: Get an API Key
 
@@ -187,30 +190,30 @@ OpenAI requires prepaid credits:
 ### Step 2: Add Key to Ritemark
 
 1. Open Ritemark
-2. Open **Settings** (gear icon), or open the **Settings** panel inside Flows
-3. Paste your API key in the OpenAI field
+2. Open **Settings** (**You** ▸ Settings, or Cmd+,)
+3. Paste your API key in the OpenAI field under **API Keys**
 4. Your key is stored securely in your system's credential store
 
-For Flows-specific configuration (default LLM and image models), see [Flows → Requirements](features/flows.md#requirements).
+Each LLM and Image step chooses its own model; see [Flows → Requirements](features/flows.md#requirements).
 
 ---
 
 ## Agent Runtime (v1.7.0+)
 
-By default, Ritemark ships its own bundled Claude and Codex binaries. If you prefer to use your own system-installed versions:
+By default, Ritemark ships its own bundled Claude Code and Codex (the program behind ChatGPT). If you prefer to use your own system-installed versions:
 
-1. Open **Settings** (gear icon).
+1. Open **Settings** (**You** ▸ Settings, or Cmd+,).
 2. Find the **Agent Runtime** section.
-3. Switch from **Bundled** to **System**.
+3. Set **Runtime preference** from **Bundled** to **Use system install**.
 
-The "Currently active:" path shown below the dropdown tells you which binary Ritemark is actually running — useful for verifying your system install is being picked up.
+**Currently active**, below it, tells you which copy Ritemark is actually running for Claude and for ChatGPT: **Bundled with app** or **System installation** — useful for verifying your system install is being picked up. **This computer's tools**, in the same section, says whether Git and Node.js are installed.
 
 **When to use System runtime:**
-- You want to use a specific version of Claude or Codex you've installed yourself.
+- You want to use a specific version of Claude Code or Codex you've installed yourself.
 - You're testing a newer Codex or Claude CLI release before it ships bundled with Ritemark.
 
 **When to use Bundled (default):**
-- You haven't installed Claude or Codex manually.
+- You haven't installed Claude Code or Codex manually.
 - You want the exact version Ritemark has tested against.
 
 ---
@@ -220,16 +223,16 @@ The "Currently active:" path shown below the dropdown tells you which binary Rit
 - API keys are stored in your system's secure credential store
 - Text is sent to the respective AI provider's servers for processing
 - Ritemark doesn't store or transmit your data elsewhere
-- Browser page content is only shared with the AI after you explicitly allow it via the "Share with Agent?" prompt
+- Browser page content is only shared with the AI after you choose **Share this page** in the question on the AI sidebar
 - See each provider's usage policies for details
 
 ---
 
 ## Without AI
 
-Ritemark works perfectly without any AI configured:
+Ritemark works perfectly without any AI configured. Choose **Skip for now** on the welcome:
 - All editing features work
-- Export works
+- Share works
 - CSV/Excel viewing works
 
 You can always add AI later.
@@ -238,6 +241,6 @@ You can always add AI later.
 
 ## Related
 
-- [AI Agents](features/ai-agents.md) - Built-in Claude, Codex, and OpenCode agents
+- [AI Agents](features/ai-agents.md) - Built-in Claude, ChatGPT, and OpenCode agents
 - [Flows](features/flows.md) - Visual AI workflows (use the OpenAI key)
 - [Getting Started](getting-started.md) - Basic setup

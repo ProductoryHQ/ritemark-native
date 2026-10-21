@@ -9,7 +9,7 @@ Dictation types what you say at the cursor in any Markdown document. The speech 
 ## What You Can Do
 
 - **Dictate at the cursor**: click the microphone in the document header and start talking
-- **Pick the language**: Estonian and English are at the top, and **More languages...** lists every language Whisper knows
+- **Pick the language**: your computer's language (when Whisper knows it) and English are at the top, and **More languages...** lists every language Whisper knows
 - **Keep working while it finishes**: the text goes where you started dictating, even if you have clicked somewhere else meanwhile
 
 ---
@@ -18,7 +18,7 @@ Dictation types what you say at the cursor in any Markdown document. The speech 
 
 ### 1. Start
 
-Put the cursor where the text should go, then click the microphone in the document header. The button shows the language it will use, such as **ET**. To use another language, open the arrow beside it and pick one; dictation starts in that language, and the button remembers it.
+Put the cursor where the text should go, then click the microphone in the document header. Beside it is the language it will use, such as **EN ⌄**. To use another language, open that menu and pick one: choosing only sets the language, and the next click on the microphone dictates in it. Ritemark remembers your choice.
 
 The first time, Ritemark asks whether to download the speech model, once. When the download finishes, click the microphone again. If you stop the download, the next click offers to resume it.
 

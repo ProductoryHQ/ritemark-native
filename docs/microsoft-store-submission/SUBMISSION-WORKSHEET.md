@@ -33,7 +33,7 @@ This is the canonical copy/paste worksheet for Ritemark's **EXE or MSI app** sub
 | License / terms URL | `https://www.productory.ai/en/terms/` |
 | Public support email | `info@productory.eu` |
 | Developed by | `Productory Services OÜ` |
-| Copyright and trademark | `Copyright 2024–2026 Productory OÜ. Ritemark is released under the MIT License.` |
+| Copyright and trademark | `Copyright 2024–2026 Productory Services OÜ. Ritemark is released under the MIT License.` |
 
 ## Package fields
 
