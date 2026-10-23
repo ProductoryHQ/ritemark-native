@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1]
+
+A Mac-only fix release. Windows stays on 2.0.0.
+
+### Fixed
+- **OpenCode on the Mac (#523).** In 2.0.0 every OpenCode turn on a Mac failed with `listen EINVAL`. The socket that gives OpenCode Ritemark's tools had a 105-byte path, and macOS holds 104. Node 24 (Electron 43) rejects such a path, where Node 22 in 1.14 had quietly cut it short. The path is now `<tmpdir>/rmt-<12 hex>.sock`, 70 bytes, with a `/tmp` fallback for a long `TMPDIR`. A new test listens and connects on the real path. Windows uses a named pipe and was not affected.
+
 ## [2.0.0] — 2026-10-23
 
 Ritemark 2.0.0 is built on main in four steps and released as one version: Surfaces and frame (Sprint 132: #443, the frame; #447, the theme pass, window sizes and the Windows fixes; #450, #451 and #452), The welcome (Sprint 133: #453 and #465), The project at the centre (Sprint 134: #467, with #468, #469 and #472), and the VS Code update under them (Sprint 135: #474, with #476 and #484). The release sprint (Sprint 136) adds the fixes #459, #477, #482, #485–#488, #491, #494 and #495 and the runtime update. #437 and #440 merged on main between the steps.
