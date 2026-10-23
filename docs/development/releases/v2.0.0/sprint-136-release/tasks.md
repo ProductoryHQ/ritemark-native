@@ -114,5 +114,5 @@ Nothing here starts before Jarmo approves the sprint plan in this sprint's own s
 - [x] The closeout: published assets against `dist/`; evidence in `docs/releases/v2.0.0/evidence/`; build output cleared; the worktree reads `REVIEW` (S30)
 - [x] `docs/CHANGELOG.md` dated; `architecture.md`'s version-history row
 - [x] The release plan: published, the pause on releases from main ended, the risk register closed
-- [ ] The closeout PR; Jarmo's "admin merge": [#520](https://github.com/ProductoryHQ/ritemark-native/pull/520). The Development manager merges it after its own check ("merge siis ise")
-- [x] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call): `--check` on 23 October; the release worktree is the only `REVIEW` entry
+- [x] The closeout PR; Jarmo's "admin merge": [#520](https://github.com/ProductoryHQ/ritemark-native/pull/520), merged by the Development manager as `36bf2193` on 23 October ("merge siis ise")
+- [x] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call): `--check` on 23 October; the release worktree is the only `REVIEW` entry. Removed with `--clean` on Jarmo's "clean the release worktree", 23 October (closeout 10.4)
