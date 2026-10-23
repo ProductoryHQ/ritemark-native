@@ -1,6 +1,6 @@
 # Release Plan — v2.0.1
 
-**Status:** **Feature complete; release candidate next.** The one fix is merged (#523, `e91c3d9a`), and the version bump to 2.0.1 is the last merge before the candidate. Main is frozen from that merge until publication.<br>
+**Status:** **Feature complete; release candidate next.** Two fixes: OpenCode on the Mac (#523, `e91c3d9a`) and Home fitting its desk (#525). The version bump (#524, `0a299477`) merged first; #525's fix is the last merge before the candidate, and main is frozen from it until publication.<br>
 **Target:** v2.0.1<br>
 **GitHub milestone:** v2.0.1 (#523)<br>
 **Release type:** a full app release for the Mac only. #523 is extension-tier by path, but the release is built, gated and notarized as a full release, as Jarmo decided ("admin merge 523, teeme 2.0.1 Macile", 23 October, through the Development manager)<br>
@@ -17,9 +17,10 @@ In 2.0.0, every OpenCode turn on a Mac fails with `listen EINVAL`. The socket th
 | PR | What | Tier |
 |---|---|---|
 | [#523](https://github.com/ProductoryHQ/ritemark-native/pull/523) | OpenCode's tools socket path under macOS's limit | extension |
+| [#525](https://github.com/ProductoryHQ/ritemark-native/issues/525)'s fix | Home fits its desk: the page, rows, tiles, What moved's Got it and the path at any desk width (Jarmo: "yes, put the Home fix in 2.0.1", 23 October) | extension |
 | The version bump | 2.0.1 in the six version files, these notes, the changelog | shell (`branding/product.json` and `installer/windows/ritemark.iss` are shell-tier paths) |
 
-Nothing else. The docs PRs merged since 2.0.0 (#519, #520, #521, #522) are docs only and change no shipped byte.
+Nothing else. The docs PRs merged since 2.0.0 (#519, #520, #521, #522) are docs only and change no shipped byte. The Home fix applies to Windows too, but Windows stays on 2.0.0 and gets it with its next release.
 
 ## The runtimes
 

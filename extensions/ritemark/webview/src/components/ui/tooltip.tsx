@@ -23,7 +23,7 @@ export function Tooltip({
   className,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
   className?: string;
   children: ReactNode;

@@ -16,6 +16,12 @@
   padding: 16px 16px 48px;
 }
 
+/* Home fits its desk at any width (#525; framework.md, window sizes): nothing is cut and nothing scrolls
+   sideways. The sizes below key to the desk's width through this container, never to the viewport. The
+   wrapper is the container, not .rh-desk: a container contains layout, which would pin the fixed toast to
+   the page instead of the window. It is the desk less the desk's 16 each side, so a desk of 760 is 728 here. */
+.rh-fit { container: rh-desk / inline-size; }
+
 .rh-cover {
   position: relative;
   height: 136px;
@@ -47,11 +53,14 @@
 }
 .rh-chip-button:hover { background: #ffffff; }
 
+/* The page is the smaller of 640 and the desk less its inset. The inset is 56 from a desk of 760 up and
+   comes down to 16 at 600 and below (100cqw + 32px is the desk). */
 .rh-page {
+  --rh-inset: clamp(16px, calc(16px + (100cqw + 32px - 600px) / 4), 56px);
   position: relative;
-  width: 640px;
+  width: min(640px, calc(100cqw - var(--rh-inset)));
   max-width: 100%;
-  margin-left: clamp(0px, calc(72px - 16px), 8vw);
+  margin-left: var(--rh-inset);
   margin-top: -28px;
 }
 .rh-page.no-cover { margin-top: 40px; }
@@ -91,6 +100,14 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   max-width: 100%;
 }
 .rh-place .rh-place-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The path is cut in the middle (#525): the start takes the ellipsis, the last two folders stay whole and
+   give way only when nothing else is left. A shrink of a million against 1 makes the start take all of the
+   overflow first: the last part's share stays under Chrome's layout unit, where 1000 against 1 still cut it by a
+   fraction of a pixel and drew its ellipsis. Its own 1 then lets it give way completely after the start is at
+   its least (shrinks that add up to less than 1 leave part of the overflow in place). */
+.rh-place-text.rh-place-cut { display: flex; }
+.rh-place-cut .rh-place-head { flex: 0 1000000 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-place-cut .rh-place-tail { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .rh-line {
   display: block;
@@ -129,6 +146,7 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--r-ink-strong);
+  overflow-wrap: anywhere; /* a long project name in "Start something in …" */
 }
 
 .rh-badge {
@@ -147,6 +165,7 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   margin: 0 0 8px;
   font: 400 14px/20px var(--ritemark-ui-font-family);
   color: var(--r-ink-muted);
+  overflow-wrap: anywhere;
 }
 .rh-empty-line { margin-top: 4px; }
 
@@ -177,12 +196,12 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   flex: none;
   color: var(--r-ink-body);
 }
-.rh-row .rh-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-row .rh-text { flex: 0 1000000 auto; min-width: min(5em, 30%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A quoted first message is cut inside its marks: Claude replied to “In one sentence…” */
 .rh-row .rh-quoted { display: flex; }
 .rh-quoted .rh-lead { flex: none; white-space: pre; }
 .rh-quoted .rh-quote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rh-row .rh-tag { flex: none; color: var(--r-ink-muted); font-size: 13px; }
+.rh-row .rh-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--r-ink-muted); font-size: 13px; }
 .rh-row .rh-when { margin-left: auto; flex: none; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; }
 
 .rh-file {
@@ -210,11 +229,19 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 .rh-desk .rh-row .rh-ic svg, .rh-desk .rh-file > svg { width: 14px; height: 14px; }
 .rh-desk .rh-file > svg { color: var(--r-ink-muted); }
 .rh-desk .rh-row:focus-visible, .rh-desk .rh-file:focus-visible { border-color: var(--r-hairline); }
+/* A row keeps its time whole (#525): the name takes the ellipsis first, down to a few letters; then
+   "in …" gives way. A tag on a Waiting row does the same. The shrinks as for the path above. */
+.rh-file .rh-file-name { flex: 0 1000000 auto; min-width: 5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rh-file .rh-ext { color: var(--r-ink-muted); }
-.rh-file .rh-where { color: var(--r-ink-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-file .rh-where { flex: 0 1 auto; min-width: 0; color: var(--r-ink-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Under a desk of 440 a row drops its tag and its "in …" place, so the title keeps the room and the time stays
+   (the Experience lead, #525) */
+@container rh-desk (max-width: 407px) {
+  .rh-row .rh-tag, .rh-file .rh-where { display: none; }
+}
 .rh-file .rh-when { margin-left: auto; flex: none; font-size: 12px; color: var(--r-ink-muted); }
 
-.rh-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.rh-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; } /* three across, then two, then one (#525) */
 .rh-tile {
   display: grid;
   gap: 10px;
@@ -248,7 +275,13 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 .rh-drop.over { box-shadow: inset 0 0 0 2px var(--r-accent); }
 .rh-drop .rh-ic { width: 32px; height: 32px; border-radius: 8px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
 .rh-drop b { display: block; font: 600 14px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rh-drop .rh-drop-text { flex: 1 1 0; min-width: 0; }
 .rh-drop .rh-drop-action { margin-left: auto; flex: none; }
+/* At a desk of 440 and below, Choose files… goes under the words (#525) */
+@container rh-desk (max-width: 408px) {
+  .rh-drop { flex-wrap: wrap; }
+  .rh-drop .rh-drop-action { flex-basis: calc(100% - 46px); margin-left: 46px; }
+}
 
 /* What moved (experience 32, frame 5) */
 .rh-card {
@@ -258,9 +291,13 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   box-shadow: 0 0 0 1px var(--r-hairline-strong);
   background: var(--r-surface);
 }
-.rh-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font: 500 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.rh-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; font: 500 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
 .rh-card-head .rh-version { height: 18px; padding: 0 6px; border-radius: 5px; background: var(--r-accent-soft); color: var(--r-accent); font: 600 11px/18px var(--ritemark-ui-font-family); }
 .rh-card-head .rh-card-action { margin-left: auto; }
+/* Got it is never hidden: at a desk of 420 and below it goes onto its own line under the title (#525) */
+@container rh-desk (max-width: 388px) {
+  .rh-card-head .rh-card-action { flex-basis: 100%; margin-left: 0; }
+}
 .rh-moved { display: flex; align-items: center; gap: 10px; min-height: 32px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .rh-moved .rh-ic { width: 22px; height: 22px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
 .rh-moved b { font-weight: 600; color: var(--r-ink-strong); }
@@ -275,8 +312,14 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 }
 .rh-missing h3 { margin: 0 0 6px; font: 600 16px/22px var(--ritemark-ui-font-family); color: var(--r-ink-strong); text-transform: none; letter-spacing: 0; }
 .rh-missing p { margin: 0 0 8px; font: 400 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rh-missing .rh-path .rh-place-text { min-width: 0; }
+.rh-missing .rh-path > svg { flex: none; } /* the folder keeps its size when the path is cut (#525) */
 .rh-missing .rh-path { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); font: 500 13px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rh-missing .rh-actions { display: flex; gap: 8px; margin: 16px 0 12px; }
+.rh-missing .rh-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 12px; }
+/* Back to the open project: a long name takes the ellipsis (#525) */
+.rh-back { max-width: 100%; }
+.rh-back > button { max-width: 100%; }
+.rh-back .rh-back-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rh-missing .rh-foot { margin: 0; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
 
 /* A notice: a file that can't be read, a change that couldn't be saved */
