@@ -30,6 +30,18 @@ export function whenWords(iso: string, now: number, precision: 'minutes' | 'days
   return new Date(then).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+/**
+ * A folder's path, cut in the middle on a narrow desk (#525): the start, which takes the ellipsis, and the
+ * last two folders, which stay whole. `~/Documents/Ritemark/Harbour` is `~/Documents` and `/Ritemark/Harbour`.
+ * A Windows path splits at its backslashes.
+ */
+export function placeParts(place: string): { head: string; tail: string } {
+  const separator = place.includes('/') || !place.includes('\\') ? '/' : '\\'
+  const parts = place.split(separator)
+  if (parts.length < 3) return { head: place, tail: '' }
+  return { head: parts.slice(0, -2).join(separator), tail: separator + parts.slice(-2).join(separator) }
+}
+
 /** Home's row fits about this much of a quoted message beside its lead and time at the page's width. */
 export const QUOTE_LIMIT = 56
 
