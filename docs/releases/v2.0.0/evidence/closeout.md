@@ -38,4 +38,10 @@ The local `dist/Ritemark-arm64.dmg`, `Ritemark-x64.dmg`, `Ritemark-Setup.exe` an
 
 ## 10.3 Clear the build output
 
-To be recorded after the clear.
+After 10.1 and this archive were pushed (`8a60cb3e`, PR #520), the build output was deleted by name in the release worktree on 2026-10-23: `dist/` (4.5 GB), `VSCode-darwin-arm64/` (2.2 GB) and `VSCode-darwin-x64/` (1.9 GB). The disk went from 12 to 19 GiB free. Then `node ./scripts/worktree-hygiene.mjs --check --no-sizes` from the main checkout:
+
+```
+REVIEW   …/.worktrees/release-c04eabf2fe02 — verified disposable release worktree ((detached))
+```
+
+It is the only `REVIEW` entry in that audit, so `--clean` would remove only this worktree. Removing it is Jarmo's call (10.4).
