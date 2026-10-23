@@ -70,7 +70,7 @@ Every shell release's test checklist carries this check, from Sprint 136 (its R3
 
 3. A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes.
 
-**The release images.** A production build differs from this dev baseline by design in More, which has no Copilot Chat (Sprint 135's E5: 1.05% and 1.02%). `release/` holds a production build's image for each such scene, and `--release` compares that scene with it; every other scene compares with the baseline above. The first images come from Sprint 136's first candidate, and they change only with Jarmo's approval, as the baseline does. Until `release/` exists, More's two scenes are read by eye against the dev images.
+**The release images.** A production build differs from this dev baseline by design in More, which has no Copilot Chat (Sprint 135's E5: 1.05% and 1.02%). `release/` holds a production build's image for each such scene, and `--release` compares that scene with it; every other scene compares with the baseline above. They change only with Jarmo's approval, as the baseline does. The first two, `light-more-menu.png` and `dark-more-menu.png`, come from 2.0.0's RC1 (`c04eabf2`), captured on 21 October 2026 in the release session's Gate 1 prep. Against the dev baseline they differed by 1.07% and 1.04%, and the other 32 scenes matched. **Jarmo approved them on 21 October 2026** ("release pildid OK", through the Development manager; Sprint 136, D2).
 
 **Windows.** The window buttons and the menu button make Windows' top different from the Mac's, so Windows has its own images (`release-win32/`) where the Windows session can run the scripts; otherwise its screenshots are compared by eye with the last Windows round's.
 

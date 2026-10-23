@@ -2,7 +2,7 @@
 
 Use one English listing initially. Review wording against the shipping candidate before every submission.
 
-**2.0 (2026-10-21):** the copy in this file is a draft for Ritemark 2.0, awaiting Jarmo's approval (Sprint 136, R7). Nothing has been submitted. Jarmo enters the approved text in Partner Center himself, through his ChatGPT flow. The copy used up to v1.14.0 is kept below under [v1.14.0 copy (for reference)](#v1140-copy-for-reference), and [What changed for 2.0](#what-changed-for-20) lists each change.
+**2.0 (submitted 2026-10-23):** the copy in this file is the text submitted for Ritemark 2.0 (Sprint 136, R7). It includes the Strategy Room's day-before fixes of 22 October: the inked line opens the text, and one wording says which plans work. The Development manager entered it in the update draft on 22 October, and Jarmo submitted on 23 October ([evidence](./evidence/partner-center-submission-v2.0.0-2026-10-23.md)). The day's record is ritemark-dev `releases/v2.0.0/store-listing.md`. The copy used up to v1.14.0 is kept below under [v1.14.0 copy (for reference)](#v1140-copy-for-reference), and [What changed for 2.0](#what-changed-for-20) lists each change.
 
 Microsoft's limits ([`OFFICIAL-REFERENCES.md`](./OFFICIAL-REFERENCES.md)): description 10,000 characters; short description 1,000, with under 270 recommended; What's new 1,500; each feature 200, with at most 20; seven search terms of up to 40 characters each, with no more than 21 unique words in all.
 
@@ -12,17 +12,17 @@ Ritemark
 
 ## Short description
 
-> A writing app where the AI you choose works directly in your files, and you stay the author. Work with Claude, ChatGPT or open models. Each project has its own Home and task board, and your documents stay ordinary Markdown files on your computer.
+> Ritemark turns a folder on your computer into a workspace where ChatGPT or Claude work with you. Each project has its own Home and task board, and your documents stay ordinary Markdown files on your computer.
 
 Under 250 characters, within the recommended 270.
 
 ## Description
 
-> Ritemark is a writing app where the AI you choose works directly in your files, and you stay the author.
+> Ritemark turns a folder on your computer into a workspace where ChatGPT or Claude work with you. The AI works directly in your files, and you stay the author.
 >
 > Ritemark 2.0 puts your project at the centre. Each project has its own Home: what waits for you, a place to start a new text, table or web page, and the documents changed last. Each project has its own task board too. Write down what you want done, give a task to Claude, ChatGPT or OpenCode, and review the result before you mark it done. Switch between projects in the same window, and each one keeps its own tabs.
 >
-> The first start is a welcome that asks which AI you use. Sign in to ChatGPT or Claude with the account you already use, or use OpenCode with an API key of your own. Then open a folder, start a new project or try the sample project, and your project opens with the AI ready beside it.
+> The first start is a welcome that asks which AI you use. Sign in with any ChatGPT account, Free included, or a paid Claude plan, or use OpenCode with an API key of your own. Then open a folder, start a new project or try the sample project, and your project opens with the AI ready beside it.
 >
 > Write in a visual Markdown editor, with tables, diagrams and comments. Read Word documents, PowerPoint presentations and PDFs without leaving Ritemark. Turn a recording into a transcript you can edit, on your computer or with a provider you choose. Share a copy as a PDF or Word document, or copy it as Markdown.
 >
@@ -60,6 +60,7 @@ Seven terms, 10 unique words.
 6. `task board`
 7. `tables`
 
+Not used: `ChatGPT` and `Claude`. First users search with them, as the Strategy Room noted, but Store Policy 10.1.3 bars other products' titles in search terms. They stay out (22 October).
 ## What's new
 
 For the first Store submission, **What's new in this version** was left blank, because Microsoft's instructions reserve the field for updates to an existing Store app. Ritemark is now live, so every update fills it.
@@ -105,7 +106,7 @@ For 2.0, also confirm that:
 
 | Field | v1.14.0 | 2.0 | Why |
 |---|---|---|---|
-| Short description | A local-first Markdown editor with a list of features | The notes' opening sentence, the AIs, Home and the task board, ordinary Markdown files | 2.0's notes describe Ritemark as a writing app where the AI you choose works in your files |
+| Short description | A local-first Markdown editor with a list of features | The inked line, Home and the task board, ordinary Markdown files | The Strategy Room's inked line, which also opens 2.0's release notes (22 October) |
 | Description | Editor-first, three paragraphs | Project at the centre, the welcome, the writing tools, the window, and the same provider boundary with a usage-data sentence | The notes' sections: your project at the centre, the welcome, a calmer window, usage data |
 | Features | 8 lines | 11 lines: the welcome, Home, the task board, switching projects, previews and the window added; "reusable insights" and "project file browser" dropped; Export became Share | The notes' new parts; Share is 2.0's word for Export |
 | Search terms | `writing`, `AI agents`, `diagrams` | `writing app`, `AI writing`, `task board` | The other four are kept |

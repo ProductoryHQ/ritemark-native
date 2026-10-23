@@ -74,3 +74,49 @@ Windows round 5 on `8052a182` found three faults for 2.0 (the Development manage
 | S49 after the review | Pass | The `qa-validator` review's points fixed: the wait (`BrowserContextStore.waitForAnswer`) can be stopped from its first moment and is tied to the page asked about (a question replaced by another page's settles it, unanswered); an ask still in flight is waited for; Stop all chats (a project switch) and a Stop during any step before the turn starts end it as stopped; a closed sheet drops its question; the welcome guard leaves a person's own new terminal ("Terminal", "Terminal 2") alone. Rechecked on main `96b4e4f2` in the dev build: on example.net held, Share, "example.net", "Done in 6.2s"; on iana.org Stop while held, "Execution cancelled", Stopped; Not now, the turn went on ("ready") with the question gone |
 | S50 What moved without Copilot Chat | Pass in tests; the production half at the candidate | `home.test.ts`: no Copilot Chat line without it, its line with it. The dev build ships the built-in Copilot Chat, so its What moved shows the line; every production build strips it (`build-prod.sh`, `build-macos-x64.yml`, `build-windows.yml`) |
 
+
+## RC1 on `c04eabf2`: the gates and publication (21–23 October)
+
+RC1 was built in `.worktrees/release-c04eabf2fe02` (RELEASE SOURCE VERIFIED), after macOS x64 CI [39598843953](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39598843953) and Windows CI [39598992733](https://github.com/ProductoryHQ/ritemark-native/actions/runs/39598992733) went green at the same commit.
+- **The build:** `build-prod.sh` took 8 minutes. "Extension source unchanged by the build", the bundled extension floored to `2.0.0-0`, product.json's commit "OK (c04eabf2fe02)", VALIDATION PASSED.
+- **Signing and the DMG:** 47 components signed, 0 failed. `create-dmg` stopped at Finder's -1743, so the DMG was made with the `ditto` + `hdiutil` fallback.
+- **Before the build:** `check:anthropic-models` OK for Claude Code 2.1.304, and preflight passed with its one known warning.
+
+The Gate 1 prep ran on a copy of RC1 in `/private/tmp`, with every test launch on its own profile, extensions and shared data, the mock keychain, and the test marker except where S33 needs `prod`.
+
+| Scenario | Status | Evidence and notes |
+|---|---|---|
+| S9 The base window | Pass | Second run: 32 of 34 scenes the same. More is 1.07% light and 1.04% dark, the expected production difference (no Copilot Chat); Jarmo approved those two captures as the first release images ("release pildid OK", 21 October). The first run's dark switcher showed 4.83%, but its capture had no menu open (the script's click missed); a second full run matched it at 0.02%. `frame-geometry.mjs` 34 pass, 0 fail, 2 skipped; `project-check.mjs` 6/6 |
+| S47 Documents after a flood | Pass | The trace log's recursive watches are only the project, `~/.claude/agents` and `~/.claude/skills`, never the home folder. 5,000 files created and deleted in the home folder and then in the project; a probe each minute for five minutes all seen within 4 s, 0 dropped-events errors |
+| S1, S4, S5 The update, on a fresh Harbour | Pass | Launched with no folder, as a person updating would. "Welcome to Ritemark 2.0", Claude and ChatGPT signed in, Harbour's three projects with Leadership programme "Open when you left", "On, as you chose in Ritemark 1.". Home in Ritemark Dark, What moved without a Copilot Chat line, the waiting card; the agent and flow in Agents; both recordings in Transcribe; the 1.x chat continued ("Continuing with Claude…", Claude recalled "harbour"). Second start: no welcome; What moved until Got it |
+| S6 An older extension copy | Pass | With `/Applications` holding RC1, the older copy was RC1's own extension marked 1.14.0 in a run's `--extensions-dir`: "Skipping extension …/ritemark.ritemark-1.14.0 in favour of the builtin extension" |
+| S18 Claude on arm64 | Pass | The Harbour chat's turn, Claude Code 2.1.304, "Done in 7.6s". No Codex or OpenCode turns in the scripted runs: a newly signed `codex-app-server` risks keychain prompts on Jarmo's screen |
+| S33 Yes, no and 1.x answers | Pass, but the live PostHog check | Against a local stand-in for PostHog. Harbour (OK in 1.x) and a fresh profile that said yes sent `welcome_shown`, `project_opened` and `first_message_sent`, all `prod`; the fresh profile sent nothing before it left the welcome. A fresh profile that said no, and a 1.x profile that opted out (`ritemark.analytics.enabled: false`, what 1.x's Opt Out writes), sent nothing at all, even after a Claude turn. `ai_signed_in` is sent only for a sign-in made inside the welcome (Sprint 133's spec), so it never fired on this Mac, where both AIs were already signed in. The live run in PostHog needs PostHog access and was not run |
+| S34 Our own runs marked | Pass | A test-marked fresh profile that said yes sent five events, all `build_channel: test`. A profile with `ritemark.features.analytics: false` sent nothing. A test-marked profile opened straight into a folder sent nothing either: with no welcome there is no yes |
+| S48, S50 on the Mac | Pass | Harbour's first start had the welcome in front (its terminals did not come back on the Mac). What moved has no Copilot Chat line in the production build |
+| S8 The update offer, after publication | Pass on the Mac (23 October) | v1.14.0 (arm64) on a fresh profile, 10 s after start: "Ritemark 2.0.0 is available (729.5 MB)" with Download Installer, Later, Skip This Version and Pause 7 Days. 729.5 MB is the published arm64 DMG. Windows' offer not checked |
+| S7 Going back to 1.14 | Pass (22 October) | The v1.14.0 DMG, hash matching its published one, started on a Harbour profile 2.0 had used. Nothing of the person's work was deleted (3 chats, 5 cards, the project files; only Chromium caches), its Open Recent showed only the folder it opened, and 2.0 started cleanly again afterwards. 1.14 restores 2.0's Home tab as a blank tab, which the notes' "some things look different" covers |
+
+**Gates, in Jarmo's own words in the release session:**
+- Gate 1, arm64: "gate 1 approved" (21 October), after his test of RC1 on his own Mac. #503 (corner shadows) and #504 (the Transcribe scrollbar) are 2.1 by his call.
+- Gate 2, x64 under Rosetta: "rosetta - approved" (21 October).
+- Gate 2, Windows: "windows approved" (22 October), after the Windows session's run on his PC passed every item it ran.
+  - What it ran: the update over the v1.14.0 Harbour zip with 0 extra and 0 missing files, the signatures, About, a day's work, and a clean uninstall.
+  - What it didn't run: Codex and OpenCode, and whether SmartScreen speaks after Run.
+  - The restored terminal came first on a slow first start (11 s, then the welcome at 23 s). That's #501, for 2.1.
+
+**Notarization:**
+- arm64 `b9506d94-fce5-4ff2-96f7-27b04a122422` and x64 `a11f044b-a542-4d4c-bfaa-7e775dc041a6`, both Accepted and stapled.
+- `stapler validate` and `spctl` (Notarized Developer ID) were checked directly.
+- x64 went 161 minutes after its DMG was built.
+
+**Publication:**
+- Published 2026-10-23T04:56:43Z on Jarmo's "publish - lets go live": <https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.0.0>.
+- The release stayed a draft until GitHub's digests for all four assets matched `dist/`.
+- The `latest` feed was byte-identical afterwards, with 25 entries.
+- The published body is the repo's release notes with four edits:
+  - the two working comments removed;
+  - the Smart App Control link made absolute;
+  - the Strategy Room's inked first sentence. The repo's notes got that sentence in this closeout.
+- Store: hosted on 22 October and submitted on 23 October (`docs/microsoft-store-submission/evidence/`).
+- Release closeout: `docs/releases/v2.0.0/evidence/closeout.md`.
