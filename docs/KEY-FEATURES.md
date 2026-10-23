@@ -39,6 +39,7 @@ These are real and stay on the features hub, but they don't lead.
 |---|---|---|---|
 | Text editor / Tekstiredaktor | The ground under 1, not a reason on its own. | [editor](user/features/editor.md) | /features/text-editor/ |
 | Agents and flows / Agendid ja töövood | The inked direction, but most first users don't reach it yet. Promote it when the User lead's data shows they do. | [agent-library](user/features/agent-library.md), [flows](user/features/flows.md) | /features/flows/ |
+| Dictation / Dikteerimine | Speak at the cursor and the speech becomes text, on your computer (Whisper), offline after a one-time download. Useful, not a first reason; bet B2 may promote it. | [dictation](user/features/dictation.md) | none |
 | In-app browser / Sisseehitatud brauser | Useful, not a first reason. | [browser](user/features/browser.md) | /features/in-app-browser/ |
 
 **Local and open source** is a promise, not a feature: your documents are files on your computer, no Ritemark account, MIT licence. It belongs in the trust line or the footer of every page, not in the menu.
@@ -48,7 +49,7 @@ These are real and stay on the features hub, but they don't lead.
 These follow the Microsoft Store checklist's rules.
 
 - Never "free" next to the AI. The app is free; the AI runs on your own plan or key.
-- Publishing to Google Docs is not claimed on Windows until its sign-in is checked there.
+- Publishing to Google Docs is not claimed on Windows until a Windows check of the Google sign-in is recorded (the Store listing's rule).
 - Plans: "any ChatGPT account, Free included, or a paid Claude plan". Never imply a free Claude plan works.
 - The AI's control of the in-app browser is **macOS only**. Never claim it on Windows.
 - PowerPoint files are read-only previews. "Make an editable copy" is for PDF and Word only.
