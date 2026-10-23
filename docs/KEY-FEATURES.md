@@ -58,4 +58,4 @@ These follow the Microsoft Store checklist's rules.
 ## Gaps this list shows
 
 - **Projects with their own Home** and **Task board** are in the top five but have no feature page on the site yet. Their story pages are the next site work.
-- [user/features/README.md](user/features/README.md) is the user-docs index and still describes 1.x ("Three Modes", "Codex in the sidebar"). It should link here and be brought up to 2.0.
+- [user/features/README.md](user/features/README.md) stays the index of every user doc and points here for the order.
