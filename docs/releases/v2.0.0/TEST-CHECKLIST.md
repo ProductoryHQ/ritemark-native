@@ -755,13 +755,23 @@ Every row of the [v1.14 parity list](../../development/releases/v2.0.0/parity-v1
 - [ ] The privacy policy (R8): right after the GitHub release and the feed are live, the Development manager sends the Traffic manager "2.0 is live". Traffic sets `lastUpdated` (EN and ET), merges [jarmo-productory/ritemark-web#451](https://github.com/jarmo-productory/ritemark-web/pull/451) (wording approved by Jarmo in the Traffic session: "kinnitan sõnastuse, merge 2.0 päeval"; the same PR fixes "Productory Services OÜ" in llms.txt) and checks /en/privacy and /et/privacy
 - [x] S8 on the Mac (23 October): v1.14.0's startup check offers "Ritemark 2.0.0 is available (729.5 MB)" with Download Installer, Later, Skip This Version and Pause 7 Days. Windows not checked
 - [x] S29: the feed was made with `--existing-feed-url` naming v1.14.0; 25 entries, and every digest of the draft matched `dist/` before `--draft=false`
-- [ ] S30: closeout. Every published asset matches `dist/`, the evidence is in `docs/releases/v2.0.0/evidence/`, and the worktree reads `REVIEW`
+- [x] S30: closeout. Every published asset matches `dist/`, the evidence is in `docs/releases/v2.0.0/evidence/`, and the worktree reads `REVIEW` (23 October: [evidence/closeout.md](evidence/closeout.md), 10.1 and 10.3)
 
 ## Deferred in writing
 
 | Line | Why | Jarmo's words, date |
 |---|---|---|
 | | | |
+
+Nothing was deferred in writing. These lines were not run before publication, and no deferral covers them. Gate 1, Gate 2 and the publication were given without them (the sign-off table below):
+
+- **S18's runtime matrix (R4):**
+  - Codex turns and OpenCode's permission gate, on arm64, x64 and Windows. The scripted runs had Claude turns only (a newly signed `codex-app-server` risks keychain prompts on Jarmo's screen), and the Windows run had no Codex or OpenCode turn.
+  - A Claude turn on x64 and on Windows: none is recorded.
+- **S33's live check in PostHog:** S33 ran against a local stand-in only.
+- **S8 on Windows:** v1.14.0 on Windows being offered 2.0.0. The Mac passed.
+
+Jarmo decides whether these lines are run on the published 2.0.0 or deferred.
 
 ## Sign-off
 
