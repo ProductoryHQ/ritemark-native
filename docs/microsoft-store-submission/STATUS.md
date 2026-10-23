@@ -1,20 +1,20 @@
 # Microsoft Store status
 
-Last updated: **2026-10-17**
+Last updated: **2026-10-23**
 
 ## High-level status
 
-**Ritemark is live in Microsoft Store. The v1.14.0 candidate 2 update was submitted on 2026-10-17 at approximately 15:00 EEST, and Partner Center now reports `Update in review`.**
+**Ritemark is live in Microsoft Store. The 2.0.0 update was submitted on 2026-10-23 at about 05:24 UTC, and Partner Center reports `Update in review`, with a review SLA of 3 business days.** It replaces the v1.14.0 update submitted on 2026-10-17.
 
 - Partner Center product ID: `3a2a9010-fbe3-47cf-ae87-4d338f587830`.
 - Store ID: `XP9K8SP24TRNK4`.
 - Existing package ID: `23647104`, x64.
 - Live Store page: `https://apps.microsoft.com/store/detail/XP9K8SP24TRNK4`.
-- The update draft now points to the immutable v1.14.0 candidate URL.
-- Target candidate: [v1.14.0 candidate 2](./release-candidates/v1.14.0-candidate-2.md).
-- Target URL: `https://getritemark.com/windows/v1.14.0/Ritemark-Setup.exe`.
-- Target SHA-256: `8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48`.
-- Submission result: `Update in review`.
+- The update points to the immutable 2.0.0 URL: `https://getritemark.com/windows/v2.0.0/Ritemark-Setup.exe`.
+- Target SHA-256: `5364a56e7d1b5f8c60084f69039b344d28605b0d82b67ff9c7e6c735ade884fe` (`532642016` bytes), the same bytes as the GitHub release asset of v2.0.0 (source `c04eabf2`, Windows CI run `39598992733`).
+- Listing: the 2.0 English (UK) text ([LISTING-COPY.md](./LISTING-COPY.md)), the five 2.0 Windows screenshots, and the 2.0 certification notes ([CERTIFICATION-NOTES-v2.0.0.md](./CERTIFICATION-NOTES-v2.0.0.md)).
+- Privacy URL: `https://ritemark.app/en/privacy/` from 2.0.
+- Submission result: `Update in review` ([evidence](./evidence/partner-center-submission-v2.0.0-2026-10-23.md)). Partner Center showed the same Freemium In-app purchases recommendation as for v1.14.0, and Jarmo pressed **Submit anyway** himself. Freemium → Free is planned for 2.1's submission.
 
 This file is a dated snapshot. Partner Center remains the live source of submission, validation, certification, and publication state.
 
@@ -25,9 +25,7 @@ This file is a dated snapshot. Partner Center remains the live source of submiss
 - [x] English (United Kingdom) listing, availability, properties, age rating, and media were accepted for the live app.
 - [x] Public support email is `info@productory.eu`.
 - [x] Product, support, privacy, and terms URLs are established.
-- [x] Existing privacy and terms URLs are frozen for this package update:
-  - `https://www.productory.ai/en/privacy/`
-  - `https://www.productory.ai/en/terms/`
+- [x] Privacy and terms URLs: from 2.0 the privacy URL is `https://ritemark.app/en/privacy/` (Jarmo, 22 October 2026); terms stay `https://www.productory.ai/en/terms/` ([LEGAL-AND-URLS.md](./LEGAL-AND-URLS.md)).
 - [x] Cloudflare R2 delivery uses direct HTTPS and an indefinite `windows/` object lock.
 - [x] The uploader uses `If-None-Match: *`, Content-MD5, exact size/SHA checks, and an anonymous post-upload verification stream.
 - [x] v1.14.0 is publicly released on GitHub.
@@ -38,7 +36,16 @@ This file is a dated snapshot. Partner Center remains the live source of submiss
 - [x] A second guarded `plan` refused the now-existing URL before any upload attempt.
 - [x] Windows CI standard-user install/uninstall round trip passes for this SHA-256.
 
-## v1.14.0 update checklist
+## 2.0.0 update
+
+- [x] Hosted at `windows/v2.0.0/Ritemark-Setup.exe` through the guarded interactive uploader on 22 October, Jarmo at the keyboard, and verified anonymously twice ([hosting evidence](./evidence/hosting-v2.0.0-2026-10-22.md)).
+- [x] Package URL changed in the update draft; x64, EXE, silent parameters and return codes kept. Validation: malware clean, code sign valid, the other three inconclusive, as for v1.14.0.
+- [x] Listing, What's new, screenshots and certification notes entered on 22 October; privacy URL moved to `https://ritemark.app/en/privacy/`.
+- [x] The GitHub release went public at 04:56:43Z and the 2.0 privacy page was live before Submit.
+- [x] Submitted on 23 October, about 05:24 UTC, on Jarmo's "submit to store", then **Submit anyway** pressed by him: `Update in review`.
+- [ ] After certification and publication, verify the Store page and a Store-origin install, launch, edit and save, and uninstall.
+
+## v1.14.0 update checklist (superseded by the 2.0.0 update)
 
 ### Hosting
 
@@ -72,7 +79,8 @@ The v1.14.0 release closeout records that all Windows checks the session could r
 
 ## Immediate next actions
 
-1. Monitor Microsoft certification for completion or a request for action.
+1. Monitor Microsoft certification of 2.0.0 for completion or a request for action.
 2. After publication, verify the Store page and Store-origin install, launch, edit/save, and uninstall.
+3. 2.1's submission: Freemium → Free, and the held S3 screenshot after its retake with an invented name.
 
 Never replace or delete any published Store installer object. A rebuilt installer requires a new versioned URL and a new candidate record.

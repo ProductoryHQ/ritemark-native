@@ -9,7 +9,7 @@ Last installer HTTP/TLS check: **2026-09-11**. Legal/support page checks remain 
 | Company website | `https://productory.ai` | HTTP 200 after redirect to localized site | Company/account record |
 | Product website | `https://ritemark.app/en/` | HTTP 200 | Yes |
 | Product support | `https://ritemark.app/en/support/` | HTTP 200 | Yes |
-| Privacy policy | `https://www.productory.ai/en/privacy/` | HTTP 200 | Yes |
+| Privacy policy | `https://ritemark.app/en/privacy/` (from 2.0; Jarmo, 22 October 2026) | HTTP 200 on 2026-10-23, "Last updated: 23 October 2026" | Yes |
 | License / terms | `https://www.productory.ai/en/terms/` | HTTP 200 | Yes |
 | Installer host | `https://getritemark.com` | Public DNS, valid HTTPS, direct v1.10.1 response, and fresh-download hash passed | Yes |
 
@@ -17,12 +17,12 @@ Use explicit `/en/` policy URLs so the English Store listing does not depend on 
 
 ## Paths not to submit
 
-These proposed Ritemark-specific paths returned HTTP 404 on 2026-09-01:
+These Ritemark-specific paths returned HTTP 404 on 2026-09-01:
 
 - `https://ritemark.app/en/privacy/`
 - `https://ritemark.app/en/terms/`
 
-Do not use them in Partner Center unless the web owner intentionally publishes and revalidates them. The shipping app already links to the approved Productory privacy and terms pages.
+For 2.0 the web side published the privacy page, and Jarmo moved the Store's privacy URL to it on 22 October 2026 ("Privacy peaks viitama ritemark.app privacy lehele"). It was Productory's page (`https://www.productory.ai/en/privacy/`), which only pointed to Ritemark's own policy. The terms page answers HTTP 200 too since then, but the Store keeps Productory's terms URL until someone decides otherwise.
 
 ## Legal-source boundary
 

@@ -1,0 +1,7 @@
+installer=Ritemark-Setup.exe
+sha256=5364a56e7d1b5f8c60084f69039b344d28605b0d82b67ff9c7e6c735ade884fe
+source_commit=c04eabf2fe02648bb872c6f65b6645ac5a2009f2
+workflow_ref=ProductoryHQ/ritemark-native/.github/workflows/build-windows.yml@refs/heads/main
+workflow_commit=c04eabf2fe02648bb872c6f65b6645ac5a2009f2
+store_url=https://getritemark.com/windows/v2.0.0/Ritemark-Setup.exe
+Partner Center must receive this same file and SHA-256.

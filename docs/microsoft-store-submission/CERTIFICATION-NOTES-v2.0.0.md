@@ -53,8 +53,8 @@ Still addressed from the 15 September 2026 report:
 
 - **Length.** The text measures 1,920 characters, counted from the raw text with line breaks. v1.14.0's saved text was recorded as 1,843 characters, and the same count gives 1,838 for it. This repository doesn't record the field's limit. If Partner Center's counter refuses the text, shorten the window paragraph before cutting the basic test or the usage-data paragraph.
 - **The package.** Only the URL changes. Keep x64, EXE, the language, the silent parameters, the installer handling URL and the return codes exactly as [`PARTNER-CENTER-LIVE-DRAFT.md`](./PARTNER-CENTER-LIVE-DRAFT.md) lists them.
-- **Privacy and terms URLs.** Keep these exactly as they are, unless the web side changed them for 2.0's usage data (R7):
-  - `https://www.productory.ai/en/privacy/`
+- **Privacy and terms URLs.** For 2.0 the privacy URL is Ritemark's own page; the terms URL is unchanged (R7):
+  - `https://ritemark.app/en/privacy/` (Jarmo, 22 October 2026; it was `https://www.productory.ai/en/privacy/`)
   - `https://www.productory.ai/en/terms/`
 - **The privacy page says the same as the app.** Before Submit, open the privacy page signed out and check that it describes usage data that is on by default, with no location ([`LEGAL-AND-URLS.md`](./LEGAL-AND-URLS.md), step 3). The Development manager confirms these lines with Traffic before publication (R8).
 - **Properties.** The privacy answers in Properties were given before usage data was on by default. Read them again against 2.0's behaviour, as [`SUBMISSION-WORKSHEET.md`](./SUBMISSION-WORKSHEET.md) asks under "Personal information/privacy". Change nothing else there.

@@ -1,8 +1,6 @@
 # Ritemark 2.0.0 Release Notes
 
-<!-- Draft for Jarmo's approval (Sprint 136, R6). Remove this comment at release. -->
-
-Ritemark is a free writing app where the AI you choose works directly in your files, and you stay the author. Ritemark 2.0 is a new Ritemark. The window has a calm new frame, in light and dark, on the Mac and on Windows. The first start is a welcome that asks which AI you use and opens your project with it ready. And your project is at the centre: each project has its own Home and its own tasks, and you switch between projects in the same window. Underneath, Ritemark runs on a newer VS Code. Everything Ritemark 1.14 did is still here, though some of it has moved. [Updating from 1.14](#updating-from-114) says where.
+Ritemark turns a folder on your computer into a workspace where ChatGPT or Claude work with you. Ritemark 2.0 is a new Ritemark. The window has a calm new frame, in light and dark, on the Mac and on Windows. The first start is a welcome that asks which AI you use and opens your project with it ready. And your project is at the centre: each project has its own Home and its own tasks, and you switch between projects in the same window. Underneath, Ritemark runs on a newer VS Code. Everything Ritemark 1.14 did is still here, though some of it has moved. [Updating from 1.14](#updating-from-114) says where.
 
 ## A calmer window
 
@@ -95,7 +93,6 @@ Ritemark is a free writing app where the AI you choose works directly in your fi
 
 ## Known issues
 
-<!-- going back to 1.14: confirm with S7 on the candidate -->
 - **Going back to 1.14.** Installing 1.14 again after 2.0 works and keeps your work, but some things look different. Its **File ▸ Open Recent** is empty, because 2.0 moved that list, and folders you open in 1.14 don't reach 2.0's list.
 - **A chat's model after a restart.** A model you pick in a conversation is not kept across a restart yet ([#417](https://github.com/ProductoryHQ/ritemark-native/issues/417)).
 - **Two prompts for one change.** When a document changes on disk while you have unsaved edits, two prompts ask what to do: VS Code's notification and Ritemark's Review changes ([#454](https://github.com/ProductoryHQ/ritemark-native/issues/454)).
