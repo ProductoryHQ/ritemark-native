@@ -23,9 +23,9 @@ Version: Ritemark 2.0.0. First written 2026-10-23 (Inbound Traffic manager, orde
 
 | # | Feature (EN / ET) | In plain words | Since | User doc | Site page | Picture |
 |---|---|---|---|---|---|---|
-| 1 | Your AI in your documents / Sinu AI sinu dokumentides | ChatGPT or Claude works directly in your files, on its own sheet beside the document. No more copying. Plan only shows what it intends before a file changes. | 1.0; 2.0 sheet | [ai-agents](user/features/ai-agents.md), [ai-assistant](user/features/ai-assistant.md) | /features/ai-agents/ | S4 |
+| 1 | Your AI in your documents / Sinu AI sinu dokumentides | ChatGPT or Claude works directly in your files, on its own sheet beside the document. No more copying. With **Plan only**, it shows its plan and changes nothing until you approve. | 1.0; 2.0 sheet | [ai-agents](user/features/ai-agents.md), [ai-assistant](user/features/ai-assistant.md) | /features/ai-agents/ | S4 |
 | 2 | Projects with their own Home / Iga projekt oma avalehega | Each folder you work in is a project with its own Home: what waits for you, what changed last, and where to start. Switch projects in one window. | 2.0 | [getting-started](user/getting-started.md) | none yet (see below) | S3 |
-| 3 | Share / Jagamine | Send a copy as Word or PDF, or publish to Google Docs. The original stays on your computer. | 2.0 (was Export) | [export](user/features/export.md), [google-docs](user/features/google-docs.md) | /features/text-editor/ (screen) | editor-export |
+| 3 | Share / Jagamine | Send a copy as Word or PDF, or publish to Google Docs (claimed for the Mac until its sign-in is checked on Windows). The original stays on your computer. | 2.0 (was Export) | [export](user/features/export.md), [google-docs](user/features/google-docs.md) | /features/text-editor/ (screen) | editor-export |
 | 4 | Your files as they are / Sinu failid, nagu need on | Read the Word, PDF and PowerPoint files you already have, edit CSV and Excel as tables, and make an editable copy of a PDF or Word file when you need one. | 1.x; 2.0 editable copy | [previews](user/features/previews.md), [spreadsheets](user/features/spreadsheets.md) | /features/data-files/ | data-window, S6 |
 | 5 | Task board / Ülesannete tahvel | Give a task to your AI, keep working, and review what comes back before you call it done. | 1.14 | [task-board](user/features/task-board.md) | none yet (see below) | S5, hero-3-board |
 | 6 | Comments the AI works on / Kommentaarid AI-le | Leave a comment in the text. Your AI answers or makes the change, and you decide. | 1.x | [comments](user/features/comments.md) | /features/ai-agents/ (screen) | agents-comments, review-answer |
@@ -45,6 +45,10 @@ These are real and stay on the features hub, but they don't lead.
 
 ## Claim guards
 
+These follow the Microsoft Store checklist's rules.
+
+- Never "free" next to the AI. The app is free; the AI runs on your own plan or key.
+- Publishing to Google Docs is not claimed on Windows until its sign-in is checked there.
 - Plans: "any ChatGPT account, Free included, or a paid Claude plan". Never imply a free Claude plan works.
 - The AI's control of the in-app browser is **macOS only**. Never claim it on Windows.
 - PowerPoint files are read-only previews. "Make an editable copy" is for PDF and Word only.

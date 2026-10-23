@@ -1,22 +1,12 @@
 # Ritemark Features
 
-Everything you can do with Ritemark, organized by mode.
+The index of Ritemark's user docs. Which features lead, and in what order, is in [KEY-FEATURES.md](../../KEY-FEATURES.md): this page lists every user doc, that page ranks them.
+
+Since 2.0 the window has three parts: the places row at the top of the left column (Home, Documents, Tasks, Browser, Agents, Transcribe), your documents on the desk in the middle, and the AI on its own sheet on the right.
 
 ---
 
-## Three Modes
-
-Ritemark is three editors in one app. Each mode handles a different type of content.
-
-| Mode | What It Does | File Types |
-|------|--------------|------------|
-| **Text** | WYSIWYG markdown editing | `.md`, `.markdown` |
-| **Data** | Spreadsheets and structured data | `.csv`, `.xlsx`, `.xls` |
-| **Flow** | Visual AI workflow automation | `.ritemark/flows/` |
-
----
-
-## Text Mode
+## Writing
 
 Write and edit markdown with a visual editor.
 
@@ -27,23 +17,23 @@ Write and edit markdown with a visual editor.
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
 | [Comments](comments.md) | Margin notes on any passage, and handing one to an agent |
 | [Voice Dictation](dictation.md) | Speak into your document; speech is turned into text on your computer |
-| [AI Agents](ai-agents.md) | Built-in Claude, ChatGPT, and OpenCode agents in the sidebar |
+| [AI Agents](ai-agents.md) | Built-in Claude, ChatGPT, and OpenCode agents on the AI's sheet beside your document |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | Complete shortcut reference |
 
 ---
 
-## Data Mode
+## Data files
 
 Work with structured data directly.
 
 | Feature | Description |
 |---------|-------------|
-| [Spreadsheets](spreadsheets.md) | CSV editing and Excel preview |
+| [Spreadsheets](spreadsheets.md) | CSV and Excel (.xlsx) editing; .xls opens as a preview |
 | [Document Properties](document-properties.md) | YAML front-matter and metadata |
 
 ---
 
-## Flow Mode
+## Flows
 
 Build and run AI workflows.
 
@@ -69,7 +59,7 @@ Build and run AI workflows.
 
 ## Cross-Cutting Features
 
-These work across all modes.
+These work across every kind of file.
 
 | Feature | Description |
 |---------|-------------|
@@ -84,11 +74,11 @@ These work across all modes.
 
 ### What Ritemark Opens
 
-| File Type | Mode | What You Can Do |
+| File Type | Opens as | What You Can Do |
 |-----------|------|-----------------|
-| `.md`, `.markdown` | Text | Full WYSIWYG editing |
-| `.csv` | Data | Inline cell editing |
-| `.xlsx`, `.xls` | Data | View and open in Excel/Numbers |
+| `.md`, `.markdown` | Document | Full WYSIWYG editing |
+| `.csv` | Table | Inline cell editing |
+| `.xlsx`, `.xls` | Table | Edit `.xlsx` cells; `.xls` is a preview; open in Excel or Numbers |
 | `.docx` | Preview | Read page by page, search, open in Word ([previews](previews.md)) |
 | `.pptx` | Preview | Read slide by slide with speaker notes, search, open in PowerPoint ([previews](previews.md)) |
 | `.pdf` | Preview | Read page by page, make an editable copy ([previews](previews.md)) |
@@ -106,7 +96,7 @@ These work across all modes.
 
 ### AI Tools
 
-Ritemark's AI lives in the sidebar on the right as three agents — **Claude**, **ChatGPT**, and **OpenCode** — that
+Ritemark's AI has its own sheet on the right of the window, with three agents, **Claude**, **ChatGPT** and **OpenCode**, that
 can read and edit your files in a multi-turn conversation.
 
 [AI Agents guide →](ai-agents.md)
