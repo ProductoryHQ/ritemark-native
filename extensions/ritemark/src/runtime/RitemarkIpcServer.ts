@@ -8,10 +8,39 @@
  * One server per OpenCode process; disposed when the process ends.
  */
 
+import * as crypto from 'crypto';
 import * as net from 'net';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+
+/**
+ * The longest Unix socket path we use, in bytes. macOS's `sun_path` holds 104
+ * bytes including the NUL terminator (Linux 108), and macOS's `os.tmpdir()`
+ * alone is 48 (`/var/folders/<2>/<28>/T`). Node 24 rejects a longer path with
+ * `listen EINVAL`; Node 22 silently truncated it.
+ */
+export const MAX_UNIX_SOCKET_PATH_BYTES = 100;
+
+/**
+ * The socket path (Unix) or named-pipe name (Windows) for one session. On Unix
+ * the name carries a short hash of the session id rather than the id itself,
+ * so the path stays well under the limit for any id; a TMPDIR long enough to
+ * break it falls back to `/tmp`.
+ */
+export function ritemarkIpcSocketPath(
+  sessionId: string,
+  platform: NodeJS.Platform = process.platform,
+  tmpdir: string = os.tmpdir(),
+): string {
+  if (platform === 'win32') {
+    return `\\\\.\\pipe\\ritemark-tools-${sessionId}`;
+  }
+  const shortId = crypto.createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
+  const name = `rmt-${shortId}.sock`;
+  const preferred = path.join(tmpdir, name);
+  return Buffer.byteLength(preferred, 'utf8') <= MAX_UNIX_SOCKET_PATH_BYTES ? preferred : path.join('/tmp', name);
+}
 
 export type RitemarkIpcRequest =
   | { id: string; op: 'list'; group: string }
@@ -43,10 +72,7 @@ export class RitemarkIpcServer {
   readonly socketPath: string;
 
   constructor(sessionId: string) {
-    this.socketPath =
-      process.platform === 'win32'
-        ? `\\\\.\\pipe\\ritemark-tools-${sessionId}`
-        : path.join(os.tmpdir(), `ritemark-tools-${sessionId}.sock`);
+    this.socketPath = ritemarkIpcSocketPath(sessionId);
   }
 
   /**
