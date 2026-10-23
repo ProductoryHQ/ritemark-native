@@ -21,12 +21,14 @@ Version: Ritemark 2.0.0. First written 2026-10-23 (Inbound Traffic manager, orde
 
 ## The menu: seven
 
+The test for every row and name (Jarmo, 2026-10-23): it is a thing a person uses inside Ritemark, and the plain-words line says its value.
+
 | # | Feature (EN / ET) | In plain words | Since | User doc | Site page | Picture |
 |---|---|---|---|---|---|---|
 | 1 | Your AI in your documents / Sinu AI sinu dokumentides | ChatGPT or Claude works directly in your files, on its own sheet beside the document. No more copying. With **Plan only**, it shows its plan and changes nothing until you approve. | 1.0; 2.0 sheet | [ai-agents](user/features/ai-agents.md), [ai-assistant](user/features/ai-assistant.md) | /features/ai-agents/ | S4 |
 | 2 | Projects with their own Home / Iga projekt oma avalehega | Each folder you work in is a project with its own Home: what waits for you, what changed last, and where to start. Switch projects in one window. | 2.0 | [getting-started](user/getting-started.md) | none yet (see below) | S3 |
 | 3 | Share / Jagamine | Send a copy as Word or PDF, or publish to Google Docs (claimed for the Mac until its sign-in is checked on Windows). The original stays on your computer. | 2.0 (was Export) | [export](user/features/export.md), [google-docs](user/features/google-docs.md) | /features/text-editor/ (screen) | editor-export |
-| 4 | Your files as they are / Sinu failid, nagu need on | Read the Word, PDF and PowerPoint files you already have, edit CSV and Excel as tables, and make an editable copy of a PDF or Word file when you need one. | 1.x; 2.0 editable copy | [previews](user/features/previews.md), [spreadsheets](user/features/spreadsheets.md) | /features/data-files/ | data-window, S6 |
+| 4 | Office documents and PDFs / Office'i dokumentide ja PDF-i eelvaated | Open Word, PowerPoint and PDF files right in Ritemark, and make an editable copy of a Word or PDF file for your AI to work on. | 1.x; 2.0 editable copy | [previews](user/features/previews.md) | /features/office-documents/ | S6, hero-4-read |
 | 5 | Task board / Ülesannete tahvel | Give a task to your AI, keep working, and review what comes back before you call it done. | 1.14 | [task-board](user/features/task-board.md) | none yet (see below) | S5, hero-3-board |
 | 6 | Comments the AI works on / Kommentaarid AI-le | Leave a comment in the text. Your AI answers or makes the change, and you decide. | 1.x | [comments](user/features/comments.md) | /features/ai-agents/ (screen) | agents-comments, review-answer |
 | 7 | Transcribe / Transkribeerimine | Turn a meeting or an interview into text you can edit, on your computer or with a provider you choose, then the decisions and the note. | 1.x | [transcribe](user/features/transcribe.md) | /features/transcribe/ | transcribe-window |
@@ -37,6 +39,7 @@ These are real and stay on the features hub, but they don't lead.
 
 | Feature (EN / ET) | Why not in the menu | User doc | Site page |
 |---|---|---|---|
+| Tables: CSV and Excel / Tabelid: CSV ja Excel | Edit CSV and Excel (.xlsx) files as tables; .xls opens as a preview. Analysts live in these, but it's a hub feature, not a first reason. | [spreadsheets](user/features/spreadsheets.md) | /features/data-files/ |
 | Text editor / Tekstiredaktor | The ground under 1, not a reason on its own. | [editor](user/features/editor.md) | /features/text-editor/ |
 | Agents and flows / Agendid ja töövood | The inked direction, but most first users don't reach it yet. Promote it when the User lead's data shows they do. | [agent-library](user/features/agent-library.md), [flows](user/features/flows.md) | /features/flows/ |
 | Dictation / Dikteerimine | Speak at the cursor and the speech becomes text, on your computer (Whisper), offline after a one-time download. Useful, not a first reason; bet B2 may promote it. | [dictation](user/features/dictation.md) | none |
