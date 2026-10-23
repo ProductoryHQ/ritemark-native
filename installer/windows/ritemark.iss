@@ -21,7 +21,7 @@
 ; Overridable from the command line: ISCC.exe /DAppVersion="1.8.2" ...
 ; (scripts/create-windows-installer.sh also sed-replaces this default.)
 #ifndef AppVersion
-  #define AppVersion "2.0.0"
+  #define AppVersion "2.0.1"
 #endif
 #define AppPublisher "Productory Services OÜ"
 #define AppURL "https://ritemark.app"
