@@ -761,17 +761,12 @@ Every row of the [v1.14 parity list](../../development/releases/v2.0.0/parity-v1
 
 | Line | Why | Jarmo's words, date |
 |---|---|---|
-| | | |
+| S18: Codex turns and OpenCode's permission gate on arm64, x64 and Windows | The scripted runs had Claude turns only, because a newly signed `codex-app-server` risks keychain prompts on Jarmo's screen. The Windows run had no Codex or OpenCode turn | "defer the lines" (typed in the release session, 23 October 2026, after publication) |
+| S18: a Claude turn on x64 and on Windows | None is recorded. Claude ran on arm64 only (Claude Code 2.1.304, "Done in 7.6s") | "defer the lines" (typed in the release session, 23 October 2026, after publication) |
+| S33: the live check in PostHog | It needs PostHog access. S33 ran against a local stand-in only | "defer the lines" (typed in the release session, 23 October 2026, after publication) |
+| S8 on Windows: v1.14.0 on Windows offered 2.0.0 | Not checked. The Mac passed on 23 October | "defer the lines" (typed in the release session, 23 October 2026, after publication) |
 
-Nothing was deferred in writing. These lines were not run before publication, and no deferral covers them. Gate 1, Gate 2 and the publication were given without them (the sign-off table below):
-
-- **S18's runtime matrix (R4):**
-  - Codex turns and OpenCode's permission gate, on arm64, x64 and Windows. The scripted runs had Claude turns only (a newly signed `codex-app-server` risks keychain prompts on Jarmo's screen), and the Windows run had no Codex or OpenCode turn.
-  - A Claude turn on x64 and on Windows: none is recorded.
-- **S33's live check in PostHog:** S33 ran against a local stand-in only.
-- **S8 on Windows:** v1.14.0 on Windows being offered 2.0.0. The Mac passed.
-
-Jarmo decides whether these lines are run on the published 2.0.0 or deferred.
+These lines were not run before publication. Gate 1, Gate 2 and the publication were given without them (the sign-off table below), and Jarmo deferred them after publication. They were not run on 2.0.0. The next shell release's checklist carries S18's runtime matrix on every platform again (the release plan's "Every release" line).
 
 ## Sign-off
 

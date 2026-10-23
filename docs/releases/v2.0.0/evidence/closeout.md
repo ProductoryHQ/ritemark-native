@@ -46,6 +46,21 @@ REVIEW   …/.worktrees/release-c04eabf2fe02 — verified disposable release wor
 
 It is the only `REVIEW` entry in that audit, so `--clean` would remove only this worktree. Removing it is Jarmo's call (10.4).
 
+## 10.4 Remove the release worktree
+
+Jarmo, in the release session on 2026-10-23, after #520 merged (`36bf2193`): "clean the release worktree". `--clean` removes every `REVIEW` entry. By then the audit had two more, this session's own worktree and #519's, so the run kept them out:
+- it ran with `--repo` on this session's worktree, which counts as current and is never removed;
+- #519's worktree (`ritemark-native-wt-keyfeatures`) was locked, and a `--check` showed the release worktree as the only `REVIEW` entry.
+
+Then `node ./scripts/worktree-hygiene.mjs --clean --no-sizes`:
+
+```
+REMOVED  …/.worktrees/release-c04eabf2fe02
+Stale worktree metadata pruned. Branches were intentionally retained.
+```
+
+#519's worktree was unlocked straight afterwards. The disk went from 19 to 30 GiB free.
+
 ## The issue sweep (Step 9)
 
 On 2026-10-23 every issue on the v2.0.0 milestone was checked against what 2.0.0 shipped and its QA evidence: #459, #471, #475, #477, #480, #482 and #485–#488 (all from #490, with #491 for #477). All ten were closed with a comment naming v2.0.0, and the milestone was closed with all 11 issues closed (#493, the Windows update blocker that #494 fixed, was closed on 21 October). The comments say what was not run on screen (#459's and #482's signed-out views, #471's planted-change dry run) and name the follow-ups for 2.1: #508 (a restored card tab's name, from #477) and #496 (which plans work, from #482). No other open issue was resolved by 2.0.0: of the issues the merges since v1.14.0 mention, only #107 (bundle size) and #139 (shell auto-update) are still open, and neither is done.
