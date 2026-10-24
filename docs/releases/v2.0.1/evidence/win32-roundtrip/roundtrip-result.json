@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "installer": "Ritemark-Setup.exe",
+  "sha256": "29ff7a8f8bddf3d92d5d51d9eeb4f6a7ccd0d0dd297811d4c9ca16c0fe5ef730",
+  "publisher": "Productory Services OÜ",
+  "version": "2.0.1",
+  "standardUser": "runnervm0xl3a\\rmci-40079413435",
+  "freshAppStarted": true,
+  "update": {
+    "previousInstallerSha256": "8f109ea80438202abab9f3105ba38ae8f1effce04d2a148e93c02d698393ca48",
+    "staleFiles": 0,
+    "appStarted": true
+  }
+}
