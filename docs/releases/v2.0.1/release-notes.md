@@ -1,6 +1,6 @@
 # Ritemark 2.0.1 Release Notes
 
-Two fixes, for the Mac.
+Three fixes. On the Mac and on Windows, Home fits a narrower window, and the ElevenLabs key Test says what's wrong with a key. On the Mac, OpenCode works again.
 
 ## OpenCode works again on the Mac
 
@@ -16,4 +16,8 @@ In 2.0.0, a project's Home was cut off on the right when it had less room: besid
 
 Home now fits at any width. A long name or path ends in an ellipsis, a row keeps its time, and the **Start something** tiles go from three across to two, then one. **Got it** moves under the title when there is no room beside it. Point at the folder under the project's name to read its whole path.
 
-Windows stays on 2.0.0 this time. Windows gets this Home fix with its next release.
+## The ElevenLabs Test says what's wrong with a key
+
+In Ritemark Settings, **Test** beside the ElevenLabs API key could say "ElevenLabs rejected this key" for a key that works. ElevenLabs keys can be limited to some of its features, and the Test asked for one that Ritemark doesn't use.
+
+The Test now asks ElevenLabs whether the key may transcribe. It sends no audio, so it costs nothing. A key without Speech to Text now gets "This key can't transcribe: turn on Speech to Text for it in ElevenLabs." A transcription with such a key says the same.

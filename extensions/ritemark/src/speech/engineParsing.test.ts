@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { parseWhisperJson, parseProgressLine, tokensToWords, transcribeProblemMessage, transcribeArgs } from './engines/whisperLocalEngine';
-import { scribeWordsToTranscriptWords, extractApiMessage, mapHttpError } from './engines/elevenLabsEngine';
+import { scribeWordsToTranscriptWords, extractApiMessage, extractApiStatus, keyTestResult, KEY_CANNOT_TRANSCRIBE, mapHttpError } from './engines/elevenLabsEngine';
 
 async function run(): Promise<void> {
   // ── whisper: progress lines (stderr, padded for two digits) ──
@@ -120,6 +120,29 @@ async function run(): Promise<void> {
   assert.equal(mapHttpError(503, '{}').code, 'network');
   assert.equal(mapHttpError(503, '{}').retryable, true);
   assert.equal(mapHttpError(418, '{}').code, 'unknown');
+
+  // A restricted key (ElevenLabs keys are restricted by default) authenticates but may lack Speech to Text
+  // (Microsoft Store certification of 2.0.0, 23 October): its 401 names the reason, and the guidance follows it.
+  const missing = JSON.stringify({ detail: { status: 'missing_permissions', message: 'The API key you used is missing the permission speech_to_text to execute this operation.' } });
+  const invalid = JSON.stringify({ detail: { status: 'invalid_api_key', message: 'Invalid API key' } });
+  assert.equal(extractApiStatus(missing), 'missing_permissions');
+  assert.equal(extractApiStatus(JSON.stringify({ detail: 'Invalid API key' })), undefined, 'a string detail has no reason');
+  assert.equal(extractApiStatus('<html>502</html>'), undefined);
+  assert.equal(mapHttpError(401, missing).message, KEY_CANNOT_TRANSCRIBE, 'at transcription time, the same guidance as the Test');
+  assert.equal(mapHttpError(401, missing).code, 'invalid-api-key');
+  assert.match(mapHttpError(401, invalid).message, /rejected the API key/);
+
+  // Settings' Test asks the transcription endpoint with no audio: a missing file means the key may transcribe
+  // The statuses ElevenLabs answered Jarmo's keys with on 23 October: a restricted key with Speech to Text got the
+  // missing file's 400 `invalid_parameters`; a made-up key got a 400 `invalid_api_key_length`, which must fail
+  assert.deepEqual(keyTestResult(400, JSON.stringify({ detail: { status: 'invalid_parameters', message: 'Must provide a file' } })), { ok: true });
+  assert.deepEqual(keyTestResult(400, JSON.stringify({ detail: { status: 'invalid_api_key_length', message: 'The API key has the wrong length' } })), { ok: false, error: 'ElevenLabs rejected this key' });
+  assert.equal(mapHttpError(400, JSON.stringify({ detail: { status: 'invalid_api_key_length', message: 'x' } })).code, 'invalid-api-key', 'and at transcription time');
+  assert.deepEqual(keyTestResult(422, JSON.stringify({ detail: [{ msg: 'Field required', loc: ['body', 'file'] }] })), { ok: true });
+  assert.deepEqual(keyTestResult(401, missing), { ok: false, error: KEY_CANNOT_TRANSCRIBE });
+  assert.deepEqual(keyTestResult(401, invalid), { ok: false, error: 'ElevenLabs rejected this key' });
+  assert.deepEqual(keyTestResult(401, '{}'), { ok: false, error: 'ElevenLabs rejected this key' }, 'any other 401');
+  assert.deepEqual(keyTestResult(429, '{}'), { ok: false, error: 'ElevenLabs returned an error (429)' });
 
   // No raw status codes or JSON leak into user-facing copy.
   for (const status of [401, 429, 402, 503]) {

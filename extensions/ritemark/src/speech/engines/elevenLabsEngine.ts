@@ -110,10 +110,47 @@ export function extractApiMessage(body: string): string {
   return body.slice(0, 200);
 }
 
+/**
+ * The machine-readable reason in an error body (`{ detail: { status } }`), such as `invalid_api_key` or
+ * `missing_permissions`; undefined when there is none.
+ */
+export function extractApiStatus(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { detail?: { status?: unknown } };
+    return typeof parsed.detail === 'object' && typeof parsed.detail?.status === 'string' ? parsed.detail.status : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A key that authenticates but may not transcribe (ElevenLabs keys are restricted by default). */
+export const KEY_CANNOT_TRANSCRIBE = 'This key can’t transcribe: turn on Speech to Text for it in ElevenLabs.';
+
+/** A reason that says the key itself is wrong, whatever the status: `invalid_api_key`, and a malformed key's
+ * `invalid_api_key_length`, which comes as a 400 (seen 23 October). */
+const isKeyProblem = (apiStatus: string | undefined): boolean => apiStatus !== undefined && /api_key/.test(apiStatus);
+
+/**
+ * Settings' Test (Microsoft Store certification, 23 October): it posts to the endpoint transcription uses with no
+ * audio, so nothing is charged. A key that may transcribe gets the missing file's 400 (`invalid_parameters`) or a
+ * 422; a 401, or any reason that names the key, says why not.
+ */
+export function keyTestResult(status: number, body: string): { ok: true } | { ok: false; error: string } {
+  const apiStatus = extractApiStatus(body);
+  if (apiStatus === 'missing_permissions') return { ok: false, error: KEY_CANNOT_TRANSCRIBE };
+  if (status === 401 || isKeyProblem(apiStatus)) return { ok: false, error: 'ElevenLabs rejected this key' };
+  if (status === 400 || status === 422 || (status >= 200 && status < 300)) return { ok: true };
+  return { ok: false, error: `ElevenLabs returned an error (${status})` };
+}
+
 export function mapHttpError(status: number, body: string): TranscriptionError {
   const detail = extractApiMessage(body);
 
-  if (status === 401 || status === 403) {
+  const apiStatus = extractApiStatus(body);
+  if (apiStatus === 'missing_permissions') {
+    return new TranscriptionError('invalid-api-key', KEY_CANNOT_TRANSCRIBE);
+  }
+  if (status === 401 || status === 403 || isKeyProblem(apiStatus)) {
     return new TranscriptionError(
       'invalid-api-key',
       'ElevenLabs rejected the API key. Check it in Settings and try again.',
