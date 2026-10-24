@@ -154,11 +154,24 @@ async function command(label) {
 }
 
 async function theme(name) {
-	await command('Preferences: Color Theme');
-	await type(name);
-	await sleep(900);
-	await pickRow(name);
-	await sleep(2000);
+	// Once more before failing the run: in a window started moments before, the theme list can miss its row
+	// (seen twice on 2.0.1's candidate, 24 October 2026; the same pick a minute later found it)
+	for (let attempt = 1; ; attempt++) {
+		await command('Preferences: Color Theme');
+		await type(name);
+		await sleep(900);
+		try {
+			await pickRow(name);
+			await sleep(2000);
+			return;
+		} catch (error) {
+			if (attempt === 2) {
+				throw error;
+			}
+			await key('Escape', 0, 'Escape');
+			await sleep(1500);
+		}
+	}
 }
 
 /**
@@ -417,7 +430,12 @@ for (const themeName of ['Ritemark Light', 'Ritemark Dark']) {
 		}
 	}
 }
-await theme('Ritemark Light');
+// Leaving the window in Light is a courtesy; a failure here must not cost the comparison of what was captured
+try {
+	await theme('Ritemark Light');
+} catch (error) {
+	console.warn(`could not switch back to Ritemark Light: ${error.message}`);
+}
 await send('Emulation.clearDeviceMetricsOverride');
 pageServer.close();
 
