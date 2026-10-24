@@ -13,6 +13,7 @@ import { UpdateService } from '../update';
 import { AVAILABLE_MODELS, defaultModelFile as voiceModelFile, getModelPath, isModelDownloaded } from '../voiceDictation/modelManager';
 import { SessionStore } from '../speech/SessionStore';
 import { sessionStoreDir } from '../speech/paths';
+import { extractApiStatus, keyTestResult } from '../speech/engines/elevenLabsEngine';
 import {
   getAgentEnvironmentStatus,
   getSetupStatus,
@@ -27,7 +28,7 @@ import {
   type SetupStatus,
 } from '../agent';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
-import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
+import { CLAUDE_MODEL_IDS, ELEVENLABS_STT_MODEL_IDS } from '../ai/modelConfig';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
 
@@ -1192,8 +1193,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * provider keys.
    */
   /**
-   * Sprint 108 R4 — validate the ElevenLabs key against a cheap authenticated
-   * endpoint. `/v1/user` returns the account, costs nothing, and needs no audio.
+   * Sprint 108 R4 — validate the ElevenLabs key before a long upload. It asks the endpoint transcription uses,
+   * with no audio, so nothing is charged (`keyTestResult`). It used `/v1/user`, which a restricted key that may
+   * transcribe cannot read: Microsoft's certification of 2.0.0 got "rejected" for a working key.
    */
   private async testElevenLabsKey(webview: vscode.Webview): Promise<void> {
     const key = await this.context.secrets.get('elevenlabs-api-key');
@@ -1203,22 +1205,23 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     try {
-      const response = await fetch('https://api.elevenlabs.io/v1/user', {
-        method: 'GET',
+      const form = new FormData();
+      form.append('model_id', ELEVENLABS_STT_MODEL_IDS.SCRIBE_V2);
+      const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+        method: 'POST',
         headers: { 'xi-api-key': key },
+        body: form,
       });
-
-      if (!response.ok) {
-        // 401 is the case that matters, and "rejected the key" is more useful
-        // to the reader than the status line.
-        throw new Error(
-          response.status === 401
-            ? 'ElevenLabs rejected this key'
-            : `ElevenLabs returned an error (${response.status})`
-        );
+      const body = await response.text();
+      const result = keyTestResult(response.status, body);
+      // What ElevenLabs answered, for support and QA: the status and its reason token, never the key or a message
+      const answered = { httpStatus: response.status, apiStatus: extractApiStatus(body) ?? null };
+      if (!result.ok) {
+        webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: false, error: result.error, answered });
+        return;
       }
 
-      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: true, message: 'API key is valid' });
+      webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: true, message: 'API key is valid', answered });
     } catch (err) {
       webview.postMessage({
         type: 'testResult',

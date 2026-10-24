@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.1]
 
-A Mac-only fix release. Windows stays on 2.0.0, and gets the Home fix with its next release.
+A fix release for the Mac and Windows. The OpenCode fix is for the Mac only.
 
 ### Fixed
 - **OpenCode on the Mac (#523).** In 2.0.0 every OpenCode turn on a Mac failed with `listen EINVAL`. The socket that gives OpenCode Ritemark's tools had a 105-byte path, and macOS holds 104. Node 24 (Electron 43) rejects such a path, where Node 22 in 1.14 had quietly cut it short. The path is now `<tmpdir>/rmt-<12 hex>.sock`, 70 bytes, with a `/tmp` fallback for a long `TMPDIR`. A new test listens and connects on the real path. Windows uses a named pipe and was not affected.
 - **Home fits its desk (#525).** In 2.0.0 Home's page was 640 wide plus a 56 inset, so on a desk under about 730 (beside the AI's sheet, a smaller window, a larger zoom) it was cut off on the right, with What moved's Got it. The page is now the smaller of 640 and the desk less its inset, and the inset comes down from 56 at a desk of 760 to 16 at 600, keyed to the desk by a container query. Row text takes the ellipsis first, then "in …"; under a desk of 440 a row drops its tag and its "in …" place, and the time always stays whole. The tiles go three, two, one across (`minmax(168px, 1fr)`), Got it and Choose files… move under their words on a narrow desk, and the folder's path is cut in the middle, with the whole path in its tooltip. The Experience lead's spec.
+- **The ElevenLabs Test says what's wrong with a key.** Microsoft's certification of 2.0.0 got "ElevenLabs rejected this key" for a working key. Settings' Test asked `GET /v1/user`, which a restricted key cannot read, and ElevenLabs keys are restricted by default. The Test now posts to `/v1/speech-to-text`, the endpoint transcription uses, with no audio, so nothing is charged. The missing audio's 400 (`invalid_parameters`) means the key may transcribe. A 401 `missing_permissions` says "This key can't transcribe: turn on Speech to Text for it in ElevenLabs". A reason that names the key is "rejected": a 401 `invalid_api_key`, or the 400 `invalid_api_key_length` of a malformed key. A transcription gives the same guidance. Checked with real keys on 23–24 October.
 
 ## [2.0.0] — 2026-10-23
 
