@@ -84,6 +84,11 @@ export const OPENROUTER_MODEL_IDS = {
   LLAMA_3_3_70B_INSTRUCT: 'meta-llama/llama-3.3-70b-instruct',
 } as const;
 
+/** ElevenLabs speech to text (Scribe): Transcribe's engine and Settings' key Test. */
+export const ELEVENLABS_STT_MODEL_IDS = {
+  SCRIBE_V2: 'scribe_v2',
+} as const;
+
 /** Compose OpenCode's provider-qualified route without duplicating model IDs. */
 export function toOpenCodeModelId(provider: string, modelId: string): string {
   return `${provider}/${modelId}`;

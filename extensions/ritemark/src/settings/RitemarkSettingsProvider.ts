@@ -28,7 +28,7 @@ import {
   type SetupStatus,
 } from '../agent';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
-import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
+import { CLAUDE_MODEL_IDS, ELEVENLABS_STT_MODEL_IDS } from '../ai/modelConfig';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
 
@@ -1206,7 +1206,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     try {
       const form = new FormData();
-      form.append('model_id', 'scribe_v2');
+      form.append('model_id', ELEVENLABS_STT_MODEL_IDS.SCRIBE_V2);
       const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
         method: 'POST',
         headers: { 'xi-api-key': key },

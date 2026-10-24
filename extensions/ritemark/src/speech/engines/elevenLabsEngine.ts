@@ -30,10 +30,11 @@ import type {
 import { TranscriptionError } from '../types';
 import type { SpeakerSeparation, TranscriptWord, TranscriptionResult } from '../types';
 import { foldWordsIntoSegments } from '../segmentFolding';
+import { ELEVENLABS_STT_MODEL_IDS } from '../../ai/modelConfig';
 
 const API_HOST = 'api.elevenlabs.io';
 const API_PATH = '/v1/speech-to-text';
-const MODEL_ID = 'scribe_v2';
+const MODEL_ID = ELEVENLABS_STT_MODEL_IDS.SCRIBE_V2;
 
 /**
  * USD per hour, published rate at the time of writing. An estimate shown before
