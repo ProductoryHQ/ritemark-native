@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.1]
+## [2.0.1] — 2026-10-24
 
 A fix release for the Mac and Windows. The OpenCode fix is for the Mac only.
 

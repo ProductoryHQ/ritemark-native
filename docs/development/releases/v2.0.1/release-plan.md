@@ -1,11 +1,11 @@
 # Release Plan — v2.0.1
 
-**Status:** **Feature complete; release candidate next.** Three fixes:
+**Status:** **Shipped** on 2026-10-24 as [v2.0.1](https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.0.1), for the Mac (arm64 and x64) and Windows, from RC1 `7810385d`. The record is in [evidence/closeout.md](../../../releases/v2.0.1/evidence/closeout.md). The Store update (hosting, Free pricing and resubmission) is with the Development manager and Jarmo.
+
+Three fixes:
 - OpenCode on the Mac (#523, `e91c3d9a`);
 - Home fitting its desk (#525, `67c5d219`);
-- the ElevenLabs key Test.
-
-The version bump (#524, `0a299477`) merged first. The ElevenLabs fix is the last merge before the candidate, and main is frozen from it until publication.<br>
+- the ElevenLabs key Test (#528, `7810385d`).<br>
 **Target:** v2.0.1<br>
 **GitHub milestone:** v2.0.1 (#523, #525)<br>
 **Release type:** a full app release for the Mac and Windows. Every fix is extension-tier by path, but the release is built, gated and notarized as a full release. Jarmo decided: "admin merge 523, teeme 2.0.1 Macile", then "2.0.1 kõigile platvormidele, ElevenLabsi parandusega" (both 23 October, through the Development manager)<br>
