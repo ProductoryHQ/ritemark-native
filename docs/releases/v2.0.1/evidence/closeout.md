@@ -53,3 +53,15 @@ The local `dist/Ritemark-arm64.dmg`, `Ritemark-x64.dmg`, `Ritemark-Setup.exe` an
 - **The installer:** the staged installer is the CI artifact (`cmp`).
 - **The sidecars:** the DMGs' `*.dmg.sha256` hold the pre-staple hashes, which is expected, because stapling changes the bytes. The Windows sidecar matches.
 - **The update offer (S8, without a window):** the app's own `resolveUpdate`, run on the live feed, offers 2.0.1 as a full update on darwin-arm64, darwin-x64 and win32-x64, from 2.0.0 and from 1.14.0. Each points to its own asset and size.
+
+## 10.3 Clear the build output
+
+Jarmo uploaded the installer to the Store's host on 2026-10-24 at 15:40Z (`windows/v2.0.1/Ritemark-Setup.exe`, R2 ETag `"780af5fb7990a8eec216798cc632c314"`). The uploader's anonymous re-download matched SHA-256 `29ff7a8f…f730` and 532,612,440 bytes. An anonymous HEAD afterwards returned 200, with the same length and ETag.
+
+10.1 had passed, and this archive was pushed (`c44ab5d4`, PR #536). Then the build output was deleted by name in the release worktree: `dist/` (4.5 GB), `VSCode-darwin-arm64/` (2.2 GB) and `VSCode-darwin-x64/` (1.9 GB). The disk went from 14 to 18 GiB free. Then `node ./scripts/worktree-hygiene.mjs --check --no-sizes`:
+
+```
+REVIEW   …/.worktrees/release-7810385df767 — verified disposable release worktree ((detached))
+```
+
+The same audit has one more `REVIEW` entry: #523's agent worktree (`.claude/worktrees/agent-a9843017f5935f085`, squash-merged). A plain `--clean` would remove both. Removing the release worktree is Jarmo's call (10.4).
