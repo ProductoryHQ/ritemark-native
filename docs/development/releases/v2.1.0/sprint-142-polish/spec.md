@@ -88,6 +88,7 @@ Acceptance criteria:
 - When the path is too long for the line, it is cut in the middle. The ellipsis joins the two parts with no space, as in "…/T/rm-smo…/proj/Leadership programme". The gap between the ellipsis and the next character is 0 px, measured.
 - **The order things give way:** the start goes first, then the project's parent folder. The end, the project's own folder, is never cut.
 - If the project's own folder name alone is wider than the line, it wraps at its spaces onto a second line instead (*Open Questions* 6). The line never scrolls sideways.
+  - *(revised 2026-10-26, the Experience lead's answer to Q6; experience 3, ritemark-dev 76b3a50)*: a name with no spaces breaks anywhere, and the › stays after its last word.
 - The full path is in the line's tooltip, as its first line (unchanged).
 - A short path shows whole, with no ellipsis. A Windows path cuts at its backslashes.
 - The cut follows the desk's width as it changes (window resize, a side column shown or hidden).
@@ -131,6 +132,10 @@ As someone looking at a split button, I want to see one button with a menu, not 
 - Each follows R5a with its own tone: quiet for dictation, outline for the viewers and the spreadsheet.
 - **While dictation runs,** its language part is not faded (*Open Questions* 3). Pressing it opens the language menu with the languages unavailable and the line "Stop dictation to change the language".
 - **While dictation finishes,** the whole button is busy.
+- *(revised 2026-10-26, the Experience lead's answer to Q3; framework §3, ritemark-dev 76b3a50)*:
+  - **While dictation runs, the whole button takes the dictating look,** caret included, never two tones.
+  - The caret still opens its menu. The languages are unavailable, the current one keeps its check, and one line reads "Stop dictation to change the language".
+  - §3's general rule: while the main part is on, the whole button shows it, and whatever can't change then is unavailable in the menu, with one line saying why.
 
 ### R6: Chat Debug never shows in More on a release build (#557, item 1)
 

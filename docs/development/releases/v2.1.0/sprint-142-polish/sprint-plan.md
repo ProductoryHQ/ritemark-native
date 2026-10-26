@@ -209,4 +209,11 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 9. **Q9, yes, after A2.** If only patch 019 can keep a restored card's title, the shell change is accepted.
 10. **Chat Debug:** a Gate 1 / Gate 2 check only, with no code.
 
+**The Experience lead's confirmation, 26 October** (framework §3 and experience 3, ritemark-dev 76b3a50):
+- **Q3, changed:** while dictation runs, the whole button takes the dictating look, caret included. The caret still opens its menu: the languages are unavailable, the current one keeps its check, and "Stop dictation to change the language" says why.
+- **Q6, confirmed:** a name with no spaces breaks anywhere, with the › after its last word.
+- §3 names the split buttons: the first day's card, Retry with, Review with, Dictate and Open in Excel. Give to and Send to share Retry with's component. The viewers' Open in… follows the same contract, as R5 lists it.
+
+`spec.md` R4 and R5d carry these as dated addenda.
+
 **Built on** `sprint-142-polish`, from the plan's commit on `origin/main` at `84ea15db`. Two merges, as planned: merge 1 the extension work, merge 2 the patches. The Development manager merges.
