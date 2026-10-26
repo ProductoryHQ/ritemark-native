@@ -114,7 +114,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | Plan: 137 and this release plan | `plan/sprint-137-files-as-written` | — | — | Local, not pushed | n/a | n/a |
 | 137 | `sprint-137-files-as-written` | — | #270, #454 | — | — | — |
 | 138 | `sprint-138-…` (named in its plan) | — | #481, #408 | — | — | — |
-| 139 | `sprint-139-chosen-ai` | — | #496, #417, #376, #479, #473, #529–#532 | — | — | — |
+| 139 | `sprint-139-chosen-ai` | #550 | #496, #417, #376, #479, #473, #552 | — | passed (technical), 26 Oct | drafted, applied at closeout |
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
@@ -131,6 +131,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   - dev runs marked.
 
   Each is listed for `ritemark-web`'s privacy lines (the shape, §6).
+- [ ] ritemark-web privacy lines (Traffic's draft ritemark-web#512) merged before 2.1 publishes.
 - [ ] The done list above, ticked on the candidate.
 - [ ] Runtime review done for the gap since 2.0.1, and `check:anthropic-models` OK.
 - [ ] Version 2.1.0 in all six version files; release notes and `CHANGELOG.md` cover everything merged since v2.0.1.

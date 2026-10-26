@@ -24,14 +24,15 @@ As someone choosing an AI on my first day, I want to know before I sign in wheth
 
 Acceptance criteria:
 - The welcome's step-1 cards say it on their own line, where "Sign in with the account you already use." is today, with no other notice:
-  - ChatGPT: "Sign in with any plan, free included."
-  - Claude: "Sign in with a paid plan, such as Pro or Max."
+  - ChatGPT: "Any plan works, free included."
+  - Claude: "Needs a paid plan, such as Pro or Max."
   - OpenCode: "Open models, with an API key of your own." (unchanged)
+  - (The Experience lead's words, 26 October: a fact that doesn't change with sign-in. They replace "Sign in with any plan, free included." and "Sign in with a paid plan, such as Pro or Max.")
 - The update welcome's Add another shows the same cards with the same lines.
-- A card that shows a state shows that state instead, as today: Checking…, Signed in, or the reason a sign-in ended. The plan line belongs to a card that offers Sign in.
+- Every card keeps its line, signed in or not, and the button row says the state: Signed in, Sign in, or Set up (the Experience lead, 26 October: "Don't close up the empty line"). Only the reason a sign-in ended here takes the line's place.
 - Ritemark Settings says the same for each AI that is not set up. Settings is still 1.x's page in 2.1; the redesign of experience 15 is not in this sprint.
-  - Claude's card leads with "Sign in with a paid plan, such as Pro or Max." and keeps its API-key choice.
-  - ChatGPT's card leads with "Sign in with any plan, free included." and keeps "Paid plans get higher limits." (#482).
+  - Claude's card leads with "Needs a paid plan, such as Pro or Max." and keeps its API-key choice.
+  - ChatGPT's card leads with "Any plan works, free included." and keeps "Paid plans get higher limits." (#482).
   - The OpenCode section says "Open models, with an API key of your own."
 - If Jarmo agrees (*Open Questions* 2), the AI sheet's own sign-in cards say the same. Those are the ones someone who skipped the welcome meets.
 - The word Codex appears nowhere.
@@ -69,15 +70,17 @@ Acceptance criteria:
 
   | Kind | Example | Way on |
   |---|---|---|
-  | The sign-in ended, or a key was refused | "Your ChatGPT sign-in has ended. Sign in again, then send your message again." | Sign in to ChatGPT (Claude keeps today's card; a refused key opens Settings' key) |
+  | The sign-in ended, or a key was refused | "Your ChatGPT sign-in has ended. Sign in, then send your message again." | Sign in to ChatGPT (Claude keeps today's card; a refused key opens Settings' key) |
   | The plan doesn't include the AI | R2 | R2 |
   | A limit, a quota or credits ran out | R5 | R5 |
   | The AI refused the model | R4 | R4 |
   | No connection | "Ritemark couldn't reach ChatGPT. Check your connection, then send your message again." | none |
-  | Anything else from the provider | the provider's own sentence, unwrapped | none |
+  | Anything else from the provider | "ChatGPT couldn't finish this request", then the provider's own sentence once, unwrapped, then "Send your message again." | none |
+  | The AI stopped mid-turn | "ChatGPT stopped unexpectedly. Send your message again." | none |
 
-  The words in this table are proposals. The Development manager or the Experience lead confirms them before merge 1 (*Tasks*, Phase 1).
-- **The status line.** Under a failed turn, it says only "Failed" for every AI, Claude included, because the sentence is right above it. Under a card (sign-in, plan, model, limit), it says nothing, as it already does under Claude's sign-in card.
+  The Experience lead set the final words on 26 October (experience 13, *When the AI's turn fails*). Every kind is a card, its heading and body the sentence's two parts; the record keeps the sentence.
+- **The status line.** Under a failed turn, it says only "Failed" for every AI, Claude included, because the sentence is right above it. Under a card with a way on (sign-in, plan, model, limit), it says nothing, as it already does under Claude's sign-in card. A turn the person stopped says "Stopped".
+- **The activity row** that opens the provider's raw text is labelled "What ChatGPT said" (the AI's name), not "Details".
 - The provider's raw text stays in the turn's activity details and in Report AI issue, for diagnosis. It never appears in the main line.
 - A restored chat shows the same sentence and card after a restart.
 - Only a turn's terminal error is classified. An answer that merely talks about an error is never turned into one.
@@ -92,8 +95,8 @@ Acceptance criteria:
   - message "It isn't available in Ritemark right now. Switch to GPT-5.6 Sol, then send your message again.";
   - a button, Use GPT-5.6 Sol, with the tooltip "Switch this chat to GPT-5.6 Sol. You'll need to send your message again."
 - The button switches this chat's model to the catalog's default for that AI (`modelCatalog.getDefault`). It does not resend.
-- When there is no default, or the default is the model that failed, there is no button, and the message ends "Choose another model in the model menu below."
-- After the switch, the card reads "Switched to GPT-5.6 Sol — send your message again when you're ready."
+- When there is no default, or the default is the model that failed, there is no button, and the message reads "It isn't available right now. Choose another model in the model menu, then send your message again."
+- After the switch, the card reads "Now using GPT-5.6 Sol" with the green check, and "Send your message again when you're ready."
 - The words don't mention the account. In the case #376 was found in, the same sign-in ran that model in OpenAI's own app.
 
 ### R5: Limits, quotas and credits (#376, Jarmo's comment of 24 October)
@@ -101,9 +104,9 @@ Acceptance criteria:
 As someone whose AI stopped because a limit ran out, I want to know whose limit it is and where to fix it.
 
 Acceptance criteria:
-- When an AI stops because a limit is reached, the turn says who stopped it and why, in one sentence, naming the provider. That covers a plan's usage limit (ChatGPT, Claude), an API key's quota, and prepaid credits that ran out (Google, OpenAI, Anthropic or OpenRouter, through OpenCode or Claude with a key). For example: "Google stopped this request: your Gemini API credits have run out."
+- When an AI stops because a limit is reached, the turn says who stopped it and why, in one sentence, naming the provider. That covers a plan's usage limit (ChatGPT, Claude), an API key's quota, and prepaid credits that ran out (Google, OpenAI, Anthropic or OpenRouter, through OpenCode or Claude with a key). For example: "Google stopped this request" / "Your Gemini API credits have run out. Add credits in Google AI Studio, then send your message again." OpenAI's says "Check your plan and billing on OpenAI's platform, then send your message again."
 - A key's quota or credits offers one way on: that provider's billing page, opened in the browser, with a button that names it (for example "Open Google AI Studio").
-- A plan's usage limit says when it resets, when the AI says so ("You've used ChatGPT's limit for now. It resets at 14:30."). If another AI is ready, it offers it ("Use Claude"), which asks the same in a new chat with it, as R2's Use ChatGPT does. Otherwise there is no button.
+- A plan's usage limit says when it resets, when the AI says so ("You've used ChatGPT's limit for now. It resets at 14:30."). Without a reset time it says "Try again later." If another AI is ready, it offers it ("Continue with Claude"), which works as the signed-out card's Use ChatGPT does: this chat continues with that AI. Otherwise there is no button.
 - A billing page opens with no question first, or the card says where to go in words (audit A3 decides).
 
 ### R6: A chat keeps its model after a restart (#417)
@@ -176,7 +179,7 @@ Acceptance criteria:
   2. "For your first message, we count whether an answer came back, or which kind of problem stopped it: a sign-in that ended, a plan that doesn't include the AI, a limit reached, a model the AI refused, no connection, or another error from the AI's company. Never the error's text." (If Jarmo agrees to *Open Questions* 3: "For each message…")
   3. "When dictation or Transcribe turns your voice into text, we count that it happened, and whether the recording was made in Ritemark or brought in as a file. Never the words or the audio."
   4. "When a document that began with your voice is changed again on a later day, we count that, with how many days later. To know which documents these are, Ritemark keeps a code on your computer that can't be turned back into a name, and forgets it after 30 days. The name and the text never leave your computer."
-  5. The rules that hold for all of them, as today: nothing before the welcome is finished, nothing with usage data off, no location, and test runs marked.
+  5. The rules that hold for all of them, as today: nothing before the welcome is finished, nothing with usage data off, no location.
 - 2.1 is not published with these counts before the page says so. This is a row in the release's checklist.
 
 ### R12: The same for Claude, ChatGPT and OpenCode

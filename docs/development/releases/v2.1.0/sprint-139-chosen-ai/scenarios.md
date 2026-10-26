@@ -9,8 +9,8 @@ Unless a scenario says otherwise, it runs on the Mac, on a dev instance launched
 ### S1: The step-1 cards on a fresh profile
 Given a fresh profile with no AI signed in
 When the welcome opens
-Then ChatGPT's card says "Sign in with any plan, free included."
-And Claude's card says "Sign in with a paid plan, such as Pro or Max."
+Then ChatGPT's card says "Any plan works, free included."
+And Claude's card says "Needs a paid plan, such as Pro or Max."
 And OpenCode's card says "Open models, with an API key of your own."
 And no other notice is on the sheet, and the word Codex appears nowhere.
 
@@ -21,14 +21,14 @@ Then ChatGPT's and OpenCode's cards show their plan lines as in S1.
 
 ### S3: A card with a state shows the state
 Given Claude is signed in before the welcome opens
-Then Claude's card shows Checking…, then Signed in, and no plan line
+Then Claude's card shows Checking…, then Signed in in its button row, and keeps its plan line
 And when a ChatGPT sign-in has ended, ChatGPT's card shows that reason, not its plan line.
 
 ### S4: Settings
 Given no AI is set up
 When the person opens Ritemark Settings
-Then Claude's card leads with "Sign in with a paid plan, such as Pro or Max." and still offers its API key
-And ChatGPT's card leads with "Sign in with any plan, free included." and still says paid plans get higher limits
+Then Claude's card leads with "Needs a paid plan, such as Pro or Max." and still offers its API key
+And ChatGPT's card leads with "Any plan works, free included." and still says paid plans get higher limits
 And the OpenCode section says "Open models, with an API key of your own."
 
 ### S5: The AI sheet's sign-in cards (if *Open Questions* 2 is yes)
@@ -119,7 +119,7 @@ Then the sentence shows once in the turn, and the status line says only "Failed"
 ### S19: ChatGPT's sign-in ended
 Given ChatGPT's sign-in has ended (signed out in Codex, or a stale token)
 When the person sends a message with ChatGPT
-Then the turn says "Your ChatGPT sign-in has ended. Sign in again, then send your message again." with Sign in to ChatGPT, which starts ChatGPT's own sign-in.
+Then the card says "ChatGPT needs you to sign in again" and "Your sign-in has ended. Sign in, then send your message again." with Sign in to ChatGPT, which starts ChatGPT's own sign-in.
 
 ### S20: No connection
 Given the network is off
@@ -151,11 +151,11 @@ Given ChatGPT signed in, and a chat on a model Ritemark's Codex can't run (or th
 When the person sends a message
 Then the card reads "ChatGPT couldn't use <model>", "It isn't available in Ritemark right now. Switch to <default>, then send your message again.", with Use <default> and its tooltip
 When the person clicks Use <default>
-Then the chat's model switches, nothing is resent, and the card reads "Switched to <default> — send your message again when you're ready."
+Then the chat's model switches, nothing is resent, and the card reads "Now using <default>" with the green check, and "Send your message again when you're ready."
 
 ### S26: The default is the model that failed
 Given the refused model is the catalog's default
-Then the card has no button, and its message ends "Choose another model in the model menu below."
+Then the card has no button, and its message reads "It isn't available right now. Choose another model in the model menu, then send your message again."
 
 ### S27: Claude refuses the model
 Given Claude, and a model the account can't use (Sprint 127 R6's case)
@@ -170,9 +170,8 @@ Then the same card shows, and since OpenCode has no catalog default, it has no b
 ### S29: Google credits through OpenCode
 Given OpenCode with a Google key whose project has no credits left (the case Jarmo met on 24 October)
 When the person sends a message
-Then the turn says "Google stopped this request: your Gemini API credits have run out." with a button that names Google's page
-When the person clicks it
-Then that page opens (with no question, or as A3 decides).
+Then the card says "Google stopped this request" and "Your Gemini API credits have run out. Add credits in Google AI Studio, then send your message again."
+And, because Google's page isn't a trusted link domain (A3), the place is named in words, with no button.
 
 ### S30: An OpenAI key's quota through OpenCode
 As S29, with an OpenAI key out of quota, naming OpenAI.
