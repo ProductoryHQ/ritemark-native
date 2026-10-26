@@ -20,15 +20,15 @@
 | Pick GPT-6-Luna, send | Reply arrived; the record holds `modelByRuntime: { codex: gpt-6-luna }` |
 | New chat, pick GPT-5.4 Mini, send | ChatGPT refused it for real: `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account.","code":"model_not_found"}}`. The turn showed one card, "ChatGPT couldn't use GPT-5.4 Mini" / "It isn't available in Ritemark right now. Switch to GPT-6.1 Sol, then send your message again." / **Use GPT-6.1 Sol**; nothing on the status line; no JSON in the chat; the raw envelope in the turn's activity row, labelled "What ChatGPT said" (S17, S24, S25). `agent_used … outcome: model` |
 | Use GPT-6.1 Sol | The model button switched to GPT-6.1 Sol, nothing was sent, and the card read "Now using GPT-6.1 Sol" with the green check and "Send your message again when you're ready.", with no button (S25). The pick saved to the chat (`modelByRuntime: { codex: gpt-6.1-sol }`) |
-| ⌘Q, second launch | The refused chat shows the same card, "Now using GPT-6.1 Sol", with no button and nothing on the status line (S21). Found and fixed in the first run: it offered Use GPT-6.1 Sol again although the chat had switched (`a22e2c2c`). |
+| ⌘Q, second launch | The refused chat shows the same card, "Now using GPT-6.1 Sol", with no button and nothing on the status line (S21). Found and fixed in the first run: it offered Use GPT-6.1 Sol again although the chat had switched (`20dd9604`). |
 | Open the first chat from the rail / All conversations, while the other is open | Its own model, GPT-6-Luna, not the open chat's (S33, S36, S37) |
 | Send in it | `continuation-state: native-restored`; ChatGPT remembered its earlier one-word answer; no new "Previous messages were included as context." (S33). The one such line in that chat is from before the restart, when the model changed from GPT-6.1 Sol to GPT-6-Luna, which starts a new ChatGPT thread by design |
 
-The scripted run (`scripts/qa/three-runtimes-check.mjs --ai chatgpt --default-model "GPT-6.1 Sol" --other-model GPT-6-Luna --refused-model "GPT-5.4 Mini"`) repeats the steps on the final code, on a fresh profile, with two hidden launches: **all twelve checks pass** (26 October, after the Experience lead's words and QA's fixes, at `9e27873e`, and again at `13baf284` with the header rule):
+The scripted run (`scripts/qa/three-runtimes-check.mjs --ai chatgpt --default-model "GPT-6.1 Sol" --other-model GPT-6-Luna --refused-model "GPT-5.4 Mini"`) repeats the steps on the final code, on a fresh profile, with two hidden launches: **all twelve checks pass** (26 October, after the Experience lead's words and QA's fixes, at `c495e094`, and again at `a971d9c5` with the header rule):
 1. S1: every step-1 card keeps its plan line, with Signed in, Sign in or Set up beside it; no "Codex".
 2. S43: the first message, with `first_message_sent`, `agent_used` and `first_reply`.
 3. S33: a message on GPT-6-Luna.
-4. S25: a refused model shows one card, and nothing on the status line or in the header (from `13baf284`).
+4. S25: a refused model shows one card, and nothing on the status line or in the header (from `a971d9c5`).
 5. The activity row with the raw envelope reads "What ChatGPT said".
 6. S25: Use GPT-6.1 Sol switches without resending; the card says "Now using GPT-6.1 Sol" with the check, no button, no em dash.
 7. S40: the refused turn is counted with `outcome: model`.
@@ -40,7 +40,7 @@ The scripted run (`scripts/qa/three-runtimes-check.mjs --ai chatgpt --default-mo
 
 The run before it, on the same words, failed two of its own checks: the raw-words row read "1 action completed · What ChatGPT said" (the label now follows the Experience lead's rule: a row that opens the provider's raw text says whose words they are), and the script's way into Settings (F1, Enter) didn't open the palette over CDP (it now uses ⌘⇧P and clicks the palette row).
 
-Seen in those runs: the chat's header said "Interrupted" after a failed or stopped turn (2.0's `conversationStatusLabel` for lifecycle `interrupted`). The Experience lead decided (26 October): the header shows a state only while it is live, so a turn that ended leaves just the title, for all three AIs; the chats list and the rail keep their marks. Built in `13baf284` (`headerStatusLabel`, unit-tested for each AI), and the script now checks the header under the refused model's card, live and after the restart. The re-run on `13baf284` passed all twelve checks, the header holding just the title under the card, live and after the restart.
+Seen in those runs: the chat's header said "Interrupted" after a failed or stopped turn (2.0's `conversationStatusLabel` for lifecycle `interrupted`). The Experience lead decided (26 October): the header shows a state only while it is live, so a turn that ended leaves just the title, for all three AIs; the chats list and the rail keep their marks. Built in `a971d9c5` (`headerStatusLabel`, unit-tested for each AI), and the script now checks the header under the refused model's card, live and after the restart. The re-run on `a971d9c5` passed all twelve checks, the header holding just the title under the card, live and after the restart.
 
 Getting the harness there took five runs. The earlier failures were the harness's own:
 - it read the chat's title before the AI had named it;
@@ -49,7 +49,7 @@ Getting the harness there took five runs. The earlier failures were the harness'
 
 In one run, the project's chat opened on Claude after the welcome was finished with ChatGPT. That is not root-caused: the update notice was in the corner in that run too. The script now turns the update notice off in its profile, and it picks the AI itself if the chat opens on another one.
 
-Screenshots (not in the repository; on this Mac under `/private/tmp/claude-501/r139-evidence-4/` (the run at `13baf284`), for the Development manager and the Experience lead): the welcome's cards, the model card with "What ChatGPT said", the "Now using" card, the restored card, the first chat after the restart, and Settings' Claude card (the script captures only that card, so the ChatGPT card's account e-mail is never in it). The first run's Claude signed-out card with its tooltip is under `/private/tmp/claude-501/r139/`.
+Screenshots (not in the repository; on this Mac under `/private/tmp/claude-501/r139-evidence-4/` (the run at `a971d9c5`), for the Development manager and the Experience lead): the welcome's cards, the model card with "What ChatGPT said", the "Now using" card, the restored card, the first chat after the restart, and Settings' Claude card (the script captures only that card, so the ChatGPT card's account e-mail is never in it). The first run's Claude signed-out card with its tooltip is under `/private/tmp/claude-501/r139/`.
 
 ### What the stand-in received (S56)
 
@@ -125,8 +125,8 @@ Nothing outside R11's lines. No text, model, file, path, project or account.
 
 - `npm test` in `extensions/ritemark`: passes (new: `turnCounts`, `voiceNotes`, `modelSubstitution`, `flowTurnCounts`, `welcomeCopy`; extended: `runtimeErrorPresentation` with A2's corpus, conversation `types`, `ConversationController`, `conversationProjection`, `activityState`, `analytics`, the dictation controller, `AgentRunner`).
 - `tsc` for the extension and the webview: clean. The pre-commit validator passes on every commit.
-- `media/webview.js`: 8,611,995 → 8,624,523 bytes (`notes/bundle.md`).
-- QA's review of `a5b28da3` (26 October): every finding fixed in this PR, with tests where code changed (`turnCounts`, `voiceNotes`, `runtimeErrorPresentation`, `conversationProjection`); the script's profile guard needs five path parts.
+- `media/webview.js`: 8,644,137 → 8,656,665 bytes on main at `53a0456a` (`notes/bundle.md`).
+- QA's review of `a5b28da3` (before the rebase onto Sprint 140) (26 October): every finding fixed in this PR, with tests where code changed (`turnCounts`, `voiceNotes`, `runtimeErrorPresentation`, `conversationProjection`); the script's profile guard needs five path parts.
 
 ## The bets' insights (R9, R10)
 
