@@ -4,7 +4,7 @@ Track: SDD (16 user-facing requirements across Home, the AI's sheet, the agent t
 Override with: "use plain full track"
 Branch: `sprint-140-first-day`, created from `origin/main` after Jarmo approves this plan. The plan itself is on `plan/sprint-140-first-day`.
 Release tier: shell (patch 015 for Help ▸ Send feedback, patch 018 for the sheet over the window). Merge 1 is extension-tier only.
-Status: **Phase 2 (PLAN), waiting for Jarmo's approval.** No code is written before it.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
 
 ## SDD Artifacts
 
@@ -171,4 +171,39 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" and "ja muud asjad ka sh worktreede kustutamine" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's questions, decided:**
+- **J1. The shell pieces:** yes. Patch 015 adds Help ▸ Send feedback, and patch 018 adds the whole-window sheet. 2.1 is a shell release.
+- **J2. The four reactions:** the command opens the new sheet, and the reactions retire. This is experience 34's decision 2, part of the shape Jarmo approved on 21 October (item 5, "#466 as experience 34 draws it"). Nothing is stubbed: the sheet replaces them in the same change.
+- **J3. Frame 2's offer cards:** built only if the spike's part B passes for all three AIs. Otherwise the Experience lead redraws frame 2 with the offers written into the answer.
+- **J4. Tasks' empty place:** experience 29 without the "becomes a task" line, by Jarmo's 15 October rule. Transcribe's words are the Experience lead's (below).
+- **J5. The spike rule:** approved as written, including Mammoth in the extension host if an AI needs it (check its licence; free software only), and PDFs only within the 3 MB bound.
+
+**The Experience lead's answers** (26 October; READMEs of experiences 29, 34 and 35, ritemark-dev commit a86d5c1):
+- **D1:** agreed. The ready request comes back in the same visit, as soon as Send or Not now ends the feedback card.
+- **D2:** agreed. The sentence shows always, as long as it is true of that AI. If the spike shows an AI reads less, the sentence says only what that AI reads.
+- **D3:** agreed. The card's main part keeps the request's words and opens Ask with, with the tooltip "Sign in to an AI first".
+- **D4:** agreed. The starting points step aside without moving the box, and come back when it is empty.
+- **D5:** "It didn't go. Your message is still here: try again, or open it in e-mail.", with Try again and Open in e-mail.
+- **D6:** the words depend on what Ritemark knows. No check mark and no exclamation mark.
+  - When the service accepted the message: "Thank you. It's with the people who make Ritemark."
+  - When Ritemark only knows the message left the computer: "Thank you. Your message is on its way."
+  - When a message is held for later and the hold survives a restart and sends itself: "Thank you. It goes when you're back online."
+  - Any other held message is not sent: use D5's line.
+- **D7:** agreed. The Help menu reads Getting started, Support, Send feedback.
+- **D8:** agreed. One word per panel: the Conversations panel's empty words say "conversation".
+- **D9:** confirmed. The composer, "AI Ready", Waiting for you's empty words and the "new" and "sample" tags stay as 2.0 shipped them.
+- **D10:** agreed, with three details:
+  - cut at a sentence end and mark "[shortened]" in both the quote and the e-mail;
+  - put a muted line under the quote: "Shortened to fit an e-mail. Copy takes the whole answer.";
+  - Copy carries the whole answer.
+- **D11:** agreed. The privacy page says "which question you were answering (the first-week card)".
+- **Transcribe's empty words,** under Recordings, centred:
+  - With Record: "No recordings yet." in ink, then in muted ink "Transcribe turns a meeting, an interview or a call into text you and the AI can work with. Record one, or transcribe a file you have.", then the file types as today.
+  - Without Record: the same two sentences, then "Transcribe a file you have to start."
+  - With recordings in other projects, or no project open: today's words.
+  - Never "on this computer" and never "who said what".
+
+**This sprint builds the shared path:** the host's "open a visible chat with this request in this AI". Sprint 139's refusal card reuses it.
+

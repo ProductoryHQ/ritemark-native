@@ -4,7 +4,7 @@ Track: SDD (auto-detected: 11 user-facing requirements from two issues; the webv
 Override with: "use plain full track"
 Branch: `sprint-137-files-as-written`, created from `origin/main` only after Jarmo approves this plan
 Release tier: shell (`patches/vscode/014-ritemark-save-receipts.patch` gains one file for #454). The #270 work is extension-tier by path, and ships in 2.1.0's shell release (the shape's decision 1).
-Status: **Phase 2 (PLAN)**, awaiting Jarmo's approval. No code before it.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
 
 ## SDD Artifacts
 
@@ -183,4 +183,18 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" and "ja muud asjad ka sh worktreede kustutamine" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's questions, decided:**
+1. **The bound:** R1–R5 as written. The forms outside it are reformatted but never lost, and they are filed as one issue.
+2. **The three losses (R6)** are in this sprint: links into folders, marks around code, images in a row. They are tracked as #539. Reproduce them in the app first.
+3. **Shift+Enter** writes a backslash (`line\`): a real line break everywhere, with no trailing spaces.
+4. **Files 2.0.1 saved:** the one-time cleanup of the four spaces on blank lines is accepted. 2.1's notes say so.
+5. **One folder of Jarmo's own files** may be measured on this Mac, as numbers only. No content is copied, quoted or committed. The report names the folder by its size and kind only.
+6. **The public wording:** "keeps your Markdown as you wrote it: lists, line breaks, tables and front matter come back unchanged".
+7. **#502 and #512 are in this sprint.** Reproduce #512 first. Either moves out if it grows.
+
+**Order:**
+- 137 merges first. Sprint 138 waits for 137's extraction of the pipeline before it touches `Editor.tsx` or `turndownService.ts`.
+- Merges are sequenced by the manager, because the webview bundles clash.
+

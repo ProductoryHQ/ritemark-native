@@ -4,7 +4,7 @@ Track: SDD (auto-detected: five linked issues and 12 user-facing requirements ac
 Override with: "use plain full track"
 Branch: `sprint-139-chosen-ai`, made from `origin/main` at Phase 3, after approval. This plan was written on `plan/sprint-139-chosen-ai`.
 Release tier: extension. Every change is under `extensions/ritemark/`, and it ships in 2.1.0's shell release (the shape's decision 1). If audit A3 puts billing hosts into `branding/product.json`, or the drawn amber dot needs a patch-018 style, this line changes to shell before that is built.
-Status: **Phase 2 (PLAN), awaiting Jarmo's approval.** Written on 26 October 2026 as a document only (decision log, 26 October: "2.1's four sprint plans (137–140) start as documents").
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
 
 ## SDD Artifacts
 
@@ -188,4 +188,21 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" and "ja muud asjad ka sh worktreede kustutamine" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's questions, decided:**
+1. **The model catalog issues #529–#532** become a sprint of their own: Sprint 141, "2.1's model lineup". It is planned separately.
+2. **The AI sheet's own sign-in cards** carry the plan lines too.
+3. **Every turn's outcome is counted,** not only the first reply's. There is no text and no new kind of data.
+4. **#376's three triage points:**
+   - one sentence and one way on, for every AI;
+   - the model card switches the model without resending;
+   - the status line says only "Failed", for Claude too.
+5. **Test accounts:** Jarmo said "Mitte praegu" to test keys and accounts (26 October). So there is no Claude Free reproduction now, and nobody may create macOS users or change system settings for it.
+6. **The plan lines ship. The refusal card's final words** wait for the reproduction, so the card lands only once it is done, in 2.1 if it comes in time and otherwise in the next release. Its words are never guessed.
+7. **OpenCode's test run** uses what needs no new key: a keyless provider if the bundled OpenCode offers one, or the local Ollama model on this Mac (installed for the local-model test, 26 October). Say plainly what couldn't be run.
+
+**A shared path:** Sprint 140 builds the host's "open a visible chat with this request in this AI" path, because the ready request needs it. The refusal card's Use ChatGPT reuses it. Where the plan says "Sprint 138" for the ready request, read Sprint 140.
+
+**Privacy:** the counts must not ship before ritemark-web's privacy page lists them. The manager sends the plan's lines to the Inbound Traffic manager.
+

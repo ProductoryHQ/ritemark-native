@@ -4,7 +4,7 @@ Track: SDD (auto-detected: 14 user-facing requirements across two issues; webvie
 Override with: "use plain full track"
 Branch: `sprint-138-equations`, made from `origin/main` after approval. This plan is on `plan/sprint-138-equations`.
 Release tier: shell (`scripts/validate-build-output.sh`; KaTeX's fonts and stylesheet in `media/katex/` and the `mathml2omml` module reach people only with an app release; they ship in 2.1.0)
-Status: **Phase 2 (PLAN), awaiting Jarmo's approval.** No code before it.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
 
 ## SDD Artifacts
 
@@ -162,4 +162,20 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" and "ja muud asjad ka sh worktreede kustutamine" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's questions, decided:**
+1. **Word equations:** the LGPL converter is accepted. `mathml2omml` ships unmodified, as its own module outside the bundle, with its licence in the notices. Any equation it can't convert becomes a picture, never LaTeX. The A4 spike (40 formulas in Word for Mac and Windows, LibreOffice and Pages) comes first. If it fails, the fallback is pictures.
+2. **Equations in Google Docs:** pictures, both display and inline. Math in a table cell goes as source, and the result says so. This is the first thing to cut.
+3. **ChatGPT's `\(…\)` and `\[…\]`** are read too.
+4. **Rendered math pasted from ChatGPT's and Claude's pages** becomes equations; S30 checks it.
+5. **A typo at export:** the export goes ahead, that equation shows its source in the code style, and the message says how many equations couldn't be typeset.
+6. **The editing look** is experience 38, drawn by the Experience lead on 26 October (`ritemark-dev/product/design/experience/experiences/math/`), including the result bubble while inline math is open. Match it exactly.
+7. **Math in the AI's sheet:** a later issue, not this sprint.
+
+**Order:** the audits, the Word converter, export, fonts and #408 can start now. The editor's reading and writing of math (R1, R2) is built on Sprint 137's extracted pipeline, after 137 merges.
+
+**Also filed from this plan:**
+- #537: the export help promises things the exporters don't do;
+- #538: the Word preview's equations.
+
