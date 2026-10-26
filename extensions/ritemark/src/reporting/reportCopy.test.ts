@@ -74,12 +74,6 @@ test('the dialog says what is included and what is not', () => {
   assert.ok(description.includes('document'), 'names documents as excluded')
 })
 
-test('the status bar item is labelled for what it does', () => {
-  assert.ok(/report/i.test(REPORT_COPY.statusBarLabel))
-  assert.ok(/ai/i.test(REPORT_COPY.statusBarLabel))
-  assert.ok(REPORT_COPY.statusBarTooltip.length > REPORT_COPY.statusBarLabel.length, 'the tooltip explains further')
-})
-
 test('the address is part of the standing vocabulary, not only the fallback', () => {
   assert.ok(/write to us/i.test(REPORT_COPY.directContactLabel), 'invites the user to write')
   // The dialog renders this label next to REPORT_RECIPIENT unconditionally.

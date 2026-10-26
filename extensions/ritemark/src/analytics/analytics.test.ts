@@ -16,7 +16,6 @@ const ALL_EVENT_NAMES: EventName[] = [
   'app_session_start',
   'feature_used',
   'agent_used',
-  'reaction_submitted',
   'feedback_sent',
   'welcome_shown',
   'ai_signed_in',
@@ -40,8 +39,7 @@ const _payloadCheck: {
   app_session_start: { version: '1.0.0', platform: 'darwin' },
   feature_used: { feature: 'editor' },
   agent_used: { agent: 'claude' },
-  reaction_submitted: { reaction: 'love_it', message: 'Great app!' },
-  feedback_sent: { message: 'Please add dark mode', reaction: 'good' },
+  feedback_sent: { message: 'Please add dark mode' },
   welcome_shown: { kind: 'fresh' },
   ai_signed_in: { provider: 'chatgpt', method: 'account' },
   project_opened: { source: 'sample', has_ai: false },
@@ -125,17 +123,7 @@ assert.match(uuid2, uuidRegex, `UUID should match v4 format: ${uuid2}`);
 // UUIDs should be unique
 assert.notStrictEqual(uuid1, uuid2, 'Two generated UUIDs should be different');
 
-// ── 4. Reaction choices ─────────────────────────────────────
-
-const REACTION_VALUES = ['love_it', 'good', 'okay', 'needs_work'];
-
-// All values should be non-empty snake_case strings
-for (const value of REACTION_VALUES) {
-  assert.match(value, /^[a-z_]+$/, `Reaction value should be snake_case: ${value}`);
-}
-
-// Should have exactly 4 choices
-assert.strictEqual(REACTION_VALUES.length, 4, 'Should have exactly 4 reaction choices');
+// ── 4. (Sprint 140: the four reaction choices retired with `reaction_submitted`) ──
 
 // ── 5. Track event suppression logic ────────────────────────
 

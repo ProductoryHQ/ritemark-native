@@ -9,7 +9,6 @@ export type EventName =
   | 'app_session_start'
   | 'feature_used'
   | 'agent_used'
-  | 'reaction_submitted'
   | 'feedback_sent'
   | 'welcome_shown'
   | 'ai_signed_in'
@@ -75,13 +74,8 @@ export interface EventPayloads {
   agent_used: {
     agent: string;
   };
-  reaction_submitted: {
-    reaction: string;
-    message?: string;
-  };
   feedback_sent: {
     message: string;
-    reaction?: string;
     /** Sprint 140 (D11): which question the message answers; only the first-week card's send carries it. */
     asked?: 'made_this_week';
   };

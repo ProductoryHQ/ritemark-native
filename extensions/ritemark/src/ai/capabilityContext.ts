@@ -23,7 +23,7 @@
 import type { AgentId } from '../agent/types';
 
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
-export const CAPABILITY_CONTEXT_VERSION = 3;
+export const CAPABILITY_CONTEXT_VERSION = 4;
 
 /**
  * Per-runtime binding details. NOT capability content — just how a runtime names
@@ -160,6 +160,8 @@ const SECTIONS: CapabilitySection[] = [
     render: () =>
       [
         'FILE OPERATIONS: you may create, rename, and delete files and folders within the workspace (writes are approval-gated). Never read, write, or delete `.git`, `node_modules`, `.env` files, `*.pem`, `*.key`, `credentials*`, or `secrets*` — if asked, explain they are excluded for safety.',
+        // Sprint 140 (R5, experience 35 frame 3): Ritemark's name for the file, so "write About this project" lands where Ritemark shows it
+        'ABOUT THIS PROJECT: what Ritemark calls "About this project" is the `AGENTS.md` file at the project\'s root. When asked to write or change About this project, write that `AGENTS.md` (never a file named "About this project"). If the root has no `CLAUDE.md`, also create one holding only the line `@AGENTS.md`, so Claude reads it too; never change a `CLAUDE.md` that is already there.',
       ].join('\n'),
   },
   {

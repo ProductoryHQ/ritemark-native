@@ -11,12 +11,8 @@
 import { REPORT_RECIPIENT } from './composeReport';
 
 export const REPORT_COPY = {
-  /** Status bar item and its tooltip. */
-  statusBarLabel: 'Report AI issue',
-  statusBarTooltip: 'Report inappropriate or harmful AI output',
 
-  /** Entry inside the AI Information dialog. */
-  informationEntryLabel: 'Report AI output',
+  /** The AI Information dialog's line under "Report an AI issue" (Sprint 140: the link opens the feedback sheet). */
   informationEntryDetail:
     'Tell us about generated output that is inappropriate or harmful. You choose exactly what is included.',
 

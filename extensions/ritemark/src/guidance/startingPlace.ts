@@ -10,6 +10,14 @@ import type { ReadyKind } from './readyRequest';
 /** The `starting_point_used` event's `place` (R15). */
 export type StartingPlace = 'project' | 'empty_project' | 'word_or_pdf' | 'short_text' | 'long_text' | 'table' | 'sample';
 
+/** Every place, for checking what the sheet says against (the webview keeps the same list in its store). */
+export const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample'];
+
+/** A place the sheet named, if it is one of Ritemark's; anything else is dropped, never passed on. */
+export function startingPlaceFrom(value: unknown): StartingPlace | undefined {
+  return STARTING_PLACES.find((place) => place === value);
+}
+
 /** A text document is short below this many words (R8). */
 export const SHORT_TEXT_WORDS = 300;
 

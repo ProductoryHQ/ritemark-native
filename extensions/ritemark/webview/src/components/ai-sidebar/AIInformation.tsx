@@ -239,16 +239,20 @@ export function AIInformationDialog({
               <p className="mt-1 text-[10px] leading-relaxed text-[var(--r-ink-muted)]">
                 {REPORT_COPY.informationEntryDetail}
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenChange(false);
-                  onReport();
-                }}
-                className="mt-2 bg-transparent p-0 text-[11px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
-              >
-                {FEEDBACK_COPY.sheet.aiIssue.title}
-              </button>
+              <Tooltip label="Opens the feedback sheet, ready for an AI issue" side="top" className="mt-2 inline-flex">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onReport();
+                  }}
+                  className="h-auto p-0 text-[11px] font-semibold text-[var(--r-accent-deep)]"
+                >
+                  {FEEDBACK_COPY.sheet.aiIssue.title}
+                </Button>
+              </Tooltip>
             </section>
 
             <div className="flex flex-wrap gap-x-3 gap-y-1.5 border-t border-[var(--r-hairline)] pt-3">

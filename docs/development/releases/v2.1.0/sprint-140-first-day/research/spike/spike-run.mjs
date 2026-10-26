@@ -2,22 +2,29 @@
 // saves the chat's record and a summary.
 // node spike-run.mjs <profile> <run-name> <runtimeId> <auto|ask> '<message>' [--open <file relative to the project>]
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { webview, frameEval, sleep, Session } from './cdp.mjs';
+
+// Where the runs' profiles and results live (the launches' --user-data-dir parent), and the dev extension's bundle,
+// through VS Code's link: <repo>/vscode/extensions/ritemark (this script is seven folders below the repository root).
+const SPIKE_DIR = process.env.SPIKE_DIR || join(tmpdir(), 's140');
+const EXTENSION_JS = process.env.RITEMARK_EXTENSION_JS || resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../../vscode/extensions/ritemark/out/extension.js');
 
 const [profile, name, runtimeId, mode, message, ...rest] = process.argv.slice(2);
 const openIndex = rest.indexOf('--open');
 const openFile = openIndex >= 0 ? rest[openIndex + 1] : null;
-const records = `/private/tmp/s140/${profile}/ud/User/globalStorage/ritemark.ritemark/conversations/v1/records`;
-const outDir = '/private/tmp/s140/runs';
+const records = join(SPIKE_DIR, profile, 'ud/User/globalStorage/ritemark.ritemark/conversations/v1/records');
+const outDir = join(SPIKE_DIR, 'runs');
 mkdirSync(outDir, { recursive: true });
 
 async function exthost(expression) {
-	const log = readFileSync(`/private/tmp/s140/${profile}/launch.log`, 'utf8');
+	const log = readFileSync(join(SPIKE_DIR, profile, 'launch.log'), 'utf8');
 	const port = [...log.matchAll(/debugger listening on port (\d+)/g)].map(m => m[1]).at(-1);
 	const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
 	const session = await new Session(list[0]).open();
-	const prelude = `const m = process.getBuiltinModule('module'); const vscode = m.createRequire('/Users/jarmotuisk/Projects/ritemark-dev/ritemark-native/.claude/worktrees/agent-a5c48759a389647e0/vscode/extensions/ritemark/out/extension.js')('vscode');`;
+	const prelude = `const m = process.getBuiltinModule('module'); const vscode = m.createRequire(${JSON.stringify(EXTENSION_JS)})('vscode');`;
 	const { result, exceptionDetails } = await session.send('Runtime.evaluate', { expression: `(async () => { ${prelude} ${expression} })()`, awaitPromise: true, returnByValue: true });
 	session.close();
 	if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || 'exthost eval failed');

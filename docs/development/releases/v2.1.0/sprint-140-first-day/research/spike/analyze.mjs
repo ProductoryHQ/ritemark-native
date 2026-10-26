@@ -1,9 +1,13 @@
 // Score the spike's runs: per run, which of the newest files' planted facts the answer gives, approvals, time,
 // tool uses, offers. node analyze.mjs [--tail]
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-const dir = '/private/tmp/s140/runs';
-const facts = JSON.parse(readFileSync('/private/tmp/s140/facts.json', 'utf8'));
-const offers = existsSync('/private/tmp/s140/offers.jsonl') ? readFileSync('/private/tmp/s140/offers.jsonl', 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const SPIKE_DIR = process.env.SPIKE_DIR || join(tmpdir(), 's140');
+const dir = join(SPIKE_DIR, 'runs');
+const facts = JSON.parse(readFileSync(join(SPIKE_DIR, 'facts.json'), 'utf8'));
+const offersLog = join(SPIKE_DIR, 'offers.jsonl');
+const offers = existsSync(offersLog) ? readFileSync(offersLog, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
 const tail = process.argv.includes('--tail');
 const rows = [];
 for (const file of readdirSync(dir).filter(f => f.endsWith('.summary.json')).sort()) {

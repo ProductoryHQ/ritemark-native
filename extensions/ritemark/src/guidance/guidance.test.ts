@@ -13,7 +13,7 @@ import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCoun
 import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
 import { AI_NAMES, cardAi, EVENT_KIND, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords } from './readyRequest';
-import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount } from './startingPlace';
+import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
 
@@ -182,3 +182,9 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   console.error(error);
   process.exit(1);
 });
+
+// ── The sheet's place, checked on the host (QA, 26 October) ──
+assert.equal(startingPlaceFrom('table'), 'table');
+assert.equal(startingPlaceFrom('anything else'), undefined, 'an unknown place is dropped');
+assert.equal(startingPlaceFrom(7), undefined);
+assert.equal(STARTING_PLACES.length, 7);

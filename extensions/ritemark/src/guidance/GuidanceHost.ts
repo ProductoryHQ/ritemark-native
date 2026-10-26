@@ -81,6 +81,8 @@ export class GuidanceHost implements vscode.Disposable {
   private readyProblem: string | null = null;
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
   private placeTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The counts line per folder, listed once and listed again only after a file is created or deleted there (QA). */
+  private readonly counts = new Map<string, Promise<string>>();
 
   constructor(private readonly deps: GuidanceDependencies) {
     const version = String(deps.context.extension.packageJSON.version ?? '0.0.0');
@@ -108,9 +110,13 @@ export class GuidanceHost implements vscode.Disposable {
       const files = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(deps.folder, '**/*'));
       this.disposables.push(files, files.onDidCreate((uri) => {
         if (SKIP_DIRS.test(uri.fsPath) || path.basename(uri.fsPath).startsWith('.')) return;
+        this.counts.clear();
         if (deps.hasWorkingTurn()) madeSomething.note('new_document');
         this.schedulePlace();
-      }), files.onDidDelete(() => this.schedulePlace()));
+      }), files.onDidDelete(() => {
+        this.counts.clear();
+        this.schedulePlace();
+      }));
     }
     this.schedulePlace(0);
   }
@@ -339,7 +345,7 @@ export class GuidanceHost implements vscode.Disposable {
     }
     if (origin.startingPoint) {
       void trackEvent('starting_point_used', {
-        place: origin.startingPoint.place as never,
+        place: origin.startingPoint.place,
         edited: turn.text.trim() !== origin.startingPoint.text.trim(),
         provider,
       });
@@ -427,9 +433,20 @@ export class GuidanceHost implements vscode.Disposable {
     }
   }
 
-  private async countsOf(root: string, skipAtRoot: ReadonlySet<string>): Promise<string> {
-    const listed = await listFileNames(root, { skipAtRoot });
-    return countsLine(listed.names, listed.more);
+  /**
+   * The counts line, from names alone (never a file's contents, never a fetch of an online-only file), listed once
+   * per folder and kept until the folder's watcher sees a file created or deleted, so a large synced folder is not
+   * walked on every Home redraw.
+   */
+  private countsOf(root: string, skipAtRoot: ReadonlySet<string>): Promise<string> {
+    const key = `${root}\n${[...skipAtRoot].sort().join('\n')}`;
+    let line = this.counts.get(key);
+    if (!line) {
+      line = listFileNames(root, { skipAtRoot }).then((listed) => countsLine(listed.names, listed.more));
+      line.catch(() => this.counts.delete(key));
+      this.counts.set(key, line);
+    }
+    return line;
   }
 
   dispose(): void {

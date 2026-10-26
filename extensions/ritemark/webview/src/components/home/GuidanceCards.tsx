@@ -10,6 +10,7 @@ import type { HomeAi, HomeAiId, HomeGuidance } from '../../../../src/projects/pr
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
+import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
 import { KeySheet } from '../welcome/WelcomeParts'
 import { send } from './homeClient'
@@ -151,7 +152,7 @@ export function FeedbackCard({ card }: { card: FeedbackCardState }) {
     <section className="rh-guide rh-ask" aria-labelledby="rh-ask-head">
       <h3 className="rh-guide-hd" id="rh-ask-head"><Icon name="chat-centered-text" size={16} tone="inherit" />{card.heading}</h3>
       <p className="rh-guide-sub" id="rh-ask-lede">{card.lede}</p>
-      <input
+      <Input
         className="rh-ask-in"
         value={text}
         maxLength={1000}

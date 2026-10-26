@@ -70,6 +70,16 @@ export const FEEDBACK_COPY = {
     kindReport: 'Report an AI issue',
     kindMessage: 'Send feedback',
   },
+  /** Each sheet button's hover hint, and why Send waits (QA, 26 October). */
+  hints: {
+    cancel: 'Closes this without sending anything',
+    send: 'Sends your words to the people who make Ritemark',
+    openInEmail: 'Opens your e-mail app with this message, to send it yourself',
+    tryAgain: 'Sends it again',
+    writeFirst: 'Write something first',
+    copy: 'Copies the whole message, to send it yourself',
+    done: 'Closes this',
+  },
   /** D6: the thank-you claims only what Ritemark knows (here: the service accepted it). */
   toast: {
     accepted: "Thank you. It's with the people who make Ritemark.",
@@ -106,5 +116,8 @@ export function emailRouteStrings(): string[] {
     handoff.copy,
     handoff.copied,
     handoff.done,
+    FEEDBACK_COPY.hints.openInEmail,
+    FEEDBACK_COPY.hints.copy,
+    FEEDBACK_COPY.hints.done,
   ];
 }

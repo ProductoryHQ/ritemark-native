@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { startingPlaceFrom, type StartingPlace } from '../guidance/startingPlace';
 import * as fs from 'fs';
 import * as os from 'os';
 import { randomBytes, randomUUID } from 'crypto';
@@ -198,7 +199,7 @@ export interface ChatStartRequest {
 export interface ChatOrigin {
   conversationId: string;
   readyRequest?: 'what_is_here' | 'what_for';
-  startingPoint?: { place: string; text: string };
+  startingPoint?: { place: StartingPlace; text: string };
 }
 
 /** Sprint 140 (R6, R15): a turn the host accepted from the sheet, with the conversation's canonical id. */
@@ -649,8 +650,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (!conversationId) break;
           const readyRequest = message.readyRequest === 'what_is_here' || message.readyRequest === 'what_for' ? message.readyRequest : undefined;
           const point = message.startingPoint as { place?: unknown; text?: unknown } | undefined;
-          const startingPoint = point && typeof point.place === 'string' && typeof point.text === 'string' && point.text.length <= 400
-            ? { place: point.place, text: point.text }
+          const place = startingPlaceFrom(point?.place);
+          const startingPoint = point && place && typeof point.text === 'string' && point.text.length <= 400
+            ? { place, text: point.text }
             : undefined;
           if (!readyRequest && !startingPoint) break;
           for (const listener of this._originListeners) listener({ conversationId, ...(readyRequest ? { readyRequest } : {}), ...(startingPoint ? { startingPoint } : {}) });

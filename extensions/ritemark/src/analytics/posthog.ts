@@ -105,7 +105,8 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
       });
       // Sprint 140 (R13, D6; research/feedback-delivery-audit.md): posthog-node's captureImmediate never rejects:
       // a request that failed after its retries is only emitted as 'error'. So a send counts as accepted only
-      // when no error was emitted while it ran, and the feedback sheet can say "sent" only when it was.
+      // when no error was emitted while it ran, and the feedback sheet can say "sent" only when it was. A feedback
+      // send gets a client of its own (consent.ts sendFeedback), so the count it reads is its own send's.
       let errors = 0;
       let lastError: unknown;
       client.on('error', (error) => {

@@ -3333,10 +3333,10 @@ index 491c451f7fa..251b2dfaebf 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..8d293c098d0
+index 00000000000..cba8ccded9b
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,367 @@
+@@ -0,0 +1,394 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3357,12 +3357,14 @@ index 00000000000..8d293c098d0
 +
 +import './media/ritemarkFeedbackSheet.css';
 +import { $, addDisposableListener, append, EventType } from '../../../base/browser/dom.js';
++import { getDefaultHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegateFactory.js';
 +import { Event } from '../../../base/common/event.js';
-+import { DisposableStore } from '../../../base/common/lifecycle.js';
++import { DisposableStore, IDisposable } from '../../../base/common/lifecycle.js';
 +import { isMacintosh } from '../../../base/common/platform.js';
 +import Severity from '../../../base/common/severity.js';
 +import { IClipboardService } from '../../../platform/clipboard/common/clipboardService.js';
 +import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
++import { IHoverService } from '../../../platform/hover/browser/hover.js';
 +import { ILayoutService } from '../../../platform/layout/browser/layoutService.js';
 +import { INotificationService } from '../../../platform/notification/common/notification.js';
 +
@@ -3400,6 +3402,16 @@ index 00000000000..8d293c098d0
 +		readonly foot: string;
 +		readonly copy: string;
 +		readonly copied: string;
++		readonly done: string;
++	};
++	/** Each button's hover hint, and why Send waits; absent from an extension older than 2.1's QA, which draws none. */
++	readonly hints?: {
++		readonly cancel: string;
++		readonly send: string;
++		readonly openInEmail: string;
++		readonly tryAgain: string;
++		readonly writeFirst: string;
++		readonly copy: string;
 +		readonly done: string;
 +	};
 +}
@@ -3448,6 +3460,8 @@ index 00000000000..8d293c098d0
 +	submit(request: IRitemarkFeedbackSubmit): Promise<RitemarkFeedbackSubmitResult>;
 +	copy(text: string): Promise<void>;
 +	readonly mac: boolean;
++	/** A hover hint on a button (the workbench's hover service); its words are read when the hover shows. */
++	hint?(element: HTMLElement, content: () => string): IDisposable;
 +}
 +
 +function button(parent: HTMLElement, label: string, kind: 'primary' | 'ghost'): HTMLButtonElement {
@@ -3529,6 +3543,13 @@ index 00000000000..8d293c098d0
 +		let sending = false;
 +		let failed = false;
 +		const route = () => ritemarkFeedbackRoute(ai.input.checked, answer.input.checked);
++		// Each button says what it does on hover, and a disabled Send says why it waits (QA, 26 October)
++		const hints = words.hints;
++		if (hints && deps.hint) {
++			store.add(deps.hint(cancel, () => hints.cancel));
++			store.add(deps.hint(toEmail, () => area.value.trim() ? hints.openInEmail : hints.writeFirst));
++			store.add(deps.hint(primary, () => !area.value.trim() ? hints.writeFirst : route() === 'email' ? hints.openInEmail : failed ? hints.tryAgain : hints.send));
++		}
 +		/** The route's words, live as the boxes change (R11, R12; experience 34 frame 3: the AI box puts the last answer's box where "I'd like an answer" was). */
 +		const update = () => {
 +			const email = route() === 'email';
@@ -3572,6 +3593,10 @@ index 00000000000..8d293c098d0
 +			const copy = button(handoffFoot, words.handoff.copy, 'ghost');
 +			copy.prepend($('span.codicon.codicon-copy'));
 +			const done = button(handoffFoot, words.handoff.done, 'primary');
++			if (hints && deps.hint) {
++				store.add(deps.hint(copy, () => hints.copy));
++				store.add(deps.hint(done, () => hints.done));
++			}
 +			store.add(addDisposableListener(copy, EventType.CLICK, async () => {
 +				await deps.copy(result.copyText);
 +				copy.lastChild!.textContent = words.handoff.copied;
@@ -3683,10 +3708,12 @@ index 00000000000..8d293c098d0
 +	const layoutService = accessor.get(ILayoutService);
 +	const commandService = accessor.get(ICommandService);
 +	const clipboardService = accessor.get(IClipboardService);
++	const hoverService = accessor.get(IHoverService);
 +	return showRitemarkFeedbackSheet(layoutService.activeContainer, spec, {
 +		submit: request => commandService.executeCommand<RitemarkFeedbackSubmitResult>(SUBMIT_COMMAND, request),
 +		copy: text => clipboardService.writeText(text),
 +		mac: isMacintosh,
++		hint: (element, content) => hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), element, content),
 +	});
 +});
 +
@@ -5472,10 +5499,10 @@ index 6851c3b584c..027d77efbca 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..0a5f2168d1d
+index 00000000000..cbc04c05f48
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,181 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5524,13 +5551,15 @@ index 00000000000..0a5f2168d1d
 +			copied: 'Copied',
 +			done: 'Done',
 +		},
++		hints: { cancel: 'Closes this', send: 'Sends it', openInEmail: 'Opens your e-mail app', tryAgain: 'Sends it again', writeFirst: 'Write something first', copy: 'Copies it', done: 'Closes this' },
 +	};
 +
 +	function open(spec: Partial<IRitemarkFeedbackSheetSpec>, submit: (request: IRitemarkFeedbackSubmit) => Promise<RitemarkFeedbackSubmitResult>) {
 +		const container = mainWindow.document.createElement('div');
 +		mainWindow.document.body.appendChild(container);
 +		const copied: string[] = [];
-+		const outcome = showRitemarkFeedbackSheet(container, { token: 't', kind: 'feedback', aiIssue: false, lastAnswer: null, words, ...spec }, { submit, copy: async text => { copied.push(text); }, mac: true });
++		const hints = new Map<HTMLElement, () => string>();
++		const outcome = showRitemarkFeedbackSheet(container, { token: 't', kind: 'feedback', aiIssue: false, lastAnswer: null, words, ...spec }, { submit, copy: async text => { copied.push(text); }, mac: true, hint: (element, content) => { hints.set(element, content); return { dispose: () => hints.delete(element) }; } });
 +		const $ = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector)!;
 +		const visible = (selector: string) => [...container.querySelectorAll<HTMLElement>(selector)].filter(element => !element.closest('[hidden]')).map(element => element.textContent);
 +		const type = (text: string) => {
@@ -5543,7 +5572,8 @@ index 00000000000..0a5f2168d1d
 +			input.checked = !input.checked;
 +			input.dispatchEvent(new Event('change'));
 +		};
-+		return { container, outcome, copied, $, visible, type, tick, dispose: () => container.remove() };
++		const hint = (element: HTMLElement) => hints.get(element)?.();
++		return { container, outcome, copied, $, visible, type, tick, hint, dispose: () => container.remove() };
 +	}
 +
 +	test('the route follows the boxes, and the keys', () => {
@@ -5560,8 +5590,11 @@ index 00000000000..0a5f2168d1d
 +		const sheet = open({}, async () => ({ route: 'straight', outcome: 'accepted' }));
 +		const button = () => sheet.$<HTMLButtonElement>('.ritemark-feedback-button.primary');
 +		assert.deepStrictEqual([button().textContent, button().disabled, sheet.$('.ritemark-feedback-foot-note').textContent, sheet.$('.ritemark-feedback-via').hidden], ['Send', true, 'Your documents and chats are never included.', true]);
++		assert.deepStrictEqual([sheet.hint(button()), sheet.hint(sheet.$('.ritemark-feedback-button.ghost'))], ['Write something first', 'Closes this'], 'a disabled Send says why; every button has a hint');
 +		sheet.type('The comments in the margin are great.');
++		assert.strictEqual(sheet.hint(button()), 'Sends it');
 +		sheet.tick(1); // I'd like an answer
++		assert.strictEqual(sheet.hint(button()), 'Opens your e-mail app');
 +		assert.deepStrictEqual([button().textContent, button().disabled, sheet.$('.ritemark-feedback-foot-note').textContent, sheet.$('.ritemark-feedback-via').hidden], ['Open in e-mail', false, 'Only what you see here goes.', false]);
 +		sheet.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click(); // Cancel
 +		assert.strictEqual(await sheet.outcome, 'cancelled');
