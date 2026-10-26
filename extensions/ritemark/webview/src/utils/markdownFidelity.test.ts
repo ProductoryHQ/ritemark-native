@@ -12,7 +12,8 @@
  *  - known/:   forms outside the bound (spec, Non-Requirements): the output is
  *              pinned in `name.expected.md`, a second save changes nothing, and
  *              no text, link, mark or image is lost, apart from the losses
- *              listed in `known/losses.json`;
+ *              listed in `known/losses.json` (each skips only the check for
+ *              what it names: `links`, `images`, `text` or `marks`);
  *  - cleanup/: files Ritemark 2.0.1 saved: the one-time cleanup (decision 4) is
  *              pinned in `name.expected.md`, and a second save changes nothing;
  *  - the look: every file opens to the same document as on `main` before the
@@ -69,16 +70,26 @@ function changedLines(before: string, after: string): { removed: string[]; added
   return { removed: a.slice(start, endA + 1), added: b.slice(start, endB + 1) }
 }
 
-function assertNothingLost(name: string, original: string, saved: string, allowed?: string): void {
+type Loss = 'links' | 'images' | 'text' | 'marks'
+
+/** A listed loss skips only its own check; what is kept of it must still come from the file. */
+function assertNothingLost(name: string, original: string, saved: string, allowed?: Loss): void {
   const before = openDocument(original)
   const after = openDocument(saved)
   const source = sourceInventory(original)
   const kept = inventory(after.doc)
-  if (allowed) return
-  assert.deepEqual(kept.links, source.links, `${name}: every link the file holds survives two saves`)
-  assert.deepEqual(kept.images, source.images, `${name}: every image survives two saves`)
-  assert.equal(kept.text, inventory(before.doc).text, `${name}: the text survives two saves`)
-  assert.deepEqual(kept.marks, inventory(before.doc).marks, `${name}: every mark survives two saves`)
+  if (allowed === 'links') {
+    for (const link of kept.links) assert.ok(source.links.includes(link), `${name}: a link kept is one the file holds: ${link}`)
+  } else {
+    assert.deepEqual(kept.links, source.links, `${name}: every link the file holds survives two saves`)
+  }
+  if (allowed === 'images') {
+    for (const image of kept.images) assert.ok(source.images.includes(image), `${name}: an image kept is one the file holds: ${image}`)
+  } else {
+    assert.deepEqual(kept.images, source.images, `${name}: every image survives two saves`)
+  }
+  if (allowed !== 'text') assert.equal(kept.text, inventory(before.doc).text, `${name}: the text survives two saves`)
+  if (allowed !== 'marks') assert.deepEqual(kept.marks, inventory(before.doc).marks, `${name}: every mark survives two saves`)
 }
 
 let checked = 0
@@ -109,7 +120,7 @@ for (const name of markdownFiles('kept')) {
 }
 
 // ---- known: pinned output, stable, nothing lost ----
-const losses = JSON.parse(readFileSync(corpus('known/losses.json'), 'utf8')) as Record<string, string>
+const losses = JSON.parse(readFileSync(corpus('known/losses.json'), 'utf8')) as Record<string, { lost: Loss; why: string }>
 for (const name of markdownFiles('known')) {
   const { text } = readAsTheHostDoes(corpus(`known/${name}`))
   const once = saveDocument(openDocument(text))
@@ -117,11 +128,12 @@ for (const name of markdownFiles('known')) {
   if (update) writeFileSync(expectedPath, once)
   assert.equal(once, readFileSync(expectedPath, 'utf8'), `known/${name}: the output is the pinned one`)
   assert.equal(saveDocument(openDocument(once)), once, `known/${name}: a second save changes nothing`)
-  assertNothingLost(`known/${name}`, text, saveDocument(openDocument(once)), losses[name])
+  assertNothingLost(`known/${name}`, text, saveDocument(openDocument(once)), losses[name]?.lost)
   checked++
 }
-for (const name of Object.keys(losses)) {
+for (const [name, loss] of Object.entries(losses)) {
   assert.ok(markdownFiles('known').includes(name), `known/losses.json names a file in known/: ${name}`)
+  assert.ok(['links', 'images', 'text', 'marks'].includes(loss.lost), `known/losses.json: ${name} names what is lost`)
 }
 
 // ---- cleanup: what 2.0.1 wrote, cleaned once ----
