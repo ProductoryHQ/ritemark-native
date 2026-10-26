@@ -131,7 +131,7 @@ No feature flag. Reading math is what keeps formulas safe on save; a switch that
 - [x] The report's PDF has typeset math with KaTeX's look, sharp at 200%, and keeps bold and italic (R8, R12). *On the Mac*
 - [ ] The report's Word file opens with no repair prompt on the Mac and Windows, with native equations (R9). *The Mac passes; Windows is open*
 - [ ] A published Google Doc shows equations as pictures, and its quotes start at their indent with a thin border (R10, R11). *Open: no Google test account*
-- [ ] `webview.js` grows by at most 40 KB with one KaTeX; the production build carries `media/katex/` and `mathml2omml` (R13, E2, E5). *+36.8 KB with one KaTeX; the production build is open (S43)*
+- [ ] `webview.js` grows by at most 40 KB with one KaTeX; the production build carries `media/katex/` and `mathml2omml` (R13, E2, E5). *+36.9 KB with one KaTeX; the production build is open (S43)*
 - [ ] Documents without math, Mermaid and the 2.0.1 regression set behave as before, on the Mac and Windows (R14).
 - [ ] The film's document passes S46 on the release candidate before capture (E3).
 

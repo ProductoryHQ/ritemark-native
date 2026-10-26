@@ -1,11 +1,11 @@
 # Bundle and weight (E2, A6, R13, S42)
 
-Measured on 26 October 2026. "Before" is the branch's base, Sprint 137's final tip `99cb47ba`; "after" is the branch's head. (On the first base, 137's pipeline extraction `b5ae122f`, the growth was the same within 200 bytes: `webview.js` +36,646.)
+Measured on 26 October 2026. "Before" is the branch's base, `main` at Sprint 137's merge `1e91466c` (the same tree as 137's final tip `99cb47ba`); "after" is the branch's head. (On the first base, 137's pipeline extraction `b5ae122f`, the growth was the same within 200 bytes: `webview.js` +36,646.)
 
 | File | Before | After | Change |
 |---|---|---|---|
-| `media/webview.js` | 8,675,522 | 8,712,339 | **+36,817 bytes (36.0 KiB)**, under the plan's 40 KB |
-| `media/office-preview.js` | 2,603,741 | 2,610,215 | +6,474 (the shared `ui/Icon.tsx` and editor modules it also imports) |
+| `media/webview.js` | 8,675,522 | 8,712,427 | **+36,905 bytes (36.0 KiB)**, under the plan's 40 KB |
+| `media/office-preview.js` | 2,603,741 | 2,610,157 | +6,416 (the shared `ui/Icon.tsx` and editor modules it also imports) |
 | `out/extension.js` | 5,650,663 | 5,678,780 | +28,117 on `b5ae122f` (the PDF layout, the Word wrapper, Google Docs' math); 5,782,370 on 137's tip with 139 and 140 in |
 | `media/katex/` (new) | — | 282,600 bytes in 23 files | `katex.min.css` (woff2 only), 20 woff2 faces (259,792 bytes), `LICENSE`, `VERSION` |
 | `node_modules/mathml2omml` (new, esbuild external) | — | 628 KB on disk | unmodified, loaded only when a Word copy has an equation |
