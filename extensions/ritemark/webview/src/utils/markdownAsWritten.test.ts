@@ -62,6 +62,30 @@ for (const markdown of [
   assert.equal(roundTrip(markdown), `${markdown}\n`, `as written: ${JSON.stringify(markdown)}`)
 }
 
+// ---- S7, S8: an edit to a list changes only what was edited ----
+{
+  const opened = openDocument('1. a\n2. b\n3. c\n')
+  const list = opened.doc.firstChild!
+  const kept: PMNode[] = []
+  list.forEach((item, _offset, index) => { if (index !== 1) kept.push(item) })
+  const edited = doc(list.type.create(list.attrs, kept))
+  assert.equal(saveDocument(opened, edited), '1. a\n2. c\n', 'S8: deleting an item renumbers only the items after it')
+}
+{
+  const opened = openDocument('* one\n* two\n\n+ one\n+ two\n+ three\n')
+  const stars = opened.doc.child(0)
+  const pluses = opened.doc.child(1)
+  const starItems: PMNode[] = []
+  stars.forEach(item => { starItems.push(item) })
+  starItems.push(li(p('new')))
+  const plusItems: PMNode[] = []
+  pluses.forEach((item, _offset, index) => { if (index !== 1) plusItems.push(item) })
+  const edited = opened.doc.copy(opened.doc.content
+    .replaceChild(0, stars.type.create(stars.attrs, starItems))
+    .replaceChild(1, pluses.type.create(pluses.attrs, plusItems)))
+  assert.equal(saveDocument(opened, edited), '* one\n* two\n* new\n\n+ one\n+ three\n', 'S7: a new item takes its list\'s marker, a deleted one leaves only its line')
+}
+
 // ---- R8: new writing in one plain form ----
 {
   // S34: `- milk`, Enter, `eggs`, Tab, `brown`.
@@ -98,6 +122,9 @@ for (const markdown of [
   assert.equal(roundTrip('Office 4\\\nTallinn'), 'Office 4\\\nTallinn\n', 'backslash breaks stay')
   assert.equal(roundTrip('one\n2. not a list'), 'one\n2. not a list\n', 'a number after a soft break that cannot start a list stays bare')
   assert.equal(roundTrip('one\n1. a list'), 'one\n1. a list\n', 'and a list that interrupts the line stays a list under it')
+  assert.equal(roundTrip('```\nplain\n```'), '```\nplain\n```\n', 'a fence written with no info string stays with none, not `plaintext`')
+  assert.equal(roundTrip('```js title="a.js"\nx\n```'), '```js title="a.js"\nx\n```\n', 'and an info string stays as written')
+  assert.equal(roundTrip('| a |\n| --- |\n| one<br>two |'), '| a |\n| --- |\n| one<br>two |\n', 'a break in a table cell is `<br>`, the one form a cell can hold')
   const html = createEditorTurndownService()
   assert.equal(html.turndown('<p><a data-md-link="bare" href="https://x.test">the site</a></p>'), '[the site](https://x.test)', 'an address whose text was edited is written inline')
   assert.equal(html.turndown('<p><a data-md-link="angle" href="mailto:a@b.test">a@b.test</a></p>'), '<a@b.test>', 'an angle address stays one')

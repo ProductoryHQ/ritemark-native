@@ -419,7 +419,10 @@ for (const relativePath of files) {
 		ok = results.every(result => result.same);
 	} else if (expect === 'word') {
 		const [first, ...rest] = results;
-		ok = first.removed.length === 1 && first.added.length === 1 && first.added[0] === `${first.removed[0]} EDITED`
+		// The word lands where the caret was: before a CRLF line's `\r`, or inside the mark that ends the paragraph
+		// (`*text EDITED*`), as typing there does.
+		ok = first.removed.length === 1 && first.added.length === 1 && first.added[0].includes(' EDITED')
+			&& first.added[0].replace(' EDITED', '') === first.removed[0]
 			&& rest.every(result => changedLines(original, readFileSync(path, 'utf8')).added.length === 1);
 	}
 	if (hidden) {
