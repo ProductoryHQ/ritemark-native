@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
-import { useAISidebarStore } from './store';
+import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
 import { vscode } from '../../lib/vscode';
 import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
@@ -58,6 +58,7 @@ export function TurnFailureCard({
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
   const [switchedTo, setSwitchedTo] = useState<string | undefined>(undefined);
+  const conversation = useActiveConversation();
 
   const names: ModelNames = {
     label: (id) => runtimeId === 'claude-code'
@@ -72,6 +73,18 @@ export function TurnFailureCard({
       ? defaultCodexModelId(codexModels)
       : undefined;
 
+  // A chat already on the catalog's default (the switch was taken before a restart, or the
+  // restore fell back to it) says so, rather than offering the switch again.
+  const currentModel = runtimeId === 'claude-code'
+    ? conversation.selectedModel
+    : runtimeId === 'codex'
+      ? conversation.codexSelectedModel
+      : conversation.opencodeSelectedModel.replace(/^opencode:/, '');
+  const alreadySwitched = isLatest && errorKind === 'model' && fallbackModel && currentModel === fallbackModel
+    && errorDetail?.model !== fallbackModel
+    ? fallbackModel
+    : undefined;
+
   const card = turnFailureCard({
     runtimeId,
     kind: errorKind,
@@ -79,7 +92,7 @@ export function TurnFailureCard({
     sentence: error,
     names,
     fallbackModel,
-    switchedTo,
+    switchedTo: switchedTo ?? alreadySwitched,
   });
 
   if (!card) {
@@ -97,7 +110,7 @@ export function TurnFailureCard({
       <RuntimeNotice
         title={card.title}
         message={card.message}
-        tone={switchedTo ? 'success' : 'warning'}
+        tone={switchedTo ?? alreadySwitched ? 'success' : 'warning'}
         primaryAction={action ? {
           label: action.label,
           icon: ACTION_ICONS[action.kind] ?? 'arrow-square-out',
