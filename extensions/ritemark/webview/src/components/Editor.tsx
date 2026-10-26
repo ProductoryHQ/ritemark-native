@@ -16,6 +16,8 @@ import { HeadingLevelShortcuts } from '../extensions/HeadingLevelShortcuts'
 import { SelectionBoundaryKeys } from '../extensions/SelectionBoundaryKeys'
 import { SearchExtension } from '../extensions/SearchExtension'
 import { DictationPlaceholder } from '../extensions/DictationPlaceholder'
+import { MathBlockWithView, MathEditing, MathInlineWithView } from '../extensions/math/mathEditing'
+import { countEquations } from '../extensions/math/mathCount'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
@@ -234,8 +236,13 @@ export function Editor({
         AutoJoiner.configure({
           elementsToJoin: ['bulletList', 'orderedList', 'taskList'],
         }),
+        // Sprint 138 (#481): writing and editing equations.
+        MathEditing,
       ],
       commentCallouts,
+      // Sprint 138 (#481): the equation nodes with their typesetting views.
+      mathInline: MathInlineWithView,
+      mathBlock: MathBlockWithView,
     }),
     content: initialContent,
     onCreate: ({ editor }) => {
@@ -647,8 +654,9 @@ export function Editor({
     const updateWordCount = () => {
       const count = countWords(editor.state.doc)
       setWordCount(count)
-      // Send word count to extension for status bar display
-      sendToExtension('wordCountChanged', { wordCount: count })
+      // Send word count to extension for status bar display. Sprint 138
+      // (experience 38): with the equations beside it, "96 words · 5 equations".
+      sendToExtension('wordCountChanged', { wordCount: count, equationCount: countEquations(editor.state.doc) })
     }
 
     // Initial count

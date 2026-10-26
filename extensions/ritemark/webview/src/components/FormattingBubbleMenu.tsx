@@ -1,4 +1,5 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
+import { NodeSelection } from '@tiptap/pm/state'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -271,6 +272,9 @@ export function FormattingBubbleMenu({
 
           if (empty) return false
           if (editor.isActive('codeBlock')) return false
+          // Sprint 138 (experience 38): a selected equation shows its focus ring
+          // or opens in place; text formatting does not apply to it.
+          if (selection instanceof NodeSelection && ['mathInline', 'mathBlock'].includes(selection.node.type.name)) return false
 
           return true
         }}

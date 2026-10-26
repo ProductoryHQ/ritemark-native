@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { watchRitemarkThemeClass } from './utils/themeClass'
+import { captureWebviewScriptUrl } from './lib/webviewAssets'
+
+// Sprint 138 (#481): webview.js's own URL, while it is still known, for the
+// files next to it in media/ (KaTeX's stylesheet and fonts).
+captureWebviewScriptUrl()
 
 // Lazy load FlowEditor to avoid loading React Flow for markdown files
 const FlowEditor = lazy(() =>
