@@ -151,7 +151,8 @@ ChatGPT, Claude and most people who write formulas in Markdown write them in LaT
 |---|---|
 | `$\bar{x} = 3.9$` | A formula in the line, at the text's size |
 | `$$` on its own line, the formula, `$$` | A formula centred on its own lines |
-| `\(…\)` and `\[…\]` (how ChatGPT often writes them) | The same as `$…$` and `$$…$$` |
+| `\(…\)` in a line, and `\[…\]` on lines of its own (how ChatGPT often writes them) | The same as `$…$` and `$$…$$` |
+| `See \[1\]` in a sentence (how Ritemark 2.0.1 saved brackets) | Text: `See [1]` |
 | `costs $5 and $10` | Text: a dollar amount is never a formula |
 | `\$` | A dollar sign |
 

@@ -32,7 +32,7 @@ The Word audit's evidence (40 formulas, the wrapper against the converter alone)
 | S1 inline and display typeset | pass | dev instance (01) |
 | S2 dollar amounts stay text | pass | dev instance and `prose-dollars.md` byte for byte |
 | S3 not inside code; S4 ChatGPT's delimiters; S5 display math in a paragraph; S6 an escaped dollar; S7 math in lists, quotes, tables, headings | pass | `mathSyntax.test.ts`, `mathRoundTrip.test.ts`; the report shows S7's table, list and quote |
-| S8 open and save untouched; S9 an edit elsewhere | pass for every equation; the list lines are Sprint 137's | `mathRoundTrip.test.ts`; dev instance diff ([A1](../research/editor-roundtrip-audit.md)) |
+| S8 open and save untouched; S9 an edit elsewhere | pass: on Sprint 137's tip all four fixtures and 137's new `kept/equations.md` come back byte for byte as whole files | `mathRoundTrip.test.ts`; dev instance diff ([A1](../research/editor-roundtrip-audit.md)) |
 | S10 every delimiter form | pass | `forms.md` byte for byte |
 | S11 editing one equation | pass | dev instance: only its lines saved; one ⌘Z restores the file byte for byte |
 | S12 an inline edit stays math; S13 literal dollars; S14 a document without math | pass | unit tests; S13 also in the dev instance |
@@ -53,7 +53,7 @@ The Word audit's evidence (40 formulas, the wrapper against the converter alone)
 | S37 an equation Word can't take | pass in unit tests (picture fallback) | `mathToWord.test.ts` |
 | S38 other readers | Word for Mac only; LibreOffice, Pages and a Google Docs import not run | [A4](../research/word-equations-audit.md) |
 | S39–S41 Google Docs | not run: no test account; unit tests only | [A5](../research/google-docs-audit.md) |
-| S42 the bundle | pass: +36.6 KB, one KaTeX | [notes/bundle.md](../notes/bundle.md) |
+| S42 the bundle | pass: +36.8 KB on 137's tip, one KaTeX | [notes/bundle.md](../notes/bundle.md) |
 | S43 the production build | not run: after the merge, from a clean-room worktree | — |
 | S44 Mermaid | pass in the editor and the PDF: the diagram renders. Math in a Mermaid label shows its `$$…$$` source, because Ritemark draws Mermaid with `htmlLabels: false` (unchanged by this sprint); not compared side by side with 2.0.1 | dev instance |
 | S45 the 2.0.1 regression set; S46 before the film | not run | Windows session and the release candidate |

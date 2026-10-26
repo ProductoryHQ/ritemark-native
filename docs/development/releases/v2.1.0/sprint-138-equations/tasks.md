@@ -5,7 +5,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 ## Phase 0: Branch and starting tree
 
 - [x] Jarmo's approval recorded in `sprint-plan.md`, with his answers to the seven decisions (the Development manager, under Jarmo's delegation, 26 October)
-- [x] `git checkout -b sprint-138-equations` from `origin/main`; `git branch --show-current` shows it (moved onto 137's `b5ae122f` at the manager's request)
+- [x] `git checkout -b sprint-138-equations` from `origin/main`; `git branch --show-current` shows it (moved onto 137's `b5ae122f`, then onto 137's final tip `99cb47ba`, at the manager's request)
 - [x] `notes/bundle.md`: `media/webview.js` and `out/extension.js` sizes before; KaTeX copies in `webview.js` (one, 0.16.47) (E2, A6)
 - [x] The Experience lead asked, through the Development manager, for a short drawing of an equation's states: typeset, editing inline, editing a block, a typo, empty (decision for Jarmo 6). Behaviour work does not wait for it; the look does
 
@@ -26,7 +26,7 @@ Nothing here starts before Jarmo approves the sprint plan. Tick a box only when 
 - [x] `mathTurndownRules.ts` and `escapeLiteralDollars` in `createTurndownService()` (`E/webview/src/utils/turndownService.ts`)
 - [x] Fixtures in `E/webview/src/extensions/math/fixtures/`: `analyst-report.md`, `forms.md`, `prose-dollars.md`, `edge-cases.md`
 - [x] `mathRoundTrip.test.ts`: every fixture byte for byte through load and save; the escaper's cases; added to the `test` chain in `E/package.json`
-- [x] S1–S14 on a dev instance; the list-item and soft-break cases marked as waiting for Sprint 137 if it has not merged (`WAITS_FOR_137`)
+- [x] S1–S14 on a dev instance; the list-item and soft-break cases marked as waiting for Sprint 137 if it has not merged (on 137's tip they are byte for byte, and `kept/equations.md` joins 137's corpus)
 
 ## Phase 3: Typesetting (W2; R3)
 

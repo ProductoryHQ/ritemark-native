@@ -23,10 +23,12 @@ The whole diff is 13 changed lines for a one-word edit. No other tool reads the 
 |---|---|
 | `forms.md` (every delimiter form: `$…$`, `$$…$$` on one line and on three, `\(…\)`, `\[…\]`, `\$`) | byte for byte |
 | `prose-dollars.md` (prices, `$5 and $10`, `US$`, a lone `$`) | byte for byte; no dollar became math |
-| `analyst-report.md` (13 inline equations, 2 blocks, 2 literal dollars) | every equation and dollar byte for byte; 6 list lines differ in list spacing, the #270 class Sprint 137 fixes |
-| `edge-cases.md` | every equation byte for byte; 2 list lines wait for Sprint 137 in the same way |
+| `analyst-report.md` (13 inline equations, 2 blocks, 2 literal dollars) | byte for byte, the whole file |
+| `edge-cases.md` | byte for byte, the whole file |
 
-The test ignores only lines that match the list-and-blank-line pattern 137 owns (`WAITS_FOR_137`); any other difference fails it.
+On Sprint 137's final tip (`99cb47ba`), every fixture also goes through 137's model of the host (`openAndSave`: the front matter split and join, the final newline) and comes back byte for byte as a whole file, list lines, soft breaks and quotes included. Before the rebase, 6 and 2 list lines of the last two differed in list spacing, the #270 class 137 fixed.
+
+137's own corpus gains `kept/equations.md`: math in a paragraph, a block, ChatGPT's `\(…\)` and `\[…\]` between lines, a list, a table and a quote, with `$5` and `\$` beside them. It passes every check `kept/` files pass: byte for byte after one save and a second, the one-word edit changing one line, nothing lost, no trailing whitespace. Its look differs from 137's in the seven blocks that hold math (a listed exception).
 
 **In the dev instance:**
 
@@ -48,5 +50,4 @@ Under 200 ms for 220 equations, on a document far heavier than an analyst's repo
 
 ## What this could not cover
 
-- List items and soft breaks around math are Sprint 137's: their bytes are checked once 137 merges (the test then loses `WAITS_FOR_137`).
 - Windows: not run here.
