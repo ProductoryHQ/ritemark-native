@@ -134,3 +134,12 @@ Run on the branch rebased onto `beac93b2` at `71a3a1cc`, before the commit that 
 - **The fix the restack needed:** `opencodeLiveList.test.ts`'s S35 expected Argon as the first row; with decision 10 it is Gemini 3.8 Flash.
 - **Checks on the restacked branch, before the commit that records them:** see *Checks, merge 2's restack* below.
 
+
+### Checks, merge 2's restack
+
+Run on the restacked branch at `daaa0b5a` (merge 1's `d3857ab1` plus merge 2's two commits), and again after the final restack at `42fdd230` (merge 1's `3bf3805b` on `beac93b2`, plus merge 2's three commits), before the commit that records them. Both times:
+- `npm run compile`: exit 0.
+- `npm test` (merge 1's chain plus `opencodeLiveList.test.ts`; `runtimeErrorPresentation` passes): exit 0.
+- The webview's `tsc --noEmit`: clean.
+- `./scripts/validate-qa.sh`: exit 0.
+- The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
