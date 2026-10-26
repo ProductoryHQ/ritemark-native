@@ -317,6 +317,15 @@ The shape after A3. If A3 says cut, this workstream moves to v2.2.0 with its aud
 - **Invariant:** a provider with a key never has an empty group (`availability.ts`'s readiness), tested with a probe that returns nothing for it.
 - **Tests:** the filter, the narrowing, the per-vendor merge and the fallback with A3's fixtures (S35–S38); the readiness invariant; Claude below 5 hidden.
 
+**W5 as built (27 October, after A3):**
+- **The read:** (a). `AcpManager` reports the `model` option of every `session/new` and resume (`onModelOptions`). `modelCatalog.noteOpenCodeModels()` keeps it in globalState and re-resolves without a new probe. The discovery cycle adds the live rows to every probe result (`withOpenCodeLive`), so `extension.ts` doesn't change.
+- **The filter and the narrowing** are one pure function, `openCodeLiveRows()`:
+  - a curated model is kept as listed;
+  - a new one only when it is a chat route of the lineup's families and at least as new as the newest curated model of its family, otherwise `hidden`;
+  - non-chat routes are dropped;
+  - Google's and OpenAI's own lists narrow only new models.
+- **On today's registry** the four groups offer 5, 8, 5 and 16 models, with GPT-6.1 Terra, Claude Haiku 5.5 and Opus 5.5 on OpenRouter, and GPT-6.1 Sol Pro as the new ones (`opencodeLiveList.test.ts`).
+
 ## Workstream 6: QA, Windows and docs (E3–E6)
 
 - **Manual QA** per `scenarios.md`, on a dev instance with:
