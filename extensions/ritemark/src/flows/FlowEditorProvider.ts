@@ -21,10 +21,11 @@ import { getAPIKeyManager } from '../ai/apiKeyManager';
 import {
   OPENAI_IMAGE_MODELS,
   GEMINI_IMAGE_MODELS,
-  DEFAULT_MODELS
 } from '../ai/modelConfig';
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
+import { listGeminiModels } from '../ai/geminiRequest';
+import { flowModelDefaults } from './flowModelDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -198,8 +199,14 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     // 3. Reloading on change causes feedback loops (blinking)
     // External changes (git, other editors) require reopening the file.
 
+    // Sprint 141 R4: a catalog change (the feed, a probe) reaches an open editor.
+    const catalogUpdates = modelCatalog.onUpdate(() => {
+      if (!isDisposed) this.sendModelConfig(webview);
+    });
+
     webviewPanel.onDidDispose(() => {
       isDisposed = true;
+      catalogUpdates.dispose();
       FlowEditorProvider.activeWebviews.delete(webview);
     });
   }
@@ -248,7 +255,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         openaiImage: OPENAI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
         geminiLLM: modelCatalog.getModels('gemini').map(m => ({ id: m.id, name: m.label })),
         geminiImage: GEMINI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
-        defaults: DEFAULT_MODELS,
+        // Sprint 141 R4: the LLM steps' defaults are the catalog's, as the run's are.
+        defaults: flowModelDefaults((provider, surface) => modelCatalog.getDefault(provider, surface)),
         // Sprint 76 R6: curated BYOK provider models for the OpenCode runtime.
         // Single source of truth (modelConfig.ts); webview filters by which
         // providers the user has keys for (booleans from R3a).
@@ -881,26 +889,22 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       throw new Error('Google AI API key not configured');
     }
 
-    // Use v1beta to include preview models
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-    );
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `HTTP ${response.status}`);
+    // Use v1beta to include preview models. Sprint 141: the key in a header (R12,
+    // #558), every page read (R13).
+    const listing = await listGeminiModels(apiKey, { version: 'v1beta' });
+    if (listing.pages === 0) {
+      throw new Error(listing.failedMessage || `HTTP ${listing.failedStatus ?? 'error'}`);
     }
 
-    const data = await response.json();
-
     // Filter for image generation models (Imagen, Gemini image models)
-    const models = (data.models || [])
-      .filter((m: { name: string; supportedGenerationMethods?: string[] }) =>
+    const models = listing.models
+      .filter((m): m is typeof m & { name: string } => typeof m.name === 'string')
+      .filter((m) =>
         m.name.includes('imagen') ||
         m.name.includes('image') ||
         m.supportedGenerationMethods?.includes('generateImage')
       )
-      .map((m: { name: string; displayName?: string }) => ({
+      .map((m) => ({
         id: m.name.replace('models/', ''),
         name: m.displayName || this.formatImageModelName(m.name.replace('models/', ''))
       }))

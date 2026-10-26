@@ -14,7 +14,13 @@ import {
   feedPollAction,
   NO_CLAUDE_DECLARATIONS,
   sessionDeclarationFor,
+  withBundledDeclarations,
 } from './runtimeDeclarations';
+import { BUNDLED_CATALOG } from './bundledCatalog';
+import { buildPublishedFeed } from './feedExport';
+import { resolveStaticModels } from './resolver';
+import { validateCatalog } from './schema';
+import { CLAUDE_MODEL_IDS } from '../modelConfig';
 
 let failures = 0;
 function test(name: string, fn: () => void): void {
@@ -100,6 +106,37 @@ test('S25/R5: the CLI is re-probed only when the declared set changes', () => {
   assert.strictEqual(feedPollAction({ declarationsChanged: false, feedChanged: true, probeAllowed: true }), 'resolve', 'relabel only');
   assert.strictEqual(feedPollAction({ declarationsChanged: true, feedChanged: true, probeAllowed: true }), 'probe', 'new model');
   assert.strictEqual(feedPollAction({ declarationsChanged: true, feedChanged: true, probeAllowed: false }), 'resolve', 'refresh() probes next anyway');
+});
+
+// ── Sprint 141 R7: 2.1 declares only what it doesn't know ──────────────────
+
+const FEED_C4808BE = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'feed-c4808be.json'), 'utf-8'));
+const BUNDLED_ANTHROPIC = BUNDLED_CATALOG.providers.anthropic!.models;
+
+function declaredFor(feed: unknown, appVersion: string): string[] {
+  const rows = resolveStaticModels('anthropic', validateCatalog(feed), null, BUNDLED_CATALOG, appVersion);
+  return buildClaudeRuntimeDeclarations(withBundledDeclarations(rows, BUNDLED_ANTHROPIC)).pickerOptions.map((option) => option.model);
+}
+
+test('S141 S24: a feed declaring Sonnet 5.5 declares nothing to 2.1\'s Claude Code', () => {
+  const refreshed = buildPublishedFeed(BUNDLED_CATALOG, FEED_C4808BE, '2099-01-01T00:00:00Z');
+  const rows = resolveStaticModels('anthropic', validateCatalog(refreshed), null, BUNDLED_CATALOG, '2.1.0');
+  assert.ok(rows.find((row) => row.id === CLAUDE_MODEL_IDS.SONNET_5_5)?.claudeCode?.inject, 'the refreshed feed does carry the declaration');
+  assert.deepStrictEqual(declaredFor(refreshed, '2.1.0'), []);
+  const declarations = buildClaudeRuntimeDeclarations(withBundledDeclarations(rows, BUNDLED_ANTHROPIC));
+  assert.strictEqual(sessionDeclarationFor(declarations, CLAUDE_MODEL_IDS.SONNET_5_5), undefined, 'no modelPicker and no output cap for its sessions');
+});
+
+test('S141 S25: a Claude model the feed adds and 2.1 doesn\'t bundle is still declared (negative)', () => {
+  const feed = JSON.parse(JSON.stringify(buildPublishedFeed(BUNDLED_CATALOG, undefined, '2099-01-01T00:00:00Z')));
+  feed.providers.anthropic.models.push({ id: 'claude-opus-6', label: 'Opus 6', description: 'Newest Opus model', tier: 'high', deprecated: false, order: 0.5, provenance: 'curated', addedAt: '2099-01-01T00:00:00Z', claudeCode: { inject: true, maxOutputTokens: 64000 } });
+  assert.deepStrictEqual(declaredFor(feed, '2.1.0'), ['claude-opus-6']);
+});
+
+test('S141 R7: withBundledDeclarations keeps a bundled row\'s own declaration', () => {
+  const bundled: ModelEntry[] = [{ ...CURATED, claudeCode: { inject: true, maxOutputTokens: 32000 } }];
+  const fromFeed: ModelEntry[] = [{ ...CURATED, claudeCode: { inject: true, maxOutputTokens: 64000 } }];
+  assert.deepStrictEqual(withBundledDeclarations(fromFeed, bundled)[0].claudeCode, { inject: true, maxOutputTokens: 32000 });
 });
 
 if (failures > 0) {

@@ -39,6 +39,7 @@ import {
   sessionDeclarationFor,
   type ClaudeRuntimeDeclarations,
   type ClaudeSessionDeclaration,
+  withBundledDeclarations,
 } from './runtimeDeclarations';
 import type { ModelCatalog, ModelEntry, Provider, Surface } from './schema';
 
@@ -185,7 +186,8 @@ function resolveAndEmit(): void {
 function computeDeclarations(): ClaudeRuntimeDeclarations {
   if (!_context || !isEnabled('remote-model-catalog')) return NO_CLAUDE_DECLARATIONS;
   const rows = resolveStaticModels('anthropic', _remote, getCachedCatalog(_context.globalState), BUNDLED_CATALOG, _appVersion);
-  return buildClaudeRuntimeDeclarations(rows);
+  // Sprint 141 R7: a bundled model is declared as this build's own row says.
+  return buildClaudeRuntimeDeclarations(withBundledDeclarations(rows, BUNDLED_CATALOG.providers.anthropic?.models ?? []));
 }
 
 /** Every model the catalog declares to Claude Code, for the discovery probe. */

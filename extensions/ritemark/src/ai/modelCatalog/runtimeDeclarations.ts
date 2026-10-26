@@ -48,6 +48,23 @@ export const NO_CLAUDE_DECLARATIONS: ClaudeRuntimeDeclarations = Object.freeze({
   signature: '[]',
 }) as ClaudeRuntimeDeclarations;
 
+/**
+ * Sprint 141 R7: a Claude model this build bundles is declared as its bundled row
+ * says, whatever a feed row of the same id carries. The build knows what its own
+ * Claude Code knows natively; the feed serves every older release at once (1.12.0
+ * needs Sonnet 5.5 declared, and later releases must not get its output cap). A
+ * model the feed adds and this build doesn't bundle keeps the feed's declaration.
+ */
+export function withBundledDeclarations(rows: readonly ModelEntry[], bundled: readonly ModelEntry[]): ModelEntry[] {
+  const bundledById = new Map(bundled.map((row) => [row.id, row]));
+  return rows.map((row) => {
+    const own = bundledById.get(row.id);
+    if (!own) return row;
+    const { claudeCode: _feed, ...rest } = row;
+    return own.claudeCode === undefined ? rest : { ...rest, claudeCode: own.claudeCode };
+  });
+}
+
 /** Build the declarations from the merged static anthropic rows (R1). */
 export function buildClaudeRuntimeDeclarations(rows: readonly ModelEntry[]): ClaudeRuntimeDeclarations {
   const declared = rows

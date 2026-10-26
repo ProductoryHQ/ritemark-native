@@ -15,6 +15,7 @@ import * as path from 'path';
 import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
 import { DEFAULT_MODELS, OPENAI_IMAGE_MODEL_IDS } from '../../ai/modelConfig';
+import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
 
@@ -371,13 +372,12 @@ async function generateWithGemini(
 
   if (isImagen) {
     // Use Imagen API
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+    // Sprint 141 R12 (#558): the key goes in a header, never in the URL.
+    const url = geminiUrl('v1beta', `models/${model}:predict`);
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: geminiHeaders(apiKey, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         instances: [{ prompt }],
         parameters: {
@@ -405,13 +405,12 @@ async function generateWithGemini(
     imageBase64 = prediction.bytesBase64Encoded;
   } else if (isNanoBanana) {
     // Use Gemini generateContent with image output
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Sprint 141 R12 (#558): the key goes in a header, never in the URL.
+    const url = geminiUrl('v1beta', `models/${model}:generateContent`);
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: geminiHeaders(apiKey, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         contents: [
           {

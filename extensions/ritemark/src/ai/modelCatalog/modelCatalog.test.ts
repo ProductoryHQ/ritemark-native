@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { validateCatalog, type ModelCatalog } from './schema';
 import { BUNDLED_CATALOG } from './bundledCatalog';
-import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS } from '../modelConfig';
+import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS, DEFAULT_MODELS, GEMINI_MODEL_IDS, OPENROUTER_MODEL_IDS } from '../modelConfig';
 import { parseCodexModelsCache } from './providerDiscovery';
 import {
   canonicalizeModelAliases,
@@ -719,6 +719,65 @@ test('versionLt compares dotted-numeric versions correctly', () => {
   assert.strictEqual(versionLt('1.9.0', '1.9.0'), false);
   assert.strictEqual(versionLt('1.10.0', '1.9.0'), false, '10 > 9');
   assert.strictEqual(versionLt('1.9.0-beta', '1.9.0'), false, 'pre-release suffix dropped');
+});
+
+// ── Sprint 141: 2.1's lineup (R1, R2, R3) ──────────────────────────────────
+
+const FEED_C4808BE = validateCatalog(JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'feed-c4808be.json'), 'utf8')));
+
+test('S141 R1/S1: offline, Argon leads Flows\' Gemini list and OpenCode\'s Google group, and OpenRouter has it', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
+  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.ARGON_4);
+  assert.strictEqual(r.opencode.models.find((m) => m.id.startsWith('google/'))?.id, `google/${GEMINI_MODEL_IDS.ARGON_4}`);
+  assert.ok(r.opencode.models.some((m) => m.id === `openrouter/google/${GEMINI_MODEL_IDS.ARGON_4}`));
+});
+
+test('S141 R1/S2: with the feed of c4808be, Argon is listed once and the bundled lineup and defaults hold', () => {
+  const r = resolveAll({}, FEED_C4808BE, null, BUNDLED_CATALOG, APP);
+  for (const provider of ['gemini', 'opencode'] as const) {
+    const ids = r[provider].models.map((m) => m.id);
+    assert.strictEqual(new Set(ids).size, ids.length, `${provider} lists no id twice`);
+  }
+  assert.strictEqual(r.gemini.models.filter((m) => m.id === GEMINI_MODEL_IDS.ARGON_4).length, 1);
+  assert.strictEqual(r.gemini.defaults['flow-llm'], DEFAULT_MODELS.flowLLMGemini);
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(r.anthropic.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
+});
+
+test('S141 R2/S5–S6: OpenCode carries the lineup, with OpenRouter\'s own Claude id', () => {
+  const ids = new Set(resolveAll({}, null, null, BUNDLED_CATALOG, APP).opencode.models.map((m) => m.id));
+  for (const id of [
+    `anthropic/${CLAUDE_MODEL_IDS.SONNET_5_5}`, `anthropic/${CLAUDE_MODEL_IDS.OPUS_5_5}`, `anthropic/${CLAUDE_MODEL_IDS.HAIKU_5_5}`,
+    `anthropic/${CLAUDE_MODEL_IDS.SONNET_5}`, `anthropic/${CLAUDE_MODEL_IDS.OPUS_5}`,
+    `openai/${CODEX_MODEL_IDS.SOL_6_1}`,
+    `openrouter/${OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5}`, `openrouter/openai/${CODEX_MODEL_IDS.SOL_6_1}`,
+  ]) assert.ok(ids.has(id), `${id} listed`);
+  assert.ok(!ids.has(`openrouter/anthropic/${CLAUDE_MODEL_IDS.SONNET_5_5}`), 'not the provider\'s dashed id on OpenRouter');
+});
+
+test('S141 R3/S10: Flows\' Gemini default is the current model, and the 2.5 rows are retained, last', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP).gemini;
+  assert.strictEqual(r.defaults['flow-llm'], GEMINI_MODEL_IDS.FLASH_LITE_3_5);
+  const legacy = r.models.filter((m) => m.id.startsWith('gemini-2.5-'));
+  assert.strictEqual(legacy.length, 3);
+  assert.ok(legacy.every((m) => m.deprecated && m.description === 'Retained for saved selections'));
+  const firstLegacy = r.models.findIndex((m) => m.id.startsWith('gemini-2.5-'));
+  assert.ok(r.models.slice(firstLegacy).every((m) => m.id.startsWith('gemini-2.5-')), '2.5 rows come last');
+  const opencode25 = resolveAll({}, null, null, BUNDLED_CATALOG, APP).opencode.models.find((m) => m.id === `google/${GEMINI_MODEL_IDS.PRO_2_5}`);
+  assert.strictEqual(opencode25?.deprecated, true);
+});
+
+test('S141 R6: no bundled row carries minAppVersion (the catalog resolves as 0.0.0 before activation)', () => {
+  for (const [provider, catalog] of Object.entries(BUNDLED_CATALOG.providers)) {
+    for (const row of catalog?.models ?? []) assert.strictEqual(row.minAppVersion, undefined, `${provider}/${row.id}`);
+  }
+  const early = resolveAll({}, null, null, BUNDLED_CATALOG, '0.0.0');
+  assert.strictEqual(early.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+});
+
+test('S141 R4: the bundled flow-llm defaults are DEFAULT_MODELS', () => {
+  assert.strictEqual(BUNDLED_CATALOG.providers.openai?.defaults['flow-llm'], DEFAULT_MODELS.flowLLM);
+  assert.strictEqual(BUNDLED_CATALOG.providers.gemini?.defaults['flow-llm'], DEFAULT_MODELS.flowLLMGemini);
 });
 
 // ── summary ────────────────────────────────────────────────────────────────

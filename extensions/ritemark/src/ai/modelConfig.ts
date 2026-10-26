@@ -46,6 +46,8 @@ export const CLAUDE_MODEL_IDS = {
 } as const;
 
 export const OPENAI_MODEL_IDS = {
+  /** Sprint 141 R2: OpenCode's OpenAI group (the API serves Codex's default too). */
+  SOL_6_1: CODEX_MODEL_IDS.SOL_6_1,
   ASTRA: CODEX_MODEL_IDS.ASTRA,
   SOL: CODEX_MODEL_IDS.SOL,
   TERRA: CODEX_MODEL_IDS.TERRA,
@@ -59,6 +61,8 @@ export const OPENAI_MODEL_IDS = {
 } as const;
 
 export const GEMINI_MODEL_IDS = {
+  /** Sprint 141 R1 (#532): Google's flagship reasoning model, stable since 13 October 2026. */
+  ARGON_4: 'gemini-4-argon',
   PRO_3_1_PREVIEW: 'gemini-3.1-pro-preview',
   FLASH_3_8: 'gemini-3.8-flash',
   FLASH_LITE_3_5: 'gemini-3.5-flash-lite',
@@ -80,8 +84,16 @@ export const GEMINI_IMAGE_MODEL_IDS = {
   FLASH_2_5: 'gemini-2.5-flash-image',
 } as const;
 
+/**
+ * OpenRouter's own model ids, where they differ from `<vendor>/<provider id>`.
+ * Routes whose OpenRouter id equals the provider's are composed with
+ * `toOpenCodeModelId`. Sprint 141 R2: OpenRouter writes Claude's point versions
+ * with a dot (`claude-sonnet-5.5`), checked in its public model list on
+ * 26 October 2026.
+ */
 export const OPENROUTER_MODEL_IDS = {
   LLAMA_3_3_70B_INSTRUCT: 'meta-llama/llama-3.3-70b-instruct',
+  CLAUDE_SONNET_5_5: 'anthropic/claude-sonnet-5.5',
 } as const;
 
 /** ElevenLabs speech to text (Scribe): Transcribe's engine and Settings' key Test. */
@@ -303,6 +315,17 @@ export const OPENAI_IMAGE_MODELS: ImageModelConfig[] = [
  */
 export const GEMINI_LLM_MODELS: ModelConfig[] = [
   {
+    id: GEMINI_MODEL_IDS.ARGON_4,
+    name: 'Gemini 4 Argon',
+    description: "Google's flagship reasoning model",
+    api: 'chat',
+    reasoning: 'medium',
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
+  {
     id: GEMINI_MODEL_IDS.PRO_3_1_PREVIEW,
     name: 'Gemini 3.1 Pro',
     description: 'Most capable Gemini model with reasoning',
@@ -421,8 +444,13 @@ export const DEFAULT_MODELS = {
   /** Default for Flow LLM nodes - OpenAI */
   flowLLM: OPENAI_MODEL_IDS.GPT_5_2,
 
-  /** Default for Flow LLM nodes - Gemini */
-  flowLLMGemini: GEMINI_MODEL_IDS.FLASH_2_5,
+  /**
+   * Default for Flow LLM nodes - Gemini. Sprint 141 R3 (#531): Google limits the
+   * 2.5 models to past users since 18 September 2026. 3.5 Flash Lite thinks at
+   * `minimal` by default, so a step's 2,000-token default leaves room for the
+   * answer (3.8 Flash thinks at `medium`; audit A2).
+   */
+  flowLLMGemini: GEMINI_MODEL_IDS.FLASH_LITE_3_5,
 
   /** Default for Flow Image nodes - OpenAI */
   flowImage: OPENAI_IMAGE_MODEL_IDS.IMAGE_2,

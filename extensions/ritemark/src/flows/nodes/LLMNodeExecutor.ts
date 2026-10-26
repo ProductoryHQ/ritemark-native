@@ -12,6 +12,8 @@ import OpenAI from 'openai';
 import { getAPIKeyManager } from '../../ai/apiKeyManager';
 import { usesResponsesAPI, getReasoningEffort } from '../../ai/modelConfig';
 import * as modelCatalog from '../../ai/modelCatalog';
+import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
+import { FlowStepError, geminiAnswerText, geminiStepFailure } from './geminiStep';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -276,15 +278,14 @@ async function executeWithGemini(
     ? `${systemPrompt}\n\n${userPrompt}`
     : userPrompt;
 
-  // Use Gemini REST API (v1beta for preview models like Gemini 3)
+  // Use Gemini REST API (v1beta for preview models like Gemini 3). Sprint 141: the
+  // key goes in a header, never in the URL (R12, #558).
   const model = data.model || modelCatalog.getDefault('gemini', 'flow-llm');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = geminiUrl('v1beta', `models/${model}:generateContent`);
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: geminiHeaders(apiKey, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       contents: [
         {
@@ -299,20 +300,18 @@ async function executeWithGemini(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(
-      error.error?.message || `Gemini API error: ${response.status}`
-    );
+    const body = await response.json().catch(() => ({}));
+    // Sprint 141 R5: a refused model in one sentence; the raw body stays in the log.
+    console.warn('[LLMNodeExecutor] Gemini request failed', response.status, JSON.stringify(body));
+    throw geminiStepFailure({
+      status: response.status,
+      body,
+      model,
+      modelLabel: modelCatalog.getModel('gemini', model)?.label ?? model,
+    });
   }
 
-  const result = await response.json();
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!text) {
-    throw new Error('No response from Gemini API');
-  }
-
-  return text;
+  return geminiAnswerText(await response.json());
 }
 
 /**
@@ -348,6 +347,8 @@ export async function executeLLMNode(
 
     return response;
   } catch (err) {
+    // Sprint 141 R5: a sentence written for the person passes through unchanged.
+    if (err instanceof FlowStepError) throw err;
     if (err instanceof Error) {
       // Handle specific errors
       if (err.message.includes('rate_limit')) {

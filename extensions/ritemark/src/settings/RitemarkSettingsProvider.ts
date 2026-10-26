@@ -29,6 +29,7 @@ import {
 } from '../agent';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, type CodexCompatibilityStatus } from '../codex/codexManager';
 import { CLAUDE_MODEL_IDS, ELEVENLABS_STT_MODEL_IDS } from '../ai/modelConfig';
+import { geminiHeaders, geminiUrl } from '../ai/geminiRequest';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
 
@@ -1125,10 +1126,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     try {
-      // Test by listing models via Google AI API
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models?key=${key}`
-      );
+      // Test by listing models via Google AI API. Sprint 141 R12 (#558): the key
+      // goes in the x-goog-api-key header, never in the URL.
+      const response = await fetch(geminiUrl('v1', 'models', { pageSize: '1' }), { headers: geminiHeaders(key) });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
