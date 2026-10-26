@@ -1,0 +1,3 @@
+{
+  "image-in-link.md": "the link around an image is dropped when the file opens: TipTap's image is a block node, so it cannot sit inside a link (main does the same)"
+}

@@ -20,7 +20,7 @@
  */
 import { Marked } from 'marked'
 import type TurndownService from 'turndown'
-import type { AnyExtension, Node as TipTapNode } from '@tiptap/core'
+import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import BulletList from '@tiptap/extension-bullet-list'
 import ListItem from '@tiptap/extension-list-item'
@@ -28,6 +28,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
+import Code from '@tiptap/extension-code'
 import { createLowlight, common } from 'lowlight'
 import { BoundedOrderedList } from '../extensions/BoundedOrderedList'
 import { CustomLink, type CustomLinkOptions } from '../extensions/CustomLink'
@@ -36,9 +37,16 @@ import { CommentMark } from '../extensions/comment/CommentMark'
 import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
-import { classifyLinkTarget } from '../lib/linkTargets'
+import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
-import { addTipTapTaskListTurndownRules, preprocessTaskListHTML } from './taskListRoundTrip'
+import { preprocessTaskListHTML } from './taskListRoundTrip'
+import {
+  annotateAsWritten,
+  AS_WRITTEN_ATTRIBUTES,
+  asWrittenMarkedExtension,
+  protectFenceTabs,
+  TIGHT_BLOCKS,
+} from './markdownAsWritten'
 
 // ---------------------------------------------------------------------------
 // Load: Markdown → the HTML the editor parses
@@ -52,6 +60,8 @@ import { addTipTapTaskListTurndownRules, preprocessTaskListHTML } from './taskLi
  * `<ritemark-comment>` (audit M2).
  */
 export const editorMarked = new Marked({ breaks: true, gfm: true })
+// Sprint 137 (#270): record how each block was written, as `data-md-*` attributes.
+editorMarked.use(asWrittenMarkedExtension)
 
 let commentMarkedRegistered = false
 
@@ -90,6 +100,10 @@ export function preprocessImageHTML(html: string): string {
 
       // If the only text content is the img alt text (or empty), unwrap the image
       if (textContent === '' || textContent === imgAlt) {
+        // Sprint 137: the paragraph's place as written (no blank line before
+        // it) moves to the image that replaces it.
+        const tight = p.getAttribute('data-md-tight')
+        if (tight !== null) img.setAttribute('data-md-tight', tight)
         // Replace paragraph with just the image
         p.replaceWith(img)
       }
@@ -124,6 +138,26 @@ export function applyImageMappings(html: string, imageMappings: Record<string, s
 }
 
 /**
+ * `editorMarked.parse`, with two steps of its own: the tabs at the start of a
+ * code fence's lines are kept from `marked`'s tab expansion
+ * (`protectFenceTabs`), and between the lexer and the parser
+ * `annotateAsWritten` marks what needs sibling context (a block straight under
+ * another) or the whole source (tab-indented lists). The rest is what `parse`
+ * does: hooks, `walkTokens` and the parser, with the same options.
+ */
+function parseAsWritten(markdown: string): string {
+  // The editor's instance is synchronous: no extension sets `async`.
+  const options = editorMarked.defaults
+  const preprocessed = options.hooks ? options.hooks.preprocess(markdown) as string : markdown
+  const source = protectFenceTabs(preprocessed)
+  const tokens = editorMarked.lexer(source)
+  annotateAsWritten(tokens, source)
+  if (options.walkTokens) editorMarked.walkTokens(tokens, options.walkTokens)
+  const html = editorMarked.parser(tokens)
+  return options.hooks ? options.hooks.postprocess(html) as string : html
+}
+
+/**
  * The editor's load path: Markdown to the HTML TipTap parses. `marked`, then
  * GFM task lists to TipTap's task nodes, then standalone images out of their
  * paragraphs, then — when given — the host's image mappings.
@@ -132,7 +166,7 @@ export function applyImageMappings(html: string, imageMappings: Record<string, s
  * paragraphs.
  */
 export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  const html = editorMarked.parse(markdown) as string
+  const html = parseAsWritten(markdown)
   let processed = preprocessTaskListHTML(html)
   processed = preprocessImageHTML(processed)
   return imageMappings ? applyImageMappings(processed, imageMappings) : processed
@@ -141,6 +175,64 @@ export function markdownToEditorHTML(markdown: string, imageMappings?: Record<st
 // ---------------------------------------------------------------------------
 // Schema: the nodes and marks whose attributes reach the file
 // ---------------------------------------------------------------------------
+
+function camelName(dataName: string): string {
+  return dataName.replace(/^data-/, '').replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
+}
+
+/** A data-only attribute, read from and written to one `data-md-*` attribute. */
+function dataAttribute(name: string, keepOnSplit: boolean) {
+  const key = camelName(name)
+  return {
+    default: null,
+    keepOnSplit,
+    parseHTML: (element: HTMLElement) => element.getAttribute(name),
+    renderHTML: (attrs: Record<string, unknown>) => {
+      const value = attrs[key]
+      return value === null || value === undefined ? {} : { [name]: String(value) }
+    },
+  }
+}
+
+function dataAttributes(names: readonly string[], keepOnSplit = true) {
+  return Object.fromEntries(names.map(name => [camelName(name), dataAttribute(name, keepOnSplit)]))
+}
+
+/**
+ * Sprint 137 (#270): how each block was written (`markdownAsWritten.ts`), on
+ * TipTap's nodes and marks as data-only attributes (`mdMarker` for
+ * `data-md-marker`). Global attributes add them without changing the schema's
+ * order or any node's own behaviour, and nothing styles them.
+ */
+export const MarkdownAsWritten = Extension.create({
+  name: 'markdownAsWritten',
+
+  addGlobalAttributes() {
+    return [
+      { types: ['bulletList', 'orderedList', 'taskList'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.list) },
+      // A new item (Enter) keeps its list's blank lines.
+      { types: ['listItem', 'taskItem'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.item) },
+      { types: ['hardBreak'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.hardBreak, false) },
+      { types: ['horizontalRule'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.horizontalRule, false) },
+      { types: ['link'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.link) },
+      { types: ['table'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.table) },
+      { types: ['codeBlock'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.codeBlock, false) },
+      // A block split off with Enter is new writing: a blank line before it.
+      { types: TIGHT_BLOCKS, attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.tight, false) },
+      {
+        types: ['tableCell', 'tableHeader'],
+        attributes: {
+          mdAlign: {
+            default: null,
+            // `marked` writes a column's alignment as `align`; the editor keeps it as data only.
+            parseHTML: (element: HTMLElement) => element.getAttribute('data-md-align') ?? element.getAttribute('align'),
+            renderHTML: (attrs: Record<string, unknown>) => attrs.mdAlign ? { 'data-md-align': String(attrs.mdAlign) } : {},
+          },
+        },
+      },
+    ]
+  },
+})
 
 /** Create lowlight instance with common languages. */
 const lowlight = createLowlight(common)
@@ -182,6 +274,19 @@ function validateLinkTarget(url: string): boolean {
 }
 
 /**
+ * Which addresses a link may have, on open, on render and in `setLink` (the
+ * link dialog). TipTap's own check first; it refuses `notes/report.md`, because
+ * its pattern's `.`–`:` range takes in `/`, so a link into a folder was dropped
+ * on open and lost on the next save (#539). A relative path Ritemark's own link
+ * check accepts is allowed too. `javascript:`, `vbscript:`, `data:` and `file:`
+ * stay refused: neither check accepts them (R6, S31).
+ */
+export function isAllowedLinkUri(url: string, defaultValidate: (url: string) => boolean): boolean {
+  if (defaultValidate(url)) return true
+  return isSafeRelativePath(url) && classifyLinkTarget(url).kind !== 'dangerous'
+}
+
+/**
  * The editor's UI pieces, passed in at the positions they always had in the
  * editor's extension list. Every slot is optional: a test leaves them out and
  * gets the same schema without node views, keyboard extensions or callbacks.
@@ -215,6 +320,7 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
       orderedList: false,
       listItem: false,
       codeBlock: false, // Disable default to use enhanced version
+      code: false, // Added last, below: no longer excludes the other marks (#539)
       heading: {
         levels: [1, 2, 3, 4, 5, 6],
       },
@@ -266,6 +372,7 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
         class: 'tiptap-link',
       },
       validate: validateLinkTarget,
+      isAllowedUri: (url, ctx) => isAllowedLinkUri(url, ctx.defaultValidate),
       onLinkClick: slots.onLinkClick,
     }),
     ...tableExtensions,
@@ -275,6 +382,13 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     // Registered at the highest level — when off, the extensions don't exist,
     // so a document's comments fall back to the plain load/save path.
     ...(slots.commentCallouts ? [CommentMark, CommentNode] : []),
+    // Sprint 137 (#539): inline code no longer excludes every other mark, so
+    // a link, bold, italic or strikethrough around code keeps its mark
+    // (``[`file.md`](file.md)``, ``**`name` is vendored**``). It comes last, so
+    // it is the innermost mark: `<a><code>`, `<strong><code>`, `<mark><code>`.
+    Code.extend({ excludes: 'code' }),
+    // Sprint 137 (#270): how each block was written, as data-only attributes.
+    MarkdownAsWritten,
   ]
 }
 
@@ -317,14 +431,14 @@ export function preprocessTableHTML(html: string): string {
 
 /**
  * The editor's Turndown service: Ritemark's canonical rules
- * (`createTurndownService`, shared with Copy and Save as Markdown) plus the
- * comment-callout and TipTap task-list rules. Comment rules register
- * unconditionally: they are harmless when no comment nodes exist.
+ * (`createTurndownService`, shared with Copy and Save as Markdown, which
+ * include the as-written rules and TipTap's task lists) plus the
+ * comment-callout rules. Comment rules register unconditionally: they are
+ * harmless when no comment nodes exist.
  */
 export function createEditorTurndownService(): TurndownService {
   const service = createTurndownService()
   addCommentTurndownRules(service)
-  addTipTapTaskListTurndownRules(service)
   return service
 }
 

@@ -25,3 +25,7 @@
 extensions/ritemark/binaries/darwin-arm64/** binary
 extensions/ritemark/binaries/darwin-x64/** binary
 extensions/ritemark/binaries/win32-x64/** binary
+
+# Sprint 137: the Markdown fidelity corpus is compared byte for byte, so Git
+# leaves its bytes alone (kept/windows-crlf.md is CRLF on purpose).
+extensions/ritemark/webview/src/utils/fidelity-corpus/** -text

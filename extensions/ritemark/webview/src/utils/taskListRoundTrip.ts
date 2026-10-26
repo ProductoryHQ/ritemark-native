@@ -1,5 +1,3 @@
-import type TurndownService from 'turndown'
-
 /**
  * Convert GFM task-list HTML emitted by `marked` to the attributes expected by
  * TipTap's TaskList and TaskItem extensions.
@@ -12,6 +10,8 @@ import type TurndownService from 'turndown'
  * TipTap cannot represent task and ordinary items in the same `<ul>` because a
  * taskList accepts taskItem children only. Mixed GFM lists are therefore split
  * into consecutive task-list and bullet-list runs without reordering items.
+ * Every run after the first carries `data-md-continues`, so the save writes
+ * the runs back as the one list they were (Sprint 137, R1).
  */
 export function transformTaskListElements(root: Element): void {
   // Deepest lists first so a nested list is already valid before its parent is
@@ -56,9 +56,11 @@ export function transformTaskListElements(root: Element): void {
     for (const { item, checkbox } of itemKinds) {
       const isTask = checkbox !== null
       if (!currentRun || currentRunIsTask !== isTask) {
+        const continues = currentRun !== null
         currentRun = list.cloneNode(false) as Element
         currentRun.removeAttribute('data-type')
         if (isTask) currentRun.setAttribute('data-type', 'taskList')
+        if (continues) currentRun.setAttribute('data-md-continues', 'true')
         parent.insertBefore(currentRun, list)
         currentRunIsTask = isTask
       }
@@ -74,44 +76,6 @@ export function preprocessTaskListHTML(html: string): string {
   root.innerHTML = html
   transformTaskListElements(root)
   return root.innerHTML
-}
-
-/** Add TipTap task node → GFM Markdown rules to a Turndown service. */
-export function addTipTapTaskListTurndownRules(service: TurndownService): void {
-  service.addRule('tiptapTaskItem', {
-    filter(node) {
-      return node.nodeName === 'LI' && node.getAttribute('data-type') === 'taskItem'
-    },
-    replacement(content, node) {
-      const element = node as HTMLElement
-      const checkbox = element.getAttribute('data-checked') === 'true' ? '[x]' : '[ ]'
-      const lines = content.split('\n').filter(line => line.trim())
-      const hasNestedTasks = lines.some((line, index) => index > 0 && /^- \[[ x]\]/.test(line))
-
-      if (hasNestedTasks && lines.length > 1) {
-        const firstLine = lines[0].trim()
-        const nestedLines = lines.slice(1).map(line => `  ${line}`).join('\n')
-        return `- ${checkbox} ${firstLine}\n${nestedLines}\n`
-      }
-
-      const cleanContent = content.trim().replace(/\n+/g, ' ')
-      // A trailing space after the marker does not survive normalisation, and
-      // `- [ ]` alone is not a GFM task item, so persist the empty item as the
-      // bare marker and let `leadingTaskMarker` read it back.
-      return cleanContent ? `- ${checkbox} ${cleanContent}\n` : `- ${checkbox}\n`
-    },
-  })
-
-  service.addRule('tiptapTaskList', {
-    filter(node) {
-      return node.nodeName === 'UL' && node.getAttribute('data-type') === 'taskList'
-    },
-    replacement(content, node) {
-      const parent = (node as HTMLElement).parentElement
-      const isNested = parent?.getAttribute('data-type') === 'taskItem'
-      return isNested ? content : `\n${content}\n`
-    },
-  })
 }
 
 function firstElementChild(node: Node): Element | null {
@@ -153,8 +117,8 @@ function leadingTaskMarker(listItem: Element): LeadingTaskMarker | null {
     return { node: candidate, checked: candidate.hasAttribute('checked') }
   }
 
-  // An empty task item is persisted as a bare `- [ ]` (see the Turndown rule
-  // below). GFM parsers only recognise a marker that is followed by text, so
+  // An empty task item is persisted as a bare `- [ ]` (`serializeList` in
+  // markdownAsWritten.ts). GFM parsers only recognise a marker that is followed by text, so
   // `marked` leaves the bare form as the literal item text `[ ]`. Accept that
   // literal, and only that literal, as an empty task item; `[ ] text` stays
   // what the author wrote.
