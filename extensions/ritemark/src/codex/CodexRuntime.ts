@@ -17,7 +17,7 @@
 
 import * as crypto from 'crypto';
 import { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT, CodexAppServer } from './codexAppServer';
-import { RETRY_LINE_PAIRING_MS, parseCodexRetryNotice, type CodexRetryNotice } from './codexRetry';
+import { CodexRetryPairing, parseCodexRetryNotice, type CodexRetryNotice, type CodexRetryWaitHeard } from './codexRetry';
 import { CodexAuth } from './codexAuth';
 import { CodexManager } from './codexManager';
 import type { CodexCompatibilityStatus } from './codexManager';
@@ -946,10 +946,10 @@ export class CodexRuntime implements AgentRuntime {
 
     // Sprint 143 (#544, R3a): Codex will try again after a wait (ChatGPT answered 429). The notification names
     // the try and the status; the wait's length comes from Codex's own log line, which may come just before
-    // or just after it.
+    // or just after it. Both carry the turn's id, so two chats waiting at once each get their own wait.
     const appServer = this._appServer;
-    let lastRetry: { session: CodexSession; notice: CodexRetryNotice; at: number } | null = null;
-    const tellRetry = (session: CodexSession, notice: CodexRetryNotice, wait: { delayMs: number; at: number } | null) => {
+    const retries = new CodexRetryPairing<{ session: CodexSession; notice: CodexRetryNotice }>();
+    const tellRetry = (session: CodexSession, notice: CodexRetryNotice, wait: CodexRetryWaitHeard | null) => {
       session.config.onRuntimeRetry?.({
         ...(notice.attempt !== undefined ? { attempt: notice.attempt } : {}),
         ...(notice.of !== undefined ? { of: notice.of } : {}),
@@ -963,14 +963,12 @@ export class CodexRuntime implements AgentRuntime {
       if (!notice) return;
       const session = this._sessionForThread(notice.threadId, 'error');
       if (!session) return;
-      lastRetry = { session, notice, at: Date.now() };
-      tellRetry(session, notice, appServer.takeRetryWait());
+      // Told at once; told again with the length when the line comes after.
+      tellRetry(session, notice, retries.notice(notice.turnId, { session, notice }));
     });
-    appServer.on(CODEX_RETRY_WAIT_EVENT, () => {
-      if (!lastRetry || Date.now() - lastRetry.at > RETRY_LINE_PAIRING_MS) return;
-      const wait = appServer.takeRetryWait();
-      if (wait) tellRetry(lastRetry.session, lastRetry.notice, wait);
-      lastRetry = null;
+    appServer.on(CODEX_RETRY_WAIT_EVENT, (wait: CodexRetryWaitHeard) => {
+      const waiting = retries.wait(wait);
+      if (waiting) tellRetry(waiting.session, waiting.notice, wait);
     });
 
     // Correctly global — but it must reach EVERY conversation, not just one.

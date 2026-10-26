@@ -26,19 +26,100 @@ export interface CodexRetryWait {
   attempt: number;
   of: number;
   delayMs: number;
+  /** The turn the wait belongs to: the line's `turn_id=`, the same id as the notification's `turnId`. */
+  turnId?: string;
+}
+
+/** How long a log line and a notification a moment apart still belong together. */
+export const RETRY_LINE_PAIRING_MS = 5_000;
+
+/** A wait as the app-server heard it: the line, and when it came. */
+export interface CodexRetryWaitHeard extends CodexRetryWait {
+  at: number;
 }
 
 // eslint-disable-next-line no-control-regex
 const ANSI = /\u001b\[[0-9;]*m/g;
 const RETRY_LINE = /retrying sampling request \((\d+)\/(\d+) in ([\d.]+)s\)/;
+const TURN_ID = /\bturn_id=([0-9A-Za-z-]+)/;
 
 /** Codex's log line for a wait before trying again, or null. ANSI colours are ignored. */
 export function parseCodexRetryLine(line: string): CodexRetryWait | null {
-  const match = RETRY_LINE.exec(line.replace(ANSI, ''));
+  const clean = line.replace(ANSI, '');
+  const match = RETRY_LINE.exec(clean);
   if (!match) return null;
   const seconds = Number(match[3]);
   if (!Number.isFinite(seconds) || seconds < 0) return null;
-  return { attempt: Number(match[1]), of: Number(match[2]), delayMs: Math.round(seconds * 1000) };
+  const turn = TURN_ID.exec(clean);
+  return {
+    attempt: Number(match[1]),
+    of: Number(match[2]),
+    delayMs: Math.round(seconds * 1000),
+    ...(turn ? { turnId: turn[1] } : {}),
+  };
+}
+
+/**
+ * Whole lines from a stream that arrives in chunks. A chunk need not end at a line's end, so a line split
+ * across two chunks is given once, whole, when its end arrives; `flush` gives what is left at the end.
+ */
+export class LineBuffer {
+  private rest = '';
+
+  push(chunk: string): string[] {
+    const parts = (this.rest + chunk).split('\n');
+    this.rest = parts.pop() ?? '';
+    return parts.map((line) => line.replace(/\r$/, ''));
+  }
+
+  flush(): string[] {
+    const rest = this.rest.replace(/\r$/, '');
+    this.rest = '';
+    return rest ? [rest] : [];
+  }
+}
+
+/**
+ * Pairs Codex's `error` notification (`willRetry: true`) with the log line that names its wait, turn by turn.
+ * The two come on different pipes, in either order, a moment apart; two chats can be waiting at once on the
+ * one app-server, so each side is kept by its turn id. When either side has no turn id (an older Codex), it
+ * pairs only with the one entry waiting on the other side.
+ */
+export class CodexRetryPairing<T> {
+  private readonly notices = new Map<string, { item: T; at: number }>();
+  private readonly waits = new Map<string, CodexRetryWaitHeard>();
+
+  constructor(private readonly windowMs = RETRY_LINE_PAIRING_MS) {}
+
+  /** A notification: the wait already logged for its turn, or null, and then it waits for the line. */
+  notice(turnId: string | undefined, item: T, now = Date.now()): CodexRetryWaitHeard | null {
+    const wait = this.take(this.waits, turnId ?? '', now);
+    if (wait) return wait;
+    this.notices.set(turnId ?? '', { item, at: now });
+    return null;
+  }
+
+  /** A log line: the notification it completes, or null, and then it waits for the notification. */
+  wait(wait: CodexRetryWaitHeard, now = Date.now()): T | null {
+    const notice = this.take(this.notices, wait.turnId ?? '', now);
+    if (notice) return notice.item;
+    this.waits.set(wait.turnId ?? '', wait);
+    return null;
+  }
+
+  private take<V extends { at: number }>(map: Map<string, V>, key: string, now: number): V | null {
+    for (const [k, v] of map) {
+      if (now - v.at > this.windowMs) map.delete(k);
+    }
+    let hit = map.get(key);
+    let hitKey = key;
+    if (!hit && map.size === 1 && (key === '' || map.has(''))) {
+      [hitKey, hit] = map.entries().next().value as [string, V];
+    }
+    if (!hit) return null;
+    map.delete(hitKey);
+    return hit;
+  }
 }
 
 export interface CodexRetryNotice {
@@ -82,6 +163,3 @@ export function parseCodexRetryNotice(params: unknown): CodexRetryNotice | null 
     busy: httpStatus === 429 || variant === 'rateLimitExceeded',
   };
 }
-
-/** How long a log line stays the wait of the notification that follows it. */
-export const RETRY_LINE_PAIRING_MS = 5_000;

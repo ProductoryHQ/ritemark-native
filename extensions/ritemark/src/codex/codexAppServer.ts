@@ -12,11 +12,11 @@
 
 import { EventEmitter } from 'events';
 import { CodexManager } from './codexManager';
-import { RETRY_LINE_PAIRING_MS, parseCodexRetryLine, type CodexRetryWait } from './codexRetry';
+import { LineBuffer, parseCodexRetryLine, type CodexRetryWaitHeard } from './codexRetry';
 
 /** Codex's `error` notification, re-emitted under a name an EventEmitter doesn't treat as a crash. */
 export const CODEX_ERROR_EVENT = 'codex/error';
-/** Sprint 143 (#544, R3a): Codex logged how long it waits before trying again. */
+/** Sprint 143 (#544, R3a): Codex logged how long it waits before trying again (a `CodexRetryWaitHeard`). */
 export const CODEX_RETRY_WAIT_EVENT = 'codex/retry-wait';
 import type {
   JsonRpcRequest,
@@ -54,8 +54,8 @@ export class CodexAppServer extends EventEmitter {
   private buffer = '';
   private lastStderrMessage: string | null = null;
   private sawStderrSinceStart = false;
-  /** Sprint 143 (#544, R3a): the newest wait Codex logged before trying again. */
-  private lastRetryWait: (CodexRetryWait & { at: number }) | null = null;
+  /** Sprint 143 (#544, R3a): stderr by whole lines; a chunk need not end at a line's end. */
+  private readonly stderrLines = new LineBuffer();
   private initializePromise: Promise<InitializeResult> | null = null;
   private readonly trace?: (scope: string, message: string, payload?: unknown) => void;
 
@@ -412,33 +412,31 @@ export class CodexAppServer extends EventEmitter {
     }
   }
 
-  /**
-   * Sprint 143 (#544, R3a): the wait Codex logged for the retry it just announced, once. A line older than
-   * a few seconds belongs to no notification here, and gives nothing.
-   */
-  takeRetryWait(now = Date.now()): (CodexRetryWait & { at: number }) | null {
-    const wait = this.lastRetryWait;
-    this.lastRetryWait = null;
-    if (!wait || now - wait.at > RETRY_LINE_PAIRING_MS) return null;
-    return wait;
+  private handleStderr(data: string): void {
+    this.handleStderrLines(this.stderrLines.push(data));
   }
 
-  private handleStderr(data: string): void {
-    const normalized = data.trim();
-    if (!normalized || normalized === this.lastStderrMessage) {
-      return;
-    }
-
-    // Sprint 143 (#544, R3a): Codex's own line naming its wait before it tries again.
-    for (const line of normalized.split('\n')) {
+  /**
+   * Sprint 143 (#544, R3a): every whole line of stderr. Codex's own line naming its wait before it tries
+   * again goes to the runtime (`CODEX_RETRY_WAIT_EVENT`, which pairs it with its turn's notification); the
+   * other lines are kept and logged together, as one chunk's message was before.
+   */
+  private handleStderrLines(lines: string[]): void {
+    const other: string[] = [];
+    for (const line of lines) {
       const wait = parseCodexRetryLine(line);
       if (wait) {
-        this.lastRetryWait = { ...wait, at: Date.now() };
+        const heard: CodexRetryWaitHeard = { ...wait, at: Date.now() };
         this.trace?.('stdio:stderr', 'retry wait', wait);
-        // The two pipes don't keep their order: a notification that came first takes it from this event.
-        this.emit(CODEX_RETRY_WAIT_EVENT, this.lastRetryWait);
-        return;
+        this.emit(CODEX_RETRY_WAIT_EVENT, heard);
+      } else if (line.trim()) {
+        other.push(line);
       }
+    }
+
+    const normalized = other.join('\n').trim();
+    if (!normalized || normalized === this.lastStderrMessage) {
+      return;
     }
 
     this.lastStderrMessage = normalized;
@@ -448,6 +446,8 @@ export class CodexAppServer extends EventEmitter {
   }
 
   private handleExit(code: number | null): void {
+    // A last line with no newline is still a line.
+    this.handleStderrLines(this.stderrLines.flush());
     this.trace?.('app-server', 'exit', { code });
     for (const [, { reject }] of this.pendingRequests.entries()) {
       reject(new Error('ChatGPT stopped unexpectedly.'));
