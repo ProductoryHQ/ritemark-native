@@ -130,6 +130,36 @@ export function canonicalMarkdownProjection(content: string): string {
   return normalizeLogicalText(content).replace(/^\n+/, '').replace(/\n+$/, '');
 }
 
+export type RefusedSaveDecision = 'converged' | 'disk-unchanged' | 'conflict';
+
+export interface RefusedSaveSnapshot {
+  /** The logical text hash of the disk version the person started from. */
+  baseDiskLogicalHash: string;
+  /** The logical text hash on disk now. */
+  diskLogicalHash: string;
+  /** The logical text hash of the person's document. */
+  modelLogicalHash: string;
+}
+
+/**
+ * VS Code refused to save a document Ritemark's editor holds, because the file
+ * changed on disk since it was read (Sprint 137, #454: R10, R11). What changed?
+ *
+ * - `converged`: the disk already holds the person's text. Nothing to ask.
+ * - `disk-unchanged`: the disk's text is still the text the person started
+ *   from; only its date, size or bytes moved (a sync client, a line-ending
+ *   rewrite). Nobody else changed the words, so the person's save may proceed.
+ * - `conflict`: someone else changed the text too. Ritemark's Review changes
+ *   is the one question.
+ *
+ * Logical text: the byte order mark and line endings are not content.
+ */
+export function classifyRefusedSave(snapshot: RefusedSaveSnapshot): RefusedSaveDecision {
+  if (snapshot.diskLogicalHash === snapshot.modelLogicalHash) return 'converged';
+  if (snapshot.diskLogicalHash === snapshot.baseDiskLogicalHash) return 'disk-unchanged';
+  return 'conflict';
+}
+
 export function classifyThreeWay(snapshot: ThreeWaySnapshot): ThreeWaySyncState {
   const diskChanged = snapshot.diskHash !== snapshot.baseDiskHash;
   const modelChanged = snapshot.modelHash !== snapshot.baseModelHash;

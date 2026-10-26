@@ -257,6 +257,8 @@ function App() {
           }
         } else {
           dispatchDocumentViewSync(message)
+          // #454: the person chose Review changes in Ritemark's notification.
+          if (message.type === 'document:conflict' && message.openReview) setShowConflictDialog(true)
         }
         return
       }
