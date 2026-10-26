@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A stopped turn reads Stopped after a restart.** A ChatGPT or OpenCode turn stopped with Stop read "Failed" once the chat was reopened, and a stopped Claude turn could read "Done". Now a stop is Stopped for all three AIs, live and after a restart (found by Sprint 140's QA).
 - **ChatGPT's working note and its answer no longer run together (#552).** Separate messages start a new paragraph, so the answer's first heading shows as a heading, live and in the saved chat.
 - **A stopped Claude follow-up reads Stopped**, not Done.
+- **The chat's header no longer says "Interrupted"** after a failed or stopped turn. It shows a state only while the AI works or waits for you; the chats list and the rail still mark a chat whose last turn ended badly.
 - **A chat's OpenCode model is checked when Ritemark starts**, as its Claude and ChatGPT models are: one no longer offered falls back to the first configured model.
 - **A chat saved by 2.0 no longer shows a provider's raw JSON** for a failed ChatGPT or OpenCode turn when reopened; the sentence inside it is shown.
 
