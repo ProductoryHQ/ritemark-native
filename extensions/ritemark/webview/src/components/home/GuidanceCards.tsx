@@ -44,6 +44,16 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   const [menuOpen, setMenuOpen] = useState(false)
   const [keySheet, setKeySheet] = useState(false)
   // Ask with opens under the whole split button, its left edge on the main button's (experience 35, frame 1)
+  // The sample's hand-over takes some seconds before the board shows it in Doing: the button waits, and is not pressed twice
+  const [pressing, setPressing] = useState(false)
+  useEffect(() => {
+    if (!pressing) return
+    const timer = setTimeout(() => setPressing(false), 30_000)
+    return () => clearTimeout(timer)
+  }, [pressing])
+  useEffect(() => {
+    if (card.problem) setPressing(false)
+  }, [card.problem])
   const splitRef = useRef<HTMLSpanElement>(null)
   const [menuOffset, setMenuOffset] = useState(0)
   const openMenu = (open: boolean) => {
@@ -71,7 +81,11 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
       <div className="rh-guide-go">
         <span className="rh-split" ref={splitRef}>
           <Tooltip label={mainTip(card, name)}>
-            <Button size="sm" className="rh-split-main" onClick={() => (card.aiReady ? send({ type: 'home/ready-request' }) : openMenu(true))}>
+            <Button size="sm" className="rh-split-main" disabled={pressing} aria-busy={pressing || undefined} onClick={() => {
+              if (!card.aiReady) return openMenu(true)
+              setPressing(true)
+              send({ type: 'home/ready-request' })
+            }}>
               <Icon name="chat-circle" size={14} tone="inherit" />
               <span className="truncate">{card.button}</span>
             </Button>
