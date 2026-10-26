@@ -104,7 +104,13 @@ On the spike branch, a prototype `offer_next_steps` tool (`{ offers: [{ title, d
 
 ## What the spike and the audits changed
 
-Written at the end of Phase 1.
+Written 26 October, with the build; the spike's runs are in `research/word-spike.md`, the audits in `research/`.
+
+- **The spike (#497), so far.** ChatGPT passed Word documents and PDFs on the Mac (one PDF run stalled for 7m27s); Claude and OpenCode were not run (no Claude sign-in on this Mac; no keyless OpenCode inside Ritemark), and Windows was not run. Part B failed for ChatGPT (0 of 3 first looks called `offer_next_steps`). So: **no R1a, no R1b**; every AI gets the honesty line (capability context version 3); **R7 is not built**, and frame 2 needs the Experience lead's redraw (J3); the Word-or-PDF starting points stay behind a gate (`READ_KINDS_EVERY_AI_PASSED` in `guidance/startingPlace.ts`) until every AI passes, so a Word file or PDF in front shows the project's points. Claude's 8 runs, OpenCode's and Windows' stay open.
+- **The sheet is not VS Code's dialog.** The dialog takes its buttons once and closes on any press, so it cannot carry R11–R13 (`research/feedback-sheet-audit.md`). The sheet is its own DOM in patch 018 on the dialog's dimmed block, as drawn; the fallback for a shell without it is 2.0's report window and an input box.
+- **"Sent" needed a fix to be true.** posthog-node's `captureImmediate` does not reject on a failed request. `analytics/posthog.ts` now makes a send that emitted an error throw, so the sheet's straight route knows (`research/feedback-delivery-audit.md`).
+- **One PR, not two merges.** The coordinator asked for one PR with the whole sprint; the delivery plan's two merges become one.
+- **Found on the way.** ChatGPT's file citations were drawn as raw markup; `chatLinks.rewriteCodexCitations` draws them as links. ChatGPT's first turn in a fresh profile took about 6 minutes in the spike (later turns took seconds).
 
 ## Workstream 1: Guidance state and Home's order (R2, R6, R14, E2, E3)
 
