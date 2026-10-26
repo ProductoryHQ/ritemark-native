@@ -26,6 +26,7 @@ Acceptance criteria:
   - On lines of its own, set off from a paragraph by a blank line or starting the block, it is an equation block.
   - Inside a paragraph (no blank line before it), it is display math within that paragraph, shown centred on its own line.
 - **ChatGPT's delimiters:** `\(…\)` is inline math and `\[…\]` display math, by the same two placements (recommended in this plan; decision for Jarmo 3).
+  - *Changed 26 October, on Sprint 137's corpus:* `\[…\]` is display math only on lines of its own (`\[` opening a line, `\]` closing one), as ChatGPT writes it. In running text it stays text, because Ritemark 2.0.1 and earlier saved every literal bracket as `\[` and `\]`: "See \[1\] and \[draft\]." in a file 2.0.1 saved is a sentence with two references, and 137's one-time cleanup writes it back as `[1]` and `[draft]`.
 - **Not math:** anything inside a code span, a fenced or indented code block, an HTML comment or a link's address; `costs $5 and $10`; `$20,000 and $30,000`; `$HOME and $PATH`; a lone `$`.
 - **`\$`** in the file is a literal dollar sign, shown as `$`.
 - Math can sit in paragraphs, headings, list items, quotes and table cells; an equation block can sit at the top level, in a list item and in a quote.

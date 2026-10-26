@@ -52,6 +52,12 @@ for (const prose of [
   '$ x$ opens on a space.',
   '$x $ closes on a space.',
   'Escaped: \\$x\\$ stays literal.',
+  // Ritemark 2.0.1 saved literal brackets as `\[` and `\]`: in running text
+  // they are brackets, not ChatGPT's display math.
+  'See \\[1\\] and \\[draft\\].',
+  '\\[1\\] Smith, J. (2020). A reference.',
+  'Tick \\[x\\] when done.',
+  'ChatGPT \\[ y = mx + b \\] in a sentence',
 ]) {
   assert.deepEqual(equationsIn(prose), [], `not math: ${JSON.stringify(prose)}`)
 }
@@ -70,7 +76,8 @@ const cases: [string, string[]][] = [
   ['Display with spaces $$ x $$.', ['$$ x $$']],
   ['Over lines $$\nx = 1\n$$ done', ['$$\nx = 1\n$$']],
   ['ChatGPT \\(x^2\\) inline', ['\\(x^2\\)']],
-  ['ChatGPT \\[ y = mx + b \\] display', ['\\[ y = mx + b \\]']],
+  ['\\[ y = mx + b \\]', ['\\[ y = mx + b \\]']],
+  ['The line is:\n\\[\ny = mx + b\n\\]\nwhere m is the slope.', ['\\[\ny = mx + b\n\\]']],
   ['Inline over a soft break $a +\nb$.', ['$a +\nb$']],
   ['Escaped dollar inside $a\\$b$ stays inside.', ['$a\\$b$']],
   ['Stars $a*b*c$ and underscores $a_1$', ['$a*b*c$', '$a_1$']],

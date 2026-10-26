@@ -82,12 +82,28 @@ function findUnescaped(text: string, needle: string, from: number): number {
  * `src[at]` must be the opening delimiter itself; the caller decides whether
  * that position is escaped (a `marked` tokenizer sees the escape first).
  */
-export function scanInlineMath(src: string, at = 0): InlineMathMatch | null {
+export function scanInlineMath(
+  src: string,
+  at = 0,
+  opensLine = at === 0 || src[at - 1] === '\n',
+): InlineMathMatch | null {
   if (src.startsWith('$$', at)) return scanDisplayDollars(src, at)
   if (src[at] === '$') return scanInlineDollar(src, at)
   if (src.startsWith('\\(', at)) return scanBackslash(src, at, '\\(', '\\)')
-  if (src.startsWith('\\[', at)) return scanBackslash(src, at, '\\[', '\\]')
+  if (src.startsWith('\\[', at)) return opensLine ? scanBracketDisplay(src, at) : null
   return null
+}
+
+/**
+ * `\[…\]` is display math only on lines of its own: `\[` opening a line and
+ * `\]` closing one, as ChatGPT writes it. In running text it is text, because
+ * Ritemark 2.0.1 and earlier saved every literal bracket as `\[` and `\]`:
+ * "See \[1\] and \[draft\]." is a sentence with two references, not math.
+ */
+function scanBracketDisplay(src: string, at: number): InlineMathMatch | null {
+  const match = scanBackslash(src, at, '\\[', '\\]')
+  if (!match) return null
+  return /^[ \t]*(?:\n|$)/.test(src.slice(at + match.raw.length)) ? match : null
 }
 
 function scanInlineDollar(src: string, at: number): InlineMathMatch | null {

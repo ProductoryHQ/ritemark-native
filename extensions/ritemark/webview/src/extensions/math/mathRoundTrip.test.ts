@@ -19,6 +19,7 @@ import { getSchema, getTextBetween, getTextSerializersFromSchema } from '@tiptap
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from './mathNodes'
+import { openAndSave } from '../../utils/markdownFidelity'
 import {
   createEditorSchemaExtensions,
   editorHTMLToMarkdown,
@@ -103,13 +104,10 @@ function nodePositions(doc: PMNode, name: string): number[] {
   return found
 }
 
-// ---- the fixtures, byte for byte ----
-// Lists, soft line breaks and a quote's blank line are Sprint 137's (#270):
-// until it lands, a list item is written `-   item` with a blank line between
-// items, a soft break as a hard one, and a quote's empty line as `> `. Math
-// inside them is still written back untouched, which is what this sprint
-// owns; the whole file is byte for byte once 137 is in.
-const WAITS_FOR_137 = /^(\s*[-*+]\s|\s*\d+[.)]\s|\s+$|$|>\s*$)/
+// ---- the fixtures, byte for byte, as whole files ----
+// Through the editor's own load and save, and through what the host does with
+// the file's text (Sprint 137's `openAndSave`): every line comes back, the
+// list lines, soft breaks and quotes around the math included.
 for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-report.md']) {
   const source = fixture(name)
   const doc = load(source)
@@ -117,14 +115,8 @@ for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-re
 
   assert.deepEqual(equations(saved), equations(source), `${name}: every equation is written back exactly`)
   assert.equal(save(load(saved)), saved, `${name}: a second save changes nothing`)
-
-  if (saved === projection(source)) continue
-  const before = projection(source).split('\n')
-  const after = saved.split('\n')
-  const changed = [...after.filter(line => !before.includes(line)), ...before.filter(line => !after.includes(line))]
-  const outside137 = changed.filter(line => !WAITS_FOR_137.test(line))
-  assert.deepEqual(outside137, [], `${name}: only list lines may differ before Sprint 137; saved:\n${saved}`)
-  console.log(`  ${name}: math byte for byte; ${changed.length} list line(s) wait for Sprint 137`)
+  assert.equal(saved, projection(source), `${name}: the editor writes the whole file back`)
+  assert.equal(openAndSave(source), source, `${name}: open and save give the file back byte for byte`)
 }
 
 // ---- the report: every equation becomes a node; prices and `\$` stay text ----
@@ -140,6 +132,20 @@ for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-re
 {
   const doc = load(fixture('prose-dollars.md'))
   assert.equal(nodesOf(doc, 'mathInline').length + nodesOf(doc, 'mathBlock').length, 0, 'no equations in prose')
+}
+
+// ---- `\[…\]`: display math on its own lines, brackets in running text ----
+{
+  // Ritemark 2.0.1 saved literal brackets escaped; they open as brackets.
+  const saved201 = 'See \\[1\\] and \\[draft\\].\n\n\\[1\\] Smith, J. (2020).'
+  const doc = load(saved201)
+  assert.equal(nodesOf(doc, 'mathInline').length + nodesOf(doc, 'mathBlock').length, 0, '2.0.1 brackets are not math')
+  assert.ok(doc.textContent.includes('See [1] and [draft].'), 'they read as brackets')
+  // ChatGPT's display math on lines of its own inside a paragraph is math.
+  const chatgpt = 'The line is:\n\\[\ny = mx + b\n\\]\nwhere m is the slope.'
+  const answer = load(chatgpt)
+  assert.deepEqual(nodesOf(answer, 'mathInline').map(node => node.attrs.latex), ['\ny = mx + b\n'], 'display math between lines')
+  assert.equal(save(answer), chatgpt, 'and it saves as written')
 }
 
 // ---- code, links and comments keep their dollars ----

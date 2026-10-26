@@ -76,11 +76,15 @@ export const mathMarkedExtension = {
       start(src: string) {
         return nextMathStart(src)
       },
-      tokenizer(src: string): MathInlineToken | undefined {
+      tokenizer(src: string, tokens: Array<{ raw: string }> = []): MathInlineToken | undefined {
         // `src` starts where `marked` stands; a backslash before it was
         // already consumed as an escape, so position 0 is never escaped.
         if (isEscapedAt(src, 0)) return undefined
-        const match = scanInlineMath(src, 0)
+        // Whether `marked` stands at the start of a line: the block's first
+        // inline token, or right after a line break (`\[…\]` needs one).
+        const last = tokens[tokens.length - 1]
+        const opensLine = !last || last.raw.endsWith('\n')
+        const match = scanInlineMath(src, 0, opensLine)
         if (!match) return undefined
         return { type: 'mathInline', raw: match.raw, delimiter: match.delimiter, latex: match.latex }
       },
