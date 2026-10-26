@@ -20,6 +20,7 @@ import { decodeProjectsRequest, type ProjectRow, type ProjectsRequest, type Proj
 import type { ProjectSwitcher } from '../projects/switchProject';
 import type { WaitingReader } from '../projects/waiting';
 import { displayPlace } from '../welcome/recentProjects';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 const FOUND_TIMEOUT_MS = 2000;
 /** A view resolved this soon after activation is the window restoring it, not a click. */
@@ -138,7 +139,15 @@ export class ProjectsViewProvider implements vscode.WebviewViewProvider, vscode.
         return;
       }
       case 'projects/open-folder': {
-        const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Open', title: 'Open a folder as a project' });
+        const picked = await vscode.window.showOpenDialog({
+          canSelectFolders: true,
+          canSelectFiles: false,
+          canSelectMany: false,
+          openLabel: 'Open',
+          title: 'Open a folder as a project',
+          // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+          defaultUri: vscode.Uri.file(pickerFolder([this.deps.folder ? path.dirname(this.deps.folder.uri.fsPath) : undefined])),
+        });
         if (picked?.[0]) await this.deps.switcher.switchTo(picked[0]);
         return;
       }

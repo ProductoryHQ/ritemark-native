@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   ALL_PROJECTS_LABEL,
+  ATTENTION_ACTIONS,
   RECORDINGS_LABEL,
   RECORD_REQUEST,
   SETTINGS_BUTTON,
@@ -84,5 +85,15 @@ assert.ok(hostSource.includes(`type: '${RECORD_REQUEST}'`), 'the host posts the 
 assert.ok(hostSource.includes("registerCommand('ritemark.transcribe.record'"));
 assert.ok(hostSource.includes("registerCommand('ritemark.transcribe.addFile'"));
 assert.ok(hostSource.includes("case 'transcribe:openSettings':"), 'the host still answers the gear');
+
+// Sprint 143 (#509, R8, S37): every card under Needs attention has Dismiss, with its tooltip, and the host answers it.
+assert.equal(ATTENTION_ACTIONS.dismiss.tooltip, 'Remove this from the list. The recording stays where it is.');
+const attentionRow = panelSource.slice(panelSource.indexOf('function AttentionRow'), panelSource.indexOf('type RecordingAction'));
+assert.ok(attentionRow.includes('ATTENTION_ACTIONS.dismiss.tooltip') && attentionRow.includes('ATTENTION_ACTIONS.retry.tooltip'), 'both buttons have tooltips');
+assert.doesNotMatch(attentionRow.slice(attentionRow.indexOf('ATTENTION_ACTIONS.dismiss.tooltip') - 200, attentionRow.indexOf('ATTENTION_ACTIONS.dismiss.tooltip')), /retryable/, 'Dismiss shows whatever the error');
+assert.ok(hostSource.includes(`case '${ATTENTION_ACTIONS.dismiss.message}':`), 'the host takes the card off the list');
+// The pending card shows an engine that can't take the file with why, and never selects it.
+assert.ok(panelSource.includes('refusal={refusalOf(engine.id)}'));
+assert.ok(hostSource.includes('cannotTakeOnDevice(path.extname(audioPath)'), 'the host decides it before anything starts');
 
 console.log('panelChrome tests passed');

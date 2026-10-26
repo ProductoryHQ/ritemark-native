@@ -425,7 +425,19 @@ export interface CodexConversationTurn {
    * cold start). Cleared once streamingText / activities arrive.
    */
   rpcProgressMessage?: string;
+  /**
+   * Sprint 143 (#544, R3a): the AI is waiting to try again. `busy` when the provider turned the request away
+   * (429); `retryAt` (epoch ms) when the wait's length is known. Cleared when the AI goes on.
+   */
+  retry?: RuntimeRetryState;
   timestamp: number;
+}
+
+export interface RuntimeRetryState {
+  busy: boolean;
+  retryAt?: number;
+  attempt?: number;
+  of?: number;
 }
 
 // ── Messages from extension → webview ──
@@ -528,6 +540,8 @@ export type ExtensionMessage =
   | { type: 'codex:status'; status: CodexSidebarStatus; generation?: number; revision?: number }
   | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'codex-rpc-progress'; method: string; message: string } & ConversationScopedMessage)
+  /** Sprint 143 (#544, R3a): the AI waits to try again; decoded field by field (`decodeRuntimeRetry`). */
+  | ({ type: 'codex-retry'; busy: boolean; retryAt?: number; attempt?: number; of?: number } & ConversationScopedMessage)
   | ({ type: 'codex-streaming'; delta: string; messageId?: string } & ConversationScopedMessage)
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)

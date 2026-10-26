@@ -12,6 +12,12 @@
 
 import { EventEmitter } from 'events';
 import { CodexManager } from './codexManager';
+import { RETRY_LINE_PAIRING_MS, parseCodexRetryLine, type CodexRetryWait } from './codexRetry';
+
+/** Codex's `error` notification, re-emitted under a name an EventEmitter doesn't treat as a crash. */
+export const CODEX_ERROR_EVENT = 'codex/error';
+/** Sprint 143 (#544, R3a): Codex logged how long it waits before trying again. */
+export const CODEX_RETRY_WAIT_EVENT = 'codex/retry-wait';
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
@@ -48,6 +54,8 @@ export class CodexAppServer extends EventEmitter {
   private buffer = '';
   private lastStderrMessage: string | null = null;
   private sawStderrSinceStart = false;
+  /** Sprint 143 (#544, R3a): the newest wait Codex logged before trying again. */
+  private lastRetryWait: (CodexRetryWait & { at: number }) | null = null;
   private initializePromise: Promise<InitializeResult> | null = null;
   private readonly trace?: (scope: string, message: string, payload?: unknown) => void;
 
@@ -404,10 +412,33 @@ export class CodexAppServer extends EventEmitter {
     }
   }
 
+  /**
+   * Sprint 143 (#544, R3a): the wait Codex logged for the retry it just announced, once. A line older than
+   * a few seconds belongs to no notification here, and gives nothing.
+   */
+  takeRetryWait(now = Date.now()): (CodexRetryWait & { at: number }) | null {
+    const wait = this.lastRetryWait;
+    this.lastRetryWait = null;
+    if (!wait || now - wait.at > RETRY_LINE_PAIRING_MS) return null;
+    return wait;
+  }
+
   private handleStderr(data: string): void {
     const normalized = data.trim();
     if (!normalized || normalized === this.lastStderrMessage) {
       return;
+    }
+
+    // Sprint 143 (#544, R3a): Codex's own line naming its wait before it tries again.
+    for (const line of normalized.split('\n')) {
+      const wait = parseCodexRetryLine(line);
+      if (wait) {
+        this.lastRetryWait = { ...wait, at: Date.now() };
+        this.trace?.('stdio:stderr', 'retry wait', wait);
+        // The two pipes don't keep their order: a notification that came first takes it from this event.
+        this.emit(CODEX_RETRY_WAIT_EVENT, this.lastRetryWait);
+        return;
+      }
     }
 
     this.lastStderrMessage = normalized;
@@ -481,7 +512,9 @@ export class CodexAppServer extends EventEmitter {
       // Notification (event)
       const notification = message as unknown as JsonRpcNotification;
       this.trace?.('rpc:event', String(notification.method), notification.params);
-      this.emit(notification.method as string, notification.params);
+      // Sprint 143 (#544): Codex's `error` notification can't be emitted as 'error': an EventEmitter throws an
+      // 'error' nobody listens to, which this loop caught and logged as a JSON line it couldn't parse.
+      this.emit(notification.method === 'error' ? CODEX_ERROR_EVENT : notification.method as string, notification.params);
       this.emit('notification', notification);
     }
   }

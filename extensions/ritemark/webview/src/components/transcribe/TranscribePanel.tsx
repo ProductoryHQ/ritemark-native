@@ -34,7 +34,7 @@ import {
   useRecordingAnnouncement,
 } from './recording/RecordingCards';
 import { useTranscribeRecording } from './recording/useTranscribeRecording';
-import { RECORD_REQUEST, canStartRecording, panelChrome, requestedRecordingStart } from './panelChrome';
+import { ATTENTION_ACTIONS, RECORD_REQUEST, canStartRecording, panelChrome, requestedRecordingStart } from './panelChrome';
 import {
   formatDuration,
   formatRecordingDate,
@@ -423,7 +423,9 @@ function PendingImportCard({
   onSelectEngine: (id: string) => void;
 }) {
   const pending = state.pending!;
-  const selected = state.engines.find((engine) => engine.id === selectedEngineId) ?? null;
+  const refusalOf = (engineId: string) => pending.estimates.find((entry) => entry.engineId === engineId)?.refusal;
+  // Sprint 143 (#509): an engine that can't take this file here is shown with why, and never selected.
+  const selected = state.engines.find((engine) => engine.id === selectedEngineId && !refusalOf(engine.id)) ?? null;
   const estimate = pending.estimates.find((entry) => entry.engineId === selectedEngineId);
 
   return (
@@ -443,8 +445,9 @@ function PendingImportCard({
           <EngineChoice
             key={engine.id}
             engine={engine}
-            selected={engine.id === selectedEngineId}
+            selected={engine.id === selected?.id}
             costUsd={pending.estimates.find((entry) => entry.engineId === engine.id)?.costUsd ?? null}
+            refusal={refusalOf(engine.id)}
             onSelect={() => onSelectEngine(engine.id)}
           />
         ))}
@@ -472,7 +475,7 @@ function PendingImportCard({
             size="sm"
             disabled={!selected?.readiness.ready}
             onClick={() =>
-              vscode.postMessage({ type: 'transcribe:start', engineId: selectedEngineId, language: null })
+              vscode.postMessage({ type: 'transcribe:start', engineId: selected?.id ?? null, language: null })
             }
           >
             <Icon name="play" size={14} />
@@ -497,14 +500,17 @@ function EngineChoice({
   engine,
   selected,
   costUsd,
+  refusal,
   onSelect,
 }: {
   engine: EngineStatus;
   selected: boolean;
   costUsd: number | null;
+  /** Sprint 143 (#509): why this engine can't take this file on this computer. */
+  refusal?: string;
   onSelect: () => void;
 }) {
-  const usable = engine.supportedOnPlatform && engine.readiness.ready;
+  const usable = engine.supportedOnPlatform && engine.readiness.ready && !refusal;
 
   return (
     <button
@@ -532,11 +538,13 @@ function EngineChoice({
         )}
       </div>
       <div className="mt-1 pl-5 text-[12px] leading-relaxed text-ink-muted">
-        {usable
-          ? engine.isLocal
-            ? 'Private — audio never leaves this device. No speaker separation.'
-            : 'Separates speakers. Audio is uploaded.'
-          : engine.readiness.reason}
+        {refusal
+          ? refusal
+          : usable
+            ? engine.isLocal
+              ? 'Private — audio never leaves this device. No speaker separation.'
+              : 'Separates speakers. Audio is uploaded.'
+            : engine.readiness.reason}
       </div>
     </button>
   );
@@ -671,14 +679,26 @@ function AttentionRow({ job }: { job: TranscriptionJob }) {
       </p>
       <div className="mt-2 flex gap-2">
         {job.error?.retryable !== false && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => vscode.postMessage({ type: 'transcribe:importPath', path: job.audioPath })}
-          >
-            Try again
-          </Button>
+          <Tooltip label={ATTENTION_ACTIONS.retry.tooltip}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => vscode.postMessage({ type: 'transcribe:importPath', path: job.audioPath })}
+            >
+              {ATTENTION_ACTIONS.retry.label}
+            </Button>
+          </Tooltip>
         )}
+        {/* Sprint 143 (#509): every failed or interrupted card can go without a restart. */}
+        <Tooltip label={ATTENTION_ACTIONS.dismiss.tooltip}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => vscode.postMessage({ type: ATTENTION_ACTIONS.dismiss.message, jobId: job.id })}
+          >
+            {ATTENTION_ACTIONS.dismiss.label}
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );

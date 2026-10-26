@@ -19,7 +19,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   if (message.role === 'user') {
     return (
       <div
-        className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)]"
+        className="px-2.5 py-2 rounded bg-[var(--vscode-input-background)] whitespace-pre-wrap [overflow-wrap:anywhere]"
         style={chatFontStyle}
       >
         {message.content}

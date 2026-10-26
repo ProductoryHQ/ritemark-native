@@ -322,6 +322,28 @@ async function run(): Promise<void> {
       assert.equal(recovered[0].state, 'interrupted', 'a job cut off by a quit is never silently dropped');
       assert.equal(recovered[0].error?.retryable, true, 'and it can be retried');
       assert.deepEqual(state.get('speech:inflightJobs', []), [], 'the record is cleared once recovered');
+
+      // Sprint 143 (#509, R8, S38): an interrupted (or failed) card can be dismissed; the audio stays.
+      const events: JobEvent[] = [];
+      const off = manager.onEvent((event) => events.push(event));
+      assert.equal(manager.dismiss('job-old'), true);
+      assert.equal(manager.get('job-old'), undefined, 'the job is off the list');
+      assert.deepEqual(events, [{ type: 'job-dismissed', jobId: 'job-old' }], 'the panel hears of it once');
+      assert.ok(fs.existsSync(audioPath), 'the audio file is untouched');
+      assert.equal(manager.dismiss('job-old'), false, 'twice is nothing');
+      assert.equal(manager.dismiss('no-such-job'), false);
+      off();
+    }
+
+    // Sprint 143 (#509): a queued or running job can't be dismissed (it is stopped with Cancel).
+    {
+      const registry = new EngineRegistry('darwin');
+      registry.register(fakeEngine());
+      const manager = new JobManager({ registry, store: new SessionStore(path.join(dir, 'sessions-q')), workDir: dir, state: new FakeMemento() });
+      const job = manager.enqueue({ audioPath, engineId: 'whisper-local', workspaceRoot: null, durationSec: 4, language: null });
+      assert.equal(manager.dismiss(job.id), false, 'a live job stays');
+      manager.cancel(job.id);
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     // ── buildSession / toErrorInfo ──

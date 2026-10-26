@@ -54,6 +54,11 @@ export class ConversationTitleGenerator {
       byokEnv: input.byokEnv,
       systemPrompt: TITLE_SYSTEM_PROMPT,
       prompt: titlePrompt(input),
+      // Sprint 143 (#514): none of the person's own Claude settings, skills, CLAUDE.md or plugins, and no
+      // tools, as idea review and the transcript insights run. The 23 September prompt alone still let an
+      // English chat be titled in Estonian on 2.0's RC; the title comes from the conversation only.
+      settingSources: [],
+      availableTools: [],
       timeoutMs: TITLE_TIMEOUT_MS,
       timeoutMessage: 'Title generation timed out',
     });

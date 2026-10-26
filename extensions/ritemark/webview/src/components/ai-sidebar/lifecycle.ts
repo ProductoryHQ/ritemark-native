@@ -1,4 +1,4 @@
-import type { AgentConversationTurn, CodexConversationTurn } from './types';
+import type { AgentConversationTurn, CodexConversationTurn, RuntimeRetryState } from './types';
 import { extractPlanDisplayText } from './planText';
 
 export interface ActiveApprovedPlan {
@@ -104,6 +104,8 @@ export function finalizeCodexTurnResult(
       : {}),
     isRunning: false,
     pendingQuestion: undefined,
+    // Sprint 143 (#544): a wait to try again ends with the turn.
+    retry: undefined,
     planText: fallbackPlanText,
     requiresPlanReview: turn.requiresPlanReview || shouldRequirePlanReview,
     result: {
@@ -113,6 +115,20 @@ export function finalizeCodexTurnResult(
       ...(result.error && result.errorKind && result.errorDetail ? { errorDetail: result.errorDetail } : {}),
     },
   };
+}
+
+/**
+ * Sprint 143 (#544, R3a): the host's `codex-retry`, field by field; null when it isn't one. A wait more
+ * than an hour away, or in the past by more than a minute, is dropped as nonsense rather than counted.
+ */
+export function decodeRuntimeRetry(message: Record<string, unknown>, now = Date.now()): RuntimeRetryState | null {
+  if (typeof message.busy !== 'boolean') return null;
+  const retry: RuntimeRetryState = { busy: message.busy };
+  const at = message.retryAt;
+  if (typeof at === 'number' && Number.isFinite(at) && at > now - 60_000 && at < now + 3_600_000) retry.retryAt = at;
+  if (typeof message.attempt === 'number' && Number.isInteger(message.attempt) && message.attempt > 0) retry.attempt = message.attempt;
+  if (typeof message.of === 'number' && Number.isInteger(message.of) && message.of > 0) retry.of = message.of;
+  return retry;
 }
 
 export function applyCodexPlanUpdate(

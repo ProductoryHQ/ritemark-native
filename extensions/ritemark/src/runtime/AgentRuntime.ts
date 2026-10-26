@@ -192,6 +192,11 @@ export interface RuntimeSessionConfig {
   /** Called with slow-RPC progress (thread/start etc.) to show UI feedback */
   onRpcProgress?: (method: string, message: string) => void;
   /**
+   * Sprint 143 (#544, R3a): the AI is waiting to try again (Codex). `busy` when the provider turned the
+   * request away (429); `retryAt` (epoch ms) when the wait's length is known. Called again when it learns more.
+   */
+  onRuntimeRetry?: (retry: { attempt?: number; of?: number; busy: boolean; retryAt?: number }) => void;
+  /**
    * Codex dynamic tools for a new thread: Ritemark's tool groups (browser, task
    * board; Sprint 130 W5). Fixed when the thread starts, so a turn whose tools
    * differ starts a fresh thread.

@@ -7,6 +7,7 @@ import {
   codexTurnErrorCode,
   isClaudeAuthenticationError,
   presentRuntimeError,
+  serviceRetryAt,
   standaloneClaudeAuthenticationError,
   standaloneClaudeOAuthExpirationError,
   unwrapProviderMessage,
@@ -16,6 +17,8 @@ import {
   failureSilencesStatusLine,
   decodeRuntimeErrorDetail,
   isRuntimeErrorKind,
+  retryingLine,
+  retryingOffersAlternative,
   trustedBillingUrl,
   turnFailureCard,
   turnOutcome,
@@ -378,3 +381,66 @@ assert.deepEqual(decodeRuntimeErrorDetail({ exited: true }), { exited: true });
 assert.equal(decodeRuntimeErrorDetail({ exited: 'yes' }), undefined);
 assert.equal(decodeRuntimeErrorDetail({ model: 'x'.repeat(300) }), undefined);
 console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
+
+// ── Sprint 143 (#544, R3a): the busy card and the waiting line (experience 13, ritemark-dev 0e6911f) ──
+{
+  // The final error the app-server gave after the retries against the local 429 endpoint.
+  const final = { message: 'exceeded retry limit, last status: 429 Too Many Requests', codexErrorInfo: { responseTooManyFailedAttempts: { httpStatusCode: 429 } } };
+  const hints = codexTurnErrorCode(final);
+  assert.deepEqual(hints, { code: 'responseTooManyFailedAttempts', httpStatus: 429 });
+  const busy = classifyRuntimeError('codex', final.message, hints);
+  assert.equal(busy?.kind, 'limit');
+  assert.deepEqual(busy?.detail, { limit: 'busy' });
+  assert.equal(busy?.sentence, 'ChatGPT is busy right now. It turned this request away several times. Send your message again in a few minutes.');
+  assert.doesNotMatch(busy?.sentence ?? '', /exceeded retry limit|429/);
+  // Codex's own rate-limit variant, and a 429 on the stream, are busy too.
+  assert.deepEqual(classifyRuntimeError('codex', 'Rate limit reached', { code: 'rateLimitExceeded' })?.detail, { limit: 'busy' });
+  assert.deepEqual(classifyRuntimeError('codex', 'x', { code: 'responseStreamDisconnected', httpStatus: 429 })?.detail, { limit: 'busy' });
+  // A plan's limit keeps its own card.
+  assert.deepEqual(classifyRuntimeError('codex', "You've hit your usage limit. Try again later.", { code: 'usageLimitExceeded' })?.detail, { limit: 'plan' });
+  // A time from the service.
+  const at = classifyRuntimeError('codex', 'Rate limit reached. Please try again in 6m59s.', { code: 'rateLimitExceeded' })?.detail?.retryAt;
+  assert.ok(at && Math.abs(Date.parse(at) - Date.now() - 419_000) < 5_000, 'six minutes fifty-nine from now');
+  assert.equal(serviceRetryAt('Please try again in 420 seconds.', 0), new Date(420_000).toISOString());
+  assert.equal(serviceRetryAt('try again in 7 minutes', 0), new Date(420_000).toISOString());
+  assert.equal(serviceRetryAt('try again later', 0), undefined);
+
+  // The card: without a time, with one, with another AI ready; the status line says "Failed" under it.
+  assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '' }), {
+    title: 'ChatGPT is busy right now',
+    message: 'It turned this request away several times. Send your message again in a few minutes.',
+  });
+  assert.equal(
+    turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy', retryAt: '2026-10-27T13:12:00.000Z' }, sentence: '', formatTime: () => '3:12 PM' })?.message,
+    'It turned this request away several times. Send your message again after 3:12 PM.',
+  );
+  assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '', readyAlternative: 'claude-code' })?.action, {
+    kind: 'use-runtime',
+    label: 'Continue with Claude',
+    tooltip: 'Stop waiting and continue this chat with Claude. Your message goes back in the box.',
+    runtimeId: 'claude-code',
+    carryMessage: true,
+  });
+  assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '', readyAlternative: 'codex' })?.action, undefined, 'never the same AI');
+  assert.equal(failureSilencesStatusLine('codex', 'limit', { limit: 'busy' }), false, '"Failed" under the busy card');
+  assert.equal(failureSilencesStatusLine('codex', 'limit', { limit: 'plan' }), true, 'the plan card keeps the line silent');
+  assert.deepEqual(decodeRuntimeErrorDetail({ limit: 'busy', retryAt: '2026-10-27T13:12:00.000Z' }), { limit: 'busy', retryAt: '2026-10-27T13:12:00.000Z' });
+  assert.deepEqual(decodeRuntimeErrorDetail({ limit: 'busy', retryAt: 'soon' }), { limit: 'busy' });
+  assert.equal(turnOutcome('failed', 'limit'), 'limit');
+
+  // The waiting line counts down in whole minutes, rounded up; "in a minute" from one minute left; no seconds, no "…".
+  assert.equal(retryingLine('codex', 419_000), 'ChatGPT is busy. Trying again in 7 minutes.');
+  assert.equal(retryingLine('codex', 360_001), 'ChatGPT is busy. Trying again in 7 minutes.');
+  assert.equal(retryingLine('codex', 360_000), 'ChatGPT is busy. Trying again in 6 minutes.');
+  assert.equal(retryingLine('codex', 61_000), 'ChatGPT is busy. Trying again in 2 minutes.');
+  assert.equal(retryingLine('codex', 60_000), 'ChatGPT is busy. Trying again in a minute.');
+  assert.equal(retryingLine('codex', 0), 'ChatGPT is busy. Trying again in a minute.');
+  assert.equal(retryingLine('codex', undefined), 'ChatGPT is busy. Trying again soon.', 'the length unknown');
+  assert.equal(retryingLine('opencode', 120_000), 'OpenCode is busy. Trying again in 2 minutes.', "the AI's own name");
+  for (const ms of [419_000, 60_000, undefined]) assert.doesNotMatch(retryingLine('codex', ms), /…|seconds| s\b|Codex/);
+  // Continue with <AI> only while more than a minute is left.
+  assert.equal(retryingOffersAlternative(419_000), true);
+  assert.equal(retryingOffersAlternative(60_000), false);
+  assert.equal(retryingOffersAlternative(undefined), false);
+  console.log('runtimeErrorPresentation: Sprint 143 busy card and waiting line pass');
+}

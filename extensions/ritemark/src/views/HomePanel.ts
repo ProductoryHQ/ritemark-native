@@ -24,6 +24,7 @@ import { UPDATED_FROM_1X_KEY } from '../welcome/updateDetection';
 import { displayPlace } from '../welcome/recentProjects';
 import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
 import { normalizeProjectUri } from '../conversations/projectScope';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 export const HOME_VIEW_TYPE = 'ritemark.home';
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
@@ -87,7 +88,9 @@ export class HomeHost implements vscode.Disposable {
       this.scheduleRedraw();
     };
     this.disposables.push(chats, chats.onDidChange(onChats), chats.onDidCreate(onChats));
-    this.disposables.push(deps.projectList.onDidChange(() => this.scheduleRedraw()) as unknown as vscode.Disposable);
+    // Sprint 143 (#556): the project list hands back an unsubscribe function, not a Disposable.
+    const offProjects = deps.projectList.onDidChange(() => this.scheduleRedraw());
+    this.disposables.push({ dispose: offProjects });
     // Copilot Chat installed, enabled or removed: What moved's line follows it.
     this.disposables.push(vscode.extensions.onDidChange(() => this.scheduleRedraw()));
     // Sprint 140: the guidance card follows a sign-in, a press, a send
@@ -250,6 +253,8 @@ export class HomeHost implements vscode.Disposable {
           openLabel: 'Use as cover',
           title: 'Choose a cover picture',
           filters: { Pictures: ['jpg', 'jpeg', 'png', 'webp', 'gif'] },
+          // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+          defaultUri: vscode.Uri.file(pickerFolder([folder.uri.fsPath])),
         });
         if (!picked?.[0]) return;
         const result = await setProjectCover(nodeProjectFileFs(), folder.uri.fsPath, picked[0].fsPath, { folderName: folder.name });
@@ -308,7 +313,13 @@ export class HomeHost implements vscode.Disposable {
         await this.push();
         return;
       case 'home/add-files': {
-        const picked = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Copy into this project', title: 'Bring files into this project' });
+        const picked = await vscode.window.showOpenDialog({
+          canSelectMany: true,
+          openLabel: 'Copy into this project',
+          title: 'Bring files into this project',
+          // Sprint 143 (#510): the files come from elsewhere, so the person's home, which exists.
+          defaultUri: vscode.Uri.file(pickerFolder([])),
+        });
         if (picked?.length) await this.copyIn(picked);
         return;
       }
@@ -383,7 +394,7 @@ export class HomeHost implements vscode.Disposable {
       canSelectFiles: false,
       canSelectFolders: true,
       canSelectMany: false,
-      defaultUri: vscode.Uri.file(start),
+      defaultUri: vscode.Uri.file(pickerFolder([start])),
       openLabel: 'This is the project',
       title: `Where is ${missing.name} now?`,
     });
@@ -533,7 +544,14 @@ export class HomeHost implements vscode.Disposable {
 
   dispose(): void {
     if (this.redrawTimer) clearTimeout(this.redrawTimer);
-    this.disposables.forEach((disposable) => disposable.dispose());
+    // Sprint 143 (#556): one subscription that throws must not keep the rest, or the panel, alive.
+    for (const disposable of this.disposables.splice(0)) {
+      try {
+        disposable.dispose();
+      } catch (error) {
+        console.error('[Home] A subscription failed to dispose:', error);
+      }
+    }
     this.panel?.dispose();
   }
 }

@@ -16,7 +16,8 @@
  */
 
 import * as crypto from 'crypto';
-import { CodexAppServer } from './codexAppServer';
+import { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT, CodexAppServer } from './codexAppServer';
+import { RETRY_LINE_PAIRING_MS, parseCodexRetryNotice, type CodexRetryNotice } from './codexRetry';
 import { CodexAuth } from './codexAuth';
 import { CodexManager } from './codexManager';
 import type { CodexCompatibilityStatus } from './codexManager';
@@ -941,6 +942,35 @@ export class CodexRuntime implements AgentRuntime {
       if (this._sessions.size === 1) {
         this._sessions.values().next().value?.config.onRpcProgress?.(event.method, event.message);
       }
+    });
+
+    // Sprint 143 (#544, R3a): Codex will try again after a wait (ChatGPT answered 429). The notification names
+    // the try and the status; the wait's length comes from Codex's own log line, which may come just before
+    // or just after it.
+    const appServer = this._appServer;
+    let lastRetry: { session: CodexSession; notice: CodexRetryNotice; at: number } | null = null;
+    const tellRetry = (session: CodexSession, notice: CodexRetryNotice, wait: { delayMs: number; at: number } | null) => {
+      session.config.onRuntimeRetry?.({
+        ...(notice.attempt !== undefined ? { attempt: notice.attempt } : {}),
+        ...(notice.of !== undefined ? { of: notice.of } : {}),
+        busy: notice.busy,
+        ...(wait ? { retryAt: wait.at + wait.delayMs } : {}),
+      });
+    };
+    appServer.on(CODEX_ERROR_EVENT, (params: unknown) => {
+      traceCodex('event', 'error', params);
+      const notice = parseCodexRetryNotice(params);
+      if (!notice) return;
+      const session = this._sessionForThread(notice.threadId, 'error');
+      if (!session) return;
+      lastRetry = { session, notice, at: Date.now() };
+      tellRetry(session, notice, appServer.takeRetryWait());
+    });
+    appServer.on(CODEX_RETRY_WAIT_EVENT, () => {
+      if (!lastRetry || Date.now() - lastRetry.at > RETRY_LINE_PAIRING_MS) return;
+      const wait = appServer.takeRetryWait();
+      if (wait) tellRetry(lastRetry.session, lastRetry.notice, wait);
+      lastRetry = null;
     });
 
     // Correctly global — but it must reach EVERY conversation, not just one.

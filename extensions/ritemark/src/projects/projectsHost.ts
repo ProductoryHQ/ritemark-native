@@ -26,6 +26,7 @@ import { ProjectList } from './ProjectList';
 import { projectWindowsDir, ProjectWindow } from './projectWindows';
 import { ProjectSwitcher } from './switchProject';
 import { WaitingReader } from './waiting';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 export const FILLED_KEY = 'ritemark.projects.filledV1';
 
@@ -181,7 +182,15 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
       );
       if (picked === 'Remove from the list') await projectList.remove(project.folderUri);
       if (picked === 'Find it…') {
-        const chosen = await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true, canSelectMany: false, openLabel: 'This is the project', title: `Where is ${project.name} now?` });
+        const chosen = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          openLabel: 'This is the project',
+          title: `Where is ${project.name} now?`,
+          // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+          defaultUri: vscode.Uri.file(pickerFolder([path.dirname(vscode.Uri.parse(project.folderUri).fsPath)])),
+        });
         if (!chosen?.[0]) return;
         const moved = await projectList.relocate(project.folderUri, chosen[0].toString());
         if (moved.ok) await switcher.switchTo(chosen[0]);

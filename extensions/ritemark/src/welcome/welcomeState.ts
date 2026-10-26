@@ -90,6 +90,15 @@ export function runtimeOfProvider(provider: WelcomeProviderId): 'claude-code' | 
   return provider === 'claude' ? 'claude-code' : provider === 'chatgpt' ? 'codex' : 'opencode';
 }
 
+/**
+ * Sprint 143 (#551, R2): the AI new chats start with (`ritemark.ai.selectedAgent`), saved when the
+ * welcome is left for a project, before the window reloads: the AI the person chose on this welcome,
+ * or nothing. An AI the update welcome merely found ready (`landingProvider`'s fallback) changes nothing.
+ */
+export function selectedAgentOnLeave(chosenOnThisWelcome: WelcomeProviderId | null): 'claude-code' | 'codex' | 'opencode' | null {
+  return chosenOnThisWelcome ? runtimeOfProvider(chosenOnThisWelcome) : null;
+}
+
 export interface StepInput {
   kind: WelcomeKind;
   step: 1 | 2;

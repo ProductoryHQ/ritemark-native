@@ -60,7 +60,8 @@ export interface PendingImport {
   audioName: string;
   /** null when the length genuinely could not be read — never invented. */
   durationSec: number | null;
-  estimates: Array<{ engineId: string; costUsd: number | null }>;
+  /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
+  estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
 }
 
 export interface TranscribeState {

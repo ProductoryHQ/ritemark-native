@@ -270,6 +270,23 @@ function resetClause(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Sprint 143 (#544, R3a): when the service said to try again, as an ISO time, from its own words
+ * ("Please try again in 6m59s", "try again in 420 seconds", "in 7 minutes"); undefined when it didn't say.
+ */
+export function serviceRetryAt(text: string, now = Date.now()): string | undefined {
+  const match = /try again in\s+((?:\d+(?:\.\d+)?\s*(?:h|hours?|m|min|minutes?|s|sec|seconds?)\s*)+)/i.exec(text);
+  if (!match) return undefined;
+  let seconds = 0;
+  for (const part of match[1].matchAll(/(\d+(?:\.\d+)?)\s*(h|hours?|m|min|minutes?|s|sec|seconds?)/gi)) {
+    const value = Number(part[1]);
+    const unit = part[2].toLowerCase();
+    seconds += unit.startsWith('h') ? value * 3600 : unit.startsWith('m') ? value * 60 : value;
+  }
+  if (!(seconds > 0) || seconds > 24 * 3600) return undefined;
+  return new Date(now + Math.ceil(seconds) * 1000).toISOString();
+}
+
 function finish(
   agentId: AgentId,
   kind: RuntimeErrorKind,
@@ -342,6 +359,12 @@ export function classifyRuntimeError(
     if (code === 'usagelimitexceeded') {
       const resetsAt = resetClause(haystack);
       return finish(agentId, 'limit', providerSentence, hints, { limit: 'plan', ...(resetsAt ? { resetsAt } : {}) });
+    }
+    // Sprint 143 (#544, R3a): ChatGPT turned the request away (429) until Codex's retries ran out; not a plan limit.
+    if (code === 'ratelimitexceeded'
+      || ((code === 'responsetoomanyfailedattempts' || code === 'responsestreamdisconnected') && hints?.httpStatus === 429)) {
+      const retryAt = serviceRetryAt(haystack);
+      return finish(agentId, 'limit', providerSentence, hints, { limit: 'busy', ...(retryAt ? { retryAt } : {}) });
     }
     if (CODEX_NETWORK_CODES.has(code) && hints?.httpStatus === undefined) {
       return finish(agentId, 'network', providerSentence, hints);

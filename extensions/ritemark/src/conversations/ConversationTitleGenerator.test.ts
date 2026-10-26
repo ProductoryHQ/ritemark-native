@@ -52,6 +52,9 @@ async function run(): Promise<void> {
 
   assert.equal(title, 'Durable conversation title');
   assert.deepEqual(runtime.config?.allowedTools, []);
+  // Sprint 143 (#514): nothing of the person's own Claude setup, and no tools.
+  assert.deepEqual(runtime.config?.settingSources, [], 'no user, project or local Claude settings, skills or CLAUDE.md');
+  assert.deepEqual(runtime.config?.availableTools, [], 'no built-in tools');
   assert.equal(runtime.config?.codexSandboxMode, 'read-only');
   assert.equal(runtime.disposed, true, 'the one-shot runtime is always released');
 

@@ -257,6 +257,7 @@ export function CodexTurn({
             errorKind={turn.result.errorKind}
             errorDetail={turn.result.errorDetail}
             isLatest={isLatest}
+            userPrompt={turn.userPrompt}
           />
         </div>
       )}

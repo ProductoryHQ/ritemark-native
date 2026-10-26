@@ -47,6 +47,8 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFailure } = require('./CodexRuntime') as typeof import('./CodexRuntime');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT } = require('./codexAppServer') as typeof import('./codexAppServer');
 type CodexRuntime = import('./CodexRuntime').CodexRuntime;
 type CodexSession = import('./CodexRuntime').CodexSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -66,11 +68,15 @@ const toolResponses: Array<{ requestId: unknown; text: string; success: boolean 
 function makeMockAppServer(threadIds: string[] = ['thread-1']) {
   const listeners = new Map<string, Listener[]>();
   let threadSeq = 0;
+  let retryWait: { attempt: number; of: number; delayMs: number; at: number } | null = null;
   return {
     listeners,
     emit(event: string, params: unknown) {
       for (const l of listeners.get(event) ?? []) l(params);
     },
+    /** Sprint 143: what Codex's log line said, as the real app-server keeps it. */
+    setRetryWait(wait: { attempt: number; of: number; delayMs: number; at: number } | null) { retryWait = wait; },
+    takeRetryWait() { const wait = retryWait; retryWait = null; return wait; },
     on: (event: string, listener: Listener) => {
       const list = listeners.get(event) ?? [];
       list.push(listener);
@@ -584,7 +590,39 @@ async function run() {
     console.log('✓ Test 16: a sign-in failure is told from a network failure');
   }
 
-  console.log('\nAll 16 CodexRuntime tests passed!');
+  // ── Test 17: Sprint 143 (#544, R3a) — Codex's wait to try again reaches its own turn, with its length.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a', 'thread-b']);
+    const retriesA: unknown[] = [];
+    const retriesB: unknown[] = [];
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, onRuntimeRetry: (retry) => retriesA.push(retry) });
+    await openTurn(runtime, 'conv-b', { ...dummyConfig, onRuntimeRetry: (retry) => retriesB.push(retry) });
+    // The notification the app-server sent against the local 429 endpoint (research/reproductions.md).
+    const notice = (threadId: string, n: number) => ({
+      error: { message: `Reconnecting... ${n}/5`, codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: 429 } }, additionalDetails: 'exceeded retry limit, last status: 429 Too Many Requests' },
+      willRetry: true,
+      threadId,
+      turnId: 'turn-1',
+    });
+    // The log line came first (the usual order): the wait goes with the notification.
+    mock.setRetryWait({ attempt: 1, of: 5, delayMs: 419_000, at: 1_000 });
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-a', 1));
+    assert.deepStrictEqual(retriesA, [{ attempt: 1, of: 5, busy: true, retryAt: 420_000 }]);
+    assert.deepStrictEqual(retriesB, [], 'only the turn it belongs to hears of it');
+    // The notification came first: the line that follows completes it.
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-b', 2));
+    assert.deepStrictEqual(retriesB, [{ attempt: 2, of: 5, busy: true }], 'told at once, without the length');
+    mock.setRetryWait({ attempt: 2, of: 5, delayMs: 60_000, at: Date.now() });
+    mock.emit(CODEX_RETRY_WAIT_EVENT, {});
+    assert.deepStrictEqual(retriesB[1], { attempt: 2, of: 5, busy: true, retryAt: (retriesB[1] as { retryAt: number }).retryAt });
+    assert.ok(typeof (retriesB[1] as { retryAt?: number }).retryAt === 'number', 'then again with the length');
+    // The turn's own failure (`willRetry: false`) is turn/completed's, not a retry.
+    mock.emit(CODEX_ERROR_EVENT, { ...notice('thread-a', 5), willRetry: false });
+    assert.strictEqual(retriesA.length, 1);
+    console.log('✓ Test 17: Codex retries reach their own turn, with the wait from the log');
+  }
+
+  console.log('\nAll 17 CodexRuntime tests passed!');
 }
 
 run().then(

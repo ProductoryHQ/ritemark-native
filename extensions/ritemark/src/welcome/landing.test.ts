@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { LANDING_MAX_AGE_MS, decideLanding, isLandingRecord, landingPlaceholder, type LandingRecord } from './landing';
+import { LANDING_MAX_AGE_MS, decideLanding, isLandingRecord, landingPlaceholder, whyNoLanding, type LandingRecord } from './landing';
 
 const folder = 'file:///Users/someone/Documents/Ritemark/Board%20report%202026';
 const now = 1_760_000_000_000;
@@ -34,5 +34,14 @@ assert.equal(isLandingRecord({ ...record, provider: null }), true, 'skipped: no 
 assert.equal(landingPlaceholder('claude'), 'Ask Claude about this project');
 assert.equal(landingPlaceholder('chatgpt'), 'Ask ChatGPT about this project');
 assert.equal(landingPlaceholder(null), null);
+
+// Sprint 143 (#551, R2, S7): why there is no landing, for the log.
+assert.equal(whyNoLanding({ stored: undefined, windowFolder: folder, now, welcomeFinishedAt: undefined }), null, 'an ordinary window says nothing');
+assert.equal(whyNoLanding({ stored: undefined, windowFolder: folder, now, welcomeFinishedAt: now - LANDING_MAX_AGE_MS - 1 }), null, 'nor one long after the welcome');
+assert.equal(whyNoLanding({ stored: undefined, windowFolder: folder, now, welcomeFinishedAt: now - 3_000 }), 'the welcome finished, but it left no landing record');
+assert.equal(whyNoLanding({ stored: { folder }, windowFolder: folder, now, welcomeFinishedAt: undefined }), 'the landing record could not be read');
+assert.equal(whyNoLanding({ stored: { ...record, at: now - LANDING_MAX_AGE_MS - 1 }, windowFolder: folder, now, welcomeFinishedAt: undefined }), 'the landing record is older than ten minutes');
+assert.equal(whyNoLanding({ stored: record, windowFolder: 'file:///elsewhere', now, welcomeFinishedAt: undefined }), 'the landing record is for another folder');
+assert.equal(whyNoLanding({ stored: record, windowFolder: folder, now, welcomeFinishedAt: undefined }), null, 'a good record lands');
 
 console.log('✓ landing tests passed');

@@ -66,6 +66,32 @@ export function decideLanding(input: {
   return { action: 'land', record };
 }
 
+/**
+ * Sprint 143 (#551, R2): why a window that may have come from the welcome has
+ * no landing, for the extension host's log; null when there is nothing to
+ * say. A missing record is said only when the welcome finished in the last
+ * ten minutes (an ordinary window logs nothing). Never a count.
+ */
+export function whyNoLanding(input: {
+  stored: unknown;
+  windowFolder: string | undefined;
+  now: number;
+  /** When the welcome last finished, epoch ms, if it did. */
+  welcomeFinishedAt: number | undefined;
+}): string | null {
+  if (input.stored === undefined) {
+    const finished = input.welcomeFinishedAt;
+    return finished !== undefined && input.now - finished >= 0 && input.now - finished <= LANDING_MAX_AGE_MS
+      ? 'the welcome finished, but it left no landing record'
+      : null;
+  }
+  if (!isLandingRecord(input.stored)) return 'the landing record could not be read';
+  const age = input.now - input.stored.at;
+  if (age < 0 || age > LANDING_MAX_AGE_MS) return 'the landing record is older than ten minutes';
+  if (input.windowFolder !== undefined && input.windowFolder !== input.stored.folder) return 'the landing record is for another folder';
+  return null;
+}
+
 /** "Ask Claude about this project" (R6): the AI the person signed in with, by its own name. */
 export function landingPlaceholder(provider: WelcomeProvider | null): string | null {
   switch (provider) {

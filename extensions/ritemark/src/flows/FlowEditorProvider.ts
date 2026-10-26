@@ -24,6 +24,7 @@ import {
   DEFAULT_MODELS
 } from '../ai/modelConfig';
 import * as modelCatalog from '../ai/modelCatalog';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -775,7 +776,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const options: vscode.OpenDialogOptions = {
       canSelectMany: false,
       openLabel: `Select ${label}`,
-      defaultUri: workspacePath ? vscode.Uri.file(workspacePath) : undefined,
+      // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+      defaultUri: vscode.Uri.file(pickerFolder([workspacePath])),
       filters: {
         'Documents': ['md', 'txt', 'json', 'csv', 'xml', 'html', 'pdf'],
         'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'],
@@ -808,7 +810,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       canSelectFolders: true,
       canSelectMany: false,
       openLabel: 'Select Folder',
-      defaultUri: workspacePath ? vscode.Uri.file(workspacePath) : undefined,
+      defaultUri: vscode.Uri.file(pickerFolder([workspacePath])),
     };
 
     const folderUri = await vscode.window.showOpenDialog(options);

@@ -39,6 +39,7 @@ import {
   writeInsightsDocumentExclusive,
 } from './speech/insightsMarkdown';
 import { normalizeSpeakerLabel } from './speech/speakerNames';
+import { pickerFolder } from './utils/dialogDefaults';
 import {
   parseTranscriptWorkbenchRequest,
   type InsightsDocumentResult,
@@ -431,7 +432,8 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
       canSelectFiles: false,
       canSelectFolders: true,
       canSelectMany: false,
-      defaultUri: vscode.Uri.file(defaultDir),
+      // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+      defaultUri: vscode.Uri.file(pickerFolder([defaultDir, path.dirname(fsPath)])),
       openLabel: 'Save here',
       title: `Save ${path.basename(fsPath)} transcript to…`,
     });

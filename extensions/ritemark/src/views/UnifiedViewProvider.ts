@@ -609,6 +609,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await this._sendCurrentAgentBootstrap();
           break;
 
+        case 'landing/dropped':
+          // Sprint 143 (#551, R2): the sheet gave up on the welcome's landing; the log says so, never a count.
+          console.warn(`[welcome] Landing dropped in the AI's sheet (${String(message.runtimeId)}): ${String(message.reason)}.`);
+          break;
+
         case 'conversation:selected':
           if (typeof message.conversationId === 'string') {
             this._selectedConversationId = message.conversationId;
@@ -1459,6 +1464,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             onRpcProgress: (_method, msg) => {
               if (!isCurrentRuntimeTurn()) return;
               this._view?.webview.postMessage({ type: 'codex-rpc-progress', conversationId, method: _method, message: msg });
+            },
+            // Sprint 143 (#544, R3a): the AI waits to try again; the sheet's status line counts it down.
+            onRuntimeRetry: (retry) => {
+              if (!isCurrentRuntimeTurn()) return;
+              this._view?.webview.postMessage({ type: 'codex-retry', conversationId, ...retry });
             },
             // Codex dynamic tools: Ritemark's tool groups, run in the extension
             // host, results sent back to Codex.
