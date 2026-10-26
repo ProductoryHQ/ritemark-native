@@ -123,7 +123,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 142, merge 1 (extension tier) | `sprint-142-polish` | [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560) | #557, #503, #504, #505, #516, #517, #535 | Open, not merged | Passed (technical), 27 Oct | Drafted in `sprint-142-polish/notes/release-notes.md`, applied at closeout |
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | — | #557 (File changes), #503 (the desk's edge), #508 | — | — | Drafted with merge 1's, in the same file |
 | Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
-| 143 | `sprint-143-fixes` | PR_LINK | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Open, not merged | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
+| 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Open, not merged | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist
