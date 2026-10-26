@@ -1146,6 +1146,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     <>
     <div
       ref={containerRef}
+      data-composer=""
       className={`relative px-3 py-2.5 ${
         // Sprint 74 R2: no separator stripe above a notch — the notch visually
         // belongs to the input card, so the container border-top is dropped

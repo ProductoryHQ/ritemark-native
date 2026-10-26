@@ -329,11 +329,11 @@ function Tile({
 function EmptyBoard({ ai }: { ai: string }) {
   const words = emptyTasksWords(ai)
   return (
-    <section className="tb-empty" aria-labelledby="tb-empty-title">
-      <span className="tb-empty-ic" aria-hidden="true"><Icon name="check-square" size={20} tone="inherit" /></span>
-      <h2 className="tb-empty-title" id="tb-empty-title">{words.title}</h2>
+    <section className="tb-emptyboard" aria-labelledby="tb-empty-title">
+      <span className="tb-emptyboard-ic" aria-hidden="true"><Icon name="check-square" size={20} tone="inherit" /></span>
+      <h2 className="tb-emptyboard-title" id="tb-empty-title">{words.title}</h2>
       <p>{words.sentence}</p>
-      <ul className="tb-empty-ways">
+      <ul className="tb-emptyboard-ways">
         {words.ways.map((way) => (
           <li key={way.words}><Icon name={way.glyph} size={16} tone="inherit" />{way.words}</li>
         ))}

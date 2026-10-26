@@ -14,7 +14,7 @@ import { Tooltip } from '../ui/tooltip'
 import { useAISidebarStore } from './store'
 import { startingPointsFor, startingSentence } from './startingPointWords'
 
-export function StartingPoints({ aiName, notice, onPicked }: { aiName: string; notice?: ReactNode; onPicked?: () => void }) {
+export function StartingPoints({ aiName, notice, onPicked, sentence = true }: { aiName: string; notice?: ReactNode; onPicked?: () => void; sentence?: boolean }) {
   const startingPlace = useAISidebarStore((s) => s.startingPlace)
   const composerEmpty = useAISidebarStore((s) => s.composerEmpty)
   const fillComposer = useAISidebarStore((s) => s.fillComposer)
@@ -23,7 +23,8 @@ export function StartingPoints({ aiName, notice, onPicked }: { aiName: string; n
     <div className="flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
       {notice && <div className="mb-4 text-left">{notice}</div>}
       <h2 className="m-0 text-center text-[17px] font-semibold leading-6 text-[var(--r-ink-strong)]">What shall we work on?</h2>
-      <p className="m-0 mt-2 text-center text-[13px] leading-5 text-[var(--r-ink-muted)]">{startingSentence(aiName)}</p>
+      {/* The conversations panel draws the heading and the points only (experience 29, frame 3) */}
+      {sentence && <p className="m-0 mt-2 text-center text-[13px] leading-5 text-[var(--r-ink-muted)]">{startingSentence(aiName)}</p>}
       {points.length > 0 && (
         <ul
           className="m-0 mt-4 grid list-none gap-2 p-0"
