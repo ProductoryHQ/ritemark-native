@@ -18,12 +18,14 @@
  *        touch — types one character and deletes it again ("open and save" in scenarios.md);
  *        word  — types " EDITED";
  *        none  — opens only;
- *   3. waits for auto-save, and reads the file's bytes; with --saves 2 it does the edit and the save again;
+ *   3. waits for auto-save, and reads the file's bytes; with --saves 2 it saves again: the edit again in touch
+ *      mode, a touch after the word in word mode;
  *   4. closes the editor (with --keep-open, leaves the last file's editor open).
  *
  * With --out, every file's bytes after each save are written there (`<name>.save1.md`, …) beside the original
  * (`<name>.orig.md`). The check prints, per file and save, whether the bytes are the original's, and with
- * --expect word whether exactly one line changed. The exit code is the number of files that did not meet --expect
+ * --expect word whether the first save changed exactly one line, by the word, and every later save wrote the
+ * first save's bytes again. The exit code is the number of files that did not meet --expect
  * (default: none expected, report only).
  *
  * With --observe, the check also watches the document's bar for that many seconds after opening and after each
@@ -377,7 +379,7 @@ for (const relativePath of files) {
 			writeFileSync(join(outDir, `${name}.save${save}.cat-A.txt`), visible(bytes));
 		}
 		const { removed, added } = changedLines(original, bytes);
-		results.push({ save, written, same: bytes === original, removed, added });
+		results.push({ save, written, same: bytes === original, removed, added, bytes });
 		previous = bytes;
 		if (observeSeconds) {
 			barSeen.push(...(await observeBar(editor, observeSeconds)).map(entry => ({ ...entry, after: `save ${save}` })));
@@ -423,7 +425,8 @@ for (const relativePath of files) {
 		// (`*text EDITED*`), as typing there does.
 		ok = first.removed.length === 1 && first.added.length === 1 && first.added[0].includes(' EDITED')
 			&& first.added[0].replace(' EDITED', '') === first.removed[0]
-			&& rest.every(result => changedLines(original, readFileSync(path, 'utf8')).added.length === 1);
+			// Each later save is a touch (a character typed and deleted): it must write exactly the first save's bytes.
+			&& rest.every(result => result.bytes === first.bytes);
 	}
 	if (hidden) {
 		console.log(`${relativePath} hidden update: editor shows the new text: ${hidden.shows ? 'yes' : 'NO'}; frames held back: ${hidden.frames}; bar: ${hidden.seen.length ? hidden.seen.map(entry => `"${entry.label}" after ${entry.atSeconds}s`).join('; ') : 'no question, no retry'}`);
